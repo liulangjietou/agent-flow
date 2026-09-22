@@ -10,6 +10,7 @@ import org.flowable.task.api.Task;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,7 +55,9 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         variables.put("applicationId", command.applicationId().toString());
         variables.put("businessNo", command.businessNo());
         variables.put("roundNo", command.roundNo());
-        variables.put("formData", command.payload() == null ? Map.of() : Map.copyOf(command.payload()));
+        // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
+        variables.put("formData", command.payload() == null ? Map.of()
+                : Collections.unmodifiableMap(new HashMap<>(command.payload())));
         org.flowable.engine.runtime.ProcessInstance instance = runtimeService
                 .createProcessInstanceBuilder().processDefinitionId(definition.getId())
                 .businessKey(command.businessNo()).tenantId(command.tenantId()).variables(variables).start();

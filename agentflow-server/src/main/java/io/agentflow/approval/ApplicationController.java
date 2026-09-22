@@ -3,6 +3,7 @@ package io.agentflow.approval;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,6 +45,18 @@ public class ApplicationController {
         return ApplicationResponse.from(facade.get(id));
     }
 
+    /** 修改草稿或退回后的申请内容，不改变绑定定义与历史轮次。 */
+    @PutMapping("/{id}")
+    public ApplicationResponse revise(@PathVariable UUID id, @Valid @RequestBody ReviseApplicationRequest request) {
+        return ApplicationResponse.from(facade.revise(id, request.expectedVersion(), request.title(), request.payload()));
+    }
+
+    /** 查询有权访问的申请的全部提交轮次。 */
+    @GetMapping("/{id}/rounds")
+    public List<SubmissionRoundResponse> rounds(@PathVariable UUID id) {
+        return facade.rounds(id).stream().map(SubmissionRoundResponse::from).toList();
+    }
+
     /** 提交申请。 */
     @PostMapping("/{id}/submit")
     public ApplicationResponse submit(@PathVariable UUID id, @Valid @RequestBody SubmitApplicationRequest request) {
@@ -62,4 +75,11 @@ public class ApplicationController {
      * @author owlzhangfq@gmail.com
      */
     public record SubmitApplicationRequest(@NotNull Long expectedVersion) { }
+
+    /**
+     * 申请补正请求；业务号、流程标识与定义版本不属于可修改字段。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ReviseApplicationRequest(@NotNull Long expectedVersion, @NotBlank @Size(max = 256) String title,
+                                           @NotNull Map<String, Object> payload) { }
 }

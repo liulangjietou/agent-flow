@@ -130,7 +130,10 @@ public final class DefinitionModels {
      * @author owlzhangfq@gmail.com
      */
     public record EvaluationContext(Map<String, Object> values) {
-        public EvaluationContext { values = values == null ? Map.of() : Map.copyOf(values); }
+        public EvaluationContext {
+            // 未填写或已清空的表单值仍参与 EXISTS/NOT_EXISTS 判断，不能在构造上下文时拒绝 null。
+            values = values == null ? Map.of() : Collections.unmodifiableMap(new HashMap<>(values));
+        }
         /** 读取白名单字段。 */
         public Object value(String name) { return values.get(name); }
     }

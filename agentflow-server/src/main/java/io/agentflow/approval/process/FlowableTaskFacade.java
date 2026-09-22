@@ -1,7 +1,9 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.approval.service.TaskAuditPort;
 import io.agentflow.common.Actor;
@@ -12,6 +14,7 @@ import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -27,16 +30,18 @@ public class FlowableTaskFacade {
     private final ApplicationRepository applicationRepository;
     private final ProcessRuntimePort processRuntime;
     private final TaskAuditPort auditPort;
+    private final SubmissionRoundRepository rounds;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
                               ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
-                              TaskAuditPort auditPort) {
+                              TaskAuditPort auditPort, SubmissionRoundRepository rounds) {
         this.taskService = taskService;
         this.currentActor = currentActor;
         this.applicationRepository = applicationRepository;
         this.processRuntime = processRuntime;
         this.auditPort = auditPort;
+        this.rounds = rounds;
     }
 
     /** 只返回当前主体可领取或已指派给自己的待办。 */
@@ -114,6 +119,7 @@ public class FlowableTaskFacade {
                 processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
                         actor.tenantId(), task.getProcessInstanceId(), normalized + " by " + actor.userId()));
                 applicationRepository.update(application, expectedVersion);
+                completeRound(task, application, actor, comment);
                 auditEventId = audit(task, application, actor, normalized, comment);
             }
             case "APPROVE" -> {
@@ -123,6 +129,7 @@ public class FlowableTaskFacade {
                         new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized, comment));
                 if (completed.processEnded()) {
                     application.approve(application.version());
+                    completeRound(task, application, actor, comment);
                 }
                 applicationRepository.update(application, expectedVersion);
                 auditEventId = audit(task, application, actor, normalized, comment);
@@ -137,6 +144,11 @@ public class FlowableTaskFacade {
         if (task.getAssignee() == null) {
             taskService.claim(task.getId(), actor.userId());
         }
+    }
+
+    private void completeRound(Task task, Application application, Actor actor, String reason) {
+        rounds.complete(actor.tenantId(), application.id(), application.roundNo(), task.getProcessInstanceId(),
+                SubmissionRound.Status.valueOf(application.status().name()), reason, actor.userId(), Instant.now());
     }
 
     private Application applicationFor(Actor actor, Task task) {

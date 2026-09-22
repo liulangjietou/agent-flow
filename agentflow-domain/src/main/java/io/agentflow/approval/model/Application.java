@@ -2,6 +2,8 @@ package io.agentflow.approval.model;
 
 import io.agentflow.common.DomainException;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -50,7 +52,7 @@ public final class Application {
         this.definitionVersion = definitionVersion;
         this.createdBy = require(createdBy, "createdBy");
         this.title = require(title, "title");
-        this.payload = payload == null ? Map.of() : Map.copyOf(payload);
+        this.payload = copyPayload(payload);
         this.status = Objects.requireNonNull(status);
         this.roundNo = roundNo;
         this.version = version;
@@ -67,6 +69,18 @@ public final class Application {
             roundNo++;
         }
         status = ApplicationStatus.IN_APPROVAL;
+        version++;
+    }
+
+    /** 补正可编辑申请；提交时才递增轮次，原业务标识和定义版本保持不变。 */
+    public void revise(long expectedVersion, String title, Map<String, Object> payload) {
+        checkVersion(expectedVersion);
+        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
+                && status != ApplicationStatus.WITHDRAWN) {
+            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
+        }
+        this.title = require(title, "title");
+        this.payload = copyPayload(payload);
         version++;
     }
 
@@ -128,6 +142,11 @@ public final class Application {
             throw new DomainException("INVALID_APPLICATION", field + " is required");
         }
         return value.trim();
+    }
+
+    /** 可选表单字段显式设为 null 表示清空，复制时必须保留该键和值。 */
+    private static Map<String, Object> copyPayload(Map<String, Object> payload) {
+        return payload == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(payload));
     }
 
     public UUID id() { return id; }

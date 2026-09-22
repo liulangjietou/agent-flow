@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import ApplicationRecord from './components/ApplicationRecord.vue'
 import { api, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task } from './api'
 
 type Page = 'workbench' | 'designer' | 'applications' | 'expense'
@@ -36,6 +37,7 @@ const savedSnapshot = ref('')
 const validationMessage = ref('尚未校验，发布前将运行服务端校验。')
 const validationErrors = ref<string[]>([])
 const newApplicationOpen = ref(false)
+const recordApplicationId = ref('')
 const applicationDefinitionId = ref('')
 const applicationTitle = ref('')
 const applicationBusinessNo = ref('')
@@ -143,6 +145,7 @@ async function login() {
 async function logout() {
   try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
   localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; tasks.value = []; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+  recordApplicationId.value = ''
 }
 async function selectTask(task: Task) {
   activeTask.value = task; activeApplication.value = null; detailError.value = ''; taskTab.value = 'detail'; pendingAction.value = null; actionComment.value = ''; targetUser.value = ''
@@ -256,10 +259,6 @@ async function createAndSubmitApplication() {
   } catch (error) { notice.value = `${errorMessage(error)}${createdApplication.value ? '；草稿已保留，可重试提交。' : ''}` }
   finally { busy.value = false }
 }
-async function submitExisting(application: Application) {
-  if (busy.value) return; busy.value = true
-  try { const submitted = await api.submitApplication(application.id, application.version); await refreshWorkspace(); notice.value = `${submitted.businessNo} 已提交` } catch (error) { notice.value = errorMessage(error) } finally { busy.value = false }
-}
 watch([nodes, edges, definitionName], () => { validationErrors.value = []; validationMessage.value = '内容已修改，请重新校验。' }, { deep: true, flush: 'sync' })
 defaultGraph(); savedSnapshot.value = snapshot()
 onMounted(async () => {
@@ -318,7 +317,7 @@ onMounted(async () => {
                   <p v-else class="unavailable">正在加载申请详情…</p>
                   <div class="agent-note"><span>✦</span><div><strong>Agent 证据尚未接入</strong><p>当前审批请以申请内容及线下核实结果为依据。</p></div></div>
                 </div>
-                <div v-else-if="taskTab === 'timeline'" class="timeline-full"><p class="unavailable">完整审批时间线尚未接入。当前任务创建时间：{{ dateLabel(activeTask.createdAt) }}。</p></div>
+                <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><p class="unavailable">可查看各轮提交内容及最终处理意见。完整节点轨迹尚未接入；当前任务创建于 {{ dateLabel(activeTask.createdAt) }}。</p></div>
                 <div v-else class="audit-list"><p>审计查询尚未接入。</p><code>当前任务版本：{{ activeTask.version }}</code><code>任务标识：{{ activeTask.taskId }}</code></div>
                 <form v-if="pendingAction" class="task-action-form" @submit.prevent="performAction(pendingAction)">
                   <h4>{{ pendingAction === 'RETURN' ? '退回申请' : '转交任务' }}</h4>
@@ -334,7 +333,7 @@ onMounted(async () => {
         </section>
         <section v-else-if="page === 'applications'" class="content">
           <div class="page-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>申请记录</h2><p class="subhead">服务端按发起人、参与者与管理员权限返回申请。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
-          <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }}</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button v-if="application.createdBy === username && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status)" class="secondary" :disabled="busy" @click="submitExisting(application)">提交申请</button></div></div>
+          <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }} · 第 {{ application.roundNo }} 轮</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button class="secondary" :disabled="busy" @click="recordApplicationId = application.id">{{ application.createdBy === actor?.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status) ? '查看并修改' : '查看详情' }}</button></div></div>
         </section>
         <section v-else-if="page === 'designer'" class="designer-page">
           <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div><div class="designer-actions"><button class="secondary" :disabled="busy || !history.length || readonlyDefinition" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="busy || !future.length || readonlyDefinition" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy" @click="validate">校验流程</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy" @click="publishDraft">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
@@ -357,6 +356,7 @@ onMounted(async () => {
         </section>
         <section v-else class="content expense-page"><div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">报销领域正在接入，当前可使用通用表单验证审批流程。</p></div><button class="primary" @click="openApplicationForm">＋ 发起表单审批</button></div><div class="expense-cards"><article v-for="item in [{ title: '报销填报', detail: '发票、费用明细和借款冲销尚未接入。' }, { title: '财务审核', detail: '费用标准、预算校验和核减尚未接入。' }, { title: '出纳付款', detail: '付款授权、银行回执和对账尚未接入。' }]" :key="item.title"><span class="card-kicker">{{ item.title }}</span><strong>待接入</strong><p>{{ item.detail }}</p></article></div><div class="panel queue-empty"><strong>暂无报销领域数据</strong><p>通用审批申请可在“申请记录”中查看；此处不展示演示单据或虚构金额。</p></div></section>
       </main>
+      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId" :application-id="recordApplicationId" :user-id="actor.userId" @close="recordApplicationId = ''" @changed="refreshWorkspace()" />
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title"><div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div><p v-if="!publishedDefinitions.length" class="unavailable">当前没有已发布流程，请先由流程管理员创建并发布。</p><form @submit.prevent="createAndSubmitApplication"><fieldset :disabled="busy || !!createdApplication"><label>已发布流程<select v-model="applicationDefinitionId" required><option value="">请选择流程</option><option v-for="definition in publishedDefinitions" :key="definition.id" :value="definition.id">{{ definition.name }} · v{{ definition.version }} · {{ definition.key }}</option></select></label><label>申请标题<input v-model="applicationTitle" required maxlength="200" /></label><label>业务单号<input v-model="applicationBusinessNo" required /></label><label>申请金额<input v-model="applicationAmount" type="number" min="0" step="0.01" required /></label><label>申请说明<textarea v-model="applicationDescription" rows="3" /></label></fieldset><p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿。</p><div class="form-actions"><button type="button" class="secondary" :disabled="busy" @click="newApplicationOpen = false">关闭</button><button class="primary" :disabled="busy || !publishedDefinitions.length">{{ busy ? '提交中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div></form></section></div>
     </template>
   </div>

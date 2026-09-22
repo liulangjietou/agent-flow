@@ -1,7 +1,9 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.service.ApprovalApplicationService;
 import io.agentflow.approval.service.ApplicationParticipantPort;
 import io.agentflow.approval.service.ProcessRuntimePort;
@@ -25,14 +27,17 @@ public class ApprovalApplicationFacade {
     private final CurrentActor currentActor;
     private final ApprovalApplicationService service;
     private final ApplicationParticipantPort participantPort;
+    private final SubmissionRoundRepository rounds;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
-                                     CurrentActor currentActor, ApplicationParticipantPort participantPort) {
+                                     CurrentActor currentActor, ApplicationParticipantPort participantPort,
+                                     SubmissionRoundRepository rounds) {
         this.repository = repository;
         this.currentActor = currentActor;
-        this.service = new ApprovalApplicationService(repository, processRuntime);
+        this.service = new ApprovalApplicationService(repository, processRuntime, rounds);
         this.participantPort = participantPort;
+        this.rounds = rounds;
     }
 
     /** 创建申请草稿。 */
@@ -47,11 +52,22 @@ public class ApprovalApplicationFacade {
     @Transactional
     public Application submit(UUID id, long expectedVersion) {
         Actor actor = currentActor.actor();
-        Application existing = service.get(actor.tenantId(), id);
-        if (!existing.createdBy().equals(actor.userId())) {
-            throw new DomainException("FORBIDDEN", "Only the applicant can submit this application");
-        }
-        return service.submit(actor.tenantId(), id, expectedVersion);
+        requireApplicant(actor, id);
+        return service.submit(actor.tenantId(), id, expectedVersion, actor.userId());
+    }
+
+    /** 只有发起人可以补正内容，补正及版本更新处于同一事务。 */
+    @Transactional
+    public Application revise(UUID id, long expectedVersion, String title, Map<String, Object> payload) {
+        Actor actor = currentActor.actor();
+        requireApplicant(actor, id);
+        return service.revise(actor.tenantId(), id, expectedVersion, title, payload);
+    }
+
+    /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */
+    public List<SubmissionRound> rounds(UUID id) {
+        Application application = get(id);
+        return rounds.findAll(application.tenantId(), application.id());
     }
 
     /** 获取申请。 */
@@ -75,5 +91,12 @@ public class ApprovalApplicationFacade {
             return true;
         }
         return participantPort.isParticipant(actor.tenantId(), application.id(), actor);
+    }
+
+    private void requireApplicant(Actor actor, UUID id) {
+        Application application = service.get(actor.tenantId(), id);
+        if (!application.createdBy().equals(actor.userId())) {
+            throw new DomainException("FORBIDDEN", "Only the applicant can revise or submit this application");
+        }
     }
 }

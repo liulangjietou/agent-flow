@@ -8,6 +8,7 @@ export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
 export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph }
 export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; status: string; roundNo: number; version: number }
+export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
@@ -32,6 +33,8 @@ export const api = {
   taskAction: (taskId: string, body: { action: string; comment?: string; targetUser?: string; expectedVersion: number }) => request<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, { method: 'POST', body: JSON.stringify(body) }),
   applications: () => request<Application[]>('/applications'),
   application: (id: string) => request<Application>(`/applications/${encodeURIComponent(id)}`),
+  updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => request<Application>(`/applications/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  applicationRounds: (id: string) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`),
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => request<Application>('/applications', { method: 'POST', body: JSON.stringify(body) }),
   submitApplication: (id: string, expectedVersion: number) => request<Application>(`/applications/${encodeURIComponent(id)}/submit`, { method: 'POST', body: JSON.stringify({ expectedVersion }) }),
   definitions: () => request<Definition[]>('/process-definitions'),

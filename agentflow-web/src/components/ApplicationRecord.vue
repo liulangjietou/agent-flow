@@ -1,0 +1,169 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { api, type ApiError, type Application, type SubmissionRound } from '../api'
+
+const props = defineProps<{ applicationId: string; userId: string }>()
+const emit = defineEmits<{ close: []; changed: [] }>()
+const dialog = ref<HTMLElement | null>(null)
+const application = ref<Application | null>(null)
+const rounds = ref<SubmissionRound[]>([])
+const title = ref('')
+const amount = ref('')
+const description = ref('')
+const loading = ref(true)
+const saving = ref(false)
+const error = ref('')
+const notice = ref('')
+const initialFields = ref('')
+let returnFocus: HTMLElement | null = null
+const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
+const canEdit = computed(() => application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
+const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
+const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
+const extraFields = computed(() => Object.entries(application.value?.payload ?? {}).filter(([key]) => !['amount', 'description'].includes(key)))
+const stateLabel = (status: string) => statusLabels[status] ?? status
+const valueLabel = (value: unknown) => typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '—')
+const fieldLabel = (key: string) => key === 'amount' ? '申请金额' : key === 'description' ? '申请说明' : key
+const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
+
+function fieldsSnapshot() { return JSON.stringify([title.value, amount.value, description.value]) }
+function showError(cause: unknown) {
+  const failure = cause as ApiError
+  error.value = failure.status === 409
+    ? '申请已被更新。请重新加载最新内容，核对后再操作。'
+    : failure.message ?? '请求未完成，请重试。'
+}
+function setApplication(value: Application) {
+  application.value = value
+  title.value = value.title
+  amount.value = value.payload.amount == null ? '' : String(value.payload.amount)
+  description.value = value.payload.description == null ? '' : String(value.payload.description)
+  initialFields.value = fieldsSnapshot()
+}
+async function load() {
+  loading.value = true; error.value = ''; notice.value = ''
+  try {
+    const [value, history] = await Promise.all([api.application(props.applicationId), api.applicationRounds(props.applicationId)])
+    setApplication(value); rounds.value = [...history].sort((a, b) => b.roundNo - a.roundNo)
+  } catch (cause) { showError(cause) }
+  finally { loading.value = false }
+}
+function editPayload(): Record<string, unknown> {
+  // 固定表单仅编辑已展示字段，保留其他业务字段，不覆盖历史轮次内容。
+  const original = application.value!.payload
+  const payload = { ...original }
+  if (description.value !== String(original.description ?? '')) payload.description = description.value.trim()
+  if (amount.value !== '' && String(amount.value) !== String(original.amount ?? '')) payload.amount = Number(amount.value)
+  return payload
+}
+function validate() {
+  if (!title.value.trim()) { error.value = '请填写申请标题。'; return false }
+  if ((amount.value === '' && application.value?.payload.amount != null) || (amount.value !== '' && (!Number.isFinite(Number(amount.value)) || Number(amount.value) < 0))) {
+    error.value = '请输入不小于零的申请金额。'; return false
+  }
+  return true
+}
+async function saveChanges() {
+  if (!application.value || !dirty.value) return
+  setApplication(await api.updateApplication(application.value.id, {
+    expectedVersion: application.value.version, title: title.value.trim(), payload: editPayload()
+  }))
+  emit('changed')
+}
+async function save(submit = false) {
+  if (!canEdit.value || saving.value || loading.value) return
+  error.value = ''; notice.value = ''
+  if (!validate()) return
+  saving.value = true
+  try {
+    await saveChanges()
+    if (submit) {
+      const value = application.value!
+      setApplication(await api.submitApplication(value.id, value.version))
+      emit('changed')
+      notice.value = `已提交第 ${application.value!.roundNo} 轮审批。`
+      rounds.value = (await api.applicationRounds(value.id)).sort((a, b) => b.roundNo - a.roundNo)
+    } else notice.value = '修改已保存，尚未提交审批。'
+  } catch (cause) { showError(cause) }
+  finally { saving.value = false }
+}
+function close() {
+  if (!saving.value && !dirty.value) emit('close')
+}
+function trapFocus(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); close(); return }
+  if (event.key !== 'Tab' || !dialog.value) return
+  const controls = [...dialog.value.querySelectorAll<HTMLElement>('button, input, select, textarea, summary, [tabindex="0"]')]
+    .filter(element => !element.hasAttribute('disabled') && !element.closest('fieldset:disabled') && element.getClientRects().length > 0)
+  const first = controls[0]; const last = controls[controls.length - 1]
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.value)) { event.preventDefault(); last?.focus() }
+  else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog.value)) { event.preventDefault(); first?.focus() }
+}
+onMounted(async () => {
+  returnFocus = document.activeElement as HTMLElement | null
+  await nextTick(); dialog.value?.focus(); await load()
+})
+onUnmounted(() => returnFocus?.focus())
+</script>
+
+<template>
+  <div class="modal-backdrop" @click.self="close">
+    <section ref="dialog" class="modal application-record" role="dialog" aria-modal="true" aria-labelledby="record-title" tabindex="-1" @keydown="trapFocus">
+      <div class="modal-heading">
+        <div><p class="eyebrow">APPLICATION RECORD</p><h2 id="record-title">申请详情与轮次</h2></div>
+        <button aria-label="关闭申请详情" :disabled="saving || dirty" @click="close">×</button>
+      </div>
+      <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
+      <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
+      <p v-if="loading" class="unavailable" role="status">正在加载申请与提交记录…</p>
+      <template v-else-if="application">
+        <div class="record-meta"><span class="status-chip">{{ stateLabel(application.status) }}</span><span>第 {{ application.roundNo }} 轮</span><span>{{ application.businessNo }}</span></div>
+        <p class="record-binding">{{ application.processKey }} · v{{ application.definitionVersion }} · 申请人 {{ application.createdBy }}</p>
+        <div v-if="application.status === 'RETURNED'" class="return-context">
+          <strong>退回原因</strong><p>{{ currentRound?.reason || '本轮暂无可用的退回原因记录，请联系审批人核实。' }}</p>
+          <small v-if="currentRound?.completedBy">{{ currentRound.completedBy }}<template v-if="currentRound.completedAt"> · {{ timeLabel(currentRound.completedAt) }}</template></small>
+          <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
+        </div>
+        <form v-if="canEdit" @submit.prevent="save(true)">
+          <fieldset :disabled="saving">
+            <label>申请标题<input v-model="title" required maxlength="256" /></label>
+            <div class="record-fields"><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label></div>
+            <label>申请说明<textarea v-model="description" rows="3" /></label>
+          </fieldset>
+          <dl v-if="extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
+          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || !dirty" @click="save()">保存修改</button><button class="primary" :disabled="saving">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
+        </form>
+        <template v-else><h3 class="record-section-title">{{ application.title }}</h3><dl class="payload-list"><template v-for="(value, key) in application.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
+        <section class="round-history" aria-label="提交轮次记录">
+          <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
+          <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
+          <details v-for="round in rounds" :key="round.roundNo" class="round-card">
+            <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
+            <div class="round-content"><h4>{{ round.title }}</h4><dl class="payload-list"><template v-for="(value, key) in round.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
+          </details>
+        </section>
+      </template>
+      <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="saving || dirty" @click="close">关闭</button></div>
+    </section>
+  </div>
+</template>
+
+<style scoped>
+.application-record{width:min(760px,100%)}
+.form-actions{flex-wrap:wrap}
+.record-meta{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:12px}
+.record-binding{color:var(--muted);font-size:11px;overflow-wrap:anywhere;margin:12px 0 22px}
+.record-alert,.record-notice{border-radius:9px;padding:12px 15px;font-size:12px;line-height:1.7}
+.record-alert{color:var(--red);background:#fff0ed}.record-notice{color:var(--deep);background:var(--soft)}
+.return-context{border-left:3px solid var(--red);background:#fff7f5;padding:14px 17px;margin-bottom:24px;font-size:12px;line-height:1.7}
+.return-context p,.round-reason p{white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0}.return-context small{color:var(--muted)}
+.record-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}.record-fields input:disabled{color:var(--muted)}
+.record-actions{display:flex;align-items:center;gap:10px;margin:22px 0 28px}.record-actions>span{font-size:11px;color:var(--muted);margin-right:auto}
+.record-section-title{font-size:17px;margin-top:22px}.round-history{border-top:1px solid var(--line);padding-top:24px;margin-top:24px}
+.record-history-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.record-history-heading h3{margin:0;font-size:16px}.record-history-heading>span{font-size:11px;color:var(--muted)}
+.round-card{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}.round-card summary{display:flex;align-items:center;gap:12px;padding:15px;cursor:pointer;list-style:none}.round-card summary::-webkit-details-marker{display:none}.round-card summary::after{content:'＋';color:var(--muted)}.round-card[open] summary::after{content:'−'}
+.round-index{width:30px;height:30px;flex-shrink:0;display:grid;place-items:center;border-radius:9px;background:var(--soft);color:var(--deep);font:12px 'DM Mono',monospace}.round-summary{display:grid;gap:5px}.round-summary strong{font-size:12px}.round-summary small,.round-version{font-size:10px;color:var(--muted)}.round-version{margin-left:auto;font-family:'DM Mono',monospace}
+.round-content{padding:0 18px 18px;border-top:1px solid var(--line)}.round-content h4{font-size:13px}.round-reason{font-size:12px;padding:12px;background:var(--paper);border-radius:8px}.round-footnote{font-size:10px;color:var(--muted)}
+textarea:focus-visible,summary:focus-visible{outline:3px solid rgba(33,173,159,.35);outline-offset:2px}
+@media(max-width:650px){.record-fields{grid-template-columns:1fr;gap:0}.record-actions{flex-wrap:wrap}.record-actions>span{width:100%}.record-actions .primary{flex:1}.round-card summary{gap:9px;padding:13px 10px}.round-content{padding:0 12px 15px}}
+</style>
