@@ -14,7 +14,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** PostgreSQL/H2 兼容的申请聚合仓储实现，所有查询均带租户条件。 */
+/**
+ * PostgreSQL/H2 兼容的申请聚合仓储实现，所有查询均带租户条件。
+ * @author owlzhangfq@gmail.com
+ */
 @Repository
 public class JdbcApplicationRepository implements ApplicationRepository {
     private final JdbcTemplate jdbcTemplate;

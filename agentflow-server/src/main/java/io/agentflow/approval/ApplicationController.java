@@ -10,7 +10,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 审批申请 REST 接口。 */
+/**
+ * 审批申请 REST 接口。
+ * @author owlzhangfq@gmail.com
+ */
 @RestController
 @RequestMapping("/api/v1/applications")
 public class ApplicationController {
@@ -47,10 +50,16 @@ public class ApplicationController {
         return ApplicationResponse.from(facade.submit(id, request.expectedVersion()));
     }
 
-    /** 创建申请请求。 */
+    /**
+     * 创建申请请求。
+     * @author owlzhangfq@gmail.com
+     */
     public record CreateApplicationRequest(@NotBlank String businessNo, @NotBlank String processKey,
                                            @NotNull Long definitionVersion, @NotBlank String title,
                                            Map<String, Object> payload) { }
-    /** 提交申请请求。 */
+    /**
+     * 提交申请请求。
+     * @author owlzhangfq@gmail.com
+     */
     public record SubmitApplicationRequest(@NotNull Long expectedVersion) { }
 }

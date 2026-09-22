@@ -3,7 +3,10 @@ package io.agentflow;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-/** AgentFlow 审批平台启动入口。 */
+/**
+ * AgentFlow 审批平台启动入口。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootApplication
 public class AgentflowApplication {
     /** 启动 Spring Boot 应用。 */

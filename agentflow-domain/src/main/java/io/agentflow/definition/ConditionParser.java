@@ -7,7 +7,10 @@ import java.util.List;
 
 import static io.agentflow.definition.DefinitionModels.*;
 
-/** 解析受限条件语法；不执行任意表达式、JUEL、脚本或 Java 代码。 */
+/**
+ * 解析受限条件语法；不执行任意表达式、JUEL、脚本或 Java 代码。
+ * @author owlzhangfq@gmail.com
+ */
 public final class ConditionParser {
     /** 解析条件。语法：field op literal，可用 AND/OR 组合。 */
     public ConditionAst parse(String source) {

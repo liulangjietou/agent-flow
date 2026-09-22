@@ -6,7 +6,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/** 审批申请聚合，维护申请轮次和审批生命周期不变量。 */
+/**
+ * 审批申请聚合，维护申请轮次和审批生命周期不变量。
+ * @author owlzhangfq@gmail.com
+ */
 public final class Application {
     private final UUID id;
     private final String tenantId;

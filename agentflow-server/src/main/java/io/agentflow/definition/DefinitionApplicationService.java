@@ -10,7 +10,10 @@ import java.util.UUID;
 import static io.agentflow.definition.DefinitionModels.DefinitionDraft;
 import static io.agentflow.definition.DefinitionModels.Graph;
 
-/** 流程定义用例服务，编排校验、并发控制和草稿生命周期。 */
+/**
+ * 流程定义用例服务，编排校验、并发控制和草稿生命周期。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class DefinitionApplicationService {
     private final DefinitionDraftRepository repository;
@@ -46,12 +49,12 @@ public class DefinitionApplicationService {
         return repository.save(draft);
     }
 
-    /** 发布草稿，版本从零开始递增。 */
+    /** 分配业务版本并部署；仓储写入和引擎发布在同一事务内成功或回滚。 */
     @Transactional
     public DefinitionDraft publish(String tenantId, UUID id, long expectedRevision) {
         DefinitionDraft draft = get(tenantId, id);
         requireValid(draft.graph());
-        draft.publish(expectedRevision);
+        draft.publish(expectedRevision, repository.nextVersion(tenantId, draft.key()));
         DefinitionDraft published = repository.save(draft);
         deploymentPort.deploy(published);
         return published;

@@ -13,6 +13,7 @@ import static io.agentflow.definition.DefinitionModels.EvaluationContext;
 /**
  * Flowable 条件表达式唯一允许调用的固定 Bean。表达式参数是 Base64 编码的受限条件文本，
  * 运行时仍由领域 ConditionParser 解析，用户文本不会被当成 JUEL 语法执行。
+ * @author owlzhangfq@gmail.com
  */
 @Component("flowableConditionEvaluator")
 public class FlowableConditionEvaluator {

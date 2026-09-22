@@ -8,6 +8,7 @@ import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
+import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -31,7 +32,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 通过真实引擎和 HTTP 链路验证认证、资源隔离与审批终止语义。 */
+/**
+ * 通过真实引擎和 HTTP 链路验证认证、资源隔离与审批终止语义。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:approval-security;DB_CLOSE_DELAY=-1",
         "agentflow.auth.demo-enabled=true", "agentflow.auth.demo-tenant=demo"
@@ -47,6 +51,7 @@ class ApprovalSecurityTest {
     @Autowired RepositoryService definitions;
     @Autowired RuntimeService runtime;
     @Autowired TaskService tasks;
+    @Autowired HistoryService history;
     @Autowired JdbcTemplate jdbc;
 
     @Test
@@ -60,6 +65,13 @@ class ApprovalSecurityTest {
     void invalidTokenReturnsStructured401AndClearsContext() throws Exception {
         mvc.perform(get("/api/v1/applications").header("Authorization", "Bearer invalid"))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    void rejectsUnsupportedTaskStatusInsteadOfReturningActiveTasks() throws Exception {
+        mvc.perform(get("/api/v1/tasks?status=completed").header("Authorization", token("finance")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -115,6 +127,33 @@ class ApprovalSecurityTest {
                 .isEqualTo(action.equals("RETURN") ? "RETURNED" : "REJECTED");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE aggregate_id=?", Integer.class,
                 taskId)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"APPROVE", "RETURN", "REJECT"})
+    void candidateDecisionKeepsTheActualApproverAsAnApplicationParticipant(String decision) throws Exception {
+        Application application = submitted("demo");
+        String taskId = task(application);
+        assertThat(tasks.createTaskQuery().taskId(taskId).singleResult().getAssignee()).isNull();
+        mvc.perform(get("/api/v1/applications/" + application.id()).header("Authorization", token("finance")))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/tasks/" + taskId + "/actions").header("Authorization", token("finance"))
+                        .contentType(MediaType.APPLICATION_JSON).content(action(decision, 2)))
+                .andExpect(status().isOk());
+
+        assertThat(history.createHistoricTaskInstanceQuery().taskId(taskId).singleResult().getAssignee())
+                .isEqualTo("finance");
+        mvc.perform(get("/api/v1/applications/" + application.id()).header("Authorization", token("finance")))
+                .andExpect(status().isOk()).andExpect(jsonPath("id").value(application.id().toString()));
+        mvc.perform(get("/api/v1/applications").header("Authorization", token("finance")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '" + application.id() + "')]").isNotEmpty());
+        mvc.perform(get("/api/v1/applications/" + application.id()).header("Authorization", token("bob")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/applications").header("Authorization", token("bob")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '" + application.id() + "')]").isEmpty());
     }
 
     @Test

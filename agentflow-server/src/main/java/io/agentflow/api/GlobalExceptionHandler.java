@@ -10,7 +10,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.util.Map;
 import java.util.UUID;
 
-/** 将领域错误转换为稳定的 API 错误契约。 */
+/**
+ * 将领域错误转换为稳定的 API 错误契约。
+ * @author owlzhangfq@gmail.com
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     /** 处理请求体字段校验错误，统一返回 400 契约。 */
@@ -33,7 +36,8 @@ public class GlobalExceptionHandler {
             case "UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
             case "FORBIDDEN" -> HttpStatus.FORBIDDEN;
             case "NOT_FOUND" -> HttpStatus.NOT_FOUND;
-            case "CONCURRENCY_CONFLICT", "IDEMPOTENCY_KEY_REUSED", "DRAFT_VERSION_CONFLICT" -> HttpStatus.CONFLICT;
+            case "CONCURRENCY_CONFLICT", "IDEMPOTENCY_KEY_REUSED", "DRAFT_VERSION_CONFLICT",
+                    "DEFINITION_DEPLOYMENT_CONFLICT" -> HttpStatus.CONFLICT;
             case "DEPENDENCY_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.UNPROCESSABLE_ENTITY;
         };

@@ -1,6 +1,13 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 export interface ApiError { status: number; message: string }
+export interface Actor { tenantId: string; userId: string; roles: string[] }
+export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
+export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
+export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
+export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph }
+export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
+export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; status: string; roundNo: number; version: number }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
@@ -8,15 +15,28 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('agentflow.token')
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers })
-  if (!response.ok) { let message = `请求失败（${response.status}）`; try { const body = await response.json() as { message?: string }; message = body.message ?? message } catch { /* 保留状态码 */ }; throw { status: response.status, message } satisfies ApiError }
-  return response.status === 204 ? undefined as T : await response.json() as T
+  if (!response.ok) {
+    let message = `请求失败（${response.status}）`
+    try { const body = await response.json() as { message?: string }; message = body.message ?? message } catch { /* 保留状态码 */ }
+    throw { status: response.status, message } satisfies ApiError
+  }
+  const text = await response.text()
+  return text ? JSON.parse(text) as T : undefined as T
 }
 
 export const api = {
-  login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; actor: { userId: string } }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-  tasks: () => request<Array<{ taskId: string; taskName: string; assignee?: string; applicationId?: string; createdAt?: string; version?: number }>>('/tasks'),
-  taskAction: (taskId: string, body: { action: string; comment?: string; targetUser?: string; expectedVersion?: number }) => request<{ taskId: string; action: string; applicationStatus: string; version?: number }>(`/tasks/${taskId}/actions`, { method: 'POST', body: JSON.stringify(body) }),
-  definition: (body: unknown) => request<{ id: string; revision: number }>('/process-definitions', { method: 'POST', body: JSON.stringify(body) }),
-  updateDefinition: (id: string, body: unknown) => request<{ id: string; revision: number }>(`/process-definitions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  publishDefinition: (id: string, revision: number) => request(`/process-definitions/${id}/publish?expectedRevision=${revision}`, { method: 'POST' })
+  login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  me: () => request<{ actor: Actor }>('/auth/me'),
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  tasks: () => request<Task[]>('/tasks'),
+  taskAction: (taskId: string, body: { action: string; comment?: string; targetUser?: string; expectedVersion: number }) => request<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, { method: 'POST', body: JSON.stringify(body) }),
+  applications: () => request<Application[]>('/applications'),
+  application: (id: string) => request<Application>(`/applications/${encodeURIComponent(id)}`),
+  createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => request<Application>('/applications', { method: 'POST', body: JSON.stringify(body) }),
+  submitApplication: (id: string, expectedVersion: number) => request<Application>(`/applications/${encodeURIComponent(id)}/submit`, { method: 'POST', body: JSON.stringify({ expectedVersion }) }),
+  definitions: () => request<Definition[]>('/process-definitions'),
+  definition: (body: { key: string; name: string; graph: Graph }) => request<Definition>('/process-definitions', { method: 'POST', body: JSON.stringify(body) }),
+  updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number }) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  validateDefinition: (graph: Graph) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph }) }),
+  publishDefinition: (id: string, revision: number) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, { method: 'POST' })
 }

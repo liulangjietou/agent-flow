@@ -6,7 +6,10 @@ import io.agentflow.approval.model.ApplicationStatus;
 import java.util.Map;
 import java.util.UUID;
 
-/** 面向客户端的申请读模型。 */
+/**
+ * 面向客户端的申请读模型。
+ * @author owlzhangfq@gmail.com
+ */
 public record ApplicationResponse(UUID id, String tenantId, String businessNo, String processKey,
                                   long definitionVersion, String createdBy, String title,
                                   Map<String, Object> payload, ApplicationStatus status,

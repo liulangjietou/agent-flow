@@ -13,7 +13,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/** 流程定义用例测试，确认发布和模拟均经过领域服务。 */
+/**
+ * 流程定义用例测试，确认发布和模拟均经过领域服务。
+ * @author owlzhangfq@gmail.com
+ */
 class DefinitionApplicationServiceTest {
     @Test
     void publishesOnceAndSimulatesUsingSafeCondition() {
@@ -59,15 +62,22 @@ class DefinitionApplicationServiceTest {
         ), List.of(new Edge("a", "start", "approve", ""), new Edge("b", "approve", "end", "amount >= 1000")));
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private static final class InMemoryRepository implements DefinitionDraftRepository {
         private DefinitionDraft value;
         public DefinitionDraft save(DefinitionDraft draft) { value = draft; return draft; }
+        public long nextVersion(String tenantId, String key) { return 1L; }
         public Optional<DefinitionDraft> findById(String tenantId, UUID id) {
             return value != null && value.id().equals(id) && value.tenantId().equals(tenantId) ? Optional.of(value) : Optional.empty();
         }
         public List<DefinitionDraft> findAll(String tenantId, String status) { return List.of(); }
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private static final class RecordingDeployment implements DefinitionDeploymentPort {
         private DefinitionDraft received;
         public DeploymentResult deploy(DefinitionDraft draft) {

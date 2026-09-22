@@ -2,7 +2,10 @@ package io.agentflow.common;
 
 import java.util.Set;
 
-/** 当前请求的认证主体。租户和角色来自服务端认证上下文。 */
+/**
+ * 当前请求的认证主体。租户和角色来自服务端认证上下文。
+ * @author owlzhangfq@gmail.com
+ */
 public record Actor(String tenantId, String userId, Set<String> roles) {
     /** 创建不可变主体。 */
     public Actor {

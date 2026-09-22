@@ -10,7 +10,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** 认证端口的首版实现；生产环境应替换为企业 IdP/OIDC 适配器。 */
+/**
+ * 认证端口的首版实现；生产环境应替换为企业 IdP/OIDC 适配器。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class AuthService {
     private final Map<String, Actor> tokens = new ConcurrentHashMap<>();
@@ -62,6 +65,9 @@ public class AuthService {
         tokens.remove(token);
     }
 
-    /** 登录结果。 */
+    /**
+     * 登录结果。
+     * @author owlzhangfq@gmail.com
+     */
     public record LoginResult(String token, Actor actor) { }
 }

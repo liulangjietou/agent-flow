@@ -7,7 +7,10 @@ import io.agentflow.common.DomainException;
 import java.util.Map;
 import java.util.UUID;
 
-/** 审批申请用例编排服务，负责聚合、运行时和仓储之间的事务协作。 */
+/**
+ * 审批申请用例编排服务，负责聚合、运行时和仓储之间的事务协作。
+ * @author owlzhangfq@gmail.com
+ */
 public class ApprovalApplicationService {
     private final ApplicationRepository repository;
     private final ProcessRuntimePort processRuntime;

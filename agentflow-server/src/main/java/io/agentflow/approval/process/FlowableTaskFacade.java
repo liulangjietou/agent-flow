@@ -3,41 +3,40 @@ package io.agentflow.approval.process;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.ProcessRuntimePort;
+import io.agentflow.approval.service.TaskAuditPort;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
-import io.agentflow.common.JsonUtil;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
-/** 任务应用服务，集中执行租户、候选关系和乐观版本校验，再调用流程防腐层。 */
+/**
+ * 任务应用服务，集中执行租户、候选关系和乐观版本校验，再调用流程防腐层。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class FlowableTaskFacade {
     private final TaskService taskService;
     private final CurrentActor currentActor;
     private final ApplicationRepository applicationRepository;
     private final ProcessRuntimePort processRuntime;
-    private final JdbcTemplate jdbcTemplate;
-    private final JsonUtil jsonUtil;
+    private final TaskAuditPort auditPort;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
                               ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
-                              JdbcTemplate jdbcTemplate, JsonUtil jsonUtil) {
+                              TaskAuditPort auditPort) {
         this.taskService = taskService;
         this.currentActor = currentActor;
         this.applicationRepository = applicationRepository;
         this.processRuntime = processRuntime;
-        this.jdbcTemplate = jdbcTemplate;
-        this.jsonUtil = jsonUtil;
+        this.auditPort = auditPort;
     }
 
     /** 只返回当前主体可领取或已指派给自己的待办。 */
@@ -45,9 +44,11 @@ public class FlowableTaskFacade {
         Actor actor = currentActor.actor();
         // Flowable 任务租户字段在部分版本不会随流程变量传播；租户边界统一由 canAct 的受控变量校验保证。
         var query = taskService.createTaskQuery().includeProcessVariables().includeIdentityLinks();
-        if ("pending".equalsIgnoreCase(status)) {
-            query.active();
+        String normalizedStatus = status == null || status.isBlank() ? "PENDING" : status.toUpperCase(Locale.ROOT);
+        if (!"PENDING".equals(normalizedStatus)) {
+            throw new DomainException("INVALID_REQUEST", "Only pending task status is supported");
         }
+        query.active();
         return query.list().stream().filter(task -> canAct(actor, task)).map(task -> {
             Application application = applicationFor(actor, task);
             return new TaskView(task.getId(), task.getName(), task.getAssignee(),
@@ -108,6 +109,7 @@ public class FlowableTaskFacade {
                 } else {
                     application.reject(expectedVersion);
                 }
+                recordDecisionAssignee(task, actor);
                 taskService.addComment(task.getId(), task.getProcessInstanceId(), comment);
                 processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
                         actor.tenantId(), task.getProcessInstanceId(), normalized + " by " + actor.userId()));
@@ -116,6 +118,7 @@ public class FlowableTaskFacade {
             }
             case "APPROVE" -> {
                 application.recordTaskAction(expectedVersion);
+                recordDecisionAssignee(task, actor);
                 ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
                         new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized, comment));
                 if (completed.processEnded()) {
@@ -127,6 +130,13 @@ public class FlowableTaskFacade {
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }
         return new ActionResult(taskId, normalized, application.status().name(), application.version(), auditEventId);
+    }
+
+    /** 候选人直接决策时记录实际处理人，使任务结束后的历史参与者授权仍可追溯。 */
+    private void recordDecisionAssignee(Task task, Actor actor) {
+        if (task.getAssignee() == null) {
+            taskService.claim(task.getId(), actor.userId());
+        }
     }
 
     private Application applicationFor(Actor actor, Task task) {
@@ -173,19 +183,20 @@ public class FlowableTaskFacade {
     }
 
     private String audit(Task task, Application application, Actor actor, String action, String comment) {
-        String auditEventId = UUID.randomUUID().toString();
-        String payload = jsonUtil.write(Map.of("action", action, "actor", actor.userId(),
-                "comment", comment == null ? "" : comment));
-        jdbcTemplate.update("INSERT INTO audit_event (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, payload_json, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                UUID.randomUUID().toString(), actor.tenantId(), auditEventId, "Task", task.getId(), application.version(), payload);
-        return auditEventId;
+        return auditPort.record(actor.tenantId(), task.getId(), application.version(), actor.userId(), action, comment);
     }
 
-    /** 待办视图。 */
+    /**
+     * 待办视图。
+     * @author owlzhangfq@gmail.com
+     */
     public record TaskView(String taskId, String taskName, String assignee, String applicationId,
                            java.util.Date createdAt, long version) { }
 
-    /** 动作结果。 */
+    /**
+     * 动作结果。
+     * @author owlzhangfq@gmail.com
+     */
     public record ActionResult(String taskId, String action, String applicationStatus, long version,
                                String auditEventId) { }
 }

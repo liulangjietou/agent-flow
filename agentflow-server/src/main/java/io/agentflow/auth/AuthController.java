@@ -9,7 +9,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 开发环境认证接口，生产接入 OIDC 后保留同一响应契约。 */
+/**
+ * 开发环境认证接口，生产接入 OIDC 后保留同一响应契约。
+ * @author owlzhangfq@gmail.com
+ */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -44,8 +47,14 @@ public class AuthController {
                 ? authorization.substring(7) : authorization;
     }
 
-    /** 登录请求。 */
+    /**
+     * 登录请求。
+     * @author owlzhangfq@gmail.com
+     */
     public record LoginRequest(@NotBlank String tenantId, @NotBlank String username, @NotBlank String password) { }
-    /** 登录响应。 */
+    /**
+     * 登录响应。
+     * @author owlzhangfq@gmail.com
+     */
     public record LoginResponse(String token, io.agentflow.common.Actor user) { }
 }

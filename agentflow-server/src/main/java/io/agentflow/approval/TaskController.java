@@ -8,7 +8,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** 审批任务 REST 接口。 */
+/**
+ * 审批任务 REST 接口。
+ * @author owlzhangfq@gmail.com
+ */
 @RestController
 @RequestMapping("/api/v1/tasks")
 public class TaskController {
@@ -32,7 +35,10 @@ public class TaskController {
         return facade.action(taskId, request.action(), request.comment(), request.targetUser(), request.expectedVersion());
     }
 
-    /** 任务动作请求。 */
+    /**
+     * 任务动作请求。
+     * @author owlzhangfq@gmail.com
+     */
     public record TaskActionRequest(@NotBlank String action, String comment, String targetUser,
                                     @NotNull Long expectedVersion) { }
 }

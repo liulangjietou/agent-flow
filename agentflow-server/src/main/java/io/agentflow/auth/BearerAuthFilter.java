@@ -14,7 +14,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Map;
 
-/** 将 Bearer 认证主体写入请求线程上下文，并保证请求结束后清理。 */
+/**
+ * 将 Bearer 认证主体写入请求线程上下文，并保证请求结束后清理。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class BearerAuthFilter extends OncePerRequestFilter {
     private final AuthService authService;

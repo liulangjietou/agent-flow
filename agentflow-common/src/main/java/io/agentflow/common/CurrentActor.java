@@ -2,7 +2,10 @@ package io.agentflow.common;
 
 import org.springframework.stereotype.Component;
 
-/** 请求范围内的认证主体访问器。Web 层过滤器负责设置和清理。 */
+/**
+ * 请求范围内的认证主体访问器。Web 层过滤器负责设置和清理。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class CurrentActor {
     private static final ThreadLocal<Actor> HOLDER = new ThreadLocal<>();

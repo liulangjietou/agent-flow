@@ -7,7 +7,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/** 统一 JSON 编解码入口，领域层不依赖 JSON 库。 */
+/**
+ * 统一 JSON 编解码入口，领域层不依赖 JSON 库。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class JsonUtil {
     private final ObjectMapper objectMapper;

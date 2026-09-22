@@ -11,6 +11,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * @author owlzhangfq@gmail.com
+ */
 class ApplicationDomainTest {
     @Test
     void returnedApplicationGetsANewRoundWhenResubmitted() {

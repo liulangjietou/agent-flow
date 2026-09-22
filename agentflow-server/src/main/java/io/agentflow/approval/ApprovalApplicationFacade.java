@@ -3,36 +3,36 @@ package io.agentflow.approval;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.ApprovalApplicationService;
+import io.agentflow.approval.service.ApplicationParticipantPort;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.flowable.engine.HistoryService;
-import org.flowable.engine.TaskService;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 审批申请应用服务，连接认证主体、聚合和基础设施端口。 */
+/**
+ * 审批申请应用服务，连接认证主体、聚合和基础设施端口。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class ApprovalApplicationFacade {
     private final ApplicationRepository repository;
     private final CurrentActor currentActor;
     private final ApprovalApplicationService service;
-    private final TaskService taskService;
-    private final HistoryService historyService;
+    private final ApplicationParticipantPort participantPort;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
-                                     CurrentActor currentActor, TaskService taskService, HistoryService historyService) {
+                                     CurrentActor currentActor, ApplicationParticipantPort participantPort) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime);
-        this.taskService = taskService;
-        this.historyService = historyService;
+        this.participantPort = participantPort;
     }
 
     /** 创建申请草稿。 */
@@ -74,17 +74,6 @@ public class ApprovalApplicationFacade {
         if (actor.hasRole("ADMIN") || application.createdBy().equals(actor.userId())) {
             return true;
         }
-        boolean activeParticipant = taskService.createTaskQuery().includeProcessVariables().includeIdentityLinks()
-                .processVariableValueEquals("applicationId", application.id().toString()).list().stream()
-                .anyMatch(task -> actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))
-                        && (actor.userId().equals(task.getAssignee()) || task.getIdentityLinks().stream()
-                        .anyMatch(link -> actor.userId().equals(link.getUserId())
-                                || (link.getGroupId() != null && actor.hasRole(link.getGroupId())))));
-        if (activeParticipant) {
-            return true;
-        }
-        return historyService.createHistoricTaskInstanceQuery()
-                .processVariableValueEquals("applicationId", application.id().toString())
-                .taskAssignee(actor.userId()).count() > 0;
+        return participantPort.isParticipant(actor.tenantId(), application.id(), actor);
     }
 }

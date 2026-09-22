@@ -5,7 +5,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** 仅允许配置的前端来源访问 API；生产通过部署配置替换默认开发来源。 */
+/**
+ * 仅允许配置的前端来源访问 API；生产通过部署配置替换默认开发来源。
+ * @author owlzhangfq@gmail.com
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
     private final String allowedOrigin;

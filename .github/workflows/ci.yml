@@ -1,0 +1,30 @@
+name: Build and verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Check Java author tags
+        run: java scripts/CheckAuthors.java .
+      - name: Verify backend
+        run: mvn -B -ntp verify
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: agentflow-web/package-lock.json
+      - name: Verify frontend
+        working-directory: agentflow-web
+        run: |
+          npm ci
+          npm run build

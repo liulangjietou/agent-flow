@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** 审批申请聚合仓储端口。 */
+/**
+ * 审批申请聚合仓储端口。
+ * @author owlzhangfq@gmail.com
+ */
 public interface ApplicationRepository {
     /** 保存新聚合。 */
     Application save(Application application);

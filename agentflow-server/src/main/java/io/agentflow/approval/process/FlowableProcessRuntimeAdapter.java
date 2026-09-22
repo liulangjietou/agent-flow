@@ -13,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Flowable 运行时防腐层：只向审批域返回稳定的流程标识。 */
+/**
+ * Flowable 运行时防腐层：只向审批域返回稳定的流程标识。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final RepositoryService repositoryService;

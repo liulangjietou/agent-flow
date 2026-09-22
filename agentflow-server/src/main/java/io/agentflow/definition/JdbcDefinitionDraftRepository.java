@@ -1,6 +1,8 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -14,7 +16,10 @@ import static io.agentflow.definition.DefinitionModels.DefinitionDraft;
 import static io.agentflow.definition.DefinitionModels.DraftStatus;
 import static io.agentflow.definition.DefinitionModels.Graph;
 
-/** 流程定义 JDBC 适配器，所有读取都带租户边界。 */
+/**
+ * 流程定义 JDBC 适配器，所有读取都带租户边界。
+ * @author owlzhangfq@gmail.com
+ */
 @Repository
 public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository {
     private final JdbcTemplate jdbcTemplate;
@@ -29,20 +34,47 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
     @Override
     public DefinitionDraft save(DefinitionDraft draft) {
         String graphJson = jsonUtil.write(draft.graph());
-        int updated = jdbcTemplate.update("""
-                UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?,
-                    published_at=CASE WHEN ?='PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END,
-                    updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=?
-                """, draft.name(), draft.version(), draft.revision(), draft.status().name(), graphJson,
-                draft.status().name(), draft.tenantId(), draft.id().toString());
+        Object persistedVersion = draft.status() == DraftStatus.DRAFT ? null : draft.version();
+        long expectedRevision = draft.revision() - 1;
+        int updated;
+        try {
+            updated = jdbcTemplate.update("""
+                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?,
+                        published_at=CASE WHEN ?='PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END,
+                        updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=? AND revision=?
+                    """, draft.name(), persistedVersion, draft.revision(), draft.status().name(), graphJson,
+                    draft.status().name(), draft.tenantId(), draft.id().toString(), expectedRevision);
+        } catch (DuplicateKeyException exception) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Definition version already exists");
+        }
         if (updated == 0) {
-            jdbcTemplate.update("""
+            if (jdbcTemplate.queryForObject("SELECT COUNT(*) FROM approval_definition WHERE tenant_id=? AND id=?",
+                    Integer.class, draft.tenantId(), draft.id().toString()) > 0) {
+                throw new DomainException("CONCURRENCY_CONFLICT", "Definition revision has changed");
+            }
+            if (draft.revision() != 0) {
+                throw new DomainException("CONCURRENCY_CONFLICT", "Definition was deleted while it was being updated");
+            }
+            try {
+                jdbcTemplate.update("""
                     INSERT INTO approval_definition (id, tenant_id, process_key, name, version, revision, status, graph_json)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, draft.id().toString(), draft.tenantId(), draft.key(), draft.name(), draft.version(),
-                    draft.revision(), draft.status().name(), graphJson);
+                        """, draft.id().toString(), draft.tenantId(), draft.key(), draft.name(), persistedVersion,
+                        draft.revision(), draft.status().name(), graphJson);
+            } catch (DuplicateKeyException exception) {
+                throw new DomainException("CONCURRENCY_CONFLICT", "Definition version or id already exists");
+            }
         }
         return draft;
+    }
+
+    @Override
+    public long nextVersion(String tenantId, String key) {
+        Long next = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(version), 0) + 1 FROM approval_definition
+                WHERE tenant_id=? AND process_key=? AND status='PUBLISHED'
+                """, Long.class, tenantId, key);
+        return next == null ? 1L : next;
     }
 
     @Override
@@ -62,8 +94,9 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
     }
 
     private DefinitionDraft map(ResultSet resultSet, int rowNum) throws SQLException {
+        Number version = (Number) resultSet.getObject("version");
         return DefinitionDraft.restore(UUID.fromString(resultSet.getString("id")), resultSet.getString("tenant_id"),
-                resultSet.getString("process_key"), resultSet.getString("name"), resultSet.getLong("version"),
+                resultSet.getString("process_key"), resultSet.getString("name"), version == null ? 0 : version.longValue(),
                 resultSet.getLong("revision"), DraftStatus.valueOf(resultSet.getString("status")),
                 jsonUtil.read(resultSet.getString("graph_json"), Graph.class));
     }

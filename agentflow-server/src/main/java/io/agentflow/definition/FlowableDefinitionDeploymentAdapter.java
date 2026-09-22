@@ -1,10 +1,11 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.DomainException;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.repository.ProcessDefinition;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.Base64;
 import java.util.Objects;
 
@@ -13,27 +14,21 @@ import static io.agentflow.definition.DefinitionModels.*;
 
 /**
  * Flowable 发布适配器。BPMN 由受限流程图生成，用户输入不会直接进入 JUEL 或脚本执行器。
+ * @author owlzhangfq@gmail.com
  */
 @Component
 public class FlowableDefinitionDeploymentAdapter implements DefinitionDeploymentPort {
+    private static final String DEPLOYMENT_CONFLICT = "DEFINITION_DEPLOYMENT_CONFLICT";
     private final RepositoryService repositoryService;
 
+    /** 使用与流程定义仓储共用事务的数据源发布流程。 */
     public FlowableDefinitionDeploymentAdapter(RepositoryService repositoryService) {
         this.repositoryService = repositoryService;
     }
 
     @Override
+    @Transactional
     public DeploymentResult deploy(DefinitionDraft draft) {
-        ProcessDefinition existing = repositoryService.createProcessDefinitionQuery()
-                .processDefinitionKey(draft.key())
-                .processDefinitionTenantId(draft.tenantId())
-                .list().stream()
-                .filter(definition -> definition.getVersion() == draft.version())
-                .max(Comparator.comparing(ProcessDefinition::getVersion))
-                .orElse(null);
-        if (existing != null) {
-            return new DeploymentResult(existing.getDeploymentId(), existing.getId(), existing.getKey(), existing.getVersion());
-        }
         String resourceName = draft.key() + "-v" + draft.version() + ".bpmn20.xml";
         var deployment = repositoryService.createDeployment()
                 .name(draft.name())
@@ -44,12 +39,20 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
         ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
                 .deploymentId(deployment.getId()).singleResult();
         if (definition == null) {
-            throw new IllegalStateException("Flowable process definition was not created");
+            throw new DomainException(DEPLOYMENT_CONFLICT, "Flowable process definition was not created");
+        }
+        // 引擎版本由引擎分配，不能复用同版本的陌生流程图；序列不一致时回滚本次发布。
+        if (definition.getVersion() != draft.version()) {
+            throw new DomainException(DEPLOYMENT_CONFLICT,
+                    "Engine definition version does not match the platform version");
         }
         return new DeploymentResult(deployment.getId(), definition.getId(), definition.getKey(), definition.getVersion());
     }
 
-    /** 只生成有限节点类型，条件以扩展属性保存供安全路由适配器消费。 */
+    /**
+     * 只生成有限节点类型，条件以扩展属性保存供安全路由适配器消费。
+     * @author owlzhangfq@gmail.com
+     */
     static final class RestrictedBpmnWriter {
         private RestrictedBpmnWriter() { }
 
@@ -87,8 +90,11 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
 
         private static void appendGateway(StringBuilder xml, Node node, Graph graph) {
             String defaultEdge = graph.edges().stream()
-                    .filter(edge -> edge.source().equals(node.id()) && edge.condition().isBlank())
-                    .map(Edge::id).findFirst().orElse(null);
+                    .filter(edge -> edge.source().equals(node.id()) && edge.defaultBranch())
+                    .map(Edge::id).findFirst()
+                    .orElseGet(() -> graph.edges().stream()
+                            .filter(edge -> edge.source().equals(node.id()) && edge.condition().isBlank())
+                            .map(Edge::id).findFirst().orElse(null));
             xml.append("<exclusiveGateway id=\"").append(escape(node.id()))
                     .append("\" name=\"").append(escape(node.name())).append("\"");
             if (defaultEdge != null) {
