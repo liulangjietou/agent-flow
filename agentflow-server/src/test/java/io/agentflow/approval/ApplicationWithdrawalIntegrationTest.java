@@ -42,10 +42,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -98,9 +94,9 @@ class ApplicationWithdrawalIntegrationTest {
                 .isAfterOrEqualTo(Instant.parse(pending.path("submittedAt").asText()));
         assertThat(withdrawn.path("payload")).isEqualTo(pending.path("payload"));
         assertThat(withdrawn.path("processInstanceId").asText()).isEqualTo(originalTask.getProcessInstanceId());
-        assertThat(applicationAudits(id)).isEqualTo(1);
+        assertThat(withdrawalAudits(id)).isEqualTo(1);
         JsonNode event = mapper.readTree(jdbc.queryForObject("""
-                SELECT payload_json FROM audit_event WHERE aggregate_type='Application' AND aggregate_id=?
+                SELECT payload_json FROM audit_event WHERE aggregate_type='Application' AND action='WITHDRAW' AND aggregate_id=?
                 """, String.class, id));
         assertThat(event.path("action").asText()).isEqualTo("WITHDRAW");
         assertThat(event.path("actor").asText()).isEqualTo("alice");
@@ -128,7 +124,7 @@ class ApplicationWithdrawalIntegrationTest {
         assertThat(recorded.get(0).path("payload").path("lines").get(0).path("amount").asInt()).isEqualTo(6000);
         assertThat(recorded.get(1).path("processInstanceId").asText()).isEqualTo(newTask.getProcessInstanceId());
         assertThat(recorded.get(1).path("definitionVersion").asInt()).isEqualTo(1);
-        assertThat(applicationAudits(id)).isEqualTo(1);
+        assertThat(withdrawalAudits(id)).isEqualTo(1);
     }
 
     @Test
@@ -151,7 +147,7 @@ class ApplicationWithdrawalIntegrationTest {
         assertThat(task(foreign.id().toString()).getId()).isEqualTo(foreignTask.getId());
         assertThat(jdbc.queryForObject("SELECT status FROM approval_submission_round WHERE tenant_id=? AND application_id=?",
                 String.class, "other-tenant", foreign.id().toString())).isEqualTo("IN_APPROVAL");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id=? AND aggregate_type='Application' AND aggregate_id=?",
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id=? AND aggregate_type='Application' AND action='WITHDRAW' AND aggregate_id=?",
                 Integer.class, "other-tenant", foreign.id().toString())).isZero();
     }
 
@@ -220,7 +216,7 @@ class ApplicationWithdrawalIntegrationTest {
         assertThat(runtime.createProcessInstanceQuery().processInstanceId(otherId).count()).isEqualTo(1);
         assertThat(tasks.createTaskQuery().taskId(unrelatedTaskId).count()).isEqualTo(1);
         assertThat(rounds(id)).isEmpty();
-        assertThat(applicationAudits(id)).isEqualTo(1);
+        assertThat(withdrawalAudits(id)).isEqualTo(1);
         assertThat(tasks.createTaskQuery().taskId(original.getId()).count()).isZero();
     }
 
@@ -246,7 +242,7 @@ class ApplicationWithdrawalIntegrationTest {
                 .andExpect(jsonPath("code").value("CONCURRENCY_CONFLICT"));
         assertThat(applications.findById("demo", UUID.fromString(id)).orElseThrow().version()).isEqualTo(2);
         assertThat(rounds(id).get(0).path("status").asText()).isEqualTo("IN_APPROVAL");
-        assertThat(applicationAudits(id)).isZero();
+        assertThat(withdrawalAudits(id)).isZero();
         if (!inconsistency.equals("MISSING")) {
             assertThat(runtime.createProcessInstanceQuery().processInstanceId(instanceId).count()).isEqualTo(1);
         }
@@ -259,7 +255,7 @@ class ApplicationWithdrawalIntegrationTest {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new DomainException("DEPENDENCY_UNAVAILABLE", "Audit storage is unavailable");
-        }).when(audit).recordWithdrawal(anyString(), any(), anyLong(), anyInt(), anyString(), anyString(), nullable(String.class));
+        }).when(audit).record(any());
         withdraw(id, "alice", 2, "回滚验证").andExpect(status().isServiceUnavailable());
         assertPending(id);
         assertThat(task(id).getId()).isEqualTo(taskId);
@@ -273,7 +269,7 @@ class ApplicationWithdrawalIntegrationTest {
             invocation.callRealMethod();
             throw new PersistenceException("Transaction was rolled back",
                     new SQLTransactionRollbackException("Deadlock victim", "40001"));
-        }).when(audit).recordWithdrawal(anyString(), any(), anyLong(), anyInt(), anyString(), anyString(), nullable(String.class));
+        }).when(audit).record(any());
         withdraw(id, "alice", 2, "数据库回滚")
                 .andExpect(status().isConflict()).andExpect(jsonPath("code").value("CONCURRENCY_CONFLICT"));
         assertPending(id);
@@ -285,7 +281,7 @@ class ApplicationWithdrawalIntegrationTest {
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new PersistenceException("Statement is invalid", new SQLSyntaxErrorException("Invalid SQL", "42000"));
-        }).when(audit).recordWithdrawal(anyString(), any(), anyLong(), anyInt(), anyString(), anyString(), nullable(String.class));
+        }).when(audit).record(any());
         assertThatThrownBy(() -> withdraw(id, "alice", 2, "无关数据库错误"))
                 .hasRootCauseInstanceOf(SQLSyntaxErrorException.class);
         assertPending(id);
@@ -334,7 +330,7 @@ class ApplicationWithdrawalIntegrationTest {
         assertThat(round.path("status").asText()).isEqualTo(result.status().name());
         assertThat(round.path("completedBy").asText()).isEqualTo(result.status().name().equals("WITHDRAWN") ? "alice" : "finance");
         assertThat(round.path("reason").asText()).isEqualTo(result.status().name().equals("WITHDRAWN") ? "并发撤回" : "审批意见");
-        assertThat(applicationAudits(id)).isEqualTo(result.status().name().equals("WITHDRAWN") ? 1 : 0);
+        assertThat(withdrawalAudits(id)).isEqualTo(result.status().name().equals("WITHDRAWN") ? 1 : 0);
         Integer taskAudits = jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE aggregate_type='Task' AND aggregate_id=?",
                 Integer.class, original.getId());
         assertThat(taskAudits).isEqualTo(result.status().name().equals("APPROVED") ? 1 : 0);
@@ -347,7 +343,9 @@ class ApplicationWithdrawalIntegrationTest {
         assertThat(runtime.createProcessInstanceQuery().variableValueEquals("applicationId", id).count()).isEqualTo(1);
         assertThat(task(id)).isNotNull();
         assertThat(rounds(id).get(0).path("status").asText()).isEqualTo("IN_APPROVAL");
-        assertThat(applicationAudits(id)).isZero();
+        assertThat(withdrawalAudits(id)).isZero();
+        assertThat(jdbc.queryForList("SELECT action FROM audit_event WHERE tenant_id='demo' AND aggregate_type='Application' AND aggregate_id=? ORDER BY aggregate_version",
+                String.class, id)).containsExactly("CREATE", "SUBMIT");
     }
 
     private void assertNoActiveProcess(String id) {
@@ -355,8 +353,8 @@ class ApplicationWithdrawalIntegrationTest {
         assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", id).count()).isZero();
     }
 
-    private int applicationAudits(String id) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND aggregate_type='Application' AND aggregate_id=?",
+    private int withdrawalAudits(String id) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND aggregate_type='Application' AND action='WITHDRAW' AND aggregate_id=?",
                 Integer.class, id);
     }
 

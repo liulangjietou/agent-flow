@@ -1,6 +1,7 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -77,6 +78,7 @@ public class FlowableTaskFacade {
             throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
         }
         Application application = applicationFor(actor, task);
+        ApplicationStatus previousStatus = application.status();
         String normalized = action == null ? "" : action.toUpperCase(Locale.ROOT);
         String auditEventId;
         switch (normalized) {
@@ -84,28 +86,28 @@ public class FlowableTaskFacade {
                 taskService.claim(taskId, actor.userId());
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized, comment);
+                auditEventId = audit(task, application, actor, normalized, comment, null, previousStatus);
             }
             case "RELEASE" -> {
                 requireAssignee(task, actor);
                 taskService.unclaim(taskId);
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized, comment);
+                auditEventId = audit(task, application, actor, normalized, comment, null, previousStatus);
             }
             case "TRANSFER" -> {
                 requireTarget(targetUser);
                 taskService.setAssignee(taskId, targetUser);
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized, comment);
+                auditEventId = audit(task, application, actor, normalized, comment, targetUser, previousStatus);
             }
             case "DELEGATE" -> {
                 requireTarget(targetUser);
                 taskService.delegateTask(taskId, targetUser);
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized, comment);
+                auditEventId = audit(task, application, actor, normalized, comment, targetUser, previousStatus);
             }
             case "REJECT", "RETURN" -> {
                 requireComment(comment);
@@ -120,7 +122,7 @@ public class FlowableTaskFacade {
                         actor.tenantId(), task.getProcessInstanceId(), normalized + " by " + actor.userId()));
                 applicationRepository.update(application, expectedVersion);
                 completeRound(task, application, actor, comment);
-                auditEventId = audit(task, application, actor, normalized, comment);
+                auditEventId = audit(task, application, actor, normalized, comment, null, previousStatus);
             }
             case "APPROVE" -> {
                 application.recordTaskAction(expectedVersion);
@@ -132,7 +134,7 @@ public class FlowableTaskFacade {
                     completeRound(task, application, actor, comment);
                 }
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized, comment);
+                auditEventId = audit(task, application, actor, normalized, comment, null, previousStatus);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }
@@ -194,8 +196,11 @@ public class FlowableTaskFacade {
         }
     }
 
-    private String audit(Task task, Application application, Actor actor, String action, String comment) {
-        return auditPort.record(actor.tenantId(), task.getId(), application.version(), actor.userId(), action, comment);
+    private String audit(Task task, Application application, Actor actor, String action, String comment, String targetUser,
+                         ApplicationStatus previousStatus) {
+        return auditPort.record(new TaskAuditPort.TaskOperation(actor.tenantId(), task.getId(), application.id(),
+                application.version(), application.roundNo(), task.getProcessInstanceId(), actor.userId(), action,
+                comment, targetUser, task.getTaskDefinitionKey(), task.getName(), previousStatus, application.status()));
     }
 
     /**

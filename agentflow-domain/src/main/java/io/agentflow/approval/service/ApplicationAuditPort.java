@@ -1,5 +1,7 @@
 package io.agentflow.approval.service;
 
+import io.agentflow.approval.model.ApplicationStatus;
+
 import java.util.UUID;
 
 /**
@@ -7,7 +9,21 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public interface ApplicationAuditPort {
-    /** 记录发起人的撤回决定及其实际终止的流程实例。 */
-    void recordWithdrawal(String tenantId, UUID applicationId, long aggregateVersion, int roundNo,
-                          String processInstanceId, String actor, String comment);
+    /** 在申请变更的同一事务中保存实际发生的操作。 */
+    void record(ApplicationOperation operation);
+
+    /**
+     * 申请生命周期操作，不承载表单原文。
+     * @author owlzhangfq@gmail.com
+     */
+    record ApplicationOperation(String tenantId, UUID applicationId, long aggregateVersion, int roundNo,
+                                String processInstanceId, String actor, Action action,
+                                ApplicationStatus previousStatus, ApplicationStatus currentStatus,
+                                String comment) { }
+
+    /**
+     * 由申请应用服务执行的生命周期动作。
+     * @author owlzhangfq@gmail.com
+     */
+    enum Action { CREATE, REVISE, SUBMIT, WITHDRAW }
 }

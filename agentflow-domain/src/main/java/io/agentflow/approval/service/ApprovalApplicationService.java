@@ -1,6 +1,7 @@
 package io.agentflow.approval.service;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -37,31 +38,41 @@ public class ApprovalApplicationService {
         }
         Application application = Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey,
                 definitionVersion, userId, title, payload);
-        return repository.save(application);
+        repository.save(application);
+        recordApplicationOperation(application, userId, ApplicationAuditPort.Action.CREATE, null, null, null);
+        return application;
     }
 
     /** 提交申请；流程启动失败时由上层事务回滚本地状态。 */
     public Application submit(String tenantId, UUID id, long expectedVersion, String submittedBy) {
         Application application = repository.findById(tenantId, id)
                 .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
+        ApplicationStatus previousStatus = application.status();
         application.submit(expectedVersion);
         ProcessRuntimePort.StartedProcess started = processRuntime.start(new ProcessRuntimePort.StartProcessCommand(tenantId, id, application.processKey(),
                 application.definitionVersion(), application.roundNo(), application.businessNo(), application.payload()));
         repository.update(application, expectedVersion);
         rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now()));
+        recordApplicationOperation(application, submittedBy, ApplicationAuditPort.Action.SUBMIT, previousStatus,
+                started.processInstanceId(), null);
         return application;
     }
 
     /** 补正申请内容并使用显式版本保存，历史轮次快照不受影响。 */
-    public Application revise(String tenantId, UUID id, long expectedVersion, String title, Map<String, Object> payload) {
+    public Application revise(String tenantId, UUID id, long expectedVersion, String title, Map<String, Object> payload,
+                              String revisedBy) {
         Application application = get(tenantId, id);
+        ApplicationStatus previousStatus = application.status();
         application.revise(expectedVersion, title, payload);
-        return repository.update(application, expectedVersion);
+        repository.update(application, expectedVersion);
+        recordApplicationOperation(application, revisedBy, ApplicationAuditPort.Action.REVISE, previousStatus, null, null);
+        return application;
     }
 
     /** 撤回当前申请轮次；领域状态、实际实例、轮次结论和申请审计由上层事务共同提交。 */
     public Application withdraw(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
         Application application = get(tenantId, id);
+        ApplicationStatus previousStatus = application.status();
         application.withdraw(expectedVersion);
         SubmissionRound round = rounds.findByRound(tenantId, id, application.roundNo()).orElse(null);
         if (round != null && (round.status() != SubmissionRound.Status.IN_APPROVAL
@@ -74,8 +85,15 @@ public class ApprovalApplicationService {
         repository.update(application, expectedVersion);
         rounds.complete(tenantId, id, application.roundNo(), instanceId,
                 SubmissionRound.Status.WITHDRAWN, comment, actor, Instant.now());
-        audit.recordWithdrawal(tenantId, id, application.version(), application.roundNo(), instanceId, actor, comment);
+        recordApplicationOperation(application, actor, ApplicationAuditPort.Action.WITHDRAW, previousStatus, instanceId, comment);
         return application;
+    }
+
+    private void recordApplicationOperation(Application application, String actor, ApplicationAuditPort.Action action,
+                                            ApplicationStatus previousStatus, String instanceId, String comment) {
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(),
+                application.version(), application.roundNo(), instanceId, actor, action, previousStatus,
+                application.status(), comment));
     }
 
     /** 获取当前租户申请。 */

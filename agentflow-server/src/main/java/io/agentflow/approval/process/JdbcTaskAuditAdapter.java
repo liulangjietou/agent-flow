@@ -5,6 +5,7 @@ import io.agentflow.common.JsonUtil;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,13 +25,26 @@ public class JdbcTaskAuditAdapter implements TaskAuditPort {
     }
 
     @Override
-    public String record(String tenantId, String taskId, long aggregateVersion, String actor,
-                         String action, String comment) {
+    public String record(TaskOperation operation) {
         String eventId = UUID.randomUUID().toString();
-        String payload = jsonUtil.write(Map.of("action", action, "actor", actor,
-                "comment", comment == null ? "" : comment));
-        jdbcTemplate.update("INSERT INTO audit_event (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, payload_json, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                UUID.randomUUID().toString(), tenantId, eventId, "Task", taskId, aggregateVersion, payload);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("action", operation.action());
+        payload.put("actor", operation.actor());
+        payload.put("comment", operation.comment() == null ? "" : operation.comment());
+        payload.put("applicationId", operation.applicationId().toString());
+        payload.put("roundNo", operation.roundNo());
+        payload.put("processInstanceId", operation.processInstanceId());
+        payload.put("targetUser", operation.targetUser());
+        payload.put("nodeId", operation.nodeId());
+        payload.put("nodeName", operation.nodeName());
+        payload.put("previousStatus", operation.previousStatus());
+        payload.put("currentStatus", operation.currentStatus());
+        jdbcTemplate.update("""
+                INSERT INTO audit_event
+                (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, payload_json, occurred_at)
+                VALUES (?, ?, ?, 'Task', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, UUID.randomUUID().toString(), operation.tenantId(), eventId, operation.taskId(),
+                operation.aggregateVersion(), operation.applicationId().toString(), operation.action(), jsonUtil.write(payload));
         return eventId;
     }
 }

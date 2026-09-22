@@ -9,6 +9,22 @@ export interface Definition { id: string; key: string; name: string; revision: n
 export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; status: string; roundNo: number; version: number }
 export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
+export interface HistoryEvent {
+  id: string; sequence: number; occurredAt: string; source: string; action: string
+  aggregateVersion?: number; roundNo?: number; actor?: string; targetUser?: string; comment?: string
+  nodeId?: string; nodeName?: string; nodeType?: string; taskId?: string; processInstanceId?: string; definitionVersion?: number
+  previousStatus?: string; currentStatus?: string
+}
+export interface HistoryPage { items: HistoryEvent[]; nextCursor?: string | null }
+export interface HistoryQuery { roundNo?: number; action?: string; from?: string; to?: string; cursor?: string; limit?: number }
+
+function historyQuery(query: HistoryQuery) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  }
+  return params.size ? '?' + params.toString() : ''
+}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
@@ -26,6 +42,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
+  applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request<{ actor: Actor }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),

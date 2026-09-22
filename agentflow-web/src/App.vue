@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
+import ApplicationHistory from './components/ApplicationHistory.vue'
 import { api, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task } from './api'
 
 type Page = 'workbench' | 'designer' | 'applications' | 'expense'
@@ -317,8 +318,8 @@ onMounted(async () => {
                   <p v-else class="unavailable">正在加载申请详情…</p>
                   <div class="agent-note"><span>✦</span><div><strong>Agent 证据尚未接入</strong><p>当前审批请以申请内容及线下核实结果为依据。</p></div></div>
                 </div>
-                <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><p class="unavailable">可查看各轮提交内容及最终处理意见。完整节点轨迹尚未接入；当前任务创建于 {{ dateLabel(activeTask.createdAt) }}。</p></div>
-                <div v-else class="audit-list"><p>审计查询尚未接入。</p><code>当前任务版本：{{ activeTask.version }}</code><code>任务标识：{{ activeTask.taskId }}</code></div>
+                <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><ApplicationHistory :application-id="activeTask.applicationId" mode="timeline" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
+                <div v-else class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <form v-if="pendingAction" class="task-action-form" @submit.prevent="performAction(pendingAction)">
                   <h4>{{ pendingAction === 'RETURN' ? '退回申请' : '转交任务' }}</h4>
                   <label v-if="pendingAction === 'TRANSFER'">接收人账号<input v-model="targetUser" required placeholder="输入用户账号，如 finance" /></label>

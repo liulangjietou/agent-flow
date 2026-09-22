@@ -62,7 +62,7 @@ public class ApprovalApplicationFacade {
     public Application revise(UUID id, long expectedVersion, String title, Map<String, Object> payload) {
         Actor actor = currentActor.actor();
         requireApplicant(actor, id);
-        return service.revise(actor.tenantId(), id, expectedVersion, title, payload);
+        return service.revise(actor.tenantId(), id, expectedVersion, title, payload, actor.userId());
     }
 
     /** 仅发起人可以撤回审批中的申请，全部写入与引擎终止共用事务。 */

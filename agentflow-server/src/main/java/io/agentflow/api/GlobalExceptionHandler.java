@@ -42,6 +42,7 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "INVALID_HISTORY_QUERY" -> HttpStatus.BAD_REQUEST;
             case "UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
             case "FORBIDDEN" -> HttpStatus.FORBIDDEN;
             case "NOT_FOUND" -> HttpStatus.NOT_FOUND;

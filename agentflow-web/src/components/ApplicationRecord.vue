@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import ApplicationHistory from './ApplicationHistory.vue'
 import { api, type ApiError, type Application, type SubmissionRound } from '../api'
 
 const props = defineProps<{ applicationId: string; userId: string }>()
@@ -7,6 +8,7 @@ const emit = defineEmits<{ close: []; changed: [] }>()
 const dialog = ref<HTMLElement | null>(null)
 const application = ref<Application | null>(null)
 const rounds = ref<SubmissionRound[]>([])
+const historyTab = ref<'rounds' | 'timeline' | 'audit'>('rounds')
 const title = ref('')
 const amount = ref('')
 const description = ref('')
@@ -181,7 +183,8 @@ onUnmounted(() => returnFocus?.focus())
             <div class="form-actions"><button type="button" class="secondary" :disabled="saving" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="saving">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
           </form>
         </section>
-        <section class="round-history" aria-label="提交轮次记录">
+        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button></div>
+        <section v-if="historyTab === 'rounds'" class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
@@ -189,6 +192,7 @@ onUnmounted(() => returnFocus?.focus())
             <div class="round-content"><h4>{{ round.title }}</h4><dl class="payload-list"><template v-for="(value, key) in round.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
+        <ApplicationHistory v-else :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
       </template>
       <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="saving || dirty" @click="close">关闭</button></div>
     </section>
@@ -207,7 +211,8 @@ onUnmounted(() => returnFocus?.focus())
 .withdrawal-panel{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:16px;margin:20px 0}.withdrawal-panel h3{font-size:14px;margin:0 0 10px}.withdrawal-panel p{font-size:12px;color:var(--muted);line-height:1.8;margin:0 0 13px}.withdrawal-panel label{margin-bottom:0}
 .record-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}.record-fields input:disabled{color:var(--muted)}
 .record-actions{display:flex;align-items:center;gap:10px;margin:22px 0 28px}.record-actions>span{font-size:11px;color:var(--muted);margin-right:auto}
-.record-section-title{font-size:17px;margin-top:22px}.round-history{border-top:1px solid var(--line);padding-top:24px;margin-top:24px}
+.record-section-title{font-size:17px;margin-top:22px}.round-history{padding-top:20px}
+.record-history-tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-top:24px;padding-bottom:9px}.record-history-tabs button{font-size:12px;border:0;background:transparent;color:var(--muted);padding:10px 13px;border-radius:8px}.record-history-tabs button[aria-pressed="true"]{background:var(--soft);color:var(--deep);font-weight:600}
 .record-history-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.record-history-heading h3{margin:0;font-size:16px}.record-history-heading>span{font-size:11px;color:var(--muted)}
 .round-card{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}.round-card summary{display:flex;align-items:center;gap:12px;padding:15px;cursor:pointer;list-style:none}.round-card summary::-webkit-details-marker{display:none}.round-card summary::after{content:'＋';color:var(--muted)}.round-card[open] summary::after{content:'−'}
 .round-index{width:30px;height:30px;flex-shrink:0;display:grid;place-items:center;border-radius:9px;background:var(--soft);color:var(--deep);font:12px 'DM Mono',monospace}.round-summary{display:grid;gap:5px}.round-summary strong{font-size:12px}.round-summary small,.round-version{font-size:10px;color:var(--muted)}.round-version{margin-left:auto;font-family:'DM Mono',monospace}
