@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -52,6 +53,13 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
         return jdbc.query("""
                 SELECT * FROM approval_submission_round WHERE tenant_id=? AND application_id=? ORDER BY round_no
                 """, this::map, tenantId, applicationId.toString());
+    }
+
+    @Override
+    public Optional<SubmissionRound> findByRound(String tenantId, UUID applicationId, int roundNo) {
+        return jdbc.query("""
+                SELECT * FROM approval_submission_round WHERE tenant_id=? AND application_id=? AND round_no=?
+                """, this::map, tenantId, applicationId.toString(), roundNo).stream().findFirst();
     }
 
     @Override

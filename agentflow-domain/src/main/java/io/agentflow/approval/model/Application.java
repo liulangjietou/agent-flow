@@ -118,7 +118,7 @@ public final class Application {
     /** 申请人撤回未结束的申请。 */
     public void withdraw(long expectedVersion) {
         checkVersion(expectedVersion);
-        if (status != ApplicationStatus.IN_APPROVAL && status != ApplicationStatus.RETURNED) {
+        if (status != ApplicationStatus.IN_APPROVAL) {
             throw new DomainException("DOMAIN_RULE_VIOLATION", "Only an active application can be withdrawn");
         }
         status = ApplicationStatus.WITHDRAWN;

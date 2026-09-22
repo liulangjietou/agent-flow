@@ -2,11 +2,13 @@ package io.agentflow.api;
 
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.flowable.common.engine.api.FlowableOptimisticLockingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
+import java.sql.SQLTransactionRollbackException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -16,6 +18,13 @@ import java.util.UUID;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    /** 引擎乐观锁或数据库已回滚的并发事务统一返回冲突；无关数据库异常保留原错误。 */
+    @ExceptionHandler({FlowableOptimisticLockingException.class, SQLTransactionRollbackException.class})
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleConcurrency(
+            Exception exception, HttpServletRequest request) {
+        return handleDomain(new DomainException("CONCURRENCY_CONFLICT", "The process was changed by another request"), request);
+    }
+
     /** 处理请求体字段校验错误，统一返回 400 契约。 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleValidation(

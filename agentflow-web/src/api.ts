@@ -37,6 +37,7 @@ export const api = {
   applicationRounds: (id: string) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`),
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => request<Application>('/applications', { method: 'POST', body: JSON.stringify(body) }),
   submitApplication: (id: string, expectedVersion: number) => request<Application>(`/applications/${encodeURIComponent(id)}/submit`, { method: 'POST', body: JSON.stringify({ expectedVersion }) }),
+  withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => request<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, { method: 'POST', body: JSON.stringify(body) }),
   definitions: () => request<Definition[]>('/process-definitions'),
   definition: (body: { key: string; name: string; graph: Graph }) => request<Definition>('/process-definitions', { method: 'POST', body: JSON.stringify(body) }),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number }) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),

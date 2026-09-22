@@ -4,6 +4,7 @@ import io.agentflow.approval.model.SubmissionRound;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -16,6 +17,9 @@ public interface SubmissionRoundRepository {
 
     /** 按提交顺序返回指定租户申请的轮次。 */
     List<SubmissionRound> findAll(String tenantId, UUID applicationId);
+
+    /** 精确读取当前轮次，用于校验申请与流程实例的绑定。 */
+    Optional<SubmissionRound> findByRound(String tenantId, UUID applicationId, int roundNo);
 
     /** 只更新当前实例对应的未结束轮次；兼容没有历史快照的旧申请，不补造旧数据。 */
     void complete(String tenantId, UUID applicationId, int roundNo, String processInstanceId,

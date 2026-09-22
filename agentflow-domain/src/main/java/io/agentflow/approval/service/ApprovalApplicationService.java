@@ -18,13 +18,15 @@ public class ApprovalApplicationService {
     private final ApplicationRepository repository;
     private final ProcessRuntimePort processRuntime;
     private final SubmissionRoundRepository rounds;
+    private final ApplicationAuditPort audit;
 
     /** 创建应用服务。 */
     public ApprovalApplicationService(ApplicationRepository repository, ProcessRuntimePort processRuntime,
-                                      SubmissionRoundRepository rounds) {
+                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit) {
         this.repository = repository;
         this.processRuntime = processRuntime;
         this.rounds = rounds;
+        this.audit = audit;
     }
 
     /** 创建草稿并拒绝租户外重复业务单号。 */
@@ -55,6 +57,25 @@ public class ApprovalApplicationService {
         Application application = get(tenantId, id);
         application.revise(expectedVersion, title, payload);
         return repository.update(application, expectedVersion);
+    }
+
+    /** 撤回当前申请轮次；领域状态、实际实例、轮次结论和申请审计由上层事务共同提交。 */
+    public Application withdraw(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
+        Application application = get(tenantId, id);
+        application.withdraw(expectedVersion);
+        SubmissionRound round = rounds.findByRound(tenantId, id, application.roundNo()).orElse(null);
+        if (round != null && (round.status() != SubmissionRound.Status.IN_APPROVAL
+                || round.definitionVersion() != application.definitionVersion())) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+        }
+        String instanceId = processRuntime.withdraw(new ProcessRuntimePort.WithdrawProcessCommand(
+                tenantId, id, application.roundNo(), round == null ? null : round.processInstanceId(),
+                "WITHDRAW by " + actor));
+        repository.update(application, expectedVersion);
+        rounds.complete(tenantId, id, application.roundNo(), instanceId,
+                SubmissionRound.Status.WITHDRAWN, comment, actor, Instant.now());
+        audit.recordWithdrawal(tenantId, id, application.version(), application.roundNo(), instanceId, actor, comment);
+        return application;
     }
 
     /** 获取当前租户申请。 */

@@ -6,6 +6,7 @@ import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.service.ApprovalApplicationService;
 import io.agentflow.approval.service.ApplicationParticipantPort;
+import io.agentflow.approval.service.ApplicationAuditPort;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
@@ -32,10 +33,10 @@ public class ApprovalApplicationFacade {
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, ApplicationParticipantPort participantPort,
-                                     SubmissionRoundRepository rounds) {
+                                     SubmissionRoundRepository rounds, ApplicationAuditPort audit) {
         this.repository = repository;
         this.currentActor = currentActor;
-        this.service = new ApprovalApplicationService(repository, processRuntime, rounds);
+        this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
         this.participantPort = participantPort;
         this.rounds = rounds;
     }
@@ -62,6 +63,14 @@ public class ApprovalApplicationFacade {
         Actor actor = currentActor.actor();
         requireApplicant(actor, id);
         return service.revise(actor.tenantId(), id, expectedVersion, title, payload);
+    }
+
+    /** 仅发起人可以撤回审批中的申请，全部写入与引擎终止共用事务。 */
+    @Transactional
+    public Application withdraw(UUID id, long expectedVersion, String comment) {
+        Actor actor = currentActor.actor();
+        requireApplicant(actor, id);
+        return service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
     }
 
     /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */
@@ -96,7 +105,7 @@ public class ApprovalApplicationFacade {
     private void requireApplicant(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!application.createdBy().equals(actor.userId())) {
-            throw new DomainException("FORBIDDEN", "Only the applicant can revise or submit this application");
+            throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit or withdraw this application");
         }
     }
 }

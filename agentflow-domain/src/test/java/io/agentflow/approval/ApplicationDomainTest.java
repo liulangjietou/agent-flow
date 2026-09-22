@@ -23,6 +23,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class ApplicationDomainTest {
     @Test
+    void returnedApplicationCannotBeWithdrawnAgain() {
+        Application application = Application.draft(UUID.randomUUID(), "tenant-a", "EXP-WITHDRAW", "expense",
+                1, "alice", "申请", Map.of("amount", 6000));
+        application.submit(1);
+        application.returnToApplicant(2);
+
+        assertThatThrownBy(() -> application.withdraw(3))
+                .isInstanceOfSatisfying(DomainException.class,
+                        error -> assertThat(error.code()).isEqualTo("DOMAIN_RULE_VIOLATION"));
+        assertThat(application.status()).isEqualTo(ApplicationStatus.RETURNED);
+        assertThat(application.version()).isEqualTo(3);
+    }
+
+    @Test
     void returnedApplicationGetsANewRoundWhenResubmitted() {
         Application application = Application.draft(UUID.randomUUID(), "tenant-a", "EXP-1", "expense-reimbursement",
                 1, "alice", "差旅费", Map.of("amount", 1200));

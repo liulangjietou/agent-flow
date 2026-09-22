@@ -63,6 +63,18 @@ public class ApplicationController {
         return ApplicationResponse.from(facade.submit(id, request.expectedVersion()));
     }
 
+    /** 发起人撤回当前审批轮次。 */
+    @PostMapping("/{id}/withdraw")
+    public ApplicationResponse withdraw(@PathVariable UUID id, @Valid @RequestBody WithdrawApplicationRequest request) {
+        return ApplicationResponse.from(facade.withdraw(id, request.expectedVersion(), request.comment()));
+    }
+
+    /**
+     * 撤回说明选填；长度在接口边界约束。
+     * @author owlzhangfq@gmail.com
+     */
+    public record WithdrawApplicationRequest(@NotNull Long expectedVersion, @Size(max = 2000) String comment) { }
+
     /**
      * 创建申请请求。
      * @author owlzhangfq@gmail.com

@@ -15,11 +15,22 @@ const saving = ref(false)
 const error = ref('')
 const notice = ref('')
 const initialFields = ref('')
+const withdrawalOpen = ref(false)
+const withdrawalComment = ref('')
+const withdrawalInput = ref<HTMLTextAreaElement | null>(null)
+const withdrawalTrigger = ref<HTMLButtonElement | null>(null)
 let returnFocus: HTMLElement | null = null
 const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
 const canEdit = computed(() => application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
+const canWithdraw = computed(() => application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL')
+const conclusionLabel = computed(() => application.value?.status === 'WITHDRAWN' ? '撤回说明' : '退回原因')
 const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
 const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
+const conclusionReason = computed(() => {
+  if (currentRound.value?.reason) return currentRound.value.reason
+  if (application.value?.status === 'WITHDRAWN') return currentRound.value?.status === 'WITHDRAWN' ? '未填写撤回说明。' : '本轮暂无可用的撤回说明记录。'
+  return '本轮暂无可用的退回原因记录，请联系审批人核实。'
+})
 const extraFields = computed(() => Object.entries(application.value?.payload ?? {}).filter(([key]) => !['amount', 'description'].includes(key)))
 const stateLabel = (status: string) => statusLabels[status] ?? status
 const valueLabel = (value: unknown) => typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '—')
@@ -39,6 +50,7 @@ function setApplication(value: Application) {
   amount.value = value.payload.amount == null ? '' : String(value.payload.amount)
   description.value = value.payload.description == null ? '' : String(value.payload.description)
   initialFields.value = fieldsSnapshot()
+  withdrawalOpen.value = false; withdrawalComment.value = ''
 }
 async function load() {
   loading.value = true; error.value = ''; notice.value = ''
@@ -85,7 +97,34 @@ async function save(submit = false) {
       rounds.value = (await api.applicationRounds(value.id)).sort((a, b) => b.roundNo - a.roundNo)
     } else notice.value = '修改已保存，尚未提交审批。'
   } catch (cause) { showError(cause) }
-  finally { saving.value = false }
+  finally {
+    saving.value = false
+    await nextTick(); dialog.value?.focus()
+  }
+}
+async function openWithdrawal() {
+  withdrawalOpen.value = true
+  await nextTick(); withdrawalInput.value?.focus()
+}
+async function cancelWithdrawal() {
+  withdrawalOpen.value = false; withdrawalComment.value = ''
+  await nextTick(); withdrawalTrigger.value?.focus()
+}
+async function withdraw() {
+  if (!application.value || !canWithdraw.value || saving.value || loading.value) return
+  saving.value = true; error.value = ''; notice.value = ''
+  try {
+    const value = await api.withdrawApplication(application.value.id, {
+      expectedVersion: application.value.version, comment: withdrawalComment.value.trim() || undefined
+    })
+    setApplication(value); emit('changed')
+    notice.value = '已撤回当前审批，可以修改后重新提交。'
+    rounds.value = (await api.applicationRounds(value.id)).sort((a, b) => b.roundNo - a.roundNo)
+  } catch (cause) { showError(cause) }
+  finally {
+    saving.value = false
+    await nextTick(); (withdrawalOpen.value ? withdrawalInput.value : dialog.value)?.focus()
+  }
 }
 function close() {
   if (!saving.value && !dirty.value) emit('close')
@@ -119,8 +158,8 @@ onUnmounted(() => returnFocus?.focus())
       <template v-else-if="application">
         <div class="record-meta"><span class="status-chip">{{ stateLabel(application.status) }}</span><span>第 {{ application.roundNo }} 轮</span><span>{{ application.businessNo }}</span></div>
         <p class="record-binding">{{ application.processKey }} · v{{ application.definitionVersion }} · 申请人 {{ application.createdBy }}</p>
-        <div v-if="application.status === 'RETURNED'" class="return-context">
-          <strong>退回原因</strong><p>{{ currentRound?.reason || '本轮暂无可用的退回原因记录，请联系审批人核实。' }}</p>
+        <div v-if="['RETURNED', 'WITHDRAWN'].includes(application.status)" class="return-context">
+          <strong>{{ conclusionLabel }}</strong><p>{{ conclusionReason }}</p>
           <small v-if="currentRound?.completedBy">{{ currentRound.completedBy }}<template v-if="currentRound.completedAt"> · {{ timeLabel(currentRound.completedAt) }}</template></small>
           <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
         </div>
@@ -134,12 +173,20 @@ onUnmounted(() => returnFocus?.focus())
           <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || !dirty" @click="save()">保存修改</button><button class="primary" :disabled="saving">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
         <template v-else><h3 class="record-section-title">{{ application.title }}</h3><dl class="payload-list"><template v-for="(value, key) in application.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
+        <section v-if="canWithdraw" class="withdrawal-panel" aria-label="撤回审批">
+          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="saving" @click="openWithdrawal">撤回审批</button></template>
+          <form v-else @submit.prevent="withdraw">
+            <h3>撤回当前审批</h3><p>撤回后，当前待办将停止，已经产生的审批意见会保留。再次提交会开始新一轮审批。</p>
+            <label>撤回说明（选填）<textarea ref="withdrawalInput" v-model="withdrawalComment" rows="3" maxlength="2000" :disabled="saving" placeholder="例如：需要补充申请材料" /></label>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="saving" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="saving">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
+          </form>
+        </section>
         <section class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
-            <div class="round-content"><h4>{{ round.title }}</h4><dl class="payload-list"><template v-for="(value, key) in round.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
+            <div class="round-content"><h4>{{ round.title }}</h4><dl class="payload-list"><template v-for="(value, key) in round.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
       </template>
@@ -157,6 +204,7 @@ onUnmounted(() => returnFocus?.focus())
 .record-alert{color:var(--red);background:#fff0ed}.record-notice{color:var(--deep);background:var(--soft)}
 .return-context{border-left:3px solid var(--red);background:#fff7f5;padding:14px 17px;margin-bottom:24px;font-size:12px;line-height:1.7}
 .return-context p,.round-reason p{white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0}.return-context small{color:var(--muted)}
+.withdrawal-panel{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:16px;margin:20px 0}.withdrawal-panel h3{font-size:14px;margin:0 0 10px}.withdrawal-panel p{font-size:12px;color:var(--muted);line-height:1.8;margin:0 0 13px}.withdrawal-panel label{margin-bottom:0}
 .record-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}.record-fields input:disabled{color:var(--muted)}
 .record-actions{display:flex;align-items:center;gap:10px;margin:22px 0 28px}.record-actions>span{font-size:11px;color:var(--muted);margin-right:auto}
 .record-section-title{font-size:17px;margin-top:22px}.round-history{border-top:1px solid var(--line);padding-top:24px;margin-top:24px}

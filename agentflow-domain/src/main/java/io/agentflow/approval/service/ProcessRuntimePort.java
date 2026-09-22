@@ -17,6 +17,9 @@ public interface ProcessRuntimePort {
     /** 终止退回或驳回对应的整个流程实例，不执行当前节点的出线。 */
     void terminate(TerminateProcessCommand command);
 
+    /** 精确定位申请当前轮次的唯一活跃实例并终止；缺失、重复或绑定不符必须失败。 */
+    String withdraw(WithdrawProcessCommand command);
+
     /**
      * @author owlzhangfq@gmail.com
      */
@@ -48,4 +51,11 @@ public interface ProcessRuntimePort {
      * @author owlzhangfq@gmail.com
      */
     record TerminateProcessCommand(String tenantId, String processInstanceId, String reason) { }
+
+    /**
+     * 已有快照提供实例绑定；旧申请允许实例标识为空，由运行时精确核对申请和轮次。
+     * @author owlzhangfq@gmail.com
+     */
+    record WithdrawProcessCommand(String tenantId, UUID applicationId, int roundNo,
+                                  String expectedProcessInstanceId, String reason) { }
 }
