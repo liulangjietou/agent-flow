@@ -1,0 +1,21 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${AGENTFLOW_DATASOURCE_URL}
+    username: ${AGENTFLOW_DATASOURCE_USERNAME}
+    password: ${AGENTFLOW_DATASOURCE_PASSWORD}
+    driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.postgresql.Driver}
+  flyway:
+    enabled: true
+
+flowable:
+  database-schema-update: false
+  check-process-definitions: false
+
+agentflow:
+  auth:
+    demo-enabled: false
+  web:
+    allowed-origin: ${AGENTFLOW_WEB_ORIGIN}

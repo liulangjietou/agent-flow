@@ -1,0 +1,191 @@
+package io.agentflow.approval.process;
+
+import io.agentflow.approval.model.Application;
+import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.approval.service.ProcessRuntimePort;
+import io.agentflow.common.Actor;
+import io.agentflow.common.CurrentActor;
+import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import org.flowable.engine.TaskService;
+import org.flowable.task.api.Task;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+/** 任务应用服务，集中执行租户、候选关系和乐观版本校验，再调用流程防腐层。 */
+@Service
+public class FlowableTaskFacade {
+    private final TaskService taskService;
+    private final CurrentActor currentActor;
+    private final ApplicationRepository applicationRepository;
+    private final ProcessRuntimePort processRuntime;
+    private final JdbcTemplate jdbcTemplate;
+    private final JsonUtil jsonUtil;
+
+    /** 创建任务服务。 */
+    public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
+                              ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
+                              JdbcTemplate jdbcTemplate, JsonUtil jsonUtil) {
+        this.taskService = taskService;
+        this.currentActor = currentActor;
+        this.applicationRepository = applicationRepository;
+        this.processRuntime = processRuntime;
+        this.jdbcTemplate = jdbcTemplate;
+        this.jsonUtil = jsonUtil;
+    }
+
+    /** 只返回当前主体可领取或已指派给自己的待办。 */
+    public List<TaskView> list(String status) {
+        Actor actor = currentActor.actor();
+        // Flowable 任务租户字段在部分版本不会随流程变量传播；租户边界统一由 canAct 的受控变量校验保证。
+        var query = taskService.createTaskQuery().includeProcessVariables().includeIdentityLinks();
+        if ("pending".equalsIgnoreCase(status)) {
+            query.active();
+        }
+        return query.list().stream().filter(task -> canAct(actor, task)).map(task -> {
+            Application application = applicationFor(actor, task);
+            return new TaskView(task.getId(), task.getName(), task.getAssignee(),
+                    String.valueOf(task.getProcessVariables().get("applicationId")), task.getCreateTime(), application.version());
+        }).toList();
+    }
+
+    /** 执行动作；负向决定直接终止实例，避免流程继续流转。 */
+    @Transactional
+    public ActionResult action(String taskId, String action, String comment, String targetUser, Long expectedVersion) {
+        Actor actor = currentActor.actor();
+        actor.requireRole("APPROVER");
+        if (expectedVersion == null) {
+            throw new DomainException("INVALID_REQUEST", "expectedVersion is required");
+        }
+        Task task = taskService.createTaskQuery().taskId(taskId).includeProcessVariables().includeIdentityLinks().singleResult();
+        if (task == null || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
+            throw new DomainException("NOT_FOUND", "Task not found");
+        }
+        if (!canAct(actor, task)) {
+            throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
+        }
+        Application application = applicationFor(actor, task);
+        String normalized = action == null ? "" : action.toUpperCase(Locale.ROOT);
+        String auditEventId;
+        switch (normalized) {
+            case "CLAIM" -> {
+                taskService.claim(taskId, actor.userId());
+                application.recordTaskAction(expectedVersion);
+                applicationRepository.update(application, expectedVersion);
+                auditEventId = audit(task, application, actor, normalized, comment);
+            }
+            case "RELEASE" -> {
+                requireAssignee(task, actor);
+                taskService.unclaim(taskId);
+                application.recordTaskAction(expectedVersion);
+                applicationRepository.update(application, expectedVersion);
+                auditEventId = audit(task, application, actor, normalized, comment);
+            }
+            case "TRANSFER" -> {
+                requireTarget(targetUser);
+                taskService.setAssignee(taskId, targetUser);
+                application.recordTaskAction(expectedVersion);
+                applicationRepository.update(application, expectedVersion);
+                auditEventId = audit(task, application, actor, normalized, comment);
+            }
+            case "DELEGATE" -> {
+                requireTarget(targetUser);
+                taskService.delegateTask(taskId, targetUser);
+                application.recordTaskAction(expectedVersion);
+                applicationRepository.update(application, expectedVersion);
+                auditEventId = audit(task, application, actor, normalized, comment);
+            }
+            case "REJECT", "RETURN" -> {
+                requireComment(comment);
+                if ("RETURN".equals(normalized)) {
+                    application.returnToApplicant(expectedVersion);
+                } else {
+                    application.reject(expectedVersion);
+                }
+                taskService.addComment(task.getId(), task.getProcessInstanceId(), comment);
+                processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
+                        actor.tenantId(), task.getProcessInstanceId(), normalized + " by " + actor.userId()));
+                applicationRepository.update(application, expectedVersion);
+                auditEventId = audit(task, application, actor, normalized, comment);
+            }
+            case "APPROVE" -> {
+                application.recordTaskAction(expectedVersion);
+                ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
+                        new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized, comment));
+                if (completed.processEnded()) {
+                    application.approve(application.version());
+                }
+                applicationRepository.update(application, expectedVersion);
+                auditEventId = audit(task, application, actor, normalized, comment);
+            }
+            default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
+        }
+        return new ActionResult(taskId, normalized, application.status().name(), application.version(), auditEventId);
+    }
+
+    private Application applicationFor(Actor actor, Task task) {
+        Object value = task.getProcessVariables().get("applicationId");
+        try {
+            return applicationRepository.findById(actor.tenantId(), UUID.fromString(String.valueOf(value)))
+                    .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
+        } catch (IllegalArgumentException exception) {
+            throw new DomainException("NOT_FOUND", "Application not found");
+        }
+    }
+
+    private boolean canAct(Actor actor, Task task) {
+        if (!actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
+            return false;
+        }
+        if (actor.userId().equals(task.getAssignee())) {
+            return true;
+        }
+        if (task.getAssignee() != null) {
+            return false;
+        }
+        return task.getIdentityLinks().stream().anyMatch(link ->
+                actor.userId().equals(link.getUserId()) ||
+                        (link.getGroupId() != null && actor.hasRole(link.getGroupId())));
+    }
+
+    private void requireAssignee(Task task, Actor actor) {
+        if (!actor.userId().equals(task.getAssignee())) {
+            throw new DomainException("FORBIDDEN", "Only the current assignee can release a task");
+        }
+    }
+
+    private void requireTarget(String targetUser) {
+        if (targetUser == null || targetUser.isBlank()) {
+            throw new DomainException("INVALID_REQUEST", "targetUser is required");
+        }
+    }
+
+    private void requireComment(String comment) {
+        if (comment == null || comment.isBlank()) {
+            throw new DomainException("DOMAIN_RULE_VIOLATION", "A reason is required");
+        }
+    }
+
+    private String audit(Task task, Application application, Actor actor, String action, String comment) {
+        String auditEventId = UUID.randomUUID().toString();
+        String payload = jsonUtil.write(Map.of("action", action, "actor", actor.userId(),
+                "comment", comment == null ? "" : comment));
+        jdbcTemplate.update("INSERT INTO audit_event (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, payload_json, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                UUID.randomUUID().toString(), actor.tenantId(), auditEventId, "Task", task.getId(), application.version(), payload);
+        return auditEventId;
+    }
+
+    /** 待办视图。 */
+    public record TaskView(String taskId, String taskName, String assignee, String applicationId,
+                           java.util.Date createdAt, long version) { }
+
+    /** 动作结果。 */
+    public record ActionResult(String taskId, String action, String applicationStatus, long version,
+                               String auditEventId) { }
+}

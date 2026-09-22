@@ -1,0 +1,9 @@
+{
+  "name": "agentflow-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"dev": "vite", "build": "vue-tsc --noEmit && vite build", "preview": "vite preview"},
+  "dependencies": {"@vitejs/plugin-vue": "latest", "vite": "latest", "vue": "latest", "vue-tsc": "^3.3.11", "typescript": "^5.8.3"},
+  "devDependencies": {}
+}

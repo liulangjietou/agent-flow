@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://agentflow.io/processes">
+    <process id="expense-reimbursement" name="费用报销审批" isExecutable="true">
+        <startEvent id="start" name="提交申请"/>
+        <sequenceFlow id="start-to-finance" sourceRef="start" targetRef="finance-approval"/>
+        <userTask id="finance-approval" name="财务审批" flowable:candidateGroups="FINANCE"/>
+        <sequenceFlow id="finance-to-end" sourceRef="finance-approval" targetRef="end"/>
+        <endEvent id="end" name="审批完成"/>
+    </process>
+</definitions>

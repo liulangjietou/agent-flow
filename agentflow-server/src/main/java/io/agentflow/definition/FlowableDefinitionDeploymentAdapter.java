@@ -1,0 +1,119 @@
+package io.agentflow.definition;
+
+import org.flowable.engine.RepositoryService;
+import org.flowable.engine.repository.ProcessDefinition;
+import org.springframework.stereotype.Component;
+
+import java.util.Comparator;
+import java.util.Base64;
+import java.util.Objects;
+
+import static io.agentflow.definition.DefinitionDeploymentPort.DeploymentResult;
+import static io.agentflow.definition.DefinitionModels.*;
+
+/**
+ * Flowable 发布适配器。BPMN 由受限流程图生成，用户输入不会直接进入 JUEL 或脚本执行器。
+ */
+@Component
+public class FlowableDefinitionDeploymentAdapter implements DefinitionDeploymentPort {
+    private final RepositoryService repositoryService;
+
+    public FlowableDefinitionDeploymentAdapter(RepositoryService repositoryService) {
+        this.repositoryService = repositoryService;
+    }
+
+    @Override
+    public DeploymentResult deploy(DefinitionDraft draft) {
+        ProcessDefinition existing = repositoryService.createProcessDefinitionQuery()
+                .processDefinitionKey(draft.key())
+                .processDefinitionTenantId(draft.tenantId())
+                .list().stream()
+                .filter(definition -> definition.getVersion() == draft.version())
+                .max(Comparator.comparing(ProcessDefinition::getVersion))
+                .orElse(null);
+        if (existing != null) {
+            return new DeploymentResult(existing.getDeploymentId(), existing.getId(), existing.getKey(), existing.getVersion());
+        }
+        String resourceName = draft.key() + "-v" + draft.version() + ".bpmn20.xml";
+        var deployment = repositoryService.createDeployment()
+                .name(draft.name())
+                .key(draft.key())
+                .tenantId(draft.tenantId())
+                .addString(resourceName, RestrictedBpmnWriter.write(draft))
+                .deploy();
+        ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
+                .deploymentId(deployment.getId()).singleResult();
+        if (definition == null) {
+            throw new IllegalStateException("Flowable process definition was not created");
+        }
+        return new DeploymentResult(deployment.getId(), definition.getId(), definition.getKey(), definition.getVersion());
+    }
+
+    /** 只生成有限节点类型，条件以扩展属性保存供安全路由适配器消费。 */
+    static final class RestrictedBpmnWriter {
+        private RestrictedBpmnWriter() { }
+
+        static String write(DefinitionDraft draft) {
+            Graph graph = draft.graph();
+            StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+                    .append("<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" ")
+                    .append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ")
+                    .append("xmlns:flowable=\"http://flowable.org/bpmn\" targetNamespace=\"http://agentflow.io/process\">")
+                    .append("<process id=\"").append(escape(draft.key())).append("\" name=\"")
+                    .append(escape(draft.name())).append("\" isExecutable=\"true\">");
+            for (Node node : graph.nodes()) {
+                switch (node.type()) {
+                    case START -> xml.append("<startEvent id=\"").append(escape(node.id())).append("\" name=\"")
+                            .append(escape(node.name())).append("\"/>");
+                    case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
+                            .append(escape(node.name())).append("\"/>");
+                    case USER_TASK -> appendUserTask(xml, node);
+                    case EXCLUSIVE_GATEWAY -> appendGateway(xml, node, graph);
+                    default -> throw new IllegalArgumentException("Unsupported publish node type: " + node.type());
+                }
+            }
+            for (Edge edge : graph.edges()) {
+                xml.append("<sequenceFlow id=\"").append(escape(edge.id())).append("\" sourceRef=\"")
+                        .append(escape(edge.source())).append("\" targetRef=\"").append(escape(edge.target())).append("\">");
+                if (!edge.condition().isBlank()) {
+                    String encodedCondition = Base64.getEncoder().encodeToString(edge.condition().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    xml.append("<conditionExpression xsi:type=\"tFormalExpression\">${flowableConditionEvaluator.matches(execution, '")
+                            .append(encodedCondition).append("')}</conditionExpression>");
+                }
+                xml.append("</sequenceFlow>");
+            }
+            return xml.append("</process></definitions>").toString();
+        }
+
+        private static void appendGateway(StringBuilder xml, Node node, Graph graph) {
+            String defaultEdge = graph.edges().stream()
+                    .filter(edge -> edge.source().equals(node.id()) && edge.condition().isBlank())
+                    .map(Edge::id).findFirst().orElse(null);
+            xml.append("<exclusiveGateway id=\"").append(escape(node.id()))
+                    .append("\" name=\"").append(escape(node.name())).append("\"");
+            if (defaultEdge != null) {
+                xml.append(" default=\"").append(escape(defaultEdge)).append("\"");
+            }
+            xml.append("/>");
+        }
+
+        private static void appendUserTask(StringBuilder xml, Node node) {
+            String rule = Objects.requireNonNull(node.properties().get("assigneeRule"), "assigneeRule");
+            xml.append("<userTask id=\"").append(escape(node.id())).append("\" name=\"")
+                    .append(escape(node.name())).append("\"");
+            if (rule.startsWith("role:")) {
+                xml.append(" flowable:candidateGroups=\"").append(escape(rule.substring("role:".length()))).append("\"");
+            } else if (rule.startsWith("user:")) {
+                xml.append(" flowable:assignee=\"").append(escape(rule.substring("user:".length()))).append("\"");
+            } else {
+                throw new IllegalArgumentException("Unsupported assigneeRule: " + rule);
+            }
+            xml.append("/>");
+        }
+
+        private static String escape(String value) {
+            return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    .replace("\"", "&quot;").replace("'", "&apos;");
+        }
+    }
+}
