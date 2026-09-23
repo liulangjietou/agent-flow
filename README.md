@@ -111,3 +111,5 @@ npm run build
 在独立验收库执行 `python3 scripts/check-notifications.py http://127.0.0.1:8082`，验证真实动作产生消息、接收范围、并发已读和权限隔离，保留全部测试数据与一张浏览器待办。
 
 GitHub Actions 将执行作者检查、后端 `verify`、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。
+
+- [待办检索与分页](docs/pending-task-queue.md)

@@ -1,6 +1,7 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.workspace.ApplicationAmountProjection;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
@@ -35,12 +36,12 @@ public class JdbcApplicationRepository implements ApplicationRepository {
         jdbcTemplate.update("""
                 INSERT INTO approval_application
                 (id, tenant_id, business_no, process_key, definition_version, created_by, title,
-                 payload_json, status, round_no, version, form_schema_json, runtime_definition_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 payload_json, status, round_no, version, form_schema_json, runtime_definition_id, search_amount, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, application.id().toString(), application.tenantId(), application.businessNo(),
                 application.processKey(), application.definitionVersion(), application.createdBy(), application.title(),
                 jsonUtil.write(application.payload()), application.status().name(), application.roundNo(), application.version(),
-                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()), application.runtimeDefinitionId());
+                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()), application.runtimeDefinitionId(), ApplicationAmountProjection.extract(application.payload(), application.formSchema()));
         return application;
     }
 
@@ -61,10 +62,10 @@ public class JdbcApplicationRepository implements ApplicationRepository {
     @Override
     public Application update(Application application, long expectedVersion) {
         int updated = jdbcTemplate.update("""
-                UPDATE approval_application SET status=?, round_no=?, version=?, title=?, payload_json=?, updated_at=CURRENT_TIMESTAMP
+                UPDATE approval_application SET status=?, round_no=?, version=?, title=?, payload_json=?, search_amount=?, updated_at=CURRENT_TIMESTAMP
                 WHERE tenant_id=? AND id=? AND version=?
                 """, application.status().name(), application.roundNo(), application.version(), application.title(),
-                jsonUtil.write(application.payload()), application.tenantId(), application.id().toString(), expectedVersion);
+                jsonUtil.write(application.payload()), ApplicationAmountProjection.extract(application.payload(), application.formSchema()), application.tenantId(), application.id().toString(), expectedVersion);
         if (updated != 1) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");
         }

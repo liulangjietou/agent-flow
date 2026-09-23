@@ -34,6 +34,10 @@ public class TaskController {
         return facade.list(status);
     }
 
+    /** 获取当前可操作的单项任务，供列表与消息入口实时复核。 */
+    @GetMapping("/{taskId}")
+    public FlowableTaskFacade.TaskView get(@PathVariable String taskId) { return facade.get(taskId); }
+
     /** 查询当前任务可转交或委派的同租户有效接收人。 */
     @GetMapping("/{taskId}/recipients")
     public List<String> recipients(@PathVariable String taskId) { return facade.recipients(taskId); }

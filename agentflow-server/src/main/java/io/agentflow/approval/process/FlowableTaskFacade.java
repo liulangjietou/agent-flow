@@ -59,19 +59,31 @@ public class FlowableTaskFacade {
     public List<TaskView> list(String status) {
         Actor actor = currentActor.actor();
         // Flowable 任务租户字段在部分版本不会随流程变量传播；租户边界统一由 canAct 的受控变量校验保证。
-        var query = taskService.createTaskQuery().includeProcessVariables().includeIdentityLinks();
+        var query = taskService.createTaskQuery().processVariableValueEquals("tenantId", actor.tenantId()).includeProcessVariables().includeIdentityLinks();
         String normalizedStatus = status == null || status.isBlank() ? "PENDING" : status.toUpperCase(Locale.ROOT);
         if (!"PENDING".equals(normalizedStatus)) {
             throw new DomainException("INVALID_REQUEST", "Only pending task status is supported");
         }
         query.active();
-        return query.list().stream().filter(task -> canAct(actor, task)).map(task -> {
-            Application application = applicationFor(actor, task);
-            return new TaskView(task.getId(), task.getName(), task.getAssignee(),
-                    String.valueOf(task.getProcessVariables().get("applicationId")), task.getCreateTime(), application.version(), task.getOwner(),
-                    task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
-                    delegation(task).allowedActions(task.getAssignee() != null));
-        }).toList();
+        return query.list().stream().filter(task -> canAct(actor, task)).map(task -> view(actor, task)).toList();
+    }
+
+    /** 按标识重新取得可操作任务，打开列表或旧消息时不依赖全量队列。 */
+    public TaskView get(String taskId) {
+        Actor actor = currentActor.actor();
+        actor.requireRole("APPROVER");
+        Task task = authorizedTask(taskId, actor);
+        if (task.isSuspended() || applicationFor(actor, task).status() != ApplicationStatus.IN_APPROVAL) {
+            throw new DomainException("NOT_FOUND", "Active task not found");
+        }
+        return view(actor, task);
+    }
+
+    private TaskView view(Actor actor, Task task) {
+        Application application = applicationFor(actor, task);
+        return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
+                application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
+                delegation(task).allowedActions(task.getAssignee() != null));
     }
 
     /** 执行动作；负向决定直接终止实例，避免流程继续流转。 */

@@ -23,11 +23,11 @@ class InboxMigrationTest {
                 """, UUID.randomUUID().toString());
         var before = jdbc.queryForList("SELECT * FROM approval_application");
         var history = jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" ORDER BY \"installed_rank\"");
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("11").load().migrate().migrationsExecuted).isEqualTo(1);
         assertThat(jdbc.queryForList("SELECT * FROM approval_application")).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox", Integer.class)).isZero();
         assertThat(jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" WHERE \"version\"<>'11' OR \"version\" IS NULL ORDER BY \"installed_rank\""))
                 .isEqualTo(history);
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isZero();
+        assertThat(Flyway.configure().dataSource(source).target("11").load().migrate().migrationsExecuted).isZero();
     }
 }

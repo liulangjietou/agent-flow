@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
 import TaskActions from './components/TaskActions.vue'
+import PendingTaskQueue from './components/PendingTaskQueue.vue'
 import NotificationInbox from './components/NotificationInbox.vue'
 import { isTaskNotification } from './notificationInbox'
 import { taskActionLabels } from './taskActions'
@@ -57,13 +58,21 @@ const recoveryError = ref('')
 const workspace = ref<HTMLElement | null>(null)
 const unsubscribeWrites = writeRequests.subscribe(() => { pendingWrites.value = writeRequests.pending() })
 const serverAvailable = ref(false)
-const tasks = ref<Task[]>([])
+const taskCount = ref<number | null>(null)
+const taskRefresh = ref(0)
+let workspaceRefreshGeneration = 0
+let taskCountRequest: AbortController | null = null
+let taskDetailRequest: AbortController | null = null
 const applications = ref<Application[]>([])
+const applicationsLoading = ref(false)
+const applicationsError = ref('')
+let applicationsRequest: AbortController | null = null
 const activeTask = ref<Task | null>(null)
 const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
+const detailLoading = ref(false)
+const taskDetailPanel = ref<HTMLElement | null>(null)
 const taskTab = ref<'detail' | 'timeline' | 'audit'>('detail')
-const taskSearch = ref('')
 const definitions = ref<Definition[]>([])
 const definitionId = ref('')
 const definitionRevision = ref(0)
@@ -138,7 +147,6 @@ const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PR
 const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
 const editorLocked = computed(() => readonlyDefinition.value || (writesBlocked.value && !autosave.saving) || busy.value || confirmationOpen.value || publicationOpen.value)
-const visibleTasks = computed(() => tasks.value.filter(task => task.taskName.toLowerCase().includes(taskSearch.value.trim().toLowerCase())))
 const dirty = computed(() => snapshot() !== savedSnapshot.value)
 const today = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date())
 const statusLabels: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', ARCHIVED: '已归档', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已拒绝', APPROVED: '已批准', REVOKED: '已撤销', CANCELLED: '已作废' }
@@ -232,12 +240,31 @@ async function loadDefinitions(restoreSelection = false) {
     if (definition) applyDefinition(definition)
   }
 }
-async function loadTasks() { const scope = actorScope.value; const result = await api.tasks(); if (scope && actorScope.value === scope) tasks.value = result }
-async function loadApplications() { const scope = actorScope.value; const result = await api.applications(); if (scope && actorScope.value === scope) applications.value = result }
+async function loadTasks() {
+  const scope = actorScope.value, controller = new AbortController()
+  taskCountRequest?.abort(); taskCountRequest = controller; taskCount.value = null
+  const timeout = setTimeout(() => controller.abort(), 12_000)
+  try { const result = await api.taskPage({ limit: 1 }, controller.signal); if (scope && actorScope.value === scope && taskCountRequest === controller) taskCount.value = result.total }
+  finally { clearTimeout(timeout) }
+}
+async function loadApplications() {
+  const scope = actorScope.value, controller = new AbortController()
+  applicationsRequest?.abort(); applicationsRequest = controller
+  applications.value = []; applicationsLoading.value = true; applicationsError.value = ''
+  const timeout = setTimeout(() => controller.abort(), 12_000)
+  try {
+    const result = await api.applications(controller.signal)
+    if (scope && actorScope.value === scope && applicationsRequest === controller) applications.value = result
+  } catch (error) {
+    if (scope && actorScope.value === scope && applicationsRequest === controller) applicationsError.value = errorMessage(error)
+  } finally { clearTimeout(timeout); if (applicationsRequest === controller) applicationsLoading.value = false }
+}
 async function refreshWorkspace(restoreSelection = false) {
+  taskRefresh.value++
+  const generation = ++workspaceRefreshGeneration
   const scope = actorScope.value
-  try { await Promise.all([loadTasks(), loadApplications(), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope) serverAvailable.value = true }
-  catch (error) { if (scope && actorScope.value === scope) { serverAvailable.value = false; notice.value = errorMessage(error) } }
+  try { await Promise.all([loadTasks(), ...(page.value === 'applications' ? [loadApplications()] : []), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
+  catch (error) { if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) { serverAvailable.value = false; notice.value = errorMessage(error) } }
 }
 function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
 async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
@@ -283,17 +310,39 @@ async function logout() {
     busy.value = true
     try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
     writeRequests.setActor(null)
-    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; tasks.value = []; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
     clearDesigner(); templateRefresh.value++
     recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
   }, () => !busy.value && !pendingWrites.value.some(operation => operation.sending))
 }
-async function selectTask(task: Task) {
+/** 打开摘要时取得最新任务版本，旧列表不能直接产生审批命令。 */
+async function selectTask(item: { taskId: string }) {
   if (busy.value || writesBlocked.value) return
-  activeTask.value = task; activeApplication.value = null; detailError.value = ''; taskTab.value = 'detail'
-  try { const application = await api.application(task.applicationId); if (activeTask.value?.taskId === task.taskId) activeApplication.value = application }
-  catch (error) { detailError.value = errorMessage(error) }
+  const scope = actorScope.value, controller = new AbortController()
+  taskDetailRequest?.abort(); taskDetailRequest = controller; detailLoading.value = true
+  activeTask.value = null; activeApplication.value = null; detailError.value = ''; taskTab.value = 'detail'
+  const timeout = setTimeout(() => controller.abort(), 12_000)
+  try {
+    const task = await api.task(item.taskId, controller.signal)
+    if (actorScope.value !== scope || taskDetailRequest !== controller) return
+    activeTask.value = task
+    const application = await api.application(task.applicationId, controller.signal)
+    if (!controller.signal.aborted && actorScope.value === scope && taskDetailRequest === controller) {
+      activeApplication.value = application
+      await nextTick()
+      if (actorScope.value === scope && taskDetailRequest === controller && page.value === 'workbench') {
+        taskDetailPanel.value?.scrollIntoView({ block: 'start' })
+        taskDetailPanel.value?.focus({ preventScroll: true })
+      }
+    }
+  } catch (error) {
+    if (actorScope.value !== scope || taskDetailRequest !== controller) return
+    detailError.value = controller.signal.aborted ? '读取待办超时，请重新选择。' : errorMessage(error)
+    notice.value = detailError.value
+    if ([403, 404].includes((error as ApiError).status)) { clearTaskSelection(); void refreshWorkspace() }
+  } finally { clearTimeout(timeout); if (taskDetailRequest === controller) detailLoading.value = false }
 }
+function clearTaskSelection() { taskDetailRequest?.abort(); taskDetailRequest = null; detailLoading.value = false; activeTask.value = null; activeApplication.value = null }
 async function performAction(input: TaskActionInput) {
   if (!activeTask.value || busy.value || writesBlocked.value) return
   busy.value = true
@@ -312,7 +361,7 @@ async function readNotification(message: InboxMessage) {
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
-/** 旧提醒不能替代当前待办权限，先读取最新列表再定位；任务已流转则打开申请详情。 */
+/** 旧消息按单项任务实时复核；已结束或转交的任务回到申请权限查询。 */
 async function openNotification(message: InboxMessage) {
   if (busy.value || writesBlocked.value) return
   if (!isTaskNotification(message)) { recordApplicationId.value = message.applicationId; return }
@@ -321,14 +370,16 @@ async function openNotification(message: InboxMessage) {
   busy.value = true
   let task: Task | undefined
   try {
-    const current = await api.tasks(controller.signal)
+    const current = await api.task(message.taskId!, controller.signal)
     if (actorScope.value !== scope) return
-    tasks.value = current
-    task = current.find(item => item.taskId === message.taskId && item.applicationId === message.applicationId)
-    if (!task) { recordApplicationId.value = message.applicationId; notice.value = '该待办已发生变化，请核对申请当前状态。' }
-  } catch (error) { notice.value = controller.signal.aborted ? '读取待办超时，请重试。' : errorMessage(error) }
-  finally { clearTimeout(timeout); busy.value = false }
-  if (task && actorScope.value === scope) { page.value = 'workbench'; await selectTask(task) }
+    if (current.applicationId === message.applicationId) task = current
+  } catch (error) {
+    if (actorScope.value !== scope) return
+    if (![403, 404].includes((error as ApiError).status)) { notice.value = controller.signal.aborted ? '读取待办超时，请重试。' : errorMessage(error); return }
+  } finally { clearTimeout(timeout); busy.value = false }
+  if (actorScope.value !== scope) return
+  if (task) { page.value = 'workbench'; await selectTask(task) }
+  else { recordApplicationId.value = message.applicationId; notice.value = '该待办已发生变化，请核对申请当前状态。' }
 }
 async function openSimulation() {
   simulationOpen.value = !simulationOpen.value
@@ -576,6 +627,10 @@ watch(applicationDefinitionId, () => {
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
 })
 
+watch(page, value => {
+  if (value === 'applications' && loggedIn.value) void loadApplications()
+  else { applicationsRequest?.abort(); applicationsRequest = null; applicationsLoading.value = false; applications.value = []; applicationsError.value = '' }
+})
 watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
 watch([actor, editorSession, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
 watch(editorSession, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
@@ -664,7 +719,7 @@ onMounted(async () => {
   try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
-onBeforeUnmount(() => { viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
+onBeforeUnmount(() => { applicationsRequest?.abort(); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
 onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
@@ -686,7 +741,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div class="brand"><div class="brand-mark">AF</div><div><strong>agentflow</strong><small>审批工作台</small></div></div>
         <div class="space-label">{{ tenantId }} WORKSPACE</div>
         <nav>
-          <button :class="{ active: page === 'workbench' }" @click="page = 'workbench'"><b>◉</b><span>待我审批</span><i>{{ tasks.length }}</i></button>
+          <button :class="{ active: page === 'workbench' }" @click="page = 'workbench'"><b>◉</b><span>待我审批</span><i>{{ taskCount ?? '—' }}</i></button>
           <button :class="{ active: page === 'started' }" @click="page = 'started'"><b>↗</b><span>我发起</span></button>
           <button :class="{ active: page === 'drafts' }" @click="page = 'drafts'"><b>▧</b><span>我的草稿</span></button>
           <button :class="{ active: page === 'handled' }" @click="page = 'handled'"><b>✓</b><span>已办记录</span></button>
@@ -707,14 +762,11 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
-          <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ tasks.length }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
-          <div class="metrics"><div><span class="metric-icon teal">◎</span><small>待我审批</small><strong>{{ tasks.length }}</strong><em>服务端实时数据</em></div><div><span class="metric-icon blue">↗</span><small>可访问的申请</small><strong>{{ applications.length }}</strong><em>按当前权限返回</em></div><div><span class="metric-icon amber">⌘</span><small>已发布流程</small><strong>{{ publishedDefinitions.length }}</strong><em>当前租户</em></div><div><span class="metric-icon purple">✦</span><small>Agent 预检</small><strong>—</strong><em>尚未接入</em></div></div>
+          <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
+
           <div class="work-grid">
-            <div class="queue panel"><div class="panel-head"><div><h3>待办队列 <span class="count">{{ visibleTasks.length }}</span></h3><p>你被指派或所在审批组可处理的任务</p></div></div><div class="queue-search"><input v-model="taskSearch" aria-label="搜索任务名称" placeholder="搜索任务名称" /></div>
-              <div v-if="!visibleTasks.length" class="queue-empty"><strong>当前没有匹配任务</strong><p>刷新数据，或从已发布流程发起一项申请。</p></div>
-              <button v-for="task in visibleTasks" :key="task.taskId" class="task-row" :disabled="busy || writesBlocked" :class="{ chosen: activeTask?.taskId === task.taskId }" @click="selectTask(task)"><span class="task-state teal-bg">◷</span><span class="task-main"><strong>{{ task.taskName }}</strong><small>{{ task.assignee ? `当前处理人：${task.assignee}` : '审批组待处理' }}</small></span><span class="task-side"><small>{{ dateLabel(task.createdAt) }}</small></span></button>
-            </div>
-            <div class="detail panel">
+            <PendingTaskQueue :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" :definitions="publishedDefinitions" @select="selectTask" @clear-selection="clearTaskSelection" />
+            <div ref="taskDetailPanel" class="detail panel" tabindex="-1" aria-label="当前待办详情">
               <div v-if="activeTask" class="detail-body">
                 <div class="detail-top"><div><span class="status-chip">● {{ activeApplication ? statusLabel(activeApplication.status) : '待处理' }}</span><h3>{{ activeApplication?.title ?? activeTask.taskName }}</h3><p>{{ activeApplication?.businessNo ?? activeTask.taskName }} · 任务创建于 {{ dateLabel(activeTask.createdAt) }}</p></div></div>
                 <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
@@ -728,12 +780,14 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
                 <div v-else class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
               </div>
-              <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>选择一项待办</h3><p>查看真实申请内容，完成批准、退回或转交。</p></div>
+              <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
             </div>
           </div>
         </section>
         <section v-else-if="page === 'applications'" class="content">
           <div class="page-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>申请记录</h2><p class="subhead">服务端按发起人、参与者与管理员权限返回申请。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
+          <p v-if="applicationsLoading" class="unavailable" role="status">正在读取申请记录…</p>
+          <p v-if="applicationsError" class="inline-error" role="alert">{{ applicationsError }}<button class="quiet" @click="loadApplications">重新读取</button></p>
           <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }} · 第 {{ application.roundNo }} 轮</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button class="secondary" :disabled="busy" @click="recordApplicationId = application.id">{{ application.createdBy === actor?.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status) ? '查看并修改' : '查看详情' }}</button></div></div>
         </section>
         <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />

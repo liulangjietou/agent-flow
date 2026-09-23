@@ -46,6 +46,19 @@ export interface SystemCheckReport {
 export type TaskAction = 'CLAIM' | 'RELEASE' | 'TRANSFER' | 'DELEGATE' | 'RESOLVE' | 'RETURN' | 'REJECT' | 'APPROVE'
 /** 当前可操作的任务快照；动作由服务端按委派状态限制。@author owlzhangfq@gmail.com */
 export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[] }
+/** 待办只读摘要不携带审批正文或可直接提交的动作版本。@author owlzhangfq@gmail.com */
+export interface PendingTaskItem {
+  taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
+  definitionVersion: number; applicant: string; amount: string | null; roundNo: number; assignee?: string
+  owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; createdAt: string
+}
+/** 服务端筛选与分页参数。@author owlzhangfq@gmail.com */
+export interface PendingTaskQuery {
+  q?: string; processKey?: string; applicant?: string; assignment?: 'all' | 'assigned' | 'unclaimed' | 'delegated'
+  minAmount?: string; maxAmount?: string; limit?: number; cursor?: string
+}
+/** 当前筛选计数不会被已加载条数替代。@author owlzhangfq@gmail.com */
+export interface PendingTaskPage { items: PendingTaskItem[]; nextCursor?: string | null; total: number }
 /** 提交时保留任务快照版本，不在冲突后自动更新版本。@author owlzhangfq@gmail.com */
 export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
@@ -115,6 +128,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       TASK_DELEGATION_PENDING: '这项任务处于受托处理阶段，请填写意见并回交给原审批人。',
       TASK_NOT_DELEGATED: '任务已不在待回交状态，请刷新后重新选择。',
       TASK_DELEGATION_OWNER_MISSING: '原委派责任人缺失，请联系流程管理员核对。',
+      INVALID_TASK_QUERY: '待办筛选无效，请检查金额范围并重新查询。',
       INVALID_TASK_RECIPIENT: '接收人须为当前租户的其他有效审批账号，请重新选择。',
       FORBIDDEN: '当前账号没有执行此操作的权限，本次未重新执行。原操作结果请查询业务状态。',
       UNAUTHENTICATED: '登录已失效，请重新登录。',
@@ -154,6 +168,8 @@ export const api = {
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request<{ actor: Actor }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  taskPage: (query: PendingTaskQuery, signal: AbortSignal) => request<PendingTaskPage>('/workspace/tasks' + historyQuery(query), { signal }),
+  task: (id: string, signal: AbortSignal) => request<Task>(`/tasks/${encodeURIComponent(id)}`, { signal }),
   tasks: (signal?: AbortSignal) => request<Task[]>('/tasks', { signal }),
   inbox: (query: InboxQuery, signal: AbortSignal) => {
     const params = new URLSearchParams()
@@ -163,8 +179,8 @@ export const api = {
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
-  applications: () => request<Application[]>('/applications'),
-  application: (id: string) => request<Application>(`/applications/${encodeURIComponent(id)}`),
+  applications: (signal?: AbortSignal) => request<Application[]>('/applications', { signal }),
+  application: (id: string, signal?: AbortSignal) => request<Application>(`/applications/${encodeURIComponent(id)}`, { signal }),
   updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>(`/applications/${encodeURIComponent(id)}`, 'PUT', '保存申请修改', body),
   applicationRounds: (id: string) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`),
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>('/applications', 'POST', '创建申请草稿', body),
