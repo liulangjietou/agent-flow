@@ -23,7 +23,7 @@ import java.util.UUID;
 public record WorkspaceQueryParameters(WorkspaceReadPort.Query query, String context) {
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 100;
-    private static final Set<String> HANDLED_ACTIONS = Set.of("APPROVE", "RETURN", "REJECT", "TRANSFER", "DELEGATE");
+    private static final Set<String> HANDLED_ACTIONS = Set.of("APPROVE", "RETURN", "REJECT", "TRANSFER", "DELEGATE", "RESOLVE");
 
     /** 拒绝越权过滤字段、非法范围及其他账号或查询条件下的游标。 */
     public static WorkspaceQueryParameters parse(Actor actor, boolean handled, Map<String, String> raw, JsonUtil json) {

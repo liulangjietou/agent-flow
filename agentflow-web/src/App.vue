@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
+import TaskActions from './components/TaskActions.vue'
+import { taskActionLabels } from './taskActions'
 import WorkspaceRecords from './components/WorkspaceRecords.vue'
 import ApplicationHistory from './components/ApplicationHistory.vue'
 import RequestRecovery from './components/RequestRecovery.vue'
@@ -18,7 +20,7 @@ import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoome
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TemplateCopyInput, type SimulationResult, type ComparisonChange } from './api'
+import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
 type Page = 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
@@ -59,9 +61,6 @@ const activeTask = ref<Task | null>(null)
 const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
 const taskTab = ref<'detail' | 'timeline' | 'audit'>('detail')
-const pendingAction = ref<'RETURN' | 'TRANSFER' | null>(null)
-const actionComment = ref('')
-const targetUser = ref('')
 const taskSearch = ref('')
 const definitions = ref<Definition[]>([])
 const definitionId = ref('')
@@ -289,20 +288,17 @@ async function logout() {
 }
 async function selectTask(task: Task) {
   if (busy.value || writesBlocked.value) return
-  activeTask.value = task; activeApplication.value = null; detailError.value = ''; taskTab.value = 'detail'; pendingAction.value = null; actionComment.value = ''; targetUser.value = ''
+  activeTask.value = task; activeApplication.value = null; detailError.value = ''; taskTab.value = 'detail'
   try { const application = await api.application(task.applicationId); if (activeTask.value?.taskId === task.taskId) activeApplication.value = application }
   catch (error) { detailError.value = errorMessage(error) }
 }
-function prepareAction(action: 'RETURN' | 'TRANSFER') { pendingAction.value = action; actionComment.value = ''; targetUser.value = '' }
-async function performAction(action: 'APPROVE' | 'RETURN' | 'TRANSFER') {
+async function performAction(input: TaskActionInput) {
   if (!activeTask.value || busy.value || writesBlocked.value) return
-  if (action === 'RETURN' && !actionComment.value.trim()) { notice.value = '请填写退回原因'; return }
-  if (action === 'TRANSFER' && !targetUser.value.trim()) { notice.value = '请填写接收人的用户账号'; return }
   busy.value = true
   try {
-    const result = await api.taskAction(activeTask.value.taskId, { action, expectedVersion: activeTask.value.version, comment: actionComment.value.trim() || undefined, targetUser: action === 'TRANSFER' ? targetUser.value.trim() : undefined })
-    activeTask.value = null; activeApplication.value = null; pendingAction.value = null
-    await refreshWorkspace(); notice.value = `${action === 'APPROVE' ? '批准' : action === 'RETURN' ? '退回' : '转交'}已完成，申请状态：${statusLabel(result.applicationStatus)}`
+    const result = await api.taskAction(activeTask.value.taskId, input)
+    activeTask.value = null; activeApplication.value = null
+    await refreshWorkspace(); notice.value = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
   } catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
@@ -606,7 +602,7 @@ async function recoverOperation(id: string) {
         }
       } else {
         const value = result as { taskId: string; applicationStatus: string }
-        if (activeTask.value?.taskId === value.taskId) { activeTask.value = null; activeApplication.value = null; pendingAction.value = null }
+        if (activeTask.value?.taskId === value.taskId) { activeTask.value = null; activeApplication.value = null }
         notice.value = `已确认原审批任务的处理结果，申请状态：${statusLabel(value.applicationStatus)}。`
       }
       await refreshWorkspace()
@@ -698,13 +694,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
                 </div>
                 <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><ApplicationHistory :application-id="activeTask.applicationId" mode="timeline" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <div v-else class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
-                <form v-if="pendingAction" class="task-action-form" @submit.prevent="performAction(pendingAction)">
-                  <h4>{{ pendingAction === 'RETURN' ? '退回申请' : '转交任务' }}</h4>
-                  <label v-if="pendingAction === 'TRANSFER'">接收人账号<input v-model="targetUser" :disabled="busy || writesBlocked" required placeholder="输入用户账号，如 finance" /></label>
-                  <label>{{ pendingAction === 'RETURN' ? '退回原因（必填）' : '转交说明（选填）' }}<textarea v-model="actionComment" :disabled="busy || writesBlocked" :required="pendingAction === 'RETURN'" rows="3" /></label>
-                  <div class="form-actions"><button type="button" class="secondary" :disabled="busy || writesBlocked" @click="pendingAction = null">取消</button><button class="primary" :disabled="busy || writesBlocked">{{ busy ? '提交中…' : '确认提交' }}</button></div>
-                </form>
-                <div v-else class="action-bar"><button class="secondary" :disabled="busy || writesBlocked" @click="prepareAction('TRANSFER')">转交</button><button class="return" :disabled="busy || writesBlocked" @click="prepareAction('RETURN')">退回</button><button class="primary" :disabled="busy || writesBlocked" @click="performAction('APPROVE')">批准申请 ↗</button></div>
+                <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
               </div>
               <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>选择一项待办</h3><p>查看真实申请内容，完成批准、退回或转交。</p></div>
             </div>

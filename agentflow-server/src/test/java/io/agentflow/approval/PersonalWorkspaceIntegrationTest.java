@@ -102,7 +102,7 @@ class PersonalWorkspaceIntegrationTest {
         act(task, "manager", "TRANSFER", "bob", 2);
         act(task, "bob", "TRANSFER", "manager", 3);
         act(task, "manager", "DELEGATE", "bob", 4);
-        act(task, "bob", "TRANSFER", "manager", 5);
+        act(task, "bob", "RESOLVE", null, 5);
         act(task, "manager", "RETURN", null, 6);
         jdbc.update("UPDATE audit_event SET occurred_at=TIMESTAMP '2026-01-01 00:00:00' WHERE application_id=? AND aggregate_type='Task'", id);
         var seen = new java.util.HashSet<String>();

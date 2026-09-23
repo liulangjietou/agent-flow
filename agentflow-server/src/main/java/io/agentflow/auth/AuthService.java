@@ -1,6 +1,8 @@
 package io.agentflow.auth;
 
 import io.agentflow.common.Actor;
+import io.agentflow.approval.service.TaskRecipientDirectory;
+import java.util.List;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,7 +17,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author owlzhangfq@gmail.com
  */
 @Service
-public class AuthService {
+public class AuthService implements TaskRecipientDirectory {
+    private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
+            "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "PROCESS_ADMIN", "ADMIN"),
+            "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"),
+            "manager", Set.of("EMPLOYEE", "APPROVER", "MANAGER"),
+            "employee", Set.of("EMPLOYEE", "APPROVER"),
+            "alice", Set.of("EMPLOYEE", "APPROVER"),
+            "bob", Set.of("EMPLOYEE", "APPROVER"));
     private final Map<String, Actor> tokens = new ConcurrentHashMap<>();
     private final boolean demoEnabled;
     private final String demoTenant;
@@ -38,17 +47,20 @@ public class AuthService {
         if (!"demo".equals(password)) {
             throw new DomainException("UNAUTHENTICATED", "Invalid credentials");
         }
-        Set<String> roles = switch (username) {
-            case "admin" -> Set.of("EMPLOYEE", "APPROVER", "FINANCE", "PROCESS_ADMIN", "ADMIN");
-            case "finance" -> Set.of("EMPLOYEE", "APPROVER", "FINANCE");
-            case "manager" -> Set.of("EMPLOYEE", "APPROVER", "MANAGER");
-            case "employee", "alice", "bob" -> Set.of("EMPLOYEE", "APPROVER");
-            default -> throw new DomainException("UNAUTHENTICATED", "Invalid credentials");
-        };
+        Set<String> roles = DEMO_ROLES.get(username);
+        if (roles == null) throw new DomainException("UNAUTHENTICATED", "Invalid credentials");
         Actor actor = new Actor(tenantId, username, roles);
         String token = UUID.randomUUID().toString();
         tokens.put(token, actor);
         return new LoginResult(token, actor);
+    }
+
+    /** 演示目录与登录共用账号来源；禁用演示或跨租户时不提供接收人。 */
+    @Override
+    public List<String> approvers(String tenantId) {
+        if (!demoEnabled || !demoTenant.equals(tenantId)) return List.of();
+        return DEMO_ROLES.entrySet().stream().filter(entry -> entry.getValue().contains("APPROVER"))
+                .map(Map.Entry::getKey).sorted().toList();
     }
 
     /** 从 Bearer token 解析认证主体。 */

@@ -8,7 +8,7 @@ const emit = defineEmits<{ open: [id: string]; create: [] }>()
 const query = reactive(new WorkspaceRecordsQuery((mode, filters, signal) => mode === 'handled' ? api.workspaceHandled(filters, signal) : api.workspaceApplications(filters, signal)))
 const text = ref(''), filter = ref('')
 const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
-const actions: Record<string, string> = { APPROVE: '批准', RETURN: '退回', REJECT: '驳回', TRANSFER: '转交', DELEGATE: '委派' }
+const actions: Record<string, string> = { APPROVE: '批准', RETURN: '退回', REJECT: '驳回', TRANSFER: '转交', DELEGATE: '委派', RESOLVE: '回交' }
 const heading = computed(() => ({ started: '我发起', drafts: '我的草稿', handled: '已办记录' })[props.mode])
 const description = computed(() => ({ started: '跟进本人发起的每一份申请，查看进度或继续修改。', drafts: '继续填写尚未提交的申请。已退回、已撤回的申请请到“我发起”查看。', handled: '回看本人每次办理的动作与意见，跟进申请当前进度。' })[props.mode])
 const empty = computed(() => ({ started: '还没有发起申请', drafts: '没有待填写的草稿', handled: '还没有办理记录' })[props.mode])
@@ -31,7 +31,7 @@ onUnmounted(() => query.clear())
     <div class="workspace-summary"><span>{{ mode === 'handled' ? '按办理时间倒序 · 同一申请可有多次办理' : '按创建时间倒序' }}</span><span v-if="query.loaded">已加载 {{ query.items.length }} 条{{ mode === 'handled' ? '办理记录' : '申请' }}</span></div>
     <div v-if="query.error" class="workspace-error panel" role="alert"><div><strong>{{ query.items.length ? '后续记录加载失败' : '暂时无法读取记录' }}</strong><p>{{ query.error }}</p></div><button class="secondary" :disabled="query.loading" @click="query.items.length ? query.more() : refresh()">重试</button></div>
     <div v-if="!query.items.length && query.loading" class="panel workspace-empty" role="status"><strong>正在读取{{ heading }}…</strong></div>
-    <div v-else-if="!query.items.length && query.loaded" class="panel workspace-empty"><span aria-hidden="true">▤</span><h3>{{ text.trim() || filter ? '没有符合条件的记录' : empty }}</h3><p>{{ text.trim() || filter ? '调整搜索内容或筛选条件后重新查询。' : mode === 'handled' ? '完成批准、退回、驳回、转交或委派后，可在这里回看。' : '选择已发布流程，填写第一份申请。' }}</p></div>
+    <div v-else-if="!query.items.length && query.loaded" class="panel workspace-empty"><span aria-hidden="true">▤</span><h3>{{ text.trim() || filter ? '没有符合条件的记录' : empty }}</h3><p>{{ text.trim() || filter ? '调整搜索内容或筛选条件后重新查询。' : mode === 'handled' ? '完成批准、退回、驳回、转交、委派或回交后，可在这里回看。' : '选择已发布流程，填写第一份申请。' }}</p></div>
     <div v-if="query.items.length" class="panel workspace-list">
       <article v-for="item in query.items" :key="item.id" class="workspace-row">
         <div class="workspace-main"><div class="workspace-row-heading"><span class="workspace-icon" aria-hidden="true">{{ 'action' in item ? '✓' : '↗' }}</span><div><h3>{{ item.title }}</h3><p class="workspace-business">{{ item.businessNo }}</p></div></div>

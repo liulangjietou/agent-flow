@@ -13,7 +13,7 @@ public interface TaskAuditPort {
     String record(TaskOperation operation);
 
     /**
-     * 动作发生当时的任务事实；目标人员只能来自转交或委托请求。
+     * 动作发生当时的任务事实；目标人员来自已校验的转交/委派请求，回交接收人来自原责任人。
      * @author owlzhangfq@gmail.com
      */
     record TaskOperation(String tenantId, String taskId, UUID applicationId, long aggregateVersion,

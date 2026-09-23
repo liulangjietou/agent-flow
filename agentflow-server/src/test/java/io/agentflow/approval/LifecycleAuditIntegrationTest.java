@@ -165,10 +165,11 @@ class LifecycleAuditIntegrationTest {
         JsonNode transferred = events(id, "Task").get(0);
         act(task.getId(), "manager", "DELEGATE", "alice", 3).andExpect(status().isOk());
         JsonNode delegated = events(id, "Task").get(1);
-        act(task.getId(), "alice", "TRANSFER", "bob", 4).andExpect(status().isOk());
+        act(task.getId(), "alice", "RESOLVE", null, 4).andExpect(status().isOk());
+        act(task.getId(), "manager", "TRANSFER", "bob", 5).andExpect(status().isOk());
         assertThat(task(id).getAssignee()).isEqualTo("bob");
         var recorded = events(id, "Task");
-        assertThat(recorded).hasSize(3);
+        assertThat(recorded).hasSize(4);
         assertThat(recorded.get(0)).isEqualTo(transferred);
         assertThat(recorded.get(1)).isEqualTo(delegated);
         assertThat(transferred.path("targetUser").asText()).isEqualTo("manager");

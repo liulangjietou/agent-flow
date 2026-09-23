@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 @Repository
 public class JdbcWorkspaceReadAdapter implements WorkspaceReadPort, ApplicationParticipantPort {
-    private static final String HANDLED_ACTIONS = "('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE')";
+    private static final String HANDLED_ACTIONS = "('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE')";
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
 

@@ -43,7 +43,11 @@ export interface SystemCheckReport {
   checkedAt: string
   checks: Array<{ id: string; status: 'UP' | 'DOWN' | 'UNKNOWN' | 'WARNING' | 'NOT_IMPLEMENTED'; code: string; message: string }>
 }
-export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
+export type TaskAction = 'CLAIM' | 'RELEASE' | 'TRANSFER' | 'DELEGATE' | 'RESOLVE' | 'RETURN' | 'REJECT' | 'APPROVE'
+/** 当前可操作的任务快照；动作由服务端按委派状态限制。@author owlzhangfq@gmail.com */
+export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[] }
+/** 提交时保留任务快照版本，不在冲突后自动更新版本。@author owlzhangfq@gmail.com */
+export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
 export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
 export interface HistoryEvent {
@@ -97,6 +101,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
+      TASK_DELEGATION_PENDING: '这项任务处于受托处理阶段，请填写意见并回交给原审批人。',
+      TASK_NOT_DELEGATED: '任务已不在待回交状态，请刷新后重新选择。',
+      TASK_DELEGATION_OWNER_MISSING: '原委派责任人缺失，请联系流程管理员核对。',
+      INVALID_TASK_RECIPIENT: '接收人须为当前租户的其他有效审批账号，请重新选择。',
       FORBIDDEN: '当前账号没有执行此操作的权限，本次未重新执行。原操作结果请查询业务状态。',
       UNAUTHENTICATED: '登录已失效，请重新登录。',
       FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
@@ -136,7 +144,8 @@ export const api = {
   me: () => request<{ actor: Actor }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
   tasks: () => request<Task[]>('/tasks'),
-  taskAction: (taskId: string, body: { action: string; comment?: string; targetUser?: string; expectedVersion: number }) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
+  taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
+  taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
   applications: () => request<Application[]>('/applications'),
   application: (id: string) => request<Application>(`/applications/${encodeURIComponent(id)}`),
   updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>(`/applications/${encodeURIComponent(id)}`, 'PUT', '保存申请修改', body),

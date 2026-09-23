@@ -34,6 +34,10 @@ public class TaskController {
         return facade.list(status);
     }
 
+    /** 查询当前任务可转交或委派的同租户有效接收人。 */
+    @GetMapping("/{taskId}/recipients")
+    public List<String> recipients(@PathVariable String taskId) { return facade.recipients(taskId); }
+
     /** 执行审批任务动作。 */
     @PostMapping("/{taskId}/actions")
     public ResponseEntity<String> action(@PathVariable String taskId, @Valid @RequestBody TaskActionRequest request,

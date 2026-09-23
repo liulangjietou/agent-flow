@@ -22,7 +22,7 @@ public record HistoryQueryParameters(Instant from, Instant to, String action, In
     private static final int DEFAULT_LIMIT = 50;
     private static final int MAX_LIMIT = 100;
     private static final Set<String> ACTIONS = Set.of("CREATE", "REVISE", "SUBMIT", "WITHDRAW", "CLAIM", "RELEASE",
-            "TRANSFER", "DELEGATE", "RETURN", "REJECT", "APPROVE");
+            "TRANSFER", "DELEGATE", "RESOLVE", "RETURN", "REJECT", "APPROVE");
 
     /** 解析并拒绝非法或不支持的过滤字段；游标同时绑定申请、视图与筛选条件。 */
     public static HistoryQueryParameters parse(UUID applicationId, boolean timeline, Map<String, String> raw) {
