@@ -1,0 +1,23 @@
+/* 视口有独立尺寸，逻辑舞台按比例缩放，滚动范围由缩放后的尺寸决定。 */
+.designer-layout .canvas-wrap { height: 600px; min-height: 0; }
+.canvas-wrap .canvas-toolbar { flex: 0 0 auto; height: auto; min-height: 49px; flex-wrap: wrap; gap: 8px; padding: 9px 12px; }
+.canvas-title { flex: 1; min-width: 100px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.canvas-toolbar .canvas-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.canvas-tools button { min-height: 30px; min-width: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--deep); padding: 6px 8px; }
+.canvas-tools button:hover:not(:disabled) { background: var(--soft); }
+.canvas-tools output { min-width: 39px; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; }
+.canvas-wrap .canvas { min-height: 0; }
+.canvas-sizer { position: relative; overflow: hidden; min-width: 100%; min-height: 100%; }
+.canvas-stage { position: absolute; left: 0; top: 0; transform-origin: top left; }
+.canvas-stage .edges { width: 100%; height: 100%; }
+.canvas-stage .edge-label { text-anchor: middle; cursor: pointer; paint-order: stroke; stroke: #f7faf9; stroke-width: 4px; stroke-linejoin: round; }
+.canvas-stage .edge-hit { stroke: transparent; stroke-width: 16px; pointer-events: stroke; }
+.canvas-stage .flow-node { height: 64px; touch-action: none; user-select: none; }
+.canvas-stage .flow-node.start, .canvas-stage .flow-node.end { height: 42px; }
+.canvas-hint { flex: 0 0 auto; margin: 0; padding: 10px 13px; color: var(--muted); font-size: 10px; line-height: 1.6; background: #fff; border-top: 1px solid var(--line); }
+@media (max-width: 650px) {
+  .designer-layout .canvas-wrap { height: 480px; }
+  .canvas-toolbar .canvas-title { flex-basis: 100%; }
+  .canvas-toolbar .canvas-tools { gap: 5px; }
+  .canvas-tools button { min-height: 34px; }
+}

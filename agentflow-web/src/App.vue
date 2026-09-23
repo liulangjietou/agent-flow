@@ -12,6 +12,7 @@ import DefinitionComparison from './components/DefinitionComparison.vue'
 import DefinitionPublication from './components/DefinitionPublication.vue'
 import PublicationDialog from './components/PublicationDialog.vue'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
+import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
@@ -93,6 +94,14 @@ const history = ref<string[]>([])
 const future = ref<string[]>([])
 const connectionTarget = ref('')
 const canvas = ref<HTMLElement | null>(null)
+const canvasZoom = ref(1)
+const canvasSize = ref({ width: 0, height: 0 })
+const canvasMessage = ref('缩放只改变视图，自动布局可撤销。')
+const routedEdges = computed(() => routeEdges(nodes.value, edges.value))
+const canvasBounds = computed(() => graphBounds(nodes.value, routedEdges.value))
+const stageSize = computed(() => ({ width: Math.max(canvasSize.value.width / canvasZoom.value, canvasBounds.value.right + CANVAS_PADDING * 2),
+  height: Math.max(canvasSize.value.height / canvasZoom.value, canvasBounds.value.bottom + CANVAS_PADDING * 2) }))
+let stopNodeDrag: (() => void) | null = null
 const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'USER_TASK', label: '人工审批', icon: '人' },
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
@@ -136,8 +145,8 @@ function defaultGraph() {
 function snapshot() { return JSON.stringify({ key: definitionKey.value, name: definitionName.value, nodes: nodes.value, edges: edges.value, formSchema: definitionFormSchema.value }) }
 function remember() { history.value.push(snapshot()); if (history.value.length > 50) history.value.shift(); future.value = [] }
 function restore(raw: string) { const value = JSON.parse(raw); definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null) }
-function undo() { if (editorLocked.value) return; const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
-function redo() { if (editorLocked.value) return; const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
+function undo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
+function redo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
 function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; validationErrors.value = []; validationMessage.value = '尚未校验，发布前将运行服务端校验。' }
 function graphPayload(): Graph {
   return {
@@ -334,17 +343,43 @@ async function publishDraft() {
 }
 function selectNode(node: FlowNode) { selectedId.value = node.id; selectedEdgeId.value = ''; connectionTarget.value = '' }
 function selectEdge(edge: GraphEdge) { selectedEdgeId.value = edge.id; selectedId.value = '' }
-function moveNode(event: MouseEvent, node: FlowNode) {
+function moveNode(event: PointerEvent, node: FlowNode) {
   if (editorLocked.value || event.button !== 0) return
-  remember(); dragging.value = node.id; const startX = event.clientX; const startY = event.clientY; const x = node.x; const y = node.y
-  const move = (next: MouseEvent) => { if (editorLocked.value) return; node.x = Math.max(12, Math.round((x + next.clientX - startX) / 9) * 9); node.y = Math.max(20, Math.round((y + next.clientY - startY) / 9) * 9) }
-  const up = () => { dragging.value = null; window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
-  window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
+  stopNodeDrag?.()
+  const viewport = canvas.value
+  if (!viewport) return
+  const target = event.currentTarget as HTMLElement
+  const start = { x: node.x, y: node.y }, pointer = { x: event.clientX, y: event.clientY }
+  const scroll = { x: viewport.scrollLeft, y: viewport.scrollTop }, zoom = canvasZoom.value
+  let changed = false
+  target.setPointerCapture(event.pointerId)
+  const move = (next: PointerEvent) => {
+    if (next.pointerId !== event.pointerId || editorLocked.value) return
+    const bounds = viewport.getBoundingClientRect()
+    if (next.clientX > bounds.right - 24) viewport.scrollLeft += 14
+    else if (next.clientX < bounds.left + 24) viewport.scrollLeft -= 14
+    if (next.clientY > bounds.bottom - 24) viewport.scrollTop += 14
+    else if (next.clientY < bounds.top + 24) viewport.scrollTop -= 14
+    const position = draggedPosition(start, { x: next.clientX - pointer.x, y: next.clientY - pointer.y },
+      { x: viewport.scrollLeft - scroll.x, y: viewport.scrollTop - scroll.y }, zoom)
+    if (position.x === node.x && position.y === node.y) return
+    if (!changed) { remember(); changed = true; dragging.value = node.id }
+    node.x = position.x; node.y = position.y
+  }
+  const up = (next: PointerEvent) => { if (next.pointerId === event.pointerId) stopNodeDrag?.() }
+  stopNodeDrag = () => {
+    dragging.value = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
+    window.removeEventListener('pointercancel', up); target.removeEventListener('lostpointercapture', up)
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
+    stopNodeDrag = null
+  }
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+  window.addEventListener('pointercancel', up); target.addEventListener('lostpointercapture', up)
 }
-function addNode(type: NodeType) {
+function addNode(type: NodeType, position?: Point) {
   if (editorLocked.value) return
   remember(); const base = selectedNode.value; const id = `${type.toLowerCase()}-${crypto.randomUUID()}`
-  nodes.value.push({ id, name: palette.find(item => item.type === type)?.label ?? '节点', type, x: (base?.x ?? 160) + 180, y: (base?.y ?? 140) + 80, assigneeRule: '' })
+  nodes.value.push({ id, name: palette.find(item => item.type === type)?.label ?? '节点', type, x: position?.x ?? (base?.x ?? 160) + 180, y: position?.y ?? (base?.y ?? 140) + 80, assigneeRule: '' })
   if (base && base.type !== 'END' && base.type !== 'EXCLUSIVE_GATEWAY') {
     const old = edges.value.find(edge => edge.source === base.id)
     if (old) old.source = id
@@ -370,12 +405,46 @@ function deleteSelected() {
   if (selectedNode.value && selectedNode.value.type !== 'START') { remember(); const id = selectedNode.value.id; nodes.value = nodes.value.filter(node => node.id !== id); edges.value = edges.value.filter(edge => edge.source !== id && edge.target !== id); selectedId.value = '' }
   else if (selectedEdge.value) { remember(); edges.value = edges.value.filter(edge => edge.id !== selectedEdgeId.value); selectedEdgeId.value = '' }
 }
-function onDrop(event: DragEvent) { const type = event.dataTransfer?.getData('node-type') as NodeType; if (palette.some(item => item.type === type)) addNode(type) }
-function edgePath(edge: GraphEdge) {
-  const a = nodes.value.find(node => node.id === edge.source); const b = nodes.value.find(node => node.id === edge.target)
-  if (!a || !b) return ''
-  const small = ['START', 'END'].includes(a.type); const ax = a.x + (small ? 67 : 126); const ay = a.y + (small ? 22 : 32); const bx = b.x; const by = b.y + (['START', 'END'].includes(b.type) ? 22 : 32); const mx = (ax + bx) / 2
-  return `M ${ax} ${ay} L ${mx} ${ay} L ${mx} ${by} L ${bx} ${by}`
+function onDrop(event: DragEvent) {
+  const type = event.dataTransfer?.getData('node-type') as NodeType
+  const viewport = canvas.value
+  if (!viewport || !palette.some(item => item.type === type)) return
+  const bounds = viewport.getBoundingClientRect()
+  const position = draggedPosition({ x: 0, y: 0 }, { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
+    { x: viewport.scrollLeft, y: viewport.scrollTop }, canvasZoom.value)
+  addNode(type, position)
+}
+async function changeCanvasZoom(delta: number) {
+  const viewport = canvas.value
+  if (!viewport) return
+  stopNodeDrag?.()
+  const next = clampZoom(canvasZoom.value + delta)
+  const position = zoomedScroll({ width: viewport.clientWidth, height: viewport.clientHeight, left: viewport.scrollLeft, top: viewport.scrollTop }, canvasZoom.value, next)
+  canvasZoom.value = next
+  await nextTick()
+  viewport.scrollTo(position.x, position.y)
+  canvasMessage.value = '缩放只改变视图，自动布局可撤销。'
+}
+async function fitCanvas(quiet = false) {
+  await nextTick()
+  const viewport = canvas.value
+  if (!viewport) return
+  stopNodeDrag?.()
+  const fit = fittedViewport(canvasBounds.value, viewport.clientWidth, viewport.clientHeight)
+  canvasZoom.value = fit.zoom
+  await nextTick()
+  viewport.scrollTo(fit.left, fit.top)
+  if (!quiet) canvasMessage.value = fit.clipped ? '已缩小至 50%，流程较大，可继续滚动画布查看。' : '已适应画布，节点坐标保持不变。'
+}
+async function autoLayout() {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  try {
+    stopNodeDrag?.()
+    const result = arrangeNodes(nodes.value, edges.value)
+    if (result.nodes.some((node, index) => node.x !== nodes.value[index]?.x || node.y !== nodes.value[index]?.y)) { remember(); nodes.value = result.nodes }
+    await fitCanvas(true)
+    canvasMessage.value = result.hasCycle ? '已整理布局；草稿仍有回环，发布前需要修复。' : '已自动布局，可撤销；审批规则和分支顺序保持不变。'
+  } catch (error) { canvasMessage.value = errorMessage(error) }
 }
 function keyHandler(event: KeyboardEvent) {
   if (page.value !== 'designer' || editorLocked.value || ['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) return
@@ -424,6 +493,15 @@ watch(applicationDefinitionId, () => {
 })
 
 watch(actor, () => { confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
+watch([actor, definitionId, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
+watch(definitionId, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
+watch(canvas, (element, _previous, onCleanup) => {
+  if (!element) return
+  const resize = () => { canvasSize.value = { width: element.clientWidth, height: element.clientHeight } }
+  const observer = new ResizeObserver(resize)
+  observer.observe(element); resize(); void fitCanvas(true)
+  onCleanup(() => observer.disconnect())
+})
 watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publicationNote.value = '' }, { flush: 'sync' })
 
 watch([nodes, edges, definitionName, definitionFormSchema], () => { validationErrors.value = []; validationMessage.value = '内容已修改，请重新校验。' }, { deep: true, flush: 'sync' })
@@ -484,7 +562,7 @@ onMounted(async () => {
   try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
-onBeforeUnmount(() => { viewActive = false; confirmation.dispose() })
+onBeforeUnmount(() => { viewActive = false; stopNodeDrag?.(); confirmation.dispose() })
 onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
@@ -567,7 +645,31 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <div class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批组和下一节点；选中连线可编辑条件或删除。</p><p>支持角色审批组；额外复核组仅为模板示例，组织负责人解析尚未接入。</p></div></aside>
-            <div class="canvas-wrap"><div class="canvas-toolbar"><span>{{ definitionName }}</span><span>滚动画布查看全部节点</span></div><div ref="canvas" class="canvas" tabindex="0" @dragover.prevent @drop="onDrop"><svg class="edges" viewBox="0 0 1600 900"><path v-for="edge in edges" :key="edge.id" :d="edgePath(edge)" :data-edge-id="edge.id" :class="{ selected: selectedEdgeId === edge.id, simulated: simulationResult?.edgeIds.includes(edge.id) }" @click.stop="selectEdge(edge)" /><text v-for="edge in edges.filter(item => item.condition || item.defaultBranch)" :key="`${edge.id}-label`" :x="((nodes.find(node => node.id === edge.source)?.x ?? 0) + (nodes.find(node => node.id === edge.target)?.x ?? 0)) / 2 + 30" :y="(nodes.find(node => node.id === edge.target)?.y ?? 0) - 8" class="edge-label">{{ edge.defaultBranch ? '默认分支' : edge.condition }}</text></svg><button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @mousedown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ roleLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button></div></div>
+            <div class="canvas-wrap">
+              <div class="canvas-toolbar"><span class="canvas-title" :title="definitionName">{{ definitionName }}</span><div class="canvas-tools" aria-label="画布视图操作">
+                <button type="button" aria-label="缩小画布" title="缩小画布" :disabled="canvasZoom <= MIN_ZOOM" @click="changeCanvasZoom(-ZOOM_STEP)">−</button>
+                <output aria-label="画布缩放比例">{{ Math.round(canvasZoom * 100) }}%</output>
+                <button type="button" aria-label="放大画布" title="放大画布" :disabled="canvasZoom >= MAX_ZOOM" @click="changeCanvasZoom(ZOOM_STEP)">＋</button>
+                <button type="button" @click="fitCanvas()">适应画布</button>
+                <button v-if="canManageDefinitions" type="button" :disabled="editorLocked || !nodes.length" @click="autoLayout">自动布局</button>
+              </div></div>
+              <div ref="canvas" class="canvas" tabindex="0" aria-label="流程画布，可滚动查看节点与连线" @dragover.prevent @drop.prevent="onDrop">
+                <div class="canvas-sizer" :style="{ width: `${stageSize.width * canvasZoom}px`, height: `${stageSize.height * canvasZoom}px` }">
+                  <div class="canvas-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px`, transform: `scale(${canvasZoom})` }">
+                    <svg class="edges" :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`">
+                      <defs><marker id="flow-arrow" markerWidth="7" markerHeight="7" refX="7" refY="3.5" orient="auto"><polygon points="0 0, 7 3.5, 0 7" fill="context-stroke" /></marker></defs>
+                      <g v-for="route in routedEdges" :key="route.edge.id">
+                        <path class="edge-hit" :d="route.path" @click.stop="selectEdge(route.edge)" />
+                        <path :d="route.path" :data-edge-id="route.edge.id" marker-end="url(#flow-arrow)" :class="{ selected: selectedEdgeId === route.edge.id, simulated: simulationResult?.edgeIds.includes(route.edge.id) }" @click.stop="selectEdge(route.edge)" />
+                        <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ route.fullText }}</title></text>
+                      </g>
+                    </svg>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ roleLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                  </div>
+                </div>
+              </div>
+              <p class="canvas-hint" role="status">{{ routedEdges.some(route => route.obstructed) ? '部分节点或连线重叠，可手动调整节点或使用自动布局。' : canvasMessage }}</p>
+            </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><label v-if="selectedNode.type === 'USER_TASK'">审批组<select v-model="selectedNode.assigneeRule" @focus="remember"><option value="">请选择审批组</option><option v-for="role in roleOptions" :key="role.value" :value="role.value">{{ role.label }}</option><option v-if="selectedNode.assigneeRule && !roleOptions.some(role => role.value === selectedNode?.assigneeRule)" :value="selectedNode.assigneeRule">{{ selectedNode.assigneeRule }}（已有配置）</option></select></label>
                 <div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY'" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>

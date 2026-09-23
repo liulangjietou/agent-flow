@@ -28,3 +28,12 @@ test('清空审批人规则移除旧值，但保留其他配置；新节点正�
   assert.deepEqual(serializeDesignerNodes([{ id: 'new', name: '新审批', type: 'USER_TASK', x: 40, y: 60, assigneeRule: 'role:FINANCE' }])[0].properties,
     { assigneeRule: 'role:FINANCE', x: '40', y: '60' })
 })
+
+
+test('非法布局坐标采用可展示位置，未移动时仍保留原始属性', () => {
+  const original = [{ id: 'bad', name: '审批', type: 'USER_TASK', properties: { x: 'not-a-number', y: 'Infinity', businessTag: '保留' } }]
+  const loadedNodes = loadDesignerNodes(original)
+  assert.ok(Number.isFinite(loadedNodes[0].x))
+  assert.ok(Number.isFinite(loadedNodes[0].y))
+  assert.deepEqual(serializeDesignerNodes(loadedNodes), original)
+})

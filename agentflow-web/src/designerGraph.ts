@@ -17,8 +17,10 @@ const DEFAULT_NODE_SPACING = 180
 /** 保留完整来源配置；没有持久化坐标时只在画布里补充展示位置。 */
 export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
   return nodes.map((node, index) => {
-    const x = Number(node.properties.x ?? DEFAULT_NODE_X + index * DEFAULT_NODE_SPACING)
-    const y = Number(node.properties.y ?? DEFAULT_NODE_Y)
+    const rawX = Number(node.properties.x ?? DEFAULT_NODE_X + index * DEFAULT_NODE_SPACING)
+    const rawY = Number(node.properties.y ?? DEFAULT_NODE_Y)
+    const x = Number.isFinite(rawX) && rawX >= 0 ? rawX : DEFAULT_NODE_X + index * DEFAULT_NODE_SPACING
+    const y = Number.isFinite(rawY) && rawY >= 0 ? rawY : DEFAULT_NODE_Y
     return { id: node.id, name: node.name, type: node.type, x, y, assigneeRule: node.properties.assigneeRule ?? '',
       originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
