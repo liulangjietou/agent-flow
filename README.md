@@ -16,6 +16,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 打开 `http://127.0.0.1:8180`，以 `demo / admin / demo` 登录。“系统自检”显示真实依赖状态，并提供模板和流程管理入口。数据库使用持久卷，仅 Web 入口开放到本机。首次构建需要网络，停止时保留数据卷。详见[演示安装与系统自检](docs/demo-installation.md)。
 
+演示 PostgreSQL 支持[完整备份与隔离恢复](docs/demo-backup-recovery.md)：校验归档后使用原镜像恢复到新项目、新卷及新端口，保留旧实例；恢复后可继续办理未完成会签任务。工具不会覆盖已有数据，当前不包含生产灾备、跨版本升级或 H2 备份。
+
 ## 本地启动
 
 需要 Java 17+、Maven 3.9+ 和 Node.js 20.19+ 或 22.12+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。
@@ -126,7 +128,7 @@ npm run build
 
 在独立验收库执行 `python3 scripts/check-notifications.py http://127.0.0.1:8082`，验证真实动作产生消息、接收范围、并发已读和权限隔离，保留全部测试数据与一张浏览器待办。
 
-GitHub Actions 将执行作者检查、后端 `verify`、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。
+GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测试、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。
 
 - [待办检索与分页](docs/pending-task-queue.md)
 

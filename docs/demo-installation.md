@@ -63,7 +63,7 @@ docker compose -f compose.demo.yml up -d --wait --wait-timeout 180
 
 PostgreSQL 使用 `agentflow-demo_demo-postgres` 命名卷。`stop` 或不带 `-v` 的 `down` 保留卷；再次启动连接原库，Flyway 沿用迁移记录。不要执行 `down -v` 或删除数据卷，这会删除演示申请、定义和审批历史。更改演示数据库密码不会修改已初始化卷内的密码。
 
-后端重启会使内存中的演示登录令牌失效，需要重新登录，业务数据保留。镜像升级先备份数据库，再使用 `up --build`；本安装方式不是自动迁移回滚方案。
+后端重启会使内存中的演示登录令牌失效，需要重新登录，业务数据保留。镜像升级先按[演示数据库备份与隔离恢复](demo-backup-recovery.md)生成完整备份，并在新项目验证恢复，再使用 `up --build`；本安装方式不是自动迁移回滚方案。
 
 镜像采用官方 `maven:3.9-eclipse-temurin-17`、`eclipse-temurin:17-jre-jammy`、`node:22-bookworm-slim`、`nginx:stable-alpine` 与 `postgres:17` 版本系列，标签可更新。本地验收记录保存实际镜像摘要；尚未提供生产镜像锁定、漏洞扫描或 Helm 发布流程。
 
