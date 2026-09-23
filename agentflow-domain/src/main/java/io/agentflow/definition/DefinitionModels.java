@@ -1,6 +1,7 @@
 package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.form.FormSchema;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -79,33 +80,53 @@ public final class DefinitionModels {
         private long revision;
         private DraftStatus status;
         private Graph graph;
+        private FormSchema formSchema;
 
         /** 创建新草稿。 */
         public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph) {
+            return create(id, tenantId, key, name, graph, null);
+        }
+
+        /** 新建携带表单契约的草稿，表单与流程图共同发布。 */
+        public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph, FormSchema formSchema) {
             if (id == null || tenantId == null || tenantId.isBlank() || key == null || key.isBlank()) {
                 throw new DomainException("INVALID_DEFINITION", "Definition id, tenant and key are required");
             }
-            return new DefinitionDraft(id, tenantId, key, name, 0, 0, DraftStatus.DRAFT, graph);
+            return new DefinitionDraft(id, tenantId, key, name, 0, 0, DraftStatus.DRAFT, graph, formSchema);
         }
 
         /** 从持久化状态恢复草稿。 */
         public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
                                                long revision, DraftStatus status, Graph graph) {
-            return new DefinitionDraft(id, tenantId, key, name, version, revision, status, graph);
+            return restore(id, tenantId, key, name, version, revision, status, graph, null);
+        }
+
+        /** 恢复当前记录自己的表单契约；旧记录保持无 schema 状态。 */
+        public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
+                                              long revision, DraftStatus status, Graph graph, FormSchema formSchema) {
+            return new DefinitionDraft(id, tenantId, key, name, version, revision, status, graph, formSchema);
         }
 
         private DefinitionDraft(UUID id, String tenantId, String key, String name, long version, long revision,
-                                DraftStatus status, Graph graph) {
+                                DraftStatus status, Graph graph, FormSchema formSchema) {
             this.id = Objects.requireNonNull(id); this.tenantId = Objects.requireNonNull(tenantId);
             this.key = Objects.requireNonNull(key); this.name = Objects.requireNonNullElse(name, key);
             this.version = version; this.revision = revision; this.status = Objects.requireNonNull(status);
             this.graph = Objects.requireNonNull(graph);
+            this.formSchema = formSchema;
         }
 
         /** 更新草稿图并校验版本。 */
         public void update(String name, Graph graph, long expectedRevision) {
+            update(name, graph, null, expectedRevision);
+        }
+
+        /** null 保留已有表单；显式空字段列表才将表单清空。 */
+        public void update(String name, Graph graph, FormSchema formSchema, long expectedRevision) {
             ensureDraft(); ensureRevision(expectedRevision);
-            this.name = Objects.requireNonNullElse(name, key); this.graph = Objects.requireNonNull(graph); this.revision++;
+            Graph updatedGraph = Objects.requireNonNull(graph);
+            if (formSchema != null) this.formSchema = formSchema;
+            this.name = Objects.requireNonNullElse(name, key); this.graph = updatedGraph; this.revision++;
         }
 
         /** 标记为已发布，发布后不可修改。 */
@@ -122,6 +143,7 @@ public final class DefinitionModels {
 
         public UUID id() { return id; } public String tenantId() { return tenantId; } public String key() { return key; }
         public String name() { return name; } public long version() { return version; } public long revision() { return revision; }
+        public FormSchema formSchema() { return formSchema; }
         public DraftStatus status() { return status; } public Graph graph() { return graph; }
     }
 
@@ -129,10 +151,13 @@ public final class DefinitionModels {
      * 条件运行上下文。
      * @author owlzhangfq@gmail.com
      */
-    public record EvaluationContext(Map<String, Object> values) {
+    public record EvaluationContext(Map<String, Object> values, Map<String, String> fieldTypes) {
+        public EvaluationContext(Map<String, Object> values) { this(values, null); }
+
         public EvaluationContext {
             // 未填写或已清空的表单值仍参与 EXISTS/NOT_EXISTS 判断，不能在构造上下文时拒绝 null。
             values = values == null ? Map.of() : Collections.unmodifiableMap(new HashMap<>(values));
+            fieldTypes = fieldTypes == null ? null : Map.copyOf(fieldTypes);
         }
         /** 读取白名单字段。 */
         public Object value(String name) { return values.get(name); }
@@ -153,12 +178,24 @@ public final class DefinitionModels {
     public record Comparison(String field, Operator operator, String literal) implements ConditionAst {
         public Comparison { if (field == null || !field.matches("[a-zA-Z][a-zA-Z0-9_.]{0,63}")) throw new DomainException("INVALID_CONDITION", "Field is not allowed"); }
         public boolean evaluate(EvaluationContext c) {
-            Object raw = c.value(field); if (raw == null) return operator == Operator.NOT_EXISTS;
+            Object raw = c.value(field);
+            String declaredType = c.fieldTypes() == null ? null : c.fieldTypes().get(field);
+            if (c.fieldTypes() != null && declaredType == null) throw new DomainException("INVALID_CONDITION", "Condition field is not declared");
+            boolean absent = c.fieldTypes() == null ? raw == null : FormSchema.empty(raw, FormSchema.FieldType.valueOf(declaredType));
+            if (absent) return operator == Operator.NOT_EXISTS;
             if (operator == Operator.EXISTS) return true;
             if (operator == Operator.NOT_EXISTS) return false;
             int cmp;
-            try { cmp = new BigDecimal(raw.toString()).compareTo(new BigDecimal(literal)); }
-            catch (NumberFormatException ex) { cmp = raw.toString().compareTo(literal); }
+            if (c.fieldTypes() != null) {
+                cmp = switch (FormSchema.FieldType.valueOf(declaredType)) {
+                    case NUMBER -> FormSchema.decimal(raw.toString()).compareTo(FormSchema.decimal(literal));
+                    case BOOLEAN -> Boolean.compare((Boolean) raw, Boolean.parseBoolean(literal));
+                    case DATE, TEXT, TEXTAREA, SELECT -> raw.toString().compareTo(literal);
+                };
+            } else {
+                try { cmp = new BigDecimal(raw.toString()).compareTo(new BigDecimal(literal)); }
+                catch (NumberFormatException ex) { cmp = raw.toString().compareTo(literal); }
+            }
             return switch (operator) { case EQ -> cmp == 0; case NE -> cmp != 0; case GT -> cmp > 0; case GE -> cmp >= 0; case LT -> cmp < 0; case LE -> cmp <= 0; default -> false; };
         }
     }

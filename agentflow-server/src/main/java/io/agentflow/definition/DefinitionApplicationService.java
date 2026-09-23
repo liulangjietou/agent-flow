@@ -1,6 +1,7 @@
 package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.form.FormSchema;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,20 +33,37 @@ public class DefinitionApplicationService {
         return validator.validate(graph);
     }
 
+    /** 联合校验流程图与表单，不改变持久化状态。 */
+    public List<String> validate(Graph graph, FormSchema formSchema) {
+        return validator.validate(graph, formSchema);
+    }
+
     /** 新建流程草稿。 */
     @Transactional
     public DefinitionDraft create(String tenantId, String key, String name, Graph graph) {
-        requireValid(graph);
-        DefinitionDraft draft = DefinitionDraft.create(UUID.randomUUID(), tenantId, key, name, graph);
+        return create(tenantId, key, name, graph, null);
+    }
+
+    /** 新建携带表单契约的流程草稿。 */
+    @Transactional
+    public DefinitionDraft create(String tenantId, String key, String name, Graph graph, FormSchema formSchema) {
+        requireValid(graph, formSchema);
+        DefinitionDraft draft = DefinitionDraft.create(UUID.randomUUID(), tenantId, key, name, graph, formSchema);
         return repository.save(draft);
     }
 
     /** 更新草稿，发布后的定义不可修改。 */
     @Transactional
     public DefinitionDraft update(String tenantId, UUID id, String name, Graph graph, long expectedRevision) {
-        requireValid(graph);
+        return update(tenantId, id, name, graph, null, expectedRevision);
+    }
+
+    /** 使用同一个草稿 revision 原子更新表单和流程图。 */
+    @Transactional
+    public DefinitionDraft update(String tenantId, UUID id, String name, Graph graph, FormSchema formSchema, long expectedRevision) {
         DefinitionDraft draft = get(tenantId, id);
-        draft.update(name, graph, expectedRevision);
+        requireValid(graph, formSchema == null ? draft.formSchema() : formSchema);
+        draft.update(name, graph, formSchema, expectedRevision);
         return repository.save(draft);
     }
 
@@ -53,7 +71,7 @@ public class DefinitionApplicationService {
     @Transactional
     public DefinitionDraft publish(String tenantId, UUID id, long expectedRevision) {
         DefinitionDraft draft = get(tenantId, id);
-        requireValid(draft.graph());
+        requireValid(draft.graph(), draft.formSchema());
         draft.publish(expectedRevision, repository.nextVersion(tenantId, draft.key()));
         DefinitionDraft published = repository.save(draft);
         deploymentPort.deploy(published);
@@ -62,7 +80,13 @@ public class DefinitionApplicationService {
 
     /** 使用同一套受限条件求值器模拟流程路径，不接触流程引擎。 */
     public List<String> simulate(String tenantId, UUID id, DefinitionModels.EvaluationContext context) {
-        return simulator.simulate(get(tenantId, id).graph(), context);
+        DefinitionDraft draft = get(tenantId, id);
+        requireValid(draft.graph(), draft.formSchema());
+        if (draft.formSchema() != null) {
+            draft.formSchema().validateSubmission(context.values());
+            context = new DefinitionModels.EvaluationContext(context.values(), draft.formSchema().fieldTypes());
+        }
+        return simulator.simulate(draft.graph(), context);
     }
 
     /** 查询定义。 */
@@ -76,8 +100,8 @@ public class DefinitionApplicationService {
         return repository.findAll(tenantId, status);
     }
 
-    private void requireValid(Graph graph) {
-        List<String> errors = validator.validate(graph);
+    private void requireValid(Graph graph, FormSchema formSchema) {
+        List<String> errors = validator.validate(graph, formSchema);
         if (!errors.isEmpty()) {
             throw new DomainException("INVALID_DEFINITION", String.join(",", errors));
         }

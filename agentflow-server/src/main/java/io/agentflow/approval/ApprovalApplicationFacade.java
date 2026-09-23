@@ -11,6 +11,9 @@ import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
+import io.agentflow.definition.DefinitionDraftRepository;
+import io.agentflow.definition.DefinitionModels;
+import io.agentflow.form.FormSchema;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,21 +27,27 @@ import java.util.UUID;
  */
 @Service
 public class ApprovalApplicationFacade {
+    private static final String BUNDLED_LEGACY_PROCESS = "expense-reimbursement";
+    private static final long BUNDLED_LEGACY_VERSION = 1L;
     private final ApplicationRepository repository;
     private final CurrentActor currentActor;
     private final ApprovalApplicationService service;
     private final ApplicationParticipantPort participantPort;
     private final SubmissionRoundRepository rounds;
+    private final DefinitionDraftRepository definitions;
+    private final ProcessRuntimePort processRuntime;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, ApplicationParticipantPort participantPort,
-                                     SubmissionRoundRepository rounds, ApplicationAuditPort audit) {
+                                     SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
         this.participantPort = participantPort;
         this.rounds = rounds;
+        this.definitions = definitions;
+        this.processRuntime = processRuntime;
     }
 
     /** 创建申请草稿。 */
@@ -46,7 +55,14 @@ public class ApprovalApplicationFacade {
     public Application create(String businessNo, String processKey, long definitionVersion, String title,
                               Map<String, Object> payload) {
         Actor actor = currentActor.actor();
-        return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload);
+        DefinitionModels.DefinitionDraft definition = definitions.findPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
+        // classpath 内置报销 v1 是唯一没有平台定义行的公开 legacy 模板。
+        if (definition == null && !(BUNDLED_LEGACY_PROCESS.equals(processKey) && definitionVersion == BUNDLED_LEGACY_VERSION)) {
+            throw new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published process definition is not available");
+        }
+        FormSchema formSchema = definition == null ? null : definition.formSchema();
+        String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
+        return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload, formSchema, runtimeDefinitionId);
     }
 
     /** 提交申请并启动流程。 */

@@ -3,6 +3,7 @@ package io.agentflow.approval.process;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
 import org.flowable.engine.RepositoryService;
+import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.engine.repository.ProcessDefinition;
@@ -22,36 +23,34 @@ import java.util.Map;
  */
 @Component
 public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
+    private static final String BUNDLED_PROCESS_KEY = "expense-reimbursement";
+    private static final long BUNDLED_PROCESS_VERSION = 1L;
     private final RepositoryService repositoryService;
     private final RuntimeService runtimeService;
     private final TaskService taskService;
+    private final HistoryService historyService;
 
     /** 注入 Flowable 运行服务。 */
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
-                                         TaskService taskService) {
+                                         TaskService taskService, HistoryService historyService) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
+        this.historyService = historyService;
+    }
+
+    /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
+    @Override
+    public String resolveDefinition(String tenantId, String processKey, long definitionVersion, boolean bundled) {
+        ProcessDefinition definition = findDefinition(tenantId, processKey, definitionVersion, bundled);
+        requireDefinitionMatches(definition, tenantId, processKey, definitionVersion);
+        return definition.getId();
     }
 
     @Override
     @Transactional
     public StartedProcess start(StartProcessCommand command) {
-        ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
-                .processDefinitionKey(command.processKey())
-                .processDefinitionVersion((int) command.definitionVersion())
-                .processDefinitionTenantId(command.tenantId())
-                .singleResult();
-        if (definition == null && "expense-reimbursement".equals(command.processKey())) {
-            definition = repositoryService.createProcessDefinitionQuery()
-                    .processDefinitionKey(command.processKey())
-                    .processDefinitionVersion((int) command.definitionVersion())
-                    .processDefinitionWithoutTenantId()
-                    .singleResult();
-        }
-        if (definition == null) {
-            throw new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published process definition is not available");
-        }
+        ProcessDefinition definition = boundDefinition(command);
         Map<String, Object> variables = new HashMap<>();
         variables.put("tenantId", command.tenantId());
         variables.put("applicationId", command.applicationId().toString());
@@ -60,11 +59,62 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
         variables.put("formData", command.payload() == null ? Map.of()
                 : Collections.unmodifiableMap(new HashMap<>(command.payload())));
+        if (command.formSchema() != null) variables.put("formFieldTypes", command.formSchema().fieldTypes());
         org.flowable.engine.runtime.ProcessInstance instance = runtimeService
                 .createProcessInstanceBuilder().processDefinitionId(definition.getId())
                 .businessKey(command.businessNo()).tenantId(command.tenantId()).variables(variables).start();
         Task task = taskService.createTaskQuery().processInstanceId(instance.getId()).singleResult();
         return new StartedProcess(instance.getId(), task == null ? null : task.getId());
+    }
+
+    private ProcessDefinition boundDefinition(StartProcessCommand command) {
+        String definitionId = command.runtimeDefinitionId();
+        if (definitionId == null && command.previousProcessInstanceId() != null) {
+            // 旧申请只相信实际历史实例的租户、申请绑定与定义标识，不能改用当前同号版本。
+            var previous = historyService.createHistoricProcessInstanceQuery()
+                    .processInstanceId(command.previousProcessInstanceId())
+                    .variableValueEquals("tenantId", command.tenantId())
+                    .variableValueEquals("applicationId", command.applicationId().toString()).singleResult();
+            if (previous == null || previous.getTenantId() != null && !previous.getTenantId().isEmpty()
+                    && !command.tenantId().equals(previous.getTenantId())) {
+                throw definitionUnavailable();
+            }
+            definitionId = previous.getProcessDefinitionId();
+        }
+        ProcessDefinition definition;
+        if (definitionId != null) {
+            definition = repositoryService.createProcessDefinitionQuery().processDefinitionId(definitionId).singleResult();
+        } else {
+            ProcessDefinition tenantDefinition = findDefinition(command.tenantId(), command.processKey(), command.definitionVersion(), false);
+            ProcessDefinition bundledDefinition = isBundled(command.processKey(), command.definitionVersion())
+                    ? findDefinition(command.tenantId(), command.processKey(), command.definitionVersion(), true) : null;
+            if (tenantDefinition != null && bundledDefinition != null) {
+                throw new DomainException("DEFINITION_BINDING_AMBIGUOUS", "Legacy application has no saved definition source and multiple sources match");
+            }
+            definition = tenantDefinition == null ? bundledDefinition : tenantDefinition;
+        }
+        requireDefinitionMatches(definition, command.tenantId(), command.processKey(), command.definitionVersion());
+        return definition;
+    }
+
+    private ProcessDefinition findDefinition(String tenantId, String key, long version, boolean bundled) {
+        if (version < 1 || version > Integer.MAX_VALUE || bundled && !isBundled(key, version)) throw definitionUnavailable();
+        var query = repositoryService.createProcessDefinitionQuery().processDefinitionKey(key).processDefinitionVersion((int) version);
+        return (bundled ? query.processDefinitionWithoutTenantId() : query.processDefinitionTenantId(tenantId)).singleResult();
+    }
+
+    private void requireDefinitionMatches(ProcessDefinition definition, String tenantId, String key, long version) {
+        if (definition == null || !key.equals(definition.getKey()) || version != definition.getVersion()) throw definitionUnavailable();
+        String owner = definition.getTenantId();
+        if (owner == null || owner.isEmpty()) {
+            if (!isBundled(key, version)) throw definitionUnavailable();
+        } else if (!tenantId.equals(owner)) throw definitionUnavailable();
+    }
+
+    private boolean isBundled(String key, long version) { return BUNDLED_PROCESS_KEY.equals(key) && version == BUNDLED_PROCESS_VERSION; }
+
+    private DomainException definitionUnavailable() {
+        return new DomainException("PROCESS_DEFINITION_NOT_FOUND", "The bound process definition is not available");
     }
 
     @Override

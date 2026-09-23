@@ -4,6 +4,7 @@ import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.form.FormSchema;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -38,11 +39,11 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
             jdbc.update("""
                     INSERT INTO approval_submission_round
                     (tenant_id, application_id, round_no, process_instance_id, definition_version,
-                     title, payload_json, submitted_by, submitted_at, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL')
+                     title, payload_json, submitted_by, submitted_at, form_schema_json, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL')
                     """, round.tenantId(), round.applicationId().toString(), round.roundNo(), round.processInstanceId(),
                     round.definitionVersion(), round.title(), jsonUtil.write(round.payload()), round.submittedBy(),
-                    round.submittedAt().atOffset(ZoneOffset.UTC));
+                    round.submittedAt().atOffset(ZoneOffset.UTC), round.formSchema() == null ? null : jsonUtil.write(round.formSchema()));
         } catch (DuplicateKeyException exception) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Submission round already exists");
         }
@@ -85,6 +86,7 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
                 row.getString("title"), jsonUtil.map(row.getString("payload_json")), row.getString("submitted_by"),
                 row.getObject("submitted_at", OffsetDateTime.class).toInstant(),
                 SubmissionRound.Status.valueOf(row.getString("status")), row.getString("reason"),
-                row.getString("completed_by"), completedAt == null ? null : completedAt.toInstant());
+                row.getString("completed_by"), completedAt == null ? null : completedAt.toInstant(),
+                row.getString("form_schema_json") == null ? null : jsonUtil.read(row.getString("form_schema_json"), FormSchema.class));
     }
 }

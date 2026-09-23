@@ -8,7 +8,7 @@ import ts from 'typescript'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const output = mkdtempSync('/fyoung/tmp/agentflow-web-requests-')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
-for (const name of ['api', 'pendingWrites']) {
+for (const name of ['api', 'pendingWrites', 'formSchema']) {
   const path = resolve(root, `src/${name}.ts`)
   if (!existsSync(path)) continue
   const source = readFileSync(path, 'utf8').replace('import.meta.env.VITE_API_BASE', 'undefined')
@@ -16,7 +16,7 @@ for (const name of ['api', 'pendingWrites']) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
   }).outputText)
 }
-const result = spawnSync(process.execPath, ['--test', resolve(root, 'tests/requests.test.mjs')], {
-  env: { ...process.env, AGENTFLOW_TEST_API: resolve(output, 'api.js') }, stdio: 'inherit'
+const result = spawnSync(process.execPath, ['--test', resolve(root, 'tests/requests.test.mjs'), resolve(root, 'tests/forms.test.mjs')], {
+  env: { ...process.env, AGENTFLOW_TEST_API: resolve(output, 'api.js'), AGENTFLOW_TEST_FORMS: resolve(output, 'formSchema.js') }, stdio: 'inherit'
 })
 process.exitCode = result.status ?? 1

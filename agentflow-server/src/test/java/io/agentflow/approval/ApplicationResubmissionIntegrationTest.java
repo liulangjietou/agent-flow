@@ -12,6 +12,7 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionApplicationService;
 import org.flowable.engine.RuntimeService;
+import org.flowable.engine.RepositoryService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class ApplicationResubmissionIntegrationTest {
     @Autowired ObjectMapper mapper;
     @Autowired AuthService auth;
     @Autowired RuntimeService runtime;
+    @Autowired RepositoryService engineDefinitions;
     @Autowired TaskService tasks;
     @Autowired DefinitionApplicationService definitions;
     @Autowired ApplicationRepository applications;
@@ -281,8 +283,14 @@ class ApplicationResubmissionIntegrationTest {
 
     @Test
     void failedEngineStartLeavesNoRoundAndKeepsTheDraftVersion() throws Exception {
-        JsonNode draft = createDraft("missing-" + UUID.randomUUID());
+        String key = "removed-engine-" + UUID.randomUUID();
+        publishDefinition(key, false);
+        JsonNode draft = createDraft(key);
         String id = draft.path("id").asText();
+        // 新申请必须绑定真实发布版本；在创建后移除引擎部署，继续验证提交失败的原事务保障。
+        var engineDefinition = engineDefinitions.createProcessDefinitionQuery().processDefinitionKey(key)
+                .processDefinitionTenantId("demo").singleResult();
+        engineDefinitions.deleteDeployment(engineDefinition.getDeploymentId(), true);
         mvc.perform(post("/api/v1/applications/" + id + "/submit").header("Authorization", token("alice"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":1}"))
                 .andExpect(status().isUnprocessableEntity())

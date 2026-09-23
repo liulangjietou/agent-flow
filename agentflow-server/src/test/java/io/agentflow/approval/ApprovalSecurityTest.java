@@ -9,7 +9,7 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import org.flowable.engine.HistoryService;
-import org.flowable.engine.RepositoryService;
+import io.agentflow.definition.DefinitionApplicationService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.Test;
@@ -23,10 +23,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static io.agentflow.definition.DefinitionModels.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static io.agentflow.support.MutationRequests.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,7 +50,7 @@ class ApprovalSecurityTest {
     @Autowired CurrentActor currentActor;
     @Autowired ApprovalApplicationFacade applications;
     @Autowired ApplicationRepository repository;
-    @Autowired RepositoryService definitions;
+    @Autowired DefinitionApplicationService definitions;
     @Autowired RuntimeService runtime;
     @Autowired TaskService tasks;
     @Autowired HistoryService history;
@@ -178,21 +180,15 @@ class ApprovalSecurityTest {
 
     private Application draft(String user, String tenant) {
         String key = "security-" + UUID.randomUUID();
-        definitions.createDeployment().tenantId(tenant).addString(key + ".bpmn20.xml", """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                 xmlns:flowable="http://flowable.org/bpmn" targetNamespace="http://agentflow.io/tests">
-                  <process id="%s" isExecutable="true">
-                    <startEvent id="start"/>
-                    <sequenceFlow id="first" sourceRef="start" targetRef="finance"/>
-                    <userTask id="finance" name="Finance" flowable:candidateGroups="FINANCE"/>
-                    <sequenceFlow id="next" sourceRef="finance" targetRef="manager"/>
-                    <userTask id="manager" name="Manager" flowable:assignee="manager"/>
-                    <sequenceFlow id="last" sourceRef="manager" targetRef="end"/>
-                    <endEvent id="end"/>
-                  </process>
-                </definitions>
-                """.formatted(key)).deploy();
+        // 安全用例使用平台正式发布链路建立相同的财务、经理两级审批，避免只有引擎定义而没有业务版本。
+        var definition = definitions.create(tenant, key, "安全验证流程", new Graph(List.of(
+                new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("finance", "Finance", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE")),
+                new Node("manager", "Manager", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")),
+                new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("first", "start", "finance", ""), new Edge("next", "finance", "manager", ""),
+                        new Edge("last", "manager", "end", ""))));
+        definitions.publish(tenant, definition.id(), 0);
         currentActor.set(new Actor(tenant, user, Set.of("EMPLOYEE", "APPROVER")));
         try { return applications.create("TEST-" + UUID.randomUUID(), key, 1, "Approval security", Map.of()); }
         finally { currentActor.clear(); }

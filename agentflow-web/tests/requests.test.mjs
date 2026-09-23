@@ -7,6 +7,42 @@ globalThis.localStorage = { getItem: () => currentToken }
 const { api, writeRequests } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_API))
 const body = { key: 'expense', name: '费用审批', graph: { nodes: [], edges: [] } }
 
+test('包含版本化表单的失败请求保留原字节和小数表示，恢复不采用后续编辑', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'schema-recovery' })
+  const schemaBody = { ...body, formSchema: { schemaVersion: 1, fields: [{ key: 'amount', label: '金额', type: 'NUMBER', required: true, minimum: '000.00' }] } }
+  const original = JSON.stringify(schemaBody)
+  const sent = []
+  globalThis.fetch = async (_url, init) => {
+    sent.push(init)
+    if (sent.length === 1) throw new TypeError('lost')
+    return Response.json({ id: 'schema-draft', formSchema: JSON.parse(original).formSchema })
+  }
+  await assert.rejects(api.definition(schemaBody))
+  schemaBody.formSchema.fields[0].label = '后续修改'
+  await assert.rejects(api.definition(schemaBody), error => error.code === 'PENDING_REQUEST_CHANGED')
+  const result = await writeRequests.recover(writeRequests.pending()[0].id)
+  assert.equal(sent.length, 2)
+  assert.equal(sent[0].body, original)
+  assert.equal(sent[1].body, original)
+  assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+  assert.equal(result.result.formSchema.fields[0].minimum, '000.00')
+})
+
+test('表单422保留字段错误并结束原请求，修改后使用新键', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'form-errors' })
+  const sent = []
+  globalThis.fetch = async (_url, init) => {
+    sent.push(init)
+    if (sent.length === 1) return Response.json({ code: 'FORM_VALIDATION_FAILED', details: { fieldErrors: { amount: 'REQUIRED' } } }, { status: 422 })
+    return Response.json({ id: 'app' })
+  }
+  await assert.rejects(api.updateApplication('app', { expectedVersion: 1, title: '金额', payload: {} }), error => error.status === 422 && error.details.fieldErrors.amount === 'REQUIRED' && error.message.includes('字段'))
+  assert.equal(writeRequests.pending().length, 0)
+  await api.updateApplication('app', { expectedVersion: 1, title: '金额', payload: { amount: '9007199254740993.01' } })
+  assert.notEqual(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+  assert.equal(JSON.parse(sent[1].body).payload.amount, '9007199254740993.01')
+})
+
 test('响应丢失后再次保存复用原请求键，不创建第二份草稿', async () => {
   writeRequests?.setActor({ tenantId: 'demo', userId: 'same-key', roles: [] })
   const sent = []

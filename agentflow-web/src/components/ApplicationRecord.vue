@@ -2,6 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import ApplicationHistory from './ApplicationHistory.vue'
 import RequestRecovery from './RequestRecovery.vue'
+import FormFields from './FormFields.vue'
+import { validatePayload, type FieldErrors } from '../formSchema'
 import { api, type ApiError, type Application, type SubmissionRound } from '../api'
 import type { PendingWrite } from '../pendingWrites.js'
 
@@ -15,6 +17,8 @@ const historyTab = ref<'rounds' | 'timeline' | 'audit'>('rounds')
 const title = ref('')
 const amount = ref('')
 const description = ref('')
+const payload = ref<Record<string, unknown>>({})
+const fieldErrors = ref<FieldErrors>({})
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
@@ -42,9 +46,10 @@ const valueLabel = (value: unknown) => typeof value === 'object' ? JSON.stringif
 const fieldLabel = (key: string) => key === 'amount' ? '申请金额' : key === 'description' ? '申请说明' : key
 const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 
-function fieldsSnapshot() { return JSON.stringify([title.value, amount.value, description.value]) }
+function fieldsSnapshot() { return JSON.stringify(application.value?.formSchema ? [title.value, payload.value] : [title.value, amount.value, description.value]) }
 function showError(cause: unknown) {
   const failure = cause as ApiError
+  fieldErrors.value = failure.details?.fieldErrors ?? {}
   error.value = failure.code === 'CONCURRENCY_CONFLICT'
     ? '申请已被更新。请重新加载最新内容，核对后再操作。'
     : failure.message ?? '请求未完成，请重试。'
@@ -52,6 +57,7 @@ function showError(cause: unknown) {
 function setApplication(value: Application) {
   application.value = value
   title.value = value.title
+  payload.value = { ...value.payload }; fieldErrors.value = {}
   amount.value = value.payload.amount == null ? '' : String(value.payload.amount)
   description.value = value.payload.description == null ? '' : String(value.payload.description)
   initialFields.value = fieldsSnapshot()
@@ -66,15 +72,22 @@ async function load() {
   finally { loading.value = false }
 }
 function editPayload(): Record<string, unknown> {
+  if (application.value!.formSchema) return { ...payload.value }
   // 固定表单仅编辑已展示字段，保留其他业务字段，不覆盖历史轮次内容。
   const original = application.value!.payload
-  const payload = { ...original }
-  if (description.value !== String(original.description ?? '')) payload.description = description.value.trim()
-  if (amount.value !== '' && String(amount.value) !== String(original.amount ?? '')) payload.amount = Number(amount.value)
-  return payload
+  const edited = { ...original }
+  if (description.value !== String(original.description ?? '')) edited.description = description.value.trim()
+  if (amount.value !== '' && String(amount.value) !== String(original.amount ?? '')) edited.amount = Number(amount.value)
+  return edited
 }
-function validate() {
+function validate(submit: boolean) {
+  fieldErrors.value = {}
   if (!title.value.trim()) { error.value = '请填写申请标题。'; return false }
+  if (application.value?.formSchema) {
+    fieldErrors.value = validatePayload(application.value.formSchema, payload.value, submit)
+    if (Object.keys(fieldErrors.value).length) { error.value = '请按字段提示修改后再操作。'; return false }
+    return true
+  }
   if ((amount.value === '' && application.value?.payload.amount != null) || (amount.value !== '' && (!Number.isFinite(Number(amount.value)) || Number(amount.value) < 0))) {
     error.value = '请输入不小于零的申请金额。'; return false
   }
@@ -90,7 +103,7 @@ async function saveChanges() {
 async function save(submit = false) {
   if (!canEdit.value || saving.value || loading.value || writesBlocked.value) return
   error.value = ''; notice.value = ''
-  if (!validate()) return
+  if (!validate(submit)) return
   saving.value = true
   try {
     await saveChanges()
@@ -169,16 +182,17 @@ onUnmounted(() => returnFocus?.focus())
           <small v-if="currentRound?.completedBy">{{ currentRound.completedBy }}<template v-if="currentRound.completedAt"> · {{ timeLabel(currentRound.completedAt) }}</template></small>
           <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
         </div>
-        <form v-if="canEdit" @submit.prevent="save(true)">
+        <form v-if="canEdit" novalidate @submit.prevent="save(true)">
           <fieldset :disabled="saving || writesBlocked">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
-            <div class="record-fields"><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label></div>
-            <label>申请说明<textarea v-model="description" rows="3" /></label>
+            <label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label>
+            <FormFields v-if="application.formSchema" v-model="payload" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" />
+            <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
-          <dl v-if="extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
+          <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
           <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || writesBlocked || !dirty" @click="save()">保存修改</button><button class="primary" :disabled="saving || writesBlocked">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
-        <template v-else><h3 class="record-section-title">{{ application.title }}</h3><dl class="payload-list"><template v-for="(value, key) in application.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
+        <template v-else><h3 class="record-section-title">{{ application.title }}</h3><FormFields :schema="application.formSchema" :model-value="application.payload" readonly /><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
         <section v-if="canWithdraw" class="withdrawal-panel" aria-label="撤回审批">
           <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="saving || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
           <form v-else @submit.prevent="withdraw">
@@ -193,7 +207,7 @@ onUnmounted(() => returnFocus?.focus())
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
-            <div class="round-content"><h4>{{ round.title }}</h4><dl class="payload-list"><template v-for="(value, key) in round.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
+            <div class="round-content"><h4>{{ round.title }}</h4><FormFields :schema="round.formSchema" :model-value="round.payload" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
         <ApplicationHistory v-else :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />

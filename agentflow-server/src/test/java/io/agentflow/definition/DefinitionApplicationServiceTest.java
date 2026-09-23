@@ -72,6 +72,10 @@ class DefinitionApplicationServiceTest {
         public Optional<DefinitionDraft> findById(String tenantId, UUID id) {
             return value != null && value.id().equals(id) && value.tenantId().equals(tenantId) ? Optional.of(value) : Optional.empty();
         }
+        public Optional<DefinitionDraft> findPublished(String tenantId, String key, long version) {
+            return value != null && value.tenantId().equals(tenantId) && value.key().equals(key)
+                    && value.version() == version && value.status() == DraftStatus.PUBLISHED ? Optional.of(value) : Optional.empty();
+        }
         public List<DefinitionDraft> findAll(String tenantId, String status) { return List.of(); }
     }
 

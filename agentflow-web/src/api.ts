@@ -1,15 +1,16 @@
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
+import type { FieldErrors, FormSchema } from './formSchema'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
-export interface ApiError { status: number; code: string; message: string }
+export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors } }
 export interface Actor { tenantId: string; userId: string; roles: string[] }
 export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
 export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
 export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
-export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph }
+export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph; formSchema: FormSchema | null }
 export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
-export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; status: string; roundNo: number; version: number }
-export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
+export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
+export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
 export interface HistoryEvent {
   id: string; sequence: number; occurredAt: string; source: string; action: string
   aggregateVersion?: number; roundNo?: number; actor?: string; targetUser?: string; comment?: string
@@ -39,15 +40,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     let message = `请求失败（${response.status}）`
     let code = 'HTTP_ERROR'
-    try { const body = await response.json() as { message?: string; code?: string }; message = body.message ?? message; code = body.code ?? code } catch { /* 已收到明确状态码，保留错误分类。 */ }
+    let details: ApiError['details']
+    try { const body = await response.json() as { message?: string; code?: string; details?: ApiError['details'] }; message = body.message ?? message; code = body.code ?? code; details = body.details } catch { /* 已收到明确状态码，保留错误分类。 */ }
     const messages: Record<string, string> = {
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
       FORBIDDEN: '当前账号没有执行此操作的权限，本次未重新执行。原操作结果请查询业务状态。',
-      UNAUTHENTICATED: '登录已失效，请重新登录。'
+      UNAUTHENTICATED: '登录已失效，请重新登录。',
+      FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
+      INVALID_FORM_SCHEMA: '表单配置未通过校验，请检查字段标识、类型、选项与约束。',
+      DEFINITION_BINDING_AMBIGUOUS: '这份旧申请未保存原流程来源，当前存在同名版本。请保留原记录，核对流程后重新发起申请。'
     }
-    throw { status: response.status, code, message: messages[code] ?? message } satisfies ApiError
+    throw { status: response.status, code, message: messages[code] ?? message, details } satisfies ApiError
   }
   try {
     const text = await response.text()
@@ -80,8 +85,8 @@ export const api = {
   submitApplication: (id: string, expectedVersion: number) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion }),
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   definitions: () => request<Definition[]>('/process-definitions'),
-  definition: (body: { key: string; name: string; graph: Graph }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
-  updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
-  validateDefinition: (graph: Graph) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph }) }),
+  definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
+  updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
+  validateDefinition: (graph: Graph, formSchema?: FormSchema | null) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }) }),
   publishDefinition: (id: string, revision: number) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程')
 }

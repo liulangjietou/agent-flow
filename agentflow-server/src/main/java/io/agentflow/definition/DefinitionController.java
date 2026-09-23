@@ -4,6 +4,8 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
+import io.agentflow.form.FormSchema;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -41,7 +43,7 @@ public class DefinitionController {
     /** 校验设计器图，不落库。 */
     @PostMapping("/validate")
     public ValidationResponse validate(@Valid @RequestBody GraphRequest request) {
-        return new ValidationResponse(service.validate(request.graph()));
+        return new ValidationResponse(service.validate(request.graph(), request.formSchema()));
     }
 
     /** 创建流程草稿。 */
@@ -49,7 +51,7 @@ public class DefinitionController {
     public ResponseEntity<String> create(@Valid @RequestBody DefinitionRequest request, HttpServletRequest httpRequest) {
         requireProcessAdmin();
         return idempotency.execute(httpRequest, HttpStatus.OK,
-                () -> DefinitionResponse.from(service.create(currentActor.actor().tenantId(), request.key(), request.name(), request.graph())));
+                () -> DefinitionResponse.from(service.create(currentActor.actor().tenantId(), request.key(), request.name(), request.graph(), request.formSchema())));
     }
 
     /** 查询租户流程定义。 */
@@ -76,7 +78,7 @@ public class DefinitionController {
                                          HttpServletRequest httpRequest) {
         requireProcessAdmin();
         return idempotency.execute(httpRequest, HttpStatus.OK, () -> DefinitionResponse.from(service.update(
-                currentActor.actor().tenantId(), id, request.name(), request.graph(), request.expectedRevision())));
+                currentActor.actor().tenantId(), id, request.name(), request.graph(), request.formSchema(), request.expectedRevision())));
     }
 
     /** 发布流程定义。 */
@@ -101,17 +103,17 @@ public class DefinitionController {
      * 设计器请求图。
      * @author owlzhangfq@gmail.com
      */
-    public record GraphRequest(@NotNull Graph graph) { }
+    public record GraphRequest(@NotNull Graph graph, FormSchema formSchema) { }
     /**
      * 创建定义请求。
      * @author owlzhangfq@gmail.com
      */
-    public record DefinitionRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph) { }
+    public record DefinitionRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema) { }
     /**
      * 更新定义请求。
      * @author owlzhangfq@gmail.com
      */
-    public record UpdateDefinitionRequest(@NotBlank String name, @NotNull Graph graph, long expectedRevision) { }
+    public record UpdateDefinitionRequest(@NotBlank String name, @NotNull Graph graph, long expectedRevision, FormSchema formSchema) { }
     /**
      * 校验结果。
      * @author owlzhangfq@gmail.com
@@ -132,10 +134,10 @@ public class DefinitionController {
      * @author owlzhangfq@gmail.com
      */
     public record DefinitionResponse(UUID id, String tenantId, String key, String name, long version, long revision,
-                                     String status, Graph graph) {
+                                     String status, Graph graph, @JsonInclude(JsonInclude.Include.ALWAYS) FormSchema formSchema) {
         static DefinitionResponse from(DefinitionDraft draft) {
             return new DefinitionResponse(draft.id(), draft.tenantId(), draft.key(), draft.name(), draft.version(),
-                    draft.revision(), draft.status().name(), draft.graph());
+                    draft.revision(), draft.status().name(), draft.graph(), draft.formSchema());
         }
     }
 

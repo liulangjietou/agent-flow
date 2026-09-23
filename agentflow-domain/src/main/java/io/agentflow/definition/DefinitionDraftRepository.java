@@ -17,6 +17,9 @@ public interface DefinitionDraftRepository {
     /** 按租户和标识读取草稿。 */
     Optional<DefinitionDraft> findById(String tenantId, UUID id);
 
+    /** 只返回指定租户和业务版本的已发布快照。 */
+    Optional<DefinitionDraft> findPublished(String tenantId, String key, long version);
+
     /** 查询租户下的流程草稿。 */
     List<DefinitionDraft> findAll(String tenantId, String status);
 

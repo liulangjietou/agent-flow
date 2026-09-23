@@ -1,6 +1,7 @@
 package io.agentflow.approval.service;
 
 import java.util.UUID;
+import io.agentflow.form.FormSchema;
 import java.util.Map;
 
 /**
@@ -8,6 +9,9 @@ import java.util.Map;
  * @author owlzhangfq@gmail.com
  */
 public interface ProcessRuntimePort {
+    /** 按明确来源解析实际定义标识；内置与租户定义之间禁止自动替换。 */
+    String resolveDefinition(String tenantId, String processKey, long definitionVersion, boolean bundled);
+
     /** 启动与申请版本绑定的流程实例。 */
     StartedProcess start(StartProcessCommand command);
 
@@ -25,7 +29,20 @@ public interface ProcessRuntimePort {
      */
     record StartProcessCommand(String tenantId, UUID applicationId, String processKey,
                                long definitionVersion, int roundNo, String businessNo,
-                               Map<String, Object> payload) {
+                               Map<String, Object> payload, FormSchema formSchema,
+                               String runtimeDefinitionId, String previousProcessInstanceId) {
+        /** 兼容尚未保存实际定义标识的旧调用。 */
+        public StartProcessCommand(String tenantId, UUID applicationId, String processKey, long definitionVersion,
+                                   int roundNo, String businessNo, Map<String, Object> payload, FormSchema formSchema) {
+            this(tenantId, applicationId, processKey, definitionVersion, roundNo, businessNo, payload, formSchema, null, null);
+        }
+
+        /** 旧申请继续使用原有条件求值语义。 */
+        public StartProcessCommand(String tenantId, UUID applicationId, String processKey,
+                                   long definitionVersion, int roundNo, String businessNo, Map<String, Object> payload) {
+            this(tenantId, applicationId, processKey, definitionVersion, roundNo, businessNo, payload, null);
+        }
+
         public StartProcessCommand(String tenantId, UUID applicationId, String processKey,
                                    long definitionVersion, int roundNo, String businessNo) {
             this(tenantId, applicationId, processKey, definitionVersion, roundNo, businessNo, Map.of());

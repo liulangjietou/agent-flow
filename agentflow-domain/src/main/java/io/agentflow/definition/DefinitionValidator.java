@@ -1,6 +1,7 @@
 package io.agentflow.definition;
 
 import java.util.*;
+import io.agentflow.form.FormSchema;
 import java.util.regex.Pattern;
 
 import static io.agentflow.definition.DefinitionModels.*;
@@ -15,6 +16,11 @@ public final class DefinitionValidator {
 
     /** 返回全部校验问题；没有问题时返回空列表。 */
     public List<String> validate(Graph graph) {
+        return validate(graph, null);
+    }
+
+    /** 在结构检查之外验证条件字段和表单类型。 */
+    public List<String> validate(Graph graph, FormSchema formSchema) {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
@@ -49,7 +55,10 @@ public final class DefinitionValidator {
             if (!nodes.containsKey(e.source()) || !nodes.containsKey(e.target())) errors.add("EDGE_NODE_NOT_FOUND:" + e.id());
             outgoing.add(e.source()); incoming.add(e.target());
             outgoingEdges.computeIfAbsent(e.source(), ignored -> new ArrayList<>()).add(e);
-            try { parser.parse(e.condition()); } catch (RuntimeException ex) { errors.add("INVALID_CONDITION:" + e.id()); }
+            try {
+                ConditionAst condition = parser.parse(e.condition());
+                if (formSchema != null) formSchema.validateCondition(condition);
+            } catch (RuntimeException ex) { errors.add("INVALID_CONDITION:" + e.id()); }
             Node sourceNode = nodes.get(e.source());
             if (sourceNode != null && sourceNode.type() == NodeType.EXCLUSIVE_GATEWAY
                     && !e.defaultBranch() && e.condition().isBlank()) {

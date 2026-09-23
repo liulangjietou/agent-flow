@@ -1,6 +1,7 @@
 package io.agentflow.approval.model;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.form.FormSchema;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -16,7 +17,16 @@ import java.util.UUID;
 public record SubmissionRound(String tenantId, UUID applicationId, int roundNo, String processInstanceId,
                               long definitionVersion, String title, Map<String, Object> payload,
                               String submittedBy, Instant submittedAt, Status status, String reason,
-                              String completedBy, Instant completedAt) {
+                              String completedBy, Instant completedAt, FormSchema formSchema) {
+    /** 兼容没有表单快照的旧调用和旧数据。 */
+    public SubmissionRound(String tenantId, UUID applicationId, int roundNo, String processInstanceId,
+                           long definitionVersion, String title, Map<String, Object> payload,
+                           String submittedBy, Instant submittedAt, Status status, String reason,
+                           String completedBy, Instant completedAt) {
+        this(tenantId, applicationId, roundNo, processInstanceId, definitionVersion, title, payload,
+                submittedBy, submittedAt, status, reason, completedBy, completedAt, null);
+    }
+
     public SubmissionRound {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         if (payload != null) payload.forEach((key, value) -> snapshot.put(key, freeze(value)));
@@ -28,7 +38,7 @@ public record SubmissionRound(String tenantId, UUID applicationId, int roundNo, 
                                             String submittedBy, Instant submittedAt) {
         return new SubmissionRound(application.tenantId(), application.id(), application.roundNo(),
                 processInstanceId, application.definitionVersion(), application.title(), application.payload(),
-                submittedBy, submittedAt, Status.IN_APPROVAL, null, null, null);
+                submittedBy, submittedAt, Status.IN_APPROVAL, null, null, null, application.formSchema());
     }
 
     private static Object freeze(Object value) {

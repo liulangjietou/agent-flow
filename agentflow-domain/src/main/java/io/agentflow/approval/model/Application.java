@@ -1,6 +1,7 @@
 package io.agentflow.approval.model;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.form.FormSchema;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -18,6 +19,8 @@ public final class Application {
     private final String businessNo;
     private final String processKey;
     private final long definitionVersion;
+    private final FormSchema formSchema;
+    private final String runtimeDefinitionId;
     private final String createdBy;
     private String title;
     private Map<String, Object> payload;
@@ -29,8 +32,23 @@ public final class Application {
     public static Application draft(UUID id, String tenantId, String businessNo, String processKey,
                                     long definitionVersion, String createdBy, String title,
                                     Map<String, Object> payload) {
+        return draft(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, null);
+    }
+
+    /** 新建申请时冻结已发布表单，类型与字段白名单由聚合自身保证。 */
+    public static Application draft(UUID id, String tenantId, String businessNo, String processKey,
+                                    long definitionVersion, String createdBy, String title,
+                                    Map<String, Object> payload, FormSchema formSchema) {
+        return draft(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, formSchema, null);
+    }
+
+    /** 冻结创建时解析的实际定义标识，后续同版本的其他来源不能替换它。 */
+    public static Application draft(UUID id, String tenantId, String businessNo, String processKey,
+                                    long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                    FormSchema formSchema, String runtimeDefinitionId) {
+        if (formSchema != null) formSchema.validateDraft(payload);
         return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy,
-                title, payload, ApplicationStatus.DRAFT, 1, 1);
+                title, payload, ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId);
     }
 
     /** 从仓储恢复聚合。 */
@@ -39,17 +57,35 @@ public final class Application {
                                       Map<String, Object> payload, ApplicationStatus status,
                                       int roundNo, long version) {
         return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy,
-                title, payload, status, roundNo, version);
+                title, payload, status, roundNo, version, null, null);
+    }
+
+    /** 恢复原记录的表单快照，不使用后来发布的新表单覆盖历史。 */
+    public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
+                                      long definitionVersion, String createdBy, String title,
+                                      Map<String, Object> payload, ApplicationStatus status,
+                                      int roundNo, long version, FormSchema formSchema) {
+        return restore(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, status, roundNo, version, formSchema, null);
+    }
+
+    /** 从存储恢复实际定义标识，旧记录未保存时保持 null。 */
+    public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
+                                      long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                      ApplicationStatus status, int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId) {
+        return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy,
+                title, payload, status, roundNo, version, formSchema, runtimeDefinitionId);
     }
 
     private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
                         String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
-                        int roundNo, long version) {
+                        int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId) {
         this.id = Objects.requireNonNull(id);
         this.tenantId = Objects.requireNonNull(tenantId);
         this.businessNo = require(businessNo, "businessNo");
         this.processKey = require(processKey, "processKey");
         this.definitionVersion = definitionVersion;
+        this.formSchema = formSchema;
+        this.runtimeDefinitionId = runtimeDefinitionId;
         this.createdBy = require(createdBy, "createdBy");
         this.title = require(title, "title");
         this.payload = copyPayload(payload);
@@ -65,6 +101,7 @@ public final class Application {
                 && status != ApplicationStatus.WITHDRAWN) {
             throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be submitted");
         }
+        if (formSchema != null) formSchema.validateSubmission(payload);
         if (status != ApplicationStatus.DRAFT) {
             roundNo++;
         }
@@ -79,8 +116,11 @@ public final class Application {
                 && status != ApplicationStatus.WITHDRAWN) {
             throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
         }
-        this.title = require(title, "title");
-        this.payload = copyPayload(payload);
+        String revisedTitle = require(title, "title");
+        if (formSchema != null) formSchema.validateDraft(payload);
+        Map<String, Object> revisedPayload = copyPayload(payload);
+        this.title = revisedTitle;
+        this.payload = revisedPayload;
         version++;
     }
 
@@ -154,6 +194,8 @@ public final class Application {
     public String businessNo() { return businessNo; }
     public String processKey() { return processKey; }
     public long definitionVersion() { return definitionVersion; }
+    public FormSchema formSchema() { return formSchema; }
+    public String runtimeDefinitionId() { return runtimeDefinitionId; }
     public String createdBy() { return createdBy; }
     public String title() { return title; }
     public Map<String, Object> payload() { return payload; }

@@ -5,6 +5,7 @@ import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.form.FormSchema;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -34,11 +35,12 @@ public class JdbcApplicationRepository implements ApplicationRepository {
         jdbcTemplate.update("""
                 INSERT INTO approval_application
                 (id, tenant_id, business_no, process_key, definition_version, created_by, title,
-                 payload_json, status, round_no, version, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 payload_json, status, round_no, version, form_schema_json, runtime_definition_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, application.id().toString(), application.tenantId(), application.businessNo(),
                 application.processKey(), application.definitionVersion(), application.createdBy(), application.title(),
-                jsonUtil.write(application.payload()), application.status().name(), application.roundNo(), application.version());
+                jsonUtil.write(application.payload()), application.status().name(), application.roundNo(), application.version(),
+                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()), application.runtimeDefinitionId());
         return application;
     }
 
@@ -80,6 +82,7 @@ public class JdbcApplicationRepository implements ApplicationRepository {
                 resultSet.getLong("definition_version"), resultSet.getString("created_by"),
                 resultSet.getString("title"), jsonUtil.map(resultSet.getString("payload_json")),
                 ApplicationStatus.valueOf(resultSet.getString("status")), resultSet.getInt("round_no"),
-                resultSet.getLong("version"));
+                resultSet.getLong("version"), resultSet.getString("form_schema_json") == null ? null
+                        : jsonUtil.read(resultSet.getString("form_schema_json"), FormSchema.class), resultSet.getString("runtime_definition_id"));
     }
 }

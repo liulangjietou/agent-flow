@@ -6,6 +6,7 @@ import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
+import io.agentflow.form.FormSchema;
 
 import java.time.Instant;
 import java.util.Map;
@@ -33,11 +34,23 @@ public class ApprovalApplicationService {
     /** 创建草稿并拒绝租户外重复业务单号。 */
     public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
                               String userId, String title, Map<String, Object> payload) {
+        return create(tenantId, businessNo, processKey, definitionVersion, userId, title, payload, null);
+    }
+
+    /** 创建绑定表单快照的申请，定义查询由上层跨聚合编排完成。 */
+    public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
+                              String userId, String title, Map<String, Object> payload, FormSchema formSchema) {
+        return create(tenantId, businessNo, processKey, definitionVersion, userId, title, payload, formSchema, null);
+    }
+
+    /** 实际引擎定义作为不透明标识保存在申请内，不把引擎类型引入领域。 */
+    public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
+                              String userId, String title, Map<String, Object> payload, FormSchema formSchema, String runtimeDefinitionId) {
         if (repository.findByBusinessNo(tenantId, businessNo).isPresent()) {
             throw new DomainException("BUSINESS_NO_EXISTS", "Business number already exists");
         }
         Application application = Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey,
-                definitionVersion, userId, title, payload);
+                definitionVersion, userId, title, payload, formSchema, runtimeDefinitionId);
         repository.save(application);
         recordApplicationOperation(application, userId, ApplicationAuditPort.Action.CREATE, null, null, null);
         return application;
@@ -48,9 +61,12 @@ public class ApprovalApplicationService {
         Application application = repository.findById(tenantId, id)
                 .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
         ApplicationStatus previousStatus = application.status();
+        SubmissionRound previousRound = application.runtimeDefinitionId() == null
+                ? rounds.findByRound(tenantId, id, application.roundNo()).orElse(null) : null;
         application.submit(expectedVersion);
         ProcessRuntimePort.StartedProcess started = processRuntime.start(new ProcessRuntimePort.StartProcessCommand(tenantId, id, application.processKey(),
-                application.definitionVersion(), application.roundNo(), application.businessNo(), application.payload()));
+                application.definitionVersion(), application.roundNo(), application.businessNo(), application.payload(), application.formSchema(),
+                application.runtimeDefinitionId(), previousRound == null ? null : previousRound.processInstanceId()));
         repository.update(application, expectedVersion);
         rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now()));
         recordApplicationOperation(application, submittedBy, ApplicationAuditPort.Action.SUBMIT, previousStatus,

@@ -27,6 +27,14 @@ public class FlowableConditionEvaluator {
         String condition = new String(Base64.getDecoder().decode(encodedCondition), StandardCharsets.UTF_8);
         Map<String, Object> variables = new HashMap<>(execution.getVariables());
         Object formData = variables.get("formData");
+        Object formFieldTypes = variables.get("formFieldTypes");
+        if (formFieldTypes instanceof Map<?, ?> declaredTypes) {
+            Map<String, String> types = new HashMap<>();
+            declaredTypes.forEach((key, value) -> types.put((String) key, (String) value));
+            Map<String, Object> values = new HashMap<>();
+            if (formData instanceof Map<?, ?> formValues) formValues.forEach((key, value) -> values.put((String) key, value));
+            return parser.parse(condition).evaluate(new EvaluationContext(values, types));
+        }
         if (formData instanceof Map<?, ?> formValues) {
             formValues.forEach((key, value) -> {
                 if (key != null) {
