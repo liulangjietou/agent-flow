@@ -77,7 +77,7 @@ graph = {"nodes": [
 process_key = "forms-" + prefix
 definition_body = {"key": process_key, "name": "版本化请假表单验收", "graph": graph, "formSchema": schema}
 definition = request("POST", "/process-definitions", definition_body, admin)
-definition = request("POST", f'/process-definitions/{definition["id"]}/publish?expectedRevision={definition["revision"]}', token=admin)
+definition = request("POST", f'/process-definitions/{definition["id"]}/publish?expectedRevision={definition["revision"]}', body={"changeNote": "验收脚本发布"}, token=admin)
 assert definition["version"] == 1 and definition["formSchema"]["fields"][0]["label"] == "请假类型"
 
 create_body = {"businessNo": "FORM-" + prefix.upper(), "processKey": process_key,
@@ -107,7 +107,7 @@ schema_v2["fields"][0]["label"] = "新版请假类别"
 schema_v2["fields"][0]["options"][0]["label"] = "新版年假"
 schema_v2["fields"][2]["minimum"] = "2"
 definition_v2 = request("POST", "/process-definitions", {**definition_body, "formSchema": schema_v2}, admin)
-definition_v2 = request("POST", f'/process-definitions/{definition_v2["id"]}/publish?expectedRevision={definition_v2["revision"]}', token=admin)
+definition_v2 = request("POST", f'/process-definitions/{definition_v2["id"]}/publish?expectedRevision={definition_v2["revision"]}', body={"changeNote": "验收脚本发布"}, token=admin)
 assert definition_v2["version"] == 2
 
 application = request("GET", path, token=employee)
@@ -139,7 +139,7 @@ if check_bundled_binding:
     ]}
     tenant_definition = request("POST", "/process-definitions", {"key": "expense-reimbursement", "name": "租户同名流程",
                                                                  "graph": tenant_graph, "formSchema": schema}, admin)
-    tenant_definition = request("POST", f'/process-definitions/{tenant_definition["id"]}/publish?expectedRevision={tenant_definition["revision"]}', token=admin)
+    tenant_definition = request("POST", f'/process-definitions/{tenant_definition["id"]}/publish?expectedRevision={tenant_definition["revision"]}', body={"changeNote": "验收脚本发布"}, token=admin)
     assert tenant_definition["version"] == 1
     builtin = request("POST", f'/applications/{builtin["id"]}/submit', {"expectedVersion": builtin["version"]}, employee)
     assert task_for(finance, builtin["id"])["taskName"] == "财务审批"

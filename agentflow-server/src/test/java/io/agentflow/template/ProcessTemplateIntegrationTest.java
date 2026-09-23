@@ -255,7 +255,7 @@ class ProcessTemplateIntegrationTest {
                 assertThat(tree(simulation).path("path")).isEqualTo(json.read(json.write(scenario.expectedPath()), JsonNode.class));
             }
         }
-        assertThat(send(definitionUrl + "/publish?expectedRevision=0", admin, "").getStatus()).isEqualTo(200);
+        assertThat(send(definitionUrl + "/publish?expectedRevision=0", admin, "{\"changeNote\":\"测试模板发布\"}").getStatus()).isEqualTo(200);
         assertThat(findCopy(template(templateKey, admin), definitionId).path("status").asText()).isEqualTo("PUBLISHED");
         for (var scenario : template.scenarios().stream().filter(value -> value.expectedFieldErrors().isEmpty()).toList()) {
             var application = tree(send("/api/v1/applications", applicant, json.write(Map.of("businessNo", uniqueKey(), "processKey", processKey,

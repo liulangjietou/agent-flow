@@ -71,7 +71,7 @@ def main():
     definition, _ = repeat("POST", "/process-definitions", admin, {"key": PREFIX, "name": "幂等协议验收", "graph": graph}, concurrent=True)
     definition, _ = repeat("PUT", "/process-definitions/" + definition["id"], admin,
                            {"name": "幂等协议验收已更新", "graph": graph, "expectedRevision": definition["revision"]})
-    published, _ = repeat("POST", f"/process-definitions/{definition['id']}/publish?expectedRevision={definition['revision']}", admin, concurrent=True)
+    published, _ = repeat("POST", f"/process-definitions/{definition['id']}/publish?expectedRevision={definition['revision']}", admin, {"changeNote": "幂等发布验收"}, concurrent=True)
     assert published["version"] == 1
     body = {"businessNo": PREFIX.upper(), "processKey": PREFIX, "definitionVersion": 1, "title": "幂等网络验收", "payload": {"amount": 80}}
     missing = request("POST", "/applications", employee, body)

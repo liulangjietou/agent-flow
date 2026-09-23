@@ -95,7 +95,7 @@ class IdempotencyIntegrationTest {
             case "submit", "withdraw" -> "{\"expectedVersion\":1}";
             case "task" -> "{\"expectedVersion\":1,\"action\":\"APPROVE\"}";
             case "definition-create", "definition-update" -> definitionBody("missing-key", operation.equals("definition-update"));
-            default -> "";
+            default -> "{\"changeNote\":\"测试发布\"}";
         };
         MockHttpServletResponse response = send(method, path, "admin", null, body);
         assertThat(response.getStatus()).isEqualTo(400);
@@ -157,16 +157,16 @@ class IdempotencyIntegrationTest {
     }
 
     @Test
-    void definitionMutationsAndBodylessPublishReplayWithoutASecondEngineDeployment() throws Exception {
+    void definitionMutationsAndPublicationReplayWithoutASecondEngineDeployment() throws Exception {
         String processKey = "idempotent-" + UUID.randomUUID();
         JsonNode created = tree(twice("POST", "/api/v1/process-definitions", "admin", key(), definitionBody(processKey, false), 200));
         String path = "/api/v1/process-definitions/" + created.path("id").asText();
         twice("PUT", path, "admin", key(), definitionBody(processKey, true), 200);
         String publishKey = key();
-        twice("POST", path + "/publish?expectedRevision=1", "admin", publishKey, "", 200);
+        twice("POST", path + "/publish?expectedRevision=1", "admin", publishKey, "{\"changeNote\":\"首次发布\"}", 200);
         assertThat(definitions.createProcessDefinitionQuery().processDefinitionKey(processKey).processDefinitionTenantId("demo").count()).isEqualTo(1);
-        assertConflict(send("POST", path + "/publish?expectedRevision=01", "admin", publishKey, ""), "IDEMPOTENCY_KEY_REUSED");
-        assertConflict(send("POST", path + "/publish?expectedRevision=1", "admin", publishKey, "{\"ignored\":true}"), "IDEMPOTENCY_KEY_REUSED");
+        assertConflict(send("POST", path + "/publish?expectedRevision=01", "admin", publishKey, "{\"changeNote\":\"首次发布\"}"), "IDEMPOTENCY_KEY_REUSED");
+        assertConflict(send("POST", path + "/publish?expectedRevision=1", "admin", publishKey, "{\"changeNote\":\"修改说明\"}"), "IDEMPOTENCY_KEY_REUSED");
     }
 
     @Test

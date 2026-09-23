@@ -413,7 +413,7 @@ class ApplicationWithdrawalIntegrationTest {
                 new Node("end", "结束", NodeType.END, Map.of())),
                 List.of(new Edge("a", "start", taskId, ""), new Edge("b", taskId, "end", "")));
         var draft = definitions.create("demo", key, "撤回重提版本测试", graph);
-        definitions.publish("demo", draft.id(), draft.revision());
+        definitions.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "集成测试发布");
     }
 
     private String token(String username) {

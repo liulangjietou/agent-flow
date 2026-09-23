@@ -188,7 +188,7 @@ class ApprovalSecurityTest {
                 new Node("end", "结束", NodeType.END, Map.of())),
                 List.of(new Edge("first", "start", "finance", ""), new Edge("next", "finance", "manager", ""),
                         new Edge("last", "manager", "end", ""))));
-        definitions.publish(tenant, definition.id(), 0);
+        definitions.publish(new io.agentflow.common.Actor(tenant, "test-admin", java.util.Set.of("ADMIN")), definition.id(), 0, "集成测试发布");
         currentActor.set(new Actor(tenant, user, Set.of("EMPLOYEE", "APPROVER")));
         try { return applications.create("TEST-" + UUID.randomUUID(), key, 1, "Approval security", Map.of()); }
         finally { currentActor.clear(); }

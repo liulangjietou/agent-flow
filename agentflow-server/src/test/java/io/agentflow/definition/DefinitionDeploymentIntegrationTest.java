@@ -43,7 +43,7 @@ class DefinitionDeploymentIntegrationTest {
                         new Edge("low-end", "low", "end", ""),
                         new Edge("high-end", "high", "end", ""))));
 
-        service.publish("demo", draft.id(), 0);
+        service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), 0, "集成测试发布");
 
         assertThat(repositoryService.createProcessDefinitionQuery()
                 .processDefinitionKey(key).processDefinitionTenantId("demo").count()).isEqualTo(1);
@@ -60,9 +60,9 @@ class DefinitionDeploymentIntegrationTest {
                         new Edge("approve-end", "approve", "end", "")));
 
         DefinitionDraft first = service.create("demo", key, "第一版", graph);
-        DefinitionDraft firstPublished = service.publish("demo", first.id(), 0);
+        DefinitionDraft firstPublished = service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), first.id(), 0, "集成测试发布");
         DefinitionDraft second = service.create("demo", key, "第二版", graph);
-        DefinitionDraft secondPublished = service.publish("demo", second.id(), 0);
+        DefinitionDraft secondPublished = service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), second.id(), 0, "集成测试发布");
 
         assertThat(firstPublished.version()).isEqualTo(1);
         assertThat(secondPublished.version()).isEqualTo(2);
@@ -77,7 +77,7 @@ class DefinitionDeploymentIntegrationTest {
                 .processDefinitionKey(key).processDefinitionWithoutTenantId().singleResult();
         DefinitionDraft draft = service.create("demo", key, "租户报销流程", approvalGraph("租户审批节点"));
 
-        DefinitionDraft published = service.publish("demo", draft.id(), 0);
+        DefinitionDraft published = service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), 0, "集成测试发布");
 
         var tenantDefinition = repositoryService.createProcessDefinitionQuery()
                 .processDefinitionKey(key).processDefinitionTenantId("demo").singleResult();
@@ -98,7 +98,7 @@ class DefinitionDeploymentIntegrationTest {
                 .deploy();
         DefinitionDraft draft = service.create("demo", key, "新的平台流程", approvalGraph("新的审批节点"));
 
-        assertThatThrownBy(() -> service.publish("demo", draft.id(), 0))
+        assertThatThrownBy(() -> service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), 0, "集成测试发布"))
                 .isInstanceOfSatisfying(DomainException.class,
                         error -> assertThat(error.code()).isEqualTo("DEFINITION_DEPLOYMENT_CONFLICT"));
 
@@ -114,13 +114,13 @@ class DefinitionDeploymentIntegrationTest {
     void rollsBackBothPlatformAndEngineWhenTheirVersionSequencesDiverge() {
         String key = "removed-history-" + UUID.randomUUID();
         DefinitionDraft first = service.create("demo", key, "第一版", approvalGraph("第一版审批"));
-        service.publish("demo", first.id(), 0);
+        service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), first.id(), 0, "集成测试发布");
         var firstEngineDefinition = repositoryService.createProcessDefinitionQuery()
                 .processDefinitionKey(key).processDefinitionTenantId("demo").singleResult();
         repositoryService.deleteDeployment(firstEngineDefinition.getDeploymentId(), true);
         DefinitionDraft nextDraft = service.create("demo", key, "第二版", approvalGraph("第二版审批"));
 
-        assertThatThrownBy(() -> service.publish("demo", nextDraft.id(), 0))
+        assertThatThrownBy(() -> service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), nextDraft.id(), 0, "集成测试发布"))
                 .isInstanceOfSatisfying(DomainException.class,
                         error -> assertThat(error.code()).isEqualTo("DEFINITION_DEPLOYMENT_CONFLICT"));
 

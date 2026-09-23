@@ -121,7 +121,7 @@ public class IdempotencyExecutor {
         ContentCachingRequestWrapper wrapped = WebUtils.getNativeRequest(request, ContentCachingRequestWrapper.class);
         if (wrapped == null) throw new IllegalStateException("Authenticated request body caching is unavailable");
         try {
-            // 无 @RequestBody 的发布接口也要读取真实 body；DTO 已消费部分由 wrapper 保留，剩余字节不能遗漏。
+            // DTO 已消费部分由 wrapper 保留；可选正文的旧请求及剩余字节也必须纳入摘要。
             wrapped.getInputStream().transferTo(OutputStream.nullOutputStream());
         } catch (IOException exception) {
             throw new DomainException("INVALID_IDEMPOTENCY_REQUEST", "Unable to read the complete request body");

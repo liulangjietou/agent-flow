@@ -22,10 +22,10 @@ class DefinitionApplicationServiceTest {
     void publishesOnceAndSimulatesUsingSafeCondition() {
         InMemoryRepository repository = new InMemoryRepository();
         RecordingDeployment deployment = new RecordingDeployment();
-        DefinitionApplicationService service = new DefinitionApplicationService(repository, deployment);
+        DefinitionApplicationService service = new DefinitionApplicationService(repository, deployment, mock(DefinitionPublicationRepository.class));
         DefinitionDraft draft = service.create("tenant-a", "travel", "出差审批", graph());
 
-        DefinitionDraft published = service.publish("tenant-a", draft.id(), 0);
+        DefinitionDraft published = service.publish(new io.agentflow.common.Actor("tenant-a", "test-admin", java.util.Set.of("ADMIN")), draft.id(), 0, "集成测试发布");
 
         assertThat(published.status()).isEqualTo(DraftStatus.PUBLISHED);
         assertThat(deployment.received).isSameAs(published);

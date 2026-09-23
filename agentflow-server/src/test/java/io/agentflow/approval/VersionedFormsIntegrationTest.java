@@ -115,7 +115,7 @@ class VersionedFormsIntegrationTest {
         assertThat(ok(send("PUT", path, "admin", Map.of("name", "无字段表单", "graph", graph(), "expectedRevision", 2, "formSchema", empty)), 200)
                 .path("formSchema")).isEqualTo(mapper.valueToTree(empty));
         assertThat(send("PUT", path, "admin", Map.of("name", "过期变更", "graph", graph(), "expectedRevision", 1, "formSchema", allTypes())).getStatus()).isEqualTo(409);
-        ok(send("POST", path + "/publish?expectedRevision=3", "admin", null), 200);
+        ok(send("POST", path + "/publish?expectedRevision=3", "admin", Map.of("changeNote", "测试表单版本发布")), 200);
         assertThat(send("PUT", path, "admin", Map.of("name", "覆盖发布", "graph", graph(), "expectedRevision", 4, "formSchema", allTypes())).getStatus()).isEqualTo(422);
     }
 
@@ -217,7 +217,7 @@ class VersionedFormsIntegrationTest {
         assertThat(send("POST", "/api/v1/applications", "alice", createBody(draft, "DRAFT-" + UUID.randomUUID(), Map.of())).getStatus()).isEqualTo(422);
         String foreignKey = "foreign-" + UUID.randomUUID();
         var foreign = definitions.create("foreign-tenant", foreignKey, "其他租户流程", domainGraph());
-        definitions.publish("foreign-tenant", foreign.id(), 0);
+        definitions.publish(new io.agentflow.common.Actor("foreign-tenant", "test-admin", java.util.Set.of("ADMIN")), foreign.id(), 0, "集成测试发布");
         for (Map<String, Object> target : List.of(Map.<String, Object>of("processKey", foreignKey, "definitionVersion", 1),
                 Map.<String, Object>of("processKey", "missing-" + UUID.randomUUID(), "definitionVersion", 1),
                 Map.<String, Object>of("processKey", "expense-reimbursement", "definitionVersion", 2))) {
@@ -287,7 +287,7 @@ class VersionedFormsIntegrationTest {
 
     private JsonNode published(String key, Map<String, Object> schema, Map<String, Object> graph) throws Exception {
         JsonNode draft = definition(key, schema, graph);
-        return ok(send("POST", "/api/v1/process-definitions/" + draft.path("id").asText() + "/publish?expectedRevision=0", "admin", null), 200);
+        return ok(send("POST", "/api/v1/process-definitions/" + draft.path("id").asText() + "/publish?expectedRevision=0", "admin", Map.of("changeNote", "测试表单版本发布")), 200);
     }
 
     private JsonNode create(JsonNode definition, Map<String, Object> payload) throws Exception {

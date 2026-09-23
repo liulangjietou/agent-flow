@@ -64,7 +64,7 @@ for template in catalog:
         else:
             assert simulated["path"] == scenario["expectedPath"]
 
-    published = request("POST", path + "/publish?expectedRevision=0", token=admin)
+    published = request("POST", path + "/publish?expectedRevision=0", body={"changeNote": "验收脚本发布"}, token=admin)
     application_results = []
     nodes = {node["id"]: node for node in published["graph"]["nodes"]}
     for scenario in scenarios:

@@ -397,7 +397,7 @@ class ApplicationResubmissionIntegrationTest {
                                 new Edge("c", "gate", "high", "amount >= 5000"), new Edge("d", "gate", "low", "", true),
                                 new Edge("e", "high", "end", ""), new Edge("f", "low", "end", "")));
         var draft = definitions.create("demo", key, "补正轮次测试", graph);
-        definitions.publish("demo", draft.id(), draft.revision());
+        definitions.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "集成测试发布");
     }
 
     private JsonNode createDraft(String key) throws Exception {

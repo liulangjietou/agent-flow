@@ -14,6 +14,11 @@ export interface ComparisonChange {
 }
 /** 服务端确认的基线和差异列表。@author owlzhangfq@gmail.com */
 export interface ComparisonResult { baseline: { id: string; key: string; name: string; version: number }; changes: ComparisonChange[] }
+/** 服务端保存的发布事实；旧版本可能缺少完整记录。@author owlzhangfq@gmail.com */
+export interface PublicationResponse {
+  recorded: boolean
+  publication: null | { definitionId: string; definitionVersion: number; publishedBy: string; authorizedRole: string; publishedAt: string; changeNote: string; validation: { nodeCount: number; edgeCount: number; fieldCount: number; formBound: boolean; checks: string[] } }
+}
 /** 不包含原测试数据的路径与分支依据。@author owlzhangfq@gmail.com */
 export interface SimulationResult {
   path: string[]; edgeIds: string[]
@@ -80,6 +85,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       UNAUTHENTICATED: '登录已失效，请重新登录。',
       FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
       INVALID_FORM_SCHEMA: '表单配置未通过校验，请检查字段标识、类型、选项与约束。',
+      INVALID_PUBLICATION_NOTE: '请填写 1 至 2000 字的发布变更说明。',
       INVALID_TEMPLATE_COPY_REQUEST: '复制信息无效，请检查流程标识、名称和模板版本。',
       TEMPLATE_VERSION_CONFLICT: '模板版本已变化，请重新加载目录，核对后再复制。',
       DEFINITION_BINDING_AMBIGUOUS: '这份旧申请未保存原流程来源，当前存在同名版本。请保留原记录，核对流程后重新发起申请。'
@@ -102,6 +108,7 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  definitionPublication: (id: string, signal: AbortSignal) => request<PublicationResponse>(`/process-definitions/${encodeURIComponent(id)}/publication`, { signal }),
   compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
@@ -126,5 +133,5 @@ export const api = {
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
   validateDefinition: (graph: Graph, formSchema?: FormSchema | null) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }) }),
-  publishDefinition: (id: string, revision: number) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程')
+  publishDefinition: (id: string, revision: number, changeNote: string) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程', { changeNote })
 }

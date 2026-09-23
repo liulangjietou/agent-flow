@@ -81,7 +81,7 @@ class DefinitionPreviewIntegrationTest {
         Graph changed = new Graph(template.graph().nodes(), template.graph().edges().stream().map(edge ->
                 edge.condition().isBlank() ? edge : new Edge(edge.id(), edge.source(), edge.target(), "durationDays > 2", false)).toList());
         var draft = definitions.create("demo", "preview-" + UUID.randomUUID(), "模拟一致性", changed, template.formSchema());
-        var published = definitions.publish("demo", draft.id(), draft.revision());
+        var published = definitions.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "集成测试发布");
         for (String days : List.of("2", "2.5")) {
             var preview = definitions.simulatePreview(changed, template.formSchema(), new EvaluationContext(values(days)));
             var instance = runtime.startProcessInstanceByKeyAndTenantId(published.key(), Map.of("formData", values(days),

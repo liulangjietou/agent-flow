@@ -208,7 +208,7 @@ class LifecycleAuditIntegrationTest {
                 List.of(new Edge("a", "start", "first", ""), new Edge("b", "first", "second", ""),
                         new Edge("c", "second", "end", "")));
         var definition = definitions.create("demo", key, "两级审批审计", graph);
-        definitions.publish("demo", definition.id(), definition.revision());
+        definitions.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), definition.id(), definition.revision(), "集成测试发布");
         String id = mapper.readTree(create("AUDIT-" + UUID.randomUUID(), key).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()).path("id").asText();
         submit(id, 1).andExpect(status().isOk());

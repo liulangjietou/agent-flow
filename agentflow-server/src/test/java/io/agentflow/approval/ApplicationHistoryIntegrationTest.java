@@ -425,7 +425,7 @@ class ApplicationHistoryIntegrationTest {
                         new Edge("c", "gate", "finance", "amount >= 5000"), new Edge("d", "gate", "end", "", true),
                         new Edge("e", "finance", "end", "")));
         var draft = definitions.create("demo", key, "历史节点测试", graph);
-        definitions.publish("demo", draft.id(), draft.revision());
+        definitions.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "集成测试发布");
     }
 
     private String draft(String key) throws Exception {

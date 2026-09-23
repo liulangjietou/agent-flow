@@ -41,6 +41,7 @@ class BundledDefinitionBindingIntegrationTest {
     void resetOnlyThisTestDatabasesTenantDefinitionFixtures() {
         definitions.createDeploymentQuery().deploymentTenantId("demo").list()
                 .forEach(deployment -> definitions.deleteDeployment(deployment.getId(), true));
+        jdbc.update("DELETE FROM definition_publication WHERE tenant_id='demo'");
         jdbc.update("DELETE FROM approval_definition WHERE tenant_id='demo'");
     }
 
@@ -128,7 +129,7 @@ class BundledDefinitionBindingIntegrationTest {
     private JsonNode publishTenantDefinition() throws Exception {
         JsonNode draft = send("/api/v1/process-definitions", "admin", Map.of("key", "expense-reimbursement", "name", "同版本新租户表单",
                 "graph", graph(), "formSchema", Map.of("schemaVersion", 1, "fields", List.of(Map.of("key", "reason", "label", "新必填字段", "type", "TEXT", "required", true)))), 200);
-        return send("/api/v1/process-definitions/" + draft.path("id").asText() + "/publish?expectedRevision=0", "admin", null, 200);
+        return send("/api/v1/process-definitions/" + draft.path("id").asText() + "/publish?expectedRevision=0", "admin", Map.of("changeNote", "测试表单版本发布"), 200);
     }
 
     private Map<String, Object> graph() {

@@ -9,6 +9,8 @@ import TemplateCenter from './components/TemplateCenter.vue'
 import SystemChecks from './components/SystemChecks.vue'
 import DefinitionSimulation from './components/DefinitionSimulation.vue'
 import DefinitionComparison from './components/DefinitionComparison.vue'
+import DefinitionPublication from './components/DefinitionPublication.vue'
+import PublicationDialog from './components/PublicationDialog.vue'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
@@ -33,6 +35,10 @@ const actorScope = computed(() => actor.value ? JSON.stringify([actor.value.tena
 const confirmation = reactive(new UnsavedConfirmation())
 const confirmationOpen = computed(() => confirmation.active !== null)
 const confirmationReturnFocus = ref<HTMLElement | null>(null)
+const publicationOpen = ref(false)
+const publicationNote = ref('')
+const publicationError = ref('')
+const publicationReturnFocus = ref<HTMLElement | null>(null)
 let viewActive = true
 const templateRefresh = ref(0)
 const notice = ref('')
@@ -99,7 +105,7 @@ const publishedDefinitions = computed(() => definitions.value.filter(definition 
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
 const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
-const editorLocked = computed(() => readonlyDefinition.value || writesBlocked.value || busy.value || confirmationOpen.value)
+const editorLocked = computed(() => readonlyDefinition.value || writesBlocked.value || busy.value || confirmationOpen.value || publicationOpen.value)
 const visibleTasks = computed(() => tasks.value.filter(task => task.taskName.toLowerCase().includes(taskSearch.value.trim().toLowerCase())))
 const dirty = computed(() => snapshot() !== savedSnapshot.value)
 const today = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date())
@@ -308,14 +314,23 @@ async function saveDraft() {
   if (busy.value || writesBlocked.value) return; busy.value = true
   try { await persistDraft(); notice.value = '流程草稿已保存' } catch (error) { notice.value = errorMessage(error) } finally { busy.value = false }
 }
+function openPublication() {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  publicationReturnFocus.value = document.activeElement as HTMLElement | null
+  publicationError.value = ''; publicationOpen.value = true
+}
 async function publishDraft() {
-  if (busy.value || writesBlocked.value || readonlyDefinition.value) return; busy.value = true
+  if (!publicationOpen.value || !canManageDefinitions.value || busy.value || writesBlocked.value || readonlyDefinition.value) return
+  const changeNote = publicationNote.value.trim()
+  if (!changeNote || changeNote.length > 2000) { publicationError.value = '请填写 1 至 2000 字的发布变更说明。'; return }
+  busy.value = true; publicationError.value = ''
   try {
-    if (!await validateGraph()) { notice.value = '请先修复服务端校验问题'; return }
+    if (!await validateGraph()) { publicationError.value = '流程校验未通过，请返回编辑并修复下方校验问题。'; return }
     const saved = await persistDraft()
-    const published = await api.publishDefinition(saved.id, saved.revision)
-    applyDefinition(published); await loadDefinitions(); notice.value = `流程${statusLabel(published.status)}，版本 v${published.version}`
-  } catch (error) { notice.value = errorMessage(error) } finally { busy.value = false }
+    const published = await api.publishDefinition(saved.id, saved.revision, changeNote)
+    applyDefinition(published); publicationOpen.value = false; publicationNote.value = ''
+    await loadDefinitions(); notice.value = `流程${statusLabel(published.status)}，版本 v${published.version}，发布记录已保存。`
+  } catch (error) { publicationError.value = errorMessage(error); notice.value = publicationError.value } finally { busy.value = false }
 }
 function selectNode(node: FlowNode) { selectedId.value = node.id; selectedEdgeId.value = ''; connectionTarget.value = '' }
 function selectEdge(edge: GraphEdge) { selectedEdgeId.value = edge.id; selectedId.value = '' }
@@ -408,7 +423,8 @@ watch(applicationDefinitionId, () => {
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
 })
 
-watch(actor, () => confirmation.cancel(), { flush: 'sync' })
+watch(actor, () => { confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
+watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publicationNote.value = '' }, { flush: 'sync' })
 
 watch([nodes, edges, definitionName, definitionFormSchema], () => { validationErrors.value = []; validationMessage.value = '内容已修改，请重新校验。' }, { deep: true, flush: 'sync' })
 
@@ -459,7 +475,7 @@ async function recoverOperation(id: string) {
   replacesDefinition && !readonlyDefinition.value && dirty.value)
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
-  if (writeRequests.hasUnconfirmed() || (!readonlyDefinition.value && dirty.value)) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 onMounted(async () => {
@@ -473,7 +489,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
 </script>
 
 <template>
-  <div class="app" :inert="confirmationOpen" @keydown="keyHandler">
+  <div class="app" :inert="confirmationOpen || publicationOpen" @keydown="keyHandler">
     <section v-if="!loggedIn" class="login-screen">
       <form class="login-card" @submit.prevent="login">
         <div class="brand-mark">AF</div><p class="eyebrow">AGENTFLOW / WORKFLOW OS</p>
@@ -545,7 +561,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <TemplateCenter v-else-if="page === 'templates' && canManageDefinitions" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page">
-          <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked" @click="publishDraft">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
+          <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked" @click="openPublication">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
           <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button></div>
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
@@ -563,6 +579,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           </div>
           <DefinitionComparison v-if="comparisonOpen && canManageDefinitions" :input="comparisonInput" :definitions="definitions" :current-id="definitionId" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @locate="locateComparisonChange" @close="comparisonOpen = false" />
           <DefinitionSimulation v-if="simulationOpen && canManageDefinitions" :graph="simulationGraph" :form-schema="definitionFormSchema" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @result="simulationResult = $event" @locate="locateDesignTarget" @close="simulationOpen = false" />
+          <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <FormSchemaEditor v-model="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <div class="validation-strip" :class="{ invalid: validationErrors.length }"><span>●</span>{{ validationMessage }}<ul v-if="validationErrors.length"><li v-for="error in validationErrors" :key="error">{{ error }}</li></ul></div>
         </section>
@@ -591,4 +608,5 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
     </template>
   </div>
   <UnsavedConfirmationDialog v-if="confirmation.active" :key="confirmation.active.id" :request="confirmation.active" :return-focus="confirmationReturnFocus" :fallback-focus="workspace" @answer="(id, accepted) => confirmation.answer(id, accepted)" />
+  <PublicationDialog v-if="publicationOpen" v-model:note="publicationNote" :name="definitionName" :process-key="definitionKey" :busy="busy" :blocked="writesBlocked" :error="publicationError" :return-focus="publicationReturnFocus" :fallback-focus="workspace" @close="publicationOpen = false" @submit="publishDraft" />
 </template>

@@ -266,3 +266,41 @@ test('8个业务写均带新键，校验和认证不附加业务幂等键', asyn
   await api.logout()
   assert.ok(sent.slice(8).every(init => !init.headers.has('Idempotency-Key')))
 })
+
+test('发布响应丢失后保留说明和原请求键，后续改写不会替换原发布事实', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'publication-recovery' })
+  const sent = []
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, ...init })
+    if (sent.length === 1) throw new TypeError('lost')
+    return Response.json({ id: 'publication-draft', status: 'PUBLISHED', version: 2 })
+  }
+  await assert.rejects(api.publishDefinition('publication-draft', 3, '启用新审批规则\n保留旧实例。'))
+  await assert.rejects(api.publishDefinition('publication-draft', 3, '另一说明'), error => error.code === 'PENDING_REQUEST_CHANGED')
+  assert.equal(sent.length, 1)
+  const recovered = await writeRequests.recover(writeRequests.pending()[0].id)
+  assert.equal(recovered.result.version, 2)
+  assert.equal(JSON.parse(sent[1].body).changeNote, '启用新审批规则\n保留旧实例。')
+  assert.equal(sent[0].body, sent[1].body)
+  assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+  assert.equal(writeRequests.pending().length, 0)
+})
+
+test('发布记录查询使用只读接口，说明校验失败后允许修正并重新发布', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'publication-note' })
+  const sent = []
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, ...init })
+    if (url.endsWith('/publication')) return Response.json({ recorded: false, publication: null })
+    if (JSON.parse(init.body).changeNote === ' ') return Response.json({ code: 'INVALID_PUBLICATION_NOTE' }, { status: 422 })
+    return Response.json({ id: 'draft', status: 'PUBLISHED' })
+  }
+  const abort = new AbortController()
+  assert.deepEqual(await api.definitionPublication('draft', abort.signal), { recorded: false, publication: null })
+  assert.equal(sent[0].signal, abort.signal)
+  assert.equal(sent[0].headers.has('Idempotency-Key'), false)
+  await assert.rejects(api.publishDefinition('draft', 0, ' '), error => error.status === 422 && error.message.includes('变更说明'))
+  assert.equal(writeRequests.pending().length, 0)
+  await api.publishDefinition('draft', 0, '补齐说明')
+  assert.notEqual(sent[1].headers.get('Idempotency-Key'), sent[2].headers.get('Idempotency-Key'))
+})

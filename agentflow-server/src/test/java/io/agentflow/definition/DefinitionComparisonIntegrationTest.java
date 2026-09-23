@@ -94,7 +94,7 @@ class DefinitionComparisonIntegrationTest {
     private DefinitionModels.DefinitionDraft published(String tenant) {
         var template = catalog.get("leave-request");
         var draft = service.create(tenant, "compare-" + UUID.randomUUID(), "比较基线", template.graph(), template.formSchema());
-        return service.publish(tenant, draft.id(), draft.revision());
+        return service.publish(new io.agentflow.common.Actor(tenant, "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "集成测试发布");
     }
     private Map<String, Object> body(DefinitionModels.DefinitionDraft draft) {
         Map<String, Object> body = new LinkedHashMap<>();

@@ -1,11 +1,14 @@
 package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import static io.agentflow.definition.DefinitionModels.DefinitionDraft;
@@ -19,14 +22,17 @@ import static io.agentflow.definition.DefinitionModels.Graph;
 public class DefinitionApplicationService {
     private final DefinitionDraftRepository repository;
     private final DefinitionDeploymentPort deploymentPort;
+    private final DefinitionPublicationRepository publications;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
     private final DefinitionDiffService differences = new DefinitionDiffService();
 
     /** 创建定义服务。 */
-    public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort) {
+    public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
+                                        DefinitionPublicationRepository publications) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
+        this.publications = publications;
     }
 
     /** 校验流程图，不改变持久化状态。 */
@@ -70,13 +76,25 @@ public class DefinitionApplicationService {
 
     /** 分配业务版本并部署；仓储写入和引擎发布在同一事务内成功或回滚。 */
     @Transactional
-    public DefinitionDraft publish(String tenantId, UUID id, long expectedRevision) {
-        DefinitionDraft draft = get(tenantId, id);
+    public DefinitionDraft publish(Actor publisher, UUID id, long expectedRevision, String changeNote) {
+        DefinitionDraft draft = get(publisher.tenantId(), id);
         requireValid(draft.graph(), draft.formSchema());
-        draft.publish(expectedRevision, repository.nextVersion(tenantId, draft.key()));
+        long version = repository.nextVersion(publisher.tenantId(), draft.key());
+        DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now());
+        draft.publish(expectedRevision, version);
         DefinitionDraft published = repository.save(draft);
         deploymentPort.deploy(published);
+        publications.save(publication);
         return published;
+    }
+
+    /** 读取已发布版本的事实；缺失表示历史记录不完整，不能据此生成操作者或说明。 */
+    public Optional<DefinitionPublication> publication(String tenantId, UUID id) {
+        DefinitionDraft definition = get(tenantId, id);
+        if (definition.status() == DefinitionModels.DraftStatus.DRAFT) {
+            throw new DomainException("DEFINITION_NOT_PUBLISHED", "Definition has not been published");
+        }
+        return publications.findByDefinition(tenantId, id);
     }
 
     /** 使用同一套受限条件求值器模拟流程路径，不接触流程引擎。 */

@@ -109,7 +109,7 @@ class DefinitionSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("path[1]").value("approve"));
 
-        service.publish("demo", draft.id(), draft.revision());
+        service.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "集成测试发布");
         mvc.perform(post(url).header("Authorization", token("employee")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("path[1]").value("approve"));

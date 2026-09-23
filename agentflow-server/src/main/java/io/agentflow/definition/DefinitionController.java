@@ -83,11 +83,33 @@ public class DefinitionController {
 
     /** 发布流程定义。 */
     @PostMapping("/{id}/publish")
-    public ResponseEntity<String> publish(@PathVariable UUID id, @RequestParam long expectedRevision, HttpServletRequest httpRequest) {
+    public ResponseEntity<String> publish(@PathVariable UUID id, @RequestParam long expectedRevision,
+                                          @RequestBody(required = false) PublicationRequest request, HttpServletRequest httpRequest) {
         requireProcessAdmin();
+        // 旧版无正文的成功请求仍可回放；只有新的执行才进入领域层要求发布说明。
         return idempotency.execute(httpRequest, HttpStatus.OK,
-                () -> DefinitionResponse.from(service.publish(currentActor.actor().tenantId(), id, expectedRevision)));
+                () -> DefinitionResponse.from(service.publish(currentActor.actor(), id, expectedRevision, request == null ? null : request.changeNote())));
     }
+
+    /** 读取发布事实，只有流程管理员可以查看完整发布依据。 */
+    @GetMapping("/{id}/publication")
+    public PublicationResponse publication(@PathVariable UUID id) {
+        requireProcessAdmin();
+        return service.publication(currentActor.actor().tenantId(), id)
+                .map(value -> new PublicationResponse(true, value)).orElseGet(() -> new PublicationResponse(false, null));
+    }
+
+    /**
+     * 发布说明；操作者和权限只能取自认证上下文。
+     * @author owlzhangfq@gmail.com
+     */
+    public record PublicationRequest(String changeNote) { }
+
+    /**
+     * 显式区分完整事实与历史缺失，避免用默认值冒充历史。
+     * @author owlzhangfq@gmail.com
+     */
+    public record PublicationResponse(boolean recorded, @JsonInclude(JsonInclude.Include.ALWAYS) DefinitionPublication publication) { }
 
     /** 发布前模拟流程路径。 */
     @PostMapping("/simulate")
