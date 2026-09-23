@@ -1,0 +1,5837 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "AgentFlow API",
+    "version": "0.1.0",
+    "description": "与当前工程同步的已实现 API。演示认证尚非企业身份服务；Agent、财务支付、外部 Webhook、组织和附件接口尚未交付。所有业务资源限定认证主体租户，客户端不能指定他人租户绕过授权。",
+    "contact": {
+      "email": "owlzhangfq@gmail.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "当前部署同源根路径；paths 已包含 /api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "认证"
+    },
+    {
+      "name": "流程设计"
+    },
+    {
+      "name": "模板"
+    },
+    {
+      "name": "申请"
+    },
+    {
+      "name": "任务"
+    },
+    {
+      "name": "工作台"
+    },
+    {
+      "name": "消息"
+    },
+    {
+      "name": "集成"
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "tags": [
+          "认证"
+        ],
+        "summary": "演示登录",
+        "description": "仅演示认证启用时可用。账号 admin、manager、finance、employee、alice、bob；密码 demo。租户默认 demo。生产 IdP/OIDC 尚未接入。",
+        "x-access": "匿名；受演示开关与租户限制",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "example": {
+                "tenantId": "demo",
+                "username": "alice",
+                "password": "demo"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "identity",
+        "tags": [
+          "认证"
+        ],
+        "summary": "当前身份",
+        "description": "响应字段为 actor；不重新返回 token。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "tags": [
+          "认证"
+        ],
+        "summary": "退出会话",
+        "description": "撤销当前 Bearer 令牌，成功为 HTTP 200 空正文。重复使用已撤销令牌返回 401。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions": {
+      "get": {
+        "operationId": "listDefinitions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "流程版本列表",
+        "description": "管理角色可读本租户全部定义，其他角色只读已发布定义。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Definition"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "状态；非管理角色指定非 PUBLISHED 返回 403",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "ARCHIVED"
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "创建流程草稿",
+        "description": "创建独立草稿，version=0；发布后不可原地修改。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Definition"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDefinition"
+              },
+              "example": {
+                "key": "integration-example",
+                "name": "集成示例流程",
+                "graph": {
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "name": "开始",
+                      "type": "START",
+                      "properties": {}
+                    },
+                    {
+                      "id": "review",
+                      "name": "部门审批",
+                      "type": "USER_TASK",
+                      "properties": {
+                        "assigneeRule": "role:MANAGER"
+                      }
+                    },
+                    {
+                      "id": "end",
+                      "name": "结束",
+                      "type": "END",
+                      "properties": {}
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "first",
+                      "source": "start",
+                      "target": "review",
+                      "condition": "",
+                      "defaultBranch": false
+                    },
+                    {
+                      "id": "last",
+                      "source": "review",
+                      "target": "end",
+                      "condition": "",
+                      "defaultBranch": false
+                    }
+                  ]
+                },
+                "formSchema": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/{id}": {
+      "get": {
+        "operationId": "getDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取流程定义",
+        "description": "普通账号读取草稿返回 404。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Definition"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "保存草稿",
+        "description": "expectedRevision 来自当前读取。冲突后重新加载、核对，不能自动用新版本覆盖。null formSchema 保留旧表单。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Definition"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDefinition"
+              },
+              "example": {
+                "name": "集成示例流程",
+                "graph": {
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "name": "开始",
+                      "type": "START",
+                      "properties": {}
+                    },
+                    {
+                      "id": "review",
+                      "name": "部门审批",
+                      "type": "USER_TASK",
+                      "properties": {
+                        "assigneeRule": "role:MANAGER"
+                      }
+                    },
+                    {
+                      "id": "end",
+                      "name": "结束",
+                      "type": "END",
+                      "properties": {}
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "first",
+                      "source": "start",
+                      "target": "review",
+                      "condition": "",
+                      "defaultBranch": false
+                    },
+                    {
+                      "id": "last",
+                      "source": "review",
+                      "target": "end",
+                      "condition": "",
+                      "defaultBranch": false
+                    }
+                  ]
+                },
+                "expectedRevision": 0,
+                "formSchema": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/validate": {
+      "post": {
+        "operationId": "validateDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "校验流程设计",
+        "description": "只读，不创建草稿。HTTP 200 的 errors 数组非空表示设计未通过；结构/表单解码失败可为 422。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphInput"
+              },
+              "example": {
+                "graph": {
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "name": "开始",
+                      "type": "START",
+                      "properties": {}
+                    },
+                    {
+                      "id": "review",
+                      "name": "部门审批",
+                      "type": "USER_TASK",
+                      "properties": {
+                        "assigneeRule": "role:MANAGER"
+                      }
+                    },
+                    {
+                      "id": "end",
+                      "name": "结束",
+                      "type": "END",
+                      "properties": {}
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "first",
+                      "source": "start",
+                      "target": "review",
+                      "condition": "",
+                      "defaultBranch": false
+                    },
+                    {
+                      "id": "last",
+                      "source": "review",
+                      "target": "end",
+                      "condition": "",
+                      "defaultBranch": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/simulate": {
+      "post": {
+        "operationId": "previewDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "模拟当前设计",
+        "description": "只读。返回真实领域求值的节点路径、连线与分支依据，不保存测试数据。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationInput"
+              },
+              "example": {
+                "graph": {
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "name": "开始",
+                      "type": "START",
+                      "properties": {}
+                    },
+                    {
+                      "id": "review",
+                      "name": "部门审批",
+                      "type": "USER_TASK",
+                      "properties": {
+                        "assigneeRule": "role:MANAGER"
+                      }
+                    },
+                    {
+                      "id": "end",
+                      "name": "结束",
+                      "type": "END",
+                      "properties": {}
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "first",
+                      "source": "start",
+                      "target": "review",
+                      "condition": "",
+                      "defaultBranch": false
+                    },
+                    {
+                      "id": "last",
+                      "source": "review",
+                      "target": "end",
+                      "condition": "",
+                      "defaultBranch": false
+                    }
+                  ]
+                },
+                "values": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/{id}/simulate": {
+      "post": {
+        "operationId": "simulateSavedDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "模拟已保存版本",
+        "description": "只读兼容入口，只返回 path；省略正文时使用空测试数据。按定义读取权限授权。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSimulationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedSimulationInput"
+              },
+              "example": {
+                "values": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/{id}/compare": {
+      "post": {
+        "operationId": "compareDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "比较发布版本",
+        "description": "id 为同 key 已发布基线；当前完整快照在正文中，不保存差异或草稿。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComparisonInput"
+              },
+              "example": {
+                "key": "integration-example",
+                "name": "集成示例流程",
+                "graph": {
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "name": "开始",
+                      "type": "START",
+                      "properties": {}
+                    },
+                    {
+                      "id": "review",
+                      "name": "部门审批",
+                      "type": "USER_TASK",
+                      "properties": {
+                        "assigneeRule": "role:MANAGER"
+                      }
+                    },
+                    {
+                      "id": "end",
+                      "name": "结束",
+                      "type": "END",
+                      "properties": {}
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "first",
+                      "source": "start",
+                      "target": "review",
+                      "condition": "",
+                      "defaultBranch": false
+                    },
+                    {
+                      "id": "last",
+                      "source": "review",
+                      "target": "end",
+                      "condition": "",
+                      "defaultBranch": false
+                    }
+                  ]
+                },
+                "formSchema": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/{id}/publish": {
+      "post": {
+        "operationId": "publishDefinition",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "发布草稿",
+        "description": "expectedRevision 在查询参数中；正文填写 changeNote。验证、部署、发布事实与幂等成功记录共用事务，运行实例继续绑定原版。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Definition"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "required": true,
+            "description": "当前草稿 revision",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              },
+              "example": {
+                "changeNote": "首次发布：部门审批"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-definitions/{id}/publication": {
+      "get": {
+        "operationId": "definitionPublication",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取发布记录",
+        "description": "历史缺少记录时返回 recorded=false、publication=null，不补造事实。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/process-templates": {
+      "get": {
+        "operationId": "listTemplates",
+        "tags": [
+          "模板"
+        ],
+        "summary": "模板目录",
+        "description": "仅已交付的 FORM 模板：请假、用印、合同。目录带场景及本租户复制记录。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProcessTemplate"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/process-templates/{key}/scenarios": {
+      "get": {
+        "operationId": "templateScenarios",
+        "tags": [
+          "模板"
+        ],
+        "summary": "模板验收场景",
+        "description": "只读样例与预期结果，不创建资源。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateScenario"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/process-templates/{key}/copy": {
+      "post": {
+        "operationId": "copyTemplate",
+        "tags": [
+          "模板"
+        ],
+        "summary": "复制模板",
+        "description": "路径 key 为模板 key，正文 key 为新的租户私有流程标识。复制不发布、不创建申请；版本不符返回 409。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Definition"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyTemplateRequest"
+              },
+              "example": {
+                "key": "integration-leave",
+                "name": "集成请假",
+                "templateVersion": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications": {
+      "get": {
+        "operationId": "listApplications",
+        "tags": [
+          "申请"
+        ],
+        "summary": "可访问申请（兼容）",
+        "description": "返回全量含正文数组；个人列表优先使用 workspace/applications，管理员仍受当前租户限制。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Application"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createApplication",
+        "tags": [
+          "申请"
+        ],
+        "summary": "创建申请草稿",
+        "description": "绑定指定已发布版本和表单快照。唯一内置 legacy 流程为 expense-reimbursement v1。创建不启动流程。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": true,
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplication"
+              },
+              "example": {
+                "businessNo": "INTEGRATION-001",
+                "processKey": "integration-example",
+                "definitionVersion": 1,
+                "title": "集成验收申请",
+                "payload": {
+                  "amount": "100.01",
+                  "description": "合成测试数据"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}": {
+      "get": {
+        "operationId": "getApplication",
+        "tags": [
+          "申请"
+        ],
+        "summary": "申请详情",
+        "description": "不可见申请返回 404；读取不赋予审批权。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "reviseApplication",
+        "tags": [
+          "申请"
+        ],
+        "summary": "编辑或补正申请",
+        "description": "仅 DRAFT、RETURNED、WITHDRAWN 可修改，保持业务号和绑定版本；原轮次不可覆盖。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseApplication"
+              },
+              "example": {
+                "expectedVersion": 0,
+                "title": "补充说明",
+                "payload": {
+                  "amount": "100.01"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/submit": {
+      "post": {
+        "operationId": "submitApplication",
+        "tags": [
+          "申请"
+        ],
+        "summary": "提交或重新提交",
+        "description": "要求表单必填完整。启动真实流程、记录新轮次并产生站内消息，成功 HTTP 200，不是 202。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              },
+              "example": {
+                "expectedVersion": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/withdraw": {
+      "post": {
+        "operationId": "withdrawApplication",
+        "tags": [
+          "申请"
+        ],
+        "summary": "撤回审批中申请",
+        "description": "仅发起人且 IN_APPROVAL；终止当前流程，记录 WITHDRAWN 轮次，保留历史并可补正重提。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawRequest"
+              },
+              "example": {
+                "expectedVersion": 1,
+                "comment": "申请人主动撤回"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/rounds": {
+      "get": {
+        "operationId": "applicationRounds",
+        "tags": [
+          "申请"
+        ],
+        "summary": "提交轮次",
+        "description": "返回按轮次保留的标题、表单、提交与结束事实；未完成字段明确为 null。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SubmissionRound"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/timeline": {
+      "get": {
+        "operationId": "applicationTimeline",
+        "tags": [
+          "申请"
+        ],
+        "summary": "审批轨迹",
+        "description": "授权与申请详情一致。轨迹按时间升序，审计按时间倒序。游标绑定申请、视图与筛选。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "指定轮次",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一响应的 nextCursor；保留原筛选条件",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/audit": {
+      "get": {
+        "operationId": "applicationAudit",
+        "tags": [
+          "申请"
+        ],
+        "summary": "操作审计",
+        "description": "授权与申请详情一致。轨迹按时间升序，审计按时间倒序。游标绑定申请、视图与筛选。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "指定轮次",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一响应的 nextCursor；保留原筛选条件",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "description": "动作",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CREATE",
+                "REVISE",
+                "SUBMIT",
+                "WITHDRAW",
+                "CLAIM",
+                "RELEASE",
+                "TRANSFER",
+                "DELEGATE",
+                "RESOLVE",
+                "RETURN",
+                "REJECT",
+                "APPROVE"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "起始时刻，含边界",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "结束时刻，含边界",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "operationId": "listTasks",
+        "tags": [
+          "任务"
+        ],
+        "summary": "待办数组（兼容）",
+        "description": "全量兼容接口，新集成使用 workspace/tasks。只接受 pending 状态。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "默认 pending",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "PENDING"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}": {
+      "get": {
+        "operationId": "getTask",
+        "tags": [
+          "任务"
+        ],
+        "summary": "当前任务快照",
+        "description": "打开队列或消息后重新读取版本与 allowedActions。任务已结束或暂停返回 404；无操作权 403。",
+        "x-access": "APPROVER 且实际 assignee 或未指派任务的候选人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}/recipients": {
+      "get": {
+        "operationId": "taskRecipients",
+        "tags": [
+          "任务"
+        ],
+        "summary": "转交或委派接收人",
+        "description": "有效审批账号中排除自己；待回交任务不允许查询转交接收人。当前目录仍为演示来源。",
+        "x-access": "APPROVER 且实际 assignee 或未指派任务的候选人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}/actions": {
+      "post": {
+        "operationId": "taskAction",
+        "tags": [
+          "任务"
+        ],
+        "summary": "办理任务",
+        "description": "RETURN、REJECT、RESOLVE 必填意见；TRANSFER、DELEGATE 必填 targetUser。委派待回交仅允许受托人 RESOLVE，回交不构成批准；allowedActions 来自最新任务。",
+        "x-access": "APPROVER 且实际 assignee 或未指派任务的候选人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskActionResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskActionRequest"
+              },
+              "example": {
+                "action": "APPROVE",
+                "expectedVersion": 1,
+                "comment": "已核对申请"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspace/tasks": {
+      "get": {
+        "operationId": "pendingTasks",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "待办检索与分页",
+        "description": "较早任务优先；数据库按当前租户、实际候选/指派、活跃任务及当前轮次过滤。无 APPROVER 返回空列表。总数与分页不是冻结快照。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingTaskPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "单号、标题或任务名包含查询；% _ ! 为字面量",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "applicant",
+            "in": "query",
+            "required": false,
+            "description": "精确申请人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "assignment",
+            "in": "query",
+            "required": false,
+            "description": "默认 all",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "assigned",
+                "unclaimed",
+                "delegated"
+              ]
+            }
+          },
+          {
+            "name": "minAmount",
+            "in": "query",
+            "required": false,
+            "description": "包含边界的精确金额；无金额不当作零",
+            "schema": {
+              "type": "string",
+              "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+            }
+          },
+          {
+            "name": "maxAmount",
+            "in": "query",
+            "required": false,
+            "description": "包含边界的精确金额；无金额不当作零",
+            "schema": {
+              "type": "string",
+              "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一响应的 nextCursor；保留原筛选条件",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/workspace/applications": {
+      "get": {
+        "operationId": "myApplications",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "我发起与我的草稿",
+        "description": "只返回本人摘要，createdAt 与 id 倒序；drafts 视图只含 DRAFT，不含退回或撤回。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceApplicationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "description": "默认 started",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "started",
+                "drafts"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "标题或单号包含查询",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "状态；drafts 不能搭配非 DRAFT",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "IN_APPROVAL",
+                "APPROVED",
+                "REJECTED",
+                "RETURNED",
+                "WITHDRAWN"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一响应的 nextCursor；保留原筛选条件",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/workspace/handled": {
+      "get": {
+        "operationId": "myHandled",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "我的已办",
+        "description": "每行是本人一次实际办理，区分办理当时状态与申请当前状态。领取和释放不计入；handledAt 与 id 倒序。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandledPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "标题或单号包含查询",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "description": "办理动作",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APPROVE",
+                "RETURN",
+                "REJECT",
+                "TRANSFER",
+                "DELEGATE",
+                "RESOLVE"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一响应的 nextCursor；保留原筛选条件",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "inbox",
+        "tags": [
+          "消息"
+        ],
+        "summary": "我的站内消息",
+        "description": "只读本人消息；未读总数不受分页和 read 筛选影响。旧消息不扩大当前申请或任务权限。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "read",
+            "in": "query",
+            "required": false,
+            "description": "默认 all",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "unread"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一响应的 nextCursor；保留原筛选条件",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "readNotification",
+        "tags": [
+          "消息"
+        ],
+        "summary": "标记已读",
+        "description": "只允许实际接收人。重复标记保留第一次 readAt，不执行审批动作。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxMessage"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/system/checks": {
+      "get": {
+        "operationId": "systemChecks",
+        "tags": [
+          "集成"
+        ],
+        "summary": "系统自检",
+        "description": "执行真实只读检查；尚未接入的企业认证、组织、存储或模型明确返回 WARNING/NOT_IMPLEMENTED。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "openApi",
+        "tags": [
+          "集成"
+        ],
+        "summary": "下载 OpenAPI 契约",
+        "description": "当前部署随包提供的静态接口契约。只含接口结构和合成示例，不含账号令牌或业务记录。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenApiDocument"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "不透明会话令牌。演示登录取得；生产身份源尚未接入。"
+      }
+    },
+    "schemas": {
+      "Actor": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "tenantId",
+          "userId",
+          "roles"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "tenantId",
+          "username",
+          "password"
+        ]
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "演示会话的不透明令牌；服务重启或注销后失效，不是 JWT。"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Actor"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "CurrentIdentity": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "当前身份查询不返回 token，本字段通常省略。"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/Actor"
+          }
+        },
+        "required": [
+          "actor"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "fieldErrors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "definitionErrors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "traceId",
+          "path"
+        ]
+      },
+      "FormOption": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "label"
+        ]
+      },
+      "FormField": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,63}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "TEXTAREA",
+              "NUMBER",
+              "DATE",
+              "SELECT",
+              "BOOLEAN"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "helpText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxLength": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1,
+                "maximum": 10000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormOption"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "类型和约束须匹配。NUMBER 最多 38 位有效数字、18 位小数；SELECT 需 1—50 个不重复选项；文本长度按 Unicode 码点计。",
+        "required": [
+          "key",
+          "label",
+          "type",
+          "required"
+        ]
+      },
+      "FormSchema": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/FormField"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "fields"
+        ]
+      },
+      "GraphNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "START",
+              "END",
+              "USER_TASK",
+              "EXCLUSIVE_GATEWAY"
+            ]
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。其他引擎节点尚未支持发布。",
+        "required": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "GraphEdge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string",
+            "description": "受限条件，不是任意 Java/EL 脚本。"
+          },
+          "defaultBranch": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "target"
+        ]
+      },
+      "Graph": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            }
+          }
+        },
+        "required": [
+          "nodes",
+          "edges"
+        ]
+      },
+      "Definition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ]
+          },
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "key",
+          "name",
+          "version",
+          "revision",
+          "status",
+          "graph",
+          "formSchema"
+        ]
+      },
+      "CreateDefinition": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "graph"
+        ]
+      },
+      "UpdateDefinition": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "请始终提交已读取的 expectedRevision。省略或 null formSchema 保留旧表单；显式 fields=[] 才清空字段。",
+        "required": [
+          "name",
+          "graph"
+        ]
+      },
+      "GraphInput": {
+        "type": "object",
+        "properties": {
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "graph"
+        ]
+      },
+      "ValidationResult": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "errors"
+        ]
+      },
+      "PublishRequest": {
+        "type": "object",
+        "properties": {
+          "changeNote": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "description": "新发布必须填写说明。仅旧版成功请求的幂等回放可没有正文。",
+        "required": [
+          "changeNote"
+        ]
+      },
+      "PublicationValidation": {
+        "type": "object",
+        "properties": {
+          "nodeCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "edgeCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fieldCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "formBound": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "GRAPH_STRUCTURE",
+                "ASSIGNEE_SYNTAX",
+                "RESTRICTED_CONDITIONS",
+                "FORM_FIELD_TYPES"
+              ]
+            }
+          }
+        },
+        "required": [
+          "nodeCount",
+          "edgeCount",
+          "fieldCount",
+          "formBound",
+          "checks"
+        ]
+      },
+      "Publication": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "publishedBy": {
+            "type": "string"
+          },
+          "authorizedRole": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changeNote": {
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/PublicationValidation"
+          }
+        },
+        "required": [
+          "tenantId",
+          "definitionId",
+          "processKey",
+          "definitionVersion",
+          "publishedBy",
+          "authorizedRole",
+          "publishedAt",
+          "changeNote",
+          "validation"
+        ]
+      },
+      "PublicationResult": {
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "type": "boolean"
+          },
+          "publication": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Publication"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "recorded",
+          "publication"
+        ]
+      },
+      "SimulationInput": {
+        "type": "object",
+        "properties": {
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          }
+        },
+        "required": [
+          "graph",
+          "values"
+        ]
+      },
+      "SavedSimulationInput": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SavedSimulationResult": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "SimulationBranch": {
+        "type": "object",
+        "properties": {
+          "edgeId": {
+            "type": "string"
+          },
+          "targetNodeId": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "MATCHED",
+              "NOT_MATCHED",
+              "SKIPPED",
+              "DEFAULT_SELECTED",
+              "DEFAULT_SKIPPED"
+            ]
+          }
+        },
+        "required": [
+          "edgeId",
+          "targetNodeId",
+          "condition",
+          "outcome"
+        ]
+      },
+      "SimulationDecision": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "selectedEdgeId": {
+            "type": "string"
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationBranch"
+            }
+          }
+        },
+        "required": [
+          "nodeId",
+          "selectedEdgeId",
+          "branches"
+        ]
+      },
+      "SimulationResult": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edgeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationDecision"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "edgeIds",
+          "decisions"
+        ]
+      },
+      "ComparisonInput": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "与指定同 key 已发布基线比较；这里 null formSchema 表示当前快照未绑定表单。",
+        "required": [
+          "key",
+          "name",
+          "graph"
+        ]
+      },
+      "ComparisonChange": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string",
+            "enum": [
+              "DEFINITION",
+              "NODE",
+              "EDGE",
+              "ROUTING",
+              "FORM",
+              "FIELD",
+              "LAYOUT"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ADDED",
+              "REMOVED",
+              "MODIFIED"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "property": {
+            "type": "string"
+          },
+          "before": {},
+          "after": {}
+        },
+        "required": [
+          "area",
+          "kind",
+          "targetId",
+          "label",
+          "property"
+        ]
+      },
+      "ComparisonBaseline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "version"
+        ]
+      },
+      "ComparisonResult": {
+        "type": "object",
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/ComparisonBaseline"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComparisonChange"
+            }
+          }
+        },
+        "required": [
+          "baseline",
+          "changes"
+        ]
+      },
+      "TemplateScenario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          },
+          "expectedPath": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expectedFieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "payload",
+          "expectedPath",
+          "expectedFieldErrors"
+        ]
+      },
+      "TemplateCopy": {
+        "type": "object",
+        "properties": {
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "templateVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "copiedBy": {
+            "type": "string"
+          },
+          "copiedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "definitionId",
+          "processKey",
+          "name",
+          "status",
+          "version",
+          "revision",
+          "templateVersion",
+          "copiedBy",
+          "copiedAt"
+        ]
+      },
+      "ProcessTemplate": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "templateVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "businessType": {
+            "type": "string",
+            "enum": [
+              "FORM"
+            ]
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fieldDescriptions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "upgradePolicy": {
+            "type": "string"
+          },
+          "notificationTexts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "notificationsAvailable": {
+            "type": "boolean"
+          },
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "formSchema": {
+            "$ref": "#/components/schemas/FormSchema"
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateScenario"
+            }
+          },
+          "copies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateCopy"
+            }
+          }
+        },
+        "description": "notificationsAvailable 表示模板自定义文案可用性，当前为 false；平台实际审批站内消息已接入，两者不是同一开关。",
+        "required": [
+          "key",
+          "templateVersion",
+          "name",
+          "category",
+          "description",
+          "scope",
+          "businessType",
+          "dependencies",
+          "defaultRoles",
+          "fieldDescriptions",
+          "risks",
+          "upgradePolicy",
+          "notificationTexts",
+          "notificationsAvailable",
+          "graph",
+          "formSchema",
+          "scenarios",
+          "copies"
+        ]
+      },
+      "CopyTemplateRequest": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "templateVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "name",
+          "templateVersion"
+        ]
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "businessNo",
+          "processKey",
+          "definitionVersion",
+          "createdBy",
+          "title",
+          "payload",
+          "status",
+          "roundNo",
+          "version",
+          "formSchema"
+        ]
+      },
+      "CreateApplication": {
+        "type": "object",
+        "properties": {
+          "businessNo": {
+            "type": "string",
+            "minLength": 1
+          },
+          "processKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "businessNo",
+          "processKey",
+          "definitionVersion",
+          "title"
+        ]
+      },
+      "ReviseApplication": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "title",
+          "payload"
+        ]
+      },
+      "VersionRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ]
+      },
+      "WithdrawRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ]
+      },
+      "SubmissionRound": {
+        "type": "object",
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "processInstanceId": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          },
+          "submittedBy": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "roundNo",
+          "processInstanceId",
+          "definitionVersion",
+          "title",
+          "payload",
+          "submittedBy",
+          "submittedAt",
+          "status",
+          "reason",
+          "completedBy",
+          "completedAt",
+          "formSchema"
+        ]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "taskName": {
+            "type": "string"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "delegationState": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "PENDING",
+              "RESOLVED"
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "CLAIM",
+                "RELEASE",
+                "TRANSFER",
+                "DELEGATE",
+                "RESOLVE",
+                "RETURN",
+                "REJECT",
+                "APPROVE"
+              ]
+            }
+          }
+        },
+        "required": [
+          "taskId",
+          "taskName",
+          "applicationId",
+          "createdAt",
+          "version",
+          "delegationState",
+          "allowedActions"
+        ]
+      },
+      "TaskActionRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "CLAIM",
+              "RELEASE",
+              "TRANSFER",
+              "DELEGATE",
+              "RESOLVE",
+              "RETURN",
+              "REJECT",
+              "APPROVE"
+            ]
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "RETURN、REJECT、RESOLVE 要求非空意见。"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetUser": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "TRANSFER、DELEGATE 必须是接收人接口返回的其他账号。"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "action",
+          "expectedVersion"
+        ]
+      },
+      "TaskActionResult": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CLAIM",
+              "RELEASE",
+              "TRANSFER",
+              "DELEGATE",
+              "RESOLVE",
+              "RETURN",
+              "REJECT",
+              "APPROVE"
+            ]
+          },
+          "applicationStatus": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "auditEventId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "action",
+          "applicationStatus",
+          "version",
+          "auditEventId"
+        ]
+      },
+      "PendingTask": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "taskName": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "applicant": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "规范十进制字符串；无可用金额时省略。"
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "delegationState": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "PENDING",
+              "RESOLVED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "taskId",
+          "taskName",
+          "applicationId",
+          "businessNo",
+          "title",
+          "processKey",
+          "definitionVersion",
+          "applicant",
+          "roundNo",
+          "delegationState",
+          "createdAt"
+        ]
+      },
+      "PendingTaskPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingTask"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "缺少此字段表示没有下一页；不透明游标，不要自行解析。"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ]
+      },
+      "WorkspaceApplication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "businessNo",
+          "title",
+          "processKey",
+          "definitionVersion",
+          "status",
+          "roundNo",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "WorkspaceApplicationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceApplication"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "缺少此字段表示没有下一页；不透明游标，不要自行解析。"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "HandledItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "applicationStatus": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CLAIM",
+              "RELEASE",
+              "TRANSFER",
+              "DELEGATE",
+              "RESOLVE",
+              "RETURN",
+              "REJECT",
+              "APPROVE"
+            ]
+          },
+          "handledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "targetUser": {
+            "type": "string"
+          },
+          "handledStatus": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "applicationId",
+          "businessNo",
+          "title",
+          "processKey",
+          "definitionVersion",
+          "applicationStatus",
+          "action",
+          "handledAt"
+        ]
+      },
+      "HandledPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HandledItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "缺少此字段表示没有下一页；不透明游标，不要自行解析。"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "HistoryEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "APPLICATION_AUDIT",
+              "TASK_AUDIT",
+              "PROCESS_HISTORY",
+              "SUBMISSION_SNAPSHOT"
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "aggregateVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "targetUser": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "nodeType": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "processInstanceId": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "previousStatus": {
+            "type": "string"
+          },
+          "currentStatus": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "occurredAt",
+          "source",
+          "action"
+        ]
+      },
+      "HistoryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEvent"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "末页明确返回 null。"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "InboxMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "APPLICATION_SUBMITTED",
+              "TASK_PENDING",
+              "APPLICATION_RETURNED",
+              "APPLICATION_REJECTED",
+              "APPLICATION_APPROVED",
+              "APPLICATION_WITHDRAWN",
+              "TASK_TRANSFERRED",
+              "TASK_DELEGATED",
+              "TASK_RESOLVED"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "recipient",
+          "applicationId",
+          "title",
+          "businessNo",
+          "kind",
+          "actor",
+          "roundNo",
+          "createdAt"
+        ]
+      },
+      "InboxPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxMessage"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "缺少此字段表示没有下一页；不透明游标，不要自行解析。"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "items",
+          "unreadCount"
+        ]
+      },
+      "SystemCheck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UP",
+              "DOWN",
+              "UNKNOWN",
+              "WARNING",
+              "NOT_IMPLEMENTED"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "code",
+          "message"
+        ]
+      },
+      "SystemReport": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemCheck"
+            }
+          }
+        },
+        "required": [
+          "checkedAt",
+          "checks"
+        ]
+      },
+      "OpenApiDocument": {
+        "type": "object",
+        "properties": {
+          "openapi": {
+            "type": "string"
+          },
+          "info": {
+            "type": "object"
+          },
+          "paths": {
+            "type": "object"
+          },
+          "components": {
+            "type": "object"
+          }
+        },
+        "description": "本服务完整 OpenAPI 3.1.1 文档，遵循 OAS 规范，包含 servers、security、tags 等根字段。",
+        "required": [
+          "openapi",
+          "info",
+          "paths",
+          "components"
+        ]
+      },
+      "FrameworkError": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "timestamp",
+          "status",
+          "error",
+          "path"
+        ],
+        "description": "进入控制器前的参数转换、方法或媒体类型错误可能返回 Spring 标准错误；此时没有业务 code/traceId。"
+      },
+      "RequestError": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "$ref": "#/components/schemas/FrameworkError"
+          }
+        ],
+        "description": "业务入口校验返回 Error；UUID 等 Spring 参数转换失败返回 FrameworkError。客户端先检查 HTTP 状态，再按是否有 code 分支。"
+      }
+    }
+  }
+}

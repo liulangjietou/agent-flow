@@ -113,3 +113,5 @@ npm run build
 GitHub Actions 将执行作者检查、后端 `verify`、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。
 
 - [待办检索与分页](docs/pending-task-queue.md)
+
+开放 API 与集成：[接口契约、调用顺序与验收](docs/openapi-reference.md)。登录后从“接口文档”进入，下载当前部署的 OpenAPI JSON。

@@ -3,7 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"dev": "vite", "build": "vue-tsc --noEmit && vite build", "preview": "vite preview", "test:requests": "node scripts/test-requests.mjs"},
-  "dependencies": {"@vitejs/plugin-vue": "latest", "vite": "latest", "vue": "latest", "vue-tsc": "^3.3.11", "typescript": "^5.8.3"},
-  "devDependencies": {}
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test:requests": "node scripts/test-requests.mjs && npm run test:openapi",
+    "test:openapi": "node scripts/check-openapi.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "latest",
+    "typescript": "^5.8.3",
+    "vite": "latest",
+    "vue": "latest",
+    "vue-tsc": "^3.3.11"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
 }

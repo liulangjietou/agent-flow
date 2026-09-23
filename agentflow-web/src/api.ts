@@ -1,3 +1,4 @@
+import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
@@ -157,6 +158,7 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  openApi: (signal: AbortSignal) => request<ApiDocument>('/openapi.json', { signal }),
   workspaceApplications: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceApplication>>('/workspace/applications' + historyQuery(query), { signal }),
   workspaceHandled: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceHandled>>('/workspace/handled' + historyQuery(query), { signal }),
   definitionPublication: (id: string, signal: AbortSignal) => request<PublicationResponse>(`/process-definitions/${encodeURIComponent(id)}/publication`, { signal }),
