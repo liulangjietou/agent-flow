@@ -4,9 +4,6 @@ import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,9 +25,7 @@ public record SubmissionRound(String tenantId, UUID applicationId, int roundNo, 
     }
 
     public SubmissionRound {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        if (payload != null) payload.forEach((key, value) -> snapshot.put(key, freeze(value)));
-        payload = Collections.unmodifiableMap(snapshot);
+        payload = PayloadSnapshot.copy(payload);
     }
 
     /** 使用本轮实际启动的实例构建提交快照，不从后续申请内容恢复旧历史。 */
@@ -39,18 +34,6 @@ public record SubmissionRound(String tenantId, UUID applicationId, int roundNo, 
         return new SubmissionRound(application.tenantId(), application.id(), application.roundNo(),
                 processInstanceId, application.definitionVersion(), application.title(), application.payload(),
                 submittedBy, submittedAt, Status.IN_APPROVAL, null, null, null, application.formSchema());
-    }
-
-    private static Object freeze(Object value) {
-        if (value instanceof Map<?, ?> values) {
-            Map<Object, Object> copy = new LinkedHashMap<>();
-            values.forEach((key, nested) -> copy.put(key, freeze(nested)));
-            return Collections.unmodifiableMap(copy);
-        }
-        if (value instanceof List<?> values) {
-            return values.stream().map(SubmissionRound::freeze).toList();
-        }
-        return value;
     }
 
     /**

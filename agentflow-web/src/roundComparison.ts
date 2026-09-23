@@ -1,5 +1,5 @@
 import type { SubmissionRound } from './api'
-import type { FormField } from './formSchema'
+import { isDetailRow, type FormField } from './formSchema.js'
 
 /** 保存值与缺失分别表示，不把空值、false 或零折叠为同一个占位符。@author owlzhangfq@gmail.com */
 export interface ComparisonValue { present: boolean; text: string; type: string }
@@ -28,6 +28,12 @@ function displayValue(present: boolean, value: unknown, field?: FormField): Comp
   if (value === null) return { present, text: '空值（null）', type: '空值' }
   if (value === '') return { present, text: '空文本', type: '文本' }
   if (typeof value === 'boolean') return { present, text: value ? '是（true）' : '否（false）', type: '布尔' }
+  if (field?.type === 'TABLE' && Array.isArray(value)) return { present, type: '明细原值', text: value.length ? value.map((row, index) => {
+    if (!isDetailRow(row)) return `第 ${index + 1} 行：${JSON.stringify(row)}`
+    const columns = new Map((field.columns ?? []).map(column => [column.key, column]))
+    const keys = new Set([...columns.keys(), ...Object.keys(row)])
+    return `第 ${index + 1} 行：` + [...keys].map(key => `${columns.get(key)?.label ?? key}：${displayValue(Object.prototype.hasOwnProperty.call(row, key), row[key], columns.get(key)).text}`).join('；')
+  }).join('\n') : '空明细（0 行）' }
   if (typeof value === 'object') return { present, text: JSON.stringify(value, null, 2), type: Array.isArray(value) ? '数组' : '对象' }
   if (field?.type === 'SELECT') {
     const option = field.options?.find(option => option.value === value)

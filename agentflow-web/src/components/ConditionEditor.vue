@@ -30,10 +30,10 @@ function change(index: number, property: keyof ConditionRow, event: Event) {
   if (property === 'value' && !safeConditionLiteral(input.value)) { input.value = rows.value.rows[index]!.value; error.value = '不支持分号、括号、模板表达式或同时包含两种引号；此字符未写入条件。'; return }
   const next = { ...rows.value, rows: rows.value.rows.map(row => ({ ...row })) }, row = next.rows[index]!
   row[property] = input.value
-  if (property === 'field') { row.operator = '=='; row.value = '' }
+  if (property === 'field') { row.operator = operatorsFor(fields.value.find(field => field.key === row.field))[0]!.value; row.value = '' }
   update(next)
 }
-function add() { update({ ...rows.value, rows: [...rows.value.rows, { field: fields.value[0]?.key ?? '', operator: '==', value: '' }] }) }
+function add() { update({ ...rows.value, rows: [...rows.value.rows, { field: fields.value[0]?.key ?? '', operator: operatorsFor(fields.value[0])[0]!.value, value: '' }] }) }
 function remove(index: number) { update({ ...rows.value, rows: rows.value.rows.filter((_, current) => index !== current) }) }
 function expression(event: Event) {
   if (props.disabled) return

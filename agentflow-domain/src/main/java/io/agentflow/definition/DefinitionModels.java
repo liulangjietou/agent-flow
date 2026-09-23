@@ -202,6 +202,7 @@ public final class DefinitionModels {
                     case NUMBER -> FormSchema.decimal(raw.toString()).compareTo(FormSchema.decimal(literal));
                     case BOOLEAN -> Boolean.compare((Boolean) raw, Boolean.parseBoolean(literal));
                     case DATE, TEXT, TEXTAREA, SELECT -> raw.toString().compareTo(literal);
+                    case TABLE -> throw new DomainException("INVALID_CONDITION", "Detail tables only support presence conditions");
                 };
             } else {
                 try { cmp = new BigDecimal(raw.toString()).compareTo(new BigDecimal(literal)); }

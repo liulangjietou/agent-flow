@@ -6708,7 +6708,8 @@
               "NUMBER",
               "DATE",
               "SELECT",
-              "BOOLEAN"
+              "BOOLEAN",
+              "TABLE"
             ]
           },
           "required": {
@@ -6772,15 +6773,73 @@
                 "type": "null"
               }
             ]
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/components/schemas/FormColumn"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxRows": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
-        "description": "类型和约束须匹配。NUMBER 最多 38 位有效数字、18 位小数；SELECT 需 1—50 个不重复选项；文本长度按 Unicode 码点计。",
+        "description": "类型和约束须匹配。NUMBER 最多 38 位有效数字、18 位小数；SELECT 需 1—50 个不重复选项；文本长度按 Unicode 码点计。 TABLE 仅限格式版本 2；列为 1—20 个基础字段，行数默认 50、最多 100；整份填写最多 2000 个明细单元格。明细仅支持 EXISTS/NOT_EXISTS 条件。",
         "required": [
           "key",
           "label",
           "type",
           "required"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "TABLE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "columns"
+              ],
+              "properties": {
+                "columns": {
+                  "type": "array"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "columns": {
+                  "type": "null"
+                },
+                "maxRows": {
+                  "type": "null"
+                }
+              }
+            }
+          }
         ]
       },
       "FormSchema": {
@@ -6788,7 +6847,10 @@
         "properties": {
           "schemaVersion": {
             "type": "integer",
-            "const": 1
+            "enum": [
+              1,
+              2
+            ]
           },
           "fields": {
             "type": "array",
@@ -6802,6 +6864,32 @@
         "required": [
           "schemaVersion",
           "fields"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "schemaVersion": {
+                  "const": 1
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "fields": {
+                  "items": {
+                    "properties": {
+                      "type": {
+                        "not": {
+                          "const": "TABLE"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         ]
       },
       "GraphNode": {
@@ -10129,6 +10217,101 @@
           "expectedVersion"
         ],
         "additionalProperties": false
+      },
+      "FormColumn": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,63}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "TEXTAREA",
+              "NUMBER",
+              "DATE",
+              "SELECT",
+              "BOOLEAN"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "helpText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxLength": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1,
+                "maximum": 10000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FormOption"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "明细中的基础列，不允许嵌套明细。",
+        "required": [
+          "key",
+          "label",
+          "type",
+          "required"
+        ]
       }
     }
   }

@@ -101,3 +101,12 @@ test('混合逻辑、未知字段与不可安全引用的值保留表达式且�
   }
   assert.deepEqual(operatorsFor(fields[1]).map(x=>x.value),['==','!=','EXISTS','NOT_EXISTS'])
 })
+
+test('明细条件只提供存在性判断，默认选择与解析序列化一致', () => {
+  const field = { key: 'items', label: '明细', type: 'TABLE', required: false, columns: [] }
+  assert.deepEqual(operatorsFor(field).map(operator => operator.value), ['EXISTS', 'NOT_EXISTS'])
+  assert.equal(parseConditionRows('', [field]).rows[0].operator, 'EXISTS')
+  assert.equal(parseConditionRows("items == 'x'", [field]), null)
+  assert.equal(serializeConditionRows({ join: 'AND', rows: [{ field: 'items', operator: 'NOT_EXISTS', value: '' }] }, [field]), 'items NOT_EXISTS')
+  assert.throws(() => serializeConditionRows({ join: 'AND', rows: [{ field: 'items', operator: '==', value: 'x' }] }, [field]), /明细/)
+})

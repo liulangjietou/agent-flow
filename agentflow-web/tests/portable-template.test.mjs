@@ -136,3 +136,13 @@ test('导入响应丢失后复用原请求，改目标不可替代原请求', as
   assert.equal(result.result.id, 'original-draft'); assert.equal(sent.length, 2)
   assert.equal(sent[0].body, sent[1].body); assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
 })
+
+test('版本二明细模板完整往返，嵌套与未知列属性整份拒绝', () => {
+  const value = source(); value.formSchema = { schemaVersion: 2, fields: [{ key: 'items', label: '明细', type: 'TABLE', required: true, maxRows: 4,
+    columns: [{ key: 'amount', label: '金额', type: 'NUMBER', required: true, minimum: '0000.01' }] }] }
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), value)
+  for (const mutate of [s => s.fields[0].columns[0].hidden = true, s => s.fields[0].columns[0].type = 'TABLE', s => s.fields[0].columns = null,
+    s => s.fields[0].maxRows = '4', s => s.schemaVersion = 1, s => s.fields[0].columns.push({ ...s.fields[0].columns[0] })]) {
+    const bad = structuredClone(value); mutate(bad.formSchema); assert.throws(() => serializePortableTemplate(bad))
+  }
+})

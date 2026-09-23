@@ -149,3 +149,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 - [Webhook 可靠投递](docs/webhook-delivery.md)：部署目的地、签名接入、事务 outbox、失败重试、管理员页面与本地验收示例。
 
 - [参与者申请检索：当前权限、历史办理与有界分页](docs/participant-application-search.md)
+
+- [重复明细表单：列配置、行编辑与历史快照](docs/detail-table-forms.md)

@@ -41,6 +41,76 @@ class VersionedFormsIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
 
     @Test
+    void detailRowsFreezeAcrossReturnAndResubmissionAndRejectCellErrorsBeforeStarting() throws Exception {
+        Map<String, Object> schema = tableSchema();
+        JsonNode definition = published("detail-" + UUID.randomUUID(), schema, graph());
+        JsonNode draft = create(definition, Map.of("items", List.of(Map.of("name", "待补数量"))));
+        String id = draft.path("id").asText();
+        var failed = send("POST", application(id, "submit"), "alice", Map.of("expectedVersion", 1));
+        assertThat(failed.getStatus()).isEqualTo(422);
+        assertThat(tree(failed).at("/details/fieldErrors/items[0].quantity").asText()).isEqualTo("REQUIRED");
+        assertThat(runtime.createProcessInstanceQuery().variableValueEquals("applicationId", id).count()).isZero();
+        assertThat(getApplication(id).path("version").asLong()).isEqualTo(1);
+        Map<String, Object> firstValues = Map.of("items", List.of(Map.of("name", "显示器", "quantity", "0002.00"), Map.of("name", "键盘", "quantity", "3")));
+        ok(send("PUT", "/api/v1/applications/" + id, "alice", Map.of("expectedVersion", 1, "title", "设备申请", "payload", firstValues)), 200);
+        ok(send("POST", application(id, "submit"), "alice", Map.of("expectedVersion", 2)), 200);
+        JsonNode original = rounds(id).get(0);
+        decide(id, "RETURN", 3);
+        Map<String, Object> changedValues = Map.of("items", List.of(Map.of("name", "键盘", "quantity", "1")));
+        ok(send("PUT", "/api/v1/applications/" + id, "alice", Map.of("expectedVersion", 4, "title", "补正明细", "payload", changedValues)), 200);
+        ok(send("POST", application(id, "submit"), "alice", Map.of("expectedVersion", 5)), 200);
+        assertThat(rounds(id).get(0).path("payload")).isEqualTo(original.path("payload"));
+        assertThat(rounds(id).get(0).path("formSchema")).isEqualTo(original.path("formSchema"));
+        assertThat(rounds(id).get(1).path("payload")).isEqualTo(mapper.valueToTree(changedValues));
+        assertThat(getApplication(id).path("formSchema")).isEqualTo(mapper.valueToTree(schema));
+    }
+
+    @Test
+    void tablePresenceSimulationMatchesRealEngine() throws Exception {
+        Map<String, Object> schema = Map.of("schemaVersion", 2, "fields", List.of(Map.of("key", "items", "label", "明细", "type", "TABLE", "required", false,
+                "columns", List.of(field("name", "名称", "TEXT", true)))));
+        for (String operator : List.of("EXISTS", "NOT_EXISTS")) {
+            JsonNode definition = published("table-route-" + UUID.randomUUID(), schema, conditionalGraph("items " + operator));
+            for (boolean present : List.of(true, false)) {
+                Map<String, Object> values = Map.of("items", present ? List.of(Map.of("name", "设备")) : List.of());
+                String selected = present == operator.equals("EXISTS") ? "selected" : "fallback";
+                var simulated = ok(send("POST", "/api/v1/process-definitions/" + definition.path("id").asText() + "/simulate", "admin", Map.of("values", values)), 200);
+                assertThat(simulated.path("path")).isEqualTo(mapper.valueToTree(List.of("start", "gate", selected, "end")));
+                JsonNode application = create(definition, values); String id = application.path("id").asText();
+                ok(send("POST", application(id, "submit"), "alice", Map.of("expectedVersion", 1)), 200);
+                assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult().getTaskDefinitionKey()).isEqualTo(selected);
+            }
+        }
+    }
+
+    @Test
+    void tableSchemaBoundaryRejectsCoercionUnknownColumnsAndNestedTables() throws Exception {
+        for (String mutation : List.of("stringRows", "fractionRows", "unknownColumn", "nestedTable", "badColumns", "versionOne")) {
+            var schema = mapper.valueToTree(tableSchema()).deepCopy();
+            var table = (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("fields").get(0);
+            switch (mutation) {
+                case "stringRows" -> table.put("maxRows", "5");
+                case "fractionRows" -> table.put("maxRows", 1.5);
+                case "unknownColumn" -> ((com.fasterxml.jackson.databind.node.ObjectNode) table.path("columns").get(0)).put("hidden", true);
+                case "nestedTable" -> ((com.fasterxml.jackson.databind.node.ObjectNode) table.path("columns").get(0)).put("type", "TABLE");
+                case "badColumns" -> table.put("columns", "wrong");
+                case "versionOne" -> ((com.fasterxml.jackson.databind.node.ObjectNode) schema).put("schemaVersion", 1);
+                default -> throw new IllegalStateException(mutation);
+            }
+            var response = send("POST", "/api/v1/process-definitions", "admin", Map.of("key", "bad-table-" + UUID.randomUUID(),
+                    "name", "错误明细", "graph", graph(), "formSchema", schema));
+            assertThat(response.getStatus()).as(mutation).isEqualTo(422);
+            assertThat(tree(response).path("code").asText()).isEqualTo("INVALID_FORM_SCHEMA");
+        }
+    }
+
+    private Map<String, Object> tableSchema() {
+        return Map.of("schemaVersion", 2, "fields", List.of(Map.of("key", "items", "label", "物品明细", "type", "TABLE", "required", true,
+                "maxRows", 5, "columns", List.of(field("name", "名称", "TEXT", true),
+                        Map.of("key", "quantity", "label", "数量", "type", "NUMBER", "required", true, "minimum", "0")))));
+    }
+
+    @Test
     void definitionPersistsAndReturnsItsFormSchema() throws Exception {
         Map<String, Object> schema = Map.of("schemaVersion", 1, "fields", List.of(
                 Map.of("key", "reason", "label", "申请理由", "type", "TEXT", "required", true)));
@@ -198,7 +268,7 @@ class VersionedFormsIntegrationTest {
     @Test
     void refusesJsonCoercionAndMalformedSchemasWithStableErrors() throws Exception {
         List<Object> schemas = List.of(
-                Map.of("schemaVersion", 2, "fields", List.of()),
+                Map.of("schemaVersion", 3, "fields", List.of()),
                 Map.of("schemaVersion", 1, "fields", List.of(field("tenantId", "系统字段", "TEXT", true))),
                 Map.of("schemaVersion", 1, "fields", List.of(Map.of("key", "n", "label", "数字", "type", "NUMBER", "required", true, "minimum", 0))),
                 Map.of("schemaVersion", 1, "fields", List.of(Map.of("key", "n", "label", "数字", "type", "NUMBER", "required", "false"))),

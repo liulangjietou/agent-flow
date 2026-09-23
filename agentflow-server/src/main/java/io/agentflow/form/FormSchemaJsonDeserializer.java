@@ -19,9 +19,9 @@ import java.util.Set;
 @JsonComponent
 public class FormSchemaJsonDeserializer extends JsonDeserializer<FormSchema> {
     private static final Set<String> SCHEMA_PROPERTIES = Set.of("schemaVersion", "fields");
-    private static final Set<String> FIELD_PROPERTIES = Set.of("key", "label", "type", "required", "helpText", "maxLength", "minimum", "maximum", "options");
+    private static final Set<String> FIELD_PROPERTIES = Set.of("key", "label", "type", "required", "helpText", "maxLength", "minimum", "maximum", "options", "columns", "maxRows");
     private static final Set<String> OPTION_PROPERTIES = Set.of("value", "label");
-    /** 仅解码六种有限字段，具体结构和业务规则由领域值对象校验。 */
+    /** 仅解码基础字段与一层明细，具体结构和业务规则由领域值对象校验。 */
     @Override
     public FormSchema deserialize(JsonParser parser, DeserializationContext context) throws IOException {
         JsonNode root = parser.getCodec().readTree(parser);
@@ -29,31 +29,43 @@ public class FormSchemaJsonDeserializer extends JsonDeserializer<FormSchema> {
                 || !root.path("fields").isArray()) throw invalid();
         requireKnownProperties(root, SCHEMA_PROPERTIES);
         List<FormSchema.Field> fields = new ArrayList<>();
-        for (JsonNode field : root.path("fields")) {
-            if (!field.isObject() || !field.path("required").isBoolean()) throw invalid();
-            requireKnownProperties(field, FIELD_PROPERTIES);
-            FormSchema.FieldType type;
-            try { type = FormSchema.FieldType.valueOf(text(field, "type", true)); }
-            catch (IllegalArgumentException exception) { throw invalid(); }
-            Integer maxLength = null;
-            if (field.hasNonNull("maxLength")) {
-                if (!field.get("maxLength").isIntegralNumber() || !field.get("maxLength").canConvertToInt()) throw invalid();
-                maxLength = field.get("maxLength").intValue();
-            }
-            List<FormSchema.Option> options = null;
-            if (field.hasNonNull("options")) {
-                if (!field.get("options").isArray()) throw invalid();
-                options = new ArrayList<>();
-                for (JsonNode option : field.get("options")) {
-                    requireKnownProperties(option, OPTION_PROPERTIES);
-                    options.add(new FormSchema.Option(text(option, "value", true), text(option, "label", true)));
-                }
-            }
-            fields.add(new FormSchema.Field(text(field, "key", true), text(field, "label", true), type,
-                    field.get("required").booleanValue(), text(field, "helpText", false), maxLength,
-                    text(field, "minimum", false), text(field, "maximum", false), options));
-        }
+        for (JsonNode field : root.path("fields")) fields.add(readField(field, false));
         return new FormSchema(root.get("schemaVersion").intValue(), fields);
+    }
+
+    private FormSchema.Field readField(JsonNode field, boolean column) {
+        if (!field.isObject() || !field.path("required").isBoolean()) throw invalid();
+        requireKnownProperties(field, FIELD_PROPERTIES);
+        FormSchema.FieldType type;
+        try { type = FormSchema.FieldType.valueOf(text(field, "type", true)); }
+        catch (IllegalArgumentException exception) { throw invalid(); }
+        // 表示层先截断嵌套深度，避免递归读取任意层级的外部输入。
+        if (column && (type == FormSchema.FieldType.TABLE || field.hasNonNull("columns"))) throw invalid();
+        List<FormSchema.Option> options = null;
+        if (field.hasNonNull("options")) {
+            if (!field.get("options").isArray()) throw invalid();
+            options = new ArrayList<>();
+            for (JsonNode option : field.get("options")) {
+                requireKnownProperties(option, OPTION_PROPERTIES);
+                options.add(new FormSchema.Option(text(option, "value", true), text(option, "label", true)));
+            }
+        }
+        List<FormSchema.Field> columns = null;
+        if (field.hasNonNull("columns")) {
+            if (!field.get("columns").isArray()) throw invalid();
+            columns = new ArrayList<>();
+            for (JsonNode child : field.get("columns")) columns.add(readField(child, true));
+        }
+        return new FormSchema.Field(text(field, "key", true), text(field, "label", true), type,
+                field.get("required").booleanValue(), text(field, "helpText", false), integer(field, "maxLength"),
+                text(field, "minimum", false), text(field, "maximum", false), options, columns, integer(field, "maxRows"));
+    }
+
+    private Integer integer(JsonNode node, String key) {
+        if (!node.hasNonNull(key)) return null;
+        JsonNode value = node.get(key);
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) throw invalid();
+        return value.intValue();
     }
 
     private void requireKnownProperties(JsonNode node, Set<String> allowed) {

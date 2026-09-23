@@ -3,8 +3,6 @@ package io.agentflow.approval.model;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -203,7 +201,7 @@ public final class Application {
 
     /** 可选表单字段显式设为 null 表示清空，复制时必须保留该键和值。 */
     private static Map<String, Object> copyPayload(Map<String, Object> payload) {
-        return payload == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(payload));
+        return PayloadSnapshot.copy(payload);
     }
 
     public UUID id() { return id; }

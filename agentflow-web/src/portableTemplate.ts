@@ -21,6 +21,26 @@ function list(value: unknown, path: string, max: number): asserts value is unkno
   if (!Array.isArray(value) || value.length > max) throw new Error(`${path} 必须是列表，最多 ${max} 项。`)
 }
 
+function readField(raw: unknown, column = false) {
+      const f = object(raw, ['key', 'label', 'type', 'required', 'helpText', 'maxLength', 'minimum', 'maximum', 'options', 'columns', 'maxRows'], ['key', 'label', 'type', 'required'], '字段')
+      text(f.key, '字段标识', 64); text(f.label, '字段名称', 128)
+      if (typeof f.required !== 'boolean') throw new Error('字段必填配置必须是布尔值。')
+      if (f.helpText != null) text(f.helpText, '填写提示', 1000, true)
+      if (f.options != null) {
+        list(f.options, '字段选项', 50)
+        if (f.type !== 'SELECT' && f.options.length) throw new Error('只有单选字段可以配置选项。')
+        for (const rawOption of f.options) {
+          const option = object(rawOption, ['value', 'label'], ['value', 'label'], '选项')
+          text(option.value, '选项保存值', 128); text(option.label, '选项名称', 128)
+        }
+      }
+      if (column && (f.type === 'TABLE' || f.columns != null)) throw new Error('明细列不能嵌套明细。')
+      if (f.columns != null) {
+        list(f.columns, '明细列', 20)
+        for (const child of f.columns) readField(child, true)
+      }
+    }
+
 /** 文件边界只校验表示和白名单；图连通性、条件与审批人仍由现有服务端校验。 */
 function process(value: unknown): PortableProcess {
   const p = object(value, ['key', 'name', 'graph', 'formSchema'], ['key', 'name', 'graph', 'formSchema'], '流程')
@@ -46,20 +66,7 @@ function process(value: unknown): PortableProcess {
   if (p.formSchema !== null) {
     const schema = object(p.formSchema, ['schemaVersion', 'fields'], ['schemaVersion', 'fields'], '表单')
     list(schema.fields, '表单字段', 50)
-    for (const raw of schema.fields) {
-      const f = object(raw, ['key', 'label', 'type', 'required', 'helpText', 'maxLength', 'minimum', 'maximum', 'options'], ['key', 'label', 'type', 'required'], '字段')
-      text(f.key, '字段标识', 64); text(f.label, '字段名称', 128)
-      if (typeof f.required !== 'boolean') throw new Error('字段必填配置必须是布尔值。')
-      if (f.helpText != null) text(f.helpText, '填写提示', 1000, true)
-      if (f.options != null) {
-        list(f.options, '字段选项', 50)
-        if (f.type !== 'SELECT' && f.options.length) throw new Error('只有单选字段可以配置选项。')
-        for (const rawOption of f.options) {
-          const option = object(rawOption, ['value', 'label'], ['value', 'label'], '选项')
-          text(option.value, '选项保存值', 128); text(option.label, '选项名称', 128)
-        }
-      }
-    }
+    for (const raw of schema.fields) readField(raw)
     const errors = validateFormSchema(p.formSchema as FormSchema)
     const messages = [...errors.schema, ...errors.fields.flatMap(field => Object.values(field))]
     if (messages.length) throw new Error(`表单配置无效：${messages[0]}`)

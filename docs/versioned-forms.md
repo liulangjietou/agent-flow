@@ -1,6 +1,6 @@
 # 版本化申请表单
 
-表单是流程定义发布内容的一部分，与流程图共用 `key + version` 和草稿 `revision`。`schemaVersion` 只表示表单格式版本，当前为 `1`；业务表单版本由所属流程定义版本标识。已发布内容不可原地修改，复制新草稿并发布下一版不会改变旧申请。
+表单是流程定义发布内容的一部分，与流程图共用 `key + version` 和草稿 `revision`。`schemaVersion` 只表示表单格式版本，支持 `1`（基础字段）和 `2`（增加重复明细）；业务表单版本由所属流程定义版本标识。已发布内容不可原地修改，复制新草稿并发布下一版不会改变旧申请。
 
 ## 配置与接口
 
@@ -33,7 +33,7 @@
 
 字段最多 50 个，标识以英文字母开头，仅包含字母、数字、下划线且最多 64 位。字段标识和选项值不可重复，单选最多 50 个选项。`constructor`、`prototype` 与租户、申请、轮次等系统变量保留字不能作为字段标识；`__proto__` 不符合首字符规则。`toString` 等合法字段按对象自身属性读取，不读取继承的原型属性。标题、业务单号、绑定流程版本属于申请自身，不放入表单字段。
 
-服务端严格检查 schema 三层属性白名单：根对象仅接受 `schemaVersion`、`fields`；字段仅接受 `key`、`label`、`type`、`required`、`helpText`、`maxLength`、`minimum`、`maximum`、`options`；选项仅接受 `value`、`label`。未知属性即使值为 `null` 也返回 `INVALID_FORM_SCHEMA`，不会被静默删除。例如拼错的 `maximun`、当前尚未支持的 `readOnly` 或 `visibleTo` 都不能保存为已生效的配置。
+服务端严格检查 schema 三层属性白名单：根对象仅接受 `schemaVersion`、`fields`；字段仅接受 `key`、`label`、`type`、`required`、`helpText`、`maxLength`、`minimum`、`maximum`、`options`、`columns`、`maxRows`；明细列只允许基础字段，不能嵌套明细；选项仅接受 `value`、`label`。未知属性即使值为 `null` 也返回 `INVALID_FORM_SCHEMA`，不会被静默删除。例如拼错的 `maximun`、当前尚未支持的 `readOnly` 或 `visibleTo` 都不能保存为已生效的配置。
 
 ## 草稿、提交与快照
 
@@ -72,4 +72,4 @@ V7 在流程定义、申请及提交轮次增加可空 `form_schema_json`，在�
 
 可选来源绑定验收使用 `python3 scripts/check-versioned-forms.py http://127.0.0.1:8080 --check-bundled-binding`。此选项会在 `demo` 租户发布固定 key 为 `expense-reimbursement` 的租户 v1，用来验证先前创建的内置申请仍走原流程、新申请采用租户表单。脚本登录后、创建任何验收业务记录前先确认不存在已发布的同名租户定义；前置条件不满足时立即结束。该选项会保留创建的定义和申请，不覆盖或删除已有数据，适用于尚未发布同名模板的独立验收环境；默认随机流程验收不受此限制。
 
-节点级字段显隐、读写与脱敏策略、附件、复杂布局及重复明细仍属于完整表单产品范围；当前六种基础字段和版本闭环不代表这些能力已实现。
+[重复明细](detail-table-forms.md)已支持列配置、行编辑和轮次快照。节点级字段显隐、读写与脱敏策略、附件及复杂布局仍待实现。

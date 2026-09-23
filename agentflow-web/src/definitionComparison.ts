@@ -65,13 +65,13 @@ const labels: Record<string, string> = {
   entity: '整体配置', name: '名称', type: '类型', label: '字段名称', key: '字段标识', id: '标识',
   source: '起点', target: '终点', condition: '条件', defaultBranch: '默认分支', branchOrder: '条件求值顺序',
   schemaBinding: '绑定申请表单', schemaVersion: '表单格式版本', fieldOrder: '字段填写顺序', required: '必填',
-  helpText: '填写提示', maxLength: '最多字符数', minimum: '最小值', maximum: '最大值', options: '可选项',
+  helpText: '填写提示', maxLength: '最多字符数', minimum: '最小值', maximum: '最大值', options: '可选项', columns: '明细列', maxRows: '最多明细行数',
   properties: '节点属性', assigneeRule: '审批人规则', 'properties.assigneeRule': '审批人规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   x: '水平位置', y: '垂直位置', 'properties.x': '水平位置', 'properties.y': '垂直位置', value: '保存值'
 }
 const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', EXCLUSIVE_GATEWAY: '条件分支',
-  SERVICE_TASK: '服务任务', PARALLEL_GATEWAY: '并行网关', TEXT: '单行文本', TEXTAREA: '多行文本', NUMBER: '数字', DATE: '日期', SELECT: '单选', BOOLEAN: '是 / 否' }
+  SERVICE_TASK: '服务任务', PARALLEL_GATEWAY: '并行网关', TEXT: '单行文本', TEXTAREA: '多行文本', NUMBER: '数字', DATE: '日期', SELECT: '单选', BOOLEAN: '是 / 否', TABLE: '重复明细' }
 const own = <T>(values: Record<string, T>, key: string): T | undefined => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined
 
 /** 未知配置保留原键，避免静默隐藏新增属性。 */

@@ -131,7 +131,7 @@ class FormSchemaTest {
         assertThat(schema.fields().get(0).options()).hasSize(1);
         assertThatThrownBy(() -> schema.fields().clear()).isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> schema.fields().get(0).options().clear()).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> new FormSchema(2, List.of())).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new FormSchema(3, List.of())).isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> new FormSchema(1, List.of(field("a", TEXT, false), field("a", NUMBER, false)))).isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> new FormSchema(1, java.util.stream.IntStream.range(0, 51).mapToObj(i -> field("f" + i, TEXT, false)).toList()))
                 .isInstanceOf(DomainException.class);

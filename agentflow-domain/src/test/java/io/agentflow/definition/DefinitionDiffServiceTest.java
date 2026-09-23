@@ -91,6 +91,18 @@ class DefinitionDiffServiceTest {
                 .isInstanceOf(DomainException.class).hasMessageContaining("unique object identifiers");
     }
 
+    @Test
+    void comparesDetailColumnsOrderConstraintsAndRowLimit() {
+        var first = field("name", "名称", FormSchema.FieldType.TEXT, true, null, null, null);
+        var second = field("quantity", "数量", FormSchema.FieldType.NUMBER, true, null, "0", null);
+        var old = new FormSchema.Field("items", "明细", FormSchema.FieldType.TABLE, false, null, null, null, null, null, List.of(first, second), 5);
+        var changed = new FormSchema.Field("items", "明细", FormSchema.FieldType.TABLE, false, null, null, null, null, null, List.of(second, first), 10);
+        var before = snapshot(graph(List.of()), new FormSchema(2, List.of(old)));
+        assertThat(service.compare(before, before)).isEmpty();
+        assertThat(service.compare(before, snapshot(graph(List.of()), new FormSchema(2, List.of(changed)))))
+                .extracting(Change::property).containsExactly("columns", "maxRows");
+    }
+
     private Snapshot snapshot(Graph graph, FormSchema form) { return new Snapshot("流程", graph, form); }
     private Graph graph(List<Edge> edges) { return new Graph(List.of(new Node("gate", "判断", NodeType.EXCLUSIVE_GATEWAY, Map.of())), edges); }
     private Edge edge(String id, String source, String target, String condition, boolean fallback) { return new Edge(id, source, target, condition, fallback); }

@@ -103,3 +103,17 @@ test('轮次接口传递取消信号，继续使用原只读授权路径', async
   assert.equal(sent.signal, controller.signal); assert.equal(sent.headers.has('Idempotency-Key'), false)
   assert.ok(sent.method === undefined || sent.method === 'GET')
 })
+
+test('明细轮次比较使用各轮列名与选项，保留空值、原始数值及行序变化', () => {
+  const aSchema = { schemaVersion: 2, fields: [{ ...field('items', 'TABLE'), columns: [
+    { ...field('amount', 'NUMBER'), label: '原金额' }, { ...field('kind', 'SELECT'), options: [{ value: 'a', label: '原类别' }] }
+  ] }] }
+  const bSchema = structuredClone(aSchema); bSchema.fields[0].columns[0].label = '新金额'; bSchema.fields[0].columns[1].options[0].label = '新类别'
+  const payload = { items: [{ amount: '0001.00', kind: 'a' }, { amount: null }] }
+  const result = compareSubmissionRounds(round(1, payload, aSchema), round(2, { items: [...payload.items].reverse() }, bSchema))
+  const row = valueRows(result)[0]
+  assert.equal(row.changed, true); assert.equal(row.definitionChanged, true)
+  assert.match(row.before.text, /原金额：0001.00；kind：原类别（a）/)
+  assert.match(row.after.text, /第 1 行：新金额：空值（null）/)
+  assert.match(row.after.text, /新类别（a）/)
+})

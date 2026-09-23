@@ -1,18 +1,19 @@
-export type FieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'BOOLEAN'
+export type FieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'BOOLEAN' | 'TABLE'
 export interface FormOption { value: string; label: string }
 export interface FormField {
   key: string; label: string; type: FieldType; required: boolean; helpText?: string
-  maxLength?: number; minimum?: string; maximum?: string; options?: FormOption[]
+  maxLength?: number; minimum?: string; maximum?: string; options?: FormOption[]; columns?: FormField[]; maxRows?: number
 }
-export interface FormSchema { schemaVersion: 1; fields: FormField[] }
+export interface FormSchema { schemaVersion: 1 | 2; fields: FormField[] }
 export type FieldErrors = Record<string, string>
 export interface SchemaErrors { schema: string[]; fields: Array<Record<string, string>> }
 export const fieldTypes: Array<{ value: FieldType; label: string }> = [
   { value: 'TEXT', label: '单行文本' }, { value: 'TEXTAREA', label: '多行文本' },
   { value: 'NUMBER', label: '数字' }, { value: 'DATE', label: '日期' },
-  { value: 'SELECT', label: '单选' }, { value: 'BOOLEAN', label: '是 / 否' }
+  { value: 'SELECT', label: '单选' }, { value: 'BOOLEAN', label: '是 / 否' }, { value: 'TABLE', label: '重复明细' }
 ]
 const errorMessages: Record<string, string> = {
+  TOO_MANY_ROWS: '明细行数超过此表单的上限。', TOO_MANY_CELLS: '明细总单元格数超过 2000，请减少行数。',
   REQUIRED: '请填写此项。', INVALID_TYPE: '保存的值类型不匹配，请重新填写。',
   INVALID_NUMBER: '请输入十进制数字，最多 38 位有效数字、18 位小数，不含空格或指数。',
   INVALID_DATE: '请输入有效日期，格式为 YYYY-MM-DD。', INVALID_OPTION: '请选择此版本提供的选项。',
@@ -36,11 +37,11 @@ export function validDecimal(value: unknown): value is string {
   return (digits.length || 1) <= 38 && (unsigned.split('.')[1]?.length ?? 0) <= 18
 }
 /** 配置提示按字段位置和属性定位，重复标识不会覆盖另一字段的错误。 */
-export function validateFormSchema(schema: FormSchema | null): SchemaErrors {
+export function validateFormSchema(schema: FormSchema | null, columnsOnly = false): SchemaErrors {
   if (!schema) return { schema: [], fields: [] }
   const result: SchemaErrors = { schema: [], fields: [] }
   const reserved = new Set(['constructor', 'prototype', 'tenantId', 'applicationId', 'businessNo', 'roundNo', 'formData', 'formFieldTypes', 'lastAction'])
-  if (schema.schemaVersion !== 1) result.schema.push('表单格式版本不受支持。')
+  if (![1, 2].includes(schema.schemaVersion)) result.schema.push('表单格式版本不受支持。')
   if (schema.fields.length > 50) result.schema.push('最多配置 50 个字段。')
   const keyCounts = new Map<string, number>()
   for (const field of schema.fields) keyCounts.set(field.key, (keyCounts.get(field.key) ?? 0) + 1)
@@ -69,6 +70,17 @@ export function validateFormSchema(schema: FormSchema | null): SchemaErrors {
         else if ((values.get(option.value) ?? 0) > 1) errors[`options.${index}.value`] = '选项保存值重复，请更换。'
         if (!option.label.trim() || option.label.length > 128) errors[`options.${index}.label`] = '显示名称不能为空，最多 128 字符。'
       })
+    }
+    if (field.type === 'TABLE') {
+      if (columnsOnly || schema.schemaVersion !== 2) errors.type = '重复明细仅支持格式版本 2，不能嵌套明细。'
+      if (!Array.isArray(field.columns) || !field.columns.length || field.columns.length > 20) errors.columns = '请配置 1 至 20 个明细列。'
+      else if (!columnsOnly) validateFormSchema({ schemaVersion: 1, fields: field.columns }, true).fields.forEach((issues, index) => {
+        for (const [key, message] of Object.entries(issues)) errors[`columns.${index}.${key}`] = message
+      })
+      if (field.maxRows != null && (!Number.isInteger(field.maxRows) || field.maxRows < 1 || field.maxRows > 100)) errors.maxRows = '最多行数须为 1 至 100 之间的整数。'
+    } else {
+      if (field.columns != null) errors.columns = '只有重复明细可以配置明细列。'
+      if (field.maxRows != null) errors.maxRows = '只有重复明细可以配置行数。'
     }
     return errors
   })
@@ -100,8 +112,22 @@ export function validatePayload(schema: FormSchema | null, payload: Record<strin
   const allowed = new Set(schema.fields.map(field => field.key))
   // 未知字段也可能叫 __proto__，定义自有属性，不能触发对象原型赋值。
   for (const key of Object.keys(payload)) if (!allowed.has(key)) Object.defineProperty(errors, key, { value: 'UNKNOWN_FIELD', enumerable: true, configurable: true, writable: true })
+  let tableCells = 0
   for (const field of schema.fields) {
     const value = ownValue(payload, field.key)
+    if (field.type === 'TABLE') {
+      if (Array.isArray(value)) tableCells += value.length * (field.columns?.length ?? 0)
+      if (Array.isArray(value) && tableCells > 2000) errors[field.key] = 'TOO_MANY_CELLS'
+      else if (value == null || Array.isArray(value) && !value.length) { if (submit && field.required) errors[field.key] = 'REQUIRED' }
+      else if (!Array.isArray(value)) errors[field.key] = 'INVALID_TYPE'
+      else if (value.length > (field.maxRows ?? 50)) errors[field.key] = 'TOO_MANY_ROWS'
+      else value.forEach((row, index) => {
+        const path = `${field.key}[${index}]`
+        if (!isDetailRow(row)) errors[path] = 'INVALID_TYPE'
+        else for (const [key, code] of Object.entries(validatePayload({ schemaVersion: 1, fields: (field.columns ?? []).filter(column => column.type !== 'TABLE') }, row, submit))) errors[`${path}.${key}`] = code
+      })
+      continue
+    }
     const empty = value == null || value === '' || ((field.type === 'TEXT' || field.type === 'TEXTAREA') && typeof value === 'string' && !value.trim())
     if (empty) { if (submit && field.required) errors[field.key] = 'REQUIRED'; continue }
     if (field.type === 'BOOLEAN') { if (typeof value !== 'boolean') errors[field.key] = 'INVALID_TYPE'; continue }
@@ -121,12 +147,22 @@ export function validatePayload(schema: FormSchema | null, payload: Record<strin
 export function updatePayloadField(payload: Record<string, unknown>, key: string, value: unknown): Record<string, unknown> {
   return { ...payload, [key]: value }
 }
+/** 明细行只接受普通 JSON 对象，不把数组或空值改写成空行。 */
+export const isDetailRow = (value: unknown): value is Record<string, unknown> => value != null && typeof value === 'object' && !Array.isArray(value)
+/** 按当前快照列名展示，保留行序和未知字段，避免隐藏旧数据。 */
+export function detailValueLabel(field: FormField, value: unknown): string {
+  if (!Array.isArray(value)) return rawValueLabel(value)
+  if (!value.length) return '未填写'
+  return value.map((row, index) => `第 ${index + 1} 行：` + (isDetailRow(row)
+    ? displayFields({ schemaVersion: 1, fields: (field.columns ?? []).filter(column => column.type !== 'TABLE') }, row).map(cell => `${cell.label}：${cell.value}`).join('；')
+    : rawValueLabel(row))).join('\n')
+}
 export const rawValueLabel = (value: unknown) => value == null ? '未填写' : typeof value === 'object' ? JSON.stringify(value, null, 2) : value === '' ? '未填写' : String(value)
 export function displayFields(schema: FormSchema | null | undefined, payload: Record<string, unknown>) {
   const known = new Set(schema?.fields.map(field => field.key) ?? [])
   const configured = (schema?.fields ?? []).map(field => {
     const value = ownValue(payload, field.key)
-    const label = field.type === 'BOOLEAN' && typeof value === 'boolean' ? value ? '是' : '否'
+    const label = field.type === 'TABLE' ? detailValueLabel(field, value) : field.type === 'BOOLEAN' && typeof value === 'boolean' ? value ? '是' : '否'
       : field.type === 'SELECT' ? field.options?.find(option => option.value === value)?.label ?? rawValueLabel(value) : rawValueLabel(value)
     return { key: field.key, label: field.label, value: label, extra: false }
   })

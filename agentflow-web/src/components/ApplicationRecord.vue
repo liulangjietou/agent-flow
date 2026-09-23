@@ -218,7 +218,7 @@ onUnmounted(() => returnFocus?.focus())
           <fieldset :disabled="saving || writesBlocked || cancellationOpen">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
             <label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label>
-            <FormFields v-if="application.formSchema" v-model="payload" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" />
+            <FormFields v-if="application.formSchema" v-model="payload" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
             <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
           <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>

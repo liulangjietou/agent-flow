@@ -962,7 +962,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
             <fieldset :disabled="busy || writesBlocked || !!createdApplication">
               <label>已发布流程<select v-model="applicationDefinitionId"><option value="">请选择流程</option><option v-for="definition in publishedDefinitions" :key="definition.id" :value="definition.id">{{ definition.name }} · v{{ definition.version }} · {{ definition.key }}</option></select></label>
               <label>申请标题<input v-model="applicationTitle" maxlength="200" /></label><label>业务单号<input v-model="applicationBusinessNo" /></label>
-              <FormFields v-if="applicationFormSchema" v-model="applicationPayload" :schema="applicationFormSchema" :disabled="busy || writesBlocked || !!createdApplication" :errors="applicationFieldErrors" />
+              <FormFields v-if="applicationFormSchema" v-model="applicationPayload" :schema="applicationFormSchema" :disabled="busy || writesBlocked || !!createdApplication" :errors="applicationFieldErrors" @update:model-value="applicationFieldErrors = {}" />
               <template v-else><label>申请金额<input v-model="applicationAmount" type="number" min="0" step="0.01" /></label><label>申请说明<textarea v-model="applicationDescription" rows="3" /></label></template>
             </fieldset>
             <p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿；需要修改时请关闭后从申请记录打开。</p>

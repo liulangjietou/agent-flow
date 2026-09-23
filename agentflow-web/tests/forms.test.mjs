@@ -150,3 +150,32 @@ test('空选项和超量字段有位置明确的提示，legacy与明确空表�
   const crowded = { schemaVersion: 1, fields: Array.from({ length: 51 }, (_, index) => ({ key: `field${index}`, label: '字段', type: 'TEXT', required: false })) }
   assert.equal(validateFormSchema(crowded).schema.length, 1)
 })
+
+const detailSchema = () => ({ schemaVersion: 2, fields: [{ key: 'items', label: '设备明细', type: 'TABLE', required: true, maxRows: 2, columns: [
+  { key: 'quantity', label: '数量', type: 'NUMBER', required: true, minimum: '0' },
+  { key: 'confirmed', label: '确认', type: 'BOOLEAN', required: false }
+] }] })
+test('重复明细逐行校验必填、原始类型、未知列和行数，不改变填写内容', () => {
+  const schema = detailSchema(), payload = { items: [{ quantity: '0009007199254740993.00', confirmed: false }] }, before = structuredClone(payload)
+  assert.deepEqual(validatePayload(schema, payload, true), {})
+  assert.deepEqual(payload, before)
+  assert.deepEqual(validatePayload(schema, { items: [{}] }, false), {})
+  assert.deepEqual(validatePayload(schema, { items: [{}, { quantity: 1, extra: 'secret' }] }, true), {
+    'items[0].quantity': 'REQUIRED', 'items[1].extra': 'UNKNOWN_FIELD', 'items[1].quantity': 'INVALID_TYPE'
+  })
+  for (const value of ['', {}, [null], [[], 'row']]) assert.ok(Object.values(validatePayload(schema, { items: value }, true)).includes('INVALID_TYPE'))
+  assert.deepEqual(validatePayload(schema, { items: [] }, true), { items: 'REQUIRED' })
+  assert.deepEqual(validatePayload(schema, { items: [{}, {}, {}] }, false), { items: 'TOO_MANY_ROWS' })
+  assert.match(displayFields(schema, payload)[0].value, /第 1 行：数量：0009007199254740993.00；确认：否/)
+})
+test('明细配置拒绝旧格式、嵌套、重复列和非法行数，单元格总量有界', () => {
+  const schema = detailSchema()
+  assert.deepEqual(validateFormSchema(schema), { schema: [], fields: [{}] })
+  assert.ok(validateFormSchema({ ...schema, schemaVersion: 1 }).fields[0].type)
+  schema.fields[0].columns.push({ ...schema.fields[0] }); schema.fields[0].maxRows = 101
+  const errors = validateFormSchema(schema).fields[0]
+  assert.ok(errors['columns.2.type']); assert.ok(errors.maxRows)
+  const columns = Array.from({ length: 20 }, (_, i) => ({ key: `c${i}`, label: '列', type: 'TEXT', required: false }))
+  const table = { key: 'items', label: '明细', type: 'TABLE', required: false, maxRows: 100, columns }
+  assert.deepEqual(validatePayload({ schemaVersion: 2, fields: [table, { ...table, key: 'more' }] }, { items: Array.from({ length: 100 }, () => ({})), more: [{}] }, true), { more: 'TOO_MANY_CELLS' })
+})

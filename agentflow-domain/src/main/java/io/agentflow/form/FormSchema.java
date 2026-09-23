@@ -17,8 +17,12 @@ import java.util.regex.Pattern;
  * @author owlzhangfq@gmail.com
  */
 public record FormSchema(int schemaVersion, List<Field> fields) {
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
     public static final int MAX_FIELDS = 50;
+    public static final int MAX_TABLE_COLUMNS = 20;
+    public static final int MAX_TABLE_ROWS = 100;
+    public static final int DEFAULT_TABLE_ROWS = 50;
+    public static final int MAX_TABLE_CELLS = 2000;
     public static final int MAX_TEXT_LENGTH = 10000;
     private static final int MAX_OPTIONS = 50;
     private static final int MAX_LABEL_LENGTH = 128;
@@ -33,10 +37,13 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
             "businessNo", "roundNo", "formData", "formFieldTypes", "lastAction");
 
     public FormSchema {
-        if (schemaVersion != CURRENT_VERSION || fields == null || fields.size() > MAX_FIELDS || fields.stream().anyMatch(java.util.Objects::isNull)) {
+        if (schemaVersion < 1 || schemaVersion > CURRENT_VERSION || fields == null || fields.size() > MAX_FIELDS || fields.stream().anyMatch(java.util.Objects::isNull)) {
             throw invalid("Unsupported schema version or field collection");
         }
         fields = List.copyOf(fields);
+        if (schemaVersion == 1 && fields.stream().anyMatch(field -> field.type() == FieldType.TABLE)) {
+            throw invalid("Detail tables require schema version 2");
+        }
         if (fields.stream().map(Field::key).distinct().count() != fields.size()) {
             throw invalid("Field keys must be unique");
         }
@@ -65,6 +72,9 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
         Field field = fields.stream().filter(candidate -> candidate.key().equals(comparison.field())).findFirst()
                 .orElseThrow(() -> new DomainException("INVALID_CONDITION", "Condition field is not declared in the form schema"));
         if (comparison.operator() == DefinitionModels.Operator.EXISTS || comparison.operator() == DefinitionModels.Operator.NOT_EXISTS) return;
+        if (field.type() == FieldType.TABLE) {
+            throw new DomainException("INVALID_CONDITION", "Detail tables only support presence conditions");
+        }
         if (field.type() != FieldType.NUMBER && field.type() != FieldType.DATE
                 && comparison.operator() != DefinitionModels.Operator.EQ && comparison.operator() != DefinitionModels.Operator.NE) {
             throw new DomainException("INVALID_CONDITION", "Condition operator does not match the field type");
@@ -87,20 +97,42 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
         Map<String, String> errors = new LinkedHashMap<>();
         Set<String> keys = fieldTypes().keySet();
         values.keySet().forEach(key -> { if (!keys.contains(key)) errors.put(key, "UNKNOWN_FIELD"); });
+        long tableCells = 0;
         for (Field field : fields) {
             Object value = values.get(field.key());
-            if (empty(value, field.type())) {
-                if (submitted && field.required()) errors.put(field.key(), "REQUIRED");
-            } else {
-                String error = field.valueError(value, true);
-                if (error != null) errors.put(field.key(), error);
+            if (field.type() == FieldType.TABLE && value instanceof List<?> rows) {
+                tableCells += (long) rows.size() * field.columns().size();
+                if (tableCells > MAX_TABLE_CELLS) { errors.put(field.key(), "TOO_MANY_CELLS"); continue; }
             }
+            validateField(field, value, submitted, field.key(), errors);
         }
         if (!errors.isEmpty()) throw new FormValidationException(errors);
     }
 
+    private static void validateField(Field field, Object value, boolean submitted, String path, Map<String, String> errors) {
+        if (empty(value, field.type())) {
+            if (submitted && field.required()) errors.put(path, "REQUIRED");
+            return;
+        }
+        if (field.type() != FieldType.TABLE) {
+            String error = field.valueError(value, true);
+            if (error != null) errors.put(path, error);
+            return;
+        }
+        if (!(value instanceof List<?> rows)) { errors.put(path, "INVALID_TYPE"); return; }
+        if (rows.size() > field.rowLimit()) { errors.put(path, "TOO_MANY_ROWS"); return; }
+        Set<String> keys = field.columns().stream().map(Field::key).collect(java.util.stream.Collectors.toSet());
+        for (int index = 0; index < rows.size(); index++) {
+            String rowPath = path + "[" + index + "]";
+            if (!(rows.get(index) instanceof Map<?, ?> row)) { errors.put(rowPath, "INVALID_TYPE"); continue; }
+            row.keySet().forEach(key -> { if (!keys.contains(key)) errors.put(rowPath + "." + key, "UNKNOWN_FIELD"); });
+            for (Field column : field.columns()) validateField(column, row.get(column.key()), submitted, rowPath + "." + column.key(), errors);
+        }
+    }
+
     /** 未填写和显式清空等价；false 与十进制字符串 0 都不是空值。 */
     public static boolean empty(Object value, FieldType type) {
+        if (type == FieldType.TABLE) return value == null || value instanceof List<?> rows && rows.isEmpty();
         return value == null || value instanceof String text && (text.isEmpty()
                 || (type == FieldType.TEXT || type == FieldType.TEXTAREA) && text.isBlank());
     }
@@ -126,17 +158,24 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
     private static DomainException invalid(String message) { return new DomainException("INVALID_FORM_SCHEMA", message); }
 
     /**
-     * 支持的六种表单输入类型。
+     * 六种基础输入与一层重复明细；明细列使用基础类型。
      * @author owlzhangfq@gmail.com
      */
-    public enum FieldType { TEXT, TEXTAREA, NUMBER, DATE, SELECT, BOOLEAN }
+    public enum FieldType { TEXT, TEXTAREA, NUMBER, DATE, SELECT, BOOLEAN, TABLE }
 
     /**
      * 不可变字段定义，不包含客户端脚本或动态表达式。
      * @author owlzhangfq@gmail.com
      */
     public record Field(String key, String label, FieldType type, boolean required, String helpText,
-                        Integer maxLength, String minimum, String maximum, List<Option> options) {
+                        Integer maxLength, String minimum, String maximum, List<Option> options,
+                        List<Field> columns, Integer maxRows) {
+        /** 兼容原六类字段的构造契约，不为旧快照添加明细配置。 */
+        public Field(String key, String label, FieldType type, boolean required, String helpText,
+                     Integer maxLength, String minimum, String maximum, List<Option> options) {
+            this(key, label, type, required, helpText, maxLength, minimum, maximum, options, null, null);
+        }
+
         public Field {
             if (key == null || !FIELD_KEY.matcher(key).matches() || RESERVED_FIELDS.contains(key)
                     || label == null || label.isBlank() || label.length() > MAX_LABEL_LENGTH || type == null
@@ -158,7 +197,22 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
                 }
             } else if (options != null && !options.isEmpty()) throw invalid("Only select fields can declare options");
             options = options == null ? null : List.copyOf(options);
+            if (type == FieldType.TABLE) {
+                if (columns == null || columns.isEmpty() || columns.size() > MAX_TABLE_COLUMNS
+                        || columns.stream().anyMatch(java.util.Objects::isNull)
+                        || columns.stream().anyMatch(column -> column.type() == FieldType.TABLE)
+                        || columns.stream().map(Field::key).distinct().count() != columns.size()) {
+                    throw invalid("Detail columns must be nonempty, flat and unique");
+                }
+                if (maxRows != null && (maxRows < 1 || maxRows > MAX_TABLE_ROWS)) throw invalid("Detail row limit is invalid");
+            } else if (columns != null || maxRows != null) {
+                throw invalid("Only detail tables can declare columns or row limits");
+            }
+            columns = columns == null ? null : List.copyOf(columns);
         }
+
+        /** 缺省上限仅在使用时解释，读取旧快照不补写默认配置。 */
+        public int rowLimit() { return maxRows == null ? DEFAULT_TABLE_ROWS : maxRows; }
 
         private String valueError(Object value, boolean checkBounds) {
             if (type == FieldType.BOOLEAN) return value instanceof Boolean ? null : "INVALID_TYPE";
@@ -168,7 +222,7 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
                 case DATE -> validDate(text) ? null : "INVALID_DATE";
                 case SELECT -> options.stream().anyMatch(option -> option.value().equals(text)) ? null : "INVALID_OPTION";
                 case NUMBER -> numberError(text, checkBounds);
-                case BOOLEAN -> throw new IllegalStateException("Boolean handled before text fields");
+                case BOOLEAN, TABLE -> throw new IllegalStateException("Structured values handled before text fields");
             };
         }
 
