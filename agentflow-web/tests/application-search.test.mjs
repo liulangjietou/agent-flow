@@ -62,3 +62,19 @@ test('管理员查询 API 保留精确筛选、特殊文本和取消信号，不
   assert.equal(sent.signal, controller.signal); assert.equal(sent.headers.get('Authorization'), 'Bearer search-token')
   assert.equal(sent.headers.has('Idempotency-Key'), false)
 })
+
+
+test('参与者检索使用独立摘要接口，保留筛选和取消信号', async () => {
+  globalThis.localStorage = { getItem: () => 'participant-token' }
+  const { api } = await import(process.env.AGENTFLOW_TEST_API)
+  let sent
+  globalThis.fetch = async (url, init) => { sent = { url, ...init }; return Response.json({ items: [] }) }
+  const controller = new AbortController()
+  await api.searchVisibleApplications({ q: '参与 & 历史', applicant: 'alice', status: 'RETURNED', limit: 30, cursor: 'p+q/=' }, controller.signal)
+  const url = new URL(sent.url, 'http://localhost')
+  assert.equal(url.pathname, '/api/v1/applications/search')
+  assert.equal(url.searchParams.get('q'), '参与 & 历史'); assert.equal(url.searchParams.get('cursor'), 'p+q/=')
+  assert.equal(url.searchParams.get('applicant'), 'alice'); assert.equal(url.searchParams.get('limit'), '30')
+  assert.equal(sent.signal, controller.signal); assert.equal(sent.headers.get('Authorization'), 'Bearer participant-token')
+  assert.equal(sent.headers.has('Idempotency-Key'), false)
+})

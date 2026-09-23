@@ -4,11 +4,11 @@ import { api } from '../api'
 import { ApplicationSearchQuery, type ApplicationSearchFilters } from '../applicationSearch'
 import { ApplicationExportQuery, type ApplicationExportFilters } from '../applicationExport'
 
-const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
+const props = defineProps<{ scopeKey: string; administrator: boolean; userId: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ open: [id: string]; create: [] }>()
 const emptyFilters = () => ({ q: '', status: '', processKey: '', version: '', applicant: '', from: '', to: '' })
 const fields = reactive(emptyFilters())
-const query = reactive(new ApplicationSearchQuery((filters, signal) => api.searchApplications(filters, signal)))
+const query = reactive(new ApplicationSearchQuery((filters, signal) => props.administrator ? api.searchApplications(filters, signal) : api.searchVisibleApplications(filters, signal)))
 const exporter = reactive(new ApplicationExportQuery((filters, signal) => api.exportApplications(filters, signal)))
 const appliedFilters = ref<ApplicationExportFilters>({}), downloadUrl = ref('')
 const submitted = ref(''), validation = ref('')
@@ -37,14 +37,14 @@ function releaseDownload() { if (downloadUrl.value) URL.revokeObjectURL(download
 watch(fields, () => exporter.clear(), { deep: true, flush: 'sync' })
 watch(() => exporter.file, file => { releaseDownload(); if (file) downloadUrl.value = URL.createObjectURL(file) }, { flush: 'sync' })
 watch(() => fields.processKey, value => { if (!value.trim()) fields.version = '' })
-watch(() => props.scopeKey, reset, { immediate: true, flush: 'sync' })
+watch(() => [props.scopeKey, props.administrator], reset, { immediate: true, flush: 'sync' })
 watch(() => props.refreshVersion, refresh)
 onUnmounted(() => { query.clear(); exporter.clear(); releaseDownload() })
 </script>
 
 <template>
   <section class="content application-search" :aria-busy="query.loading">
-    <div class="page-heading"><div><p class="eyebrow">APPLICATIONS / SEARCH</p><h2>申请记录</h2><p class="subhead">检索当前租户的申请，查看进度、原始轮次和审批依据。</p></div><button class="primary" :disabled="locked" @click="emit('create')">＋ 发起申请</button></div>
+    <div class="page-heading"><div><p class="eyebrow">APPLICATIONS / SEARCH</p><h2>申请记录</h2><p class="subhead">{{ administrator ? '检索当前租户的申请，查看进度、原始轮次和审批依据。' : '检索我发起或有权参与的申请，查看当前进度和办理记录。' }}</p></div><button class="primary" :disabled="locked" @click="emit('create')">＋ 发起申请</button></div>
     <form class="panel search-filters" @submit.prevent="refresh">
       <label class="search-text">标题或业务单号<input v-model="fields.q" type="search" maxlength="100" placeholder="输入关键词查询" /></label>
       <label>申请状态<select v-model="fields.status"><option value="">全部状态</option><option v-for="(label, value) in stateLabels" :key="value" :value="value">{{ label }}</option></select></label>
@@ -58,7 +58,7 @@ onUnmounted(() => { query.clear(); exporter.clear(); releaseDownload() })
     <p v-if="validation" class="search-error" role="alert">{{ validation }}</p>
     <p v-if="changed && query.loaded" class="search-pending" role="status">筛选已修改，下方仍是上次查询结果。点击“查询申请”后生效。</p>
     <div class="search-summary"><span>按创建时间倒序 · 日期筛选包含首尾两天 · 记录时间按当前设备时区显示</span><span v-if="query.loaded">已加载 {{ query.items.length }} 份申请</span></div>
-    <div class="panel search-export" :aria-busy="exporter.loading">
+    <div v-if="administrator" class="panel search-export" :aria-busy="exporter.loading">
       <div><strong>导出申请摘要</strong><p>按已查询条件导出全部匹配记录，每次最多 10,000 份。包含单号、状态和时间，不含表单正文与审批意见。</p></div>
       <button class="secondary" :disabled="!query.loaded || query.loading || !!query.error || changed || !!validation || exporter.loading" @click="exporter.generate(scopeKey, appliedFilters)">{{ exporter.loading ? '正在生成…' : '生成 Excel' }}</button>
       <button v-if="exporter.loading" class="secondary" @click="exporter.clear()">取消等待</button>
@@ -72,7 +72,7 @@ onUnmounted(() => { query.clear(); exporter.clear(); releaseDownload() })
       <article v-for="item in query.items" :key="item.id" class="search-row">
         <div class="search-subject"><h3>{{ item.title }}</h3><p>{{ item.businessNo }}</p><small>{{ item.processKey }} · v{{ item.definitionVersion }} · 第 {{ item.roundNo }} 轮</small></div>
         <div class="search-person"><small>申请人</small><strong>{{ item.createdBy }}</strong><time>{{ dateLabel(item.createdAt) }}</time><small>创建时间</small></div>
-        <div class="search-state"><span class="search-badge" :class="item.status.toLowerCase()">{{ stateLabels[item.status] ?? item.status }}</span><button class="secondary" :disabled="locked" @click="emit('open', item.id)">查看详情 ↗</button></div>
+        <div class="search-state"><span class="search-badge" :class="item.status.toLowerCase()">{{ stateLabels[item.status] ?? item.status }}</span><button class="secondary" :disabled="locked" @click="emit('open', item.id)">{{ item.createdBy === userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(item.status) ? '查看并修改 ↗' : '查看详情 ↗' }}</button></div>
       </article>
     </div>
     <div v-if="query.items.length" class="search-pagination"><button v-if="query.nextCursor" class="secondary" :disabled="query.loading || changed" @click="query.more()">{{ query.loading ? '加载中…' : '加载更多申请' }}</button><span v-else>已加载全部匹配申请</span><small>审批状态可能继续变化，可重新查询获取最新结果。</small></div>

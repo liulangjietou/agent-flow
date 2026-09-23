@@ -1,4 +1,4 @@
-/** 管理员申请摘要，不包含业务正文。 */
+/** 可访问的申请摘要，不包含业务正文。 */
 export interface ApplicationSearchItem {
   id: string; businessNo: string; title: string; processKey: string; definitionVersion: number
   createdBy: string; status: string; roundNo: number; createdAt: string; updatedAt: string
@@ -7,7 +7,7 @@ export interface ApplicationSearchFilters { q?: string; status?: string; process
 export interface ApplicationSearchPage { items: ApplicationSearchItem[]; nextCursor?: string | null }
 
 /**
- * 管理员申请检索只保留当前账号和已提交条件的结果，分页失败可重试。
+ * 申请检索只保留当前账号和已提交条件的结果，分页失败可重试。
  * @author owlzhangfq@gmail.com
  */
 export class ApplicationSearchQuery {

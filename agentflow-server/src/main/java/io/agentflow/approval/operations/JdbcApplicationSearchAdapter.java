@@ -1,5 +1,7 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.Actor;
+import io.agentflow.approval.process.FlowableApplicationParticipationSql;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
@@ -20,12 +22,23 @@ public class JdbcApplicationSearchAdapter implements ApplicationSearchPort {
     public JdbcApplicationSearchAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     @Override
-    public List<Item> search(String tenantId, Query query) {
-        var parameters = new ArrayList<Object>(List.of(tenantId));
+    public List<Item> search(Actor actor, Query query) {
+        var parameters = new ArrayList<Object>(List.of(actor.tenantId()));
         StringBuilder sql = new StringBuilder("""
                 SELECT id,business_no,title,process_key,definition_version,created_by,status,round_no,created_at,updated_at
-                FROM approval_application WHERE tenant_id=?
+                FROM approval_application a WHERE tenant_id=?
                 """);
+        if (!actor.hasRole("ADMIN")) {
+            sql.append(" AND (a.created_by=? OR "); parameters.add(actor.userId());
+            sql.append(FlowableApplicationParticipationSql.predicate(actor, parameters));
+            // 转交会改变引擎指派人，真实办理审计保留原办理人的读取权限。
+            sql.append("""
+                    OR EXISTS (SELECT 1 FROM audit_event e WHERE e.tenant_id=a.tenant_id AND e.application_id=a.id
+                        AND e.actor_id=? AND e.aggregate_type='Task'
+                        AND e.action IN ('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE')))
+                    """);
+            parameters.add(actor.userId());
+        }
         if (!query.text().isEmpty()) {
             String pattern = "%" + query.text().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
             sql.append(" AND (LOWER(title) LIKE ? ESCAPE '!' OR LOWER(business_no) LIKE ? ESCAPE '!')");

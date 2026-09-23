@@ -87,10 +87,6 @@ watch(actorScope, () => { taskQueueView.value = 'list' }, { flush: 'sync' })
 let workspaceRefreshGeneration = 0
 let taskCountRequest: AbortController | null = null
 let taskDetailRequest: AbortController | null = null
-const applications = ref<Application[]>([])
-const applicationsLoading = ref(false)
-const applicationsError = ref('')
-let applicationsRequest: AbortController | null = null
 const activeTask = ref<Task | null>(null)
 const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
@@ -274,23 +270,11 @@ async function loadTasks() {
   try { const result = await api.taskPage({ limit: 1 }, controller.signal); if (scope && actorScope.value === scope && taskCountRequest === controller) taskCount.value = result.total }
   finally { clearTimeout(timeout) }
 }
-async function loadApplications() {
-  const scope = actorScope.value, controller = new AbortController()
-  applicationsRequest?.abort(); applicationsRequest = controller
-  applications.value = []; applicationsLoading.value = true; applicationsError.value = ''
-  const timeout = setTimeout(() => controller.abort(), 12_000)
-  try {
-    const result = await api.applications(controller.signal)
-    if (scope && actorScope.value === scope && applicationsRequest === controller) applications.value = result
-  } catch (error) {
-    if (scope && actorScope.value === scope && applicationsRequest === controller) applicationsError.value = errorMessage(error)
-  } finally { clearTimeout(timeout); if (applicationsRequest === controller) applicationsLoading.value = false }
-}
 async function refreshWorkspace(restoreSelection = false) {
   taskRefresh.value++
   const generation = ++workspaceRefreshGeneration
   const scope = actorScope.value
-  try { await Promise.all([loadTasks(), ...(page.value === 'applications' && !canInspectSystem.value ? [loadApplications()] : []), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
+  try { await Promise.all([loadTasks(), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
   catch (error) { if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) { serverAvailable.value = false; notice.value = errorMessage(error) } }
 }
 function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
@@ -352,7 +336,7 @@ async function logout() {
     busy.value = true
     try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
     writeRequests.setActor(null)
-    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
     clearDesigner(); templateRefresh.value++
     recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
   }, () => !busy.value && !pendingWrites.value.some(operation => operation.sending))
@@ -719,10 +703,6 @@ watch(applicationDefinitionId, () => {
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
 })
 
-watch(page, value => {
-  if (value === 'applications' && loggedIn.value && !canInspectSystem.value) void loadApplications()
-  else { applicationsRequest?.abort(); applicationsRequest = null; applicationsLoading.value = false; applications.value = []; applicationsError.value = '' }
-})
 watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
 watch([actor, editorSession, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
 watch(editorSession, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
@@ -824,7 +804,7 @@ onMounted(async () => {
   try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
-onBeforeUnmount(() => { applicationsRequest?.abort(); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
+onBeforeUnmount(() => { taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
 onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
@@ -900,13 +880,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         </section>
         <WebhookDeliveries v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
-        <ApplicationSearch v-else-if="page === 'applications' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <section v-else-if="page === 'applications'" class="content">
-          <div class="page-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>申请记录</h2><p class="subhead">服务端按发起人、参与者与管理员权限返回申请。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
-          <p v-if="applicationsLoading" class="unavailable" role="status">正在读取申请记录…</p>
-          <p v-if="applicationsError" class="inline-error" role="alert">{{ applicationsError }}<button class="quiet" @click="loadApplications">重新读取</button></p>
-          <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }} · 第 {{ application.roundNo }} 轮</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button class="secondary" :disabled="busy" @click="recordApplicationId = application.id">{{ application.createdBy === actor?.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status) ? '查看并修改' : '查看详情' }}</button></div></div>
-        </section>
+        <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" @import="page = 'transfer'" />

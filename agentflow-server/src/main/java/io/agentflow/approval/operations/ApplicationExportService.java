@@ -27,7 +27,7 @@ public class ApplicationExportService {
             Instant startedAt = Instant.now();
             var query = new ApplicationSearchPort.Query(filters.text(), filters.status(), filters.processKey(), filters.definitionVersion(),
                     filters.applicant(), filters.createdFrom(), filters.createdBefore(), MAX_RECORDS, null, null);
-            var rows = reader.search(actor.tenantId(), query);
+            var rows = reader.search(actor, query);
             if (rows.size() > MAX_RECORDS) throw new DomainException("APPLICATION_EXPORT_LIMIT_EXCEEDED", "Narrow the filters to at most 10000 records");
             return ApplicationWorkbook.write(rows, actor, query, startedAt);
         } catch (IOException exception) {

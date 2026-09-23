@@ -180,6 +180,21 @@ async function exercise(base) {
   assert.equal(nextSearch.items.length, 1); assert.notEqual(nextSearch.items[0].id, firstSearch.items[0].id)
   const cancelledSearch = await call('GET', searchPath, { path: searchPath + '?processKey=' + definition.key + '&status=CANCELLED&applicant=alice&definitionVersion=1' })
   assert.deepEqual(cancelledSearch.items.map(row => row.id), [cancelled.id]); assert.ok(!('payload' in cancelledSearch.items[0]))
+  const visiblePath = apps + '/search', visibleFilter = '?processKey=' + definition.key
+  const visibleOwn = await call('GET', visiblePath, { user: 'alice', path: visiblePath + visibleFilter })
+  assert.deepEqual(visibleOwn.items.map(row => row.id).sort(), [application.id, withdrawn.id, cancelled.id].sort())
+  assert.ok(visibleOwn.items.every(row => !('payload' in row) && !('formSchema' in row)))
+  assert.deepEqual((await call('GET', visiblePath, { user: 'bob', path: visiblePath + visibleFilter })).items, [])
+  const visibleHandled = await call('GET', visiblePath, { user: 'manager', path: visiblePath + visibleFilter })
+  // 原流程为角色候选审批；未领取即撤回不建立永久参与关系。
+  assert.deepEqual(visibleHandled.items.map(row => row.id).sort(), [application.id].sort())
+  const visibleFirst = await call('GET', visiblePath, { user: 'alice', path: visiblePath + visibleFilter + '&limit=1' })
+  assert.ok(visibleFirst.nextCursor)
+  const visibleNext = await call('GET', visiblePath, { user: 'alice', path: visiblePath + visibleFilter + '&limit=2&cursor=' + encodeURIComponent(visibleFirst.nextCursor) })
+  assert.deepEqual([ ...visibleFirst.items, ...visibleNext.items ], visibleOwn.items)
+  await call('GET', visiblePath, { user: 'anonymous', status: 401 })
+  await call('GET', visiblePath, { user: 'alice', path: visiblePath + '?tenantId=other', status: 400 })
+  await call('GET', visiblePath, { user: 'bob', path: visiblePath + visibleFilter + '&cursor=' + encodeURIComponent(visibleFirst.nextCursor), status: 400 })
   const exportPath = searchPath + '/export'
   await call('GET', exportPath, { path: exportPath + '?processKey=' + definition.key })
   await call('GET', exportPath, { user: 'alice', status: 403 })

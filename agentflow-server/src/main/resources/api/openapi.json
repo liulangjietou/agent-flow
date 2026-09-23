@@ -1714,7 +1714,7 @@
           "申请"
         ],
         "summary": "可访问申请（兼容）",
-        "description": "返回全量含正文数组；个人列表优先使用 workspace/applications，管理员仍受当前租户限制。",
+        "description": "兼容原数组调用方；交互页面请使用 /api/v1/applications/search 的有界摘要分页。",
         "x-access": "同租户管理员、发起人或实际流程参与者",
         "x-idempotency": false,
         "responses": {
@@ -1751,7 +1751,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       },
       "post": {
         "operationId": "createApplication",
@@ -6373,6 +6374,174 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/applications/search": {
+      "get": {
+        "operationId": "searchVisibleApplications",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "检索当前用户可访问的申请摘要",
+        "description": "发起人、当前任务参与者、历史指派人及真实办理人可检索对应申请；ADMIN 可检索当前租户全部申请。PROCESS_ADMIN 不自动获得全租户读取权限。按创建时间和 ID 倒序分页，每页重新判断权限，不含表单正文。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationSearchPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户申请摘要",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_APPLICATION_QUERY：筛选、版本、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "标题或业务单号包含文本；大小写不敏感，百分号和下划线按字面量匹配",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "申请当前状态，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "DRAFT",
+                "IN_APPROVAL",
+                "RETURNED",
+                "WITHDRAWN",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "REVOKED"
+              ]
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "definitionVersion",
+            "in": "query",
+            "required": false,
+            "description": "精确版本，必须同时指定流程标识",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "applicant",
+            "in": "query",
+            "required": false,
+            "description": "精确申请人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "创建开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "创建结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "每页返回上限",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "原查询下一页位置，绑定租户、账号、角色及筛选条件",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          }
+        ]
       }
     }
   },

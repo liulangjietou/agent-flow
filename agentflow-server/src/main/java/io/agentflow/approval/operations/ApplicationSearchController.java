@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import org.springframework.http.ResponseEntity;
@@ -10,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 管理员申请检索入口，权限与参数只在这里校验，不开放其他租户参数。
+ * 申请检索入口，管理员运营视图与参与者视图共用摘要分页，不开放租户覆盖。
  * @author owlzhangfq@gmail.com
  */
 @RestController
@@ -24,12 +25,22 @@ public class ApplicationSearchController {
         this.currentActor = currentActor; this.reader = reader; this.json = json;
     }
 
-    /** 普通参与者继续使用个人工作台与原详情授权，流程管理员不自动获得全租户申请权。 */
+    /** 运营检索和导出仍仅对租户管理员开放。 */
     @GetMapping("/api/v1/operations/applications")
     public ResponseEntity<Page> search(@RequestParam Map<String, String> raw) {
         var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        return page(actor, raw);
+    }
+
+    /** 查询当前用户有权读取的申请，流程管理员不会自动获得全租户读取权。 */
+    @GetMapping("/api/v1/applications/search")
+    public ResponseEntity<Page> visible(@RequestParam Map<String, String> raw) {
+        return page(currentActor.actor(), raw);
+    }
+
+    private ResponseEntity<Page> page(Actor actor, Map<String, String> raw) {
         var parameters = ApplicationSearchParameters.parse(actor, raw, json);
-        var rows = reader.search(actor.tenantId(), parameters.query());
+        var rows = reader.search(actor, parameters.query());
         int count = Math.min(rows.size(), parameters.query().limit());
         var last = count == 0 ? null : rows.get(count - 1);
         String cursor = rows.size() > count ? parameters.cursor(last.createdAt(), last.id()) : null;

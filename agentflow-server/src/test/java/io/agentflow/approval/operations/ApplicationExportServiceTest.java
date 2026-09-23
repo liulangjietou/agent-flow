@@ -28,21 +28,21 @@ class ApplicationExportServiceTest {
     void exactLimitIsCompleteAndExcessNeverBecomesATruncatedFile() throws Exception {
         var reader = mock(ApplicationSearchPort.class);
         var item = new ApplicationSearchPort.Item(UUID.randomUUID(), "001234567890123456789", "=1+1", "flow", 1, "alice", "DRAFT", 0, Instant.EPOCH, Instant.EPOCH);
-        when(reader.search(eq("demo"), any())).thenReturn(Collections.nCopies(10_001, item), Collections.nCopies(10_000, item));
+        when(reader.search(eq(actor), any())).thenReturn(Collections.nCopies(10_001, item), Collections.nCopies(10_000, item));
         var service = new ApplicationExportService(reader);
         assertThatThrownBy(() -> service.export(actor, filters)).isInstanceOfSatisfying(DomainException.class, e -> assertThat(e.code()).isEqualTo("APPLICATION_EXPORT_LIMIT_EXCEEDED"));
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(service.export(actor, filters)))) {
             assertThat(book.getSheetAt(0).getLastRowNum()).isEqualTo(10_000);
             assertThat(book.getSheetAt(1).getRow(3).getCell(1).getStringCellValue()).isEqualTo("10000");
         }
-        verify(reader, times(2)).search(eq("demo"), argThat(query -> query.limit() == 10_000 && query.beforeId() == null && query.beforeTime() == null && query.processKey().equals("flow")));
+        verify(reader, times(2)).search(eq(actor), argThat(query -> query.limit() == 10_000 && query.beforeId() == null && query.beforeTime() == null && query.processKey().equals("flow")));
     }
 
     @Test
     void rejectsConcurrentGenerationAndReleasesCapacityAfterQueryFailure() throws Exception {
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         var reader = mock(ApplicationSearchPort.class);
-        when(reader.search(anyString(), any())).thenAnswer(call -> {
+        when(reader.search(any(Actor.class), any())).thenAnswer(call -> {
             entered.countDown(); assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
             throw new IllegalStateException("read failed");
         }).thenReturn(List.of());
@@ -54,6 +54,6 @@ class ApplicationExportServiceTest {
         } finally { release.countDown(); }
         assertThatThrownBy(() -> first.get(10, TimeUnit.SECONDS)).hasCauseInstanceOf(IllegalStateException.class);
         try (var book = new XSSFWorkbook(new ByteArrayInputStream(service.export(actor, filters)))) { assertThat(book.getSheetAt(0).getLastRowNum()).isZero(); }
-        verify(reader, times(2)).search(anyString(), any());
+        verify(reader, times(2)).search(any(Actor.class), any());
     }
 }

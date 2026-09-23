@@ -1,16 +1,17 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.Actor;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * 管理员的租户申请摘要检索端口，不读取正文或改变审批状态。
+ * 按当前身份可见范围检索申请摘要的端口，不读取正文或改变审批状态。
  * @author owlzhangfq@gmail.com
  */
 public interface ApplicationSearchPort {
     /** 返回最多 limit + 1 条摘要供入口生成下一页，不计算全库总数。 */
-    List<Item> search(String tenantId, Query query);
+    List<Item> search(Actor actor, Query query);
 
     /**
      * 入口已校验的精确筛选和创建时间游标；日期上界为不包含。
