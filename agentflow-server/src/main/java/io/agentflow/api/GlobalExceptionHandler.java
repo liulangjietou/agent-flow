@@ -67,12 +67,12 @@ public class GlobalExceptionHandler {
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
             case "INVALID_HISTORY_QUERY", "IDEMPOTENCY_KEY_REQUIRED", "INVALID_IDEMPOTENCY_KEY",
-                    "INVALID_IDEMPOTENCY_REQUEST" -> HttpStatus.BAD_REQUEST;
+                    "INVALID_IDEMPOTENCY_REQUEST", "INVALID_TEMPLATE_COPY_REQUEST" -> HttpStatus.BAD_REQUEST;
             case "UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
             case "FORBIDDEN" -> HttpStatus.FORBIDDEN;
             case "NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "CONCURRENCY_CONFLICT", "IDEMPOTENCY_KEY_REUSED", "IDEMPOTENCY_KEY_EXPIRED", "DRAFT_VERSION_CONFLICT",
-                    "DEFINITION_DEPLOYMENT_CONFLICT", "DEFINITION_BINDING_AMBIGUOUS" -> HttpStatus.CONFLICT;
+                    "DEFINITION_DEPLOYMENT_CONFLICT", "DEFINITION_BINDING_AMBIGUOUS", "TEMPLATE_VERSION_CONFLICT" -> HttpStatus.CONFLICT;
             case "DEPENDENCY_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.UNPROCESSABLE_ENTITY;
         };

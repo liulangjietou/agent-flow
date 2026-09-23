@@ -135,7 +135,8 @@ public class DefinitionController {
      */
     public record DefinitionResponse(UUID id, String tenantId, String key, String name, long version, long revision,
                                      String status, Graph graph, @JsonInclude(JsonInclude.Include.ALWAYS) FormSchema formSchema) {
-        static DefinitionResponse from(DefinitionDraft draft) {
+        /** 将定义聚合转换为统一响应，供模板复制等创建入口复用。 */
+        public static DefinitionResponse from(DefinitionDraft draft) {
             return new DefinitionResponse(draft.id(), draft.tenantId(), draft.key(), draft.name(), draft.version(),
                     draft.revision(), draft.status().name(), draft.graph(), draft.formSchema());
         }

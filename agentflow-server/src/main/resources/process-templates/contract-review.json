@@ -1,0 +1,279 @@
+{
+  "key": "contract-review",
+  "templateVersion": 1,
+  "name": "合同审批",
+  "category": "OA",
+  "description": "合同先经经理审批，人民币金额达到 100000 元时增加复核；审批通过不等于签约、付款或记账。",
+  "scope": "用于合同审批，并按人民币合同金额安排分级复核。",
+  "businessType": "FORM",
+  "dependencies": [
+    "配置经理审批组和额外复核组",
+    "确认合同金额的分级审批规则"
+  ],
+  "defaultRoles": [
+    "MANAGER",
+    "ADMIN"
+  ],
+  "fieldDescriptions": {
+    "contractTitle": "填写合同名称，最多 200 字符。",
+    "counterparty": "填写合同相对方的名称，最多 200 字符。",
+    "contractAmount": "填写合同金额，单位为人民币元，金额不能小于 0。",
+    "contractType": "选择本次审批的合同类型。",
+    "summary": "说明合同标的、履约和验收要点，最多 2000 字符。"
+  },
+  "risks": [
+    "使用前请配置审批组和人民币 100000 元分级阈值；额外复核示例角色不代表法务人员。",
+    "合同审批通过不代表签约或付款；当前不提供法务审查、归档、汇率换算或财务核算。",
+    "通知文案仅供参考，当前不会发送通知。"
+  ],
+  "upgradePolicy": "升级后需重新复制；已有草稿、发布版本和申请保持原样。",
+  "notificationTexts": {
+    "SUBMITTED": "您的合同审批已提交，等待审批。",
+    "RETURNED": "您的合同审批已退回，请查看审批意见并补正。",
+    "APPROVED": "您的合同审批已审批通过，请按业务规定办理后续事项。"
+  },
+  "notificationsAvailable": false,
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "name": "开始",
+        "type": "START",
+        "properties": {
+          "x": "40",
+          "y": "250"
+        }
+      },
+      {
+        "id": "manager",
+        "name": "经理审批（示例）",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "240",
+          "y": "250",
+          "assigneeRule": "role:MANAGER"
+        }
+      },
+      {
+        "id": "route",
+        "name": "金额是否达到 10 万元",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "460",
+          "y": "250"
+        }
+      },
+      {
+        "id": "review",
+        "name": "额外复核（示例）",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "700",
+          "y": "90",
+          "assigneeRule": "role:ADMIN"
+        }
+      },
+      {
+        "id": "end",
+        "name": "结束",
+        "type": "END",
+        "properties": {
+          "x": "940",
+          "y": "250"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "start_manager",
+        "source": "start",
+        "target": "manager",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "manager_route",
+        "source": "manager",
+        "target": "route",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "route_review",
+        "source": "route",
+        "target": "review",
+        "condition": "contractAmount >= 100000",
+        "defaultBranch": false
+      },
+      {
+        "id": "route_end",
+        "source": "route",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "review_end",
+        "source": "review",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": false
+      }
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 1,
+    "fields": [
+      {
+        "key": "contractTitle",
+        "label": "合同标题",
+        "type": "TEXT",
+        "required": true,
+        "helpText": "填写合同名称，最多 200 字符。",
+        "maxLength": 200
+      },
+      {
+        "key": "counterparty",
+        "label": "合同相对方",
+        "type": "TEXT",
+        "required": true,
+        "helpText": "填写合同相对方的名称，最多 200 字符。",
+        "maxLength": 200
+      },
+      {
+        "key": "contractAmount",
+        "label": "合同金额（人民币元）",
+        "type": "NUMBER",
+        "required": true,
+        "helpText": "填写合同金额，单位为人民币元，金额不能小于 0。",
+        "minimum": "0"
+      },
+      {
+        "key": "contractType",
+        "label": "合同类型",
+        "type": "SELECT",
+        "required": true,
+        "helpText": "选择本次审批的合同类型。",
+        "options": [
+          {
+            "value": "SALES",
+            "label": "销售合同"
+          },
+          {
+            "value": "PURCHASE",
+            "label": "采购合同"
+          },
+          {
+            "value": "SERVICE",
+            "label": "服务合同"
+          }
+        ]
+      },
+      {
+        "key": "summary",
+        "label": "合同摘要",
+        "type": "TEXTAREA",
+        "required": true,
+        "helpText": "说明合同标的、履约和验收要点，最多 2000 字符。",
+        "maxLength": 2000
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "small-contract",
+      "name": "低于阈值",
+      "description": "99999.99 元低于阈值，走默认路径。",
+      "payload": {
+        "contractTitle": "技术服务合同",
+        "counterparty": "示例合作方",
+        "contractAmount": "99999.99",
+        "contractType": "SERVICE",
+        "summary": "约定服务内容、验收方式与履约周期；本例只演示合同审批。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "threshold-contract",
+      "name": "恰好达到阈值",
+      "description": "100000 元符合大于等于条件，进入额外复核。",
+      "payload": {
+        "contractTitle": "技术服务合同",
+        "counterparty": "示例合作方",
+        "contractAmount": "100000",
+        "contractType": "SERVICE",
+        "summary": "约定服务内容、验收方式与履约周期；本例只演示合同审批。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "review",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "large-contract",
+      "name": "高于阈值",
+      "description": "100000.01 元进入额外复核。",
+      "payload": {
+        "contractTitle": "技术服务合同",
+        "counterparty": "示例合作方",
+        "contractAmount": "100000.01",
+        "contractType": "SERVICE",
+        "summary": "约定服务内容、验收方式与履约周期；本例只演示合同审批。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "review",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "zero-contract",
+      "name": "零金额边界",
+      "description": "0 元满足字段下界，走默认路径；企业是否允许零金额合同需自行配置。",
+      "payload": {
+        "contractTitle": "技术服务合同",
+        "counterparty": "示例合作方",
+        "contractAmount": "0",
+        "contractType": "SERVICE",
+        "summary": "约定服务内容、验收方式与履约周期；本例只演示合同审批。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "invalid-contract",
+      "name": "拒绝负数和非法类型",
+      "description": "负金额低于下界，未定义的合同类型不被接受。",
+      "payload": {
+        "contractTitle": "技术服务合同",
+        "counterparty": "示例合作方",
+        "contractAmount": "-0.01",
+        "contractType": "OTHER",
+        "summary": "约定服务内容、验收方式与履约周期；本例只演示合同审批。"
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "contractAmount": "BELOW_MINIMUM",
+        "contractType": "INVALID_OPTION"
+      }
+    }
+  ]
+}

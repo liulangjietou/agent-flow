@@ -8,6 +8,15 @@ export interface GraphNode { id: string; name: string; type: string; properties:
 export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
 export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
 export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph; formSchema: FormSchema | null }
+export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
+export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
+export interface ProcessTemplate {
+  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM'
+  dependencies: string[]; defaultRoles: string[]; fieldDescriptions: Record<string, string>; risks: string[]; upgradePolicy: string
+  notificationTexts: Record<string, string>; notificationsAvailable: false; graph: Graph; formSchema: FormSchema
+  scenarios: TemplateScenario[]; copies: TemplateCopy[]
+}
+export interface TemplateCopyInput { key: string; name: string; templateVersion: number }
 export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
 export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
@@ -50,6 +59,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       UNAUTHENTICATED: '登录已失效，请重新登录。',
       FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
       INVALID_FORM_SCHEMA: '表单配置未通过校验，请检查字段标识、类型、选项与约束。',
+      INVALID_TEMPLATE_COPY_REQUEST: '复制信息无效，请检查流程标识、名称和模板版本。',
+      TEMPLATE_VERSION_CONFLICT: '模板版本已变化，请重新加载目录，核对后再复制。',
       DEFINITION_BINDING_AMBIGUOUS: '这份旧申请未保存原流程来源，当前存在同名版本。请保留原记录，核对流程后重新发起申请。'
     }
     throw { status: response.status, code, message: messages[code] ?? message, details } satisfies ApiError
@@ -85,6 +96,9 @@ export const api = {
   submitApplication: (id: string, expectedVersion: number) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion }),
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   definitions: () => request<Definition[]>('/process-definitions'),
+  getDefinition: (id: string) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`),
+  templates: () => request<ProcessTemplate[]>('/process-templates'),
+  copyTemplate: (templateKey: string, body: TemplateCopyInput) => write<Definition>(`/process-templates/${encodeURIComponent(templateKey)}/copy`, 'POST', '复制流程模板为草稿', body),
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
   validateDefinition: (graph: Graph, formSchema?: FormSchema | null) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }) }),

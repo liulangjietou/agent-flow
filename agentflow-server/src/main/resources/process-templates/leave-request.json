@@ -1,0 +1,281 @@
+{
+  "key": "leave-request",
+  "templateVersion": 1,
+  "name": "请假申请",
+  "category": "OA",
+  "description": "先经经理审批，超过 3 天再进入额外复核；复制后可调整字段、示例阈值和审批角色。",
+  "scope": "用于日常请假申请，并按请假天数安排分级复核。",
+  "businessType": "FORM",
+  "dependencies": [
+    "配置经理审批组和额外复核组",
+    "确认请假天数的分级审批规则"
+  ],
+  "defaultRoles": [
+    "MANAGER",
+    "ADMIN"
+  ],
+  "fieldDescriptions": {
+    "leaveType": "选择本次请假的类型。",
+    "startDate": "填写请假开始日期。",
+    "durationDays": "按实际天数填写，可填 1.5；允许范围为 0.5 至 365 天。",
+    "reason": "说明请假原因和工作交接安排，最多 1000 字符。"
+  },
+  "risks": [
+    "使用前请配置审批组和 3 天分级阈值；示例角色不代表自动识别的直属上级。",
+    "不计算假期余额或工作日，也不限制半天步进；请按企业制度填写请假天数。",
+    "通知文案仅供参考，当前不会发送通知。"
+  ],
+  "upgradePolicy": "升级后需重新复制；已有草稿、发布版本和申请保持原样。",
+  "notificationTexts": {
+    "SUBMITTED": "您的请假申请已提交，等待审批。",
+    "RETURNED": "您的请假申请已退回，请查看审批意见并补正。",
+    "APPROVED": "您的请假申请已审批通过，请按业务规定办理后续事项。"
+  },
+  "notificationsAvailable": false,
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "name": "开始",
+        "type": "START",
+        "properties": {
+          "x": "40",
+          "y": "250"
+        }
+      },
+      {
+        "id": "manager",
+        "name": "经理审批（示例）",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "240",
+          "y": "250",
+          "assigneeRule": "role:MANAGER"
+        }
+      },
+      {
+        "id": "route",
+        "name": "是否超过 3 天",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "460",
+          "y": "250"
+        }
+      },
+      {
+        "id": "review",
+        "name": "额外复核（示例）",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "700",
+          "y": "90",
+          "assigneeRule": "role:ADMIN"
+        }
+      },
+      {
+        "id": "end",
+        "name": "结束",
+        "type": "END",
+        "properties": {
+          "x": "940",
+          "y": "250"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "start_manager",
+        "source": "start",
+        "target": "manager",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "manager_route",
+        "source": "manager",
+        "target": "route",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "route_review",
+        "source": "route",
+        "target": "review",
+        "condition": "durationDays > 3",
+        "defaultBranch": false
+      },
+      {
+        "id": "route_end",
+        "source": "route",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "review_end",
+        "source": "review",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": false
+      }
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 1,
+    "fields": [
+      {
+        "key": "leaveType",
+        "label": "请假类型",
+        "type": "SELECT",
+        "required": true,
+        "helpText": "选择本次请假的类型。",
+        "options": [
+          {
+            "value": "ANNUAL",
+            "label": "年假"
+          },
+          {
+            "value": "PERSONAL",
+            "label": "事假"
+          },
+          {
+            "value": "SICK",
+            "label": "病假"
+          }
+        ]
+      },
+      {
+        "key": "startDate",
+        "label": "开始日期",
+        "type": "DATE",
+        "required": true,
+        "helpText": "填写请假开始日期。"
+      },
+      {
+        "key": "durationDays",
+        "label": "请假天数",
+        "type": "NUMBER",
+        "required": true,
+        "helpText": "按实际天数填写，可填 1.5；允许范围为 0.5 至 365 天。",
+        "minimum": "0.5",
+        "maximum": "365"
+      },
+      {
+        "key": "reason",
+        "label": "请假原因",
+        "type": "TEXTAREA",
+        "required": true,
+        "helpText": "说明请假原因和工作交接安排，最多 1000 字符。",
+        "maxLength": 1000
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "short-leave",
+      "name": "短假默认路径",
+      "description": "1.5 天经经理审批后结束。",
+      "payload": {
+        "leaveType": "ANNUAL",
+        "startDate": "2026-10-12",
+        "durationDays": "1.5",
+        "reason": "处理个人事务，工作已完成交接。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "threshold-leave",
+      "name": "恰好 3 天",
+      "description": "阈值使用大于，3 天仍走默认路径。",
+      "payload": {
+        "leaveType": "ANNUAL",
+        "startDate": "2026-10-12",
+        "durationDays": "3",
+        "reason": "处理个人事务，工作已完成交接。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "long-leave",
+      "name": "长假额外复核",
+      "description": "4 天经经理审批后再交额外复核。",
+      "payload": {
+        "leaveType": "ANNUAL",
+        "startDate": "2026-10-12",
+        "durationDays": "4",
+        "reason": "处理个人事务，工作已完成交接。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "review",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "minimum-leave",
+      "name": "最小天数",
+      "description": "0.5 天满足字段下界，走默认路径。",
+      "payload": {
+        "leaveType": "ANNUAL",
+        "startDate": "2026-10-12",
+        "durationDays": "0.5",
+        "reason": "处理个人事务，工作已完成交接。"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "invalid-leave",
+      "name": "拒绝非法字段",
+      "description": "非法枚举、无效日期、低于下界和空白原因同时报错，不模拟路径。",
+      "payload": {
+        "leaveType": "OTHER",
+        "startDate": "2026-02-30",
+        "durationDays": "0.1",
+        "reason": " "
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "leaveType": "INVALID_OPTION",
+        "startDate": "INVALID_DATE",
+        "durationDays": "BELOW_MINIMUM",
+        "reason": "REQUIRED"
+      }
+    },
+    {
+      "id": "excessive-leave",
+      "name": "拒绝超出上界",
+      "description": "366 天超过模板字段上界。",
+      "payload": {
+        "leaveType": "ANNUAL",
+        "startDate": "2026-10-12",
+        "durationDays": "366",
+        "reason": "处理个人事务，工作已完成交接。"
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "durationDays": "ABOVE_MAXIMUM"
+      }
+    }
+  ]
+}

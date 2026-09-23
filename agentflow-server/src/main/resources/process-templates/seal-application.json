@@ -1,0 +1,255 @@
+{
+  "key": "seal-application",
+  "templateVersion": 1,
+  "name": "用印申请",
+  "category": "OA",
+  "description": "普通用印经经理审批后结束，急件在经理审批后增加一次复核。",
+  "scope": "用于文件用印申请，并为急件安排额外复核。",
+  "businessType": "FORM",
+  "dependencies": [
+    "配置经理审批组和额外复核组",
+    "确认急件用印的审批要求"
+  ],
+  "defaultRoles": [
+    "MANAGER",
+    "ADMIN"
+  ],
+  "fieldDescriptions": {
+    "documentTitle": "填写待用印文件的名称，最多 200 字符。",
+    "sealType": "选择文件需要使用的印章类型。",
+    "urgent": "选择本次用印是否需要加急办理。",
+    "purpose": "说明用印用途和办理安排，最多 1000 字符。",
+    "documentRef": "填写文件编号（选填），最多 100 字符。"
+  },
+  "risks": [
+    "使用前请配置审批组并确认急件复核规则；示例角色不代表真实的印章管理人员。",
+    "审批通过不授予印章操作权限；当前不管理印章库存、领取归还、用印核销或电子签章。",
+    "通知文案仅供参考，当前不会发送通知。"
+  ],
+  "upgradePolicy": "升级后需重新复制；已有草稿、发布版本和申请保持原样。",
+  "notificationTexts": {
+    "SUBMITTED": "您的用印申请已提交，等待审批。",
+    "RETURNED": "您的用印申请已退回，请查看审批意见并补正。",
+    "APPROVED": "您的用印申请已审批通过，请按业务规定办理后续事项。"
+  },
+  "notificationsAvailable": false,
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "name": "开始",
+        "type": "START",
+        "properties": {
+          "x": "40",
+          "y": "250"
+        }
+      },
+      {
+        "id": "manager",
+        "name": "经理审批（示例）",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "240",
+          "y": "250",
+          "assigneeRule": "role:MANAGER"
+        }
+      },
+      {
+        "id": "route",
+        "name": "是否急件",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "460",
+          "y": "250"
+        }
+      },
+      {
+        "id": "review",
+        "name": "额外复核（示例）",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "700",
+          "y": "90",
+          "assigneeRule": "role:ADMIN"
+        }
+      },
+      {
+        "id": "end",
+        "name": "结束",
+        "type": "END",
+        "properties": {
+          "x": "940",
+          "y": "250"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "start_manager",
+        "source": "start",
+        "target": "manager",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "manager_route",
+        "source": "manager",
+        "target": "route",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "route_review",
+        "source": "route",
+        "target": "review",
+        "condition": "urgent == true",
+        "defaultBranch": false
+      },
+      {
+        "id": "route_end",
+        "source": "route",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "review_end",
+        "source": "review",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": false
+      }
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 1,
+    "fields": [
+      {
+        "key": "documentTitle",
+        "label": "文件标题",
+        "type": "TEXT",
+        "required": true,
+        "helpText": "填写待用印文件的名称，最多 200 字符。",
+        "maxLength": 200
+      },
+      {
+        "key": "sealType",
+        "label": "印章类型",
+        "type": "SELECT",
+        "required": true,
+        "helpText": "选择文件需要使用的印章类型。",
+        "options": [
+          {
+            "value": "COMPANY",
+            "label": "公章"
+          },
+          {
+            "value": "CONTRACT",
+            "label": "合同章"
+          },
+          {
+            "value": "FINANCE",
+            "label": "财务章"
+          }
+        ]
+      },
+      {
+        "key": "urgent",
+        "label": "是否急件",
+        "type": "BOOLEAN",
+        "required": true,
+        "helpText": "选择本次用印是否需要加急办理。"
+      },
+      {
+        "key": "purpose",
+        "label": "用印用途",
+        "type": "TEXTAREA",
+        "required": true,
+        "helpText": "说明用印用途和办理安排，最多 1000 字符。",
+        "maxLength": 1000
+      },
+      {
+        "key": "documentRef",
+        "label": "文件编号",
+        "type": "TEXT",
+        "required": false,
+        "helpText": "填写文件编号（选填），最多 100 字符。",
+        "maxLength": 100
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "normal-seal",
+      "name": "普通用印",
+      "description": "urgent=false 是有效值，走经理审批后的默认路径。",
+      "payload": {
+        "documentTitle": "合作备忘录用印",
+        "sealType": "COMPANY",
+        "urgent": false,
+        "purpose": "用于合作方确认，完成审批后由授权人员办理用印。",
+        "documentRef": "SEAL-SAMPLE-001"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "urgent-seal",
+      "name": "急件额外复核",
+      "description": "urgent=true 增加额外复核，仍先经过经理审批。",
+      "payload": {
+        "documentTitle": "合作备忘录用印",
+        "sealType": "COMPANY",
+        "urgent": true,
+        "purpose": "用于合作方确认，完成审批后由授权人员办理用印。",
+        "documentRef": "SEAL-SAMPLE-001"
+      },
+      "expectedPath": [
+        "start",
+        "manager",
+        "route",
+        "review",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "invalid-seal",
+      "name": "拒绝字符串布尔值",
+      "description": "空标题、非法印章类型和字符串 false 均拒绝。",
+      "payload": {
+        "documentTitle": "",
+        "sealType": "OTHER",
+        "urgent": "false",
+        "purpose": "用于合作方确认，完成审批后由授权人员办理用印。",
+        "documentRef": "SEAL-SAMPLE-001"
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "documentTitle": "REQUIRED",
+        "sealType": "INVALID_OPTION",
+        "urgent": "INVALID_TYPE"
+      }
+    },
+    {
+      "id": "missing-urgency",
+      "name": "未选择急件状态",
+      "description": "缺少必填布尔值不能被自动解释成 false。",
+      "payload": {
+        "documentTitle": "合作备忘录用印",
+        "sealType": "COMPANY",
+        "purpose": "用于合作方确认，完成审批后由授权人员办理用印。",
+        "documentRef": "SEAL-SAMPLE-001"
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "urgent": "REQUIRED"
+      }
+    }
+  ]
+}

@@ -5,11 +5,12 @@ import ApplicationHistory from './components/ApplicationHistory.vue'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
+import TemplateCenter from './components/TemplateCenter.vue'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task } from './api'
+import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TemplateCopyInput } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type Page = 'workbench' | 'designer' | 'applications' | 'expense'
+type Page = 'workbench' | 'designer' | 'templates' | 'applications' | 'expense'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
 interface FlowNode { id: string; name: string; type: string; x: number; y: number; assigneeRule: string }
 const page = ref<Page>('workbench')
@@ -18,6 +19,8 @@ const username = ref('')
 const password = ref('')
 const tenantId = ref('demo')
 const actor = ref<Actor | null>(null)
+const actorScope = computed(() => actor.value ? JSON.stringify([actor.value.tenantId, actor.value.userId]) : '')
+const templateRefresh = ref(0)
 const notice = ref('')
 const busy = ref(false)
 const pendingWrites = ref<PendingWrite[]>([])
@@ -75,7 +78,7 @@ const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
   { type: 'END', label: '结束节点', icon: '●' }
 ]
-const roleOptions = [{ value: 'role:MANAGER', label: '部门审批组' }, { value: 'role:FINANCE', label: '财务审批组' }]
+const roleOptions = [{ value: 'role:MANAGER', label: '部门审批组' }, { value: 'role:FINANCE', label: '财务审批组' }, { value: 'role:ADMIN', label: '额外复核组（示例）' }]
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedId.value) ?? null)
 const selectedEdge = computed(() => edges.value.find(edge => edge.id === selectedEdgeId.value) ?? null)
 const publishedDefinitions = computed(() => definitions.value.filter(definition => definition.status === 'PUBLISHED'))
@@ -130,27 +133,67 @@ function applyDefinition(definition: Definition) {
   selectedId.value = nodes.value[0]?.id ?? ''; resetEditor(); savedSnapshot.value = snapshot()
   localStorage.setItem(`agentflow.definition.${tenantId.value}`, definition.id)
 }
-function chooseDefinition() { if (busy.value || writesBlocked.value) return; const definition = definitions.value.find(item => item.id === selectedDefinitionId.value); if (definition) applyDefinition(definition) }
+function confirmReplaceDefinition() {
+  return readonlyDefinition.value || !dirty.value || window.confirm('当前流程有未保存的修改。继续将替换设计器内容，是否继续？')
+}
+function chooseDefinition() {
+  if (busy.value || writesBlocked.value) return
+  const definition = definitions.value.find(item => item.id === selectedDefinitionId.value)
+  if (definition && confirmReplaceDefinition()) applyDefinition(definition)
+  else selectedDefinitionId.value = definitionId.value
+}
 function newDefinition(copy = false) {
   if (!canManageDefinitions.value || busy.value || writesBlocked.value) return
+  if (!copy && !confirmReplaceDefinition()) return
   if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
   else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
   definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
   notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
 }
 async function loadDefinitions(restoreSelection = false) {
-  definitions.value = await api.definitions()
+  const scope = actorScope.value
+  const result = await api.definitions()
+  if (!scope || actorScope.value !== scope) return
+  definitions.value = result
   if (restoreSelection) {
     const remembered = localStorage.getItem(`agentflow.definition.${tenantId.value}`)
     const definition = definitions.value.find(item => item.id === remembered) ?? definitions.value[0]
     if (definition) applyDefinition(definition)
   }
 }
-async function loadTasks() { tasks.value = await api.tasks() }
-async function loadApplications() { applications.value = await api.applications() }
+async function loadTasks() { const scope = actorScope.value; const result = await api.tasks(); if (scope && actorScope.value === scope) tasks.value = result }
+async function loadApplications() { const scope = actorScope.value; const result = await api.applications(); if (scope && actorScope.value === scope) applications.value = result }
 async function refreshWorkspace(restoreSelection = false) {
-  try { await Promise.all([loadTasks(), loadApplications(), loadDefinitions(restoreSelection)]); serverAvailable.value = true }
-  catch (error) { serverAvailable.value = false; notice.value = errorMessage(error) }
+  const scope = actorScope.value
+  try { await Promise.all([loadTasks(), loadApplications(), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope) serverAvailable.value = true }
+  catch (error) { if (scope && actorScope.value === scope) { serverAvailable.value = false; notice.value = errorMessage(error) } }
+}
+function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
+async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
+  if (!canManageDefinitions.value || busy.value || writesBlocked.value || !confirmReplaceDefinition()) return
+  busy.value = true
+  try {
+    const definition = await api.copyTemplate(templateKey, body)
+    applyDefinition(definition); page.value = 'designer'; templateRefresh.value++
+    await loadDefinitions(); notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
+  } catch (error) { notice.value = errorMessage(error) }
+  finally { busy.value = false }
+}
+async function openTemplateCopy(id: string) {
+  if (!canManageDefinitions.value || busy.value || writesBlocked.value || !confirmReplaceDefinition()) return
+  busy.value = true
+  const scope = actorScope.value
+  try {
+    const definition = await api.getDefinition(id)
+    if (actorScope.value !== scope) return
+    applyDefinition(definition); page.value = 'designer'; notice.value = '已打开当前租户的模板副本。'
+  } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
+  finally { busy.value = false }
+}
+function clearDesigner() {
+  defaultGraph(); definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0
+  definitionStatus.value = 'DRAFT'; definitionKey.value = 'expense-reimbursement'; definitionName.value = '费用报销审批'; definitionFormSchema.value = defaultFormSchema()
+  resetEditor(); savedSnapshot.value = snapshot()
 }
 async function login() {
   if (busy.value) return
@@ -162,10 +205,12 @@ async function login() {
 }
 async function logout() {
   if (busy.value || pendingWrites.value.some(operation => operation.sending)) return
+  if (!confirmReplaceDefinition()) return
   busy.value = true
   try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
   writeRequests.setActor(null)
   localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; tasks.value = []; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+  clearDesigner(); templateRefresh.value++
   recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
 }
 async function selectTask(task: Task) {
@@ -310,10 +355,15 @@ watch([nodes, edges, definitionName, definitionFormSchema], () => { validationEr
 /** 恢复结果始终更新原资源；恢复成功后由用户决定是否继续提交或发布。 */
 async function recoverOperation(id: string) {
   if (busy.value) return
+  const pending = pendingWrites.value.find(operation => operation.id === id)
+  if (pending && (pending.path.startsWith('/process-definitions') || pending.path.startsWith('/process-templates/')) && !confirmReplaceDefinition()) return
   busy.value = true; recoveryError.value = ''
   try {
     const { request, result } = await writeRequests.recover(id)
-    if (request.path.startsWith('/process-definitions')) {
+    if (request.path.startsWith('/process-templates/') && request.path.endsWith('/copy')) {
+      applyDefinition(result as Definition); page.value = 'designer'; templateRefresh.value++
+      notice.value = '已确认原模板复制结果，已打开原草稿，请核对后再发布。'
+    } else if (request.path.startsWith('/process-definitions')) {
       applyDefinition(result as Definition); page.value = 'designer'
       notice.value = request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
     } else if (request.path.startsWith('/applications')) {
@@ -346,7 +396,7 @@ async function recoverOperation(id: string) {
   }
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
-  if (writeRequests.hasUnconfirmed()) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || (!readonlyDefinition.value && dirty.value)) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 onMounted(async () => {
@@ -380,6 +430,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <button :class="{ active: page === 'applications' }" @click="page = 'applications'"><b>↗</b><span>申请记录</span></button>
           <div class="nav-divider"></div>
           <button :class="{ active: page === 'designer' }" @click="page = 'designer'"><b>⌘</b><span>流程管理</span></button>
+          <button v-if="canManageDefinitions" :class="{ active: page === 'templates' }" @click="page = 'templates'"><b>▤</b><span>模板中心</span></button>
           <button disabled title="Agent 证据服务尚未接入"><b>✦</b><span>Agent 助理</span><small>未接入</small></button>
           <div class="nav-divider"></div>
           <button :class="{ active: page === 'expense' }" @click="page = 'expense'"><b>▣</b><span>费用报销</span></button>
@@ -387,7 +438,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '服务连接正常' : '服务连接异常' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
       </aside>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'designer' ? '流程管理' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshWorkspace()">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="pendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
@@ -426,13 +477,14 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <div class="page-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>申请记录</h2><p class="subhead">服务端按发起人、参与者与管理员权限返回申请。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
           <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }} · 第 {{ application.roundNo }} 轮</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button class="secondary" :disabled="busy" @click="recordApplicationId = application.id">{{ application.createdBy === actor?.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status) ? '查看并修改' : '查看详情' }}</button></div></div>
         </section>
+        <TemplateCenter v-else-if="page === 'templates' && canManageDefinitions" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page">
           <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy" @click="validate">校验流程</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked" @click="publishDraft">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
           <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button></div>
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <div class="designer-layout">
-            <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批组和下一节点；选中连线可编辑条件或删除。</p><p>当前支持部门审批组和财务审批组，组织负责人解析尚未接入。</p></div></aside>
+            <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批组和下一节点；选中连线可编辑条件或删除。</p><p>支持角色审批组；额外复核组仅为模板示例，组织负责人解析尚未接入。</p></div></aside>
             <div class="canvas-wrap"><div class="canvas-toolbar"><span>{{ definitionName }}</span><span>滚动画布查看全部节点</span></div><div ref="canvas" class="canvas" tabindex="0" @dragover.prevent @drop="onDrop"><svg class="edges" viewBox="0 0 1600 900"><path v-for="edge in edges" :key="edge.id" :d="edgePath(edge)" :class="{ selected: selectedEdgeId === edge.id }" @click.stop="selectEdge(edge)" /><text v-for="edge in edges.filter(item => item.condition || item.defaultBranch)" :key="`${edge.id}-label`" :x="((nodes.find(node => node.id === edge.source)?.x ?? 0) + (nodes.find(node => node.id === edge.target)?.x ?? 0)) / 2 + 30" :y="(nodes.find(node => node.id === edge.target)?.y ?? 0) - 8" class="edge-label">{{ edge.defaultBranch ? '默认分支' : edge.condition }}</text></svg><button v-for="node in nodes" :key="node.id" class="flow-node" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @mousedown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ roleLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button></div></div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><label v-if="selectedNode.type === 'USER_TASK'">审批组<select v-model="selectedNode.assigneeRule" @focus="remember"><option value="">请选择审批组</option><option v-for="role in roleOptions" :key="role.value" :value="role.value">{{ role.label }}</option><option v-if="selectedNode.assigneeRule && !roleOptions.some(role => role.value === selectedNode?.assigneeRule)" :value="selectedNode.assigneeRule">{{ selectedNode.assigneeRule }}（已有配置）</option></select></label>
