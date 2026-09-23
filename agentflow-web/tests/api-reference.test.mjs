@@ -5,7 +5,8 @@ const { entries, filterEntries, curlExample, ApiReferenceQuery } = await import(
 const document = JSON.parse(readFileSync(new URL('../../agentflow-server/src/main/resources/api/openapi.json', import.meta.url)))
 test('接口搜索按实际路径、方法、分组和标题组合', () => {
   const catalog = entries(document)
-  assert.equal(catalog.length, 36)
+  assert.equal(catalog.length, Object.values(document.paths).reduce((count, methods) => count + Object.keys(methods).length, 0))
+  assert.equal(filterEntries(catalog, 'assignee-options', '流程设计')[0].operation.operationId, 'definitionAssigneeOptions')
   assert.deepEqual(filterEntries(catalog, ' publish ', '流程设计').map(e => e.operation.operationId), ['publishDefinition'])
   assert.equal(filterEntries(catalog, 'publish', '任务').length, 0)
 })

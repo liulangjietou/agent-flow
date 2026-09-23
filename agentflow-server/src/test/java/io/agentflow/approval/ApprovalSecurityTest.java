@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ApprovalSecurityTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
-    @Autowired AuthService authService;
+    @org.springframework.boot.test.mock.mockito.SpyBean AuthService authService;
     @Autowired CurrentActor currentActor;
     @Autowired ApprovalApplicationFacade applications;
     @Autowired ApplicationRepository repository;
@@ -104,6 +104,9 @@ class ApprovalSecurityTest {
 
     @Test
     void crossTenantTaskIsInvisibleEvenToMatchingAssignee() throws Exception {
+        // 本用例验证跨租户资源隔离，显式提供另一租户已配置的审批身份目录。
+        org.mockito.Mockito.doReturn(new AuthService(true, "other-tenant").options("other-tenant"))
+                .when(authService).options("other-tenant");
         Application application = submitted("other-tenant");
         String taskId = task(application);
         mvc.perform(get("/api/v1/applications/" + application.id()).header("Authorization", token("finance")))

@@ -2,6 +2,7 @@ package io.agentflow.auth;
 
 import io.agentflow.common.Actor;
 import io.agentflow.approval.service.TaskRecipientDirectory;
+import io.agentflow.definition.DefinitionAssigneeDirectory;
 import java.util.List;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author owlzhangfq@gmail.com
  */
 @Service
-public class AuthService implements TaskRecipientDirectory {
+public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
     private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
             "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "PROCESS_ADMIN", "ADMIN"),
             "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"),
@@ -68,6 +69,19 @@ public class AuthService implements TaskRecipientDirectory {
     public List<String> members(String tenantId, Set<String> users, Set<String> roles) {
         return approvers(tenantId).stream().filter(user -> users.contains(user)
                 || DEMO_ROLES.get(user).stream().anyMatch(roles::contains)).toList();
+    }
+
+    /** 设计器与登录共用身份源；只展示至少有一位有效审批人的规则。 */
+    @Override
+    public List<DefinitionAssigneeDirectory.Option> options(String tenantId) {
+        List<String> users = approvers(tenantId);
+        var options = new java.util.ArrayList<DefinitionAssigneeDirectory.Option>();
+        users.forEach(user -> options.add(new DefinitionAssigneeDirectory.Option("user:" + user, user, 1)));
+        users.stream().flatMap(user -> DEMO_ROLES.get(user).stream()).distinct().sorted().forEach(role -> {
+            int count = (int) users.stream().filter(user -> DEMO_ROLES.get(user).contains(role)).count();
+            options.add(new DefinitionAssigneeDirectory.Option("role:" + role, role, count));
+        });
+        return List.copyOf(options);
     }
 
     /** 从 Bearer token 解析认证主体。 */

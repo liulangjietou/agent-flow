@@ -73,6 +73,51 @@ class DefinitionSecurityTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"user:missing-user", "role:MISSING_ROLE"})
+    void publicationRefusesAssigneesAbsentFromCurrentTenantDirectory(String rule) throws Exception {
+        DefinitionDraft draft = service.create("demo", "missing-assignee-" + UUID.randomUUID(), "无人审批", graph("审批", rule));
+        mvc.perform(post("/api/v1/process-definitions/" + draft.id() + "/publish")
+                        .param("expectedRevision", String.valueOf(draft.revision()))
+                        .header("Authorization", token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"changeNote\":\"核对实际审批人\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("code").value("INVALID_DEFINITION"));
+        org.assertj.core.api.Assertions.assertThat(service.get("demo", draft.id()).status())
+                .isEqualTo(DefinitionModels.DraftStatus.DRAFT);
+    }
+
+    @Test
+    void directoryRequiresAdministratorAndNeverCrossesTenantOrDisabledIdentitySource() throws Exception {
+        mvc.perform(get("/api/v1/process-definitions/assignee-options")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/process-definitions/assignee-options").header("Authorization", token("employee")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/process-definitions/assignee-options").header("Authorization", token("admin")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$[?(@.rule == 'user:bob')].memberCount").value(org.hamcrest.Matchers.contains(1)))
+                .andExpect(jsonPath("$[?(@.rule == 'role:FINANCE')].memberCount").value(org.hamcrest.Matchers.contains(2)));
+        org.assertj.core.api.Assertions.assertThat(authService.options("foreign-tenant")).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(new AuthService(false, "demo").options("demo")).isEmpty();
+    }
+
+    @Test
+    void validationLocatesMissingAssigneeButKnownUserCanPublish() throws Exception {
+        mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(Map.of("graph", graph("审批", "user:unknown")))))
+                .andExpect(status().isOk()).andExpect(jsonPath("errors[0]").value("ASSIGNEE_NOT_AVAILABLE:approve"));
+        mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("employee"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(Map.of("graph", graph("审批", "user:unknown")))))
+                .andExpect(status().isOk()).andExpect(jsonPath("errors").isEmpty());
+        DefinitionDraft draft = service.create("demo", "assigned-user-" + UUID.randomUUID(), "指定账号", graph("审批", "user:bob"));
+        mvc.perform(post("/api/v1/process-definitions/" + draft.id() + "/publish").param("expectedRevision", "0")
+                        .header("Authorization", token("admin")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changeNote\":\"指定 bob 审批\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("status").value("PUBLISHED"));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"user:${'alice'.toUpperCase()}", "role:#{'FINANCE'}", "user:alice,bob"})
     void refusesExecutableOrMultipleAssigneeIdentifiers(String rule) throws Exception {
         mvc.perform(post("/api/v1/process-definitions")

@@ -707,7 +707,7 @@
           "流程设计"
         ],
         "summary": "校验流程设计",
-        "description": "只读，不创建草稿。HTTP 200 的 errors 数组非空表示设计未通过；结构/表单解码失败可为 422。",
+        "description": "只读，不创建草稿。HTTP 200 的 errors 数组非空表示设计未通过；结构/表单解码失败可为 422。 管理员同时检查身份源中是否存在有效审批人；普通用户只检查结构，不开放账号存在性探测。",
         "x-access": "当前已登录账号",
         "x-idempotency": false,
         "responses": {
@@ -1200,7 +1200,7 @@
           "流程设计"
         ],
         "summary": "发布草稿",
-        "description": "expectedRevision 在查询参数中；正文填写 changeNote。验证、部署、发布事实与幂等成功记录共用事务，运行实例继续绑定原版。",
+        "description": "expectedRevision 在查询参数中；正文填写 changeNote。验证、部署、发布事实与幂等成功记录共用事务，运行实例继续绑定原版。 每次新发布重新查询当前租户身份源；任一审批节点无人可审批返回 422 INVALID_DEFINITION，details.definitionErrors 中包含 ASSIGNEE_NOT_AVAILABLE:节点标识，保持草稿且不部署。",
         "x-access": "ADMIN 或 PROCESS_ADMIN",
         "x-idempotency": true,
         "responses": {
@@ -3729,6 +3729,63 @@
           }
         }
       }
+    },
+    "/api/v1/process-definitions/assignee-options": {
+      "get": {
+        "operationId": "definitionAssigneeOptions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取可配置审批人",
+        "description": "只返回当前租户身份源中的有效审批账号和至少有一位审批人的角色；memberCount 是查询时人数，发布时重新核对。当前身份源仍为演示目录。响应禁止缓存。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssigneeOption"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5831,6 +5888,28 @@
           }
         ],
         "description": "业务入口校验返回 Error；UUID 等 Spring 参数转换失败返回 FrameworkError。客户端先检查 HTTP 状态，再按是否有 code 分支。"
+      },
+      "AssigneeOption": {
+        "type": "object",
+        "required": [
+          "rule",
+          "label",
+          "memberCount"
+        ],
+        "properties": {
+          "rule": {
+            "type": "string",
+            "description": "可直接用于节点 properties.assigneeRule 的字面量，例如 user:bob 或 role:FINANCE。"
+          },
+          "label": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

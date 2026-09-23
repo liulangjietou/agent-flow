@@ -23,16 +23,18 @@ public class DefinitionApplicationService {
     private final DefinitionDraftRepository repository;
     private final DefinitionDeploymentPort deploymentPort;
     private final DefinitionPublicationRepository publications;
+    private final DefinitionAssigneeDirectory assignees;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
     private final DefinitionDiffService differences = new DefinitionDiffService();
 
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
-                                        DefinitionPublicationRepository publications) {
+                                        DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
+        this.assignees = assignees;
     }
 
     /** 校验流程图，不改变持久化状态。 */
@@ -43,6 +45,22 @@ public class DefinitionApplicationService {
     /** 联合校验流程图与表单，不改变持久化状态。 */
     public List<String> validate(Graph graph, FormSchema formSchema) {
         return validator.validate(graph, formSchema);
+    }
+
+    /** 结构通过后查询真实身份源；目录解析属于跨上下文编排，不进入纯领域校验器。 */
+    public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
+        List<String> errors = validator.validate(graph, formSchema);
+        if (!errors.isEmpty()) return errors;
+        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0)
+                .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
+        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
+                .filter(node -> !available.contains(node.properties().get("assigneeRule")))
+                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList();
+    }
+
+    /** 读取当前租户设计器可用的审批规则，不改变流程或身份数据。 */
+    public List<DefinitionAssigneeDirectory.Option> assigneeOptions(String tenantId) {
+        return assignees.options(tenantId);
     }
 
     /** 新建流程草稿。 */
@@ -78,7 +96,8 @@ public class DefinitionApplicationService {
     @Transactional
     public DefinitionDraft publish(Actor publisher, UUID id, long expectedRevision, String changeNote) {
         DefinitionDraft draft = get(publisher.tenantId(), id);
-        requireValid(draft.graph(), draft.formSchema());
+        List<String> errors = validate(publisher.tenantId(), draft.graph(), draft.formSchema());
+        if (!errors.isEmpty()) throw new DefinitionValidationException(errors);
         long version = repository.nextVersion(publisher.tenantId(), draft.key());
         DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now());
         draft.publish(expectedRevision, version);

@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DefinitionComparisonIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
-    @Autowired AuthService auth;
+    @org.springframework.boot.test.mock.mockito.SpyBean AuthService auth;
     @Autowired DefinitionApplicationService service;
     @Autowired ClasspathProcessTemplateCatalog catalog;
     @Autowired JdbcTemplate jdbc;
@@ -50,6 +50,9 @@ class DefinitionComparisonIntegrationTest {
 
     @Test
     void anonymousEmployeeAndForeignTenantCannotReadBaseline() throws Exception {
+        // 本用例验证跨租户资源隔离，显式提供另一租户已配置的审批身份目录。
+        org.mockito.Mockito.doReturn(new AuthService(true, "foreign").options("foreign"))
+                .when(auth).options("foreign");
         var baseline = published("foreign");
         String body = json.write(body(baseline));
         var before = snapshot();

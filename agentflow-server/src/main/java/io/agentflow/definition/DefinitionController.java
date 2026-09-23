@@ -43,7 +43,19 @@ public class DefinitionController {
     /** 校验设计器图，不落库。 */
     @PostMapping("/validate")
     public ValidationResponse validate(@Valid @RequestBody GraphRequest request) {
-        return new ValidationResponse(service.validate(request.graph(), request.formSchema()));
+        Actor actor = currentActor.actor();
+        // 普通用户仍可检查图结构，但不得通过校验接口探测身份目录中的账号。
+        return new ValidationResponse(canManageDefinitions(actor)
+                ? service.validate(actor.tenantId(), request.graph(), request.formSchema())
+                : service.validate(request.graph(), request.formSchema()));
+    }
+
+    /** 仅流程管理员可读取当前租户的审批人配置目录。 */
+    @GetMapping("/assignee-options")
+    public ResponseEntity<List<DefinitionAssigneeDirectory.Option>> assigneeOptions() {
+        requireProcessAdmin();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(service.assigneeOptions(currentActor.actor().tenantId()));
     }
 
     /** 创建流程草稿。 */
