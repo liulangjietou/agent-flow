@@ -13,6 +13,8 @@ import FormFields from './components/FormFields.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
 import TemplateCenter from './components/TemplateCenter.vue'
 import SystemChecks from './components/SystemChecks.vue'
+import FirstWorkflow from './components/FirstWorkflow.vue'
+import { guideHidden, rememberGuideSelection } from './firstWorkflow'
 import ApprovalOperations from './components/ApprovalOperations.vue'
 import ApiReference from './components/ApiReference.vue'
 import DefinitionSimulation from './components/DefinitionSimulation.vue'
@@ -31,7 +33,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type Page = 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
+type Page = 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
@@ -226,6 +228,7 @@ async function chooseDefinition() {
 async function newDefinition(copy = false) {
   await confirmReplaceDefinition('放弃修改并新建', () => {
     editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
+    page.value = 'designer'
     if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
     else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
     definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
@@ -276,7 +279,7 @@ async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
     busy.value = true
     try {
       const definition = await api.copyTemplate(templateKey, originalBody)
-      applyDefinition(definition); page.value = 'designer'; templateRefresh.value++
+      applyDefinition(definition); rememberGuideSelection(actorScope.value, definition.id); page.value = 'designer'; templateRefresh.value++
       await loadDefinitions(); notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
     } catch (error) { notice.value = errorMessage(error) }
     finally { busy.value = false }
@@ -289,7 +292,7 @@ async function openTemplateCopy(id: string) {
     try {
       const definition = await api.getDefinition(id)
       if (actorScope.value !== scope) return
-      applyDefinition(definition); page.value = 'designer'; notice.value = '已打开当前租户的模板副本。'
+      applyDefinition(definition); rememberGuideSelection(actorScope.value, definition.id); page.value = 'designer'; notice.value = '已打开当前租户的流程版本。'
     } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
     finally { busy.value = false }
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
@@ -304,7 +307,7 @@ async function login() {
   if (busy.value) return
   if (!username.value.trim() || !password.value) { notice.value = '请输入用户名和密码'; return }
   busy.value = true
-  try { const result = await api.login({ tenantId: tenantId.value.trim(), username: username.value.trim(), password: password.value }); localStorage.setItem('agentflow.token', result.token); actor.value = result.user; writeRequests.setActor(result.user); loggedIn.value = true; password.value = ''; notice.value = '已进入工作空间'; await refreshWorkspace(true) }
+  try { const result = await api.login({ tenantId: tenantId.value.trim(), username: username.value.trim(), password: password.value }); localStorage.setItem('agentflow.token', result.token); actor.value = result.user; writeRequests.setActor(result.user); loggedIn.value = true; password.value = ''; notice.value = '已进入工作空间'; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
@@ -418,6 +421,7 @@ async function validate() { if (busy.value) return; busy.value = true; try { awa
 /** 只确认本次发送的快照；新输入、选中项、焦点和撤销栈均留在编辑器。 */
 function acknowledgeDraft(definition: Definition, checkpoint: DraftCheckpoint) {
   if (!viewActive || checkpoint.scope !== draftScope.value) return
+  rememberGuideSelection(actorScope.value, definition.id)
   definitionId.value = definition.id; selectedDefinitionId.value = definition.id
   definitionKey.value = definition.key
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
@@ -597,6 +601,16 @@ async function openApplicationForm() {
     applicationAmount.value = ''; applicationDescription.value = ''; applicationPayload.value = {}; applicationFieldErrors.value = {}; applicationFormError.value = ''; newApplicationOpen.value = true
   } catch (error) { notice.value = errorMessage(error) }
 }
+/** 引导发起必须仍绑定用户选中的已发布版本，不能静默切换为另一份定义。 */
+async function startGuidedApplication(id: string) {
+  const scope = actorScope.value
+  await openApplicationForm()
+  if (actorScope.value !== scope || !newApplicationOpen.value) return
+  if (!publishedDefinitions.value.some(item => item.id === id)) {
+    newApplicationOpen.value = false; notice.value = '所选版本当前不可发起，请刷新引导重新选择。'; return
+  }
+  applicationDefinitionId.value = id
+}
 async function createAndSubmitApplication(submit = true) {
   if (busy.value || writesBlocked.value) return
   applicationFormError.value = ''; applicationFieldErrors.value = {}
@@ -719,7 +733,7 @@ defaultGraph(); savedSnapshot.value = snapshot()
 onMounted(async () => {
   window.addEventListener('beforeunload', warnBeforeUnload)
   if (!localStorage.getItem('agentflow.token')) return
-  try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; await refreshWorkspace(true) }
+  try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
 onBeforeUnmount(() => { applicationsRequest?.abort(); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
@@ -744,6 +758,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div class="brand"><div class="brand-mark">AF</div><div><strong>agentflow</strong><small>审批工作台</small></div></div>
         <div class="space-label">{{ tenantId }} WORKSPACE</div>
         <nav>
+          <button v-if="canInspectSystem" :class="{ active: page === 'guide' }" @click="page = 'guide'"><b>◎</b><span>开始使用</span></button>
           <button :class="{ active: page === 'workbench' }" @click="page = 'workbench'"><b>◉</b><span>待我审批</span><i>{{ taskCount ?? '—' }}</i></button>
           <button :class="{ active: page === 'started' }" @click="page = 'started'"><b>↗</b><span>我发起</span></button>
           <button :class="{ active: page === 'drafts' }" @click="page = 'drafts'"><b>▧</b><span>我的草稿</span></button>
@@ -763,7 +778,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
       </aside>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
@@ -797,8 +812,9 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         </section>
         <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <TemplateCenter v-else-if="page === 'templates' && canManageDefinitions" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
+        <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
+        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="definitions" :locked="busy || writesBlocked" @templates="page = 'templates'" @examples="page = 'examples'" @new="newDefinition()" @edit="openTemplateCopy" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
         <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="publishedDefinitions" @open="recordApplicationId = $event" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page" @compositionstart="composing = true" @compositionend="composing = false">

@@ -5,7 +5,7 @@ import { fieldErrorMessage, fieldTypes, ownValue } from '../formSchema'
 import { TemplateCatalog, validateTemplateCopy } from '../templateCenter'
 import FormFields from './FormFields.vue'
 
-const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean; hasUnsavedDefinition: boolean }>()
+const props = defineProps<{ examplesOnly?: boolean; scopeKey: string; refreshVersion: number; locked: boolean; hasUnsavedDefinition: boolean }>()
 const emit = defineEmits<{ copy: [templateKey: string, body: TemplateCopyInput]; open: [definitionId: string]; returnDesigner: [] }>()
 const catalog = reactive(new TemplateCatalog(api.templates))
 const search = ref('')
@@ -32,13 +32,14 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 async function load() {
   selectedKey.value = ''; search.value = ''; targetKey.value = ''; targetName.value = ''; attempted.value = false
   await catalog.load(props.scopeKey)
+  if (props.examplesOnly && catalog.templates.length) selectedKey.value = catalog.templates[0]!.key
 }
 function choose(key: string) {
   if (props.locked) return
   selectedKey.value = key
 }
 function copy() {
-  if (props.locked || !selected.value) return
+  if (props.examplesOnly || props.locked || !selected.value) return
   attempted.value = true
   if (Object.keys(copyErrors.value).length) return
   emit('copy', selected.value.key, { ...copyInput.value })
@@ -52,7 +53,7 @@ onUnmounted(() => catalog.clear())
 
 <template>
   <section class="content template-center">
-    <div class="page-heading"><div><p class="eyebrow">PROCESS TEMPLATES</p><h2>从成熟的起点开始。</h2><p class="subhead">选择模板，复制为当前租户的独立草稿，再按业务制度调整。</p></div><button class="secondary" :disabled="locked || catalog.loading" @click="load">重新加载目录</button></div>
+    <div class="page-heading"><div><p class="eyebrow">PROCESS TEMPLATES</p><h2>{{ examplesOnly ? '先了解一条流程怎样运行。' : '从成熟的起点开始。' }}</h2><p class="subhead">{{ examplesOnly ? '只读预览样例输入、预期路径和校验错误；不会创建申请或执行审批。' : '选择模板，复制为当前租户的独立草稿，再按业务制度调整。' }}</p></div><button class="secondary" :disabled="locked || catalog.loading" @click="load">重新加载目录</button></div>
     <div v-if="hasUnsavedDefinition" class="template-draft-note" role="status"><span>流程设计器中有未保存的修改，浏览模板不会覆盖内容。</span><button class="quiet" :disabled="locked" @click="emit('returnDesigner')">返回继续编辑 →</button></div>
     <p v-if="catalog.loading" class="unavailable" role="status">正在加载模板与当前租户副本…</p>
     <div v-else-if="catalog.error" class="panel template-error" role="alert"><p>{{ catalog.error }}</p><button class="secondary" :disabled="locked" @click="load">重试加载</button></div>
@@ -68,7 +69,7 @@ onUnmounted(() => catalog.clear())
         <article v-if="selected" :key="selected.key" class="panel template-detail">
           <div class="template-detail-heading"><div><p class="eyebrow">{{ selected.key }} / V{{ selected.templateVersion }}</p><h3>{{ selected.name }}</h3><p>{{ selected.description }}</p></div><span class="status-chip">通用表单</span></div>
           <section class="template-section"><h4>适用范围</h4><p>{{ selected.scope }}</p></section>
-          <form class="template-copy-form" novalidate @submit.prevent="copy">
+          <form v-if="!examplesOnly" class="template-copy-form" novalidate @submit.prevent="copy">
             <h4>复制为我的流程草稿</h4><p>复制后进入设计器；审批角色与示例阈值需核对，发布由你决定。</p>
             <fieldset :disabled="locked"><label for="template-target-key">目标流程标识<input id="template-target-key" v-model="targetKey" aria-required="true" :aria-invalid="!!copyErrors.key" :aria-describedby="copyErrors.key ? 'template-key-error' : undefined" /><small v-if="copyErrors.key" id="template-key-error" class="inline-error">{{ copyErrors.key }}</small></label><label for="template-target-name">目标流程名称<input id="template-target-name" v-model="targetName" aria-required="true" :aria-invalid="!!copyErrors.name" :aria-describedby="copyErrors.name ? 'template-name-error' : undefined" /><small v-if="copyErrors.name" id="template-name-error" class="inline-error">{{ copyErrors.name }}</small></label></fieldset>
             <p v-if="copyErrors.templateVersion" class="inline-error" role="alert">{{ copyErrors.templateVersion }}</p><button class="primary" :disabled="locked">{{ locked ? '操作暂不可用' : '复制并编辑 ↗' }}</button>
@@ -77,8 +78,8 @@ onUnmounted(() => catalog.clear())
           <section class="template-section"><h4>审批链与分支</h4><ol class="template-approval-chain"><li v-for="node in selected.graph.nodes.filter(item => item.type === 'USER_TASK')" :key="node.id"><strong>{{ node.name }}</strong><span>{{ roleName(node.properties.assigneeRule ?? '') }}</span></li></ol><ul class="template-branches"><li v-for="edge in selected.graph.edges" :key="edge.id">{{ nodeName(edge.source) }} → {{ nodeName(edge.target) }}<code v-if="edge.condition">{{ edge.condition }}</code><small v-else-if="edge.defaultBranch">默认分支</small></li></ul><p>默认角色：{{ selected.defaultRoles.map(role => roleName(role)).join('、') }}</p></section>
           <section class="template-section"><h4>依赖与使用风险</h4><ul><li v-for="dependency in selected.dependencies" :key="dependency">{{ dependency }}</li></ul><div class="template-risk"><strong>使用前核对</strong><ul><li v-for="risk in selected.risks" :key="risk">{{ risk }}</li></ul></div><h4>版本升级</h4><p>{{ selected.upgradePolicy }}</p></section>
           <section class="template-section"><h4>通知文案 <span class="template-unavailable">文案尚未启用</span></h4><p>当前站内消息使用平台统一文案，以下模板文案尚未启用；邮件和其他外部渠道尚未接入。</p><dl class="template-notifications"><template v-for="(text, key) in selected.notificationTexts" :key="key"><dt>{{ ownValue(notificationLabels, key) ?? key }}</dt><dd>{{ text }}</dd></template></dl></section>
-          <section class="template-section"><h4>路径与校验样例 <span>{{ selected.scenarios.length }}</span></h4><p>以下是模板预期结果，未创建申请或执行审批。</p><details v-for="scenario in selected.scenarios" :key="scenario.id" class="template-scenario"><summary>{{ scenario.name }}<span :class="{ failure: Object.keys(scenario.expectedFieldErrors).length }">{{ Object.keys(scenario.expectedFieldErrors).length ? '预期校验失败' : '预期通过' }}</span></summary><p>{{ scenario.description }}</p><FormFields :schema="selected.formSchema" :model-value="scenario.payload" readonly /><p v-if="scenario.expectedPath.length" class="template-expected-path"><strong>预期路径</strong>{{ scenario.expectedPath.map(nodeName).join(' → ') }}</p><ul v-if="Object.keys(scenario.expectedFieldErrors).length" class="template-scenario-errors"><li v-for="(code, key) in scenario.expectedFieldErrors" :key="key">{{ fieldName(key) }}：{{ fieldErrorMessage(code) }} <code>{{ code }}</code></li></ul></details></section>
-          <section class="template-section"><h4>当前租户的副本 <span>{{ selected.copies.length }}</span></h4><p v-if="!selected.copies.length">还没有复制记录。复制后的草稿会显示在这里。</p><div v-for="item in selected.copies" :key="item.definitionId" class="template-copy-row"><div><strong>{{ item.name }}</strong><small>{{ item.processKey }} · {{ ownValue(statusLabels, item.status) ?? item.status }}{{ item.version ? ` v${item.version}` : '' }} · 修订 {{ item.revision }}</small><small>来自模板 V{{ item.templateVersion }} · {{ item.copiedBy }} · {{ timeLabel(item.copiedAt) }}</small></div><button class="secondary" :disabled="locked" @click="emit('open', item.definitionId)">{{ item.status === 'DRAFT' ? '打开草稿' : '查看流程' }}</button></div></section>
+          <section class="template-section"><h4>路径与校验样例 <span>{{ selected.scenarios.length }}</span></h4><p>以下是模板预期结果，未创建申请或执行审批。</p><details v-for="(scenario,index) in selected.scenarios" :key="scenario.id" :open="examplesOnly && index === 0" class="template-scenario"><summary>{{ scenario.name }}<span :class="{ failure: Object.keys(scenario.expectedFieldErrors).length }">{{ Object.keys(scenario.expectedFieldErrors).length ? '预期校验失败' : '预期通过' }}</span></summary><p>{{ scenario.description }}</p><FormFields :schema="selected.formSchema" :model-value="scenario.payload" readonly /><p v-if="scenario.expectedPath.length" class="template-expected-path"><strong>预期路径</strong>{{ scenario.expectedPath.map(nodeName).join(' → ') }}</p><ul v-if="Object.keys(scenario.expectedFieldErrors).length" class="template-scenario-errors"><li v-for="(code, key) in scenario.expectedFieldErrors" :key="key">{{ fieldName(key) }}：{{ fieldErrorMessage(code) }} <code>{{ code }}</code></li></ul></details></section>
+          <section v-if="!examplesOnly" class="template-section"><h4>当前租户的副本 <span>{{ selected.copies.length }}</span></h4><p v-if="!selected.copies.length">还没有复制记录。复制后的草稿会显示在这里。</p><div v-for="item in selected.copies" :key="item.definitionId" class="template-copy-row"><div><strong>{{ item.name }}</strong><small>{{ item.processKey }} · {{ ownValue(statusLabels, item.status) ?? item.status }}{{ item.version ? ` v${item.version}` : '' }} · 修订 {{ item.revision }}</small><small>来自模板 V{{ item.templateVersion }} · {{ item.copiedBy }} · {{ timeLabel(item.copiedAt) }}</small></div><button class="secondary" :disabled="locked" @click="emit('open', item.definitionId)">{{ item.status === 'DRAFT' ? '打开草稿' : '查看流程' }}</button></div></section>
         </article>
         <div v-else class="panel template-empty"><div class="empty-icon">▤</div><h3>选择一份流程模板</h3><p>查看字段、审批链与样例，确认适用范围后复制。</p></div>
       </div>

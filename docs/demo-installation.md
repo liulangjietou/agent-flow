@@ -77,3 +77,5 @@ python3 scripts/check-process-templates.py http://127.0.0.1:8180
 第一个脚本只读业务数据并验证权限、来源、探针及自检；第二个脚本会保留带随机前缀的演示流程与申请，完成三个模板的真实审批路径。容器构建执行作者检查与编译，测试门禁仍使用 README 中的后端 `mvn verify`、前端测试与构建命令。
 
 实现依据：[Docker Compose 启动依赖与健康检查](https://docs.docker.com/compose/how-tos/startup-order/)、[Spring Boot 3.5 Actuator 健康与探针](https://docs.spring.io/spring-boot/3.5/reference/actuator/endpoints.html)。
+
+管理员首次登录默认进入“开始使用”，可选择模板、新建流程或只读预览样例，并按真实保存、发布、提交和批准记录继续验证。可勾选以后直接进入工作台；侧栏始终保留返回入口。这不是租户/法人/企业身份初始化的完成标记。

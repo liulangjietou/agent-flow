@@ -1,3 +1,4 @@
+import type { FirstWorkflowReport } from './firstWorkflow'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
@@ -127,7 +128,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const messages: Record<string, string> = {
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
-      INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
+      INVALID_FIRST_WORKFLOW_QUERY: '流程进度筛选无效，请重新选择流程。',
+  INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
       COUNTERSIGN_ASSIGNMENT_FIXED: '会签名单已固定，不能转交、释放或重新领取；可委派协助后回交。',
       COUNTERSIGN_NO_MEMBERS: '会签节点当前没有有效审批人，本次操作未生效，请联系管理员补齐审批名单。',
@@ -171,6 +173,7 @@ export const api = {
   compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
   approvalOperations: (filter: OperationsFilter, signal: AbortSignal) => request<OperationsReport>('/operations/approvals' + historyQuery(filter), { signal }),
+  firstWorkflow: (id: string, signal: AbortSignal) => request<FirstWorkflowReport>('/system/first-workflow' + (id ? '?definitionId=' + encodeURIComponent(id) : ''), { signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),

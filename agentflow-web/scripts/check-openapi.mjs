@@ -69,6 +69,12 @@ async function exercise(base) {
   const create = example(defs); create.key = `api-contract-${suffix}`
   let definition = await call('POST', defs, { body: create })
   const defPath = `${defs}/${definition.id}`
+  const guidePath = '/api/v1/system/first-workflow', selectedGuide = guidePath + '?definitionId=' + definition.id
+  const draftGuide = await call('GET', guidePath, {path:selectedGuide})
+  assert.equal(draftGuide.definition.status, 'DRAFT'); assert.equal(draftGuide.submittedRounds, 0)
+  await call('GET', guidePath, {user:'alice',status:403})
+  await call('GET', guidePath, {path:guidePath + '?tenantId=other',status:400})
+
   assert.deepEqual((await call('POST', defs + '/validate', { body: { graph: create.graph } })).errors, [])
   await call('POST', defs + '/simulate', { body: { graph: create.graph, values: {} } })
   await call('POST', defs + '/{id}/simulate', { path: defPath + '/simulate', body: { values: {} } })
@@ -106,6 +112,11 @@ async function exercise(base) {
   const withdrawnPath = `${apps}/${withdrawn.id}`
   withdrawn = await call('POST', apps + '/{id}/submit', { user: 'alice', path: withdrawnPath + '/submit', body: { expectedVersion: withdrawn.version } })
   await call('POST', apps + '/{id}/withdraw', { user: 'alice', path: withdrawnPath + '/withdraw', body: { expectedVersion: withdrawn.version, comment: '接口撤回验收' } })
+  const completedGuide = await call('GET', guidePath, {path:selectedGuide})
+  assert.equal(completedGuide.definition.version, definition.version)
+  assert.equal(completedGuide.submittedRounds, 2); assert.equal(completedGuide.approvedRounds, 1)
+  assert.equal(completedGuide.latestApproval.applicationId, application.id)
+  assert.equal(completedGuide.latestSubmission.applicationId, withdrawn.id)
   const operationsPath = '/api/v1/operations/approvals'
   const operations = await call('GET', operationsPath, { path: operationsPath + '?processKey=' + definition.key })
   assert.equal(operations.metrics.submittedRounds, 2); assert.equal(operations.metrics.approved, 1)

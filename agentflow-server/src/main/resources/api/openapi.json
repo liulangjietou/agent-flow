@@ -3902,6 +3902,101 @@
           }
         ]
       }
+    },
+    "/api/v1/system/first-workflow": {
+      "get": {
+        "operationId": "firstWorkflow",
+        "tags": [
+          "集成"
+        ],
+        "summary": "首次流程运行进度",
+        "description": "ADMIN 只读查询本租户流程的真实保存、发布、提交与批准证据。省略 definitionId 选最近更新的定义；空租户不返回 definition。提交计数覆盖全部日期，仅属于精确发布版本；草稿不借用旧版本记录。旧申请缺少轮次快照不补造。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirstWorkflowReport"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户进度",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_FIRST_WORKFLOW_QUERY：定义 UUID 或参数名无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "definitionId",
+            "in": "query",
+            "required": false,
+            "description": "当前租户的完整定义 UUID；仅接收此参数，不接收租户或账号覆盖。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -6353,6 +6448,127 @@
           "moreWaitingNodes",
           "oldestTasks",
           "moreOldestTasks",
+          "unrecordedHistoricalRounds"
+        ]
+      },
+      "FirstWorkflowDefinition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "version",
+          "status"
+        ]
+      },
+      "FirstWorkflowEvidence": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_APPROVAL",
+              "APPROVED",
+              "RETURNED",
+              "REJECTED",
+              "WITHDRAWN"
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "applicationId",
+          "businessNo",
+          "title",
+          "roundNo",
+          "status",
+          "submittedAt"
+        ]
+      },
+      "FirstWorkflowReport": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/FirstWorkflowDefinition"
+          },
+          "submittedRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "approvedRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "latestSubmission": {
+            "$ref": "#/components/schemas/FirstWorkflowEvidence"
+          },
+          "latestApproval": {
+            "$ref": "#/components/schemas/FirstWorkflowEvidence"
+          },
+          "unrecordedHistoricalRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "该版本缺少快照的历史轮次数；不从当前申请状态推断历史结论。"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "submittedRounds",
+          "approvedRounds",
           "unrecordedHistoricalRounds"
         ]
       }
