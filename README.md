@@ -4,9 +4,19 @@ AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。�
 
 当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。初始化向导、完整组织、节点字段权限与附件、财务领域、Agent 协作和生产认证仍在开发范围内；当前版本用于本地开发验收。详细进度与验收证据见相邻文档目录中的 [开发进度与验收记录](../doc/06-开发进度与验收记录.md)。
 
+## 单命令演示安装
+
+Docker 已启动时，在仓库根目录执行：
+
+```bash
+docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
+```
+
+打开 `http://127.0.0.1:8180`，以 `demo / admin / demo` 登录。“系统自检”显示真实依赖状态，并提供模板和流程管理入口。数据库使用持久卷，仅 Web 入口开放到本机。首次构建需要网络，停止时保留数据卷。详见[演示安装与系统自检](docs/demo-installation.md)。
+
 ## 本地启动
 
-需要 Java 17+、Maven 3.9+ 和 Node.js 20+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。
+需要 Java 17+、Maven 3.9+ 和 Node.js 20.19+ 或 22.12+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。
 
 ```bash
 cd /Volumes/fyoung/code/AI/flow/agentflow

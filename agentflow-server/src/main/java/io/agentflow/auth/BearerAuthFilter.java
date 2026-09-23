@@ -21,6 +21,8 @@ import java.util.Map;
  */
 @Component
 public class BearerAuthFilter extends OncePerRequestFilter {
+    private static final java.util.Set<String> PUBLIC_HEALTH_PATHS = java.util.Set.of(
+            "/actuator/health", "/actuator/health/readiness", "/actuator/health/liveness");
     private final AuthService authService;
     private final CurrentActor currentActor;
     private final JsonUtil jsonUtil;
@@ -76,6 +78,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private boolean isPublic(HttpServletRequest request) {
         String path = request.getRequestURI();
         return (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
-                || path.equals("/actuator/health") || path.equals("/error");
+                || ((HttpMethod.GET.matches(request.getMethod()) || HttpMethod.HEAD.matches(request.getMethod()))
+                && PUBLIC_HEALTH_PATHS.contains(path)) || path.equals("/error");
     }
 }

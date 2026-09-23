@@ -1,0 +1,17 @@
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /workspace
+COPY pom.xml ./
+COPY agentflow-common agentflow-common
+COPY agentflow-domain agentflow-domain
+COPY agentflow-server agentflow-server
+COPY scripts/CheckAuthors.java scripts/CheckAuthors.java
+RUN --mount=type=cache,target=/root/.m2 java scripts/CheckAuthors.java . && mvn -B -ntp -DskipTests package
+
+FROM eclipse-temurin:17-jre-jammy
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 agentflow && useradd --uid 10001 --gid agentflow --no-create-home agentflow
+WORKDIR /app
+COPY --from=build --chown=agentflow:agentflow /workspace/agentflow-server/target/agentflow-server-0.1.0-SNAPSHOT.jar app.jar
+USER agentflow
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

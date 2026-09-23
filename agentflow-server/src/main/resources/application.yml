@@ -36,5 +36,10 @@ management:
         include: health,info
   endpoint:
     health:
+      show-details: never
+      show-components: never
+      group:
+        readiness:
+          include: readinessState,db
       probes:
         enabled: true

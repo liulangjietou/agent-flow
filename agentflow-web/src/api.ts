@@ -17,6 +17,11 @@ export interface ProcessTemplate {
   scenarios: TemplateScenario[]; copies: TemplateCopy[]
 }
 export interface TemplateCopyInput { key: string; name: string; templateVersion: number }
+/** 自检只读快照。@author owlzhangfq@gmail.com */
+export interface SystemCheckReport {
+  checkedAt: string
+  checks: Array<{ id: string; status: 'UP' | 'DOWN' | 'UNKNOWN' | 'WARNING' | 'NOT_IMPLEMENTED'; code: string; message: string }>
+}
 export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
 export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
@@ -81,6 +86,7 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),

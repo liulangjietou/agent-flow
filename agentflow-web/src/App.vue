@@ -6,13 +6,14 @@ import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
 import TemplateCenter from './components/TemplateCenter.vue'
+import SystemChecks from './components/SystemChecks.vue'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
 import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TemplateCopyInput } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type Page = 'workbench' | 'designer' | 'templates' | 'applications' | 'expense'
+type Page = 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
 interface FlowNode { id: string; name: string; type: string; x: number; y: number; assigneeRule: string }
 const page = ref<Page>('workbench')
@@ -89,6 +90,7 @@ const selectedNode = computed(() => nodes.value.find(node => node.id === selecte
 const selectedEdge = computed(() => edges.value.find(edge => edge.id === selectedEdgeId.value) ?? null)
 const publishedDefinitions = computed(() => definitions.value.filter(definition => definition.status === 'PUBLISHED'))
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
+const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
 const editorLocked = computed(() => readonlyDefinition.value || writesBlocked.value || busy.value || confirmationOpen.value)
 const visibleTasks = computed(() => tasks.value.filter(task => task.taskName.toLowerCase().includes(taskSearch.value.trim().toLowerCase())))
@@ -464,11 +466,12 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <button disabled title="Agent 证据服务尚未接入"><b>✦</b><span>Agent 助理</span><small>未接入</small></button>
           <div class="nav-divider"></div>
           <button :class="{ active: page === 'expense' }" @click="page = 'expense'"><b>▣</b><span>费用报销</span></button>
+          <button v-if="canInspectSystem" :class="{ active: page === 'system' }" @click="page = 'system'"><b>◈</b><span>系统自检</span></button>
         </nav>
-        <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '服务连接正常' : '服务连接异常' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
+        <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
       </aside>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="pendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
@@ -508,6 +511,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }} · 第 {{ application.roundNo }} 轮</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button class="secondary" :disabled="busy" @click="recordApplicationId = application.id">{{ application.createdBy === actor?.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status) ? '查看并修改' : '查看详情' }}</button></div></div>
         </section>
         <TemplateCenter v-else-if="page === 'templates' && canManageDefinitions" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
+        <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page">
           <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy" @click="validate">校验流程</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked" @click="publishDraft">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
           <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button></div>
