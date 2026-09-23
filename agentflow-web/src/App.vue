@@ -77,6 +77,9 @@ const unsubscribeWrites = writeRequests.subscribe(() => { pendingWrites.value = 
 const serverAvailable = ref(false)
 const taskCount = ref<number | null>(null)
 const taskRefresh = ref(0)
+const taskQueueView = ref<'list' | 'board'>('list')
+const taskQueuePanel = ref<InstanceType<typeof PendingTaskQueue> | null>(null)
+watch(actorScope, () => { taskQueueView.value = 'list' }, { flush: 'sync' })
 let workspaceRefreshGeneration = 0
 let taskCountRequest: AbortController | null = null
 let taskDetailRequest: AbortController | null = null
@@ -848,9 +851,10 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <section v-if="page === 'workbench'" class="content">
           <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
 
-          <div class="work-grid">
-            <PendingTaskQueue :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" :definitions="publishedDefinitions" @select="selectTask" @clear-selection="clearTaskSelection" />
+          <div class="work-grid" :class="{ 'board-work-grid': taskQueueView === 'board' }">
+            <PendingTaskQueue ref="taskQueuePanel" v-model:view="taskQueueView" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" :definitions="publishedDefinitions" @select="selectTask" @clear-selection="clearTaskSelection" />
             <div ref="taskDetailPanel" class="detail panel" tabindex="-1" aria-label="当前待办详情">
+              <div v-if="taskQueueView === 'board'" class="board-return"><button type="button" class="quiet" @click="taskQueuePanel?.focusTask(activeTask?.taskId)">↑ 返回待办看板</button></div>
               <div v-if="activeTask" class="detail-body">
                 <div class="detail-top"><div><span class="status-chip">● {{ activeApplication ? statusLabel(activeApplication.status) : '待处理' }}</span><h3>{{ activeApplication?.title ?? activeTask.taskName }}</h3><p>{{ activeApplication?.businessNo ?? activeTask.taskName }} · 任务创建于 {{ dateLabel(activeTask.createdAt) }}</p></div></div>
                 <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
@@ -971,3 +975,8 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
   <UnsavedConfirmationDialog v-if="confirmation.active" :key="confirmation.active.id" :request="confirmation.active" :return-focus="confirmationReturnFocus" :fallback-focus="workspace" @answer="(id, accepted) => confirmation.answer(id, accepted)" />
   <PublicationDialog v-if="publicationOpen" v-model:note="publicationNote" :name="definitionName" :process-key="definitionKey" :busy="busy" :blocked="writesBlocked" :error="publicationError" :return-focus="publicationReturnFocus" :fallback-focus="workspace" @close="publicationOpen = false" @submit="publishDraft" />
 </template>
+
+<style scoped>
+.work-grid.board-work-grid{grid-template-columns:minmax(0,1fr)}
+.board-return{padding:16px 22px 0}
+</style>
