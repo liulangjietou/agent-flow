@@ -5483,6 +5483,93 @@
           }
         ]
       }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/diagram": {
+      "get": {
+        "operationId": "roundDiagram",
+        "tags": [
+          "申请"
+        ],
+        "summary": "轮次流程图",
+        "description": "读取经过申请权限与轮次绑定核对的实际引擎定义和节点状态。连线仅表示结构；LEFT 只表示离开，不代表通过。缺少轮次、引擎历史或精确绑定时返回 404，不改用当前草稿或同号版本。Cache-Control: no-store。一次读取使用数据库可重复读事务。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundDiagram"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -8620,6 +8707,133 @@
         "required": [
           "items"
         ]
+      },
+      "RoundDiagram": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_APPROVAL",
+              "RETURNED",
+              "REJECTED",
+              "APPROVED",
+              "WITHDRAWN"
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoundDiagramNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoundDiagramEdge"
+            }
+          }
+        },
+        "required": [
+          "applicationId",
+          "roundNo",
+          "definitionVersion",
+          "status",
+          "observedAt",
+          "nodes",
+          "edges"
+        ],
+        "additionalProperties": false
+      },
+      "RoundDiagramNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "START",
+              "END",
+              "USER_TASK",
+              "EXCLUSIVE_GATEWAY",
+              "PARALLEL_GATEWAY",
+              "OTHER"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NOT_REACHED",
+              "ACTIVE",
+              "LEFT"
+            ]
+          },
+          "activeTasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "firstEnteredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastLeftAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "state",
+          "activeTasks"
+        ],
+        "additionalProperties": false
+      },
+      "RoundDiagramEdge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "defaultBranch": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "target",
+          "defaultBranch"
+        ],
+        "additionalProperties": false
       }
     }
   }

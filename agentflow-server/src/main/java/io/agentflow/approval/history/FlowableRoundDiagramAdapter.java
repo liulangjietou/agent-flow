@@ -1,0 +1,99 @@
+package io.agentflow.approval.history;
+
+import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.SubmissionRound;
+import io.agentflow.common.DomainException;
+import org.flowable.bpmn.model.*;
+import org.flowable.engine.HistoryService;
+import org.flowable.engine.RepositoryService;
+import org.flowable.engine.RuntimeService;
+import org.flowable.engine.TaskService;
+import org.flowable.engine.history.HistoricActivityInstance;
+import org.springframework.stereotype.Component;
+import java.time.Instant;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 从轮次实际引擎定义生成图；平台后续发布与同号全局模板不能替换历史拓扑。
+ * @author owlzhangfq@gmail.com
+ */
+@Component
+public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
+    private final HistoryService history;
+    private final RepositoryService repository;
+    private final RuntimeService runtime;
+    private final TaskService tasks;
+
+    /** 只依赖引擎公开查询接口，不直接读取或修改其内部表。 */
+    public FlowableRoundDiagramAdapter(HistoryService history, RepositoryService repository,
+                                       RuntimeService runtime, TaskService tasks) {
+        this.history = history; this.repository = repository; this.runtime = runtime; this.tasks = tasks;
+    }
+
+    @Override
+    public Diagram read(Application application, SubmissionRound round) {
+        String tenant = application.tenantId();
+        var instance = history.createHistoricProcessInstanceQuery().processInstanceId(round.processInstanceId())
+                .variableValueEquals("tenantId", tenant)
+                .variableValueEquals("applicationId", application.id().toString())
+                .variableValueEquals("roundNo", round.roundNo()).singleResult();
+        if (instance == null || !matchesTenant(instance.getTenantId(), tenant)
+                || !application.processKey().equals(instance.getProcessDefinitionKey())
+                || (instance.getProcessDefinitionVersion() == null || instance.getProcessDefinitionVersion().longValue() != round.definitionVersion())
+                || application.definitionVersion() != round.definitionVersion()
+                || application.runtimeDefinitionId() != null
+                    && !application.runtimeDefinitionId().equals(instance.getProcessDefinitionId())) throw unavailable();
+        var definition = repository.createProcessDefinitionQuery().processDefinitionId(instance.getProcessDefinitionId()).singleResult();
+        if (definition == null || !matchesTenant(definition.getTenantId(), tenant)
+                || !application.processKey().equals(definition.getKey()) || round.definitionVersion() != definition.getVersion()) throw unavailable();
+        // 无租户定义仅允许已明确保留的内置报销 v1，不能放宽到任意全局流程。
+        if ((definition.getTenantId() == null || definition.getTenantId().isEmpty())
+                && !("expense-reimbursement".equals(definition.getKey()) && definition.getVersion() == 1)) throw unavailable();
+        var model = repository.getBpmnModel(definition.getId());
+        var process = model == null ? null : model.getProcessById(definition.getKey());
+        if (process == null) throw unavailable();
+        List<FlowNode> flowNodes = process.getFlowElements().stream().filter(FlowNode.class::isInstance).map(FlowNode.class::cast).toList();
+        // 当前平台只发布平面受限图；遇到外部子流程时明确不可用，避免把缺失结构显示成完整流程。
+        if (flowNodes.isEmpty() || flowNodes.stream().anyMatch(SubProcess.class::isInstance)) throw unavailable();
+        var activities = history.createHistoricActivityInstanceQuery().processInstanceId(instance.getId()).list().stream()
+                .filter(activity -> matchesTenant(activity.getTenantId(), tenant))
+                .collect(Collectors.groupingBy(HistoricActivityInstance::getActivityId));
+        var activeTasks = tasks.createTaskQuery().processInstanceId(instance.getId()).list().stream()
+                .filter(task -> matchesTenant(task.getTenantId(), tenant))
+                .collect(Collectors.groupingBy(org.flowable.task.api.Task::getTaskDefinitionKey, Collectors.counting()));
+        var live = runtime.createProcessInstanceQuery().processInstanceId(instance.getId()).singleResult();
+        Set<String> active = live == null ? Set.of() : new HashSet<>(runtime.getActiveActivityIds(instance.getId()));
+        List<Node> nodes = flowNodes.stream().map(node -> {
+            var evidence = activities.getOrDefault(node.getId(), List.of());
+            long count = activeTasks.getOrDefault(node.getId(), 0L);
+            State state = active.contains(node.getId()) || count > 0 ? State.ACTIVE : evidence.isEmpty() ? State.NOT_REACHED : State.LEFT;
+            Instant entered = evidence.stream().map(HistoricActivityInstance::getStartTime).filter(Objects::nonNull).min(Date::compareTo).map(Date::toInstant).orElse(null);
+            Instant left = evidence.stream().map(HistoricActivityInstance::getEndTime).filter(Objects::nonNull).max(Date::compareTo).map(Date::toInstant).orElse(null);
+            return new Node(node.getId(), node.getName() == null ? node.getId() : node.getName(), type(node), state, count, entered, left);
+        }).toList();
+        Set<String> ids = nodes.stream().map(Node::id).collect(Collectors.toSet());
+        List<Edge> edges = process.getFlowElements().stream().filter(SequenceFlow.class::isInstance).map(SequenceFlow.class::cast)
+                .filter(edge -> ids.contains(edge.getSourceRef()) && ids.contains(edge.getTargetRef()))
+                .map(edge -> new Edge(edge.getId(), edge.getSourceRef(), edge.getTargetRef(),
+                        edge.getSourceFlowElement() instanceof Gateway gateway && edge.getId().equals(gateway.getDefaultFlow())))
+                .toList();
+        return new Diagram(application.id(), round.roundNo(), round.definitionVersion(), round.status(), Instant.now(), nodes, edges);
+    }
+
+    private String type(FlowNode node) {
+        if (node instanceof StartEvent) return "START";
+        if (node instanceof EndEvent) return "END";
+        if (node instanceof UserTask) return "USER_TASK";
+        if (node instanceof ExclusiveGateway) return "EXCLUSIVE_GATEWAY";
+        if (node instanceof ParallelGateway) return "PARALLEL_GATEWAY";
+        return "OTHER";
+    }
+
+    private boolean matchesTenant(String owner, String tenant) { return owner == null || owner.isEmpty() || owner.equals(tenant); }
+    private DomainException unavailable() { return new DomainException("NOT_FOUND", "Bound process diagram is not available"); }
+}

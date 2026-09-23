@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import RoundDiagram from './RoundDiagram.vue'
 import ApplicationHistory from './ApplicationHistory.vue'
 import ApplicationComments from './ApplicationComments.vue'
 import RequestRecovery from './RequestRecovery.vue'
@@ -14,7 +15,7 @@ const writesBlocked = computed(() => props.pendingWrites.length > 0)
 const dialog = ref<HTMLElement | null>(null)
 const application = ref<Application | null>(null)
 const rounds = ref<SubmissionRound[]>([])
-const historyTab = ref<'rounds' | 'timeline' | 'audit' | 'comments'>('rounds')
+const historyTab = ref<'rounds' | 'diagram' | 'timeline' | 'audit' | 'comments'>('rounds')
 const title = ref('')
 const amount = ref('')
 const description = ref('')
@@ -244,7 +245,7 @@ onUnmounted(() => returnFocus?.focus())
             <div class="form-actions"><button type="button" class="secondary" :disabled="saving || writesBlocked" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="saving || writesBlocked">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
           </form>
         </section>
-        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button></div>
+        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button></div>
         <section v-if="historyTab === 'rounds'" class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
@@ -253,6 +254,7 @@ onUnmounted(() => returnFocus?.focus())
             <div class="round-content"><h4>{{ round.title }}</h4><FormFields :schema="round.formSchema" :model-value="round.payload" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
+        <RoundDiagram v-else-if="historyTab === 'diagram'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" />
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />
       </template>

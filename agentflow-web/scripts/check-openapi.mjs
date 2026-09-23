@@ -90,6 +90,12 @@ async function exercise(base) {
   assert.deepEqual(await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: revise, key: retryKey }), application)
   await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: { ...revise, title: '冲突内容' }, key: retryKey, status: 409 })
   application = await call('POST', apps + '/{id}/submit', { user: 'alice', path: appPath + '/submit', body: { expectedVersion: application.version } })
+  const diagramTemplate = apps + '/{id}/rounds/{roundNo}/diagram', diagramPath = appPath + '/rounds/1/diagram'
+  const diagram = await call('GET', diagramTemplate, { user: 'alice', path: diagramPath })
+  assert.equal(diagram.applicationId, application.id); assert.equal(diagram.roundNo, 1)
+  assert.ok(diagram.nodes.some(node => node.state === 'ACTIVE' && node.activeTasks > 0))
+  await call('GET', diagramTemplate, { user: 'bob', path: diagramPath, status: 404 })
+  await call('GET', diagramTemplate, { user: 'alice', path: appPath + '/rounds/0/diagram', status: 400 })
   const commentTemplate = apps + '/{id}/comments', commentPath = appPath + '/comments', commentKey = randomUUID()
   const commentBody = { content: '契约验收：补充审批依据', expectedVersion: application.version }
   const comment = await call('POST', commentTemplate, { user: 'alice', path: commentPath, status: 201, body: commentBody, key: commentKey })

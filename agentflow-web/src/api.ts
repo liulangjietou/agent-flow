@@ -1,3 +1,4 @@
+import type { RoundDiagram } from './roundDiagram'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
@@ -216,6 +217,7 @@ export const api = {
   applications: (signal?: AbortSignal) => request<Application[]>('/applications', { signal }),
   application: (id: string, signal?: AbortSignal) => request<Application>(`/applications/${encodeURIComponent(id)}`, { signal }),
   updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>(`/applications/${encodeURIComponent(id)}`, 'PUT', '保存申请修改', body),
+  roundDiagram: (id: string, round: number, signal?: AbortSignal) => request<RoundDiagram>(`/applications/${encodeURIComponent(id)}/rounds/${round}/diagram`, { signal }),
   applicationRounds: (id: string) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`),
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>('/applications', 'POST', '创建申请草稿', body),
   submitApplication: (id: string, expectedVersion: number) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion }),
