@@ -105,6 +105,16 @@ public class ApprovalApplicationService {
         return application;
     }
 
+    /** 作废只改变申请状态，已有审批结论与轮次快照保持原样，不新建或终止流程。 */
+    public Application cancel(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
+        Application application = get(tenantId, id);
+        ApplicationStatus previousStatus = application.status();
+        application.cancel(expectedVersion);
+        repository.update(application, expectedVersion);
+        recordApplicationOperation(application, actor, ApplicationAuditPort.Action.CANCEL, previousStatus, null, comment);
+        return application;
+    }
+
     private void recordApplicationOperation(Application application, String actor, ApplicationAuditPort.Action action,
                                             ApplicationStatus previousStatus, String instanceId, String comment) {
         audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(),

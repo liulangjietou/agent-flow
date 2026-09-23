@@ -4,19 +4,24 @@
 
 ## 接口范围
 
-以下 9 个业务写接口必须携带 `Idempotency-Key`：
+以下 14 个业务写接口必须携带 `Idempotency-Key`：
 
+- `POST /api/v1/process-definitions`
+- `PUT /api/v1/process-definitions/{id}`
+- `POST /api/v1/process-definitions/{id}/publish`
+- `POST /api/v1/process-templates/{key}/copy`
 - `POST /api/v1/applications`
 - `PUT /api/v1/applications/{id}`
 - `POST /api/v1/applications/{id}/submit`
 - `POST /api/v1/applications/{id}/withdraw`
 - `POST /api/v1/tasks/{taskId}/actions`
-- `POST /api/v1/process-definitions`
-- `PUT /api/v1/process-definitions/{id}`
-- `POST /api/v1/process-definitions/{id}/publish?expectedRevision=...`
-- `POST /api/v1/process-templates/{templateKey}/copy`
+- `POST /api/v1/notifications/{id}/read`
+- `POST /api/v1/applications/{id}/comments`
+- `POST /api/v1/business-calendars`
+- `PUT /api/v1/business-calendars/{id}`
+- `POST /api/v1/applications/{id}/cancel`
 
-登录、注销以及只读的流程校验和模拟不属于这 9 个业务写接口。外部集成调用方需要同步增加请求头；缺失或格式不合法会返回 400，不会自动生成服务端随机键来掩盖契约缺失。
+登录、注销以及只读校验、模拟、比较和日历试算不属于上述业务写入。发布接口的 expectedRevision 仍位于查询参数中。缺失或格式不合法的键返回 400，不会自动生成服务端随机键。
 
 键长 1—128，字符范围为 ASCII 字母、数字、`.`、`_`、`:`、`-`。推荐客户端为一次新操作生成 UUID；同次重试保留原键，新操作使用新键。
 

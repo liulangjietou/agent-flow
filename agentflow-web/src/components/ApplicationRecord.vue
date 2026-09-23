@@ -29,6 +29,10 @@ const withdrawalOpen = ref(false)
 const withdrawalComment = ref('')
 const withdrawalInput = ref<HTMLTextAreaElement | null>(null)
 const withdrawalTrigger = ref<HTMLButtonElement | null>(null)
+const cancellationOpen = ref(false)
+const cancellationComment = ref('')
+const cancellationInput = ref<HTMLTextAreaElement | null>(null)
+const cancellationTrigger = ref<HTMLButtonElement | null>(null)
 let returnFocus: HTMLElement | null = null
 const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
 const canEdit = computed(() => application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
@@ -63,6 +67,7 @@ function setApplication(value: Application) {
   description.value = value.payload.description == null ? '' : String(value.payload.description)
   initialFields.value = fieldsSnapshot()
   withdrawalOpen.value = false; withdrawalComment.value = ''
+  cancellationOpen.value = false; cancellationComment.value = ''
 }
 async function load() {
   loading.value = true; error.value = ''; notice.value = ''
@@ -102,7 +107,7 @@ async function saveChanges() {
   emit('changed')
 }
 async function save(submit = false) {
-  if (!canEdit.value || saving.value || loading.value || writesBlocked.value) return
+  if (!canEdit.value || saving.value || loading.value || writesBlocked.value || cancellationOpen.value) return
   error.value = ''; notice.value = ''
   if (!validate(submit)) return
   saving.value = true
@@ -148,6 +153,30 @@ async function withdraw() {
 function close() {
   if (!saving.value && !dirty.value) emit('close')
 }
+async function openCancellation() {
+  if (!canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
+  cancellationOpen.value = true
+  await nextTick(); cancellationInput.value?.focus()
+}
+async function dismissCancellation() {
+  cancellationOpen.value = false; cancellationComment.value = ''
+  await nextTick(); cancellationTrigger.value?.focus()
+}
+async function cancelApplication() {
+  if (!application.value || !canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
+  saving.value = true; error.value = ''; notice.value = ''
+  try {
+    const value = await api.cancelApplication(application.value.id, {
+      expectedVersion: application.value.version, comment: cancellationComment.value.trim() || undefined
+    })
+    setApplication(value); emit('changed'); historyTab.value = 'audit'
+    notice.value = '申请已作废，不能再修改或提交；原内容、审批轮次和历史记录已保留。'
+  } catch (cause) { showError(cause) }
+  finally {
+    saving.value = false
+    await nextTick(); (cancellationOpen.value ? cancellationInput.value : dialog.value)?.focus()
+  }
+}
 function trapFocus(event: KeyboardEvent) {
   if (event.key === 'Escape') { event.preventDefault(); close(); return }
   if (event.key !== 'Tab' || !dialog.value) return
@@ -184,16 +213,29 @@ onUnmounted(() => returnFocus?.focus())
           <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
         </div>
         <form v-if="canEdit" novalidate @submit.prevent="save(true)">
-          <fieldset :disabled="saving || writesBlocked">
+          <fieldset :disabled="saving || writesBlocked || cancellationOpen">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
             <label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label>
             <FormFields v-if="application.formSchema" v-model="payload" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" />
             <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
           <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
-          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || writesBlocked || !dirty" @click="save()">保存修改</button><button class="primary" :disabled="saving || writesBlocked">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
+          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="saving || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
         <template v-else><h3 class="record-section-title">{{ application.title }}</h3><FormFields :schema="application.formSchema" :model-value="application.payload" readonly /><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
+        <section v-if="canEdit" class="withdrawal-panel" aria-label="作废申请">
+          <template v-if="!cancellationOpen">
+            <p>不再需要这份申请时可以作废。作废后不能修改或重新提交，原内容与历史记录会保留。</p>
+            <p v-if="dirty">请先保存修改，或重新加载已保存的内容，再作废申请。</p>
+            <button ref="cancellationTrigger" type="button" class="return" :disabled="saving || loading || writesBlocked || dirty" @click="openCancellation">作废申请</button>
+          </template>
+          <form v-else @submit.prevent="cancelApplication">
+            <h3>确认作废这份申请</h3><p>作废后将结束这份申请，不能恢复编辑或重新提交。历史审批意见和轮次不会删除。</p>
+            <label>作废说明（选填）<textarea ref="cancellationInput" v-model="cancellationComment" rows="3" maxlength="2000" :disabled="saving || writesBlocked" placeholder="例如：申请计划已取消" /></label>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="saving || writesBlocked" @click="dismissCancellation">暂不作废</button><button class="return" :disabled="saving || writesBlocked || dirty">{{ saving ? '正在作废…' : '确认作废申请' }}</button></div>
+          </form>
+        </section>
+        <p v-if="application.status === 'CANCELLED'" class="return-context">此申请已作废，不能再修改或提交。作废人、说明和时间可在操作审计中查看。</p>
         <section v-if="canWithdraw" class="withdrawal-panel" aria-label="撤回审批">
           <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="saving || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
           <form v-else @submit.prevent="withdraw">
@@ -205,7 +247,7 @@ onUnmounted(() => returnFocus?.focus())
         <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button></div>
         <section v-if="historyTab === 'rounds'" class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
-          <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
+          <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
             <div class="round-content"><h4>{{ round.title }}</h4><FormFields :schema="round.formSchema" :model-value="round.payload" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>

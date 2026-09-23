@@ -7,6 +7,28 @@ globalThis.localStorage = { getItem: () => currentToken }
 const { api, writeRequests } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_API))
 const body = { key: 'expense', name: '费用审批', graph: { nodes: [], edges: [] } }
 
+test('作废响应丢失后只恢复原版本和说明，不新建动作或修改请求', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'cancel-recovery' })
+  const sent = [], body = { expectedVersion: 7, comment: '计划已取消' }
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, ...init })
+    if (sent.length === 1) throw new TypeError('lost')
+    return Response.json({ id: 'app/one', status: 'CANCELLED', version: 8 })
+  }
+  await assert.rejects(api.cancelApplication('app/one', body))
+  body.comment = '后续修改'
+  await assert.rejects(api.cancelApplication('app/one', body), error => error.code === 'PENDING_REQUEST_CHANGED')
+  const result = await writeRequests.recover(writeRequests.pending()[0].id)
+  assert.equal(sent.length, 2)
+  assert.equal(sent[0].url, '/api/v1/applications/app%2Fone/cancel')
+  assert.equal(sent[0].method, 'POST')
+  assert.equal(sent[1].body, sent[0].body)
+  assert.deepEqual(JSON.parse(sent[1].body), { expectedVersion: 7, comment: '计划已取消' })
+  assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+  assert.equal(result.result.status, 'CANCELLED')
+  assert.equal(writeRequests.pending().length, 0)
+})
+
 test('包含版本化表单的失败请求保留原字节和小数表示，恢复不采用后续编辑', async () => {
   writeRequests.setActor({ tenantId: 'demo', userId: 'schema-recovery' })
   const schemaBody = { ...body, formSchema: { schemaVersion: 1, fields: [{ key: 'amount', label: '金额', type: 'NUMBER', required: true, minimum: '000.00' }] } }

@@ -78,6 +78,20 @@ public class ApplicationController {
                 () -> ApplicationResponse.from(facade.withdraw(id, request.expectedVersion(), request.comment())));
     }
 
+    /** 作废草稿、已退回或已撤回的申请，保留记录且不能再提交。 */
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<String> cancel(@PathVariable UUID id, @Valid @RequestBody CancelApplicationRequest request,
+                                         HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> ApplicationResponse.from(facade.cancel(id, request.expectedVersion(), request.comment())));
+    }
+
+    /**
+     * 作废说明选填，版本必填；不能携带待保存的表单内容或其他租户。
+     * @author owlzhangfq@gmail.com
+     */
+    public record CancelApplicationRequest(@NotNull Long expectedVersion, @Size(max = 2000) String comment) { }
+
     /**
      * 撤回说明选填；长度在接口边界约束。
      * @author owlzhangfq@gmail.com

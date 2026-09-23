@@ -165,6 +165,17 @@ public final class Application {
         version++;
     }
 
+    /** 作废未在审批中的申请，保留内容与原轮次并进入不可重提的终态。 */
+    public void cancel(long expectedVersion) {
+        checkVersion(expectedVersion);
+        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
+                && status != ApplicationStatus.WITHDRAWN) {
+            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be cancelled");
+        }
+        status = ApplicationStatus.CANCELLED;
+        version++;
+    }
+
     private void requireInApproval() {
         if (status != ApplicationStatus.IN_APPROVAL) {
             throw new DomainException("DOMAIN_RULE_VIOLATION", "Application is not in approval");

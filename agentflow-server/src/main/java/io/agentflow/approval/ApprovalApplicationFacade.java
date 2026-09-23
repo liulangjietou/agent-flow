@@ -98,6 +98,14 @@ public class ApprovalApplicationFacade {
         return application;
     }
 
+    /** 仅申请人可作废未在审批中的单据；申请版本与审计在同一事务内提交。 */
+    @Transactional
+    public Application cancel(UUID id, long expectedVersion, String comment) {
+        Actor actor = currentActor.actor();
+        requireApplicant(actor, id);
+        return service.cancel(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+    }
+
     /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */
     public List<SubmissionRound> rounds(UUID id) {
         Application application = get(id);
@@ -130,7 +138,7 @@ public class ApprovalApplicationFacade {
     private void requireApplicant(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!application.createdBy().equals(actor.userId())) {
-            throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit or withdraw this application");
+            throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit, withdraw or cancel this application");
         }
     }
 }

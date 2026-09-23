@@ -218,6 +218,7 @@ export const api = {
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>('/applications', 'POST', '创建申请草稿', body),
   submitApplication: (id: string, expectedVersion: number) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion }),
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
+  cancelApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/cancel`, 'POST', '作废申请', body),
   definitionAssignees: (signal: AbortSignal) => request<AssigneeOption[]>('/process-definitions/assignee-options', { signal }),
   definitions: () => request<Definition[]>('/process-definitions'),
   getDefinition: (id: string) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`),
