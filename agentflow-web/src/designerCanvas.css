@@ -21,3 +21,6 @@
   .canvas-toolbar .canvas-tools { gap: 5px; }
   .canvas-tools button { min-height: 34px; }
 }
+
+/* 快速步骤和高级画布共享定义，仅切换呈现方式。 */
+.designer-mode-switch{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0 0 14px}.designer-mode-switch button{border:1px solid var(--line);border-radius:8px;background:white;color:var(--muted);padding:9px 14px;font-size:12px}.designer-mode-switch button[aria-pressed=true]{background:var(--deep);color:white;border-color:var(--deep)}.designer-mode-switch span{font-size:11px;color:var(--muted);margin-left:7px}.designer-mode-switch button:focus-visible{outline:3px solid #20a18c60;outline-offset:3px}

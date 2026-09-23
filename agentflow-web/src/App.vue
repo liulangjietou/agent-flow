@@ -30,6 +30,10 @@ import { simulationIssue } from './definitionSimulation'
 import DefinitionPublication from './components/DefinitionPublication.vue'
 import PublicationDialog from './components/PublicationDialog.vue'
 import { DraftAutosave } from './draftAutosave'
+import type { GraphNode } from './api'
+import QuickDesigner from './components/QuickDesigner.vue'
+import ConditionEditor from './components/ConditionEditor.vue'
+import { editQuickGraph, type QuickCommand } from './quickDesigner'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
 import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
@@ -130,6 +134,9 @@ const applicationPayload = ref<Record<string, unknown>>({})
 const applicationFieldErrors = ref<FieldErrors>({})
 const applicationFormError = ref('')
 const applicationFormSchema = computed(() => createdApplication.value ? createdApplication.value.formSchema ?? null : publishedDefinitions.value.find(item => item.id === applicationDefinitionId.value)?.formSchema ?? null)
+const designerMode = ref<'quick' | 'advanced'>('quick')
+// 编辑视图保留输入中的空格，提交时才调用 graphPayload 规范化。
+const quickGraph = computed<Graph>(() => ({ nodes: serializeDesignerNodes(nodes.value), edges: edges.value.map(edge => ({ ...edge })) }))
 const nodes = ref<FlowNode[]>([])
 const edges = ref<GraphEdge[]>([])
 const selectedId = ref('')
@@ -415,7 +422,9 @@ async function locateDesignTarget(id: string) {
   else { const edge = edges.value.find(item => item.id === id); if (!edge) return; selectEdge(edge) }
   await nextTick()
   const nodeId = node?.id ?? edges.value.find(item => item.id === id)?.source
-  const target = Array.from(canvas.value?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []).find(item => item.dataset.nodeId === nodeId)
+  const target = designerMode.value === 'quick'
+    ? Array.from(document.querySelectorAll<HTMLElement>('[data-quick-node]')).find(item => item.dataset.quickNode === nodeId)
+    : Array.from(canvas.value?.querySelectorAll<HTMLElement>('[data-node-id]') ?? []).find(item => item.dataset.nodeId === nodeId)
   target?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' })
 }
 async function validateGraph() {
@@ -535,6 +544,43 @@ function addNode(type: NodeType, position?: Point) {
   }
   selectedId.value = id; selectedEdgeId.value = ''
 }
+/** 快速模式只提交同一图的编辑结果，不持有另一份流程或绕过发布校验。 */
+function editQuick(command: QuickCommand) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  try {
+    const result = editQuickGraph(quickGraph.value, command)
+    const previous = new Map(nodes.value.map(node => [node.id, node]))
+    remember()
+    nodes.value = loadDesignerNodes(result.nodes).map(node => {
+      const old = previous.get(node.id)
+      return old ? { ...node, x: old.x, y: old.y, loadedPosition: old.loadedPosition } : node
+    })
+    edges.value = result.edges
+    const added = nodes.value.find(node => !previous.has(node.id))
+    selectedEdgeId.value = !added && edges.value.some(edge => edge.id === selectedEdgeId.value) ? selectedEdgeId.value : ''
+    selectedId.value = selectedEdgeId.value ? '' : added?.id
+      ?? nodes.value.find(node => node.id === selectedId.value)?.id ?? nodes.value[0]?.id ?? ''
+    connectionTarget.value = ''
+    notice.value = command.kind === 'insert' || command.kind === 'addBranch'
+      ? '步骤已添加，请配置审批人和分支条件；完成后保存并校验。' : '流程已更新，可通过撤销恢复。'
+  } catch (error) { notice.value = errorMessage(error) }
+}
+function patchQuickNode(id: string, patch: Partial<GraphNode>) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (!node) return
+  if (patch.name !== undefined) node.name = patch.name
+  if (patch.properties) {
+    node.originalProperties = { ...node.originalProperties, ...patch.properties }
+    node.assigneeRule = patch.properties.assigneeRule ?? node.assigneeRule
+    node.approvalMode = patch.properties.approvalMode ?? node.approvalMode
+  }
+}
+function patchQuickEdge(id: string, condition: string) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const edge = edges.value.find(edge => edge.id === id)
+  if (edge && !edge.defaultBranch) edge.condition = condition
+}
 function connectNode() {
   const node = selectedNode.value
   if (editorLocked.value || !node || node.type === 'END' || !connectionTarget.value || edges.value.some(edge => edge.source === node.id && edge.target === connectionTarget.value)) return
@@ -597,7 +643,7 @@ async function autoLayout() {
 function keyHandler(event: KeyboardEvent) {
   if (page.value !== 'designer' || editorLocked.value || ['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) return
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo() }
-  if (['Delete', 'Backspace'].includes(event.key)) { event.preventDefault(); deleteSelected() }
+  if (['Delete', 'Backspace'].includes(event.key)) { event.preventDefault(); if (designerMode.value === 'advanced') deleteSelected(); else notice.value = '请使用步骤配置中的删除按钮，以便核对分支内的删除范围。' }
 }
 async function openApplicationForm() {
   if (busy.value || writesBlocked.value) { notice.value = '请先恢复上次操作，再发起新申请。'; return }
@@ -852,7 +898,9 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button></div>
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
-          <div class="designer-layout">
+          <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
               <div class="canvas-toolbar"><span class="canvas-title" :title="definitionName">{{ definitionName }}</span><div class="canvas-tools" aria-label="画布视图操作">
@@ -884,7 +932,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
                 <div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY'" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>
               </template>
-              <template v-else-if="selectedEdge"><div class="inspector-head"><div><p class="eyebrow">EDGE PROPERTY</p><h3>连线条件</h3></div></div><label>条件<input v-model="selectedEdge.condition" :disabled="selectedEdge.defaultBranch" placeholder="如 amount > 5000" @focus="remember" /></label><button v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'EXCLUSIVE_GATEWAY'" class="secondary" @click="toggleDefault(selectedEdge)">{{ selectedEdge.defaultBranch ? '取消默认分支' : '设为默认分支' }}</button><button class="delete-button" @click="deleteSelected">删除连线</button></template>
+              <template v-else-if="selectedEdge"><div class="inspector-head"><div><p class="eyebrow">EDGE PROPERTY</p><h3>连线条件</h3></div></div><ConditionEditor v-if="!selectedEdge.defaultBranch" :key="selectedEdge.id" :model-value="selectedEdge.condition" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchQuickEdge(selectedEdge.id, $event)" /><p v-else class="field-help">其他条件均不满足时进入默认分支。</p><button v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'EXCLUSIVE_GATEWAY'" class="secondary" @click="toggleDefault(selectedEdge)">{{ selectedEdge.defaultBranch ? '取消默认分支' : '设为默认分支' }}</button><button class="delete-button" @click="deleteSelected">删除连线</button></template>
               <div v-else class="inspector-empty"><span>＋</span><h3>选择节点或连线</h3><p>在这里配置流程属性。</p></div>
             </fieldset></aside>
           </div>
