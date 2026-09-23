@@ -5748,6 +5748,192 @@
           }
         ]
       }
+    },
+    "/api/v1/operations/audit": {
+      "get": {
+        "operationId": "searchAudit",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "管理员检索操作审计",
+        "description": "ADMIN 在认证租户内分页检索追加审计事件。按操作时间和记录标识倒序，默认 30、最多 100。q 对关联申请的当前标题或业务单号作字面量包含匹配；actor/action/source/applicationId 精确匹配。from/to 为 UTC 操作日期，包含首尾两天。保留未关联申请或缺少动作、操作人的历史记录；不猜测缺失元数据。只返回索引摘要，不返回表单、原审计正文或意见。不计算总数；翻页不是数据库快照，新事件需重新查询，申请标题始终为当前值。仅接收声明参数。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditSearchPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户审计摘要",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_AUDIT_QUERY：筛选、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "关联申请当前标题或业务单号的字面量包含文本",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "description": "已记录的精确操作人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "description": "明确记录的动作，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "CREATE",
+                "REVISE",
+                "SUBMIT",
+                "WITHDRAW",
+                "CANCEL",
+                "CLAIM",
+                "RELEASE",
+                "TRANSFER",
+                "DELEGATE",
+                "RESOLVE",
+                "RETURN",
+                "REJECT",
+                "APPROVE"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "事件聚合类型，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "Application",
+                "Task"
+              ]
+            }
+          },
+          {
+            "name": "applicationId",
+            "in": "query",
+            "required": false,
+            "description": "可关联的当前租户申请 UUID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "操作开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "操作结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "每页返回上限",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "原查询下一页位置，绑定租户、账号、角色及筛选条件",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -9012,6 +9198,92 @@
           "defaultBranch"
         ],
         "additionalProperties": false
+      },
+      "AuditSearchItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "aggregateId": {
+            "type": "string"
+          },
+          "aggregateVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "applicationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "source",
+          "aggregateId",
+          "aggregateVersion",
+          "occurredAt"
+        ]
+      },
+      "AuditSearchPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditSearchItem"
+            },
+            "maxItems": 100
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ]
       }
     }
   }

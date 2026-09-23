@@ -60,9 +60,10 @@ class LifecycleAuditIntegrationTest {
     void creatingAnApplicationRecordsTheRealActorAndDraftTransition() throws Exception {
         JsonNode application = mapper.readTree(create("AUDIT-" + UUID.randomUUID()).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
-        var events = jdbc.queryForList("SELECT payload_json, aggregate_version FROM audit_event WHERE aggregate_type='Application' AND aggregate_id=?",
+        var events = jdbc.queryForList("SELECT payload_json, aggregate_version, actor_id FROM audit_event WHERE aggregate_type='Application' AND aggregate_id=?",
                 application.path("id").asText());
         assertThat(events).hasSize(1);
+        assertThat(events.get(0).get("ACTOR_ID")).isEqualTo("alice");
         JsonNode event = mapper.readTree(events.get(0).get("PAYLOAD_JSON").toString());
         assertThat(event.path("action").asText()).isEqualTo("CREATE");
         assertThat(event.path("actor").asText()).isEqualTo("alice");
@@ -249,7 +250,7 @@ class LifecycleAuditIntegrationTest {
                 Long.class, id)).isEqualTo(2);
         assertThat(events(id, "Task")).isEmpty();
         assertThat(events(id, "Application")).isEqualTo(before);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND actor_id IS NOT NULL",
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND aggregate_type='Task' AND actor_id IS NOT NULL",
                 Integer.class, id)).isZero();
     }
 

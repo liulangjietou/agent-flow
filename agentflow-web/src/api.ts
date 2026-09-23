@@ -1,4 +1,5 @@
 import type { RoundDiagram } from './roundDiagram'
+import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
 import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
@@ -224,6 +225,7 @@ export const api = {
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
+  searchAudit: (filters: AuditSearchFilters, signal: AbortSignal) => request<AuditSearchPage>('/operations/audit' + historyQuery(filters), { signal }),
   searchApplications: (filters: ApplicationSearchFilters, signal: AbortSignal) => request<ApplicationSearchPage>('/operations/applications' + historyQuery(filters), { signal }),
   exportApplications: (filters: ApplicationExportFilters, signal: AbortSignal) => request<Blob>('/operations/applications/export' + historyQuery(filters), { signal }, 'xlsx'),
   applications: (signal?: AbortSignal) => request<Application[]>('/applications', { signal }),

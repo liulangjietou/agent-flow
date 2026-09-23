@@ -152,6 +152,26 @@ async function exercise(base) {
   assert.equal(cancellationAudit.items.length, 1); assert.equal(cancellationAudit.items[0].comment, cancelBody.comment)
   assert.equal(cancellationAudit.items[0].previousStatus, 'DRAFT'); assert.equal(cancellationAudit.items[0].currentStatus, 'CANCELLED')
   assert.deepEqual((await call('GET', operationsPath, { path: operationsPath + '?processKey=' + definition.key })).metrics, operations.metrics)
+  const auditPath = '/api/v1/operations/audit'
+  const auditFilters = '?applicationId=' + application.id
+  const fullAudit = await call('GET', auditPath, { path: auditPath + auditFilters })
+  assert.deepEqual(fullAudit.items.map(row => row.action).sort(), ['APPROVE', 'CREATE', 'REVISE', 'SUBMIT'])
+  assert.ok(fullAudit.items.every(row => row.actor === (row.source === 'Task' ? 'manager' : 'alice')))
+  assert.ok(fullAudit.items.every(row => row.applicationId === application.id && !('payload' in row) && !('comment' in row)))
+  const firstAudit = await call('GET', auditPath, { path: auditPath + auditFilters + '&limit=2' })
+  assert.equal(firstAudit.items.length, 2); assert.ok(firstAudit.nextCursor)
+  const nextAudit = await call('GET', auditPath, { path: auditPath + auditFilters + '&limit=2&cursor=' + encodeURIComponent(firstAudit.nextCursor) })
+  assert.deepEqual([...firstAudit.items, ...nextAudit.items], fullAudit.items); assert.ok(!nextAudit.nextCursor)
+  const approvals = await call('GET', auditPath, { path: auditPath + auditFilters + '&actor=manager&action=APPROVE&source=Task' })
+  assert.equal(approvals.items.length, 1)
+  const cancelEvents = await call('GET', auditPath, { path: auditPath + '?applicationId=' + cancelled.id + '&actor=alice&action=CANCEL' })
+  assert.equal(cancelEvents.items.length, 1)
+  const withdrawEvents = await call('GET', auditPath, { path: auditPath + '?applicationId=' + withdrawn.id + '&actor=alice&action=WITHDRAW' })
+  assert.equal(withdrawEvents.items.length, 1)
+  await call('GET', auditPath, { user: 'anonymous', status: 401 })
+  await call('GET', auditPath, { user: 'alice', status: 403 })
+  await call('GET', auditPath, { path: auditPath + '?tenantId=other', status: 400 })
+  await call('GET', auditPath, { path: auditPath + auditFilters + '&actor=manager&cursor=' + encodeURIComponent(firstAudit.nextCursor), status: 400 })
   const searchPath = '/api/v1/operations/applications'
   const searchFilters = '?processKey=' + definition.key + '&limit=1'
   const firstSearch = await call('GET', searchPath, { path: searchPath + searchFilters })

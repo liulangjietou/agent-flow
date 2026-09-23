@@ -37,10 +37,10 @@ public class JdbcApplicationAuditAdapter implements ApplicationAuditPort {
         payload.put("comment", operation.comment());
         jdbc.update("""
                 INSERT INTO audit_event
-                (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, payload_json, occurred_at)
-                VALUES (?, ?, ?, 'Application', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, actor_id, payload_json, occurred_at)
+                VALUES (?, ?, ?, 'Application', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """, UUID.randomUUID().toString(), operation.tenantId(), UUID.randomUUID().toString(),
                 operation.applicationId().toString(), operation.aggregateVersion(), operation.applicationId().toString(),
-                operation.action().name(), json.write(payload));
+                operation.action().name(), operation.actor(), json.write(payload));
     }
 }
