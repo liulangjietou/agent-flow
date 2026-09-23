@@ -242,6 +242,6 @@ export const api = {
   copyTemplate: (templateKey: string, body: TemplateCopyInput) => write<Definition>(`/process-templates/${encodeURIComponent(templateKey)}/copy`, 'POST', '复制流程模板为草稿', body),
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
-  validateDefinition: (graph: Graph, formSchema?: FormSchema | null) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }) }),
+  validateDefinition: (graph: Graph, formSchema?: FormSchema | null, signal?: AbortSignal) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }), signal }),
   publishDefinition: (id: string, revision: number, changeNote: string) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程', { changeNote })
 }

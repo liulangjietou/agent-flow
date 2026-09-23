@@ -16,6 +16,8 @@ import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
 import TemplateCenter from './components/TemplateCenter.vue'
+import PortableTemplate from './components/PortableTemplate.vue'
+import type { PortableProcess } from './portableTemplate'
 import SystemChecks from './components/SystemChecks.vue'
 import FirstWorkflow from './components/FirstWorkflow.vue'
 import { guideHidden, rememberGuideSelection } from './firstWorkflow'
@@ -43,7 +45,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type Page = 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
+type Page = 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
@@ -299,6 +301,21 @@ async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
       applyDefinition(definition); rememberGuideSelection(actorScope.value, definition.id); page.value = 'designer'; templateRefresh.value++
       await loadDefinitions(); notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
     } catch (error) { notice.value = errorMessage(error) }
+    finally { busy.value = false }
+  }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
+}
+/** 导入只创建新聚合；与手工新建共用服务端校验、授权、幂等和恢复链路。 */
+async function importTemplate(input: PortableProcess) {
+  const body: PortableProcess = JSON.parse(JSON.stringify(input))
+  await confirmReplaceDefinition('放弃修改并导入', async () => {
+    busy.value = true
+    const scope = actorScope.value
+    try {
+      const definition = await api.definition(body)
+      if (!viewActive || actorScope.value !== scope) return
+      applyDefinition(definition); rememberGuideSelection(scope, definition.id); page.value = 'designer'; templateRefresh.value++
+      await loadDefinitions(); notice.value = '模板已导入为独立草稿，请核对审批人、运行模拟后再发布。'
+    } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
     finally { busy.value = false }
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
 }
@@ -845,7 +862,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
       </aside>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
@@ -883,12 +900,13 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         </section>
         <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
+        <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
-        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="definitions" :locked="busy || writesBlocked" @templates="page = 'templates'" @examples="page = 'examples'" @new="newDefinition()" @edit="openTemplateCopy" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
+        <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :existing-keys="definitions.map(item => item.key)" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
+        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="definitions" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openTemplateCopy" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
         <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="publishedDefinitions" @open="recordApplicationId = $event" />
         <BusinessCalendars v-else-if="page === 'calendars' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
-        <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @designer="page = 'designer'" />
+        <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @import="page = 'transfer'" @designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page" @compositionstart="composing = true" @compositionend="composing = false">
           <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy || writesBlocked" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked || draftConflict" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || draftConflict" @click="openPublication">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
           <section v-if="canManageDefinitions && !readonlyDefinition" class="draft-save-status" aria-label="草稿保存状态">
@@ -901,7 +919,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
               <p v-else-if="!writesBlocked">修正后点击“保存草稿”，成功后恢复自动保存。</p>
             </div>
           </section>
-          <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button></div>
+          <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="page = 'transfer'">导入 / 导出模板</button></div>
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>

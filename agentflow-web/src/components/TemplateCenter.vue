@@ -6,7 +6,7 @@ import { TemplateCatalog, validateTemplateCopy } from '../templateCenter'
 import FormFields from './FormFields.vue'
 
 const props = defineProps<{ examplesOnly?: boolean; scopeKey: string; refreshVersion: number; locked: boolean; hasUnsavedDefinition: boolean }>()
-const emit = defineEmits<{ copy: [templateKey: string, body: TemplateCopyInput]; open: [definitionId: string]; returnDesigner: [] }>()
+const emit = defineEmits<{ copy: [templateKey: string, body: TemplateCopyInput]; open: [definitionId: string]; returnDesigner: []; import: [] }>()
 const catalog = reactive(new TemplateCatalog(api.templates))
 const search = ref('')
 const selectedKey = ref('')
@@ -54,6 +54,7 @@ onUnmounted(() => catalog.clear())
 <template>
   <section class="content template-center">
     <div class="page-heading"><div><p class="eyebrow">PROCESS TEMPLATES</p><h2>{{ examplesOnly ? '先了解一条流程怎样运行。' : '从成熟的起点开始。' }}</h2><p class="subhead">{{ examplesOnly ? '只读预览样例输入、预期路径和校验错误；不会创建申请或执行审批。' : '选择模板，复制为当前租户的独立草稿，再按业务制度调整。' }}</p></div><button class="secondary" :disabled="locked || catalog.loading" @click="load">重新加载目录</button></div>
+    <button v-if="!examplesOnly" class="secondary" :disabled="locked" @click="emit('import')">从文件导入模板</button>
     <div v-if="hasUnsavedDefinition" class="template-draft-note" role="status"><span>流程设计器中有未保存的修改，浏览模板不会覆盖内容。</span><button class="quiet" :disabled="locked" @click="emit('returnDesigner')">返回继续编辑 →</button></div>
     <p v-if="catalog.loading" class="unavailable" role="status">正在加载模板与当前租户副本…</p>
     <div v-else-if="catalog.error" class="panel template-error" role="alert"><p>{{ catalog.error }}</p><button class="secondary" :disabled="locked" @click="load">重试加载</button></div>

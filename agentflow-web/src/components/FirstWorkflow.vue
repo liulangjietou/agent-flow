@@ -5,7 +5,7 @@ import { FirstWorkflowQuery, guideHidden, guideSelection, hideGuide, rememberGui
 import { SystemChecksQuery } from '../systemChecks'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; definitions: Definition[]; locked: boolean }>()
-const emit = defineEmits<{ templates: []; examples: []; new: []; edit: [id: string]; apply: [id: string]; open: [id: string]; checks: []; workbench: [] }>()
+const emit = defineEmits<{ templates: []; import: []; examples: []; new: []; edit: [id: string]; apply: [id: string]; open: [id: string]; checks: []; workbench: [] }>()
 const query = reactive(new FirstWorkflowQuery(api.firstWorkflow))
 const diagnostics = reactive(new SystemChecksQuery(api.systemChecks))
 const selectedId = ref('')
@@ -40,7 +40,7 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
     </div>
     <div class="guide-scope"><strong>当前为开发与演示环境</strong><span>租户、法人、企业身份和组织初始化尚未完成。下方引导帮助验证已有的流程能力，正式使用前需完成企业接入。</span></div>
     <div class="guide-paths">
-      <article class="panel guide-path featured"><span class="guide-number">01 / RECOMMENDED</span><h3>从模板开始</h3><p>请假、用印、合同审批已有字段与路由样例，复制后按实际制度调整。</p><button class="primary" :disabled="locked" @click="emit('templates')">选择并复制模板 ↗</button></article>
+      <article class="panel guide-path featured"><span class="guide-number">01 / RECOMMENDED</span><h3>从模板开始</h3><p>请假、用印、合同审批已有字段与路由样例，复制后按实际制度调整。</p><button class="primary" :disabled="locked" @click="emit('templates')">选择并复制模板 ↗</button><button class="quiet" :disabled="locked" @click="emit('import')">从文件导入模板 →</button></article>
       <article class="panel guide-path"><span class="guide-number">02 / DESIGN</span><h3>创建自己的流程</h3><p>打开可视化设计器，配置字段、审批人和条件，校验并模拟后发布。</p><button class="secondary" :disabled="locked" @click="emit('new')">新建审批流程</button></article>
       <article class="panel guide-path"><span class="guide-number">03 / EXPLORE</span><h3>先看示例数据</h3><p>预览表单样例、预期路径和校验错误，理解一条流程会怎样运行。</p><button class="secondary" :disabled="locked" @click="emit('examples')">只读查看样例</button></article>
     </div>
