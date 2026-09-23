@@ -5305,6 +5305,184 @@
           }
         }
       }
+    },
+    "/api/v1/operations/applications": {
+      "get": {
+        "operationId": "searchApplications",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "管理员检索申请",
+        "description": "ADMIN 在认证租户内检索申请摘要，不包含正文。按创建时间及申请标识倒序进行游标分页，每页默认 30、最多 100。q 对标题或业务单号作字面量包含匹配，其余字段精确匹配。from/to 为可选 UTC 创建日期，包含首尾两天；省略时不限制该侧日期。无全库总数；翻页不冻结审批状态，新记录需重新查询。只接收声明参数。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationSearchPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户申请摘要",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_APPLICATION_QUERY：筛选、版本、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "标题或业务单号包含文本；大小写不敏感，百分号和下划线按字面量匹配",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "申请当前状态，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "DRAFT",
+                "IN_APPROVAL",
+                "RETURNED",
+                "WITHDRAWN",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "REVOKED"
+              ]
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "definitionVersion",
+            "in": "query",
+            "required": false,
+            "description": "精确版本，必须同时指定流程标识",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "applicant",
+            "in": "query",
+            "required": false,
+            "description": "精确申请人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "创建开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "创建结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "每页返回上限",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "原查询下一页位置，绑定租户、账号、角色及筛选条件",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -8358,6 +8536,89 @@
         },
         "required": [
           "expectedVersion"
+        ]
+      },
+      "ApplicationSearchItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN",
+              "CANCELLED",
+              "REVOKED"
+            ]
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "businessNo",
+          "title",
+          "processKey",
+          "definitionVersion",
+          "status",
+          "roundNo",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "ApplicationSearchPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationSearchItem"
+            },
+            "maxItems": 100
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
         ]
       }
     }

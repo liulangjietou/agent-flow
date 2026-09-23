@@ -1,3 +1,4 @@
+import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
@@ -211,6 +212,7 @@ export const api = {
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
+  searchApplications: (filters: ApplicationSearchFilters, signal: AbortSignal) => request<ApplicationSearchPage>('/operations/applications' + historyQuery(filters), { signal }),
   applications: (signal?: AbortSignal) => request<Application[]>('/applications', { signal }),
   application: (id: string, signal?: AbortSignal) => request<Application>(`/applications/${encodeURIComponent(id)}`, { signal }),
   updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>(`/applications/${encodeURIComponent(id)}`, 'PUT', '保存申请修改', body),

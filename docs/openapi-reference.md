@@ -2,7 +2,7 @@
 
 当前已实现 API 的唯一机器可读契约位于 `agentflow-server/src/main/resources/api/openapi.json`，采用 [OpenAPI 3.1.1](https://spec.openapis.org/oas/v3.1.1.html)。它随服务打包，并由已认证的 `GET /api/v1/openapi.json` 返回。接口文档页直接读取此资源，提供搜索、分组、参数、模型、curl 示例和 JSON 下载；没有另建业务状态或修改 DDD 聚合。
 
-契约包含 49 个操作，覆盖认证、定义草稿/发布/校验/模拟/比较、模板、申请、轮次/轨迹/审计/协作评论、任务、工作台、站内消息、工作日历和系统自检。未来新增端点时同步更新契约，Java 路由对照测试会阻止遗漏或虚构端点。
+契约包含 50 个操作，覆盖认证、定义草稿/发布/校验/模拟/比较、模板、申请、轮次/轨迹/审计/协作评论、任务、工作台、站内消息、工作日历和系统自检。未来新增端点时同步更新契约，Java 路由对照测试会阻止遗漏或虚构端点。
 
 ## 最小集成顺序
 
@@ -34,7 +34,7 @@
 ## 验证与维护
 
 - 根目录 `mvn verify`：OpenApiContractTest 对照 Spring 实际路由、所有记录类型请求 DTO 和主要响应 DTO 字段，并验证匿名拒绝、登录可读与静态内容无会话数据。
-- 前端 `npm run test:requests`：132 项请求/模型测试，并调用 `npm run test:openapi`。后者使用固定版本 Swagger Parser 校验 OAS、Ajv 校验所有响应 schema 与 19 个请求样例，以及历史页显式 null。依赖仅在开发阶段使用，不进入浏览器包。
+- 前端 `npm run test:requests`：136 项请求/模型测试，并调用 `npm run test:openapi`。后者使用固定版本 Swagger Parser 校验 OAS、Ajv 校验所有响应 schema 与 19 个请求样例，以及历史页显式 null。依赖仅在开发阶段使用，不进入浏览器包。
 - 在独立演示库运行 `node scripts/check-openapi.mjs http://127.0.0.1:8082 --exercise`（工作目录 agentflow-web）。脚本限制 loopback，显式 --exercise 才写入；从契约读取样例、逐次验证真实响应，覆盖全部 49 个操作与 200/201/400/401/403/404/409/422。创建随机前缀流程、模板副本和申请，执行批准、撤回、作废、已读、日历修订与试算；数据保留，不对正式库执行。
 - 只读文档页不提供在线审批执行器。浏览器验收覆盖接口搜索、权限/幂等说明、模型展开、无结果清空、错误重试和窄屏；其结果与自动化测试分开记录。
 
@@ -53,3 +53,5 @@
 工作日历管理、历史与试算仅允许 ADMIN。写请求携带原修订及幂等键，试算明确指定 revision 且为只读 POST。详见[工作日历与期限试算](business-calendars.md)。
 
 申请人可通过 `/applications/{id}/cancel` 作废草稿、已退回或已撤回的申请。Application 当前状态允许 CANCELLED；原 SubmissionRound 和已办当时状态保持原结论，不能统一改成作废。详见[申请作废](application-cancellation.md)。
+
+管理员可用 `GET /api/v1/operations/applications` 检索租户申请摘要，按创建时间稳定分页；筛选和角色边界见 [管理员申请检索](application-search.md)。原 `/applications` 数组接口仍作为兼容入口，管理员 UI 已切换为分页查询。

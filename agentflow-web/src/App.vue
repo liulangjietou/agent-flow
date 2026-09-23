@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
+import ApplicationSearch from './components/ApplicationSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import PendingTaskQueue from './components/PendingTaskQueue.vue'
 import NotificationInbox from './components/NotificationInbox.vue'
@@ -274,7 +275,7 @@ async function refreshWorkspace(restoreSelection = false) {
   taskRefresh.value++
   const generation = ++workspaceRefreshGeneration
   const scope = actorScope.value
-  try { await Promise.all([loadTasks(), ...(page.value === 'applications' ? [loadApplications()] : []), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
+  try { await Promise.all([loadTasks(), ...(page.value === 'applications' && !canInspectSystem.value ? [loadApplications()] : []), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
   catch (error) { if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) { serverAvailable.value = false; notice.value = errorMessage(error) } }
 }
 function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
@@ -650,7 +651,7 @@ watch(applicationDefinitionId, () => {
 })
 
 watch(page, value => {
-  if (value === 'applications' && loggedIn.value) void loadApplications()
+  if (value === 'applications' && loggedIn.value && !canInspectSystem.value) void loadApplications()
   else { applicationsRequest?.abort(); applicationsRequest = null; applicationsLoading.value = false; applications.value = []; applicationsError.value = '' }
 })
 watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
@@ -704,6 +705,7 @@ async function recoverOperation(id: string) {
         templateRefresh.value++
         notice.value = '已确认原日历保存结果，旧版本保持不变。'
       } else if (request.path.startsWith('/applications')) {
+        templateRefresh.value++
         const value = result as Application
         if (request.path === '/applications') {
           createdApplication.value = value; applicationTitle.value = value.title; applicationBusinessNo.value = value.businessNo
@@ -820,6 +822,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
             </div>
           </div>
         </section>
+        <ApplicationSearch v-else-if="page === 'applications' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <section v-else-if="page === 'applications'" class="content">
           <div class="page-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>申请记录</h2><p class="subhead">服务端按发起人、参与者与管理员权限返回申请。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
           <p v-if="applicationsLoading" class="unavailable" role="status">正在读取申请记录…</p>

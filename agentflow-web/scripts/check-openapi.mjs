@@ -143,6 +143,16 @@ async function exercise(base) {
   assert.equal(cancellationAudit.items.length, 1); assert.equal(cancellationAudit.items[0].comment, cancelBody.comment)
   assert.equal(cancellationAudit.items[0].previousStatus, 'DRAFT'); assert.equal(cancellationAudit.items[0].currentStatus, 'CANCELLED')
   assert.deepEqual((await call('GET', operationsPath, { path: operationsPath + '?processKey=' + definition.key })).metrics, operations.metrics)
+  const searchPath = '/api/v1/operations/applications'
+  const searchFilters = '?processKey=' + definition.key + '&limit=1'
+  const firstSearch = await call('GET', searchPath, { path: searchPath + searchFilters })
+  assert.equal(firstSearch.items.length, 1); assert.ok(firstSearch.nextCursor)
+  const nextSearch = await call('GET', searchPath, { path: searchPath + searchFilters + '&cursor=' + encodeURIComponent(firstSearch.nextCursor) })
+  assert.equal(nextSearch.items.length, 1); assert.notEqual(nextSearch.items[0].id, firstSearch.items[0].id)
+  const cancelledSearch = await call('GET', searchPath, { path: searchPath + '?processKey=' + definition.key + '&status=CANCELLED&applicant=alice&definitionVersion=1' })
+  assert.deepEqual(cancelledSearch.items.map(row => row.id), [cancelled.id]); assert.ok(!('payload' in cancelledSearch.items[0]))
+  await call('GET', searchPath, { user: 'alice', status: 403 })
+  await call('GET', searchPath, { path: searchPath + '?tenantId=other', status: 400 })
   await call('GET', operationsPath, { user: 'alice', status: 403 })
   await call('GET', operationsPath, { path: operationsPath + '?tenantId=other', status: 400 })
   const calendars = '/api/v1/business-calendars', calendarBody = example(calendars), calendarKey = randomUUID()
