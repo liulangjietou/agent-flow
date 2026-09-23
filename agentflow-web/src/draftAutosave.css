@@ -1,0 +1,7 @@
+.draft-save-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0 18px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--muted); font-size: 12px; }
+.draft-save-status > label { display: inline-flex; align-items: center; gap: 7px; margin: 0; color: var(--deep); }
+.draft-save-status input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--teal); }
+.draft-save-error { flex-basis: 100%; padding: 12px 14px; border-left: 3px solid #d5aa67; background: #fff9ef; color: var(--ink); line-height: 1.7; }
+.draft-save-error p { margin: 5px 0; }
+.draft-conflict-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 650px) { .draft-save-status { padding: 12px; } .draft-conflict-actions { flex-direction: column; } }

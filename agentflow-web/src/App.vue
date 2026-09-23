@@ -11,6 +11,7 @@ import DefinitionSimulation from './components/DefinitionSimulation.vue'
 import DefinitionComparison from './components/DefinitionComparison.vue'
 import DefinitionPublication from './components/DefinitionPublication.vue'
 import PublicationDialog from './components/PublicationDialog.vue'
+import { DraftAutosave } from './draftAutosave'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
 import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
@@ -71,6 +72,26 @@ const definitionName = ref('费用报销审批')
 const definitionFormSchema = ref<FormSchema | null>(defaultFormSchema())
 const selectedDefinitionId = ref('')
 const savedSnapshot = ref('')
+const editorSession = ref(0)
+const autosaveEnabled = ref(true)
+const composing = ref(false)
+/** 保存检查点仅留在当前页面，用于确认原请求而不覆盖发送之后的新输入。@author owlzhangfq@gmail.com */
+interface DraftCheckpoint { scope: string; snapshot: string; path: string }
+let pendingDraftCheckpoint: DraftCheckpoint | null = null
+const draftScope = computed(() => `${actorScope.value}:${editorSession.value}`)
+const autosave = reactive(new DraftAutosave(
+  () => ({ scope: draftScope.value, snapshot: snapshot(), eligible: viewActive && loggedIn.value && canManageDefinitions.value
+    && page.value === 'designer' && autosaveEnabled.value && dirty.value && !readonlyDefinition.value
+    && !busy.value && !writesBlocked.value && !confirmationOpen.value && !publicationOpen.value
+    && !dragging.value && !composing.value && !!definitionKey.value.trim() && !!definitionName.value.trim() }),
+  async () => { await persistDraft() }
+))
+const draftConflict = computed(() => ['DRAFT_VERSION_CONFLICT', 'CONCURRENCY_CONFLICT', 'DEFINITION_IMMUTABLE'].includes(autosave.failure?.code ?? ''))
+const visiblePendingWrites = computed(() => pendingWrites.value.filter(operation => !(autosave.saving && operation.sending && operation.path === pendingDraftCheckpoint?.path)))
+const autosaveLabel = computed(() => autosave.saving ? '正在保存草稿…' : autosave.failure ? '自动保存已暂停'
+  : !autosaveEnabled.value ? '自动保存已关闭' : !definitionKey.value.trim() || !definitionName.value.trim() ? '填写流程标识和名称后自动保存'
+  : !definitionId.value && !dirty.value ? '首次修改后自动保存'
+  : autosave.scheduled || dirty.value ? '编辑停顿 2 秒后自动保存' : '草稿已保存')
 const validationMessage = ref('尚未校验，发布前将运行服务端校验。')
 const validationErrors = ref<string[]>([])
 const newApplicationOpen = ref(false)
@@ -114,7 +135,7 @@ const publishedDefinitions = computed(() => definitions.value.filter(definition 
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
 const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
-const editorLocked = computed(() => readonlyDefinition.value || writesBlocked.value || busy.value || confirmationOpen.value || publicationOpen.value)
+const editorLocked = computed(() => readonlyDefinition.value || (writesBlocked.value && !autosave.saving) || busy.value || confirmationOpen.value || publicationOpen.value)
 const visibleTasks = computed(() => tasks.value.filter(task => task.taskName.toLowerCase().includes(taskSearch.value.trim().toLowerCase())))
 const dirty = computed(() => snapshot() !== savedSnapshot.value)
 const today = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date())
@@ -144,7 +165,8 @@ function defaultGraph() {
 }
 function snapshot() { return JSON.stringify({ key: definitionKey.value, name: definitionName.value, nodes: nodes.value, edges: edges.value, formSchema: definitionFormSchema.value }) }
 function remember() { history.value.push(snapshot()); if (history.value.length > 50) history.value.shift(); future.value = [] }
-function restore(raw: string) { const value = JSON.parse(raw); definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null) }
+// 首次保存前的撤销快照可能尚无标识；已落库草稿的身份不能随内容撤销。
+function restore(raw: string) { const value = JSON.parse(raw); if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null) }
 function undo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
 function redo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
 function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; validationErrors.value = []; validationMessage.value = '尚未校验，发布前将运行服务端校验。' }
@@ -155,6 +177,7 @@ function graphPayload(): Graph {
   }
 }
 function applyDefinition(definition: Definition) {
+  editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
   definitionId.value = definition.id; selectedDefinitionId.value = definition.id
   definitionKey.value = definition.key; definitionName.value = definition.name; definitionFormSchema.value = cloneSchema(definition.formSchema ?? null)
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
@@ -189,6 +212,7 @@ async function chooseDefinition() {
 }
 async function newDefinition(copy = false) {
   await confirmReplaceDefinition('放弃修改并新建', () => {
+    editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
     if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
     else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
     definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
@@ -239,6 +263,7 @@ async function openTemplateCopy(id: string) {
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
 }
 function clearDesigner() {
+  editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
   defaultGraph(); definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0
   definitionStatus.value = 'DRAFT'; definitionKey.value = 'expense-reimbursement'; definitionName.value = '费用报销审批'; definitionFormSchema.value = defaultFormSchema()
   resetEditor(); savedSnapshot.value = snapshot()
@@ -311,20 +336,53 @@ async function validateGraph() {
   return result.errors.length === 0
 }
 async function validate() { if (busy.value) return; busy.value = true; try { await validateGraph() } catch (error) { validationMessage.value = '校验请求失败，请重试。'; notice.value = errorMessage(error) } finally { busy.value = false } }
+/** 只确认本次发送的快照；新输入、选中项、焦点和撤销栈均留在编辑器。 */
+function acknowledgeDraft(definition: Definition, checkpoint: DraftCheckpoint) {
+  if (!viewActive || checkpoint.scope !== draftScope.value) return
+  definitionId.value = definition.id; selectedDefinitionId.value = definition.id
+  definitionKey.value = definition.key
+  definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
+  savedSnapshot.value = checkpoint.snapshot
+  const index = definitions.value.findIndex(item => item.id === definition.id)
+  if (index < 0) definitions.value.unshift(definition)
+  else definitions.value[index] = definition
+  localStorage.setItem(`agentflow.definition.${actor.value!.tenantId}`, definition.id)
+}
 async function persistDraft(): Promise<Definition> {
   if (readonlyDefinition.value) throw new Error('已发布定义只读，请先复制为新草稿')
   if (!definitionKey.value.trim() || !definitionName.value.trim()) throw new Error('请填写流程标识和名称')
-  const definition = definitionId.value
-    ? await api.updateDefinition(definitionId.value, { name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value, expectedRevision: definitionRevision.value })
-    : await api.definition({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value })
-  applyDefinition(definition); await loadDefinitions(); return definition
+  definitionKey.value = definitionKey.value.trim()
+  const checkpoint: DraftCheckpoint = { scope: draftScope.value, snapshot: snapshot(), path: definitionId.value ? `/process-definitions/${encodeURIComponent(definitionId.value)}` : '/process-definitions' }
+  pendingDraftCheckpoint = checkpoint
+  try {
+    const definition = definitionId.value
+      ? await api.updateDefinition(definitionId.value, { name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value, expectedRevision: definitionRevision.value })
+      : await api.definition({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value })
+    acknowledgeDraft(definition, checkpoint)
+    if (pendingDraftCheckpoint === checkpoint) pendingDraftCheckpoint = null
+    return definition
+  } catch (error) {
+    if (!pendingWrites.value.some(operation => operation.path === checkpoint.path) && pendingDraftCheckpoint === checkpoint) pendingDraftCheckpoint = null
+    throw error
+  }
 }
 async function saveDraft() {
-  if (busy.value || writesBlocked.value) return; busy.value = true
-  try { await persistDraft(); notice.value = '流程草稿已保存' } catch (error) { notice.value = errorMessage(error) } finally { busy.value = false }
+  if (busy.value || writesBlocked.value || draftConflict.value) return; busy.value = true
+  try { await persistDraft(); autosave.saved(); notice.value = '流程草稿已保存' }
+  catch (error) { autosave.pause(error); notice.value = errorMessage(error) } finally { busy.value = false }
+}
+/** 冲突不自动合并或覆盖；明确放弃本地修改后重新读取服务器最新版本。 */
+async function reloadConflictingDraft() {
+  const id = definitionId.value, scope = draftScope.value
+  if (!id) return
+  await confirmReplaceDefinition('放弃本地修改并加载', async () => {
+    busy.value = true
+    try { const definition = await api.getDefinition(id); if (draftScope.value === scope) { applyDefinition(definition); notice.value = '已加载服务端最新版本。' } }
+    catch (error) { notice.value = errorMessage(error) } finally { busy.value = false }
+  })
 }
 function openPublication() {
-  if (editorLocked.value || !canManageDefinitions.value) return
+  if (editorLocked.value || draftConflict.value || !canManageDefinitions.value) return
   publicationReturnFocus.value = document.activeElement as HTMLElement | null
   publicationError.value = ''; publicationOpen.value = true
 }
@@ -336,10 +394,11 @@ async function publishDraft() {
   try {
     if (!await validateGraph()) { publicationError.value = '流程校验未通过，请返回编辑并修复下方校验问题。'; return }
     const saved = await persistDraft()
+    autosave.saved()
     const published = await api.publishDefinition(saved.id, saved.revision, changeNote)
     applyDefinition(published); publicationOpen.value = false; publicationNote.value = ''
     await loadDefinitions(); notice.value = `流程${statusLabel(published.status)}，版本 v${published.version}，发布记录已保存。`
-  } catch (error) { publicationError.value = errorMessage(error); notice.value = publicationError.value } finally { busy.value = false }
+  } catch (error) { autosave.pause(error); publicationError.value = errorMessage(error); notice.value = publicationError.value } finally { busy.value = false }
 }
 function selectNode(node: FlowNode) { selectedId.value = node.id; selectedEdgeId.value = ''; connectionTarget.value = '' }
 function selectEdge(edge: GraphEdge) { selectedEdgeId.value = edge.id; selectedId.value = '' }
@@ -492,9 +551,9 @@ watch(applicationDefinitionId, () => {
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
 })
 
-watch(actor, () => { confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
-watch([actor, definitionId, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
-watch(definitionId, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
+watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
+watch([actor, editorSession, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
+watch(editorSession, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
 watch(canvas, (element, _previous, onCleanup) => {
   if (!element) return
   const resize = () => { canvasSize.value = { width: element.clientWidth, height: element.clientHeight } }
@@ -504,12 +563,16 @@ watch(canvas, (element, _previous, onCleanup) => {
 })
 watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publicationNote.value = '' }, { flush: 'sync' })
 
+watch([() => snapshot(), draftScope, page, loggedIn, canManageDefinitions, autosaveEnabled, readonlyDefinition,
+  busy, writesBlocked, confirmationOpen, publicationOpen, dragging, composing, savedSnapshot], () => autosave.observe())
+
 watch([nodes, edges, definitionName, definitionFormSchema], () => { validationErrors.value = []; validationMessage.value = '内容已修改，请重新校验。' }, { deep: true, flush: 'sync' })
 
 /** 恢复结果始终更新原资源；恢复成功后由用户决定是否继续提交或发布。 */
 async function recoverOperation(id: string) {
   const pending = pendingWrites.value.find(operation => operation.id === id)
   if (!pending) return
+  const checkpoint = pendingDraftCheckpoint?.scope === draftScope.value && pendingDraftCheckpoint.path === pending.path ? pendingDraftCheckpoint : null
   const replacesDefinition = pending.path.startsWith('/process-definitions') || pending.path.startsWith('/process-templates/')
   await confirmReplaceDefinition('放弃修改并恢复', async () => {
     busy.value = true; recoveryError.value = ''
@@ -518,6 +581,11 @@ async function recoverOperation(id: string) {
       if (request.path.startsWith('/process-templates/') && request.path.endsWith('/copy')) {
         applyDefinition(result as Definition); page.value = 'designer'; templateRefresh.value++
         notice.value = '已确认原模板复制结果，已打开原草稿，请核对后再发布。'
+      } else if (checkpoint && request.path === checkpoint.path && checkpoint.scope === draftScope.value) {
+        acknowledgeDraft(result as Definition, checkpoint); pendingDraftCheckpoint = null
+        if (dirty.value) autosave.pause({ code: 'RECOVERED_WITH_LOCAL_CHANGES', message: '原草稿已确认保存，后续修改仍保留。请点击保存草稿后继续自动保存。' })
+        else autosave.saved()
+        notice.value = '已确认原草稿保存结果，保留发送后的本地修改。'
       } else if (request.path.startsWith('/process-definitions')) {
         applyDefinition(result as Definition); page.value = 'designer'
         notice.value = request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
@@ -541,7 +609,13 @@ async function recoverOperation(id: string) {
         notice.value = `已确认原审批任务的处理结果，申请状态：${statusLabel(value.applicationStatus)}。`
       }
       await refreshWorkspace()
-    } catch (error) { recoveryError.value = errorMessage(error); notice.value = recoveryError.value }
+    } catch (error) {
+      if (checkpoint?.scope === draftScope.value) {
+        autosave.pause(error)
+        if (!pendingWrites.value.some(operation => operation.id === id)) pendingDraftCheckpoint = null
+      }
+      recoveryError.value = errorMessage(error); notice.value = recoveryError.value
+    }
     finally {
       busy.value = false
       await nextTick()
@@ -550,7 +624,7 @@ async function recoverOperation(id: string) {
       ;(recovery ?? dialog ?? workspace.value)?.focus()
     }
   }, () => !busy.value && pendingWrites.value.some(operation => operation.id === id && !operation.sending),
-  replacesDefinition && !readonlyDefinition.value && dirty.value)
+  replacesDefinition && !checkpoint && !readonlyDefinition.value && dirty.value)
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (writeRequests.hasUnconfirmed() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
@@ -562,7 +636,7 @@ onMounted(async () => {
   try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
-onBeforeUnmount(() => { viewActive = false; stopNodeDrag?.(); confirmation.dispose() })
+onBeforeUnmount(() => { viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
 onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
@@ -599,7 +673,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
       <main ref="workspace" class="main" tabindex="-1">
         <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
-        <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="pendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
+        <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
           <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ tasks.length }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
           <div class="metrics"><div><span class="metric-icon teal">◎</span><small>待我审批</small><strong>{{ tasks.length }}</strong><em>服务端实时数据</em></div><div><span class="metric-icon blue">↗</span><small>可访问的申请</small><strong>{{ applications.length }}</strong><em>按当前权限返回</em></div><div><span class="metric-icon amber">⌘</span><small>已发布流程</small><strong>{{ publishedDefinitions.length }}</strong><em>当前租户</em></div><div><span class="metric-icon purple">✦</span><small>Agent 预检</small><strong>—</strong><em>尚未接入</em></div></div>
@@ -638,11 +712,21 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         </section>
         <TemplateCenter v-else-if="page === 'templates' && canManageDefinitions" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @designer="page = 'designer'" />
-        <section v-else-if="page === 'designer'" class="designer-page">
-          <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked" @click="openPublication">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
+        <section v-else-if="page === 'designer'" class="designer-page" @compositionstart="composing = true" @compositionend="composing = false">
+          <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy || writesBlocked" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked || draftConflict" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || draftConflict" @click="openPublication">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
+          <section v-if="canManageDefinitions && !readonlyDefinition" class="draft-save-status" aria-label="草稿保存状态">
+            <label><input v-model="autosaveEnabled" type="checkbox" :disabled="busy || writesBlocked" />自动保存</label>
+            <span role="status" aria-live="polite">{{ autosaveLabel }}<time v-if="autosave.savedAt && !dirty" :datetime="autosave.savedAt.toISOString()"> · {{ autosave.savedAt.toLocaleTimeString('zh-CN') }}</time></span>
+            <div v-if="autosave.failure" class="draft-save-error" role="alert">
+              <strong>{{ draftConflict ? '服务端版本已变化，本地修改已保留。' : '草稿未全部确认保存。' }}</strong>
+              <p>{{ draftConflict ? '自动保存已暂停。可另存本地设计，或放弃本地修改并加载最新版本。' : autosave.failure.message }}</p>
+              <div v-if="draftConflict" class="draft-conflict-actions"><button type="button" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition(true)">另存为新草稿</button><button type="button" class="secondary" :disabled="busy || writesBlocked" @click="reloadConflictingDraft">加载服务端版本</button></div>
+              <p v-else-if="!writesBlocked">修正后点击“保存草稿”，成功后恢复自动保存。</p>
+            </div>
+          </section>
           <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button></div>
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
-          <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
+          <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <div class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批组和下一节点；选中连线可编辑条件或删除。</p><p>支持角色审批组；额外复核组仅为模板示例，组织负责人解析尚未接入。</p></div></aside>
             <div class="canvas-wrap">
@@ -692,7 +776,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
           <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>
           <p v-if="!publishedDefinitions.length && !createdApplication" class="unavailable">当前没有已发布流程，请先由流程管理员创建并发布。</p>
-          <RequestRecovery :pending="pendingWrites" :error="recoveryError" @recover="recoverOperation" />
+          <RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" />
           <p v-if="applicationFormError" class="inline-error" role="alert">{{ applicationFormError }}</p>
           <form novalidate @submit.prevent="createAndSubmitApplication(true)">
             <fieldset :disabled="busy || writesBlocked || !!createdApplication">
