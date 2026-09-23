@@ -3,8 +3,8 @@ import { computed, onUnmounted, reactive, watch } from 'vue'
 import { api } from '../api'
 import { assigneeLabel, DefinitionAssigneesQuery } from '../definitionAssignees'
 
-const props = defineProps<{ modelValue: string; scopeKey: string; disabled: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [rule: string]; beforeChange: [] }>()
+const props = defineProps<{ modelValue: string; approvalMode?: string; scopeKey: string; disabled: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [rule: string]; 'update:approvalMode': [mode: string]; beforeChange: [] }>()
 const query = reactive(new DefinitionAssigneesQuery(api.definitionAssignees))
 const users = computed(() => query.options.filter(option => option.rule.startsWith('user:')))
 const roles = computed(() => query.options.filter(option => option.rule.startsWith('role:')))
@@ -15,12 +15,24 @@ function choose(event: Event) {
   if (rule && !query.options.some(option => option.rule === rule && option.memberCount > 0)) return
   emit('beforeChange'); emit('update:modelValue', rule)
 }
+function chooseMode(event: Event) {
+  const mode = (event.target as HTMLSelectElement).value
+  if (props.disabled || !['SINGLE', 'ALL'].includes(mode) || mode === (props.approvalMode ?? 'SINGLE')) return
+  emit('beforeChange'); emit('update:approvalMode', mode)
+}
 watch(() => props.scopeKey, scope => { void query.load(scope) }, { immediate: true, flush: 'sync' })
 onUnmounted(() => query.clear())
 </script>
 
 <template>
   <section class="assignee-config" aria-label="审批人配置">
+    <label>审批方式
+      <select :value="approvalMode ?? 'SINGLE'" :disabled="disabled" @change="chooseMode">
+        <option value="SINGLE">单人审批 · 一人处理即可</option>
+        <option value="ALL">全员会签 · 全部同意才通过</option>
+        <option v-if="approvalMode && !['SINGLE', 'ALL'].includes(approvalMode)" :value="approvalMode">未知方式：{{ approvalMode }}</option>
+      </select>
+    </label>
     <label>审批人
       <select :value="modelValue" :disabled="disabled || query.loading || !query.loaded || !!query.error || !query.options.length" @change="choose">
         <option value="">请选择审批人或角色</option>
@@ -34,8 +46,9 @@ onUnmounted(() => query.clear())
     <template v-else-if="query.loaded">
       <p v-if="!query.options.length" class="assignee-error">当前没有可用审批账号，请先配置身份源和审批角色。</p>
       <p v-else-if="modelValue && (!selected || selected.memberCount < 1)" class="assignee-error" role="alert">已有配置当前匹配不到审批人，请重新选择后发布。</p>
-      <p v-else-if="selected">{{ selected.rule.startsWith('user:') ? '任务直接交给该账号审批。' : `当前有 ${selected.memberCount} 人可审批，由其中一人处理。` }}</p>
+      <p v-else-if="selected">{{ approvalMode === 'ALL' ? `当前匹配 ${selected.memberCount} 人，每人收到一张待办。` : selected.rule.startsWith('user:') ? '任务直接交给该账号审批。' : `当前有 ${selected.memberCount} 人可审批，由其中一人处理。` }}</p>
     </template>
+    <p v-if="approvalMode === 'ALL'" class="assignee-help">进入节点时固定审批名单；全部同意才流转，任一驳回结束整轮。支持委派后回交，不支持转交和释放。</p>
     <button v-if="scopeKey" type="button" class="secondary" :disabled="disabled || query.loading" @click="query.load(scopeKey)">{{ query.error ? '重试读取审批人' : '刷新审批人' }}</button>
     <p class="assignee-help">名单来自当前身份源，发布时重新核对；组织负责人和多级上级尚未接入。</p>
   </section>

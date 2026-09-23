@@ -4,6 +4,19 @@ const { loadDesignerNodes, serializeDesignerNodes } = await import(process.env.A
 const loaded = () => ({ id: 'approve', name: '审批', type: 'USER_TASK', x: 220, y: 180, assigneeRule: 'role:MANAGER',
   originalProperties: { assigneeRule: 'role:MANAGER', businessTag: '保留原属性' }, loadedPosition: { x: 220, y: 180 } })
 
+test('会签方式可保存、重新加载和切回单人审批，旧节点保持缺省属性', () => {
+  const graph = [{ id: 'approve', name: '审批', type: 'USER_TASK', properties: loaded().originalProperties }]
+  const nodes = loadDesignerNodes(graph)
+  assert.equal(nodes[0].approvalMode, 'SINGLE')
+  assert.deepEqual(serializeDesignerNodes(nodes), graph)
+  nodes[0].approvalMode = 'ALL'
+  const reloaded = loadDesignerNodes(serializeDesignerNodes(nodes))
+  assert.equal(reloaded[0].approvalMode, 'ALL')
+  reloaded[0].approvalMode = 'SINGLE'
+  assert.equal(serializeDesignerNodes(reloaded)[0].properties.approvalMode, 'SINGLE')
+  assert.equal(serializeDesignerNodes(reloaded)[0].properties.businessTag, '保留原属性')
+})
+
 test('旧节点未修改时不写入虚构坐标，保留编辑器未知属性', () => {
   const node = loadDesignerNodes([{ id: 'approve', name: '审批', type: 'USER_TASK', properties: loaded().originalProperties }])[0]
   const result = serializeDesignerNodes([node])[0]

@@ -107,6 +107,16 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             String rule = Objects.requireNonNull(node.properties().get("assigneeRule"), "assigneeRule");
             xml.append("<userTask id=\"").append(escape(node.id())).append("\" name=\"")
                     .append(escape(node.name())).append("\"");
+            if (node.approvalMode() == ApprovalMode.ALL) {
+                String encodedRule = Base64.getEncoder().encodeToString(rule.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                // 不设置提前结束条件：所有子任务完成后引擎才继续；用户规则只作为编码后的字面量参数。
+                xml.append(" flowable:assignee=\"${agentflowCountersignUser}\">")
+                        .append("<multiInstanceLoopCharacteristics isSequential=\"false\" ")
+                        .append("flowable:collection=\"${flowableCountersignMembers.resolve(execution, '").append(encodedRule).append("')}\" ")
+                        .append("flowable:elementVariable=\"agentflowCountersignUser\"/>")
+                        .append("</userTask>");
+                return;
+            }
             if (rule.startsWith("role:")) {
                 xml.append(" flowable:candidateGroups=\"").append(escape(rule.substring("role:".length()))).append("\"");
             } else if (rule.startsWith("user:")) {

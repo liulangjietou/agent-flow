@@ -6,6 +6,7 @@ import type { GraphNode } from './api'
  */
 export interface DesignerNode {
   id: string; name: string; type: string; x: number; y: number; assigneeRule: string
+  approvalMode?: string
   originalProperties?: Record<string, string>
   loadedPosition?: { x: number; y: number }
 }
@@ -22,7 +23,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
     const x = Number.isFinite(rawX) && rawX >= 0 ? rawX : DEFAULT_NODE_X + index * DEFAULT_NODE_SPACING
     const y = Number.isFinite(rawY) && rawY >= 0 ? rawY : DEFAULT_NODE_Y
     return { id: node.id, name: node.name, type: node.type, x, y, assigneeRule: node.properties.assigneeRule ?? '',
-      originalProperties: { ...node.properties }, loadedPosition: { x, y } }
+      approvalMode: node.properties.approvalMode ?? 'SINGLE', originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
 }
 
@@ -33,6 +34,10 @@ export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
     if (node.type === 'USER_TASK') {
       if (node.assigneeRule) properties.assigneeRule = node.assigneeRule
       else delete properties.assigneeRule
+      // 未修改的旧节点保留原属性，不能因展示默认值而制造版本差异。
+      if (node.approvalMode && (node.approvalMode !== 'SINGLE' || properties.approvalMode !== undefined)) {
+        properties.approvalMode = node.approvalMode
+      }
     }
     for (const axis of ['x', 'y'] as const) {
       if (!node.loadedPosition || node[axis] !== node.loadedPosition[axis]) properties[axis] = String(node[axis])

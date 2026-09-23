@@ -67,6 +67,7 @@ const labels: Record<string, string> = {
   schemaBinding: '绑定申请表单', schemaVersion: '表单格式版本', fieldOrder: '字段填写顺序', required: '必填',
   helpText: '填写提示', maxLength: '最多字符数', minimum: '最小值', maximum: '最大值', options: '可选项',
   properties: '节点属性', assigneeRule: '审批人规则', 'properties.assigneeRule': '审批人规则',
+  approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   x: '水平位置', y: '垂直位置', 'properties.x': '水平位置', 'properties.y': '垂直位置', value: '保存值'
 }
 const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', EXCLUSIVE_GATEWAY: '条件分支',
@@ -82,6 +83,7 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (value === '') return '空值'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'string') {
+    if (property.endsWith('approvalMode')) return value === 'ALL' ? '全员会签' : value === 'SINGLE' ? '单人审批' : value
     if (property === 'type') return own(types, value) ?? value
     if (property.endsWith('assigneeRule')) {
       const roles: Record<string, string> = { 'role:MANAGER': '部门审批组', 'role:FINANCE': '财务审批组', 'role:ADMIN': '额外复核组（示例）' }

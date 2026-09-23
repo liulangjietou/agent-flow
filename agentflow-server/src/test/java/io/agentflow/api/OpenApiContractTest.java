@@ -81,6 +81,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("Publication", io.agentflow.definition.DefinitionPublication.class),
                 java.util.Map.entry("PublicationValidation", io.agentflow.definition.DefinitionPublication.ValidationSummary.class),
                 java.util.Map.entry("Task", io.agentflow.approval.process.FlowableTaskFacade.TaskView.class),
+                java.util.Map.entry("CountersignProgress", io.agentflow.approval.model.CountersignProgress.class),
                 java.util.Map.entry("TaskActionResult", io.agentflow.approval.process.FlowableTaskFacade.ActionResult.class),
                 java.util.Map.entry("PendingTask", io.agentflow.approval.workspace.PendingTaskReadPort.Item.class),
                 java.util.Map.entry("PendingTaskPage", io.agentflow.approval.workspace.PendingTaskController.Page.class),

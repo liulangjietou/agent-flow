@@ -63,8 +63,10 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         org.flowable.engine.runtime.ProcessInstance instance = runtimeService
                 .createProcessInstanceBuilder().processDefinitionId(definition.getId())
                 .businessKey(command.businessNo()).tenantId(command.tenantId()).variables(variables).start();
-        Task task = taskService.createTaskQuery().processInstanceId(instance.getId()).singleResult();
-        return new StartedProcess(instance.getId(), task == null ? null : task.getId());
+        // 会签会同时产生多张待办；兼容端口只提供首个标识，不把它作为全部运行任务。
+        List<Task> firstTasks = taskService.createTaskQuery().processInstanceId(instance.getId())
+                .orderByTaskCreateTime().asc().orderByTaskId().asc().listPage(0, 1);
+        return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId());
     }
 
     private ProcessDefinition boundDefinition(StartProcessCommand command) {

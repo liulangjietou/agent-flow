@@ -4,6 +4,7 @@ import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.TaskAction;
 import io.agentflow.approval.model.TaskDelegation;
+import io.agentflow.approval.model.CountersignProgress;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import org.flowable.task.api.DelegationState;
 import io.agentflow.approval.model.SubmissionRound;
@@ -81,9 +82,19 @@ public class FlowableTaskFacade {
 
     private TaskView view(Actor actor, Task task) {
         Application application = applicationFor(actor, task);
+        CountersignProgress countersign = countersign(task);
         return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
                 application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
-                delegation(task).allowedActions(task.getAssignee() != null));
+                delegation(task).allowedActions(task.getAssignee() != null).stream()
+                        .filter(action -> countersign == null || countersign.allows(action)).toList(), countersign);
+    }
+
+    private CountersignProgress countersign(Task task) {
+        var variables = taskService.getVariables(task.getId(), List.of(FlowableCountersignMembers.MEMBERS,
+                FlowableCountersignMembers.TOTAL, FlowableCountersignMembers.COMPLETED));
+        if (!variables.containsKey(FlowableCountersignMembers.MEMBERS)) return null;
+        return new CountersignProgress(((Number) variables.get(FlowableCountersignMembers.TOTAL)).intValue(),
+                ((Number) variables.get(FlowableCountersignMembers.COMPLETED)).intValue());
     }
 
     /** 执行动作；负向决定直接终止实例，避免流程继续流转。 */
@@ -99,6 +110,9 @@ public class FlowableTaskFacade {
         ApplicationStatus previousStatus = application.status();
         TaskAction normalized = TaskAction.parse(action);
         delegation(task).requireAction(normalized);
+        CountersignProgress countersign = countersign(task);
+        if (countersign != null) countersign.requireAction(normalized);
+        var previousTaskIds = normalized == TaskAction.APPROVE ? notifications.pendingTaskIds(application) : java.util.Set.<String>of();
         String auditEventId;
         switch (normalized) {
             case CLAIM -> {
@@ -171,7 +185,7 @@ public class FlowableTaskFacade {
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }
-        notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName());
+        notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds);
         return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }
 
@@ -268,7 +282,7 @@ public class FlowableTaskFacade {
      */
     public record TaskView(String taskId, String taskName, String assignee, String applicationId,
                            java.util.Date createdAt, long version, String owner, String delegationState,
-                           List<TaskAction> allowedActions) { }
+                           List<TaskAction> allowedActions, CountersignProgress countersign) { }
 
     /**
      * 动作结果。

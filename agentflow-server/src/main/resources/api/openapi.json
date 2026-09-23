@@ -4071,7 +4071,8 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
-            }
+            },
+            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）和 ALL（全员会签）。ALL 在节点激活时固定有效成员，全部同意才通过，空名单回滚本次操作。"
           }
         },
         "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。其他引擎节点尚未支持发布。",
@@ -5199,6 +5200,10 @@
                 "APPROVE"
               ]
             }
+          },
+          "countersign": {
+            "$ref": "#/components/schemas/CountersignProgress",
+            "description": "仅会签任务返回；人数来自当前多实例节点的引擎状态。"
           }
         },
         "required": [
@@ -5910,6 +5915,24 @@
           }
         },
         "additionalProperties": false
+      },
+      "CountersignProgress": {
+        "type": "object",
+        "required": [
+          "total",
+          "completed"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "description": "进入节点时固定有效审批名单，全部同意才流转；任一驳回终止整轮。委派协助后回交不计为同意。"
       }
     }
   }

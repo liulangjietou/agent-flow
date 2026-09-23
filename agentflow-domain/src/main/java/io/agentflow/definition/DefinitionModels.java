@@ -25,6 +25,12 @@ public final class DefinitionModels {
     public enum NodeType { START, END, USER_TASK, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
 
     /**
+     * 单人办理或全员会签；未配置的历史节点保持单人办理。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ApprovalMode { SINGLE, ALL }
+
+    /**
      * 流程节点。
      * @author owlzhangfq@gmail.com
      */
@@ -34,6 +40,11 @@ public final class DefinitionModels {
                 throw new DomainException("INVALID_NODE", "Node id, name and type are required");
             }
             properties = properties == null ? Map.of() : Map.copyOf(properties);
+        }
+
+        /** 入口已校验模式合法性，发布适配器直接读取领域语义。 */
+        public ApprovalMode approvalMode() {
+            return ApprovalMode.valueOf(properties.getOrDefault("approvalMode", ApprovalMode.SINGLE.name()));
         }
     }
 

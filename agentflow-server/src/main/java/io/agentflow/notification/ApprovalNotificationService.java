@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import static io.agentflow.notification.InboxMessage.Kind;
 
@@ -31,7 +34,13 @@ public class ApprovalNotificationService {
     /** 提交成功后给申请人确认，并提醒实际第一批审批人。 */
     public void submitted(Application application, String actor) {
         send(application, actor, application.createdBy(), Kind.APPLICATION_SUBMITTED, null, null);
-        pending(application, actor, Kind.TASK_PENDING);
+        pending(application, actor, Kind.TASK_PENDING, task -> true);
+    }
+
+    /** 审批前记录已有任务，审批成功后只提醒本次实际新建的待办。 */
+    public Set<String> pendingTaskIds(Application application) {
+        return audience.pending(application.tenantId(), application.id()).stream()
+                .map(TaskAudiencePort.Audience::taskId).collect(Collectors.toSet());
     }
 
     /** 撤回前保留当前处理人，避免实例终止后无法定位需要通知的账号。 */
@@ -48,25 +57,27 @@ public class ApprovalNotificationService {
     }
 
     /** 通知内容取已成功执行后的事实；领取不重复提醒，释放提醒恢复的候选人。 */
-    public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName) {
+    public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName,
+                          Set<String> previousTaskIds) {
         switch (action) {
             case APPROVE -> {
                 if (application.status() == ApplicationStatus.APPROVED) {
                     send(application, actor, application.createdBy(), Kind.APPLICATION_APPROVED, taskId, nodeName);
-                } else pending(application, actor, Kind.TASK_PENDING);
+                } else pending(application, actor, Kind.TASK_PENDING, task -> !previousTaskIds.contains(task.taskId()));
             }
             case RETURN -> send(application, actor, application.createdBy(), Kind.APPLICATION_RETURNED, taskId, nodeName);
             case REJECT -> send(application, actor, application.createdBy(), Kind.APPLICATION_REJECTED, taskId, nodeName);
-            case TRANSFER -> pending(application, actor, Kind.TASK_TRANSFERRED);
-            case DELEGATE -> pending(application, actor, Kind.TASK_DELEGATED);
-            case RESOLVE -> pending(application, actor, Kind.TASK_RESOLVED);
-            case RELEASE -> pending(application, actor, Kind.TASK_PENDING);
+            case TRANSFER -> pending(application, actor, Kind.TASK_TRANSFERRED, task -> taskId.equals(task.taskId()));
+            case DELEGATE -> pending(application, actor, Kind.TASK_DELEGATED, task -> taskId.equals(task.taskId()));
+            case RESOLVE -> pending(application, actor, Kind.TASK_RESOLVED, task -> taskId.equals(task.taskId()));
+            case RELEASE -> pending(application, actor, Kind.TASK_PENDING, task -> taskId.equals(task.taskId()));
             case CLAIM -> { /* 领取不生成新提醒，原消息仍保留其发生时事实。 */ }
         }
     }
 
-    private void pending(Application application, String actor, Kind kind) {
+    private void pending(Application application, String actor, Kind kind, Predicate<TaskAudiencePort.Audience> affected) {
         for (var task : audience.pending(application.tenantId(), application.id())) {
+            if (!affected.test(task)) continue;
             for (String user : task.recipients()) send(application, actor, user, kind, task.taskId(), task.nodeName());
         }
     }

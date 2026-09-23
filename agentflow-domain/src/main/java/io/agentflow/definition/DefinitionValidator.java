@@ -24,6 +24,13 @@ public final class DefinitionValidator {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            String approvalMode = n.properties().get("approvalMode");
+            if (approvalMode != null) {
+                if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_MODE_REQUIRES_USER_TASK:" + n.id());
+                else if (java.util.Arrays.stream(ApprovalMode.values()).noneMatch(mode -> mode.name().equals(approvalMode))) {
+                    errors.add("APPROVAL_MODE_INVALID:" + n.id());
+                }
+            }
             if (nodes.put(n.id(), n) != null) errors.add("DUPLICATE_NODE:" + n.id());
             if (n.type() == NodeType.SERVICE_TASK || n.type() == NodeType.PARALLEL_GATEWAY) {
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());

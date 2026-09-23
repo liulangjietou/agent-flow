@@ -29,6 +29,7 @@ onUnmounted(cancel)
 
 <template>
   <div class="task-actions">
+    <div v-if="task.countersign" class="delegation-note" role="status"><strong>全员会签 · 已同意 {{ task.countersign.completed }} / {{ task.countersign.total }} 人</strong><p>全部同意才通过，任一驳回结束整轮。名单已固定，可委派协助后回交，由原审批人作最终决定。</p></div>
     <div v-if="delegated" class="delegation-note"><strong>受托处理 · 回交给 {{ task.owner || '待核对的原审批人' }}</strong><p>{{ task.owner ? '填写处理意见并回交。申请继续保持审批中，由原审批人作最终决定。' : '原责任人缺失，请联系流程管理员核对后再处理。' }}</p></div>
     <div v-else-if="task.delegationState === 'RESOLVED'" class="delegation-note"><strong>受托处理已回交</strong><p>请在操作审计中查看受托人的意见，再继续审批。</p></div>
     <form v-if="pending" class="task-action-form" @submit.prevent="execute(pending)">

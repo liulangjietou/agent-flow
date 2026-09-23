@@ -47,7 +47,7 @@ export interface SystemCheckReport {
 }
 export type TaskAction = 'CLAIM' | 'RELEASE' | 'TRANSFER' | 'DELEGATE' | 'RESOLVE' | 'RETURN' | 'REJECT' | 'APPROVE'
 /** 当前可操作的任务快照；动作由服务端按委派状态限制。@author owlzhangfq@gmail.com */
-export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[] }
+export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number } }
 /** 待办只读摘要不携带审批正文或可直接提交的动作版本。@author owlzhangfq@gmail.com */
 export interface PendingTaskItem {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
@@ -127,6 +127,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
+      COUNTERSIGN_ASSIGNMENT_FIXED: '会签名单已固定，不能转交、释放或重新领取；可委派协助后回交。',
+      COUNTERSIGN_NO_MEMBERS: '会签节点当前没有有效审批人，本次操作未生效，请联系管理员补齐审批名单。',
+      COUNTERSIGN_STATE_INVALID: '会签执行状态异常，本次操作未生效，请联系管理员核对。',
       TASK_DELEGATION_PENDING: '这项任务处于受托处理阶段，请填写意见并回交给原审批人。',
       TASK_NOT_DELEGATED: '任务已不在待回交状态，请刷新后重新选择。',
       TASK_DELEGATION_OWNER_MISSING: '原委派责任人缺失，请联系流程管理员核对。',

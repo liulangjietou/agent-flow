@@ -34,10 +34,12 @@
 ## 验证与维护
 
 - 根目录 `mvn verify`：OpenApiContractTest 对照 Spring 实际路由、所有记录类型请求 DTO 和主要响应 DTO 字段，并验证匿名拒绝、登录可读与静态内容无会话数据。
-- 前端 `npm run test:requests`：96 项请求/模型测试，并调用 `npm run test:openapi`。后者使用固定版本 Swagger Parser 校验 OAS、Ajv 校验所有响应 schema 与 14 个请求样例，以及历史页显式 null。依赖仅在开发阶段使用，不进入浏览器包。
+- 前端 `npm run test:requests`：101 项请求/模型测试，并调用 `npm run test:openapi`。后者使用固定版本 Swagger Parser 校验 OAS、Ajv 校验所有响应 schema 与 14 个请求样例，以及历史页显式 null。依赖仅在开发阶段使用，不进入浏览器包。
 - 在独立演示库运行 `node scripts/check-openapi.mjs http://127.0.0.1:8082 --exercise`（工作目录 agentflow-web）。脚本限制 loopback，显式 --exercise 才写入；从契约读取样例、逐次验证真实响应，覆盖全部 37 个操作与 200/201/400/401/403/404/409/422。创建随机前缀流程、模板副本和申请，执行批准、撤回、已读；数据保留，不对正式库执行。
 - 只读文档页不提供在线审批执行器。浏览器验收覆盖接口搜索、权限/幂等说明、模型展开、无结果清空、错误重试和窄屏；其结果与自动化测试分开记录。
 
 结构校验不能证明业务权限和状态正确；实际调用验收也不能覆盖所有业务分支。授权、事务和表单边界仍由原领域与集成回归测试验证。普通已认证账号可读契约，读取文档不会改变其接口权限。
 
 流程管理员可通过 `/process-definitions/assignee-options` 读取当前身份源中的可配置审批账号和角色。发布会重新核对有效成员，完整语义见[审批人配置](designer-assignees.md)。
+
+会签模式使用人工节点 `properties.approvalMode=ALL`，默认 SINGLE。任务详情可返回 `countersign.total/completed`，并限制固定责任动作。全员规则、空名单回滚与并发处理见[全员会签](all-countersign.md)。

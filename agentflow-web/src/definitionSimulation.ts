@@ -76,6 +76,8 @@ const ruleLabels: Record<string, string> = {
   DUPLICATE_NODE: '节点标识重复', DUPLICATE_EDGE: '连线标识重复', EDGE_NODE_NOT_FOUND: '连线引用了不存在的节点',
   START_COUNT_MUST_BE_ONE: '流程必须只有一个开始节点', END_REQUIRED: '流程缺少结束节点',
   NODE_UNREACHABLE: '节点无法从开始节点到达', NODE_DEAD_END: '节点没有后续路径', GRAPH_LOOP: '流程存在循环，请移除回流连线',
+  APPROVAL_MODE_INVALID: '审批方式不合法，请选择单人审批或全员会签',
+  APPROVAL_MODE_REQUIRES_USER_TASK: '只有人工审批节点可以配置审批方式',
   ASSIGNEE_NOT_AVAILABLE: '该节点当前匹配不到有效审批人，请重新选择',
   ASSIGNEE_RULE_REQUIRED: '审批节点尚未配置审批人', ASSIGNEE_RULE_INVALID: '审批人配置不合法',
   UNSUPPORTED_NODE_TYPE: '当前版本不支持此节点类型', INVALID_CONDITION: '分支条件或引用字段不合法',

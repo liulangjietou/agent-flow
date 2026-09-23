@@ -115,3 +115,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、前端请求测试和�
 - [待办检索与分页](docs/pending-task-queue.md)
 
 开放 API 与集成：[接口契约、调用顺序与验收](docs/openapi-reference.md)。登录后从“接口文档”进入，下载当前部署的 OpenAPI JSON。
+
+人工审批节点现支持[全员会签](docs/all-countersign.md)：全部同意才流转，任一驳回结束整轮。设计器可配置，待办展示实际完成进度；名单在节点激活时固定，支持委派协助后回交。
