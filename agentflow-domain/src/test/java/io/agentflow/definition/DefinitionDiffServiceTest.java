@@ -17,6 +17,14 @@ class DefinitionDiffServiceTest {
     private final DefinitionDiffService service = new DefinitionDiffService();
 
     @Test
+    void conditionLanguageVersionIsAnExplicitRoutingChange() {
+        Graph old = graph(List.of());
+        Graph upgraded = new Graph(old.nodes(), old.edges(), 2);
+        assertThat(service.compare(snapshot(old, null), snapshot(upgraded, null)))
+                .containsExactly(new Change(Area.ROUTING, ChangeKind.MODIFIED, "", "条件语言", "conditionLanguageVersion", 1, 2));
+    }
+
+    @Test
     void identicalSnapshotsAndGlobalEdgeReorderingHaveNoChanges() {
         Graph before = graph(List.of(edge("one", "gate", "a", "amount > 1", false),
                 edge("two", "gate", "b", "amount > 2", false), edge("outside", "a", "end", "", false)));

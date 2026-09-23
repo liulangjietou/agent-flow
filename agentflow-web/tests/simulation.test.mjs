@@ -71,3 +71,19 @@ test('设计试算用只读 POST，携带完整未保存内容与取消信号，
   await assert.rejects(api.simulateDesign(input(), controller.signal), failure => failure.code === 'NETWORK_ERROR')
   assert.deepEqual(writeRequests.pending(), [])
 })
+
+test('条件错误定位保留含冒号的连线标识和字符位置', () => {
+  const issue=simulationIssue('INVALID_CONDITION_AT:edge:part:9')
+  assert.equal(issue.target,'edge:part');assert.match(issue.label,/第 9 个字符/)
+})
+
+test('条件升级只读请求携带原图与取消信号，不创建幂等写入', async () => {
+  const {api,writeRequests}=await import(process.env.AGENTFLOW_TEST_API)
+  const controller=new AbortController(), graph={nodes:[],edges:[],conditionLanguageVersion:1}
+  let sent
+  globalThis.fetch=async(url,init)=>{sent={url,...init};return Response.json({...graph,conditionLanguageVersion:2})}
+  assert.equal((await api.upgradeConditions(graph,controller.signal)).conditionLanguageVersion,2)
+  assert.ok(sent.url.endsWith('/process-definitions/upgrade-conditions'))
+  assert.deepEqual(JSON.parse(sent.body),{graph});assert.equal(sent.signal,controller.signal)
+  assert.equal(sent.headers.has('Idempotency-Key'),false);assert.deepEqual(writeRequests.pending(),[])
+})

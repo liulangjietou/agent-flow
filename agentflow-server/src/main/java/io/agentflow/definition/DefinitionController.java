@@ -50,6 +50,14 @@ public class DefinitionController {
                 : service.validate(request.graph(), request.formSchema()));
     }
 
+    /** 只读地将旧条件转换为等价新版表达式，结果仍须由既有草稿用例保存。 */
+    @PostMapping("/upgrade-conditions")
+    public ResponseEntity<Graph> upgradeConditions(@Valid @RequestBody GraphRequest request) {
+        requireProcessAdmin();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(new ConditionLanguageUpgrade().upgrade(request.graph()));
+    }
+
     /** 仅流程管理员可读取当前租户的审批人配置目录。 */
     @GetMapping("/assignee-options")
     public ResponseEntity<List<DefinitionAssigneeDirectory.Option>> assigneeOptions() {

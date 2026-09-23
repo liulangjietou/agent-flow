@@ -63,8 +63,10 @@ public final class DefinitionValidator {
             outgoing.add(e.source()); incoming.add(e.target());
             outgoingEdges.computeIfAbsent(e.source(), ignored -> new ArrayList<>()).add(e);
             try {
-                ConditionAst condition = parser.parse(e.condition());
+                ConditionAst condition = parser.parse(e.condition(), graph.conditionLanguageVersion());
                 if (formSchema != null) formSchema.validateCondition(condition);
+                else if (containsMembership(condition)) errors.add("CONDITION_MEMBERSHIP_REQUIRES_SCHEMA:" + e.id());
+            } catch (ConditionSyntaxException ex) { errors.add("INVALID_CONDITION_AT:" + e.id() + ":" + ex.position());
             } catch (RuntimeException ex) { errors.add("INVALID_CONDITION:" + e.id()); }
             Node sourceNode = nodes.get(e.source());
             if (sourceNode != null && sourceNode.type() == NodeType.EXCLUSIVE_GATEWAY
@@ -114,6 +116,12 @@ public final class DefinitionValidator {
         }
         if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
         return List.copyOf(errors);
+    }
+
+    private boolean containsMembership(ConditionAst condition) {
+        if (condition instanceof Membership) return true;
+        if (condition instanceof Negation negation) return containsMembership(negation.term());
+        return condition instanceof Logical logical && logical.terms().stream().anyMatch(this::containsMembership);
     }
 
     private boolean containsCycle(Set<String> nodeIds, Map<String, List<Edge>> outgoing) {

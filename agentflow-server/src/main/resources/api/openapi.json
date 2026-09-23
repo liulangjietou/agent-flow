@@ -6543,6 +6543,132 @@
           }
         ]
       }
+    },
+    "/api/v1/process-definitions/upgrade-conditions": {
+      "post": {
+        "operationId": "upgradeDefinitionConditions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "转换旧条件为等价的新版表达式",
+        "description": "只读，要求 ADMIN 或 PROCESS_ADMIN。缺省 v1 的每条条件先解析为旧 AST，再生成等价 v2 文本；返回完整独立图，不写库、不发布，节点与连线顺序保留，条件语言版本置为 2。无效条件或转换超限整体失败。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Graph"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前账号没有流程管理权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphInput"
+              },
+              "example": {
+                "graph": {
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "name": "开始",
+                      "type": "START",
+                      "properties": {}
+                    },
+                    {
+                      "id": "review",
+                      "name": "部门审批",
+                      "type": "USER_TASK",
+                      "properties": {
+                        "assigneeRule": "role:MANAGER"
+                      }
+                    },
+                    {
+                      "id": "end",
+                      "name": "结束",
+                      "type": "END",
+                      "properties": {}
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "first",
+                      "source": "start",
+                      "target": "review",
+                      "condition": "",
+                      "defaultBranch": false
+                    },
+                    {
+                      "id": "last",
+                      "source": "review",
+                      "target": "end",
+                      "condition": "",
+                      "defaultBranch": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6967,6 +7093,15 @@
             "items": {
               "$ref": "#/components/schemas/GraphEdge"
             }
+          },
+          "conditionLanguageVersion": {
+            "type": "integer",
+            "enum": [
+              1,
+              2
+            ],
+            "default": 1,
+            "description": "缺省按 v1 保留旧语义；v2 支持括号、取反、符号连接符与单选枚举 IN，限制 4000 字符、16 层嵌套、100 项比较、50 个集合值。"
           }
         },
         "required": [

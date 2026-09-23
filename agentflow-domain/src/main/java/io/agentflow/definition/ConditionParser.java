@@ -12,7 +12,13 @@ import static io.agentflow.definition.DefinitionModels.*;
  * @author owlzhangfq@gmail.com
  */
 public final class ConditionParser {
-    /** 解析条件。语法：field op literal，可用 AND/OR 组合。 */
+    /** 使用发布时绑定的语法版本；缺省入口继续保留历史语义。 */
+    public ConditionAst parse(String source, int version) {
+        if (version != 1 && version != 2) throw new DomainException("INVALID_CONDITION_VERSION", "Unsupported condition language version");
+        return version == 1 ? parse(source) : new ConditionV2Parser(source).parse();
+    }
+
+    /** 解析旧条件。语法：field op literal，可用 AND/OR 组合。 */
     public ConditionAst parse(String source) {
         if (source == null || source.isBlank()) return new Logical(Kind.AND, List.of());
         List<String> orParts = splitOutsideQuotes(source, "OR");

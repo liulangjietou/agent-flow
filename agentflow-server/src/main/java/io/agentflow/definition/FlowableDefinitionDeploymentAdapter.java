@@ -81,7 +81,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 if (!edge.condition().isBlank()) {
                     String encodedCondition = Base64.getEncoder().encodeToString(edge.condition().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     xml.append("<conditionExpression xsi:type=\"tFormalExpression\">${flowableConditionEvaluator.matches(execution, '")
-                            .append(encodedCondition).append("')}</conditionExpression>");
+                            .append(encodedCondition).append("', ").append(graph.conditionLanguageVersion()).append(")}</conditionExpression>");
                 }
                 xml.append("</sequenceFlow>");
             }

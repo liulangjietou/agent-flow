@@ -33,7 +33,7 @@ public final class DefinitionSimulator {
             path.add(current.id());
             String source = current.id();
             List<Edge> outgoing = graph.edges().stream().filter(edge -> edge.source().equals(source)).toList();
-            Decision decision = select(source, outgoing, context);
+            Decision decision = select(source, outgoing, context, graph.conditionLanguageVersion());
             if (current.type() == NodeType.EXCLUSIVE_GATEWAY) decisions.add(decision);
             Edge selected = outgoing.stream().filter(edge -> edge.id().equals(decision.selectedEdgeId())).findFirst().orElseThrow();
             edgeIds.add(selected.id());
@@ -43,7 +43,7 @@ public final class DefinitionSimulator {
         return new Result(path, edgeIds, decisions);
     }
 
-    private Decision select(String nodeId, List<Edge> outgoing, EvaluationContext context) {
+    private Decision select(String nodeId, List<Edge> outgoing, EvaluationContext context, int languageVersion) {
         String selectedId = null;
         String defaultId = null;
         List<Branch> branches = new ArrayList<>();
@@ -52,7 +52,7 @@ public final class DefinitionSimulator {
             if (edge.defaultBranch()) { defaultId = edge.id(); continue; }
             Outcome outcome = Outcome.SKIPPED;
             if (selectedId == null) {
-                boolean matches = parser.parse(edge.condition()).evaluate(context);
+                boolean matches = parser.parse(edge.condition(), languageVersion).evaluate(context);
                 outcome = matches ? Outcome.MATCHED : Outcome.NOT_MATCHED;
                 if (matches) selectedId = edge.id();
             }

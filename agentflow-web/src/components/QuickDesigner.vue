@@ -61,7 +61,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
         <template v-else-if="selectedLine && gateway">
           <p class="eyebrow">BRANCH CONDITION</p><h3>{{ selectedLine.defaultBranch ? '其他情况' : '分支条件' }}</h3>
           <p v-if="selectedLine.defaultBranch" class="quick-help">其余条件都不满足时进入此分支，无需填写条件。</p>
-          <ConditionEditor v-else :key="selectedLine.id" :model-value="selectedLine.condition" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('edge', selectedLine.id, $event)" />
+          <ConditionEditor v-else :key="selectedLine.id" :model-value="selectedLine.condition" :language-version="graph.conditionLanguageVersion ?? 1" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('edge', selectedLine.id, $event)" />
           <div v-if="!selectedLine.defaultBranch" class="quick-move"><button type="button" class="secondary" :disabled="conditional[0]?.id === selectedLine.id" @click="moveBranch(-1)">优先判断</button><button type="button" class="secondary" :disabled="conditional[conditional.length - 1]?.id === selectedLine.id" @click="moveBranch(1)">延后判断</button></div>
           <button v-if="!selectedLine.defaultBranch" type="button" class="secondary" @click="emit('defaultBranch', selectedLine)">设为其他情况</button>
           <p class="quick-help">{{ selectedLine.defaultBranch ? '默认分支不能直接删除，可先将另一分支设为默认。' : `删除此分支将同时移除其中 ${branchCount} 个步骤，可撤销。` }}</p>

@@ -45,7 +45,8 @@ function readField(raw: unknown, column = false) {
 function process(value: unknown): PortableProcess {
   const p = object(value, ['key', 'name', 'graph', 'formSchema'], ['key', 'name', 'graph', 'formSchema'], '流程')
   text(p.key, '来源流程标识', 128); text(p.name, '流程名称', 128)
-  const g = object(p.graph, ['nodes', 'edges'], ['nodes', 'edges'], '流程图')
+  const g = object(p.graph, ['nodes', 'edges', 'conditionLanguageVersion'], ['nodes', 'edges'], '流程图')
+  if (g.conditionLanguageVersion !== undefined && g.conditionLanguageVersion !== 1 && g.conditionLanguageVersion !== 2) throw new Error('条件语言版本不受支持。')
   list(g.nodes, '节点', 200); list(g.edges, '连线', 400)
   for (const raw of g.nodes) {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')

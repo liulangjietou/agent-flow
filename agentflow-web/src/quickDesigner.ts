@@ -101,7 +101,7 @@ export function quickNodeIds(sequence: QuickSequence): string[] {
 export function editQuickGraph(source: Graph, command: QuickCommand, newId: () => string = () => crypto.randomUUID()): Graph {
   const projection = projectQuickGraph(source)
   if (!projection.sequence) throw new Error(projection.reason)
-  const graph: Graph = { nodes: source.nodes.map(node => ({ ...node, properties: { ...node.properties } })), edges: source.edges.map(edge => ({ ...edge })) }
+  const graph: Graph = { ...source, nodes: source.nodes.map(node => ({ ...node, properties: { ...node.properties } })), edges: source.edges.map(edge => ({ ...edge })) }
   const find = (id: string) => {
     const node = graph.nodes.find(node => node.id === id)
     if (!node) throw new Error('步骤已变化，请重新选择。')

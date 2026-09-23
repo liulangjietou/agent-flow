@@ -61,6 +61,8 @@ async function exercise(base) {
   await call('GET', '/api/v1/openapi.json', { user: 'anonymous', status: 401 })
   for (const username of ['admin', 'alice', 'manager', 'bob']) tokens[username] = (await call('POST', '/api/v1/auth/login', { body: { tenantId: 'demo', username, password: 'demo' }, user: 'anonymous' })).token
   assert.deepEqual(await call('GET', '/api/v1/openapi.json'), spec, 'served contract matches checkout')
+  const upgraded = await call('POST', '/api/v1/process-definitions/upgrade-conditions', { body: { graph: example(defs).graph } })
+  assert.equal(upgraded.conditionLanguageVersion, 2)
   await call('GET', '/api/v1/process-definitions/assignee-options')
   await call('GET', '/api/v1/process-definitions/assignee-options', { user: 'alice', status: 403 })
   await call('GET', '/api/v1/auth/me')

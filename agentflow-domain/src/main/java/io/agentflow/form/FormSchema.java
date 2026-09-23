@@ -68,6 +68,14 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
             logical.terms().forEach(this::validateCondition);
             return;
         }
+        if (ast instanceof DefinitionModels.Negation negation) { validateCondition(negation.term()); return; }
+        if (ast instanceof DefinitionModels.Membership membership) {
+            Field field = fields.stream().filter(candidate -> candidate.key().equals(membership.field())).findFirst()
+                    .orElseThrow(() -> new DomainException("INVALID_CONDITION", "Condition field is not declared in the form schema"));
+            if (field.type() != FieldType.SELECT) throw new DomainException("INVALID_CONDITION", "Membership requires a select field");
+            membership.literals().forEach(value -> validateCondition(new DefinitionModels.Comparison(membership.field(), DefinitionModels.Operator.EQ, value)));
+            return;
+        }
         DefinitionModels.Comparison comparison = (DefinitionModels.Comparison) ast;
         Field field = fields.stream().filter(candidate -> candidate.key().equals(comparison.field())).findFirst()
                 .orElseThrow(() -> new DomainException("INVALID_CONDITION", "Condition field is not declared in the form schema"));

@@ -23,6 +23,7 @@ public final class DefinitionDiffService {
     public List<Change> compare(Snapshot before, Snapshot after) {
         List<Change> changes = new ArrayList<>();
         modified(changes, Area.DEFINITION, "", after.name(), "name", before.name(), after.name());
+        modified(changes, Area.ROUTING, "", "条件语言", "conditionLanguageVersion", before.graph().conditionLanguageVersion(), after.graph().conditionLanguageVersion());
         compareNodes(changes, before.graph(), after.graph());
         compareEdges(changes, before.graph(), after.graph());
         compareForm(changes, before.formSchema(), after.formSchema());

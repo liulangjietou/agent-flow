@@ -110,3 +110,34 @@ test('明细条件只提供存在性判断，默认选择与解析序列化一�
   assert.equal(serializeConditionRows({ join: 'AND', rows: [{ field: 'items', operator: 'NOT_EXISTS', value: '' }] }, [field]), 'items NOT_EXISTS')
   assert.throws(() => serializeConditionRows({ join: 'AND', rows: [{ field: 'items', operator: '==', value: 'x' }] }, [field]), /明细/)
 })
+
+test('新版枚举多选与引号转义无损回显，复杂表达式保留原文', () => {
+  const typed = [...fields, {key:'category', label:'类型', type:'SELECT', options:[{value:'A',label:'甲'},{value:'B',label:'乙'}]}]
+  for (const source of ['category IN ["A", "B"] && amount > "9007199254740993.123456789"', 'memo == "a (b) AND \\"c\\""', 'memo == "a\\\\b"']) {
+    const parsed = parseConditionRows(source,typed,2)
+    assert.ok(parsed,source)
+    assert.deepEqual(parseConditionRows(serializeConditionRows(parsed,typed,2),typed,2),parsed)
+  }
+  assert.deepEqual(parseConditionRows('category in ["B","A"]',typed,2).rows[0].values,['B','A'])
+  for (const source of ['(amount > 1)', '!flag EXISTS', 'amount > 1 AND flag EXISTS OR memo EXISTS', 'category IN []', 'category IN ["A",]', 'category IN ["UNKNOWN"]', 'memo IN ["A"]', 'memo == "x" trailing', 'memo == "\\u003b"']) {
+    assert.equal(parseConditionRows(source,typed,2),null,source)
+  }
+  assert.equal(operatorsFor(typed[3],1).some(x=>x.value==='IN'),false)
+  assert.equal(operatorsFor(typed[3],2).some(x=>x.value==='IN'),true)
+  assert.throws(()=>serializeConditionRows({join:'AND',rows:[{field:'category',operator:'IN',value:'',values:['UNKNOWN']}]},typed,2))
+  assert.equal(serializeConditionRows({join:'AND',rows:[{field:'amount',operator:'>',value:'9007199254740993.123456789'}]},typed,2),'amount > "9007199254740993.123456789"')
+})
+
+test('快速编辑保留图条件语言版本，历史缺省图不被隐式升级', () => {
+  for (const version of [undefined,1,2]) {
+    const graph=branch()
+    if(version!==undefined)graph.conditionLanguageVersion=version
+    assert.equal(edit(graph,{kind:'insert',edgeId:'condition',type:'USER_TASK'}).conditionLanguageVersion,version)
+  }
+})
+
+test('新版存在性关键字需要单词边界，非法相连词不能被回显重写', () => {
+  for (const source of ['memo EXISTSAND flag EXISTS', 'memo NOT_EXISTSOR flag EXISTS']) {
+    assert.equal(parseConditionRows(source, fields, 2), null, source)
+  }
+})

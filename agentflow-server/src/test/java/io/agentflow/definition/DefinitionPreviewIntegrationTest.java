@@ -35,6 +35,7 @@ class DefinitionPreviewIntegrationTest {
     @Autowired RuntimeService runtime;
     @Autowired TaskService tasks;
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.flowable.engine.RepositoryService engineRepository;
 
     @Test
     void previewIsReadOnlyAndReturnsTypedDecisionTrace() throws Exception {
@@ -94,6 +95,88 @@ class DefinitionPreviewIntegrationTest {
             if (review != null) { assertThat(review.getTaskDefinitionKey()).isEqualTo("review"); tasks.complete(review.getId()); }
             assertThat(runtime.createProcessInstanceQuery().processInstanceId(instance.getId()).count()).isZero();
         }
+    }
+
+    @Test
+    void upgradesWithoutWritesAndStrictlyBindsGraphVersion() throws Exception {
+        var template = catalog.get("leave-request");
+        String oldGraph = json.write(template.graph()).replace(",\"conditionLanguageVersion\":1", "");
+        String body = "{\"graph\":" + oldGraph + "}";
+        var before = snapshot();
+        mvc.perform(post("/api/v1/process-definitions/upgrade-conditions").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/process-definitions/upgrade-conditions").header("Authorization", token("employee"))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/process-definitions/upgrade-conditions").header("Authorization", token("admin"))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("conditionLanguageVersion").value(2));
+        assertThat(json.read(oldGraph, Graph.class).conditionLanguageVersion()).isEqualTo(1);
+        for (String version : List.of("0", "3", "-1", "null", "\"2\"", "2.5", "2147483648", "true")) {
+            String bad = "{\"graph\":" + oldGraph.substring(0, oldGraph.length() - 1) + ",\"conditionLanguageVersion\":" + version + "}}";
+            mvc.perform(post("/api/v1/process-definitions/upgrade-conditions").header("Authorization", token("admin"))
+                    .contentType(MediaType.APPLICATION_JSON).content(bad)).andExpect(status().is4xxClientError());
+        }
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    void reportsSyntaxPositionAndRejectsUnknownEnumBeforeSavingOrPublishing() throws Exception {
+        var template = catalog.get("leave-request");
+        for (String condition : List.of("durationDays >", "leaveType IN [\"UNKNOWN\"]")) {
+            Graph graph = conditionGraph(template.graph(), condition, 2);
+            String body = json.write(Map.of("graph", graph, "formSchema", template.formSchema()));
+            var result = mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("admin"))
+                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk()).andReturn();
+            assertThat(result.getResponse().getContentAsString()).contains(condition.endsWith(">") ? "INVALID_CONDITION_AT:" : "INVALID_CONDITION:");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> definitions.create("demo", "invalid-v2", "无效条件", graph, template.formSchema()))
+                    .isInstanceOf(DefinitionValidationException.class);
+        }
+    }
+
+    @Test
+    void v2EngineMatchesSimulationAcrossMembershipGroupingAndExactThreshold() {
+        var template = catalog.get("leave-request");
+        Graph graph = conditionGraph(template.graph(), "(durationDays > 2 && leaveType IN [\"ANNUAL\"]) || !(reason EXISTS)", 2);
+        var draft = definitions.create("demo", "v2-" + UUID.randomUUID(), "新版条件", graph, template.formSchema());
+        assertThat(definitions.get("demo", draft.id()).graph()).isEqualTo(graph);
+        var published = definitions.publish(new io.agentflow.common.Actor("demo", "test-admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "条件验证");
+        var definition = engineRepository.createProcessDefinitionQuery().processDefinitionKey(published.key()).processDefinitionTenantId("demo").singleResult();
+        var model = engineRepository.getBpmnModel(definition.getId());
+        assertThat(model.getMainProcess().findFlowElementsOfType(org.flowable.bpmn.model.SequenceFlow.class))
+                .anySatisfy(flow -> assertThat(flow.getConditionExpression()).contains("', 2)"));
+        for (String days : List.of("2", "2.000000000000000001")) {
+            var preview = definitions.simulatePreview(graph, template.formSchema(), new EvaluationContext(values(days)));
+            assertEngineRoute(published.key(), Map.of("formData", values(days), "formFieldTypes", template.formSchema().fieldTypes()), preview.path().contains("review"));
+        }
+    }
+
+    @Test
+    void historicalTwoArgumentBpmnKeepsConnectorTextLiteralAfterEngineUpgrade() {
+        var template = catalog.get("leave-request");
+        Graph graph = conditionGraph(template.graph(), "reason == a && b", 1);
+        var draft = DefinitionDraft.create(UUID.randomUUID(), "demo", "old-bpmn-" + UUID.randomUUID(), "历史两参数表达式", graph, template.formSchema());
+        String historicalXml = FlowableDefinitionDeploymentAdapter.RestrictedBpmnWriter.write(draft).replace("', 1)", "')");
+        assertThat(historicalXml).doesNotContain("', 1)");
+        engineRepository.createDeployment().tenantId("demo").addString("legacy.bpmn20.xml", historicalXml).deploy();
+        assertEngineRoute(draft.key(), Map.of("formData", Map.of("reason", "a && b"), "formFieldTypes", template.formSchema().fieldTypes()), true);
+        assertEngineRoute(draft.key(), Map.of("formData", Map.of("reason", "a"), "formFieldTypes", template.formSchema().fieldTypes()), false);
+    }
+
+    private Graph conditionGraph(Graph base, String condition, int languageVersion) {
+        return new Graph(base.nodes(), base.edges().stream().map(edge -> edge.condition().isBlank() ? edge
+                : new Edge(edge.id(), edge.source(), edge.target(), condition, false)).toList(), languageVersion);
+    }
+
+    private void assertEngineRoute(String key, Map<String, Object> variables, boolean shouldReview) {
+        var instance = runtime.startProcessInstanceByKeyAndTenantId(key, variables, "demo");
+        var manager = tasks.createTaskQuery().processInstanceId(instance.getId()).singleResult();
+        assertThat(manager.getTaskDefinitionKey()).isEqualTo("manager");
+        tasks.complete(manager.getId());
+        var review = tasks.createTaskQuery().processInstanceId(instance.getId()).singleResult();
+        assertThat(review != null).isEqualTo(shouldReview);
+        if (review != null) { assertThat(review.getTaskDefinitionKey()).isEqualTo("review"); tasks.complete(review.getId()); }
+        assertThat(runtime.createProcessInstanceQuery().processInstanceId(instance.getId()).count()).isZero();
     }
 
     private Map<String, Object> values(String days) {

@@ -69,10 +69,16 @@ public final class DefinitionModels {
      * 不可变的流程图。
      * @author owlzhangfq@gmail.com
      */
-    public record Graph(List<Node> nodes, List<Edge> edges) {
+    public record Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion) {
+        /** 历史调用方使用 v1，不能因服务升级而改变文本含义。 */
+        public Graph(List<Node> nodes, List<Edge> edges) { this(nodes, edges, 1); }
         public Graph {
             nodes = nodes == null ? List.of() : List.copyOf(nodes);
             edges = edges == null ? List.of() : List.copyOf(edges);
+            conditionLanguageVersion = conditionLanguageVersion == null ? 1 : conditionLanguageVersion;
+            if (conditionLanguageVersion != 1 && conditionLanguageVersion != 2) {
+                throw new DomainException("INVALID_CONDITION_VERSION", "Unsupported condition language version");
+            }
         }
         /** 按标识查找节点。 */
         public Node node(String id) { return nodes.stream().filter(n -> n.id().equals(id)).findFirst().orElse(null); }
@@ -178,7 +184,7 @@ public final class DefinitionModels {
      * 条件 AST。
      * @author owlzhangfq@gmail.com
      */
-    public sealed interface ConditionAst permits Comparison, Logical {
+    public sealed interface ConditionAst permits Comparison, Logical, Negation, Membership {
         /** 在受限上下文中求值。 */
         boolean evaluate(EvaluationContext context);
     }
@@ -218,6 +224,29 @@ public final class DefinitionModels {
     public record Logical(Kind kind, List<ConditionAst> terms) implements ConditionAst {
         public Logical { terms = List.copyOf(terms == null ? List.of() : terms); }
         public boolean evaluate(EvaluationContext c) { return kind == Kind.AND ? terms.stream().allMatch(x -> x.evaluate(c)) : terms.stream().anyMatch(x -> x.evaluate(c)); }
+    }
+    /**
+     * 对完整条件结果取反；未填写的比较原本为 false，取反后为 true。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Negation(ConditionAst term) implements ConditionAst {
+        /** 使用与比较表达式一致的缺失值语义。 */
+        public boolean evaluate(EvaluationContext context) { return !term.evaluate(context); }
+    }
+    /**
+     * 枚举集合判断，仅支持表单单选字段的字面量选项。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Membership(String field, List<String> literals) implements ConditionAst {
+        public Membership { literals = List.copyOf(literals); }
+        /** 未填写不属于任何集合；值按枚举原文精确匹配。 */
+        public boolean evaluate(EvaluationContext context) {
+            if (context.fieldTypes() == null || !"SELECT".equals(context.fieldTypes().get(field))) {
+                throw new DomainException("INVALID_CONDITION", "Membership requires a declared select field");
+            }
+            Object value = context.value(field);
+            return !FormSchema.empty(value, FormSchema.FieldType.SELECT) && literals.contains(value.toString());
+        }
     }
     /**
      * 比较运算符。

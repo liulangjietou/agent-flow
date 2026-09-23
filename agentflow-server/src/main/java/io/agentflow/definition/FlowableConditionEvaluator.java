@@ -21,6 +21,11 @@ public class FlowableConditionEvaluator {
 
     /** 使用流程变量求值受限条件。 */
     public boolean matches(DelegateExecution execution, String encodedCondition) {
+        return matches(execution, encodedCondition, 1);
+    }
+
+    /** 新发布的定义显式绑定语法版本；旧 BPMN 的两参数调用永远按 v1 执行。 */
+    public boolean matches(DelegateExecution execution, String encodedCondition, int languageVersion) {
         if (execution == null || encodedCondition == null || encodedCondition.isBlank()) {
             return false;
         }
@@ -33,7 +38,7 @@ public class FlowableConditionEvaluator {
             declaredTypes.forEach((key, value) -> types.put((String) key, (String) value));
             Map<String, Object> values = new HashMap<>();
             if (formData instanceof Map<?, ?> formValues) formValues.forEach((key, value) -> values.put((String) key, value));
-            return parser.parse(condition).evaluate(new EvaluationContext(values, types));
+            return parser.parse(condition, languageVersion).evaluate(new EvaluationContext(values, types));
         }
         if (formData instanceof Map<?, ?> formValues) {
             formValues.forEach((key, value) -> {
@@ -42,6 +47,6 @@ public class FlowableConditionEvaluator {
                 }
             });
         }
-        return parser.parse(condition).evaluate(new EvaluationContext(variables));
+        return parser.parse(condition, languageVersion).evaluate(new EvaluationContext(variables));
     }
 }

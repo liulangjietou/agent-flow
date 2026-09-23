@@ -146,3 +146,15 @@ test('版本二明细模板完整往返，嵌套与未知列属性整份拒绝',
     const bad = structuredClone(value); mutate(bad.formSchema); assert.throws(() => serializePortableTemplate(bad))
   }
 })
+
+test('导入导出保留条件语言版本，未知或强制转换版本拒绝', () => {
+  for (const version of [undefined,1,2]) {
+    const original=source()
+    if(version!==undefined)original.graph.conditionLanguageVersion=version
+    assert.deepEqual(parsePortableTemplate(serializePortableTemplate(original)).graph,original.graph)
+  }
+  for (const version of [null,0,3,'2',2.5,true]) {
+    const value=envelope();value.process.graph.conditionLanguageVersion=version
+    assert.throws(()=>parsePortableTemplate(JSON.stringify(value)),/版本/)
+  }
+})
