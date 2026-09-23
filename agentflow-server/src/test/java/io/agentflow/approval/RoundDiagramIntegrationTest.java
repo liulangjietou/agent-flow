@@ -7,6 +7,7 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
 import org.flowable.engine.HistoryService;
+import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ class RoundDiagramIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired TaskService tasks;
     @Autowired HistoryService history;
+    @Autowired RuntimeService runtime;
     @Autowired JdbcTemplate jdbc;
     @Autowired JsonUtil json;
 
@@ -49,6 +51,7 @@ class RoundDiagramIntegrationTest {
         UUID id = submitted(key);
         JsonNode first = diagram(id, 1, "alice");
         assertThat(node(first, "manager").path("state").asText()).isEqualTo("ACTIVE");
+        assertTaken(first, "a");
         assertThat(node(first, "manager").path("activeTasks").asLong()).isEqualTo(1);
         assertThat(node(first, "finance").path("state").asText()).isEqualTo("NOT_REACHED");
         assertThat(first.toString()).doesNotContain("formData", "assigneeRule", "role:MANAGER", "tenantId", "sensitive-value");
@@ -57,6 +60,7 @@ class RoundDiagramIntegrationTest {
         assertThat(returned.path("status").asText()).isEqualTo("RETURNED");
         assertThat(node(returned, "manager").path("state").asText()).isEqualTo("LEFT");
         assertThat(node(returned, "end").path("state").asText()).isEqualTo("NOT_REACHED");
+        assertTaken(returned, "a");
         publish("demo", key, false, "部门审批 v2 不可串入历史");
         asAlice(() -> applications.submit(id, applications.get(id).version()));
         action(id, "manager", "APPROVE");
@@ -64,12 +68,16 @@ class RoundDiagramIntegrationTest {
         assertThat(second.path("definitionVersion").asInt()).isEqualTo(1);
         assertThat(node(second, "manager").path("name").asText()).isEqualTo("部门审批 v1");
         assertThat(node(second, "finance").path("state").asText()).isEqualTo("ACTIVE");
+        assertTaken(second, "a", "b", "c");
+        assertTaken(diagram(id, 1, "alice"), "a");
         assertThat(node(diagram(id, 1, "alice"), "finance").path("state").asText()).isEqualTo("NOT_REACHED");
         action(id, "finance", "APPROVE");
         JsonNode approved = diagram(id, 2, "alice");
         assertThat(approved.path("status").asText()).isEqualTo("APPROVED");
         assertThat(node(approved, "end").path("state").asText()).isEqualTo("LEFT");
         assertThat(approved.path("nodes")).allSatisfy(n -> assertThat(n.path("activeTasks").asInt()).isZero());
+        assertTaken(approved, "a", "b", "c", "e");
+        // gate 和 end 均已离开，未走过的默认连线 d 仍不能被高亮。
         assertThat(approved.path("edges")).anySatisfy(e -> assertThat(e.path("defaultBranch").asBoolean()).isTrue());
     }
 
@@ -83,11 +91,64 @@ class RoundDiagramIntegrationTest {
         JsonNode partial = diagram(id, 1, "alice");
         assertThat(node(partial, "manager").path("state").asText()).isEqualTo("ACTIVE");
         assertThat(node(partial, "manager").path("activeTasks").asInt()).isEqualTo(1);
+        assertTaken(partial, "a");
         action(id, "admin", "REJECT");
         JsonNode rejected = diagram(id, 1, "alice");
         assertThat(rejected.path("status").asText()).isEqualTo("REJECTED");
         assertThat(node(rejected, "manager").path("state").asText()).isEqualTo("LEFT");
         assertThat(node(rejected, "end").path("state").asText()).isEqualTo("NOT_REACHED");
+        assertTaken(rejected, "a");
+    }
+
+    @Test
+    void defaultBranchAndWithdrawalUseOnlyRecordedSequenceFlows() throws Exception {
+        String key = "diagram-default-" + UUID.randomUUID();
+        publish("demo", key, false, "部门审批");
+        UUID id = submitted(key, 100);
+        action(id, "manager", "APPROVE");
+        assertTaken(diagram(id, 1, "alice"), "a", "b", "d");
+        UUID withdrawn = submitted(key);
+        asAlice(() -> applications.withdraw(withdrawn, applications.get(withdrawn).version(), "撤回"));
+        assertTaken(diagram(withdrawn, 1, "alice"), "a");
+    }
+
+    @Test
+    void missingOrForeignSequenceEvidenceIsNotRebuiltFromNodeHistory() throws Exception {
+        String key = "diagram-evidence-" + UUID.randomUUID();
+        publish("demo", key, false, "部门审批");
+        UUID id = submitted(key);
+        String instance = tasks.createTaskQuery().processVariableValueEquals("applicationId", id.toString()).singleResult().getProcessInstanceId();
+        // 先证明当前引擎已经记录真实连线；历史类型和租户都必须匹配，不能只按 ID 连接。
+        var evidence = history.createHistoricActivityInstanceQuery().processInstanceId(instance).activityType("sequenceFlow").list();
+        assertThat(evidence).extracting(org.flowable.engine.history.HistoricActivityInstance::getActivityId).containsExactly("a");
+        jdbc.update("update ACT_HI_ACTINST set TENANT_ID_='other' where PROC_INST_ID_=? and ACT_TYPE_='sequenceFlow'", instance);
+        assertTaken(diagram(id, 1, "alice"));
+        jdbc.update("update ACT_HI_ACTINST set TENANT_ID_='demo', ACT_TYPE_='userTask' where PROC_INST_ID_=? and ACT_ID_='a'", instance);
+        assertTaken(diagram(id, 1, "alice"));
+        jdbc.update("delete from ACT_HI_ACTINST where PROC_INST_ID_=? and ACT_ID_='a'", instance);
+        JsonNode withoutEvidence = diagram(id, 1, "alice");
+        assertThat(node(withoutEvidence, "start").path("state").asText()).isEqualTo("LEFT");
+        assertThat(node(withoutEvidence, "manager").path("state").asText()).isEqualTo("ACTIVE");
+        assertTaken(withoutEvidence);
+    }
+
+    @Test
+    void repeatedEngineTraversalKeepsCountAndTimeRange() throws Exception {
+        String key = "diagram-repeated-" + UUID.randomUUID();
+        publish("demo", key, false, "部门审批");
+        UUID id = submitted(key);
+        String instance = tasks.createTaskQuery().processVariableValueEquals("applicationId", id.toString()).singleResult().getProcessInstanceId();
+        // 引擎级位置调整会产生第二次真实流转；此测试不向平台开放位置调整接口。
+        runtime.createChangeActivityStateBuilder().processInstanceId(instance).moveActivityIdTo("manager", "start").changeState();
+        var times = history.createHistoricActivityInstanceQuery().processInstanceId(instance).activityType("sequenceFlow")
+                .activityId("a").list().stream().map(activity -> activity.getStartTime().toInstant()).sorted().toList();
+        assertThat(times).hasSize(2);
+        JsonNode edge = diagram(id, 1, "alice").path("edges").get(0);
+        assertThat(edge.path("id").asText()).isEqualTo("a");
+        assertThat(edge.path("state").asText()).isEqualTo("TAKEN");
+        assertThat(edge.path("traversalCount").asInt()).isEqualTo(2);
+        assertThat(java.time.Instant.parse(edge.path("firstTakenAt").asText())).isEqualTo(times.get(0));
+        assertThat(java.time.Instant.parse(edge.path("lastTakenAt").asText())).isEqualTo(times.get(1));
     }
 
     @Test
@@ -146,10 +207,11 @@ class RoundDiagramIntegrationTest {
         definitions.publish(new Actor(tenant, "admin", Set.of("ADMIN")), draft.id(), draft.revision(), "验证流程图绑定");
     }
 
-    private UUID submitted(String key) {
+    private UUID submitted(String key) { return submitted(key, 6000); }
+    private UUID submitted(String key, int amount) {
         current.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            var app = applications.create("DIAGRAM-" + UUID.randomUUID(), key, 1, "流程图验收", Map.of("amount", 6000, "description", "sensitive-value"));
+            var app = applications.create("DIAGRAM-" + UUID.randomUUID(), key, 1, "流程图验收", Map.of("amount", amount, "description", "sensitive-value"));
             return applications.submit(app.id(), app.version()).id();
         } finally { current.clear(); }
     }
@@ -167,6 +229,21 @@ class RoundDiagramIntegrationTest {
         return json.read(response.getContentAsString(), JsonNode.class);
     }
     private JsonNode node(JsonNode diagram, String id) { for (JsonNode node : diagram.path("nodes")) if (node.path("id").asText().equals(id)) return node; throw new AssertionError(id); }
+    private void assertTaken(JsonNode diagram, String... ids) {
+        Set<String> expected = Set.of(ids);
+        for (JsonNode edge : diagram.path("edges")) {
+            boolean taken = expected.contains(edge.path("id").asText());
+            assertThat(edge.path("state").asText()).as("edge %s", edge.path("id").asText()).isEqualTo(taken ? "TAKEN" : "NOT_RECORDED");
+            assertThat(edge.path("traversalCount").asLong()).isEqualTo(taken ? 1 : 0);
+            if (taken) {
+                assertThat(edge.path("firstTakenAt").asText()).isNotBlank();
+                assertThat(edge.path("lastTakenAt").asText()).isEqualTo(edge.path("firstTakenAt").asText());
+            } else {
+                assertThat(edge.has("firstTakenAt")).isFalse();
+                assertThat(edge.has("lastTakenAt")).isFalse();
+            }
+        }
+    }
     private String path(UUID id, int round) { return "/api/v1/applications/" + id + "/rounds/" + round + "/diagram"; }
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
 }

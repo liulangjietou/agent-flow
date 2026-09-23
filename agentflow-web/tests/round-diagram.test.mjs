@@ -1,6 +1,25 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const { RoundDiagramQuery } = await import(process.env.AGENTFLOW_TEST_DIAGRAM)
+const { RoundDiagramQuery, traversalRecords } = await import(process.env.AGENTFLOW_TEST_DIAGRAM)
+
+test('流转记录只读取连线证据，不根据已离开的端点推断默认分支', () => {
+  const diagram = { nodes: [{ id: 'gate', name: '金额分支', state: 'LEFT' }, { id: 'end', name: '结束', state: 'LEFT' }], edges: [
+    { id: 'default', source: 'gate', target: 'end', defaultBranch: true, state: 'NOT_RECORDED', traversalCount: 0 },
+    { id: 'recorded', source: 'gate', target: 'finance', defaultBranch: false, state: 'TAKEN', traversalCount: 2,
+      firstTakenAt: '2026-09-23T10:00:00Z', lastTakenAt: '2026-09-23T11:00:00Z' }
+  ] }
+  const before = structuredClone(diagram), records = traversalRecords(diagram)
+  assert.equal(records.length, 1); assert.equal(records[0].id, 'recorded')
+  assert.equal(records[0].sourceName, '金额分支'); assert.equal(records[0].targetName, 'finance')
+  assert.equal(records[0].traversalCount, 2); assert.equal(records[0].lastTakenAt, '2026-09-23T11:00:00Z')
+  assert.deepEqual(diagram, before)
+})
+
+test('连线记录按首次时间稳定展示，缺失时间保留事实且空证据不生成记录', () => {
+  const edge = (id, time) => ({ id, source: 's', target: 't', state: 'TAKEN', traversalCount: 1, firstTakenAt: time })
+  assert.deepEqual(traversalRecords({ nodes: [], edges: [edge('z', '2026-09-23T12:00:00Z'), edge('a', '2026-09-23T12:00:00Z'), edge('old', null)] }).map(record => record.id), ['old', 'a', 'z'])
+  assert.deepEqual(traversalRecords({ nodes: [], edges: [] }), [])
+})
 
 test('轮次或账号切换取消旧请求，迟到成功和失败均不能回填', async () => {
   const pending = []

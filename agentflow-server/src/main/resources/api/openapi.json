@@ -5496,7 +5496,7 @@
           "申请"
         ],
         "summary": "轮次流程图",
-        "description": "读取经过申请权限与轮次绑定核对的实际引擎定义和节点状态。连线仅表示结构；LEFT 只表示离开，不代表通过。缺少轮次、引擎历史或精确绑定时返回 404，不改用当前草稿或同号版本。Cache-Control: no-store。一次读取使用数据库可重复读事务。",
+        "description": "读取经过申请权限与轮次绑定核对的实际引擎定义和节点状态。连线包含本轮实际流转证据、次数与时间；NOT_RECORDED 仅表示缺少连线历史，不推断未执行。LEFT 只表示离开，不代表通过。缺少轮次、引擎历史或精确绑定时返回 404，不改用当前草稿或同号版本。Cache-Control: no-store。一次读取使用数据库可重复读事务。",
         "x-access": "同租户管理员、发起人或实际流程参与者",
         "x-idempotency": false,
         "responses": {
@@ -9886,13 +9886,36 @@
           },
           "defaultBranch": {
             "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "TAKEN",
+              "NOT_RECORDED"
+            ],
+            "description": "仅使用本轮引擎连线历史；未记录不等于从未执行。"
+          },
+          "traversalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "匹配本轮、定义、租户和连线类型的历史记录数量。"
+          },
+          "firstTakenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastTakenAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
           "id",
           "source",
           "target",
-          "defaultBranch"
+          "defaultBranch",
+          "state",
+          "traversalCount"
         ],
         "additionalProperties": false
       },

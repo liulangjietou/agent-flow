@@ -1,12 +1,25 @@
 /** 申请轮次的只读引擎图，不包含表单值或审批人规则。@author owlzhangfq@gmail.com */
 export interface RoundDiagram {
   applicationId: string; roundNo: number; definitionVersion: number; status: string; observedAt: string
-  nodes: DiagramNode[]; edges: { id: string; source: string; target: string; defaultBranch: boolean }[]
+  nodes: DiagramNode[]; edges: DiagramEdge[]
+}
+/** 连线仅按本轮引擎历史高亮，未记录不推断为未执行。@author owlzhangfq@gmail.com */
+export interface DiagramEdge {
+  id: string; source: string; target: string; defaultBranch: boolean
+  state: 'TAKEN' | 'NOT_RECORDED'; traversalCount: number
+  firstTakenAt?: string | null; lastTakenAt?: string | null
 }
 /** 节点离开不表示审批通过，会签任务数量取自当前引擎。@author owlzhangfq@gmail.com */
 export interface DiagramNode {
   id: string; name: string; type: string; state: 'NOT_REACHED' | 'ACTIVE' | 'LEFT'; activeTasks: number
   firstEnteredAt?: string | null; lastLeftAt?: string | null
+}
+/** 文本记录与画布使用同一份证据，便于键盘和屏幕阅读器查看。 */
+export function traversalRecords(diagram: RoundDiagram) {
+  const names = new Map(diagram.nodes.map(node => [node.id, node.name]))
+  return diagram.edges.filter(edge => edge.state === 'TAKEN').map(edge => ({
+    ...edge, sourceName: names.get(edge.source) ?? edge.source, targetName: names.get(edge.target) ?? edge.target
+  })).sort((left, right) => (left.firstTakenAt ?? '').localeCompare(right.firstTakenAt ?? '') || left.id.localeCompare(right.id))
 }
 /** 隔离账号和轮次请求，刷新失败时不显示过期运行状态。@author owlzhangfq@gmail.com */
 export class RoundDiagramQuery {

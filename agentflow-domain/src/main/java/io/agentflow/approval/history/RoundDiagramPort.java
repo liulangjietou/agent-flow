@@ -15,7 +15,7 @@ public interface RoundDiagramPort {
     Diagram read(Application application, SubmissionRound round);
 
     /**
-     * 轮次结论独立于节点状态，连线仅表示定义结构。
+     * 轮次结论独立于节点状态；连线包含实际定义结构和本轮流转证据。
      * @author owlzhangfq@gmail.com
      */
     record Diagram(UUID applicationId, int roundNo, long definitionVersion, SubmissionRound.Status status,
@@ -28,6 +28,12 @@ public interface RoundDiagramPort {
     enum State { NOT_REACHED, ACTIVE, LEFT }
 
     /**
+     * 未记录不等于从未走过，历史缺失时不推断路径。
+     * @author owlzhangfq@gmail.com
+     */
+    enum EdgeState { TAKEN, NOT_RECORDED }
+
+    /**
      * 人工节点的当前任务数直接来自引擎，包含会签剩余任务。
      * @author owlzhangfq@gmail.com
      */
@@ -38,5 +44,6 @@ public interface RoundDiagramPort {
      * 只返回安全的拓扑信息，不向申请读者暴露内部表达式和人员规则。
      * @author owlzhangfq@gmail.com
      */
-    record Edge(String id, String source, String target, boolean defaultBranch) { }
+    record Edge(String id, String source, String target, boolean defaultBranch, EdgeState state,
+                long traversalCount, Instant firstTakenAt, Instant lastTakenAt) { }
 }

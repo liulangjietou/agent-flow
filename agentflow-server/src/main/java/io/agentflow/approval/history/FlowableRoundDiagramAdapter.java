@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  */
 @Component
 public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
+    private static final String SEQUENCE_FLOW = "sequenceFlow";
     private final HistoryService history;
     private final RepositoryService repository;
     private final RuntimeService runtime;
@@ -79,10 +80,22 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
         Set<String> ids = nodes.stream().map(Node::id).collect(Collectors.toSet());
         List<Edge> edges = process.getFlowElements().stream().filter(SequenceFlow.class::isInstance).map(SequenceFlow.class::cast)
                 .filter(edge -> ids.contains(edge.getSourceRef()) && ids.contains(edge.getTargetRef()))
-                .map(edge -> new Edge(edge.getId(), edge.getSourceRef(), edge.getTargetRef(),
-                        edge.getSourceFlowElement() instanceof Gateway gateway && edge.getId().equals(gateway.getDefaultFlow())))
+                .map(edge -> edge(edge, activities.getOrDefault(edge.getId(), List.of()).stream()
+                        .filter(activity -> SEQUENCE_FLOW.equals(activity.getActivityType())
+                                && definition.getId().equals(activity.getProcessDefinitionId())).toList()))
                 .toList();
         return new Diagram(application.id(), round.roundNo(), round.definitionVersion(), round.status(), Instant.now(), nodes, edges);
+    }
+
+    /** 仅使用引擎的连线历史，两个端点都已到达也不能证明这条连线被执行。 */
+    private Edge edge(SequenceFlow flow, List<HistoricActivityInstance> evidence) {
+        Instant first = evidence.stream().map(HistoricActivityInstance::getStartTime).filter(Objects::nonNull)
+                .min(Date::compareTo).map(Date::toInstant).orElse(null);
+        Instant last = evidence.stream().map(HistoricActivityInstance::getStartTime).filter(Objects::nonNull)
+                .max(Date::compareTo).map(Date::toInstant).orElse(null);
+        boolean defaultBranch = flow.getSourceFlowElement() instanceof Gateway gateway && flow.getId().equals(gateway.getDefaultFlow());
+        return new Edge(flow.getId(), flow.getSourceRef(), flow.getTargetRef(), defaultBranch,
+                evidence.isEmpty() ? EdgeState.NOT_RECORDED : EdgeState.TAKEN, evidence.size(), first, last);
     }
 
     private String type(FlowNode node) {

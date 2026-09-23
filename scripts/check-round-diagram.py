@@ -6,10 +6,10 @@ import urllib.parse
 import urllib.request
 import uuid
 
-if len(sys.argv) != 2:
-    raise SystemExit("Usage: python3 scripts/check-round-diagram.py http://127.0.0.1:8082")
+if len(sys.argv) != 3 or sys.argv[2] != "--exercise":
+    raise SystemExit("Usage: python3 scripts/check-round-diagram.py http://127.0.0.1:8082 --exercise")
 origin = urllib.parse.urlparse(sys.argv[1])
-if origin.scheme != "http" or origin.hostname not in ("127.0.0.1", "localhost", "::1") or origin.path not in ("", "/"):
+if origin.scheme != "http" or origin.hostname not in ("127.0.0.1", "localhost", "::1") or origin.path not in ("", "/") or origin.port in (None, 8080, 8180) or origin.query or origin.fragment or origin.username or origin.password:
     raise SystemExit("Use an isolated loopback demo environment")
 BASE = sys.argv[1].rstrip("/") + "/api/v1"
 PREFIX = "diagram-" + uuid.uuid4().hex[:10]
@@ -82,9 +82,22 @@ def node(view, node_id):
     return next(item for item in view["nodes"] if item["id"] == node_id)
 
 
+def taken(view, *ids):
+    expected = set(ids)
+    for edge in view["edges"]:
+        recorded = edge["id"] in expected
+        assert edge["state"] == ("TAKEN" if recorded else "NOT_RECORDED"), edge
+        assert edge["traversalCount"] == (1 if recorded else 0), edge
+        if recorded:
+            assert edge["firstTakenAt"] == edge["lastTakenAt"]
+        else:
+            assert "firstTakenAt" not in edge and "lastTakenAt" not in edge
+
+
 publish(PREFIX, graph())
 app = update(create(PREFIX, "重提当前节点"), "submit")
 assert node(diagram(app, 1), "review")["state"] == "ACTIVE"
+taken(diagram(app, 1), "a")
 app = act(app, "manager", "RETURN")
 assert node(diagram(app, 1), "end")["state"] == "NOT_REACHED"
 publish(PREFIX, graph(name="部门审批 v2 不可串入旧轮次"))
@@ -93,24 +106,33 @@ app = act(app, "manager", "APPROVE")
 assert node(diagram(app, 2), "review")["name"] == "部门审批 v1"
 assert node(diagram(app, 2), "finance")["state"] == "ACTIVE"
 assert node(diagram(app, 1), "finance")["state"] == "NOT_REACHED"
+taken(diagram(app, 1), "a")
+taken(diagram(app, 2), "a", "b", "c")
 low = update(create(PREFIX, "默认分支已批准", 100), "submit")
 low = act(low, "manager", "APPROVE")
 assert diagram(low, 1)["status"] == "APPROVED"
 assert node(diagram(low, 1), "finance")["state"] == "NOT_REACHED"
 assert node(diagram(low, 1), "end")["state"] == "LEFT"
+taken(diagram(low, 1), "a", "b", "d")
+high = update(create(PREFIX, "条件分支已批准"), "submit")
+high = act(act(high, "manager", "APPROVE"), "finance", "APPROVE")
+taken(diagram(high, 1), "a", "b", "c", "e")
 publish(PREFIX + "-all", graph(True, "财务会签"))
 all_app = update(create(PREFIX + "-all", "会签剩余任务"), "submit")
 assert node(diagram(all_app, 1), "review")["activeTasks"] == 2
 all_app = act(all_app, "finance", "APPROVE")
 assert node(diagram(all_app, 1), "review")["activeTasks"] == 1
+taken(diagram(all_app, 1), "a")
 rejected = update(create(PREFIX + "-all", "会签已驳回"), "submit")
 rejected = act(rejected, "admin", "REJECT")
 assert diagram(rejected, 1)["status"] == "REJECTED"
 assert node(diagram(rejected, 1), "review")["state"] == "LEFT"
 assert node(diagram(rejected, 1), "end")["state"] == "NOT_REACHED"
+taken(diagram(rejected, 1), "a")
 withdrawn = update(create(PREFIX, "已撤回"), "submit")
 withdrawn = update(withdrawn, "withdraw")
 assert diagram(withdrawn, 1)["status"] == "WITHDRAWN"
+taken(diagram(withdrawn, 1), "a")
 draft = create(PREFIX, "未提交")
 request("GET", "/applications/" + draft["id"] + "/rounds/1/diagram", "alice", expected=404)
 request("GET", "/applications/" + app["id"] + "/rounds/1/diagram", "bob", expected=404)
@@ -119,12 +141,12 @@ request("GET", "/applications/" + app["id"] + "/rounds/0/diagram", "alice", expe
 
 def facts():
     return {item["id"]: {path: request("GET", "/applications/" + item["id"] + path, "alice") for path in ("", "/rounds", "/audit?limit=100", "/timeline?limit=100")}
-        for item in (app, low, all_app, rejected, withdrawn, draft)}
+        for item in (app, low, high, all_app, rejected, withdrawn, draft)}
 
 
 before = facts()
-for item in (app, low, all_app, rejected, withdrawn):
+for item in (app, low, high, all_app, rejected, withdrawn):
     diagram(item, 1)
 assert before == facts()
 print(json.dumps({"result": "PASS", "base": BASE, "processKey": PREFIX, "readOnlyFacts": "EXACT_MATCH", "applications": {
-    "resubmitted": app["id"], "defaultApproved": low["id"], "countersign": all_app["id"], "rejected": rejected["id"], "withdrawn": withdrawn["id"], "draft": draft["id"]}}, ensure_ascii=False))
+    "resubmitted": app["id"], "defaultApproved": low["id"], "conditionalApproved": high["id"], "countersign": all_app["id"], "rejected": rejected["id"], "withdrawn": withdrawn["id"], "draft": draft["id"]}}, ensure_ascii=False))
