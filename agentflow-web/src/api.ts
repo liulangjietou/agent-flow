@@ -1,4 +1,5 @@
 import type { FirstWorkflowReport } from './firstWorkflow'
+import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
@@ -129,6 +130,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
       INVALID_FIRST_WORKFLOW_QUERY: '流程进度筛选无效，请重新选择流程。',
+      INVALID_COMMENT_QUERY: '评论筛选或分页已失效，请重新查询。',
   INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
       COUNTERSIGN_ASSIGNMENT_FIXED: '会签名单已固定，不能转交、释放或重新领取；可委派协助后回交。',
@@ -176,6 +178,8 @@ export const api = {
   firstWorkflow: (id: string, signal: AbortSignal) => request<FirstWorkflowReport>('/system/first-workflow' + (id ? '?definitionId=' + encodeURIComponent(id) : ''), { signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
+  applicationComments: (id: string, query: CommentQuery, signal: AbortSignal) => request<CommentPage>('/applications/' + encodeURIComponent(id) + '/comments' + historyQuery(query), { signal }),
+  addApplicationComment: (id: string, body: CommentDraft) => write<ApplicationComment>('/applications/' + encodeURIComponent(id) + '/comments', 'POST', '追加申请评论', body),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request<{ actor: Actor }>('/auth/me'),

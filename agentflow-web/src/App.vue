@@ -8,6 +8,8 @@ import { isTaskNotification } from './notificationInbox'
 import { taskActionLabels } from './taskActions'
 import WorkspaceRecords from './components/WorkspaceRecords.vue'
 import ApplicationHistory from './components/ApplicationHistory.vue'
+import ApplicationComments from './components/ApplicationComments.vue'
+import { commentDrafts, type CommentDraft, type ApplicationComment } from './applicationComments'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
@@ -79,7 +81,8 @@ const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
 const detailLoading = ref(false)
 const taskDetailPanel = ref<HTMLElement | null>(null)
-const taskTab = ref<'detail' | 'timeline' | 'audit'>('detail')
+const taskTab = ref<'detail' | 'timeline' | 'audit' | 'comments'>('detail')
+const commentRefresh = ref(0)
 const definitions = ref<Definition[]>([])
 const definitionId = ref('')
 const definitionRevision = ref(0)
@@ -689,6 +692,11 @@ async function recoverOperation(id: string) {
       } else if (request.path.startsWith('/notifications/') && request.path.endsWith('/read')) {
         templateRefresh.value++
         notice.value = '已确认消息的已读状态。'
+      } else if (/^\/applications\/[^/]+\/comments$/.test(request.path)) {
+        const value = result as ApplicationComment
+        if (request.body) commentDrafts.acknowledge(actorScope.value, value.applicationId, JSON.parse(request.body) as CommentDraft)
+        commentRefresh.value++
+        notice.value = '已确认原评论追加成功，审批状态未改变。'
       } else if (request.path.startsWith('/applications')) {
         const value = result as Application
         if (request.path === '/applications') {
@@ -727,7 +735,7 @@ async function recoverOperation(id: string) {
   replacesDefinition && !checkpoint && !readonlyDefinition.value && dirty.value)
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
-  if (writeRequests.hasUnconfirmed() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 onMounted(async () => {
@@ -789,7 +797,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
             <div ref="taskDetailPanel" class="detail panel" tabindex="-1" aria-label="当前待办详情">
               <div v-if="activeTask" class="detail-body">
                 <div class="detail-top"><div><span class="status-chip">● {{ activeApplication ? statusLabel(activeApplication.status) : '待处理' }}</span><h3>{{ activeApplication?.title ?? activeTask.taskName }}</h3><p>{{ activeApplication?.businessNo ?? activeTask.taskName }} · 任务创建于 {{ dateLabel(activeTask.createdAt) }}</p></div></div>
-                <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
+                <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
                 <div v-if="taskTab === 'detail'" class="detail-content">
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
                   <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" readonly /></template>
@@ -797,7 +805,8 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
                   <div class="agent-note"><span>✦</span><div><strong>Agent 证据尚未接入</strong><p>当前审批请以申请内容及线下核实结果为依据。</p></div></div>
                 </div>
                 <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><ApplicationHistory :application-id="activeTask.applicationId" mode="timeline" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
-                <div v-else class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
+                <div v-else-if="taskTab === 'audit'" class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
+                <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
                 <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
               </div>
               <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
@@ -876,7 +885,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         </section>
         <section v-else class="content expense-page"><div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">报销领域正在接入，当前可使用通用表单验证审批流程。</p></div><button class="primary" @click="openApplicationForm">＋ 发起表单审批</button></div><div class="expense-cards"><article v-for="item in [{ title: '报销填报', detail: '发票、费用明细和借款冲销尚未接入。' }, { title: '财务审核', detail: '费用标准、预算校验和核减尚未接入。' }, { title: '出纳付款', detail: '付款授权、银行回执和对账尚未接入。' }]" :key="item.title"><span class="card-kicker">{{ item.title }}</span><strong>待接入</strong><p>{{ item.detail }}</p></article></div><div class="panel queue-empty"><strong>暂无报销领域数据</strong><p>通用审批申请可在“申请记录”中查看；此处不展示演示单据或虚构金额。</p></div></section>
       </main>
-      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="refreshPage()" />
+      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="refreshPage()" />
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
           <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>

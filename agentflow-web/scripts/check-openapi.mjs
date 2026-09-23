@@ -90,6 +90,16 @@ async function exercise(base) {
   assert.deepEqual(await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: revise, key: retryKey }), application)
   await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: { ...revise, title: '冲突内容' }, key: retryKey, status: 409 })
   application = await call('POST', apps + '/{id}/submit', { user: 'alice', path: appPath + '/submit', body: { expectedVersion: application.version } })
+  const commentTemplate = apps + '/{id}/comments', commentPath = appPath + '/comments', commentKey = randomUUID()
+  const commentBody = { content: '契约验收：补充审批依据', expectedVersion: application.version }
+  const comment = await call('POST', commentTemplate, { user: 'alice', path: commentPath, status: 201, body: commentBody, key: commentKey })
+  assert.deepEqual(await call('POST', commentTemplate, { user: 'alice', path: commentPath, status: 201, body: commentBody, key: commentKey }), comment)
+  const commentPage = await call('GET', commentTemplate, { user: 'alice', path: commentPath + '?limit=1&roundNo=1' })
+  assert.deepEqual(commentPage.items, [comment]); assert.equal(commentPage.nextCursor, null)
+  assert.equal(comment.author, 'alice'); assert.equal(comment.applicationVersion, application.version)
+  await call('GET', commentTemplate, { user: 'bob', path: commentPath, status: 404 })
+  await call('GET', commentTemplate, { user: 'alice', path: commentPath + '?limit=101', status: 400 })
+
   const tasks = await call('GET', '/api/v1/workspace/tasks', { user: 'manager', path: `/api/v1/workspace/tasks?processKey=${definition.key}&minAmount=100.01&limit=1` })
   assert.equal(tasks.total, 1)
   const taskPath = `${tasksPath}/${tasks.items[0].taskId}`

@@ -171,6 +171,12 @@ public final class Application {
         }
     }
 
+    /** 评论绑定用户核对过的审批上下文，追加沟通不递增申请版本或改变审批结论。 */
+    public void requireCommentContext(long expectedVersion) {
+        checkVersion(expectedVersion);
+        requireInApproval();
+    }
+
     private void checkVersion(long expectedVersion) {
         if (version != expectedVersion) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");

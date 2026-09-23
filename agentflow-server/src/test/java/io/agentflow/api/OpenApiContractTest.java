@@ -83,6 +83,8 @@ class OpenApiContractTest {
                 java.util.Map.entry("OperationsWaitingNode", io.agentflow.approval.operations.ApprovalOperationsReadPort.WaitingNode.class),
                 java.util.Map.entry("OperationsWaitingTask", io.agentflow.approval.operations.ApprovalOperationsReadPort.WaitingTask.class),
                 java.util.Map.entry("AssigneeOption", io.agentflow.definition.DefinitionAssigneeDirectory.Option.class),
+                java.util.Map.entry("ApplicationComment", io.agentflow.approval.comment.ApplicationComment.class),
+                java.util.Map.entry("CommentPage", io.agentflow.approval.comment.ApplicationCommentService.Page.class),
                 java.util.Map.entry("Application", io.agentflow.approval.ApplicationResponse.class),
                 java.util.Map.entry("SubmissionRound", io.agentflow.approval.SubmissionRoundResponse.class),
                 java.util.Map.entry("Definition", io.agentflow.definition.DefinitionController.DefinitionResponse.class),

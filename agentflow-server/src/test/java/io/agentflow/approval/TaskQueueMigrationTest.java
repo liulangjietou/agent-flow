@@ -26,7 +26,7 @@ class TaskQueueMigrationTest {
                         ? "{\"schemaVersion\":1,\"fields\":[{\"key\":\"amount\",\"type\":\"TEXT\"}]}" : null);
         var before = jdbc.queryForList("SELECT * FROM approval_application ORDER BY business_no");
         var history = jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" ORDER BY \"installed_rank\"");
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(Flyway.configure().dataSource(source).target("12").load().migrate().migrationsExecuted).isEqualTo(1);
         var after = jdbc.queryForList("SELECT * FROM approval_application ORDER BY business_no");
         assertThat(after.get(0).get("SEARCH_AMOUNT").toString()).isEqualTo("100.010000000000000000");
         assertThat(((java.math.BigDecimal) after.get(1).get("SEARCH_AMOUNT"))).isEqualByComparingTo("0");
@@ -35,6 +35,6 @@ class TaskQueueMigrationTest {
         after.forEach(row -> row.remove("SEARCH_AMOUNT")); assertThat(after).isEqualTo(before);
         assertThat(jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" WHERE \"version\"<>'12' OR \"version\" IS NULL ORDER BY \"installed_rank\""))
                 .isEqualTo(history);
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isZero();
+        assertThat(Flyway.configure().dataSource(source).target("12").load().migrate().migrationsExecuted).isZero();
     }
 }
