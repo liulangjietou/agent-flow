@@ -9,6 +9,7 @@ import TemplateCenter from './components/TemplateCenter.vue'
 import SystemChecks from './components/SystemChecks.vue'
 import DefinitionSimulation from './components/DefinitionSimulation.vue'
 import DefinitionComparison from './components/DefinitionComparison.vue'
+import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
@@ -17,7 +18,6 @@ import type { PendingWrite } from './pendingWrites.js'
 
 type Page = 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
-interface FlowNode { id: string; name: string; type: string; x: number; y: number; assigneeRule: string }
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value }))
@@ -135,7 +135,7 @@ function redo() { if (editorLocked.value) return; const value = future.value.pop
 function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; validationErrors.value = []; validationMessage.value = '尚未校验，发布前将运行服务端校验。' }
 function graphPayload(): Graph {
   return {
-    nodes: nodes.value.map(node => ({ id: node.id, name: node.name, type: node.type, properties: { ...(node.type === 'USER_TASK' && node.assigneeRule ? { assigneeRule: node.assigneeRule } : {}), x: String(node.x), y: String(node.y) } })),
+    nodes: serializeDesignerNodes(nodes.value),
     edges: edges.value.map(edge => ({ ...edge, condition: edge.defaultBranch ? '' : edge.condition.trim() }))
   }
 }
@@ -143,7 +143,7 @@ function applyDefinition(definition: Definition) {
   definitionId.value = definition.id; selectedDefinitionId.value = definition.id
   definitionKey.value = definition.key; definitionName.value = definition.name; definitionFormSchema.value = cloneSchema(definition.formSchema ?? null)
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
-  nodes.value = definition.graph.nodes.map((node, index) => ({ id: node.id, name: node.name, type: node.type, x: Number(node.properties.x ?? 40 + index * 180), y: Number(node.properties.y ?? 180), assigneeRule: node.properties.assigneeRule ?? '' }))
+  nodes.value = loadDesignerNodes(definition.graph.nodes)
   edges.value = definition.graph.edges.map(edge => ({ ...edge, defaultBranch: edge.defaultBranch ?? false }))
   selectedId.value = nodes.value[0]?.id ?? ''; resetEditor(); savedSnapshot.value = snapshot()
   localStorage.setItem(`agentflow.definition.${tenantId.value}`, definition.id)
