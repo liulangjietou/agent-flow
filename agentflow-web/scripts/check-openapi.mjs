@@ -8,6 +8,7 @@ const spec = JSON.parse(readFileSync(new URL('../../agentflow-server/src/main/re
 await SwaggerParser.validate(structuredClone(spec))
 const ajv = new Ajv2020({ strict: false, allErrors: true })
 addFormats(ajv)
+ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
@@ -18,7 +19,7 @@ for (const methods of Object.values(spec.paths)) for (const operation of Object.
   const body = operation.requestBody?.content['application/json']
   if (body?.example !== undefined) { validate(body.schema, body.example); examples++ }
   assert.equal(Boolean(operation.parameters?.find(p => p.name === 'Idempotency-Key')?.required), operation['x-idempotency'])
-  for (const response of Object.values(operation.responses)) if (response.content) validator(response.content['application/json'].schema)
+  for (const response of Object.values(operation.responses)) for (const media of Object.values(response.content ?? {})) validator(media.schema)
 }
 console.log(JSON.stringify({ result: 'PASS', operations: ids.size, schemas: Object.keys(spec.components.schemas).length, requestExamples: examples }))
 // 写入型验收只在明确指定独立本机演示入口时运行，保留所有验收数据。
@@ -43,11 +44,13 @@ async function exercise(base) {
     if (operation['x-idempotency']) headers['Idempotency-Key'] = key
     if (body !== undefined) validate(operation.requestBody.content['application/json'].schema, body)
     const response = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) })
-    const text = await response.text(), value = text ? JSON.parse(text) : undefined
+    const binary = response.ok && operation.responses[String(status)]?.content?.['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    const text = binary ? '' : await response.text(), value = binary ? new Uint8Array(await response.arrayBuffer()) : text ? JSON.parse(text) : undefined
     assert.equal(response.status, status, `${method} ${template}: ${value?.code ?? 'unexpected status'}`)
     const declared = operation.responses[String(status)]
     assert.ok(declared, `undocumented status ${status}`)
-    if (declared.content) validate(declared.content['application/json'].schema, value)
+    if (binary) { assert.equal(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); assert.deepEqual([...value.slice(0, 2)], [80, 75]); assert.equal(response.headers.get('cache-control'), 'no-store') }
+    else if (declared.content) validate(declared.content['application/json'].schema, value)
     else assert.equal(value, undefined)
     if (status < 300 && operation['x-idempotency']) assert.ok(['true', 'false'].includes(response.headers.get('Idempotency-Replayed')))
     completed.add(operation.operationId); statuses.add(status)
@@ -157,6 +160,10 @@ async function exercise(base) {
   assert.equal(nextSearch.items.length, 1); assert.notEqual(nextSearch.items[0].id, firstSearch.items[0].id)
   const cancelledSearch = await call('GET', searchPath, { path: searchPath + '?processKey=' + definition.key + '&status=CANCELLED&applicant=alice&definitionVersion=1' })
   assert.deepEqual(cancelledSearch.items.map(row => row.id), [cancelled.id]); assert.ok(!('payload' in cancelledSearch.items[0]))
+  const exportPath = searchPath + '/export'
+  await call('GET', exportPath, { path: exportPath + '?processKey=' + definition.key })
+  await call('GET', exportPath, { user: 'alice', status: 403 })
+  await call('GET', exportPath, { path: exportPath + '?limit=30', status: 400 })
   await call('GET', searchPath, { user: 'alice', status: 403 })
   await call('GET', searchPath, { path: searchPath + '?tenantId=other', status: 400 })
   await call('GET', operationsPath, { user: 'alice', status: 403 })

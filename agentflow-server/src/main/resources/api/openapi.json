@@ -5570,6 +5570,184 @@
           }
         ]
       }
+    },
+    "/api/v1/operations/applications/export": {
+      "get": {
+        "operationId": "exportApplications",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "导出当前租户申请摘要 Excel",
+        "description": "仅 ADMIN。复用申请检索筛选，一次查询全部匹配摘要，最多 10000 条；超过上限整次拒绝，不生成截断文件。不接受 cursor 或 limit。响应包含申请记录和导出说明两个工作表；单号和标题均为文本，无表单正文或审批意见。每个服务实例同时只生成一份文件。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "完整匹配结果工作簿，Cache-Control: no-store；Content-Disposition: attachment; filename=\"agentflow-applications.xlsx\"。空结果仍生成表头及导出说明。",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_APPLICATION_QUERY：筛选、版本、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "APPLICATION_EXPORT_LIMIT_EXCEEDED：超过 10000 份，请缩小筛选。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "APPLICATION_EXPORT_BUSY：另一导出正在生成，请稍后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "APPLICATION_EXPORT_FAILED：文件生成失败，可重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "标题或业务单号包含文本；大小写不敏感，百分号和下划线按字面量匹配",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "申请当前状态，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "DRAFT",
+                "IN_APPROVAL",
+                "RETURNED",
+                "WITHDRAWN",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "REVOKED"
+              ]
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "definitionVersion",
+            "in": "query",
+            "required": false,
+            "description": "精确版本，必须同时指定流程标识",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "applicant",
+            "in": "query",
+            "required": false,
+            "description": "精确申请人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "创建开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "创建结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

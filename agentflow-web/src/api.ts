@@ -1,5 +1,6 @@
 import type { RoundDiagram } from './roundDiagram'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
+import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
 import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
@@ -115,7 +116,7 @@ function historyQuery(query: object) {
   return params.size ? '?' + params.toString() : ''
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, format: 'json' | 'xlsx' = 'json'): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
   const token = localStorage.getItem('agentflow.token')
@@ -130,6 +131,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let details: ApiError['details']
     try { const body = await response.json() as { message?: string; code?: string; details?: ApiError['details'] }; message = body.message ?? message; code = body.code ?? code; details = body.details } catch { /* 已收到明确状态码，保留错误分类。 */ }
     const messages: Record<string, string> = {
+      APPLICATION_EXPORT_LIMIT_EXCEEDED: '匹配申请超过 10,000 份，请按创建日期、流程或申请人缩小筛选后再导出。未生成截断文件。',
+      APPLICATION_EXPORT_BUSY: '服务正在生成另一份导出，请稍后重试。',
+      APPLICATION_EXPORT_FAILED: '文件生成失败，请重试。',
+      INVALID_APPLICATION_QUERY: '筛选条件无效，请重新查询后导出。',
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
       INVALID_FIRST_WORKFLOW_QUERY: '流程进度筛选无效，请重新选择流程。',
@@ -164,6 +169,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw { status: response.status, code, message: messages[code] ?? message, details } satisfies ApiError
   }
   try {
+    if (format === 'xlsx') {
+      if (response.headers.get('Content-Type')?.split(';')[0] !== workbookType) throw new Error('Unexpected workbook content type')
+      const blob = await response.blob()
+      if (!blob.size) throw new Error('Empty workbook')
+      return blob as T
+    }
     const text = await response.text()
     const value = text ? JSON.parse(text) : undefined
     if (businessWrite && (value === null || typeof value !== 'object' || Array.isArray(value))) throw new Error('Invalid write response')
@@ -214,6 +225,7 @@ export const api = {
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
   searchApplications: (filters: ApplicationSearchFilters, signal: AbortSignal) => request<ApplicationSearchPage>('/operations/applications' + historyQuery(filters), { signal }),
+  exportApplications: (filters: ApplicationExportFilters, signal: AbortSignal) => request<Blob>('/operations/applications/export' + historyQuery(filters), { signal }, 'xlsx'),
   applications: (signal?: AbortSignal) => request<Application[]>('/applications', { signal }),
   application: (id: string, signal?: AbortSignal) => request<Application>(`/applications/${encodeURIComponent(id)}`, { signal }),
   updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>(`/applications/${encodeURIComponent(id)}`, 'PUT', '保存申请修改', body),
