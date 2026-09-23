@@ -21,6 +21,7 @@ public class DefinitionApplicationService {
     private final DefinitionDeploymentPort deploymentPort;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
+    private final DefinitionDiffService differences = new DefinitionDiffService();
 
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort) {
@@ -88,6 +89,29 @@ public class DefinitionApplicationService {
     public DefinitionSimulator.Result simulatePreview(Graph graph, FormSchema formSchema, DefinitionModels.EvaluationContext context) {
         return simulator.simulateDetailed(graph, formSchema, context);
     }
+
+    /** 只读比较同租户、同 key 的发布基线与当前设计，不要求当前图已经通过发布校验。 */
+    public Comparison compare(String tenantId, UUID baselineId, String key, DefinitionDiffService.Snapshot current) {
+        DefinitionDraft baseline = get(tenantId, baselineId);
+        if (baseline.status() != DefinitionModels.DraftStatus.PUBLISHED) {
+            throw new DomainException("COMPARISON_BASELINE_REQUIRED", "Comparison baseline must be a published definition");
+        }
+        if (!baseline.key().equals(key)) throw new DomainException("COMPARISON_KEY_MISMATCH", "Comparison requires the same process key");
+        return new Comparison(new Baseline(baseline.id(), baseline.key(), baseline.name(), baseline.version()), differences.compare(
+                new DefinitionDiffService.Snapshot(baseline.name(), baseline.graph(), baseline.formSchema()), current));
+    }
+
+    /**
+     * 已授权的基线标识，不携带完整聚合或其他租户信息。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Baseline(UUID id, String key, String name, long version) { }
+
+    /**
+     * 服务端读取的可信基线及本次只读差异。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Comparison(Baseline baseline, List<DefinitionDiffService.Change> changes) { }
 
     /** 查询定义。 */
     public DefinitionDraft get(String tenantId, UUID id) {

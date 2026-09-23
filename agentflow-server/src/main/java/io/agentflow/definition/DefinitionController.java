@@ -106,6 +106,20 @@ public class DefinitionController {
         return new SimulationResponse(service.simulate(draft.tenantId(), id, context));
     }
 
+    /** 将当前设计与同流程的发布版本比较，不写入草稿或部署引擎。 */
+    @PostMapping("/{id}/compare")
+    public DefinitionApplicationService.Comparison compare(@PathVariable UUID id, @Valid @RequestBody ComparisonRequest request) {
+        requireProcessAdmin();
+        return service.compare(currentActor.actor().tenantId(), id, request.key(),
+                new DefinitionDiffService.Snapshot(request.name(), request.graph(), request.formSchema()));
+    }
+
+    /**
+     * formSchema 表示完整快照；null 明确表示未绑定表单。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ComparisonRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema) { }
+
     /**
      * 设计器请求图。
      * @author owlzhangfq@gmail.com

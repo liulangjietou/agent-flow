@@ -5,6 +5,15 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
 /** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
 export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown> }
+/** 与发布基线比较的完整当前配置。@author owlzhangfq@gmail.com */
+export interface ComparisonInput { key: string; name: string; graph: Graph; formSchema: FormSchema | null }
+/** 一个稳定对象的配置变化；缺少前后值表示该侧未配置。@author owlzhangfq@gmail.com */
+export interface ComparisonChange {
+  area: 'DEFINITION' | 'NODE' | 'EDGE' | 'ROUTING' | 'FORM' | 'FIELD' | 'LAYOUT'
+  kind: 'ADDED' | 'REMOVED' | 'MODIFIED'; targetId: string; label: string; property: string; before?: unknown; after?: unknown
+}
+/** 服务端确认的基线和差异列表。@author owlzhangfq@gmail.com */
+export interface ComparisonResult { baseline: { id: string; key: string; name: string; version: number }; changes: ComparisonChange[] }
 /** 不包含原测试数据的路径与分支依据。@author owlzhangfq@gmail.com */
 export interface SimulationResult {
   path: string[]; edgeIds: string[]
@@ -93,6 +102,7 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
