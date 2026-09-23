@@ -19,3 +19,5 @@ button:disabled{cursor:not-allowed;opacity:.48;transform:none}textarea{font:inhe
 .flow-node.simulated{box-shadow:0 0 0 3px rgba(8,122,118,.28);border-color:var(--deep)}
 .edges path.simulated{stroke:var(--deep);stroke-width:3.5}
 .edges path.simulated.selected{stroke:var(--amber);stroke-width:4}
+/* 导航数量增加时只滚动菜单，品牌与会话入口始终保留在视口内。 */
+.sidebar nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}.sidebar>.brand,.sidebar>.space-label,.sidebar-bottom{flex-shrink:0}

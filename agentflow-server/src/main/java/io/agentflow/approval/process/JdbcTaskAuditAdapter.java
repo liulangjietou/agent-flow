@@ -2,6 +2,9 @@ package io.agentflow.approval.process;
 
 import io.agentflow.approval.service.TaskAuditPort;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.integration.ApprovalWebhookEvents;
+import java.time.Instant;
+import java.sql.Timestamp;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -17,16 +20,19 @@ import java.util.UUID;
 public class JdbcTaskAuditAdapter implements TaskAuditPort {
     private final JdbcTemplate jdbcTemplate;
     private final JsonUtil jsonUtil;
+    private final ApprovalWebhookEvents webhooks;
 
     /** 创建审计适配器。 */
-    public JdbcTaskAuditAdapter(JdbcTemplate jdbcTemplate, JsonUtil jsonUtil) {
+    public JdbcTaskAuditAdapter(JdbcTemplate jdbcTemplate, JsonUtil jsonUtil, ApprovalWebhookEvents webhooks) {
         this.jdbcTemplate = jdbcTemplate;
         this.jsonUtil = jsonUtil;
+        this.webhooks = webhooks;
     }
 
     @Override
     public String record(TaskOperation operation) {
         String eventId = UUID.randomUUID().toString();
+        Instant occurredAt = Instant.now();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("action", operation.action());
         payload.put("actor", operation.actor());
@@ -42,9 +48,10 @@ public class JdbcTaskAuditAdapter implements TaskAuditPort {
         jdbcTemplate.update("""
                 INSERT INTO audit_event
                 (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, actor_id, payload_json, occurred_at)
-                VALUES (?, ?, ?, 'Task', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, 'Task', ?, ?, ?, ?, ?, ?, ?)
                 """, UUID.randomUUID().toString(), operation.tenantId(), eventId, operation.taskId(),
-                operation.aggregateVersion(), operation.applicationId().toString(), operation.action(), operation.actor(), jsonUtil.write(payload));
+                operation.aggregateVersion(), operation.applicationId().toString(), operation.action(), operation.actor(), jsonUtil.write(payload), Timestamp.from(occurredAt));
+        webhooks.task(operation, eventId, occurredAt);
         return eventId;
     }
 }

@@ -208,6 +208,18 @@ async function exercise(base) {
     assert.equal(calculation.revision, revision); assert.equal(calculation.deadline.dueAt, dueAt)
   }
   await call('POST', '/api/v1/auth/logout', { user: 'bob' }); await call('GET', '/api/v1/auth/me', { user: 'bob', status: 401 })
+  const wh = '/api/v1/integrations/webhooks'
+  await call('GET', wh)
+  await call('GET', wh, { user: 'alice', status: 403 })
+  const deliveries = await call('GET', wh + '/deliveries', { path: wh + '/deliveries?applicationId=' + application.id })
+  await call('GET', wh + '/deliveries', { path: wh + '/deliveries?tenantId=other', status: 400 })
+  const missingDelivery = randomUUID()
+  await call('GET', wh + '/deliveries/{id}', { path: wh + '/deliveries/' + missingDelivery, status: 404 })
+  await call('POST', wh + '/deliveries/{id}/retry', { path: wh + '/deliveries/' + missingDelivery + '/retry', body: { expectedVersion: 1 }, status: 404 })
+  for (const item of deliveries.items) {
+    await call('GET', wh + '/deliveries/{id}', { path: wh + '/deliveries/' + item.id })
+    assert.ok(!JSON.stringify(item).includes('payload_json'))
+  }
   assert.deepEqual([...completed].sort(), [...ids].sort())
   console.log(JSON.stringify({ result: 'PASS', base, operations: completed.size, statuses: [...statuses].sort(), processKey: definition.key, approved: application.id, withdrawn: withdrawn.id }))
 }

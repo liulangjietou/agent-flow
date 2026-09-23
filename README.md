@@ -145,3 +145,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 审批运营的指标、权限、日期边界和验证方式见 [审批运营统计](docs/approval-operations.md)。
 
 管理员的首次使用入口、真实运行进度和样例预览见 [首次流程使用引导](docs/first-workflow-guide.md)；企业租户及身份初始化仍待接入。
+
+- [Webhook 可靠投递](docs/webhook-delivery.md)：部署目的地、签名接入、事务 outbox、失败重试、管理员页面与本地验收示例。
