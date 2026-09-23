@@ -65,7 +65,11 @@ public class SystemCheckService {
         checks.add(up("templates", "已加载 " + templates.size() + " 个模板，启动时验证 " + scenarios + " 个路由场景。"));
         checks.add(new Check("authentication", Status.WARNING, demoEnabled ? "DEMO_AUTH_ONLY" : "AUTH_PROVIDER_NOT_CONFIGURED",
                 demoEnabled ? "使用演示账号，企业身份认证尚未接入。" : "演示登录已关闭，企业身份认证尚未接入。"));
-        for (String id : List.of("objectStorage", "notifications", "organization", "model")) {
+        checks.add(inspect("notifications", () -> {
+            diagnostics.notifications(actor.tenantId());
+            return new Check("notifications", Status.WARNING, "IN_APP_ONLY", "站内消息存储查询成功；邮件、IM 和 SLA 尚未接入。");
+        }));
+        for (String id : List.of("objectStorage", "organization", "model")) {
             checks.add(new Check(id, Status.NOT_IMPLEMENTED, "ADAPTER_NOT_IMPLEMENTED", "当前版本尚未实现此服务接入，未执行连接检查。"));
         }
         return new Report(Instant.now(), List.copyOf(checks));

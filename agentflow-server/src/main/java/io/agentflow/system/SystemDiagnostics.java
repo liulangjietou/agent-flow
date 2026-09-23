@@ -65,4 +65,16 @@ public class SystemDiagnostics {
         tasks.createTaskQuery().taskTenantId(tenantId).count();
         history.createHistoricProcessInstanceQuery().processInstanceTenantId(tenantId).count();
     }
+
+    /** 验证当前租户消息存储可读，不触发发送或改变阅读状态。 */
+    public void notifications(String tenantId) {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("SELECT id FROM notification_inbox WHERE tenant_id=? LIMIT 1")) {
+            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setString(1, tenantId);
+            try (var result = statement.executeQuery()) { result.next(); }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Notification storage probe failed", exception);
+        }
+    }
 }

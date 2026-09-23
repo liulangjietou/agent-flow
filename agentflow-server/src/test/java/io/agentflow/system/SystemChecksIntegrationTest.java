@@ -62,7 +62,8 @@ class SystemChecksIntegrationTest {
                 .andExpect(jsonPath("checks[?(@.id == 'flowable')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'templates')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'authentication')].code").value("DEMO_AUTH_ONLY"))
-                .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.hasSize(4)));
+                .andExpect(jsonPath("checks[?(@.id == 'notifications')].code").value("IN_APP_ONLY"))
+                .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.hasSize(3)));
     }
 
     private String token(String username) {

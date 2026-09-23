@@ -46,7 +46,7 @@ class WorkspaceMigrationTest {
         var applicationBefore = jdbc.queryForList("SELECT * FROM approval_application");
         var auditsBefore = jdbc.queryForList("SELECT * FROM audit_event ORDER BY id");
         var migrationsBefore = jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" ORDER BY \"installed_rank\"");
-        Flyway.configure().dataSource(source).load().migrate();
+        Flyway.configure().dataSource(source).target("10").load().migrate();
         assertThat(jdbc.queryForList("SELECT * FROM approval_application")).isEqualTo(applicationBefore);
         var auditsAfter = jdbc.queryForList("SELECT * FROM audit_event ORDER BY id");
         auditsAfter.forEach(row -> row.remove("ACTOR_ID"));
@@ -55,7 +55,7 @@ class WorkspaceMigrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE actor_id IS NOT NULL", Integer.class)).isEqualTo(reliable.size());
         assertThat(jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" WHERE (\"version\" IS NULL OR \"version\"<>'10') ORDER BY \"installed_rank\""))
                 .isEqualTo(migrationsBefore);
-        assertThat(Flyway.configure().dataSource(source).load().migrate().migrationsExecuted).isZero();
+        assertThat(Flyway.configure().dataSource(source).target("10").load().migrate().migrationsExecuted).isZero();
     }
 
     private static String audit(JdbcTemplate jdbc, String tenant, String applicationId, String action, String payload) {

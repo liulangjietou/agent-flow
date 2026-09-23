@@ -47,7 +47,8 @@ checks = {check["id"]: check for check in report["checks"]}
 for check_id in ("database", "migrations", "flowable", "templates"):
     assert checks[check_id]["status"] == "UP", (check_id, checks[check_id]["code"])
 assert checks["authentication"]["code"] == "DEMO_AUTH_ONLY"
-assert sum(check["status"] == "NOT_IMPLEMENTED" for check in report["checks"]) == 4
+assert sum(check["status"] == "NOT_IMPLEMENTED" for check in report["checks"]) == 3
+assert next(check for check in report["checks"] if check["id"] == "notifications")["code"] == "IN_APP_ONLY"
 assert request("/actuator/health/readiness")["status"] == "UP"
 for forbidden in ("jdbc:", "password=", "Bearer ", "agentflow-local-demo-only"):
     assert forbidden not in json.dumps(report)

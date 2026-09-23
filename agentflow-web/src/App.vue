@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
 import TaskActions from './components/TaskActions.vue'
+import NotificationInbox from './components/NotificationInbox.vue'
+import { isTaskNotification } from './notificationInbox'
 import { taskActionLabels } from './taskActions'
 import WorkspaceRecords from './components/WorkspaceRecords.vue'
 import ApplicationHistory from './components/ApplicationHistory.vue'
@@ -20,10 +22,10 @@ import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoome
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange } from './api'
+import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type Page = 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
+type Page = 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
@@ -301,6 +303,32 @@ async function performAction(input: TaskActionInput) {
     await refreshWorkspace(); notice.value = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
   } catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
+}
+/** 标记已读只更新消息；结果不确定时由原请求恢复入口处理。 */
+async function readNotification(message: InboxMessage) {
+  if (busy.value || writesBlocked.value) return
+  busy.value = true
+  try { await api.readNotification(message.id); templateRefresh.value++; notice.value = '消息已标为已读。' }
+  catch (error) { notice.value = errorMessage(error) }
+  finally { busy.value = false }
+}
+/** 旧提醒不能替代当前待办权限，先读取最新列表再定位；任务已流转则打开申请详情。 */
+async function openNotification(message: InboxMessage) {
+  if (busy.value || writesBlocked.value) return
+  if (!isTaskNotification(message)) { recordApplicationId.value = message.applicationId; return }
+  const scope = actorScope.value, controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 12_000)
+  busy.value = true
+  let task: Task | undefined
+  try {
+    const current = await api.tasks(controller.signal)
+    if (actorScope.value !== scope) return
+    tasks.value = current
+    task = current.find(item => item.taskId === message.taskId && item.applicationId === message.applicationId)
+    if (!task) { recordApplicationId.value = message.applicationId; notice.value = '该待办已发生变化，请核对申请当前状态。' }
+  } catch (error) { notice.value = controller.signal.aborted ? '读取待办超时，请重试。' : errorMessage(error) }
+  finally { clearTimeout(timeout); busy.value = false }
+  if (task && actorScope.value === scope) { page.value = 'workbench'; await selectTask(task) }
 }
 async function openSimulation() {
   simulationOpen.value = !simulationOpen.value
@@ -659,6 +687,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <button :class="{ active: page === 'started' }" @click="page = 'started'"><b>↗</b><span>我发起</span></button>
           <button :class="{ active: page === 'drafts' }" @click="page = 'drafts'"><b>▧</b><span>我的草稿</span></button>
           <button :class="{ active: page === 'handled' }" @click="page = 'handled'"><b>✓</b><span>已办记录</span></button>
+          <button aria-label="消息中心" :class="{ active: page === 'notifications' }" @click="page = 'notifications'"><b>◌</b><span>消息中心</span></button>
           <button :class="{ active: page === 'applications' }" @click="page = 'applications'"><b>↗</b><span>申请记录</span></button>
           <div class="nav-divider"></div>
           <button :class="{ active: page === 'designer' }" @click="page = 'designer'"><b>⌘</b><span>流程管理</span></button>
@@ -671,7 +700,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
       </aside>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
@@ -704,6 +733,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <div class="page-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>申请记录</h2><p class="subhead">服务端按发起人、参与者与管理员权限返回申请。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
           <div class="panel"><div v-if="!applications.length" class="queue-empty"><strong>还没有可访问的申请</strong><p>选择已发布流程，填写申请并提交。</p></div><div v-for="application in applications" :key="application.id" class="expense-row"><span class="receipt-icon">▤</span><div><strong>{{ application.title }}</strong><small>{{ application.businessNo }} · {{ application.createdBy }} · {{ application.processKey }} v{{ application.definitionVersion }} · 第 {{ application.roundNo }} 轮</small></div><span class="status-chip">{{ statusLabel(application.status) }}</span><button class="secondary" :disabled="busy" @click="recordApplicationId = application.id">{{ application.createdBy === actor?.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.status) ? '查看并修改' : '查看详情' }}</button></div></div>
         </section>
+        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="page === 'templates' && canManageDefinitions" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @designer="page = 'designer'" />

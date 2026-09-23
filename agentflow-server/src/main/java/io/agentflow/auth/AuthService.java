@@ -63,6 +63,13 @@ public class AuthService implements TaskRecipientDirectory {
                 .map(Map.Entry::getKey).sorted().toList();
     }
 
+    /** 任务候选人与候选组取并集；与登录共享同一租户、账号和角色来源。 */
+    @Override
+    public List<String> members(String tenantId, Set<String> users, Set<String> roles) {
+        return approvers(tenantId).stream().filter(user -> users.contains(user)
+                || DEMO_ROLES.get(user).stream().anyMatch(roles::contains)).toList();
+    }
+
     /** 从 Bearer token 解析认证主体。 */
     public Actor authenticate(String token) {
         Actor actor = tokens.get(token);

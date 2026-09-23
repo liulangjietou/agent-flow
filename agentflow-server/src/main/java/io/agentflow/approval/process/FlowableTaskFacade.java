@@ -14,6 +14,7 @@ import io.agentflow.approval.service.TaskAuditPort;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
+import io.agentflow.notification.ApprovalNotificationService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
@@ -37,11 +38,13 @@ public class FlowableTaskFacade {
     private final ProcessRuntimePort processRuntime;
     private final TaskAuditPort auditPort;
     private final SubmissionRoundRepository rounds;
+    private final ApprovalNotificationService notifications;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
                               ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
-                              TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients) {
+                              TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients,
+                              ApprovalNotificationService notifications) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -49,6 +52,7 @@ public class FlowableTaskFacade {
         this.processRuntime = processRuntime;
         this.auditPort = auditPort;
         this.rounds = rounds;
+        this.notifications = notifications;
     }
 
     /** 只返回当前主体可领取或已指派给自己的待办。 */
@@ -155,6 +159,7 @@ public class FlowableTaskFacade {
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }
+        notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName());
         return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }
 

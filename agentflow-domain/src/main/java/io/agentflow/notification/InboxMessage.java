@@ -1,0 +1,28 @@
+package io.agentflow.notification;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * 单个接收人的站内消息；业务事实不可覆盖，已读时间只记录第一次阅读。
+ * @author owlzhangfq@gmail.com
+ */
+public record InboxMessage(UUID id, String tenantId, String recipient, UUID applicationId, String title,
+                           String businessNo, Kind kind, String actor, String taskId, String nodeName,
+                           int roundNo, Instant createdAt, Instant readAt) {
+    /** 重复标记保持第一次阅读时间，不改变消息对应的业务事实。 */
+    public InboxMessage markRead(Instant time) {
+        if (readAt != null) return this;
+        return new InboxMessage(id, tenantId, recipient, applicationId, title, businessNo, kind, actor,
+                taskId, nodeName, roundNo, createdAt, time);
+    }
+
+    /**
+     * 站内消息只表示已经提交的业务事实，不表示接收人仍然拥有任务操作权。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum Kind {
+        APPLICATION_SUBMITTED, TASK_PENDING, APPLICATION_RETURNED, APPLICATION_REJECTED,
+        APPLICATION_APPROVED, APPLICATION_WITHDRAWN, TASK_TRANSFERRED, TASK_DELEGATED, TASK_RESOLVED
+    }
+}

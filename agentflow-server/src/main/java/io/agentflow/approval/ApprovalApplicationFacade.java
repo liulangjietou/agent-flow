@@ -14,6 +14,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionModels;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.ApprovalNotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,11 +37,13 @@ public class ApprovalApplicationFacade {
     private final SubmissionRoundRepository rounds;
     private final DefinitionDraftRepository definitions;
     private final ProcessRuntimePort processRuntime;
+    private final ApprovalNotificationService notifications;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, List<ApplicationParticipantPort> participantPorts,
-                                     SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions) {
+                                     SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions,
+                                     ApprovalNotificationService notifications) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
@@ -48,6 +51,7 @@ public class ApprovalApplicationFacade {
         this.rounds = rounds;
         this.definitions = definitions;
         this.processRuntime = processRuntime;
+        this.notifications = notifications;
     }
 
     /** 创建申请草稿。 */
@@ -70,7 +74,9 @@ public class ApprovalApplicationFacade {
     public Application submit(UUID id, long expectedVersion) {
         Actor actor = currentActor.actor();
         requireApplicant(actor, id);
-        return service.submit(actor.tenantId(), id, expectedVersion, actor.userId());
+        Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId());
+        notifications.submitted(application, actor.userId());
+        return application;
     }
 
     /** 只有发起人可以补正内容，补正及版本更新处于同一事务。 */
@@ -86,7 +92,10 @@ public class ApprovalApplicationFacade {
     public Application withdraw(UUID id, long expectedVersion, String comment) {
         Actor actor = currentActor.actor();
         requireApplicant(actor, id);
-        return service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+        var previous = notifications.beforeWithdrawal(service.get(actor.tenantId(), id));
+        Application application = service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+        notifications.withdrawn(application, actor.userId(), previous);
+        return application;
     }
 
     /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */

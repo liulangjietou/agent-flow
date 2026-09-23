@@ -75,6 +75,17 @@ export interface WorkspacePage<T> { items: T[]; nextCursor?: string | null }
 /** 服务端白名单内的工作台筛选。@author owlzhangfq@gmail.com */
 export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; status?: string; action?: string; cursor?: string; limit?: number }
 
+/** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
+export interface InboxMessage {
+  id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
+  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED'
+  taskId?: string; nodeName?: string; createdAt: string; readAt?: string
+}
+/** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
+export interface InboxPage { items: InboxMessage[]; nextCursor?: string | null; unreadCount: number }
+/** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
+export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
+
 function historyQuery(query: HistoryQuery) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
@@ -143,7 +154,13 @@ export const api = {
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request<{ actor: Actor }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
-  tasks: () => request<Task[]>('/tasks'),
+  tasks: (signal?: AbortSignal) => request<Task[]>('/tasks', { signal }),
+  inbox: (query: InboxQuery, signal: AbortSignal) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value))
+    return request<InboxPage>(`/notifications?${params}`, { signal })
+  },
+  readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
   applications: () => request<Application[]>('/applications'),
