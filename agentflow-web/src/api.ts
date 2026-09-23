@@ -1,3 +1,4 @@
+import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
@@ -104,7 +105,7 @@ export interface InboxPage { items: InboxMessage[]; nextCursor?: string | null; 
 /** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
 export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
 
-function historyQuery(query: HistoryQuery) {
+function historyQuery(query: object) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined && value !== '') params.set(key, String(value))
@@ -130,6 +131,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
       IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
       INVALID_FIRST_WORKFLOW_QUERY: '流程进度筛选无效，请重新选择流程。',
+      INVALID_CALENDAR_QUERY: '日历分页参数无效，请重新读取。',
+      INVALID_CALENDAR: '请填写有效标识、名称和日历规则。',
+      INVALID_CALENDAR_RULES: '请检查时区、重复日期和工作时段。时段须为 HH:mm 且不重叠，结束可为 24:00；至少保留一个工作时段。',
+      INVALID_CALENDAR_CALCULATION: '请输入有效开始时间和 1 至 527040 个工作分钟。',
+      CALENDAR_KEY_CONFLICT: '此日历标识已存在，请选择其他标识。',
+      CALENDAR_NONEXISTENT_START: '此当地钟点因时区切换不存在，请选择其他开始时间。',
+      CALENDAR_AMBIGUOUS_START: '此当地钟点出现两次，请选择第一次或第二次后试算。',
+      CALENDAR_HORIZON_EXCEEDED: '未来 3660 天内没有足够工作时间，请核对规则或缩短时长。',
       INVALID_COMMENT_QUERY: '评论筛选或分页已失效，请重新查询。',
   INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
@@ -168,6 +177,13 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  calendars: (afterKey: string | undefined, signal: AbortSignal) => request<CalendarPage>('/business-calendars' + historyQuery({ afterKey, limit: 30 }), { signal }),
+  calendar: (id: string, signal: AbortSignal) => request<BusinessCalendar>(`/business-calendars/${encodeURIComponent(id)}`, { signal }),
+  calendarVersions: (id: string, beforeRevision: number | undefined, signal: AbortSignal) => request<CalendarVersionPage>(`/business-calendars/${encodeURIComponent(id)}/versions` + historyQuery({ beforeRevision, limit: 30 }), { signal }),
+  calendarVersion: (id: string, revision: number, signal: AbortSignal) => request<BusinessCalendar>(`/business-calendars/${encodeURIComponent(id)}/versions/${revision}`, { signal }),
+  createCalendar: (body: CalendarInput) => write<BusinessCalendar>('/business-calendars', 'POST', '新建工作日历', body),
+  updateCalendar: (id: string, body: CalendarUpdate) => write<BusinessCalendar>(`/business-calendars/${encodeURIComponent(id)}`, 'PUT', '保存工作日历修订', body),
+  calculateCalendar: (id: string, body: CalendarCalculationInput, signal: AbortSignal) => request<CalendarCalculation>(`/business-calendars/${encodeURIComponent(id)}/calculate`, { method: 'POST', body: JSON.stringify(body), signal }),
   openApi: (signal: AbortSignal) => request<ApiDocument>('/openapi.json', { signal }),
   workspaceApplications: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceApplication>>('/workspace/applications' + historyQuery(query), { signal }),
   workspaceHandled: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceHandled>>('/workspace/handled' + historyQuery(query), { signal }),

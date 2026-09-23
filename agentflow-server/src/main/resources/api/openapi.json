@@ -43,6 +43,10 @@
     },
     {
       "name": "集成"
+    },
+    {
+      "name": "工作日历",
+      "description": "管理员维护工作时间规则、不可变修订及只读到期试算。尚未关联任务 SLA。"
     }
   ],
   "paths": {
@@ -4242,6 +4246,925 @@
           }
         }
       }
+    },
+    "/api/v1/business-calendars": {
+      "get": {
+        "operationId": "businessCalendars",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "分页读取工作日历目录",
+        "description": "仅当前租户管理员。按日历标识升序翻页，响应禁止缓存。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "afterKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createBusinessCalendar",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "新建工作日历",
+        "description": "管理员明确配置时区、周规则及日期例外。租户和修改人来自认证。每个租户日历标识唯一。首版为 v1。示例不是法定节假日数据。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessCalendar"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCalendarRequest"
+              },
+              "example": {
+                "key": "headquarters",
+                "name": "总部工作日历",
+                "rules": {
+                  "zoneId": "Asia/Shanghai",
+                  "weeklyHours": {
+                    "MONDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "TUESDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "WEDNESDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "THURSDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "FRIDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ]
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business-calendars/{id}": {
+      "get": {
+        "operationId": "getBusinessCalendar",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "读取日历当前版本",
+        "description": "",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessCalendar"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateBusinessCalendar",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "保存日历新修订",
+        "description": "按 expectedRevision 乐观锁保存，新规则追加不可变历史并更新当前指针。版本冲突返回 409，不自动合并或修改旧版本。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessCalendar"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCalendarRequest"
+              },
+              "example": {
+                "name": "总部工作日历",
+                "rules": {
+                  "zoneId": "Asia/Shanghai",
+                  "weeklyHours": {
+                    "MONDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "TUESDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "WEDNESDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "THURSDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ],
+                    "FRIDAY": [
+                      {
+                        "start": "09:00",
+                        "end": "12:00"
+                      },
+                      {
+                        "start": "13:00",
+                        "end": "18:00"
+                      }
+                    ]
+                  },
+                  "overrides": []
+                },
+                "expectedRevision": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business-calendars/{id}/versions": {
+      "get": {
+        "operationId": "businessCalendarVersions",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "分页读取日历版本历史",
+        "description": "按修订号倒序，保留当时规则、作者与保存时间。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarVersionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "beforeRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/business-calendars/{id}/versions/{revision}": {
+      "get": {
+        "operationId": "getBusinessCalendarVersion",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "读取日历历史规则",
+        "description": "",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessCalendar"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/business-calendars/{id}/calculate": {
+      "post": {
+        "operationId": "calculateBusinessDeadline",
+        "tags": [
+          "工作日历"
+        ],
+        "summary": "按固定日历版本试算到期时间",
+        "description": "只读，不创建任务、不保存试算内容。跳过午休和休息日；日期例外覆盖整天规则。仅累计工作窗口内真实时间：时区跳时不存在的时间不计入，回拨重复窗口分别计入。开始钟点不存在或重复且未选择时返回 422。最多向后搜索 3660 天，不足工作时长返回 422。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarCalculation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateCalendarRequest"
+              },
+              "example": {
+                "revision": 1,
+                "startLocal": "2026-09-25T17:30:00",
+                "workingMinutes": 120
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6910,6 +7833,366 @@
           "content",
           "expectedVersion"
         ]
+      },
+      "CalendarPeriod": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "end": {
+            "type": "string",
+            "pattern": "^(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]|24:00)$"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarOverride": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarPeriod"
+            },
+            "maxItems": 8
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "date",
+          "periods",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarRules": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "description": "Java ZoneId 支持的 IANA 时区，例如 Asia/Shanghai；必填，无隐式系统时区。"
+          },
+          "weeklyHours": {
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY"
+              ]
+            },
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CalendarPeriod"
+              },
+              "maxItems": 8
+            }
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarOverride"
+            },
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "zoneId",
+          "weeklyHours",
+          "overrides"
+        ],
+        "additionalProperties": false
+      },
+      "BusinessCalendar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/CalendarRules"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "revision",
+          "updatedBy",
+          "updatedAt",
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zoneId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "revision",
+          "updatedBy",
+          "updatedAt",
+          "zoneId"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarSummary"
+            }
+          },
+          "nextAfterKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextAfterKey"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarVersionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarSummary"
+            }
+          },
+          "nextBeforeRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "items",
+          "nextBeforeRevision"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarDeadline": {
+        "type": "object",
+        "properties": {
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zoneId": {
+            "type": "string"
+          },
+          "workingMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 527040
+          },
+          "usedPeriods": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "startAt",
+          "dueAt",
+          "zoneId",
+          "workingMinutes",
+          "usedPeriods"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarCalculation": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "deadline": {
+            "$ref": "#/components/schemas/CalendarDeadline"
+          }
+        },
+        "required": [
+          "calendarId",
+          "revision",
+          "deadline"
+        ],
+        "additionalProperties": false
+      },
+      "CreateCalendarRequest": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "rules": {
+            "$ref": "#/components/schemas/CalendarRules"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateCalendarRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "rules": {
+            "$ref": "#/components/schemas/CalendarRules"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "name",
+          "rules",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "CalculateCalendarRequest": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "startLocal": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?$",
+            "description": "日历时区内当地时间，不带 UTC 偏移。支持年份 0001 至 9998。"
+          },
+          "workingMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 527040
+          },
+          "overlapChoice": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "EARLIER",
+              "LATER",
+              null
+            ],
+            "description": "回拨重复钟点时必须选择第一次或第二次；常规钟点可省略。"
+          }
+        },
+        "required": [
+          "revision",
+          "startLocal",
+          "workingMinutes"
+        ],
+        "additionalProperties": false
       }
     }
   }

@@ -134,6 +134,25 @@ async function exercise(base) {
   assert.equal(operations.metrics.returnRatePercent, 0); assert.equal(operations.pendingTasks, 0)
   await call('GET', operationsPath, { user: 'alice', status: 403 })
   await call('GET', operationsPath, { path: operationsPath + '?tenantId=other', status: 400 })
+  const calendars = '/api/v1/business-calendars', calendarBody = example(calendars), calendarKey = randomUUID()
+  calendarBody.key = 'calendar-' + suffix
+  const calendar = await call('POST', calendars, { body: calendarBody, status: 201, key: calendarKey })
+  assert.deepEqual(await call('POST', calendars, { body: calendarBody, status: 201, key: calendarKey }), calendar)
+  const calendarPath = calendars + '/' + calendar.id
+  await call('GET', calendars)
+  await call('GET', calendars, { user: 'alice', status: 403 })
+  await call('GET', calendars, { path: calendars + '?tenantId=other', status: 400 })
+  assert.deepEqual(await call('GET', calendars + '/{id}', { path: calendarPath }), calendar)
+  const revised = await call('PUT', calendars + '/{id}', { path: calendarPath, body: { name: '新版日历', rules: { ...calendarBody.rules, overrides: [{ date: '2026-09-28', periods: [], note: '自定义休息' }] }, expectedRevision: 1 } })
+  assert.equal(revised.revision, 2)
+  await call('PUT', calendars + '/{id}', { path: calendarPath, body: { name: '过期修改', rules: calendarBody.rules, expectedRevision: 1 }, status: 409 })
+  assert.deepEqual(await call('GET', calendars + '/{id}/versions/{revision}', { path: calendarPath + '/versions/1' }), calendar)
+  const versions = await call('GET', calendars + '/{id}/versions', { path: calendarPath + '/versions?limit=1' })
+  assert.equal(versions.items[0].revision, 2); assert.equal(versions.nextBeforeRevision, 2)
+  for (const [revision, dueAt] of [[1, '2026-09-28T02:30:00Z'], [2, '2026-09-29T02:30:00Z']]) {
+    const calculation = await call('POST', calendars + '/{id}/calculate', { path: calendarPath + '/calculate', body: { revision, startLocal: '2026-09-25T17:30:00', workingMinutes: 120 } })
+    assert.equal(calculation.revision, revision); assert.equal(calculation.deadline.dueAt, dueAt)
+  }
   await call('POST', '/api/v1/auth/logout', { user: 'bob' }); await call('GET', '/api/v1/auth/me', { user: 'bob', status: 401 })
   assert.deepEqual([...completed].sort(), [...ids].sort())
   console.log(JSON.stringify({ result: 'PASS', base, operations: completed.size, statuses: [...statuses].sort(), processKey: definition.key, approved: application.id, withdrawn: withdrawn.id }))

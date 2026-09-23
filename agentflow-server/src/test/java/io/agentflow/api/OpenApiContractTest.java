@@ -73,6 +73,15 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("BusinessCalendar", io.agentflow.calendar.BusinessCalendarController.CalendarResponse.class),
+                java.util.Map.entry("CalendarSummary", io.agentflow.calendar.BusinessCalendarRepository.Summary.class),
+                java.util.Map.entry("CalendarRules", io.agentflow.calendar.CalendarRules.class),
+                java.util.Map.entry("CalendarPeriod", io.agentflow.calendar.CalendarRules.Period.class),
+                java.util.Map.entry("CalendarOverride", io.agentflow.calendar.CalendarRules.DayOverride.class),
+                java.util.Map.entry("CalendarPage", io.agentflow.calendar.BusinessCalendarService.CalendarPage.class),
+                java.util.Map.entry("CalendarVersionPage", io.agentflow.calendar.BusinessCalendarService.VersionPage.class),
+                java.util.Map.entry("CalendarCalculation", io.agentflow.calendar.BusinessCalendarService.Calculation.class),
+                java.util.Map.entry("CalendarDeadline", io.agentflow.calendar.BusinessDeadline.Result.class),
                 java.util.Map.entry("FirstWorkflowReport", io.agentflow.onboarding.FirstWorkflowReadPort.Report.class),
                 java.util.Map.entry("FirstWorkflowDefinition", io.agentflow.onboarding.FirstWorkflowReadPort.Definition.class),
                 java.util.Map.entry("FirstWorkflowEvidence", io.agentflow.onboarding.FirstWorkflowReadPort.Evidence.class),
