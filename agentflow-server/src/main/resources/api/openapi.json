@@ -3786,6 +3786,122 @@
           }
         }
       }
+    },
+    "/api/v1/operations/approvals": {
+      "get": {
+        "operationId": "approvalOperations",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "审批运营统计",
+        "description": "ADMIN 租户内只读快照。按 UTC 提交日期统计轮次，默认近 30 天，含首尾且最多 366 天；结论取查询时状态。重提独立计轮次。当前积压不受日期范围影响，会签按成员任务计数。旧轮次缺失量独立披露。仅接收声明的四个查询参数。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsReport"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户统计快照",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_OPERATIONS_QUERY：日期、流程版本或未知查询参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "提交开始日期，默认结束日期减 29 天",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "提交结束日期，包含该日且不晚于当前 UTC 日期",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识，留空表示全部",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "definitionVersion",
+            "in": "query",
+            "required": false,
+            "description": "精确流程版本；必须同时提供 processKey",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5933,6 +6049,312 @@
           }
         },
         "description": "进入节点时固定有效审批名单，全部同意才流转；任一驳回终止整轮。委派协助后回交不计为同意。"
+      },
+      "OperationsMetrics": {
+        "type": "object",
+        "properties": {
+          "submittedRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "applications": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "inApproval": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "approved": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "returned": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "withdrawn": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "durationSamples": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "averageApprovalSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "decidedRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "returnRatePercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "退回 / (批准 + 退回 + 驳回) × 100，四舍五入一位；分母零时省略。"
+          }
+        },
+        "required": [
+          "submittedRounds",
+          "applications",
+          "inApproval",
+          "approved",
+          "returned",
+          "rejected",
+          "withdrawn",
+          "durationSamples",
+          "decidedRounds"
+        ]
+      },
+      "OperationsDaily": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "submittedRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "date",
+          "submittedRounds"
+        ]
+      },
+      "OperationsProcess": {
+        "type": "object",
+        "properties": {
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/OperationsMetrics"
+          }
+        },
+        "required": [
+          "processKey",
+          "definitionVersion",
+          "metrics"
+        ]
+      },
+      "OperationsWaitingNode": {
+        "type": "object",
+        "properties": {
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "oldestCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "oldestWaitSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "processKey",
+          "definitionVersion",
+          "nodeId",
+          "nodeName",
+          "tasks",
+          "oldestCreatedAt",
+          "oldestWaitSeconds"
+        ]
+      },
+      "OperationsWaitingTask": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "taskName": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "taskId",
+          "taskName",
+          "applicationId",
+          "businessNo",
+          "title",
+          "processKey",
+          "definitionVersion",
+          "roundNo",
+          "createdAt",
+          "waitingSeconds"
+        ]
+      },
+      "OperationsReport": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "timeZone": {
+            "type": "string",
+            "const": "UTC"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/OperationsMetrics"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationsDaily"
+            },
+            "maxItems": 366
+          },
+          "processes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationsProcess"
+            },
+            "maxItems": 50
+          },
+          "moreProcesses": {
+            "type": "boolean"
+          },
+          "pendingTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "waitingNodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationsWaitingNode"
+            },
+            "maxItems": 20
+          },
+          "moreWaitingNodes": {
+            "type": "boolean"
+          },
+          "oldestTasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationsWaitingTask"
+            },
+            "maxItems": 20
+          },
+          "moreOldestTasks": {
+            "type": "boolean"
+          },
+          "unrecordedHistoricalRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "generatedAt",
+          "from",
+          "to",
+          "timeZone",
+          "processKey",
+          "metrics",
+          "daily",
+          "processes",
+          "moreProcesses",
+          "pendingTasks",
+          "waitingNodes",
+          "moreWaitingNodes",
+          "oldestTasks",
+          "moreOldestTasks",
+          "unrecordedHistoricalRounds"
+        ]
       }
     }
   }

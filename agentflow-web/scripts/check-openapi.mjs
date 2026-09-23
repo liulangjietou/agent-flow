@@ -106,6 +106,13 @@ async function exercise(base) {
   const withdrawnPath = `${apps}/${withdrawn.id}`
   withdrawn = await call('POST', apps + '/{id}/submit', { user: 'alice', path: withdrawnPath + '/submit', body: { expectedVersion: withdrawn.version } })
   await call('POST', apps + '/{id}/withdraw', { user: 'alice', path: withdrawnPath + '/withdraw', body: { expectedVersion: withdrawn.version, comment: '接口撤回验收' } })
+  const operationsPath = '/api/v1/operations/approvals'
+  const operations = await call('GET', operationsPath, { path: operationsPath + '?processKey=' + definition.key })
+  assert.equal(operations.metrics.submittedRounds, 2); assert.equal(operations.metrics.approved, 1)
+  assert.equal(operations.metrics.withdrawn, 1); assert.equal(operations.metrics.decidedRounds, 1)
+  assert.equal(operations.metrics.returnRatePercent, 0); assert.equal(operations.pendingTasks, 0)
+  await call('GET', operationsPath, { user: 'alice', status: 403 })
+  await call('GET', operationsPath, { path: operationsPath + '?tenantId=other', status: 400 })
   await call('POST', '/api/v1/auth/logout', { user: 'bob' }); await call('GET', '/api/v1/auth/me', { user: 'bob', status: 401 })
   assert.deepEqual([...completed].sort(), [...ids].sort())
   console.log(JSON.stringify({ result: 'PASS', base, operations: completed.size, statuses: [...statuses].sort(), processKey: definition.key, approved: application.id, withdrawn: withdrawn.id }))
