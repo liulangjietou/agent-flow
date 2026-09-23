@@ -34,6 +34,8 @@
 
 消息读取是只读请求，可取消且有 12 秒总时限。切换账号、筛选或刷新会清空旧结果，迟到成功和失败均不回填；加载更多失败保留原记录和游标。已读响应不确定时使用现有原请求恢复入口，不换请求键推测执行结果。
 
+页面恢复分派单独识别消息已读请求，显示“已确认消息的已读状态”并刷新收件箱。浏览器回归步骤：打开存在未读消息的收件箱 → 模拟离线 → 点击标为已读 → 确认出现原操作恢复入口且其他写入锁定 → 恢复网络 → 点击恢复 → 确认消息变已读、未读总数减少、无审批状态提示。该步骤覆盖主页面分派，API 请求测试只能证明原请求重放，不能代替此页面验证。
+
 ## DDD 与一致性
 
 写链路：ApprovalApplicationFacade / FlowableTaskFacade → ApprovalNotificationService → TaskAudiencePort / InboxRepository。读取链路：NotificationInbox → InboxController → InboxApplicationService → InboxRepository。

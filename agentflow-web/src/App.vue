@@ -614,6 +614,9 @@ async function recoverOperation(id: string) {
       } else if (request.path.startsWith('/process-definitions')) {
         applyDefinition(result as Definition); page.value = 'designer'
         notice.value = request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
+      } else if (request.path.startsWith('/notifications/') && request.path.endsWith('/read')) {
+        templateRefresh.value++
+        notice.value = '已确认消息的已读状态。'
       } else if (request.path.startsWith('/applications')) {
         const value = result as Application
         if (request.path === '/applications') {
