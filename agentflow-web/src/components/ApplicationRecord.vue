@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import ApplicationHistory from './ApplicationHistory.vue'
+import RequestRecovery from './RequestRecovery.vue'
 import { api, type ApiError, type Application, type SubmissionRound } from '../api'
+import type { PendingWrite } from '../pendingWrites.js'
 
-const props = defineProps<{ applicationId: string; userId: string }>()
-const emit = defineEmits<{ close: []; changed: [] }>()
+const props = defineProps<{ applicationId: string; userId: string; pendingWrites: PendingWrite[]; recoveryError: string }>()
+const emit = defineEmits<{ close: []; changed: []; recover: [id: string] }>()
+const writesBlocked = computed(() => props.pendingWrites.length > 0)
 const dialog = ref<HTMLElement | null>(null)
 const application = ref<Application | null>(null)
 const rounds = ref<SubmissionRound[]>([])
@@ -42,7 +45,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 function fieldsSnapshot() { return JSON.stringify([title.value, amount.value, description.value]) }
 function showError(cause: unknown) {
   const failure = cause as ApiError
-  error.value = failure.status === 409
+  error.value = failure.code === 'CONCURRENCY_CONFLICT'
     ? '申请已被更新。请重新加载最新内容，核对后再操作。'
     : failure.message ?? '请求未完成，请重试。'
 }
@@ -85,7 +88,7 @@ async function saveChanges() {
   emit('changed')
 }
 async function save(submit = false) {
-  if (!canEdit.value || saving.value || loading.value) return
+  if (!canEdit.value || saving.value || loading.value || writesBlocked.value) return
   error.value = ''; notice.value = ''
   if (!validate()) return
   saving.value = true
@@ -113,7 +116,7 @@ async function cancelWithdrawal() {
   await nextTick(); withdrawalTrigger.value?.focus()
 }
 async function withdraw() {
-  if (!application.value || !canWithdraw.value || saving.value || loading.value) return
+  if (!application.value || !canWithdraw.value || saving.value || loading.value || writesBlocked.value) return
   saving.value = true; error.value = ''; notice.value = ''
   try {
     const value = await api.withdrawApplication(application.value.id, {
@@ -156,6 +159,7 @@ onUnmounted(() => returnFocus?.focus())
       </div>
       <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
+      <RequestRecovery :pending="pendingWrites" :error="recoveryError" @recover="emit('recover', $event)" />
       <p v-if="loading" class="unavailable" role="status">正在加载申请与提交记录…</p>
       <template v-else-if="application">
         <div class="record-meta"><span class="status-chip">{{ stateLabel(application.status) }}</span><span>第 {{ application.roundNo }} 轮</span><span>{{ application.businessNo }}</span></div>
@@ -166,21 +170,21 @@ onUnmounted(() => returnFocus?.focus())
           <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
         </div>
         <form v-if="canEdit" @submit.prevent="save(true)">
-          <fieldset :disabled="saving">
+          <fieldset :disabled="saving || writesBlocked">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
             <div class="record-fields"><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label></div>
             <label>申请说明<textarea v-model="description" rows="3" /></label>
           </fieldset>
           <dl v-if="extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
-          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || !dirty" @click="save()">保存修改</button><button class="primary" :disabled="saving">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
+          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || writesBlocked || !dirty" @click="save()">保存修改</button><button class="primary" :disabled="saving || writesBlocked">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
         <template v-else><h3 class="record-section-title">{{ application.title }}</h3><dl class="payload-list"><template v-for="(value, key) in application.payload" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
         <section v-if="canWithdraw" class="withdrawal-panel" aria-label="撤回审批">
-          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="saving" @click="openWithdrawal">撤回审批</button></template>
+          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="saving || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
           <form v-else @submit.prevent="withdraw">
             <h3>撤回当前审批</h3><p>撤回后，当前待办将停止，已经产生的审批意见会保留。再次提交会开始新一轮审批。</p>
-            <label>撤回说明（选填）<textarea ref="withdrawalInput" v-model="withdrawalComment" rows="3" maxlength="2000" :disabled="saving" placeholder="例如：需要补充申请材料" /></label>
-            <div class="form-actions"><button type="button" class="secondary" :disabled="saving" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="saving">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
+            <label>撤回说明（选填）<textarea ref="withdrawalInput" v-model="withdrawalComment" rows="3" maxlength="2000" :disabled="saving || writesBlocked" placeholder="例如：需要补充申请材料" /></label>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="saving || writesBlocked" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="saving || writesBlocked">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
           </form>
         </section>
         <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button></div>

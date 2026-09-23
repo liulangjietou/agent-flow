@@ -1,9 +1,13 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.process.FlowableTaskFacade;
+import io.agentflow.api.idempotency.IdempotencyExecutor;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,10 +20,12 @@ import java.util.List;
 @RequestMapping("/api/v1/tasks")
 public class TaskController {
     private final FlowableTaskFacade facade;
+    private final IdempotencyExecutor idempotency;
 
     /** 创建控制器。 */
-    public TaskController(FlowableTaskFacade facade) {
+    public TaskController(FlowableTaskFacade facade, IdempotencyExecutor idempotency) {
         this.facade = facade;
+        this.idempotency = idempotency;
     }
 
     /** 查询当前租户待办。 */
@@ -30,9 +36,10 @@ public class TaskController {
 
     /** 执行审批任务动作。 */
     @PostMapping("/{taskId}/actions")
-    public FlowableTaskFacade.ActionResult action(@PathVariable String taskId,
-                                                   @Valid @RequestBody TaskActionRequest request) {
-        return facade.action(taskId, request.action(), request.comment(), request.targetUser(), request.expectedVersion());
+    public ResponseEntity<String> action(@PathVariable String taskId, @Valid @RequestBody TaskActionRequest request,
+                                         HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> facade.action(taskId, request.action(), request.comment(), request.targetUser(), request.expectedVersion()));
     }
 
     /**

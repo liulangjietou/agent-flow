@@ -1,6 +1,7 @@
+import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
-export interface ApiError { status: number; message: string }
+export interface ApiError { status: number; code: string; message: string }
 export interface Actor { tenantId: string; userId: string; roles: string[] }
 export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
 export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
@@ -31,14 +32,36 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   headers.set('Content-Type', 'application/json')
   const token = localStorage.getItem('agentflow.token')
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  const response = await fetch(`${API_BASE}${path}`, { ...init, headers })
+  const businessWrite = headers.has('Idempotency-Key')
+  let response: Response
+  try { response = await fetch(`${API_BASE}${path}`, { ...init, headers }) }
+  catch { throw { status: 0, code: 'NETWORK_ERROR', message: businessWrite ? '连接中断，操作结果尚未确认。请恢复上次操作。' : '无法连接服务，请稍后重试。' } satisfies ApiError }
   if (!response.ok) {
     let message = `请求失败（${response.status}）`
-    try { const body = await response.json() as { message?: string }; message = body.message ?? message } catch { /* 保留状态码 */ }
-    throw { status: response.status, message } satisfies ApiError
+    let code = 'HTTP_ERROR'
+    try { const body = await response.json() as { message?: string; code?: string }; message = body.message ?? message; code = body.code ?? code } catch { /* 已收到明确状态码，保留错误分类。 */ }
+    const messages: Record<string, string> = {
+      IDEMPOTENCY_KEY_REUSED: '上次请求键对应其他内容，本次未重新执行。请先查询当前业务状态。',
+      IDEMPOTENCY_KEY_EXPIRED: '上次操作的恢复期限已过，未重新执行。请先查询当前业务状态。',
+      CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
+      FORBIDDEN: '当前账号没有执行此操作的权限，本次未重新执行。原操作结果请查询业务状态。',
+      UNAUTHENTICATED: '登录已失效，请重新登录。'
+    }
+    throw { status: response.status, code, message: messages[code] ?? message } satisfies ApiError
   }
-  const text = await response.text()
-  return text ? JSON.parse(text) as T : undefined as T
+  try {
+    const text = await response.text()
+    const value = text ? JSON.parse(text) : undefined
+    if (businessWrite && (value === null || typeof value !== 'object' || Array.isArray(value))) throw new Error('Invalid write response')
+    return value as T
+  } catch { throw { status: 0, code: 'RESPONSE_UNREADABLE', message: businessWrite ? '操作响应未完整接收，请恢复上次操作确认结果。' : '服务响应无法读取，请重试。' } satisfies ApiError }
+}
+
+export const writeRequests = new PendingWrites((operation, key) => request(operation.path, {
+  method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }
+}))
+function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
+  return writeRequests.run<T>({ path, method, label, body: body === undefined ? undefined : JSON.stringify(body) })
 }
 
 export const api = {
@@ -48,17 +71,17 @@ export const api = {
   me: () => request<{ actor: Actor }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
   tasks: () => request<Task[]>('/tasks'),
-  taskAction: (taskId: string, body: { action: string; comment?: string; targetUser?: string; expectedVersion: number }) => request<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, { method: 'POST', body: JSON.stringify(body) }),
+  taskAction: (taskId: string, body: { action: string; comment?: string; targetUser?: string; expectedVersion: number }) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
   applications: () => request<Application[]>('/applications'),
   application: (id: string) => request<Application>(`/applications/${encodeURIComponent(id)}`),
-  updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => request<Application>(`/applications/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  updateApplication: (id: string, body: { expectedVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>(`/applications/${encodeURIComponent(id)}`, 'PUT', '保存申请修改', body),
   applicationRounds: (id: string) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`),
-  createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => request<Application>('/applications', { method: 'POST', body: JSON.stringify(body) }),
-  submitApplication: (id: string, expectedVersion: number) => request<Application>(`/applications/${encodeURIComponent(id)}/submit`, { method: 'POST', body: JSON.stringify({ expectedVersion }) }),
-  withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => request<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, { method: 'POST', body: JSON.stringify(body) }),
+  createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>('/applications', 'POST', '创建申请草稿', body),
+  submitApplication: (id: string, expectedVersion: number) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion }),
+  withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   definitions: () => request<Definition[]>('/process-definitions'),
-  definition: (body: { key: string; name: string; graph: Graph }) => request<Definition>('/process-definitions', { method: 'POST', body: JSON.stringify(body) }),
-  updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number }) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  definition: (body: { key: string; name: string; graph: Graph }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
+  updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
   validateDefinition: (graph: Graph) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph }) }),
-  publishDefinition: (id: string, revision: number) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, { method: 'POST' })
+  publishDefinition: (id: string, revision: number) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程')
 }

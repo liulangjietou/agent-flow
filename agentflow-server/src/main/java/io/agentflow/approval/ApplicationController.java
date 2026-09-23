@@ -1,10 +1,13 @@
 package io.agentflow.approval;
 
+import io.agentflow.api.idempotency.IdempotencyExecutor;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,18 +22,19 @@ import java.util.UUID;
 @RequestMapping("/api/v1/applications")
 public class ApplicationController {
     private final ApprovalApplicationFacade facade;
+    private final IdempotencyExecutor idempotency;
 
     /** 创建控制器。 */
-    public ApplicationController(ApprovalApplicationFacade facade) {
+    public ApplicationController(ApprovalApplicationFacade facade, IdempotencyExecutor idempotency) {
         this.facade = facade;
+        this.idempotency = idempotency;
     }
 
     /** 创建申请草稿。 */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApplicationResponse create(@Valid @RequestBody CreateApplicationRequest request) {
-        return ApplicationResponse.from(facade.create(request.businessNo(), request.processKey(),
-                request.definitionVersion(), request.title(), request.payload()));
+    public ResponseEntity<String> create(@Valid @RequestBody CreateApplicationRequest request, HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.CREATED, () -> ApplicationResponse.from(facade.create(
+                request.businessNo(), request.processKey(), request.definitionVersion(), request.title(), request.payload())));
     }
 
     /** 查询当前租户申请列表。 */
@@ -47,8 +51,10 @@ public class ApplicationController {
 
     /** 修改草稿或退回后的申请内容，不改变绑定定义与历史轮次。 */
     @PutMapping("/{id}")
-    public ApplicationResponse revise(@PathVariable UUID id, @Valid @RequestBody ReviseApplicationRequest request) {
-        return ApplicationResponse.from(facade.revise(id, request.expectedVersion(), request.title(), request.payload()));
+    public ResponseEntity<String> revise(@PathVariable UUID id, @Valid @RequestBody ReviseApplicationRequest request,
+                                         HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> ApplicationResponse.from(facade.revise(id, request.expectedVersion(), request.title(), request.payload())));
     }
 
     /** 查询有权访问的申请的全部提交轮次。 */
@@ -59,14 +65,17 @@ public class ApplicationController {
 
     /** 提交申请。 */
     @PostMapping("/{id}/submit")
-    public ApplicationResponse submit(@PathVariable UUID id, @Valid @RequestBody SubmitApplicationRequest request) {
-        return ApplicationResponse.from(facade.submit(id, request.expectedVersion()));
+    public ResponseEntity<String> submit(@PathVariable UUID id, @Valid @RequestBody SubmitApplicationRequest request,
+                                         HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.OK, () -> ApplicationResponse.from(facade.submit(id, request.expectedVersion())));
     }
 
     /** 发起人撤回当前审批轮次。 */
     @PostMapping("/{id}/withdraw")
-    public ApplicationResponse withdraw(@PathVariable UUID id, @Valid @RequestBody WithdrawApplicationRequest request) {
-        return ApplicationResponse.from(facade.withdraw(id, request.expectedVersion(), request.comment()));
+    public ResponseEntity<String> withdraw(@PathVariable UUID id, @Valid @RequestBody WithdrawApplicationRequest request,
+                                           HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> ApplicationResponse.from(facade.withdraw(id, request.expectedVersion(), request.comment())));
     }
 
     /**

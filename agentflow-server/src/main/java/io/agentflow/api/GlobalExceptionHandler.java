@@ -42,11 +42,12 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
-            case "INVALID_HISTORY_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "INVALID_HISTORY_QUERY", "IDEMPOTENCY_KEY_REQUIRED", "INVALID_IDEMPOTENCY_KEY",
+                    "INVALID_IDEMPOTENCY_REQUEST" -> HttpStatus.BAD_REQUEST;
             case "UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
             case "FORBIDDEN" -> HttpStatus.FORBIDDEN;
             case "NOT_FOUND" -> HttpStatus.NOT_FOUND;
-            case "CONCURRENCY_CONFLICT", "IDEMPOTENCY_KEY_REUSED", "DRAFT_VERSION_CONFLICT",
+            case "CONCURRENCY_CONFLICT", "IDEMPOTENCY_KEY_REUSED", "IDEMPOTENCY_KEY_EXPIRED", "DRAFT_VERSION_CONFLICT",
                     "DEFINITION_DEPLOYMENT_CONFLICT" -> HttpStatus.CONFLICT;
             case "DEPENDENCY_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.UNPROCESSABLE_ENTITY;

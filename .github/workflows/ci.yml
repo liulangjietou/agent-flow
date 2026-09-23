@@ -26,5 +26,7 @@ jobs:
       - name: Verify frontend
         working-directory: agentflow-web
         run: |
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
           npm ci
+          npm run test:requests
           npm run build

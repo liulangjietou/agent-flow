@@ -21,7 +21,7 @@ import java.util.UUID;
 
 import static io.agentflow.definition.DefinitionModels.Edge;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static io.agentflow.support.MutationRequests.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 

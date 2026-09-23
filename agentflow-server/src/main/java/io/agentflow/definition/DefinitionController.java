@@ -3,9 +3,13 @@ package io.agentflow.definition;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
+import io.agentflow.api.idempotency.IdempotencyExecutor;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,11 +29,13 @@ public class DefinitionController {
     private static final String ADMIN_ROLE = "ADMIN";
     private final DefinitionApplicationService service;
     private final CurrentActor currentActor;
+    private final IdempotencyExecutor idempotency;
 
     /** 创建控制器。 */
-    public DefinitionController(DefinitionApplicationService service, CurrentActor currentActor) {
+    public DefinitionController(DefinitionApplicationService service, CurrentActor currentActor, IdempotencyExecutor idempotency) {
         this.service = service;
         this.currentActor = currentActor;
+        this.idempotency = idempotency;
     }
 
     /** 校验设计器图，不落库。 */
@@ -40,9 +46,10 @@ public class DefinitionController {
 
     /** 创建流程草稿。 */
     @PostMapping
-    public DefinitionResponse create(@Valid @RequestBody DefinitionRequest request) {
+    public ResponseEntity<String> create(@Valid @RequestBody DefinitionRequest request, HttpServletRequest httpRequest) {
         requireProcessAdmin();
-        return DefinitionResponse.from(service.create(currentActor.actor().tenantId(), request.key(), request.name(), request.graph()));
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> DefinitionResponse.from(service.create(currentActor.actor().tenantId(), request.key(), request.name(), request.graph())));
     }
 
     /** 查询租户流程定义。 */
@@ -65,16 +72,19 @@ public class DefinitionController {
 
     /** 更新草稿。 */
     @PutMapping("/{id}")
-    public DefinitionResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateDefinitionRequest request) {
+    public ResponseEntity<String> update(@PathVariable UUID id, @Valid @RequestBody UpdateDefinitionRequest request,
+                                         HttpServletRequest httpRequest) {
         requireProcessAdmin();
-        return DefinitionResponse.from(service.update(currentActor.actor().tenantId(), id, request.name(), request.graph(), request.expectedRevision()));
+        return idempotency.execute(httpRequest, HttpStatus.OK, () -> DefinitionResponse.from(service.update(
+                currentActor.actor().tenantId(), id, request.name(), request.graph(), request.expectedRevision())));
     }
 
     /** 发布流程定义。 */
     @PostMapping("/{id}/publish")
-    public DefinitionResponse publish(@PathVariable UUID id, @RequestParam long expectedRevision) {
+    public ResponseEntity<String> publish(@PathVariable UUID id, @RequestParam long expectedRevision, HttpServletRequest httpRequest) {
         requireProcessAdmin();
-        return DefinitionResponse.from(service.publish(currentActor.actor().tenantId(), id, expectedRevision));
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> DefinitionResponse.from(service.publish(currentActor.actor().tenantId(), id, expectedRevision)));
     }
 
     /** 发布前模拟流程路径。 */

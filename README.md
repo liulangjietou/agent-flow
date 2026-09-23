@@ -43,17 +43,23 @@ Web 端的流程管理、申请记录和待办动作均调用服务端接口。�
 
 待办与申请详情支持真实审批轨迹、操作审计、轮次与动作/时间筛选及游标分页。新操作在业务事务内保存当时的操作人、转交接收人和申请状态变化；旧记录没有的信息不补造。详见[审批轨迹与操作审计](docs/approval-history.md)。
 
+所有申请、任务动作和流程定义写接口要求 `Idempotency-Key`。服务端在业务事务内保存成功响应，前端在网络结果未确认时保留原请求供恢复；详见[业务写请求幂等协议](docs/request-idempotency.md)。
+
 ## 验证
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 "$JAVA_HOME/bin/java" scripts/CheckAuthors.java .
 mvn -B -ntp verify
-cd agentflow-web && npm run build
+cd agentflow-web
+npm run test:requests
+npm run build
 ```
 
 全部 Java 命名类型（包括接口、枚举、record、内部类型和测试类）必须在所属 Javadoc 中包含 `@author owlzhangfq@gmail.com`。检查器解析源码语法树，缺失作者或语法错误均返回非零退出码。
 
 本地前后端启动后，执行 `python3 scripts/check-web-proxy.py`，检查带浏览器 Origin 的演示登录成功，以及未允许来源被拒绝。省略 Origin 的 curl 请求无法覆盖这类代理问题。
 
-GitHub Actions 将执行作者检查、后端 `verify` 和前端构建；推送前的本地验证与远端 CI 状态分别记录。
+在代码仓库根目录执行 `python3 scripts/check-idempotency.py`，验证演示环境中全部 8 个业务写接口的响应回放和关键操作的并发幂等。可用第一个参数指定后端地址，例如 `http://127.0.0.1:8081`。脚本会创建带随机业务号的演示申请与流程定义，并完成两轮审批，不删除既有数据。
+
+GitHub Actions 将执行作者检查、后端 `verify`、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。

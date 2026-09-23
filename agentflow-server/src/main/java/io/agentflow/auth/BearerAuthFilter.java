@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingRequestWrapper;
 
 import java.io.IOException;
 import java.util.Map;
@@ -56,7 +57,8 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         }
         try {
             currentActor.set(actor);
-            chain.doFilter(request, response);
+            // 仅认证后缓存完整原始字节，业务写接口用它核对重试；不以固定前缀代替真实 body。
+            chain.doFilter(new ContentCachingRequestWrapper(request, Integer.MAX_VALUE), response);
         } finally {
             currentActor.clear();
         }
