@@ -32,19 +32,19 @@ public class ApprovalApplicationFacade {
     private final ApplicationRepository repository;
     private final CurrentActor currentActor;
     private final ApprovalApplicationService service;
-    private final ApplicationParticipantPort participantPort;
+    private final List<ApplicationParticipantPort> participantPorts;
     private final SubmissionRoundRepository rounds;
     private final DefinitionDraftRepository definitions;
     private final ProcessRuntimePort processRuntime;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
-                                     CurrentActor currentActor, ApplicationParticipantPort participantPort,
+                                     CurrentActor currentActor, List<ApplicationParticipantPort> participantPorts,
                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
-        this.participantPort = participantPort;
+        this.participantPorts = List.copyOf(participantPorts);
         this.rounds = rounds;
         this.definitions = definitions;
         this.processRuntime = processRuntime;
@@ -115,7 +115,7 @@ public class ApprovalApplicationFacade {
         if (actor.hasRole("ADMIN") || application.createdBy().equals(actor.userId())) {
             return true;
         }
-        return participantPort.isParticipant(actor.tenantId(), application.id(), actor);
+        return participantPorts.stream().anyMatch(port -> port.isParticipant(actor.tenantId(), application.id(), actor));
     }
 
     private void requireApplicant(Actor actor, UUID id) {

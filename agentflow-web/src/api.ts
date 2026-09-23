@@ -55,6 +55,22 @@ export interface HistoryEvent {
 export interface HistoryPage { items: HistoryEvent[]; nextCursor?: string | null }
 export interface HistoryQuery { roundNo?: number; action?: string; from?: string; to?: string; cursor?: string; limit?: number }
 
+/** 个人申请清单不携带表单正文。@author owlzhangfq@gmail.com */
+export interface WorkspaceApplication {
+  id: string; businessNo: string; title: string; processKey: string; definitionVersion: number
+  status: string; roundNo: number; createdAt: string; updatedAt: string
+}
+/** 每一行代表本人的一次真实办理，保留当时结果与当前状态。@author owlzhangfq@gmail.com */
+export interface WorkspaceHandled {
+  id: string; taskId: string; applicationId: string; businessNo: string; title: string; processKey: string
+  definitionVersion: number; applicationStatus: string; action: string; handledAt: string
+  roundNo: number | null; nodeName: string | null; comment: string | null; targetUser: string | null; handledStatus: string | null
+}
+/** 个人工作台游标分页响应。@author owlzhangfq@gmail.com */
+export interface WorkspacePage<T> { items: T[]; nextCursor?: string | null }
+/** 服务端白名单内的工作台筛选。@author owlzhangfq@gmail.com */
+export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; status?: string; action?: string; cursor?: string; limit?: number }
+
 function historyQuery(query: HistoryQuery) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
@@ -108,6 +124,8 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  workspaceApplications: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceApplication>>('/workspace/applications' + historyQuery(query), { signal }),
+  workspaceHandled: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceHandled>>('/workspace/handled' + historyQuery(query), { signal }),
   definitionPublication: (id: string, signal: AbortSignal) => request<PublicationResponse>(`/process-definitions/${encodeURIComponent(id)}/publication`, { signal }),
   compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),

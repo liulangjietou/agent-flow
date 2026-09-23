@@ -248,6 +248,8 @@ class LifecycleAuditIntegrationTest {
                 Long.class, id)).isEqualTo(2);
         assertThat(events(id, "Task")).isEmpty();
         assertThat(events(id, "Application")).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND actor_id IS NOT NULL",
+                Integer.class, id)).isZero();
     }
 
     private List<JsonNode> events(String applicationId, String aggregateType) throws Exception {

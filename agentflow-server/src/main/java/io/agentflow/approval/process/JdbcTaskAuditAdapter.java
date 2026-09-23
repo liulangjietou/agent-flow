@@ -41,10 +41,10 @@ public class JdbcTaskAuditAdapter implements TaskAuditPort {
         payload.put("currentStatus", operation.currentStatus());
         jdbcTemplate.update("""
                 INSERT INTO audit_event
-                (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, payload_json, occurred_at)
-                VALUES (?, ?, ?, 'Task', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, actor_id, payload_json, occurred_at)
+                VALUES (?, ?, ?, 'Task', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """, UUID.randomUUID().toString(), operation.tenantId(), eventId, operation.taskId(),
-                operation.aggregateVersion(), operation.applicationId().toString(), operation.action(), jsonUtil.write(payload));
+                operation.aggregateVersion(), operation.applicationId().toString(), operation.action(), operation.actor(), jsonUtil.write(payload));
         return eventId;
     }
 }
