@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
 import ApplicationHistory from './components/ApplicationHistory.vue'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
 import TemplateCenter from './components/TemplateCenter.vue'
+import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
+import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
 import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TemplateCopyInput } from './api'
 import type { PendingWrite } from './pendingWrites.js'
@@ -20,6 +22,10 @@ const password = ref('')
 const tenantId = ref('demo')
 const actor = ref<Actor | null>(null)
 const actorScope = computed(() => actor.value ? JSON.stringify([actor.value.tenantId, actor.value.userId]) : '')
+const confirmation = reactive(new UnsavedConfirmation())
+const confirmationOpen = computed(() => confirmation.active !== null)
+const confirmationReturnFocus = ref<HTMLElement | null>(null)
+let viewActive = true
 const templateRefresh = ref(0)
 const notice = ref('')
 const busy = ref(false)
@@ -84,7 +90,7 @@ const selectedEdge = computed(() => edges.value.find(edge => edge.id === selecte
 const publishedDefinitions = computed(() => definitions.value.filter(definition => definition.status === 'PUBLISHED'))
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
-const editorLocked = computed(() => readonlyDefinition.value || writesBlocked.value || busy.value)
+const editorLocked = computed(() => readonlyDefinition.value || writesBlocked.value || busy.value || confirmationOpen.value)
 const visibleTasks = computed(() => tasks.value.filter(task => task.taskName.toLowerCase().includes(taskSearch.value.trim().toLowerCase())))
 const dirty = computed(() => snapshot() !== savedSnapshot.value)
 const today = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date())
@@ -133,22 +139,37 @@ function applyDefinition(definition: Definition) {
   selectedId.value = nodes.value[0]?.id ?? ''; resetEditor(); savedSnapshot.value = snapshot()
   localStorage.setItem(`agentflow.definition.${tenantId.value}`, definition.id)
 }
-function confirmReplaceDefinition() {
-  return readonlyDefinition.value || !dirty.value || window.confirm('当前流程有未保存的修改。继续将替换设计器内容，是否继续？')
+/** 应用层持有原操作意图，等待结束后复核会话与业务锁，再执行原动作。 */
+async function confirmReplaceDefinition(confirmLabel: string, operation: () => void | Promise<void>,
+  allowed = () => !busy.value && !writesBlocked.value, required = !readonlyDefinition.value && dirty.value) {
+  const sessionActor = actor.value
+  const scope = actorScope.value
+  const current = () => viewActive && !!sessionActor && actor.value === sessionActor && actorScope.value === scope && allowed()
+  if (!current() || confirmationOpen.value) return
+  if (required) confirmationReturnFocus.value = document.activeElement as HTMLElement | null
+  if (await confirmation.confirm(confirmLabel, current, required)) {
+    // Promise 恢复与调用方之间仍可能发生状态变化；此处是实际执行前的最后一道准入检查。
+    if (current()) await operation()
+  }
 }
-function chooseDefinition() {
+async function chooseDefinition() {
   if (busy.value || writesBlocked.value) return
-  const definition = definitions.value.find(item => item.id === selectedDefinitionId.value)
-  if (definition && confirmReplaceDefinition()) applyDefinition(definition)
-  else selectedDefinitionId.value = definitionId.value
+  const targetId = selectedDefinitionId.value
+  selectedDefinitionId.value = definitionId.value
+  if (!targetId || targetId === definitionId.value) return
+  await confirmReplaceDefinition('放弃修改并切换', () => {
+    const definition = definitions.value.find(item => item.id === targetId)
+    if (definition) applyDefinition(definition)
+    else notice.value = '该流程已不在当前列表，请刷新后重试。'
+  })
 }
-function newDefinition(copy = false) {
-  if (!canManageDefinitions.value || busy.value || writesBlocked.value) return
-  if (!copy && !confirmReplaceDefinition()) return
-  if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
-  else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
-  definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
-  notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
+async function newDefinition(copy = false) {
+  await confirmReplaceDefinition('放弃修改并新建', () => {
+    if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
+    else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
+    definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
+    notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
+  }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value, !copy && !readonlyDefinition.value && dirty.value)
 }
 async function loadDefinitions(restoreSelection = false) {
   const scope = actorScope.value
@@ -170,25 +191,28 @@ async function refreshWorkspace(restoreSelection = false) {
 }
 function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
 async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
-  if (!canManageDefinitions.value || busy.value || writesBlocked.value || !confirmReplaceDefinition()) return
-  busy.value = true
-  try {
-    const definition = await api.copyTemplate(templateKey, body)
-    applyDefinition(definition); page.value = 'designer'; templateRefresh.value++
-    await loadDefinitions(); notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
-  } catch (error) { notice.value = errorMessage(error) }
-  finally { busy.value = false }
+  const originalBody = { ...body }
+  await confirmReplaceDefinition('放弃修改并复制', async () => {
+    busy.value = true
+    try {
+      const definition = await api.copyTemplate(templateKey, originalBody)
+      applyDefinition(definition); page.value = 'designer'; templateRefresh.value++
+      await loadDefinitions(); notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
+    } catch (error) { notice.value = errorMessage(error) }
+    finally { busy.value = false }
+  }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
 }
 async function openTemplateCopy(id: string) {
-  if (!canManageDefinitions.value || busy.value || writesBlocked.value || !confirmReplaceDefinition()) return
-  busy.value = true
-  const scope = actorScope.value
-  try {
-    const definition = await api.getDefinition(id)
-    if (actorScope.value !== scope) return
-    applyDefinition(definition); page.value = 'designer'; notice.value = '已打开当前租户的模板副本。'
-  } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
-  finally { busy.value = false }
+  await confirmReplaceDefinition('放弃修改并打开', async () => {
+    busy.value = true
+    const scope = actorScope.value
+    try {
+      const definition = await api.getDefinition(id)
+      if (actorScope.value !== scope) return
+      applyDefinition(definition); page.value = 'designer'; notice.value = '已打开当前租户的模板副本。'
+    } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
+    finally { busy.value = false }
+  }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
 }
 function clearDesigner() {
   defaultGraph(); definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0
@@ -204,14 +228,14 @@ async function login() {
   finally { busy.value = false }
 }
 async function logout() {
-  if (busy.value || pendingWrites.value.some(operation => operation.sending)) return
-  if (!confirmReplaceDefinition()) return
-  busy.value = true
-  try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
-  writeRequests.setActor(null)
-  localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; tasks.value = []; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
-  clearDesigner(); templateRefresh.value++
-  recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
+  await confirmReplaceDefinition('放弃修改并退出', async () => {
+    busy.value = true
+    try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
+    writeRequests.setActor(null)
+    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; tasks.value = []; applications.value = []; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+    clearDesigner(); templateRefresh.value++
+    recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
+  }, () => !busy.value && !pendingWrites.value.some(operation => operation.sending))
 }
 async function selectTask(task: Task) {
   if (busy.value || writesBlocked.value) return
@@ -350,50 +374,55 @@ watch(applicationDefinitionId, () => {
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
 })
 
+watch(actor, () => confirmation.cancel(), { flush: 'sync' })
+
 watch([nodes, edges, definitionName, definitionFormSchema], () => { validationErrors.value = []; validationMessage.value = '内容已修改，请重新校验。' }, { deep: true, flush: 'sync' })
 
 /** 恢复结果始终更新原资源；恢复成功后由用户决定是否继续提交或发布。 */
 async function recoverOperation(id: string) {
-  if (busy.value) return
   const pending = pendingWrites.value.find(operation => operation.id === id)
-  if (pending && (pending.path.startsWith('/process-definitions') || pending.path.startsWith('/process-templates/')) && !confirmReplaceDefinition()) return
-  busy.value = true; recoveryError.value = ''
-  try {
-    const { request, result } = await writeRequests.recover(id)
-    if (request.path.startsWith('/process-templates/') && request.path.endsWith('/copy')) {
-      applyDefinition(result as Definition); page.value = 'designer'; templateRefresh.value++
-      notice.value = '已确认原模板复制结果，已打开原草稿，请核对后再发布。'
-    } else if (request.path.startsWith('/process-definitions')) {
-      applyDefinition(result as Definition); page.value = 'designer'
-      notice.value = request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
-    } else if (request.path.startsWith('/applications')) {
-      const value = result as Application
-      if (request.path === '/applications') {
-        createdApplication.value = value; applicationTitle.value = value.title; applicationBusinessNo.value = value.businessNo
-        applicationPayload.value = { ...value.payload }; applicationFieldErrors.value = {}; applicationFormError.value = ''
-        applicationAmount.value = String(value.payload.amount ?? ''); applicationDescription.value = String(value.payload.description ?? '')
-        applicationDefinitionId.value = definitions.value.find(item => item.key === value.processKey && item.version === value.definitionVersion)?.id ?? ''
-        newApplicationOpen.value = true
-        notice.value = '原申请草稿已确认，请核对后再提交。'
+  if (!pending) return
+  const replacesDefinition = pending.path.startsWith('/process-definitions') || pending.path.startsWith('/process-templates/')
+  await confirmReplaceDefinition('放弃修改并恢复', async () => {
+    busy.value = true; recoveryError.value = ''
+    try {
+      const { request, result } = await writeRequests.recover(id)
+      if (request.path.startsWith('/process-templates/') && request.path.endsWith('/copy')) {
+        applyDefinition(result as Definition); page.value = 'designer'; templateRefresh.value++
+        notice.value = '已确认原模板复制结果，已打开原草稿，请核对后再发布。'
+      } else if (request.path.startsWith('/process-definitions')) {
+        applyDefinition(result as Definition); page.value = 'designer'
+        notice.value = request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
+      } else if (request.path.startsWith('/applications')) {
+        const value = result as Application
+        if (request.path === '/applications') {
+          createdApplication.value = value; applicationTitle.value = value.title; applicationBusinessNo.value = value.businessNo
+          applicationPayload.value = { ...value.payload }; applicationFieldErrors.value = {}; applicationFormError.value = ''
+          applicationAmount.value = String(value.payload.amount ?? ''); applicationDescription.value = String(value.payload.description ?? '')
+          applicationDefinitionId.value = definitions.value.find(item => item.key === value.processKey && item.version === value.definitionVersion)?.id ?? ''
+          newApplicationOpen.value = true
+          notice.value = '原申请草稿已确认，请核对后再提交。'
+        } else {
+          if (createdApplication.value?.id === value.id) { createdApplication.value = null; newApplicationOpen.value = false }
+          if (recordApplicationId.value === value.id) recordRefresh.value++
+          notice.value = `已确认申请 ${value.businessNo} 的原操作，状态：${statusLabel(value.status)}。`
+        }
       } else {
-        if (createdApplication.value?.id === value.id) { createdApplication.value = null; newApplicationOpen.value = false }
-        if (recordApplicationId.value === value.id) recordRefresh.value++
-        notice.value = `已确认申请 ${value.businessNo} 的原操作，状态：${statusLabel(value.status)}。`
+        const value = result as { taskId: string; applicationStatus: string }
+        if (activeTask.value?.taskId === value.taskId) { activeTask.value = null; activeApplication.value = null; pendingAction.value = null }
+        notice.value = `已确认原审批任务的处理结果，申请状态：${statusLabel(value.applicationStatus)}。`
       }
-    } else {
-      const value = result as { taskId: string; applicationStatus: string }
-      if (activeTask.value?.taskId === value.taskId) { activeTask.value = null; activeApplication.value = null; pendingAction.value = null }
-      notice.value = `已确认原审批任务的处理结果，申请状态：${statusLabel(value.applicationStatus)}。`
+      await refreshWorkspace()
+    } catch (error) { recoveryError.value = errorMessage(error); notice.value = recoveryError.value }
+    finally {
+      busy.value = false
+      await nextTick()
+      const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+      const recovery = (dialog ?? workspace.value)?.querySelector<HTMLElement>('.request-recovery button:not(:disabled)')
+      ;(recovery ?? dialog ?? workspace.value)?.focus()
     }
-    await refreshWorkspace()
-  } catch (error) { recoveryError.value = errorMessage(error); notice.value = recoveryError.value }
-  finally {
-    busy.value = false
-    await nextTick()
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
-    const recovery = (dialog ?? workspace.value)?.querySelector<HTMLElement>('.request-recovery button:not(:disabled)')
-    ;(recovery ?? dialog ?? workspace.value)?.focus()
-  }
+  }, () => !busy.value && pendingWrites.value.some(operation => operation.id === id && !operation.sending),
+  replacesDefinition && !readonlyDefinition.value && dirty.value)
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (writeRequests.hasUnconfirmed() || (!readonlyDefinition.value && dirty.value)) { event.preventDefault(); event.returnValue = '' }
@@ -405,11 +434,12 @@ onMounted(async () => {
   try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
+onBeforeUnmount(() => { viewActive = false; confirmation.dispose() })
 onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
 <template>
-  <div class="app" @keydown="keyHandler">
+  <div class="app" :inert="confirmationOpen" @keydown="keyHandler">
     <section v-if="!loggedIn" class="login-screen">
       <form class="login-card" @submit.prevent="login">
         <div class="brand-mark">AF</div><p class="eyebrow">AGENTFLOW / WORKFLOW OS</p>
@@ -522,4 +552,5 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
       </div>
     </template>
   </div>
+  <UnsavedConfirmationDialog v-if="confirmation.active" :key="confirmation.active.id" :request="confirmation.active" :return-focus="confirmationReturnFocus" :fallback-focus="workspace" @answer="(id, accepted) => confirmation.answer(id, accepted)" />
 </template>
