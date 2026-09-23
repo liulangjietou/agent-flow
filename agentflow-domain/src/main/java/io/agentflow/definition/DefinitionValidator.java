@@ -77,6 +77,13 @@ public final class DefinitionValidator {
         });
         for (Node n : graph.nodes()) {
             if (n.type() != NodeType.START && !incoming.contains(n.id())) errors.add("NODE_UNREACHABLE:" + n.id());
+            int outgoingCount = outgoingEdges.getOrDefault(n.id(), List.of()).size();
+            if (n.type() == NodeType.START && incoming.contains(n.id())) errors.add("START_MUST_HAVE_NO_INCOMING:" + n.id());
+            if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
+            // 当前只支持顺序与排他分支，普通节点的多出线会在引擎中产生隐式并行。
+            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK) && outgoingCount > 1) {
+                errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
+            }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
             if (n.type() == NodeType.EXCLUSIVE_GATEWAY && outgoingEdges.getOrDefault(n.id(), List.of()).size() < 2) {
                 errors.add("GATEWAY_BRANCH_REQUIRED:" + n.id());
@@ -98,6 +105,27 @@ public final class DefinitionValidator {
                 }
             }
         }
+        if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
         return List.copyOf(errors);
+    }
+
+    private boolean containsCycle(Set<String> nodeIds, Map<String, List<Edge>> outgoing) {
+        Map<String, Integer> inDegree = new HashMap<>();
+        nodeIds.forEach(id -> inDegree.put(id, 0));
+        outgoing.forEach((source, edges) -> {
+            if (nodeIds.contains(source)) edges.stream().filter(edge -> nodeIds.contains(edge.target()))
+                    .forEach(edge -> inDegree.merge(edge.target(), 1, Integer::sum));
+        });
+        Deque<String> ready = new ArrayDeque<>();
+        inDegree.forEach((id, count) -> { if (count == 0) ready.add(id); });
+        int visited = 0;
+        while (!ready.isEmpty()) {
+            String id = ready.removeFirst();
+            visited++;
+            for (Edge edge : outgoing.getOrDefault(id, List.of())) {
+                if (inDegree.containsKey(edge.target()) && inDegree.merge(edge.target(), -1, Integer::sum) == 0) ready.add(edge.target());
+            }
+        }
+        return visited != nodeIds.size();
     }
 }

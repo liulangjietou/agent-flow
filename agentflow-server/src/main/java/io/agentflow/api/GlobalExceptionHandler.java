@@ -2,6 +2,7 @@ package io.agentflow.api;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormValidationException;
+import io.agentflow.definition.DefinitionValidationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.flowable.common.engine.api.FlowableOptimisticLockingException;
@@ -45,6 +46,15 @@ public class GlobalExceptionHandler {
                                                                                    HttpServletRequest request) {
         Map<String, Object> response = new java.util.LinkedHashMap<>(handleDomain(exception, request).getBody());
         response.put("details", Map.of("fieldErrors", exception.fieldErrors()));
+        return org.springframework.http.ResponseEntity.unprocessableEntity().body(response);
+    }
+
+    /** 图校验返回规则码与对象标识，便于设计器定位错误。 */
+    @ExceptionHandler(DefinitionValidationException.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleDefinition(DefinitionValidationException exception,
+                                                                                        HttpServletRequest request) {
+        Map<String, Object> response = new java.util.LinkedHashMap<>(handleDomain(exception, request).getBody());
+        response.put("details", Map.of("definitionErrors", exception.errors()));
         return org.springframework.http.ResponseEntity.unprocessableEntity().body(response);
     }
 

@@ -81,12 +81,12 @@ public class DefinitionApplicationService {
     /** 使用同一套受限条件求值器模拟流程路径，不接触流程引擎。 */
     public List<String> simulate(String tenantId, UUID id, DefinitionModels.EvaluationContext context) {
         DefinitionDraft draft = get(tenantId, id);
-        requireValid(draft.graph(), draft.formSchema());
-        if (draft.formSchema() != null) {
-            draft.formSchema().validateSubmission(context.values());
-            context = new DefinitionModels.EvaluationContext(context.values(), draft.formSchema().fieldTypes());
-        }
-        return simulator.simulate(draft.graph(), context);
+        return simulatePreview(draft.graph(), draft.formSchema(), context).path();
+    }
+
+    /** 试算当前设计快照，不读取或修改持久化草稿，也不启动实例。 */
+    public DefinitionSimulator.Result simulatePreview(Graph graph, FormSchema formSchema, DefinitionModels.EvaluationContext context) {
+        return simulator.simulateDetailed(graph, formSchema, context);
     }
 
     /** 查询定义。 */
@@ -103,7 +103,7 @@ public class DefinitionApplicationService {
     private void requireValid(Graph graph, FormSchema formSchema) {
         List<String> errors = validator.validate(graph, formSchema);
         if (!errors.isEmpty()) {
-            throw new DomainException("INVALID_DEFINITION", String.join(",", errors));
+            throw new DefinitionValidationException(errors);
         }
     }
 }

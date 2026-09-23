@@ -90,6 +90,13 @@ public class DefinitionController {
     }
 
     /** 发布前模拟流程路径。 */
+    @PostMapping("/simulate")
+    public DefinitionSimulator.Result simulatePreview(@Valid @RequestBody PreviewSimulationRequest request) {
+        requireProcessAdmin();
+        return service.simulatePreview(request.graph(), request.formSchema(), new DefinitionModels.EvaluationContext(request.values()));
+    }
+
+    /** 模拟已保存定义，保留已有调用契约。 */
     @PostMapping("/{id}/simulate")
     public SimulationResponse simulate(@PathVariable UUID id, @RequestBody(required = false) SimulationRequest request) {
         DefinitionDraft draft = requireVisibleDefinition(id);
@@ -124,6 +131,12 @@ public class DefinitionController {
      * @author owlzhangfq@gmail.com
      */
     public record SimulationRequest(java.util.Map<String, Object> values) { }
+    /**
+     * 当前设计与测试数据，不接受需要加载其他租户资源的定义标识。
+     * @author owlzhangfq@gmail.com
+     */
+    public record PreviewSimulationRequest(@NotNull Graph graph, FormSchema formSchema,
+                                           @NotNull java.util.Map<String, Object> values) { }
     /**
      * 模拟输出。
      * @author owlzhangfq@gmail.com

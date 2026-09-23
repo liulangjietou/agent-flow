@@ -61,6 +61,8 @@ Web 端的流程管理、申请记录和待办动作均调用服务端接口。�
 
 设计器有未保存修改时，切换、新建、复制模板、打开副本、退出及恢复定义操作会显示应用内确认框；取消继续保留原内容，确认后重新检查会话和操作锁。详见[未保存流程修改的确认](docs/unsaved-design-confirmation.md)。
 
+设计器支持对当前未保存的流程和表单运行路径模拟，显示条件分支依据、节点与连线高亮并可定位配置错误。修改设计或测试数据后旧结果立即清除，模拟不创建业务记录；详见[流程设计器模拟运行](docs/designer-simulation.md)。
+
 ## 验证
 
 ```bash
@@ -83,5 +85,7 @@ npm run build
 需要额外验证内置与租户同名定义的来源绑定时，执行 `python3 scripts/check-versioned-forms.py http://127.0.0.1:8080 --check-bundled-binding`。此选项会保留一个固定 key 为 `expense-reimbursement` 的租户定义，仅用于尚无同名已发布模板的验收环境；登录后会先检查前置条件，再创建业务记录。详见[来源绑定验收说明](docs/versioned-forms.md#ui-与验收)。
 
 执行 `python3 scripts/check-process-templates.py` 验证三个模板的权限、复制幂等、样例模拟、真实审批路径、独立副本和来源记录；可用第一个参数指定后端地址。脚本会创建带随机前缀的定义与申请并完成审批，保留所有验收数据。
+
+执行 `python3 scripts/check-designer-simulation.py` 验证当前设计模拟、全部模板样例、精确边界、权限和错误定位；可用第一个参数指定后端地址。该脚本只读业务数据，并检查定义、申请、任务和模板列表前后相等。
 
 GitHub Actions 将执行作者检查、后端 `verify`、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。

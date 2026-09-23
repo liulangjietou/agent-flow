@@ -2,7 +2,14 @@ import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
-export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors } }
+export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
+/** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
+export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown> }
+/** 不包含原测试数据的路径与分支依据。@author owlzhangfq@gmail.com */
+export interface SimulationResult {
+  path: string[]; edgeIds: string[]
+  decisions: Array<{ nodeId: string; selectedEdgeId: string; branches: Array<{ edgeId: string; targetNodeId: string; condition: string; outcome: 'MATCHED' | 'NOT_MATCHED' | 'SKIPPED' | 'DEFAULT_SELECTED' | 'DEFAULT_SKIPPED' }> }>
+}
 export interface Actor { tenantId: string; userId: string; roles: string[] }
 export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
 export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
@@ -86,6 +93,7 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),
