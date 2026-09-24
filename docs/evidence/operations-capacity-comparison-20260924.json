@@ -1,0 +1,1324 @@
+{
+  "format": "agentflow-capacity-comparison-v1",
+  "baseCommit": "4e9560d6e9ef9e6057446a971a6999a0931755ea",
+  "change": "Combine total pending task count with node aggregation",
+  "releaseJarSha256": "4a63db331f2acc258692dee07acb5bcb8ec623757db78f0abb8d3e4a41f45030",
+  "datasets": {
+    "1000": {
+      "before": {
+        "startedAt": "2026-09-24T04:19:11.939007+00:00",
+        "finishedAt": "2026-09-24T04:20:10.836344+00:00",
+        "configuration": {
+          "server_image": "agentflow-server:query-20260924",
+          "postgres_image": "postgres:17",
+          "output": "/fyoung/tmp/agentflow-query-capacity-1000-20260924",
+          "port": 8192,
+          "applications": 1000,
+          "definitions": 40,
+          "seed_concurrency": 4,
+          "concurrency": [
+            1,
+            4,
+            8
+          ],
+          "requests": 100,
+          "warmup": 5
+        },
+        "measurement": "Closed-loop bounded workers; one HTTP connection per request; client wall latency includes connect, response body and JSON decode; warmup excluded from measured phases; no production capacity claim.",
+        "expected": {
+          "applications": 1000,
+          "approved": 250,
+          "pending": 750,
+          "definitions": 40,
+          "aliceApplications": 500
+        },
+        "readPhases": [
+          {
+            "phase": "read_c1",
+            "concurrency": 1,
+            "requests": 700,
+            "wallSeconds": 8.965,
+            "completedRequestsPerSecond": 78.081
+          },
+          {
+            "phase": "read_c4",
+            "concurrency": 4,
+            "requests": 700,
+            "wallSeconds": 6.904,
+            "completedRequestsPerSecond": 101.393
+          },
+          {
+            "phase": "read_c8",
+            "concurrency": 8,
+            "requests": 700,
+            "wallSeconds": 8.517,
+            "completedRequestsPerSecond": 82.184
+          }
+        ],
+        "verification": {
+          "applicationStates": "EXACT_MATCH",
+          "activeTaskSet": "EXACT_MATCH",
+          "participantPaging": "PASS",
+          "unrelatedAccount": "EMPTY",
+          "roundMetrics": "EXACT_MATCH",
+          "managerNotifications": "EXACT_MATCH",
+          "definitionCount": "EXACT_MATCH"
+        },
+        "resources": {
+          "runId": "09e1d4d24ed8431989fd5383b5f1b4d8",
+          "network": "agentflow-capacity-09e1d4d24ed8",
+          "volume": "agentflow-capacity-09e1d4d24ed8-data",
+          "containers": {
+            "database": "da2acecd71d9003d07af639102a746d43ef321a59d477519d6beb112ad4ff518",
+            "server": "72d34e69a1e00afac53707d37219e27f4bd028516728e0d6ee3f9cf2b8a84f3c"
+          },
+          "images": {
+            "server": "sha256:145f8aeffdcaee1240e31c5efe64286fc8bd29b0ff3f49833e37c76729852bdf",
+            "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+          },
+          "architecture": "arm64",
+          "dockerHost": {
+            "ServerVersion": "29.6.2",
+            "NCPU": 5,
+            "MemTotal": 16484818944,
+            "Architecture": "aarch64",
+            "KernelVersion": "6.12.76-linuxkit"
+          },
+          "resources": {
+            "serverCpuLimit": 2,
+            "serverMemoryMiB": 1536,
+            "javaHeapMiB": 1024,
+            "databaseCpuLimit": 1,
+            "databaseMemoryMiB": 768,
+            "hikariMaximumPoolSize": 10
+          },
+          "postgresVersion": 170011,
+          "javaVersion": "openjdk 17.0.20 2026-07-21"
+        },
+        "formalReadSummary": [
+          {
+            "phase": "read_c1",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.475,
+            "p95Ms": 8.811,
+            "p99Ms": 10.449,
+            "maxMs": 19.3
+          },
+          {
+            "phase": "read_c1",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 7.235,
+            "p95Ms": 12.062,
+            "p99Ms": 17.9,
+            "maxMs": 31.364
+          },
+          {
+            "phase": "read_c1",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 33.502,
+            "p95Ms": 40.916,
+            "p99Ms": 46.67,
+            "maxMs": 51.21
+          },
+          {
+            "phase": "read_c1",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.206,
+            "p95Ms": 7.024,
+            "p99Ms": 8.658,
+            "maxMs": 12.593
+          },
+          {
+            "phase": "read_c1",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.944,
+            "p95Ms": 6.616,
+            "p99Ms": 11.193,
+            "maxMs": 16.726
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 16.283,
+            "p95Ms": 21.731,
+            "p99Ms": 26.334,
+            "maxMs": 26.909
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 16.015,
+            "p95Ms": 20.107,
+            "p99Ms": 23.475,
+            "maxMs": 34.076
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.909,
+            "p95Ms": 10.721,
+            "p99Ms": 60.785,
+            "maxMs": 70.418
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 8.881,
+            "p95Ms": 75.971,
+            "p99Ms": 84.15,
+            "maxMs": 92.06
+          },
+          {
+            "phase": "read_c4",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 105.192,
+            "p95Ms": 171.397,
+            "p99Ms": 182.909,
+            "maxMs": 206.23
+          },
+          {
+            "phase": "read_c4",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.612,
+            "p95Ms": 64.514,
+            "p99Ms": 69.443,
+            "maxMs": 76.277
+          },
+          {
+            "phase": "read_c4",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.615,
+            "p95Ms": 11.451,
+            "p99Ms": 65.151,
+            "maxMs": 68.806
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 73.488,
+            "p95Ms": 91.718,
+            "p99Ms": 94.233,
+            "maxMs": 96.998
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 68.679,
+            "p95Ms": 91.566,
+            "p99Ms": 93.456,
+            "maxMs": 97.034
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.388,
+            "p95Ms": 82.877,
+            "p99Ms": 91.649,
+            "maxMs": 93.615
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 74.034,
+            "p95Ms": 99.2,
+            "p99Ms": 102.03,
+            "maxMs": 111.703
+          },
+          {
+            "phase": "read_c8",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 299.985,
+            "p95Ms": 390.746,
+            "p99Ms": 406.533,
+            "maxMs": 510.082
+          },
+          {
+            "phase": "read_c8",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.78,
+            "p95Ms": 83.487,
+            "p99Ms": 87.125,
+            "maxMs": 92.922
+          },
+          {
+            "phase": "read_c8",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.696,
+            "p95Ms": 82.292,
+            "p99Ms": 86.94,
+            "maxMs": 87.33
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 110.874,
+            "p95Ms": 203.311,
+            "p99Ms": 205.185,
+            "maxMs": 210.034
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 109.271,
+            "p95Ms": 205.719,
+            "p99Ms": 211.925,
+            "maxMs": 273.459
+          }
+        ],
+        "raw": {
+          "/fyoung/tmp/agentflow-query-capacity-1000-20260924/report.json": "8a7b38aa29abf984acbdd8d41fb5f2381f1dba4660d5b2147eb557f8c8194683",
+          "/fyoung/tmp/agentflow-query-capacity-1000-20260924/samples.json": "315969fdd55e4e939eae8e6b669d24907e1466cea82db727af3b293021ffeee4"
+        }
+      },
+      "after": {
+        "startedAt": "2026-09-24T04:38:55.905271+00:00",
+        "finishedAt": "2026-09-24T04:39:56.522573+00:00",
+        "configuration": {
+          "server_image": "agentflow-server:operations-20260924",
+          "postgres_image": "postgres:17",
+          "output": "/fyoung/tmp/agentflow-operations-capacity-1000-20260924",
+          "port": 8194,
+          "applications": 1000,
+          "definitions": 40,
+          "seed_concurrency": 4,
+          "concurrency": [
+            1,
+            4,
+            8
+          ],
+          "requests": 100,
+          "warmup": 5
+        },
+        "measurement": "Closed-loop bounded workers; one HTTP connection per request; client wall latency includes connect, response body and JSON decode; warmup excluded from measured phases; no production capacity claim.",
+        "expected": {
+          "applications": 1000,
+          "approved": 250,
+          "pending": 750,
+          "definitions": 40,
+          "aliceApplications": 500
+        },
+        "readPhases": [
+          {
+            "phase": "read_c1",
+            "concurrency": 1,
+            "requests": 700,
+            "wallSeconds": 9.759,
+            "completedRequestsPerSecond": 71.726
+          },
+          {
+            "phase": "read_c4",
+            "concurrency": 4,
+            "requests": 700,
+            "wallSeconds": 6.315,
+            "completedRequestsPerSecond": 110.84
+          },
+          {
+            "phase": "read_c8",
+            "concurrency": 8,
+            "requests": 700,
+            "wallSeconds": 7.466,
+            "completedRequestsPerSecond": 93.754
+          }
+        ],
+        "verification": {
+          "applicationStates": "EXACT_MATCH",
+          "activeTaskSet": "EXACT_MATCH",
+          "participantPaging": "PASS",
+          "unrelatedAccount": "EMPTY",
+          "roundMetrics": "EXACT_MATCH",
+          "managerNotifications": "EXACT_MATCH",
+          "definitionCount": "EXACT_MATCH"
+        },
+        "resources": {
+          "runId": "da9be371fd2b42febb959951b03027fc",
+          "network": "agentflow-capacity-da9be371fd2b",
+          "volume": "agentflow-capacity-da9be371fd2b-data",
+          "containers": {
+            "database": "05e2634fe575581d561341adc365ba1c44bd96192e55b0da5586f5ae2320538d",
+            "server": "2887b3e3b77fa2b712394e7eaf4e2312ea0167931cab7edca0ebf71b119ffeb3"
+          },
+          "images": {
+            "server": "sha256:8f03bbcd7e5da8b75269b1f65277233affd1e5623d10d965ceb961c51eb7bdc9",
+            "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+          },
+          "architecture": "arm64",
+          "dockerHost": {
+            "ServerVersion": "29.6.2",
+            "NCPU": 5,
+            "MemTotal": 16484818944,
+            "Architecture": "aarch64",
+            "KernelVersion": "6.12.76-linuxkit"
+          },
+          "resources": {
+            "serverCpuLimit": 2,
+            "serverMemoryMiB": 1536,
+            "javaHeapMiB": 1024,
+            "databaseCpuLimit": 1,
+            "databaseMemoryMiB": 768,
+            "hikariMaximumPoolSize": 10
+          },
+          "postgresVersion": 170011,
+          "javaVersion": "openjdk 17.0.20 2026-07-21"
+        },
+        "formalReadSummary": [
+          {
+            "phase": "read_c1",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.703,
+            "p95Ms": 10.221,
+            "p99Ms": 21.772,
+            "maxMs": 26.429
+          },
+          {
+            "phase": "read_c1",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 7.869,
+            "p95Ms": 12.031,
+            "p99Ms": 17.027,
+            "maxMs": 17.082
+          },
+          {
+            "phase": "read_c1",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 32.298,
+            "p95Ms": 38.704,
+            "p99Ms": 43.153,
+            "maxMs": 47.534
+          },
+          {
+            "phase": "read_c1",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.095,
+            "p95Ms": 7.944,
+            "p99Ms": 9.979,
+            "maxMs": 10.035
+          },
+          {
+            "phase": "read_c1",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.325,
+            "p95Ms": 8.882,
+            "p99Ms": 11.507,
+            "maxMs": 13.147
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 18.973,
+            "p95Ms": 27.228,
+            "p99Ms": 43.064,
+            "maxMs": 44.136
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 19.09,
+            "p95Ms": 26.605,
+            "p99Ms": 31.672,
+            "maxMs": 36.151
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.872,
+            "p95Ms": 14.291,
+            "p99Ms": 64.35,
+            "maxMs": 67.076
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 10.153,
+            "p95Ms": 75.96,
+            "p99Ms": 84.174,
+            "maxMs": 88.692
+          },
+          {
+            "phase": "read_c4",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 93.415,
+            "p95Ms": 108.48,
+            "p99Ms": 172.803,
+            "maxMs": 190.624
+          },
+          {
+            "phase": "read_c4",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.127,
+            "p95Ms": 17.619,
+            "p99Ms": 69.408,
+            "maxMs": 71.954
+          },
+          {
+            "phase": "read_c4",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.57,
+            "p95Ms": 44.642,
+            "p99Ms": 66.629,
+            "maxMs": 70.689
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 71.507,
+            "p95Ms": 89.924,
+            "p99Ms": 97.2,
+            "maxMs": 98.394
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 70.017,
+            "p95Ms": 88.144,
+            "p99Ms": 90.148,
+            "maxMs": 96.33
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 6.2,
+            "p95Ms": 81.487,
+            "p99Ms": 86.943,
+            "maxMs": 98.462
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 79.18,
+            "p95Ms": 101.512,
+            "p99Ms": 108.528,
+            "maxMs": 151.824
+          },
+          {
+            "phase": "read_c8",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 195.268,
+            "p95Ms": 290.933,
+            "p99Ms": 297.3,
+            "maxMs": 297.983
+          },
+          {
+            "phase": "read_c8",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.851,
+            "p95Ms": 84.643,
+            "p99Ms": 90.099,
+            "maxMs": 93.487
+          },
+          {
+            "phase": "read_c8",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 9.451,
+            "p95Ms": 86.951,
+            "p99Ms": 91.972,
+            "maxMs": 100.414
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 107.783,
+            "p95Ms": 207.208,
+            "p99Ms": 282.819,
+            "maxMs": 288.124
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 106.236,
+            "p95Ms": 193.205,
+            "p99Ms": 217.957,
+            "maxMs": 243.455
+          }
+        ],
+        "raw": {
+          "/fyoung/tmp/agentflow-operations-capacity-1000-20260924/report.json": "14ac3bfbd17e09f59a1823ce8e448cbd4d5bb3fba794c1723f76f5cb00203a18",
+          "/fyoung/tmp/agentflow-operations-capacity-1000-20260924/samples.json": "c5dbb939287c33a217f8343c889699b199104be731e714b18c466053a31e6801"
+        }
+      }
+    },
+    "5000": {
+      "before": {
+        "startedAt": "2026-09-24T04:20:51.709072+00:00",
+        "finishedAt": "2026-09-24T04:24:09.138307+00:00",
+        "configuration": {
+          "server_image": "agentflow-server:query-20260924",
+          "postgres_image": "postgres:17",
+          "output": "/fyoung/tmp/agentflow-query-capacity-5000-20260924",
+          "port": 8193,
+          "applications": 5000,
+          "definitions": 40,
+          "seed_concurrency": 4,
+          "concurrency": [
+            1,
+            4,
+            8
+          ],
+          "requests": 100,
+          "warmup": 5
+        },
+        "measurement": "Closed-loop bounded workers; one HTTP connection per request; client wall latency includes connect, response body and JSON decode; warmup excluded from measured phases; no production capacity claim.",
+        "expected": {
+          "applications": 5000,
+          "approved": 1250,
+          "pending": 3750,
+          "definitions": 40,
+          "aliceApplications": 2500
+        },
+        "readPhases": [
+          {
+            "phase": "read_c1",
+            "concurrency": 1,
+            "requests": 700,
+            "wallSeconds": 37.257,
+            "completedRequestsPerSecond": 18.788
+          },
+          {
+            "phase": "read_c4",
+            "concurrency": 4,
+            "requests": 700,
+            "wallSeconds": 42.944,
+            "completedRequestsPerSecond": 16.3
+          },
+          {
+            "phase": "read_c8",
+            "concurrency": 8,
+            "requests": 700,
+            "wallSeconds": 51.65,
+            "completedRequestsPerSecond": 13.553
+          }
+        ],
+        "verification": {
+          "applicationStates": "EXACT_MATCH",
+          "activeTaskSet": "EXACT_MATCH",
+          "participantPaging": "PASS",
+          "unrelatedAccount": "EMPTY",
+          "roundMetrics": "EXACT_MATCH",
+          "managerNotifications": "EXACT_MATCH",
+          "definitionCount": "EXACT_MATCH"
+        },
+        "resources": {
+          "runId": "eb7db3fdbfcf4ae4923f703ed61ae46e",
+          "network": "agentflow-capacity-eb7db3fdbfcf",
+          "volume": "agentflow-capacity-eb7db3fdbfcf-data",
+          "containers": {
+            "database": "cb6a313ced67b58b2816da0543d046cff1d7d7862f54438311ded75af44e68e3",
+            "server": "bd31ef3b485cc5b16b48f4fd60fda867345993081a49de6b87da362c79552182"
+          },
+          "images": {
+            "server": "sha256:145f8aeffdcaee1240e31c5efe64286fc8bd29b0ff3f49833e37c76729852bdf",
+            "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+          },
+          "architecture": "arm64",
+          "dockerHost": {
+            "ServerVersion": "29.6.2",
+            "NCPU": 5,
+            "MemTotal": 16484818944,
+            "Architecture": "aarch64",
+            "KernelVersion": "6.12.76-linuxkit"
+          },
+          "resources": {
+            "serverCpuLimit": 2,
+            "serverMemoryMiB": 1536,
+            "javaHeapMiB": 1024,
+            "databaseCpuLimit": 1,
+            "databaseMemoryMiB": 768,
+            "hikariMaximumPoolSize": 10
+          },
+          "postgresVersion": 170011,
+          "javaVersion": "openjdk 17.0.20 2026-07-21"
+        },
+        "formalReadSummary": [
+          {
+            "phase": "read_c1",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.584,
+            "p95Ms": 7.586,
+            "p99Ms": 8.603,
+            "maxMs": 15.671
+          },
+          {
+            "phase": "read_c1",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 19.382,
+            "p95Ms": 23.841,
+            "p99Ms": 53.031,
+            "maxMs": 66.65
+          },
+          {
+            "phase": "read_c1",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 171.355,
+            "p95Ms": 212.621,
+            "p99Ms": 282.501,
+            "maxMs": 377.441
+          },
+          {
+            "phase": "read_c1",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.12,
+            "p95Ms": 5.286,
+            "p99Ms": 12.83,
+            "maxMs": 14.727
+          },
+          {
+            "phase": "read_c1",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.537,
+            "p95Ms": 8.741,
+            "p99Ms": 11.952,
+            "maxMs": 13.427
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 75.515,
+            "p95Ms": 98.271,
+            "p99Ms": 127.854,
+            "maxMs": 129.783
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 75.334,
+            "p95Ms": 113.953,
+            "p99Ms": 154.581,
+            "maxMs": 174.261
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.922,
+            "p95Ms": 76.356,
+            "p99Ms": 85.663,
+            "maxMs": 87.73
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 93.424,
+            "p95Ms": 101.477,
+            "p99Ms": 105.173,
+            "maxMs": 108.064
+          },
+          {
+            "phase": "read_c4",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 874.374,
+            "p95Ms": 902.942,
+            "p99Ms": 911.013,
+            "maxMs": 988.272
+          },
+          {
+            "phase": "read_c4",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.176,
+            "p95Ms": 71.585,
+            "p99Ms": 80.367,
+            "maxMs": 86.572
+          },
+          {
+            "phase": "read_c4",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.122,
+            "p95Ms": 74.354,
+            "p99Ms": 76.263,
+            "maxMs": 80.244
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 389.782,
+            "p95Ms": 406.197,
+            "p99Ms": 461.108,
+            "maxMs": 472.02
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 388.915,
+            "p95Ms": 408.228,
+            "p99Ms": 466.277,
+            "maxMs": 476.352
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.657,
+            "p95Ms": 88.494,
+            "p99Ms": 91.176,
+            "maxMs": 93.772
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 210.396,
+            "p95Ms": 309.088,
+            "p99Ms": 313.91,
+            "maxMs": 375.689
+          },
+          {
+            "phase": "read_c8",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 1901.923,
+            "p95Ms": 2688.537,
+            "p99Ms": 2712.102,
+            "maxMs": 2798.821
+          },
+          {
+            "phase": "read_c8",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.191,
+            "p95Ms": 89.985,
+            "p99Ms": 94.915,
+            "maxMs": 95.556
+          },
+          {
+            "phase": "read_c8",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 8.156,
+            "p95Ms": 92.82,
+            "p99Ms": 98.691,
+            "maxMs": 99.082
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 998.808,
+            "p95Ms": 1284.565,
+            "p99Ms": 1393.489,
+            "maxMs": 1400.526
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 880.238,
+            "p95Ms": 1210.842,
+            "p99Ms": 1284.468,
+            "maxMs": 1286.772
+          }
+        ],
+        "raw": {
+          "/fyoung/tmp/agentflow-query-capacity-5000-20260924/report.json": "7fecb87f905ef843db431d413fe3e35fc0f7fcdab12eb1aaf55728ae52bbe4fd",
+          "/fyoung/tmp/agentflow-query-capacity-5000-20260924/samples.json": "da6c414fcb8d464fd22976b9576b7728e6e971712cf389561e796d670bb021d4"
+        }
+      },
+      "after": {
+        "startedAt": "2026-09-24T04:40:30.634414+00:00",
+        "finishedAt": "2026-09-24T04:43:33.566999+00:00",
+        "configuration": {
+          "server_image": "agentflow-server:operations-20260924",
+          "postgres_image": "postgres:17",
+          "output": "/fyoung/tmp/agentflow-operations-capacity-5000-20260924",
+          "port": 8195,
+          "applications": 5000,
+          "definitions": 40,
+          "seed_concurrency": 4,
+          "concurrency": [
+            1,
+            4,
+            8
+          ],
+          "requests": 100,
+          "warmup": 5
+        },
+        "measurement": "Closed-loop bounded workers; one HTTP connection per request; client wall latency includes connect, response body and JSON decode; warmup excluded from measured phases; no production capacity claim.",
+        "expected": {
+          "applications": 5000,
+          "approved": 1250,
+          "pending": 3750,
+          "definitions": 40,
+          "aliceApplications": 2500
+        },
+        "readPhases": [
+          {
+            "phase": "read_c1",
+            "concurrency": 1,
+            "requests": 700,
+            "wallSeconds": 37.97,
+            "completedRequestsPerSecond": 18.436
+          },
+          {
+            "phase": "read_c4",
+            "concurrency": 4,
+            "requests": 700,
+            "wallSeconds": 35.416,
+            "completedRequestsPerSecond": 19.765
+          },
+          {
+            "phase": "read_c8",
+            "concurrency": 8,
+            "requests": 700,
+            "wallSeconds": 38.304,
+            "completedRequestsPerSecond": 18.275
+          }
+        ],
+        "verification": {
+          "applicationStates": "EXACT_MATCH",
+          "activeTaskSet": "EXACT_MATCH",
+          "participantPaging": "PASS",
+          "unrelatedAccount": "EMPTY",
+          "roundMetrics": "EXACT_MATCH",
+          "managerNotifications": "EXACT_MATCH",
+          "definitionCount": "EXACT_MATCH"
+        },
+        "resources": {
+          "runId": "be9ade634a5842748c544b50f3c338a8",
+          "network": "agentflow-capacity-be9ade634a58",
+          "volume": "agentflow-capacity-be9ade634a58-data",
+          "containers": {
+            "database": "00e9e482848ab7c781f097e65caeca65b127fa95e25e29880ad80d9c000950d9",
+            "server": "5950d6925d20f12f725cbed65f19535bfe35974faa5d90afa18537516761d67f"
+          },
+          "images": {
+            "server": "sha256:8f03bbcd7e5da8b75269b1f65277233affd1e5623d10d965ceb961c51eb7bdc9",
+            "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+          },
+          "architecture": "arm64",
+          "dockerHost": {
+            "ServerVersion": "29.6.2",
+            "NCPU": 5,
+            "MemTotal": 16484818944,
+            "Architecture": "aarch64",
+            "KernelVersion": "6.12.76-linuxkit"
+          },
+          "resources": {
+            "serverCpuLimit": 2,
+            "serverMemoryMiB": 1536,
+            "javaHeapMiB": 1024,
+            "databaseCpuLimit": 1,
+            "databaseMemoryMiB": 768,
+            "hikariMaximumPoolSize": 10
+          },
+          "postgresVersion": 170011,
+          "javaVersion": "openjdk 17.0.20 2026-07-21"
+        },
+        "formalReadSummary": [
+          {
+            "phase": "read_c1",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.793,
+            "p95Ms": 9.663,
+            "p99Ms": 13.094,
+            "maxMs": 60.17
+          },
+          {
+            "phase": "read_c1",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 21.451,
+            "p95Ms": 26.409,
+            "p99Ms": 31.079,
+            "maxMs": 49.632
+          },
+          {
+            "phase": "read_c1",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 154.913,
+            "p95Ms": 209.812,
+            "p99Ms": 252.899,
+            "maxMs": 273.889
+          },
+          {
+            "phase": "read_c1",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.355,
+            "p95Ms": 6.899,
+            "p99Ms": 8.913,
+            "maxMs": 10.466
+          },
+          {
+            "phase": "read_c1",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 6.081,
+            "p95Ms": 9.993,
+            "p99Ms": 13.503,
+            "maxMs": 14.152
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 85.961,
+            "p95Ms": 126.402,
+            "p99Ms": 135.52,
+            "maxMs": 154.84
+          },
+          {
+            "phase": "read_c1",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 86.675,
+            "p95Ms": 124.26,
+            "p99Ms": 138.911,
+            "maxMs": 185.186
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 3.874,
+            "p95Ms": 10.346,
+            "p99Ms": 77.927,
+            "maxMs": 78.383
+          },
+          {
+            "phase": "read_c4",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 92.242,
+            "p95Ms": 104.527,
+            "p99Ms": 106.713,
+            "maxMs": 187.021
+          },
+          {
+            "phase": "read_c4",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 604.176,
+            "p95Ms": 685.686,
+            "p99Ms": 694.451,
+            "maxMs": 697.035
+          },
+          {
+            "phase": "read_c4",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 4.008,
+            "p95Ms": 69.073,
+            "p99Ms": 73.272,
+            "maxMs": 83.549
+          },
+          {
+            "phase": "read_c4",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.217,
+            "p95Ms": 73.459,
+            "p99Ms": 75.396,
+            "maxMs": 86.03
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 313.999,
+            "p95Ms": 391.25,
+            "p99Ms": 399.569,
+            "maxMs": 404.079
+          },
+          {
+            "phase": "read_c4",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 316.069,
+            "p95Ms": 392.65,
+            "p99Ms": 397.877,
+            "maxMs": 398.44
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_admin",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 6.243,
+            "p95Ms": 88.311,
+            "p99Ms": 93.0,
+            "maxMs": 112.162
+          },
+          {
+            "phase": "read_c8",
+            "operation": "application_participant",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 198.402,
+            "p95Ms": 296.362,
+            "p99Ms": 304.625,
+            "maxMs": 349.899
+          },
+          {
+            "phase": "read_c8",
+            "operation": "approval_operations",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 1214.656,
+            "p95Ms": 1715.188,
+            "p99Ms": 1979.673,
+            "maxMs": 2001.018
+          },
+          {
+            "phase": "read_c8",
+            "operation": "definition_catalog",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 5.645,
+            "p95Ms": 86.723,
+            "p99Ms": 90.759,
+            "maxMs": 90.844
+          },
+          {
+            "phase": "read_c8",
+            "operation": "notification_inbox",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 8.854,
+            "p95Ms": 90.766,
+            "p99Ms": 95.238,
+            "maxMs": 96.322
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_first",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 797.769,
+            "p95Ms": 1094.483,
+            "p99Ms": 1196.476,
+            "maxMs": 1286.208
+          },
+          {
+            "phase": "read_c8",
+            "operation": "pending_second",
+            "requests": 100,
+            "failed": 0,
+            "errors": {},
+            "p50Ms": 785.425,
+            "p95Ms": 1016.953,
+            "p99Ms": 1100.871,
+            "maxMs": 1287.5
+          }
+        ],
+        "raw": {
+          "/fyoung/tmp/agentflow-operations-capacity-5000-20260924/report.json": "64ccd7f91e904595bcb599e2e2cb1b3e6804d4ea684fc9d5e231535a345f76f8",
+          "/fyoung/tmp/agentflow-operations-capacity-5000-20260924/samples.json": "c114e640da98a0de6371146fd0985d25e465f7c3e901445549f8f7b35b56bb2b"
+        }
+      }
+    }
+  }
+}

@@ -172,3 +172,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 部署验收提供 [PostgreSQL 容量基线](docs/capacity-baseline.md)：新建隔离容器，通过真实申请与审批 API 生成负载，记录延迟、并发吞吐和业务一致性，结束后停止并保留数据。报告按实际资源与负载解释，不代替生产容量目标验收。
 
 [参与者检索性能验证](docs/participant-search-performance.md) 记录大量不可见申请导致重复扫描的根因、授权等价性、双库回归与修复前后的执行计划。
+
+[运营统计查询性能验证](docs/operations-query-performance.md) 记录完整待办总数与节点分组合并聚合、展示截断回归及同参数容量对比。

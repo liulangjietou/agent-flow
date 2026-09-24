@@ -73,17 +73,21 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
         var taskParameters = new ArrayList<Object>(List.of(tenantId));
         StringBuilder tasks = new StringBuilder(FlowableActiveTaskSql.fromCurrentApplications());
         filters(tasks, taskParameters, query, "a.definition_version");
-        long pending = jdbc.queryForObject("SELECT COUNT(*) " + tasks, Long.class, taskParameters.toArray());
-        List<WaitingNode> nodes = jdbc.query("""
-                SELECT a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_,COUNT(*) AS tasks,MIN(t.CREATE_TIME_) AS oldest
+        // 窗口在 LIMIT 前汇总全部分组，待办总数不会随展示截断，也不必重新联查引擎表。
+        List<WaitingNodeRow> nodeRows = jdbc.query("""
+                SELECT a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_,COUNT(*) AS tasks,
+                       MIN(t.CREATE_TIME_) AS oldest,SUM(COUNT(*)) OVER () AS total_tasks
                 """ + tasks + "\n" + """
                 GROUP BY a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_
                 ORDER BY oldest ASC,a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_
                 """ + " LIMIT " + (WAITING_LIMIT + 1), (row, index) -> {
             Instant oldest = row.getTimestamp("oldest").toInstant();
-            return new WaitingNode(row.getString("process_key"), row.getLong("definition_version"), row.getString("TASK_DEF_KEY_"),
+            var node = new WaitingNode(row.getString("process_key"), row.getLong("definition_version"), row.getString("TASK_DEF_KEY_"),
                     row.getString("NAME_"), row.getLong("tasks"), oldest, elapsed(oldest, generatedAt));
+            return new WaitingNodeRow(node, row.getLong("total_tasks"));
         }, taskParameters.toArray());
+        long pending = nodeRows.isEmpty() ? 0 : nodeRows.get(0).totalTasks();
+        List<WaitingNode> nodes = nodeRows.stream().map(WaitingNodeRow::node).toList();
         List<WaitingTask> oldestTasks = jdbc.query("""
                 SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.CREATE_TIME_,a.id,a.business_no,a.title,a.process_key,a.definition_version,a.round_no
                 """ + tasks + " ORDER BY t.CREATE_TIME_,t.ID_ LIMIT " + (WAITING_LIMIT + 1), (row, index) -> {
@@ -112,4 +116,10 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
 
     private static long elapsed(Instant start, Instant end) { return Math.max(0, Duration.between(start, end).getSeconds()); }
     private static <T> List<T> head(List<T> rows, int limit) { return List.copyOf(rows.subList(0, Math.min(rows.size(), limit))); }
+
+    /**
+     * 节点聚合行附带截断前的任务总数，仅用于基础设施层结果映射。
+     * @author owlzhangfq@gmail.com
+     */
+    private record WaitingNodeRow(WaitingNode node, long totalTasks) { }
 }

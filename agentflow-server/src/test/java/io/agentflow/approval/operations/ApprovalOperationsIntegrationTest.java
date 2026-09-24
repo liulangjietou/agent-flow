@@ -5,6 +5,7 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
+import io.agentflow.approval.history.JdbcSubmissionHistoryGapQuery;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +31,8 @@ import static io.agentflow.definition.DefinitionModels.*;
 import static io.agentflow.support.MutationRequests.post;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -33,7 +40,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 运营查询覆盖轮次口径、日期边界、租户权限、真实会签待办和返回上限。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:approval-operations;DB_CLOSE_DELAY=-1", "agentflow.auth.demo-enabled=true"})
+@SpringBootTest(properties = {
+        "spring.datasource.url=${AGENTFLOW_OPERATIONS_TEST_URL:jdbc:h2:mem:approval-operations;DB_CLOSE_DELAY=-1}",
+        "spring.datasource.username=${AGENTFLOW_OPERATIONS_TEST_USER:sa}",
+        "spring.datasource.password=${AGENTFLOW_OPERATIONS_TEST_PASSWORD:}",
+        "spring.datasource.driver-class-name=${AGENTFLOW_OPERATIONS_TEST_DRIVER:org.h2.Driver}",
+        "agentflow.auth.demo-enabled=true"})
 @AutoConfigureMockMvc
 class ApprovalOperationsIntegrationTest {
     @Autowired MockMvc mvc;
@@ -151,6 +163,68 @@ class ApprovalOperationsIntegrationTest {
         runtime.setVariable(task.getProcessInstanceId(), "tenantId", "other");
         assertThat(reader.read("demo", query(key), Instant.now()).pendingTasks()).isZero();
         assertThat(reader.read("other", query(key), Instant.now()).pendingTasks()).isZero();
+    }
+
+    @Test
+    void readsCurrentTaskSetTwiceAndKeepsTotalBeyondBothDisplayLimits() throws Exception {
+        String tenant = "backlog-limit-" + UUID.randomUUID();
+        Instant created = Instant.parse("2020-01-01T00:00:00Z");
+        for (int group = 1; group <= 22; group++) {
+            // 最后一个不可见分组有三项任务，总数不能从返回的 20 行或预读的 21 行累加。
+            for (int member = 0; member < (group == 22 ? 3 : 1); member++) {
+                String app = UUID.randomUUID().toString();
+                seedApplication(tenant, app, "flow-" + group, 1);
+                jdbc.update("UPDATE approval_application SET status='IN_APPROVAL',definition_version=? WHERE id=?", group, app);
+                var process = runtime.startProcessInstanceByKey("expense-reimbursement",
+                        Map.of("applicationId", app, "tenantId", tenant, "roundNo", 1));
+                jdbc.update("UPDATE ACT_RU_TASK SET CREATE_TIME_=? WHERE PROC_INST_ID_=?",
+                        Timestamp.from(created.plusSeconds(group)), process.getId());
+            }
+        }
+        var statements = new ArrayList<String>();
+        var observedJdbc = observedJdbc(statements);
+        var observedReader = new JdbcApprovalOperationsReadAdapter(observedJdbc,
+                new JdbcSubmissionHistoryGapQuery(observedJdbc, json));
+        var report = observedReader.read(tenant, query(""), created.plusSeconds(60));
+        assertThat(report.pendingTasks()).isEqualTo(24);
+        assertThat(report.waitingNodes()).hasSize(20);
+        assertThat(report.waitingNodes()).extracting(ApprovalOperationsReadPort.WaitingNode::tasks).containsOnly(1L);
+        assertThat(report.waitingNodes().get(19).processKey()).isEqualTo("flow-20");
+        assertThat(report.moreWaitingNodes()).isTrue();
+        assertThat(report.oldestTasks()).hasSize(20);
+        assertThat(report.moreOldestTasks()).isTrue();
+        assertThat(statements.stream().filter(sql -> sql.contains("FROM ACT_RU_TASK")).count())
+                .as("current task set reads for grouped nodes and oldest tasks").isEqualTo(2);
+
+        var filtered = reader.read(tenant, new ApprovalOperationsReadPort.Query(query("").from(), query("").to(), "flow-22", 22L), created.plusSeconds(60));
+        assertThat(filtered.pendingTasks()).isEqualTo(3);
+        assertThat(filtered.waitingNodes()).hasSize(1);
+        assertThat(filtered.waitingNodes().get(0).tasks()).isEqualTo(3);
+        assertThat(filtered.moreWaitingNodes()).isFalse();
+        assertThat(filtered.moreOldestTasks()).isFalse();
+        var empty = reader.read(tenant, new ApprovalOperationsReadPort.Query(query("").from(), query("").to(), "flow-22", 21L), created);
+        assertThat(empty.pendingTasks()).isZero();
+        assertThat(empty.waitingNodes()).isEmpty();
+        assertThat(empty.moreWaitingNodes()).isFalse();
+    }
+
+    /** 在真实 JDBC 连接上记录准备的 SQL，不替换查询结果或依赖执行耗时断言。 */
+    private JdbcTemplate observedJdbc(List<String> statements) throws SQLException {
+        var source = mock(javax.sql.DataSource.class);
+        when(source.getConnection()).thenAnswer(invocation -> {
+            Connection connection = jdbc.getDataSource().getConnection();
+            return java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[]{Connection.class},
+                    (proxy, method, arguments) -> {
+                        if (method.getName().equals("prepareStatement")) statements.add((String) arguments[0]);
+                        try {
+                            return method.invoke(connection, arguments);
+                        } catch (java.lang.reflect.InvocationTargetException exception) {
+                            // 保留驱动原始异常，避免代理包装改变 Spring 的数据库错误处理。
+                            throw exception.getCause();
+                        }
+                    });
+        });
+        return new JdbcTemplate(source);
     }
 
     private JsonNode report(String key) throws Exception {
