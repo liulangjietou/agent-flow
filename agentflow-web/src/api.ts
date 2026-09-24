@@ -17,7 +17,7 @@ import type { FieldErrors, FormSchema } from './formSchema'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
-export interface AuthOptions { mode: 'DEMO' | 'OIDC' | 'UNCONFIGURED'; loginUrl?: string; csrfHeader?: string; csrfToken?: string }
+export interface AuthOptions { mode: 'DEMO' | 'OIDC' | 'UNCONFIGURED'; loginUrl?: string; csrfHeader?: string; csrfToken?: string; csrfParameter?: string; providerLogoutUrl?: string }
 const AUTH_OPTIONS_TIMEOUT_MS = 10_000
 let authentication: AuthOptions | null = null
 let requestActor: Pick<Actor, 'tenantId' | 'userId'> | null = null
@@ -239,7 +239,9 @@ export const api = {
     const options = await request<AuthOptions>('/auth/options', { cache: 'no-store', signal: AbortSignal.timeout(AUTH_OPTIONS_TIMEOUT_MS) })
     if (!['DEMO', 'OIDC', 'UNCONFIGURED'].includes(options.mode)
         || options.mode === 'OIDC' && (options.loginUrl !== '/api/v1/auth/oidc/authorize/enterprise'
-          || options.csrfHeader !== 'X-CSRF-TOKEN' || !options.csrfToken || API_BASE !== '/api/v1')) {
+          || options.csrfHeader !== 'X-CSRF-TOKEN' || !options.csrfToken || API_BASE !== '/api/v1'
+          || options.providerLogoutUrl != null && (options.providerLogoutUrl !== '/api/v1/auth/oidc/logout/enterprise'
+            || options.csrfParameter !== '_csrf'))) {
       throw { status: 0, code: 'AUTH_CONFIGURATION_INVALID', message: '登录配置无效，企业登录需要使用同源入口，请联系管理员。' } satisfies ApiError
     }
     authentication = options
@@ -275,6 +277,18 @@ export const api = {
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request<{ actor: Actor }>('/auth/me'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  prepareProviderLogout: async () => {
+    const original = requestActor
+    const options = await api.authOptions()
+    const current = (await api.me()).actor
+    if (!original || requestActor !== original || current.tenantId !== original.tenantId || current.userId !== original.userId) {
+      throw { status: 409, code: 'LOGOUT_IDENTITY_CHANGED', message: '当前企业账号与本页不同，请恢复原账号后重试。' } satisfies ApiError
+    }
+    if (options.mode !== 'OIDC' || !options.providerLogoutUrl) {
+      throw { status: 409, code: 'PROVIDER_LOGOUT_UNAVAILABLE', message: '企业退出入口不可用，请选择仅退出平台。' } satisfies ApiError
+    }
+    return { action: options.providerLogoutUrl, fields: { [options.csrfParameter!]: options.csrfToken!, actor: JSON.stringify([original.tenantId, original.userId]) } }
+  },
   taskPage: (query: PendingTaskQuery, signal: AbortSignal) => request<PendingTaskPage>('/workspace/tasks' + historyQuery(query), { signal }),
   task: (id: string, signal: AbortSignal) => request<Task>(`/tasks/${encodeURIComponent(id)}`, { signal }),
   tasks: (signal?: AbortSignal) => request<Task[]>('/tasks', { signal }),

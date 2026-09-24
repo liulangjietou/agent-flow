@@ -61,7 +61,7 @@ server:
 
 所有企业模式的写请求需要 `GET /api/v1/auth/options` 返回的 `X-CSRF-TOKEN`。业务写请求还携带 `X-AgentFlow-Actor`，值为 `encodeURIComponent(JSON.stringify([tenantId, userId]))`；该请求头只核对页面身份，服务端身份仍来自已验证会话。带该头的读请求同样核对身份，防止其他标签切换账号后旧页面读取或提交另一账号的数据。`/auth/me` 用于读取实际身份。
 
-退出调用 `POST /api/v1/auth/logout`，携带 CSRF，销毁平台会话并返回 204；它不退出 IdP 全局会话。退出请求失败时页面保持登录状态并提示失败。
+退出调用 `POST /api/v1/auth/logout`，携带 CSRF，销毁平台会话并返回 204；它不退出 IdP 全局会话。退出请求失败时页面保持登录状态并提示失败。身份源提供有效 `end_session_endpoint` 时，退出窗口另外提供[同时退出企业账号](provider-initiated-logout.md)。
 
 会话失效时原页面保留草稿、原请求正文和幂等键。点击“重新登录”打开新窗口，完成原账号登录后回到旧页面点击“恢复当前会话”；确认同租户、同 sub 后才恢复。不同账号不会接管旧页面。随后由用户主动恢复原操作，不自动继续提交或批准。CSRF_INVALID 与 401 均保留原请求恢复记录，避免响应丢失后生成新键重复写入。
 

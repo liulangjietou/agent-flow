@@ -45,6 +45,11 @@ public final class OidcTestProvider implements AutoCloseable {
     volatile int lifetimeSeconds = 300;
     volatile String sessionId;
     volatile int issuedSecondsAgo = 5;
+    volatile boolean supportsLogout;
+    volatile Object logoutEndpointOverride;
+    volatile int logoutRequests;
+    volatile String lastLogoutSubject;
+    private final java.util.Set<String> logoutReturns = ConcurrentHashMap.newKeySet();
 
     OidcTestProvider() {
         try {
@@ -61,10 +66,15 @@ public final class OidcTestProvider implements AutoCloseable {
     private void handle(HttpExchange exchange) throws IOException {
         try {
             switch (exchange.getRequestURI().getPath()) {
-                case "/.well-known/openid-configuration" -> respond(exchange, 200, Map.of(
-                        "issuer", issuer(), "authorization_endpoint", issuer() + "/authorize", "token_endpoint", issuer() + "/token",
-                        "jwks_uri", issuer() + "/jwks", "response_types_supported", List.of("code"),
-                        "subject_types_supported", List.of("public"), "id_token_signing_alg_values_supported", List.of("RS256")));
+                case "/.well-known/openid-configuration" -> {
+                    var metadata = new LinkedHashMap<String, Object>(Map.of(
+                            "issuer", issuer(), "authorization_endpoint", issuer() + "/authorize", "token_endpoint", issuer() + "/token",
+                            "jwks_uri", issuer() + "/jwks", "response_types_supported", List.of("code"),
+                            "subject_types_supported", List.of("public"), "id_token_signing_alg_values_supported", List.of("RS256")));
+                    if (supportsLogout) metadata.put("end_session_endpoint", logoutEndpointOverride == null ? issuer() + "/end-session" : logoutEndpointOverride);
+                    respond(exchange, 200, metadata);
+                }
+                case "/end-session" -> endSession(exchange);
                 case "/jwks" -> respond(exchange, 200, new JWKSet(key.toPublicJWK()).toJSONObject());
                 case "/authorize" -> authorize(exchange);
                 case "/token" -> token(exchange);
@@ -103,11 +113,34 @@ public final class OidcTestProvider implements AutoCloseable {
                 || values.get("nonce") == null || values.get("state") == null) {
             respond(exchange, 400, Map.of("error", "invalid_request")); return;
         }
+        URI callback = URI.create(values.get("redirect_uri"));
+        logoutReturns.add(callback.getScheme() + "://" + callback.getRawAuthority() + "/");
         String code = UUID.randomUUID().toString();
         codes.put(code, values);
         exchange.getResponseHeaders().set("Location", values.get("redirect_uri") + "?code=" + code
                 + "&state=" + URLEncoder.encode(values.get("state"), StandardCharsets.UTF_8));
         exchange.sendResponseHeaders(302, -1);
+    }
+
+    private void endSession(HttpExchange exchange) throws Exception {
+        if (!"POST".equals(exchange.getRequestMethod())) { respond(exchange, 405, Map.of("error", "method")); return; }
+        var values = parameters(URI.create("http://fixture/?" + new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+        SignedJWT token = SignedJWT.parse(values.get("id_token_hint"));
+        var claims = token.getJWTClaimsSet();
+        String home = values.get("post_logout_redirect_uri");
+        if (!token.verify(new com.nimbusds.jose.crypto.RSASSAVerifier(key.toRSAPublicKey()))
+                || !issuer().equals(claims.getIssuer()) || !claims.getAudience().contains("platform") || !logoutReturns.contains(home)) {
+            respond(exchange, 400, Map.of("error", "invalid_logout")); return;
+        }
+        logoutRequests++;
+        lastLogoutSubject = claims.getSubject();
+        byte[] html = ("<!doctype html><html lang=\"zh-CN\"><meta charset=\"utf-8\"><title>测试身份服务</title>"
+                + "<h1>测试企业会话已退出</h1><p>已校验平台提交的身份令牌和返回地址。</p><a href=\""
+                + org.springframework.web.util.HtmlUtils.htmlEscape(home) + "\">返回审批平台</a></html>").getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "text/html;charset=UTF-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, html.length);
+        exchange.getResponseBody().write(html);
     }
 
     private void token(HttpExchange exchange) throws Exception {
@@ -170,8 +203,9 @@ public final class OidcTestProvider implements AutoCloseable {
 
     /** 仅从测试 classpath 启动浏览器验收夹具，输出位置必须由调用方明确指定。 */
     public static void main(String[] args) throws Exception {
-        if (args.length != 1 || !args[0].startsWith("/fyoung/tmp/")) throw new IllegalArgumentException("Expected a temporary evidence path");
+        if ((args.length != 1 && args.length != 2) || !args[0].startsWith("/fyoung/tmp/")) throw new IllegalArgumentException("Expected a temporary evidence path");
         var provider = new OidcTestProvider();
+        provider.supportsLogout = args.length == 2 && "--logout".equals(args[1]);
         Runtime.getRuntime().addShutdownHook(new Thread(provider::close));
         java.nio.file.Files.writeString(java.nio.file.Path.of(args[0]), provider.issuer());
         new java.util.concurrent.CountDownLatch(1).await();

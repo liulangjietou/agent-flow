@@ -51,6 +51,7 @@ import { editQuickGraph, type QuickCommand } from './quickDesigner'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
 import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
+import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
@@ -67,6 +68,10 @@ const loggedIn = ref(false)
 const authOptions = ref<AuthOptions | null>(null)
 const authLoading = ref(true)
 const sessionExpired = ref(false)
+const logoutOpen = ref(false)
+const logoutReturnFocus = ref<HTMLElement | null>(null)
+let logoutActorScope = ''
+let providerNavigation = false
 const username = ref('')
 const password = ref('')
 const tenantId = ref('demo')
@@ -127,7 +132,7 @@ const draftScope = computed(() => `${actorScope.value}:${editorSession.value}`)
 const autosave = reactive(new DraftAutosave(
   () => ({ scope: draftScope.value, snapshot: snapshot(), eligible: viewActive && loggedIn.value && canManageDefinitions.value
     && page.value === 'designer' && autosaveEnabled.value && dirty.value && !readonlyDefinition.value
-    && !busy.value && !writesBlocked.value && !confirmationOpen.value && !publicationOpen.value
+    && !busy.value && !writesBlocked.value && !confirmationOpen.value && !publicationOpen.value && !logoutOpen.value
     && !dragging.value && !composing.value && !!definitionKey.value.trim() && !!definitionName.value.trim() }),
   async () => { await persistDraft() }
 ))
@@ -196,7 +201,7 @@ const selectedEdge = computed(() => edges.value.find(edge => edge.id === selecte
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
 const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
-const editorLocked = computed(() => readonlyDefinition.value || (writesBlocked.value && !autosave.saving) || busy.value || confirmationOpen.value || publicationOpen.value)
+const editorLocked = computed(() => readonlyDefinition.value || (writesBlocked.value && !autosave.saving) || busy.value || confirmationOpen.value || publicationOpen.value || logoutOpen.value)
 const dirty = computed(() => snapshot() !== savedSnapshot.value)
 const today = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date())
 const statusLabels: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', ARCHIVED: '已归档', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已拒绝', APPROVED: '已批准', REVOKED: '已撤销', CANCELLED: '已作废' }
@@ -353,10 +358,41 @@ async function login() {
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
-async function logout() {
+function requestLogout() {
+  if (busy.value || pendingWrites.value.some(operation => operation.sending)) return
+  if (!authOptions.value?.providerLogoutUrl) { void logout(); return }
+  logoutActorScope = actorScope.value
+  logoutReturnFocus.value = document.activeElement as HTMLElement | null
+  logoutOpen.value = true
+}
+async function chooseLogout(scope: 'local' | 'provider') {
+  if (busy.value || logoutActorScope !== actorScope.value || pendingWrites.value.some(operation => operation.sending)) return
+  logoutOpen.value = false
+  await nextTick()
+  await logout(scope)
+}
+async function logout(scope: 'local' | 'provider' = 'local') {
   await confirmReplaceDefinition('放弃修改并退出', async () => {
     busy.value = true
-    try { if (authOptions.value?.mode === 'OIDC') await api.authOptions(); await api.logout() }
+    try {
+      if (scope === 'provider') {
+        const navigation = await api.prepareProviderLogout()
+        const form = document.createElement('form')
+        form.method = 'POST'; form.action = navigation.action; form.hidden = true
+        for (const [name, value] of Object.entries(navigation.fields)) {
+          const input = document.createElement('input')
+          input.type = 'hidden'; input.name = name; input.value = value; form.append(input)
+        }
+        document.body.append(form)
+        // 用户已确认退出范围和丢弃内容；身份令牌由服务端协议页处理，不进入业务脚本。
+        providerNavigation = true
+        form.submit(); form.remove()
+        setTimeout(() => { providerNavigation = false; busy.value = false }, 0)
+        return
+      }
+      if (authOptions.value?.mode === 'OIDC') await api.authOptions()
+      await api.logout()
+    }
     catch (error) {
       // Cookie 会话只能由服务端退出；断网不能显示虚假的退出成功。
       if (authOptions.value?.mode === 'OIDC') { notice.value = '退出未完成：' + errorMessage(error); busy.value = false; return }
@@ -759,7 +795,7 @@ watch(canvas, (element, _previous, onCleanup) => {
 watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publicationNote.value = '' }, { flush: 'sync' })
 
 watch([() => snapshot(), draftScope, page, loggedIn, canManageDefinitions, autosaveEnabled, readonlyDefinition,
-  busy, writesBlocked, confirmationOpen, publicationOpen, dragging, composing, savedSnapshot], () => autosave.observe())
+  busy, writesBlocked, confirmationOpen, publicationOpen, logoutOpen, dragging, composing, savedSnapshot], () => autosave.observe())
 
 watch([nodes, edges, definitionName, definitionFormSchema, conditionLanguageVersion], () => {
   clearValidation()
@@ -844,6 +880,7 @@ async function recoverOperation(id: string) {
   replacesDefinition && !checkpoint && !readonlyDefinition.value && dirty.value)
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
+  if (providerNavigation) return
   if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
@@ -901,7 +938,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 </script>
 
 <template>
-  <div class="app" :inert="confirmationOpen || publicationOpen" @keydown="keyHandler">
+  <div class="app" :inert="confirmationOpen || publicationOpen || logoutOpen" @keydown="keyHandler">
     <section v-if="!loggedIn" class="login-screen">
       <form class="login-card" @submit.prevent="login">
         <div class="brand-mark">AF</div><p class="eyebrow">AGENTFLOW / WORKFLOW OS</p>
@@ -927,7 +964,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
     </section>
     <template v-else>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="logout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
         <div v-if="notice && !sessionExpired" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
@@ -1064,6 +1101,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       </div>
     </template>
   </div>
+  <EnterpriseLogoutDialog v-if="logoutOpen" :return-focus="logoutReturnFocus" :fallback-focus="workspace" @close="logoutOpen = false" @choose="chooseLogout" />
   <UnsavedConfirmationDialog v-if="confirmation.active" :key="confirmation.active.id" :request="confirmation.active" :return-focus="confirmationReturnFocus" :fallback-focus="workspace" @answer="(id, accepted) => confirmation.answer(id, accepted)" />
   <PublicationDialog v-if="publicationOpen" :validation="validation.result" :checking="validation.loading" :validation-error="validation.error" :graph="quickGraph" :form-schema="definitionFormSchema" v-model:note="publicationNote" :name="definitionName" :process-key="definitionKey" :busy="busy" :blocked="writesBlocked" :error="publicationError" :return-focus="publicationReturnFocus" :fallback-focus="workspace" @close="publicationOpen = false" @submit="publishDraft" />
 </template>

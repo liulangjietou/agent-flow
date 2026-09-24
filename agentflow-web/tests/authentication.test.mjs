@@ -57,3 +57,27 @@ test('切回演示模式不发送企业 CSRF 和身份头', async () => {
   assert.equal(headers.has('X-CSRF-TOKEN'), false)
   assert.equal(headers.has('X-AgentFlow-Actor'), false)
 })
+
+test('企业退出准备仅返回同源表单与当前 CSRF，不使用业务令牌', async () => {
+  const actor = { tenantId: 'tenant-a', userId: '原账号', roles: ['EMPLOYEE'] }
+  bindAuthenticationActor(actor)
+  globalThis.fetch = async url => Response.json(url.endsWith('/auth/options')
+    ? { ...enterprise, csrfParameter: '_csrf', providerLogoutUrl: '/api/v1/auth/oidc/logout/enterprise' } : { actor })
+  const form = await api.prepareProviderLogout()
+  assert.equal(form.action, '/api/v1/auth/oidc/logout/enterprise')
+  assert.deepEqual(form.fields, { _csrf: enterprise.csrfToken, actor: JSON.stringify(['tenant-a', '原账号']) })
+})
+
+test('企业退出拒绝身份切换、未支持能力及外部表单地址', async () => {
+  const actor = { tenantId: 'tenant-a', userId: 'original', roles: ['EMPLOYEE'] }
+  bindAuthenticationActor(actor)
+  const options = { ...enterprise, csrfParameter: '_csrf', providerLogoutUrl: '/api/v1/auth/oidc/logout/enterprise' }
+  globalThis.fetch = async url => Response.json(url.endsWith('/auth/options') ? options : { actor: { ...actor, userId: 'changed' } })
+  await assert.rejects(api.prepareProviderLogout(), error => error.code === 'LOGOUT_IDENTITY_CHANGED')
+  globalThis.fetch = async url => Response.json(url.endsWith('/auth/options') ? enterprise : { actor })
+  await assert.rejects(api.prepareProviderLogout(), error => error.code === 'PROVIDER_LOGOUT_UNAVAILABLE')
+  for (const invalid of [{ ...options, providerLogoutUrl: 'https://attacker.invalid/logout' }, { ...options, csrfParameter: 'actor' }]) {
+    globalThis.fetch = async () => Response.json(invalid)
+    await assert.rejects(api.prepareProviderLogout(), error => error.code === 'AUTH_CONFIGURATION_INVALID')
+  }
+})

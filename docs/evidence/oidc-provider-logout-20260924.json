@@ -1,0 +1,46 @@
+{
+  "stage": 70,
+  "recordedAt": "2026-09-24T12:46:31.965734+00:00",
+  "baseline": "0711d5b24750f568f30461856e556ed830d3606a",
+  "branch": "codex/oidc-provider-logout",
+  "scope": "Explicit local or OIDC provider logout, guarded POST with shared session invalidation and fixed return URL",
+  "checks": {
+    "java": {
+      "tests": 704,
+      "domain": 181,
+      "server": 523,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "postgresqlProviderLogoutIntegration": 5,
+    "frontend": 254,
+    "frontendBuild": true,
+    "openapiOperations": 65,
+    "openapiSchemas": 112,
+    "maintenanceTools": 19,
+    "javaAuthorFiles": 282,
+    "javaNamedTypes": 452,
+    "missingAuthors": 0,
+    "diffCheck": true
+  },
+  "browser": {
+    "isolatedUrl": "http://localhost:5199/",
+    "realProviderFormPost": true,
+    "returnRequiresLogin": true,
+    "localLogout": true,
+    "cancelEscapeAndFocusCycle": true,
+    "mobileWidth": 390,
+    "unsavedDesignCancelPreservesContent": true,
+    "unsavedDesignConfirmedLogout": true,
+    "finalRuntimeClassesIdentical": true,
+    "finalContractOnlyRebuild": true
+  },
+  "artifact": {
+    "sha256": "9b2e5116d145377f288bbf7696bdf270153db6ecb71d2ef7dcac7a25ccd6ed67"
+  },
+  "migration": null,
+  "productionIdentityProviderVerified": false,
+  "remoteConfigured": false,
+  "pullRequestCreated": false
+}

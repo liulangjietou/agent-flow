@@ -13,6 +13,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 /**
  * 开发环境认证接口，生产接入 OIDC 后保留同一响应契约。
@@ -25,14 +27,17 @@ public class AuthController {
     private final CurrentActor currentActor;
     private final OidcProperties oidc;
     private final boolean demoEnabled;
+    private final ObjectProvider<ClientRegistrationRepository> clients;
 
     /** 创建控制器。 */
     public AuthController(AuthService authService, CurrentActor currentActor, OidcProperties oidc,
+                          ObjectProvider<ClientRegistrationRepository> clients,
                           @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled) {
         this.authService = authService;
         this.currentActor = currentActor;
         this.oidc = oidc;
         this.demoEnabled = demoEnabled;
+        this.clients = clients;
     }
 
     /** 前端按服务端实际配置展示登录入口；CSRF 令牌只供当前同源会话使用。 */
@@ -42,7 +47,9 @@ public class AuthController {
         CsrfToken csrf = oidc.enabled() ? (CsrfToken) request.getAttribute(CsrfToken.class.getName()) : null;
         return new AuthOptions(oidc.enabled() ? "OIDC" : demoEnabled ? "DEMO" : "UNCONFIGURED",
                 oidc.enabled() ? OidcClientConfiguration.AUTHORIZATION_BASE + "/" + OidcClientConfiguration.REGISTRATION_ID : null,
-                csrf == null ? null : csrf.getHeaderName(), csrf == null ? null : csrf.getToken());
+                csrf == null ? null : csrf.getHeaderName(), csrf == null ? null : csrf.getToken(),
+                csrf == null ? null : csrf.getParameterName(),
+                oidc.enabled() && OidcProviderLogoutFilter.available(clients.getIfAvailable()) ? OidcProviderLogoutFilter.PATH : null);
     }
 
     /** 登录。 */
@@ -82,5 +89,6 @@ public class AuthController {
     /** 服务端登录模式与当前会话防伪令牌。
      * @author owlzhangfq@gmail.com
      */
-    public record AuthOptions(String mode, String loginUrl, String csrfHeader, String csrfToken) { }
+    public record AuthOptions(String mode, String loginUrl, String csrfHeader, String csrfToken,
+                              String csrfParameter, String providerLogoutUrl) { }
 }

@@ -55,6 +55,12 @@ public class OidcClientConfiguration {
             if (!(metadata.get(key) instanceof String value)) throw new IllegalArgumentException("OIDC endpoint is missing");
             properties.requireTrustedUrl(value);
         }
+        if (metadata.containsKey(OidcProviderLogoutFilter.END_SESSION_ENDPOINT)) {
+            if (!(metadata.get(OidcProviderLogoutFilter.END_SESSION_ENDPOINT) instanceof String value)) {
+                throw new IllegalArgumentException("OIDC logout endpoint is invalid");
+            }
+            properties.requireTrustedUrl(value);
+        }
         var client = ClientRegistrations.fromOidcConfiguration(metadata).registrationId(REGISTRATION_ID)
                 .clientId(properties.clientId()).clientSecret(properties.clientSecret())
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)

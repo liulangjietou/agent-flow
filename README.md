@@ -190,3 +190,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 企业多实例部署可显式启用 [JDBC 共享会话](docs/shared-enterprise-sessions.md)，支持跨实例回调、登录恢复和平台退出同步；系统自检展示会话存储状态。真实企业身份源、组织同步和生产集群仍需另行验收。
 
 企业认证支持可选的 [OIDC 后通道注销](docs/oidc-backchannel-logout.md)：身份源签名通知按用户或会话跨实例生效，覆盖延迟登录回调和重复投递；需启用 JDBC 共享会话。
+
+企业身份源支持时，工作台提供明确选择的 [主动退出企业账号](docs/provider-initiated-logout.md)，使用固定返回地址和表单 POST，保留原有仅退出平台的行为。

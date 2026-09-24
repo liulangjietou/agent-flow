@@ -12124,6 +12124,14 @@
           "csrfToken": {
             "type": "string",
             "description": "当前会话的防伪令牌，登录及退出后重新取得，不持久化。"
+          },
+          "csrfParameter": {
+            "type": "string",
+            "description": "当前 CSRF 表单参数名，仅企业登录返回"
+          },
+          "providerLogoutUrl": {
+            "type": "string",
+            "description": "可选同源企业退出 POST 入口，仅身份服务支持时返回"
           }
         }
       }

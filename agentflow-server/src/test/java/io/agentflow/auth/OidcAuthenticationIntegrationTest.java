@@ -116,6 +116,17 @@ class OidcAuthenticationIntegrationTest {
     }
 
     @Test
+    void providerWithoutLogoutMetadataKeepsLocalSessionWhenGlobalLogoutIsRequested() throws Exception {
+        MockHttpSession session = complete(authorize());
+        JsonNode options = options(session);
+        assertThat(options.path("providerLogoutUrl").isMissingNode() || options.path("providerLogoutUrl").isNull()).isTrue();
+        mvc.perform(post(OidcProviderLogoutFilter.PATH).session(session)
+                        .param("_csrf", options.path("csrfToken").asText()).param("actor", "[\"tenant-a\",\"employee-42\"]"))
+                .andExpect(status().isConflict());
+        mvc.perform(get("/api/v1/auth/me").session(session)).andExpect(status().isOk());
+    }
+
+    @Test
     void expiredSessionIsRejectedEvenIfSecurityContextRemains() throws Exception {
         MockHttpSession session = complete(authorize());
         SecurityContext context = (SecurityContext) session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);

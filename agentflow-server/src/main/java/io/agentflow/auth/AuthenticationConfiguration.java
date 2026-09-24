@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -53,6 +54,8 @@ public class AuthenticationConfiguration {
             http.addFilterBefore(new OidcBackchannelLogoutFilter(logoutDecoders.getObject(), revocations, json), CsrfFilter.class);
         }
         String home = origin.replaceAll("/$", "") + "/";
+        var providerLogout = new OidcProviderLogoutFilter(repository, json, home);
+        http.addFilterBefore(providerLogout, LogoutFilter.class);
         http.sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
                 .csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()))
                 .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
@@ -94,9 +97,15 @@ public class AuthenticationConfiguration {
                             if (session != null) session.invalidate();
                             response.sendRedirect(home + "?authError=oidc");
                         }))
-                .logout(logout -> logout.logoutUrl("/api/v1/auth/logout")
+                .logout(logout -> logout.logoutRequestMatcher(request -> "POST".equals(request.getMethod())
+                                && ("/api/v1/auth/logout".equals(request.getRequestURI())
+                                || OidcProviderLogoutFilter.PATH.equals(request.getRequestURI())))
                         .deleteCookies(OidcClientConfiguration.SESSION_COOKIE)
-                        .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)));
+                        .logoutSuccessHandler((request, response, authentication) -> {
+                            if (OidcProviderLogoutFilter.PATH.equals(request.getRequestURI())) {
+                                providerLogout.complete(request, response, authentication);
+                            } else response.setStatus(204);
+                        }));
         return http.build();
     }
 }
