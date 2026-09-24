@@ -5,6 +5,8 @@ export interface AuditSearchItem {
   applicationId?: string | null; businessNo?: string | null; currentTitle?: string | null
 }
 export interface AuditSearchFilters { q?: string; actor?: string; action?: string; source?: string; applicationId?: string; from?: string; to?: string; limit?: number; cursor?: string }
+/** 审计导出覆盖完整匹配摘要，不允许分页。@author owlzhangfq@gmail.com */
+export type AuditExportFilters = Omit<AuditSearchFilters, 'cursor' | 'limit'>
 export interface AuditSearchPage { items: AuditSearchItem[]; nextCursor?: string | null }
 
 /**

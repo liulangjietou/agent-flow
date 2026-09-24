@@ -7024,6 +7024,192 @@
           }
         ]
       }
+    },
+    "/api/v1/operations/audit/export": {
+      "get": {
+        "operationId": "exportAudit",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "导出当前租户操作审计摘要 Excel",
+        "description": "仅 ADMIN。按审计筛选一次导出全部匹配摘要，最多 10000 条，超限整次拒绝。缺失元数据留空，不包含表单正文、审批意见或完整审计 JSON；APPROVE 不代表整单批准。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "完整匹配结果工作簿，Cache-Control: no-store；Content-Disposition: attachment; filename=\"agentflow-audit.xlsx\"。空结果仍生成表头及导出说明。",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_AUDIT_QUERY：筛选、版本、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "AUDIT_EXPORT_LIMIT_EXCEEDED：超过 10000 份，请缩小筛选。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "AUDIT_EXPORT_BUSY：另一导出正在生成，请稍后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "AUDIT_EXPORT_FAILED：文件生成失败，可重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "关联申请当前标题或业务单号的字面量包含文本",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "description": "已记录的精确操作人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "description": "明确记录的动作，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "CREATE",
+                "REVISE",
+                "SUBMIT",
+                "WITHDRAW",
+                "CANCEL",
+                "CLAIM",
+                "RELEASE",
+                "TRANSFER",
+                "DELEGATE",
+                "RESOLVE",
+                "RETURN",
+                "REJECT",
+                "APPROVE"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "事件聚合类型，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "Application",
+                "Task"
+              ]
+            }
+          },
+          {
+            "name": "applicationId",
+            "in": "query",
+            "required": false,
+            "description": "可关联的当前租户申请 UUID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "操作开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "操作结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

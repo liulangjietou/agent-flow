@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import { AuditSearchQuery, type AuditSearchFilters } from '../auditSearch'
+import { AuditSearchQuery, type AuditSearchFilters, type AuditExportFilters } from '../auditSearch'
+import { WorkbookExportQuery } from '../workbookExport'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ open: [id: string] }>()
 const emptyFilters = () => ({ q: '', actor: '', action: '', source: '', applicationId: '', from: '', to: '' })
 const fields = reactive(emptyFilters())
 const query = reactive(new AuditSearchQuery((filters, signal) => api.searchAudit(filters, signal)))
+const exporter = reactive(new WorkbookExportQuery<AuditExportFilters>((filters, signal) => api.exportAudit(filters, signal)))
+const appliedFilters = ref<AuditExportFilters>({}), downloadUrl = ref('')
 const submitted = ref(''), validation = ref('')
 const actions: Record<string, string> = { CREATE: '创建申请', REVISE: '修改申请', SUBMIT: '提交审批', WITHDRAW: '撤回申请', CANCEL: '作废申请', CLAIM: '认领任务', RELEASE: '释放任务', TRANSFER: '转办', DELEGATE: '委派', RESOLVE: '完成委派', RETURN: '退回', REJECT: '驳回', APPROVE: '同意' }
 const sources: Record<string, string> = { Application: '申请操作', Task: '任务操作' }
@@ -16,6 +19,7 @@ const changed = computed(() => submitted.value !== snapshot())
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 
 function refresh() {
+  exporter.clear()
   validation.value = ''
   const applicationId = fields.applicationId.trim()
   if (applicationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId)) validation.value = '申请标识需要填写完整 UUID。'
@@ -26,12 +30,16 @@ function refresh() {
   if (fields.from) filters.from = fields.from
   if (fields.to) filters.to = fields.to
   submitted.value = snapshot()
+  appliedFilters.value = { ...filters }
   void query.load(props.scopeKey, filters)
 }
 function reset() { Object.assign(fields, emptyFilters()); refresh() }
+function releaseDownload() { if (downloadUrl.value) URL.revokeObjectURL(downloadUrl.value); downloadUrl.value = '' }
+watch(fields, () => exporter.clear(), { deep: true, flush: 'sync' })
+watch(() => exporter.file, file => { releaseDownload(); if (file) downloadUrl.value = URL.createObjectURL(file) }, { flush: 'sync' })
 watch(() => props.scopeKey, reset, { immediate: true, flush: 'sync' })
 watch(() => props.refreshVersion, refresh)
-onUnmounted(() => query.clear())
+onUnmounted(() => { query.clear(); exporter.clear(); releaseDownload() })
 </script>
 
 <template>
@@ -51,6 +59,13 @@ onUnmounted(() => query.clear())
     <p v-if="changed && query.loaded" class="audit-pending" role="status">筛选已修改，下方仍是上次查询结果。点击“查询审计”后生效。</p>
     <div class="audit-summary"><span>操作时间倒序 · 日期筛选包含首尾两天 · 时间按当前设备时区显示</span><span v-if="query.loaded">已加载 {{ query.items.length }} 条操作</span></div>
     <p class="audit-note">这里只展示已记录的操作事实；任务“同意”不等于整单批准。旧记录缺失的操作人或动作显示“未记录”，无法关联申请的事件仍保留。申请标题为当前值，历史正文请进入申请详情查看。</p>
+    <div class="panel audit-export" :aria-busy="exporter.loading">
+      <div><strong>导出审计摘要</strong><p>按已查询条件导出全部匹配操作，每次最多 10,000 条。包含操作人、动作和关联申请标识，不含表单正文与审批意见。</p></div>
+      <button class="secondary" :disabled="!query.loaded || query.loading || !!query.error || changed || !!validation || exporter.loading" @click="exporter.generate(scopeKey, appliedFilters)">{{ exporter.loading ? '正在生成…' : '生成 Excel' }}</button>
+      <button v-if="exporter.loading" class="secondary" @click="exporter.clear()">取消等待</button>
+      <p v-if="exporter.error" class="audit-error" role="alert">{{ exporter.error }}</p>
+      <p v-if="downloadUrl" class="audit-download" role="status">文件已生成。<a :href="downloadUrl" download="agentflow-audit.xlsx">下载 Excel ↓</a> <span>新操作可能继续产生；修改筛选后需重新生成。</span></p>
+    </div>
     <div v-if="query.error" class="panel audit-failure" role="alert"><div><strong>{{ query.items.length ? '后续记录加载失败' : '暂时无法读取审计' }}</strong><p>{{ query.error }}</p></div><button class="secondary" :disabled="query.loading || changed" @click="query.items.length ? query.more() : refresh()">重试</button></div>
     <div v-if="!query.items.length && query.loading" class="panel audit-empty" role="status">正在查询审计…</div>
     <div v-else-if="!query.items.length && query.loaded" class="panel audit-empty"><h3>没有符合条件的操作</h3><p>调整账号、动作或日期后重新查询。操作人筛选仅匹配已记录的账号。</p></div>
@@ -66,6 +81,8 @@ onUnmounted(() => query.clear())
 </template>
 
 <style scoped>
+.audit-export{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 22px;margin-bottom:20px}.audit-export>div{flex:1;min-width:200px}.audit-export strong{font-size:12px;color:var(--deep)}.audit-export p{font-size:11px;line-height:1.8;margin:6px 0 0;color:var(--muted)}.audit-export>p{flex-basis:100%}.audit-export .audit-error{color:var(--red)}.audit-download a{color:var(--deep);font-weight:600;text-underline-offset:3px}.audit-download span{margin-left:8px}
+
 .admin-label{font-size:11px;background:var(--soft);color:var(--deep);padding:8px 12px;border-radius:6px;white-space:nowrap}.audit-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;padding:24px}.audit-filters label{display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:11px;min-width:0}.audit-filters .wide{grid-column:span 2}.audit-filters input,.audit-filters select{width:100%;min-width:0;height:40px;border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:white;font:inherit;color:var(--ink)}.audit-actions{display:flex;align-items:end;gap:10px;grid-column:span 2}.audit-summary{display:flex;justify-content:space-between;gap:18px;color:var(--muted);font-size:11px;line-height:1.7;margin:20px 0 10px}.audit-note{color:var(--muted);font-size:11px;line-height:1.9;margin:0 0 20px;max-width:900px}.audit-pending{font-size:12px;padding:12px 16px;background:#fff5e1;color:#866324;border-radius:6px}.audit-error{color:var(--red);font-size:12px}.audit-row{display:grid;grid-template-columns:185px minmax(0,1fr) auto;gap:24px;align-items:start;padding:24px}.audit-row+.audit-row{border-top:1px solid var(--line)}.audit-event{display:flex;flex-direction:column;align-items:start;gap:8px;min-width:0}.audit-event strong{font-size:12px;overflow-wrap:anywhere}.audit-event time,.audit-event small,.audit-subject small{font-size:10px;color:var(--muted)}.audit-subject{min-width:0;overflow-wrap:anywhere}.audit-subject h3{font-size:14px;margin:7px 0 8px}.audit-subject p{font-size:11px;margin:0 0 12px;color:var(--muted)}.audit-subject details{font-size:10px;color:var(--muted)}.audit-subject summary{cursor:pointer;color:var(--deep);padding:4px 0}.audit-subject dl{line-height:1.7;margin-bottom:0}.audit-subject dt{margin-top:8px}.audit-subject dd{margin:2px 0 0;font-family:monospace}.audit-open{white-space:nowrap;align-self:center}.audit-badge{border-radius:5px;padding:5px 8px;font-size:11px;background:#f0f3f2;color:#64746f}.audit-badge.approve{background:var(--soft);color:var(--deep)}.audit-badge.return,.audit-badge.withdraw{background:#fff4df;color:#8b682e}.audit-badge.reject{background:#fff0ed;color:var(--red)}.audit-empty{padding:48px 20px;text-align:center;color:var(--muted);font-size:13px}.audit-empty h3{font-size:16px;color:var(--ink)}.audit-pagination{text-align:center;padding:24px;font-size:11px;color:var(--muted)}.audit-pagination small{display:block;margin-top:12px}.audit-failure{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px;color:var(--red);font-size:12px;margin-bottom:18px}.audit-failure p{margin-bottom:0}
 @media(max-width:1100px){.audit-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.audit-row{grid-template-columns:155px minmax(0,1fr);gap:18px}.audit-open{grid-column:2;justify-self:start}}
 @media(max-width:650px){.audit-search .page-heading{align-items:start;flex-direction:column;gap:16px}.audit-filters{padding:16px;gap:14px}.audit-actions{flex-wrap:wrap}.audit-summary{flex-direction:column;gap:5px}.audit-row{display:flex;flex-direction:column;padding:20px}.audit-event,.audit-subject{width:100%}.audit-event{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center}.audit-open{align-self:start}.audit-failure{align-items:start;flex-direction:column}}

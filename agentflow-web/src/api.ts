@@ -5,6 +5,7 @@ import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
 import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
+import type { AuditExportFilters } from './auditSearch'
 import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
@@ -143,6 +144,10 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
     let details: ApiError['details']
     try { const body = await response.json() as { message?: string; code?: string; details?: ApiError['details'] }; message = body.message ?? message; code = body.code ?? code; details = body.details } catch { /* 已收到明确状态码，保留错误分类。 */ }
     const messages: Record<string, string> = {
+      AUDIT_EXPORT_LIMIT_EXCEEDED: '匹配操作超过 10,000 条，请按操作日期、账号或关联申请缩小筛选后再导出。未生成截断文件。',
+      AUDIT_EXPORT_BUSY: '服务正在生成另一份审计导出，请稍后重试。',
+      AUDIT_EXPORT_FAILED: '审计文件生成失败，请重试。',
+      INVALID_AUDIT_QUERY: '审计筛选条件无效，请重新查询后再导出。',
       APPLICATION_EXPORT_LIMIT_EXCEEDED: '匹配申请超过 10,000 份，请按创建日期、流程或申请人缩小筛选后再导出。未生成截断文件。',
       APPLICATION_EXPORT_BUSY: '服务正在生成另一份导出，请稍后重试。',
       APPLICATION_EXPORT_FAILED: '文件生成失败，请重试。',
@@ -248,6 +253,7 @@ export const api = {
   searchAudit: (filters: AuditSearchFilters, signal: AbortSignal) => request<AuditSearchPage>('/operations/audit' + historyQuery(filters), { signal }),
   searchApplications: (filters: ApplicationSearchFilters, signal: AbortSignal) => request<ApplicationSearchPage>('/operations/applications' + historyQuery(filters), { signal }),
   searchVisibleApplications: (filters: ApplicationSearchFilters, signal: AbortSignal) => request<ApplicationSearchPage>('/applications/search' + historyQuery(filters), { signal }),
+  exportAudit: (filters: AuditExportFilters, signal: AbortSignal) => request<Blob>('/operations/audit/export' + historyQuery(filters), { signal }, 'xlsx'),
   exportApplications: (filters: ApplicationExportFilters, signal: AbortSignal) => request<Blob>('/operations/applications/export' + historyQuery(filters), { signal }, 'xlsx'),
   applications: (signal?: AbortSignal) => request<Application[]>('/applications', { signal }),
   application: (id: string, signal?: AbortSignal) => request<Application>(`/applications/${encodeURIComponent(id)}`, { signal }),

@@ -206,6 +206,10 @@ async function exercise(base) {
   await call('GET', visiblePath, { user: 'anonymous', status: 401 })
   await call('GET', visiblePath, { user: 'alice', path: visiblePath + '?tenantId=other', status: 400 })
   await call('GET', visiblePath, { user: 'bob', path: visiblePath + visibleFilter + '&cursor=' + encodeURIComponent(visibleFirst.nextCursor), status: 400 })
+  const auditExportPath = '/api/v1/operations/audit/export'
+  await call('GET', auditExportPath, { path: auditExportPath + '?action=APPROVE' })
+  await call('GET', auditExportPath, { user: 'alice', status: 403 })
+  await call('GET', auditExportPath, { path: auditExportPath + '?limit=30', status: 400 })
   const exportPath = searchPath + '/export'
   await call('GET', exportPath, { path: exportPath + '?processKey=' + definition.key })
   await call('GET', exportPath, { user: 'alice', status: 403 })

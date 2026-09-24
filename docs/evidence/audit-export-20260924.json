@@ -1,0 +1,86 @@
+{
+  "date": "2026-09-24",
+  "result": "PASS",
+  "scope": "Administrator audit summary XLSX export",
+  "verification": {
+    "java": 645,
+    "domain": 181,
+    "server": 464,
+    "frontend": 241,
+    "tools": 19,
+    "javaAuthorFiles": 259,
+    "javaAuthorTypes": 425,
+    "openapiOperations": 63,
+    "openapiSchemas": 110,
+    "requestExamples": 21,
+    "build": "PASS",
+    "postgresAuditIntegration": 5
+  },
+  "runtime": {
+    "H2": {
+      "status": "PASS",
+      "base": "http://127.0.0.1:8097",
+      "recordCounts": [
+        9,
+        1,
+        0,
+        2
+      ],
+      "allSummaryCells": "EXACT_MATCH",
+      "beforeAfterAudit": "EXACT_MATCH",
+      "roles": [
+        401,
+        403,
+        403
+      ],
+      "paginationAndTenantOverride": 400,
+      "files": 4
+    },
+    "PostgreSQL": {
+      "status": "PASS",
+      "base": "http://127.0.0.1:8098",
+      "recordCounts": [
+        9,
+        1,
+        0,
+        2
+      ],
+      "allSummaryCells": "EXACT_MATCH",
+      "beforeAfterAudit": "EXACT_MATCH",
+      "roles": [
+        401,
+        403,
+        403
+      ],
+      "paginationAndTenantOverride": 400,
+      "files": 4
+    }
+  },
+  "browser": {
+    "engine": "Codex in-app Chromium",
+    "checks": [
+      "Generate link",
+      "Clear old file when filters change",
+      "Invalid query disables export",
+      "Empty result workbook",
+      "Cancel delayed request discards late result",
+      "Role switch removes administration and old link"
+    ],
+    "cssViewportWidth": 390,
+    "documentWidth": 390,
+    "limitations": [
+      "Desktop Chromium emulation, no physical device test",
+      "No browser system download; real files obtained and checked over HTTP API"
+    ]
+  },
+  "readModel": "Existing tenant-isolated summary SQL; no aggregate body or raw audit JSON",
+  "schemaVersion": 20,
+  "migrationsAdded": 0,
+  "capacity": {
+    "auditWorkbooksPerInstance": 1,
+    "applicationWorkbooksPerInstance": 1,
+    "auditRecordsMaximum": 10000,
+    "overLimit": "Whole request rejected, no truncated workbook"
+  },
+  "releaseJarSha256": "7230ab00747f511371fefdeceef44a6d113fa21aacd26398a5f944aeed9b33a1"
+}
