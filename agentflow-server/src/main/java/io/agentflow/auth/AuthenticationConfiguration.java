@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,8 @@ import org.springframework.security.oauth2.client.web.DefaultOAuth2Authorization
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 /**
  * 登录协议在接入层完成，资源授权仍由 CurrentActor 下游的应用服务负责。
@@ -28,6 +31,8 @@ public class AuthenticationConfiguration {
     @Bean
     public SecurityFilterChain authenticationChain(HttpSecurity http, OidcProperties properties,
             ObjectProvider<ClientRegistrationRepository> clients, JsonUtil json,
+            ObjectProvider<OidcLogoutScopes> logoutScopes,
+            @Qualifier("oidcLogoutDecoder") ObjectProvider<JwtDecoder> logoutDecoders,
             @Value("${agentflow.web.allowed-origin:http://localhost:5173}") String origin) throws Exception {
         http.authorizeHttpRequests(access -> access.anyRequest().permitAll())
                 .requestCache(cache -> cache.disable()).httpBasic(basic -> basic.disable())
@@ -41,6 +46,10 @@ public class AuthenticationConfiguration {
         var resolver = new DefaultOAuth2AuthorizationRequestResolver(repository, OidcClientConfiguration.AUTHORIZATION_BASE);
         resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
         var mapper = new OidcActorMapper(properties);
+        var revocations = logoutScopes.getIfAvailable();
+        if (revocations != null) {
+            http.addFilterBefore(new OidcBackchannelLogoutFilter(logoutDecoders.getObject(), revocations, json), CsrfFilter.class);
+        }
         String home = origin.replaceAll("/$", "") + "/";
         http.sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
                 .csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()))
@@ -57,6 +66,7 @@ public class AuthenticationConfiguration {
                         .userInfoEndpoint(endpoint -> endpoint.oidcUserService(request -> {
                             // 签名、签发方、受众和 nonce 由 Spring 协议链路校验；这里仅映射签名声明。
                             var actor = mapper.map(request.getIdToken(), Instant.now());
+                            if (revocations != null) revocations.requireActive(request.getIdToken(), Instant.now());
                             return new PlatformOidcUser(request.getIdToken(), actor.tenantId(), actor.userId(), actor.roles());
                         }))
                         .successHandler((request, response, authentication) -> response.sendRedirect(home))

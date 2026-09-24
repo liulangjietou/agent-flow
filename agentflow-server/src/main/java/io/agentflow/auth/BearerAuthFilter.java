@@ -17,6 +17,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 
@@ -39,14 +41,17 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final JsonUtil jsonUtil;
     private final OidcProperties oidc;
     private final OidcActorMapper oidcActors;
+    private final ObjectProvider<OidcLogoutScopes> logoutScopes;
 
     /** 创建过滤器。 */
-    public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc) {
+    public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc,
+                           ObjectProvider<OidcLogoutScopes> logoutScopes) {
         this.authService = authService;
         this.currentActor = currentActor;
         this.jsonUtil = jsonUtil;
         this.oidc = oidc;
         this.oidcActors = new OidcActorMapper(oidc);
+        this.logoutScopes = logoutScopes;
     }
 
     @Override
@@ -77,6 +82,14 @@ public class BearerAuthFilter extends OncePerRequestFilter {
                     "code", "UNAUTHENTICATED", "message", exception.getMessage(),
                     "traceId", java.util.UUID.randomUUID().toString(), "path", request.getRequestURI())));
             return;
+        } catch (DataAccessException unavailable) {
+            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            response.setContentType("application/json;charset=UTF-8");
+            response.setHeader("Cache-Control", "no-store");
+            response.getWriter().write(jsonUtil.write(Map.of("code", "AUTHENTICATION_UNAVAILABLE",
+                    "message", "Authentication storage is unavailable; retry later",
+                    "traceId", java.util.UUID.randomUUID().toString(), "path", request.getRequestURI())));
+            return;
         }
         try {
             currentActor.set(actor);
@@ -93,7 +106,10 @@ public class BearerAuthFilter extends OncePerRequestFilter {
             if (authentication != null && authentication.isAuthenticated()
                     && authentication.getPrincipal() instanceof PlatformOidcUser user) {
                 try {
-                    return oidcActors.restoreSession(user, Instant.now());
+                    Actor actor = oidcActors.restoreSession(user, Instant.now());
+                    var revocations = logoutScopes.getIfAvailable();
+                    if (revocations != null) revocations.requireActive(user.getIdToken(), Instant.now());
+                    return actor;
                 } catch (OAuth2AuthenticationException exception) {
                     var session = request.getSession(false);
                     if (session != null) session.invalidate();

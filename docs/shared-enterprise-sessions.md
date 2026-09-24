@@ -54,3 +54,5 @@ agentflow.session-test.jdbc-password
 真实企业 IdP、组织同步、账号即时停用、IdP 全局退出、生产代理及集群故障转移仍需单独验收。共享会话通过双实例协议验证，不代表完整平台已经生产可用。
 
 依据：[Spring Boot 3.5 会话配置](https://docs.spring.io/spring-boot/3.5/reference/web/spring-session.html)、[Spring Session JDBC](https://docs.spring.io/spring-session/reference/3.5/configuration/jdbc.html)、[Cookie 属性](https://docs.spring.io/spring-session/reference/3.5/configuration/common.html)。在线文档可能展示后续补丁，工程使用的具体 API 以编译和运行验证为准。
+
+企业身份源可以显式接入 [后通道注销](oidc-backchannel-logout.md)，通过签名通知使对应登录跨实例失效。真实企业身份源联调与生产验收仍需完成。

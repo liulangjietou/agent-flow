@@ -28,6 +28,8 @@ agentflow:
     demo-enabled: ${AGENTFLOW_DEMO_AUTH:true}
     session:
       jdbc-enabled: ${AGENTFLOW_JDBC_SESSIONS:false}
+    backchannel:
+      enabled: ${AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT:false}
   web:
     allowed-origin: ${AGENTFLOW_WEB_ORIGIN:http://localhost:5173}
 

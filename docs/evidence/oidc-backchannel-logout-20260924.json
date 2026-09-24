@@ -1,0 +1,44 @@
+{
+  "stage": 69,
+  "recordedAt": "2026-09-24T09:42:00.542759+00:00",
+  "branch": "codex/oidc-backchannel-logout",
+  "baseline": "33221ce2f8a8ef6dc481152e5f894d74280d0ff3",
+  "scope": "Opt-in signed OIDC back-channel logout; durable issuer/client/subject/session revocation watermarks",
+  "checks": {
+    "java": {
+      "tests": 694,
+      "domain": 181,
+      "server": 513,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "frontend": 252,
+    "maintenanceTools": 19,
+    "postgresqlBackchannelIntegration": 8,
+    "javaAuthorFiles": 278,
+    "javaNamedTypes": 448,
+    "missingAuthors": 0,
+    "frontendBuild": true,
+    "openapiOperations": 65,
+    "diffCheck": true
+  },
+  "regressions": [
+    "Raw null claims were removed by JWT conversion and an invalid notification was acknowledged; input shape is now checked before conversion and signature verification",
+    "Authentication store failure returned generic 500; now returns retryable 503 without allowing protected reads"
+  ],
+  "browser": {
+    "isolatedUrl": "http://localhost:5198/",
+    "secondNodeLogoutRejectedFirstNodeLogin": true,
+    "sameAccountLoginRestoresOriginalPage": true,
+    "oldNotificationReplayPreservesFreshLogin": true
+  },
+  "artifact": {
+    "sha256": "0b4fbbcd00b81cce7bba738fac1b2702f498d750d4aa4dd9e6be6b689bb2b36d"
+  },
+  "migration": "V22__oidc_logout_scopes.sql",
+  "productionIdentityProviderVerified": false,
+  "productionClusterSloVerified": false,
+  "remoteConfigured": false,
+  "pullRequestCreated": false
+}
