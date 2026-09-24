@@ -1,0 +1,21 @@
+# 复制到受控部署目录；签发方中的实际声明值和平台角色映射必须逐项核对。
+agentflow:
+  auth:
+    oidc:
+      enabled: true
+      issuer: ${AGENTFLOW_OIDC_ISSUER}
+      client-id: ${AGENTFLOW_OIDC_CLIENT_ID}
+      client-secret: ${AGENTFLOW_OIDC_CLIENT_SECRET}
+      tenant-claim: tenant
+      roles-claim: roles
+      tenant-mappings:
+        replace-with-identity-tenant: replace-with-platform-tenant
+      role-mappings:
+        replace-with-employee-role: [EMPLOYEE]
+        replace-with-approver-role: [EMPLOYEE, APPROVER]
+        replace-with-administrator-role: [EMPLOYEE, APPROVER, PROCESS_ADMIN, ADMIN]
+      allow-insecure-loopback: false
+server:
+  servlet:
+    session:
+      timeout: 30m

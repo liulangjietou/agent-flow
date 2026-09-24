@@ -36,6 +36,7 @@ public final class OidcTestProvider implements AutoCloseable {
     private final HttpServer server;
     private final RSAKey key;
     private final RSAKey wrongKey;
+    private final String publicIssuer;
     private final JsonUtil json = new JsonUtil(new com.fasterxml.jackson.databind.ObjectMapper());
     private final Map<String, Map<String, String>> codes = new ConcurrentHashMap<>();
     volatile String mode = "valid";
@@ -52,6 +53,14 @@ public final class OidcTestProvider implements AutoCloseable {
     private final java.util.Set<String> logoutReturns = ConcurrentHashMap.newKeySet();
 
     OidcTestProvider() {
+        this(null);
+    }
+
+    OidcTestProvider(String publicIssuer) {
+        if (publicIssuer != null && !publicIssuer.startsWith("https://")) {
+            throw new IllegalArgumentException("An external fixture issuer must use HTTPS");
+        }
+        this.publicIssuer = publicIssuer;
         try {
             key = new RSAKeyGenerator(2048).keyID("fixture-key").generate();
             wrongKey = new RSAKeyGenerator(2048).keyID("fixture-key").generate();
@@ -61,7 +70,9 @@ public final class OidcTestProvider implements AutoCloseable {
         } catch (IOException | JOSEException exception) { throw new IllegalStateException(exception); }
     }
 
-    String issuer() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
+    String issuer() { return publicIssuer == null ? listener() : publicIssuer; }
+
+    private String listener() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
 
     private void handle(HttpExchange exchange) throws IOException {
         try {
@@ -204,10 +215,10 @@ public final class OidcTestProvider implements AutoCloseable {
     /** 仅从测试 classpath 启动浏览器验收夹具，输出位置必须由调用方明确指定。 */
     public static void main(String[] args) throws Exception {
         if ((args.length != 1 && args.length != 2) || !args[0].startsWith("/fyoung/tmp/")) throw new IllegalArgumentException("Expected a temporary evidence path");
-        var provider = new OidcTestProvider();
+        var provider = new OidcTestProvider(System.getenv("AGENTFLOW_TEST_PROVIDER_ISSUER"));
         provider.supportsLogout = args.length == 2 && "--logout".equals(args[1]);
         Runtime.getRuntime().addShutdownHook(new Thread(provider::close));
-        java.nio.file.Files.writeString(java.nio.file.Path.of(args[0]), provider.issuer());
+        java.nio.file.Files.writeString(java.nio.file.Path.of(args[0]), provider.listener());
         new java.util.concurrent.CountDownLatch(1).await();
     }
 }

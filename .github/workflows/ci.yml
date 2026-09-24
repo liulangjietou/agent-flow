@@ -50,6 +50,8 @@ jobs:
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+      - name: Validate production Compose configuration
+        run: docker compose --env-file deploy/production/production.env.example -f compose.production.yml config --quiet
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

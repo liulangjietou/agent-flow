@@ -1,0 +1,114 @@
+name: agentflow-production
+
+services:
+  server:
+    image: ${AGENTFLOW_SERVER_IMAGE:?Set the verified server release image}
+    entrypoint: [/bin/sh, /opt/agentflow/production-entrypoint.sh]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_ADDITIONAL_LOCATION: file:/etc/agentflow/enterprise.yml
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_FORWARD_HEADERS_STRATEGY: none
+      AGENTFLOW_DATASOURCE_URL: ${AGENTFLOW_DATASOURCE_URL:?Set the PostgreSQL JDBC URL}
+      AGENTFLOW_DATASOURCE_USERNAME: ${AGENTFLOW_DATASOURCE_USERNAME:?Set the runtime database user}
+      AGENTFLOW_DATASOURCE_PASSWORD_FILE: /run/secrets/database_password
+      AGENTFLOW_DEMO_AUTH: "false"
+      AGENTFLOW_JDBC_SESSIONS: "true"
+      AGENTFLOW_WEB_ORIGIN: ${AGENTFLOW_WEB_ORIGIN:?Set the public HTTPS origin}
+      AGENTFLOW_OIDC_ISSUER: ${AGENTFLOW_OIDC_ISSUER:?Set the trusted HTTPS issuer}
+      AGENTFLOW_OIDC_CLIENT_ID: ${AGENTFLOW_OIDC_CLIENT_ID:?Set the registered OIDC client}
+      AGENTFLOW_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+      AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT: ${AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT:-false}
+    secrets:
+      - database_password
+      - database_ca
+      - oidc_client_secret
+    volumes:
+      - type: bind
+        source: ./deploy/production/entrypoint.sh
+        target: /opt/agentflow/production-entrypoint.sh
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AGENTFLOW_ENTERPRISE_CONFIG_FILE:?Set the enterprise mapping configuration file}
+        target: /etc/agentflow/enterprise.yml
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "4", http://127.0.0.1:8080/actuator/health/readiness]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 12
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  web:
+    image: ${AGENTFLOW_WEB_IMAGE:?Set the verified web release image}
+    ports:
+      - "${AGENTFLOW_HTTPS_BIND_ADDRESS:-0.0.0.0}:${AGENTFLOW_HTTPS_PORT:-443}:8443"
+    volumes:
+      - type: bind
+        source: ./deploy/production/nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    secrets:
+      - tls_certificate
+      - tls_private_key
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, --timeout=4, http://127.0.0.1:8080/healthz]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  migrate:
+    profiles: [maintenance]
+    image: ${AGENTFLOW_SERVER_IMAGE:?Set the verified server release image}
+    entrypoint: [/bin/sh, /opt/agentflow/production-entrypoint.sh]
+    command: [--schema=migrate]
+    environment:
+      AGENTFLOW_DATASOURCE_URL: ${AGENTFLOW_DATASOURCE_URL:?Set the PostgreSQL JDBC URL}
+      AGENTFLOW_DATASOURCE_USERNAME: ${AGENTFLOW_MIGRATION_USERNAME:?Set the migration database user}
+      AGENTFLOW_DATASOURCE_PASSWORD_FILE: /run/secrets/migration_password
+    secrets: [migration_password, database_ca]
+    volumes:
+      - type: bind
+        source: ./deploy/production/entrypoint.sh
+        target: /opt/agentflow/production-entrypoint.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: "no"
+
+secrets:
+  database_ca:
+    file: ${AGENTFLOW_DATABASE_CA_FILE:?Set the PostgreSQL CA certificate file}
+  database_password:
+    file: ${AGENTFLOW_DATABASE_PASSWORD_FILE:?Set the runtime database password file}
+  migration_password:
+    file: ${AGENTFLOW_MIGRATION_PASSWORD_FILE:?Set the migration database password file}
+  oidc_client_secret:
+    file: ${AGENTFLOW_OIDC_SECRET_FILE:?Set the OIDC client secret file}
+  tls_certificate:
+    file: ${AGENTFLOW_TLS_CERTIFICATE_FILE:?Set the full certificate chain PEM file}
+  tls_private_key:
+    file: ${AGENTFLOW_TLS_PRIVATE_KEY_FILE:?Set the TLS private key PEM file}

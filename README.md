@@ -35,6 +35,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 生产部署使用[独立数据库迁移命令](docs/production-database-lifecycle.md)：同一发布 jar 提供 `--schema=migrate` 和 `--schema=validate`，前者初始化或升级业务及引擎结构，后者使用 PostgreSQL 只读连接校验。`prod` 服务启动只检查已迁移结构，未迁移时拒绝启动；生产安装、升级和备份流程见该文档。
 
+[企业 HTTPS 容器部署](docs/production-container-deployment.md)提供独立 `compose.production.yml`、文件密钥、PostgreSQL CA、企业 OIDC 配置和 HTTPS 代理；连接外部数据库，迁移仅由维护命令执行。正式企业身份、组织、监控和完整上线验收仍需完成。
+
 ## 本地启动
 
 需要 Java 17+、Maven 3.9+ 和 Node.js 20.19+ 或 22.12+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。
