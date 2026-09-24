@@ -21,7 +21,7 @@ onUnmounted(() => query.clear())
 <template>
   <section class="content system-checks" :aria-busy="query.loading">
     <div class="page-heading"><div><p class="eyebrow">WORKSPACE / SYSTEM CHECKS</p><h2>系统自检</h2><p class="subhead">查看实际运行状态，再开始第一条审批。</p></div><button class="secondary" :disabled="query.loading" @click="refresh">{{ query.loading ? '正在检查…' : '重新检查' }}</button></div>
-    <div class="system-scope-note"><strong>当前版本用于开发与演示</strong><span>检查通过仅表示已实现的基础服务可用。站内消息已可用；企业认证、组织、邮件 / IM、附件和模型服务仍需接入。</span></div>
+    <div class="system-scope-note"><strong>当前版本用于开发与演示</strong><span>检查通过仅表示已实现的基础服务可用。站内消息已可用；认证模式以下方检查结果为准。组织、邮件 / IM、附件和模型服务仍需接入。</span></div>
     <div v-if="query.loading" class="panel system-empty" role="status"><strong>正在检查依赖</strong><p>查询数据库、迁移记录与流程引擎，请稍候。</p></div>
     <div v-else-if="query.error" class="panel system-empty" role="alert"><strong>未取得自检结果</strong><p>{{ query.error }}</p><button class="secondary" @click="refresh">重试检查</button></div>
     <template v-else-if="query.report">
@@ -31,7 +31,7 @@ onUnmounted(() => query.clear())
           <section class="panel system-panel" aria-labelledby="system-core-title"><div class="system-panel-heading"><h3 id="system-core-title">运行基础</h3><span>真实依赖查询</span></div><article v-for="check in core" :key="check.id" class="system-check-row"><div><h4>{{ labels[check.id] ?? check.id }}</h4><p>{{ check.message }}</p><code v-if="check.status !== 'UP'">{{ check.code }}</code></div><span class="system-status" :class="check.status.toLowerCase()">{{ states[check.status] }}</span></article></section>
           <section class="panel system-panel" aria-labelledby="system-adapters-title"><div class="system-panel-heading"><h3 id="system-adapters-title">服务接入</h3><span>当前实现状态</span></div><article v-for="check in connections" :key="check.id" class="system-check-row"><div><h4>{{ labels[check.id] ?? check.id }}</h4><p>{{ check.message }}</p></div><span class="system-status" :class="check.status.toLowerCase()">{{ states[check.status] }}</span></article></section>
         </div>
-        <aside class="panel system-start"><p class="eyebrow">FIRST WORKFLOW</p><h3>从一条真实审批开始</h3><p>按实际制度配置表单、审批组与分支，再发布给演示账号试用。</p><ol><li><strong>选择官方模板</strong><span>请假、用印、合同，复制后独立编辑。</span></li><li><strong>检查并发布流程</strong><span>在流程管理中调整字段和审批规则。</span></li><li><strong>提交与处理申请</strong><span>使用申请人与审批人账号完成流程，查看实际轨迹。</span></li></ol><button class="primary" @click="emit('templates')">从模板开始 ↗</button><button class="secondary" @click="emit('designer')">打开流程管理</button><p class="system-note">演示角色尚未关联真实组织。正式接入前需核对审批人来源和权限。</p></aside>
+        <aside class="panel system-start"><p class="eyebrow">FIRST WORKFLOW</p><h3>从一条真实审批开始</h3><p>按实际制度配置表单、审批组与分支，核对身份和审批人目录就绪后，再发布试用。</p><ol><li><strong>选择官方模板</strong><span>请假、用印、合同，复制后独立编辑。</span></li><li><strong>检查并发布流程</strong><span>在流程管理中调整字段和审批规则。</span></li><li><strong>提交与处理申请</strong><span>使用申请人与审批人账号完成流程，查看实际轨迹。</span></li></ol><button class="primary" @click="emit('templates')">从模板开始 ↗</button><button class="secondary" @click="emit('designer')">打开流程管理</button><p class="system-note">正式接入前需核对组织目录、审批人来源和权限。</p></aside>
       </div>
     </template>
   </section>

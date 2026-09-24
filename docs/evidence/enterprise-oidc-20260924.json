@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-24",
+  "feature": "Enterprise OIDC protocol and session integration",
+  "validation": {
+    "java": {
+      "domain": 181,
+      "server": 491,
+      "total": 672,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "frontend": 252,
+    "tools": 19,
+    "authorJavaFiles": 268,
+    "authorNamedTypes": 437,
+    "authorMissing": 0,
+    "postgresOidcIntegration": 13,
+    "openApiOperations": 65,
+    "openApiSchemas": 112,
+    "openApiRequestExamples": 21,
+    "h2ActualApiOperations": 65
+  },
+  "browser": {
+    "oidc": "local HTTP protocol fixture on isolated PostgreSQL",
+    "login": true,
+    "invalidSignatureRejected": true,
+    "cookieHttpOnly": true,
+    "cookieSameSite": "Lax",
+    "localLoopbackSecure": false,
+    "httpsSecure": "configuration unit test; production TLS proxy not exercised",
+    "logout": true,
+    "offlineLogoutPreservesWorkspace": true,
+    "expiredSessionPreservesDraftAndRequest": true,
+    "sameAccountRecoverySavedDraft": "OIDC 最终会话恢复验收",
+    "otherAccountRecoveryRejected": true,
+    "mobileCssWidth": 390,
+    "mobileDocumentWidth": 390,
+    "demoLogin": true
+  },
+  "limitations": [
+    "No actual enterprise IdP integration",
+    "No enterprise organization directory",
+    "No distributed/persistent session",
+    "No IdP global logout or immediate account revocation",
+    "No production HTTPS proxy acceptance"
+  ],
+  "artifact": {
+    "jar": "/fyoung/tmp/agentflow-oidc65-validated-release.jar",
+    "sha256": "359c5da46598cd1eb6e5c318b9c3625b3cb8d53afdce27ee86278b244cd89a16",
+    "assets": {
+      "index.html": "98db6298489ba4dac2669f762f6cc5ff02f6a4e02b03b5dde689482509d68227",
+      "assets/index-BYJXvSoY.js": "7449fdb8e4ed132a9f4408cbf32baf3e2c874968fbf170b9c696692d083eecbe",
+      "assets/index-CSAoUFgj.css": "9d98dc97fa54e155821c89e8e6dd5afd695587367b6071c96c583329af8dc492"
+    }
+  },
+  "gitNexus": "AgentFlow is not indexed; no impact report available"
+}

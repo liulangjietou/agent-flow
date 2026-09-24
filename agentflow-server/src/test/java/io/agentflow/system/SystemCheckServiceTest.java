@@ -34,6 +34,19 @@ class SystemCheckServiceTest {
     }
 
     @Test
+    void configuredOidcDoesNotClaimProviderHealthOrOrganizationIntegration() {
+        when(catalog.list()).thenReturn(List.of());
+        var service = new SystemCheckService(diagnostics, catalog, false, true);
+        try {
+            var report = service.check(admin);
+            assertThat(report.checks().get(4).code()).isEqualTo("OIDC_CONFIGURED");
+            assertThat(report.checks().get(4).status()).isEqualTo(SystemCheckService.Status.WARNING);
+            assertThat(report.checks()).filteredOn(check -> check.id().equals("organization"))
+                    .allSatisfy(check -> assertThat(check.status()).isEqualTo(SystemCheckService.Status.NOT_IMPLEMENTED));
+        } finally { service.close(); }
+    }
+
+    @Test
     void redactsFailureAndContinuesOtherChecksInTheActorsTenant() {
         doThrow(new IllegalStateException("jdbc:secret-host password=secret-value")).when(diagnostics).database();
         when(diagnostics.migrations()).thenReturn("8");

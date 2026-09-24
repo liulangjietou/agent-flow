@@ -326,3 +326,22 @@ test('发布记录查询使用只读接口，说明校验失败后允许修正�
   await api.publishDefinition('draft', 0, '补齐说明')
   assert.notEqual(sent[1].headers.get('Idempotency-Key'), sent[2].headers.get('Idempotency-Key'))
 })
+
+test('响应丢失后遇到 CSRF 失效仍保留原请求键，重新认证后只恢复原操作', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'csrf-recovery' })
+  const sent = []
+  globalThis.fetch = async (_url, init) => {
+    sent.push(init)
+    if (sent.length === 1) throw new TypeError('lost response')
+    if (sent.length === 2) return Response.json({ code: 'CSRF_INVALID' }, { status: 403 })
+    return Response.json({ id: 'original-draft' })
+  }
+  await assert.rejects(api.definition(body))
+  const id = writeRequests.pending()[0].id
+  await assert.rejects(writeRequests.recover(id), error => error.code === 'CSRF_INVALID')
+  assert.equal(writeRequests.pending().length, 1)
+  await writeRequests.recover(id)
+  assert.equal(new Set(sent.map(request => request.headers.get('Idempotency-Key'))).size, 1)
+  assert.equal(new Set(sent.map(request => request.body)).size, 1)
+  assert.equal(writeRequests.pending().length, 0)
+})

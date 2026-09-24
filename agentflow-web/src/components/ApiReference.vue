@@ -34,7 +34,7 @@ onBeforeUnmount(() => { query.clear(); releaseDownload() })
     <div v-if="query.loading" class="panel api-empty" role="status">正在加载当前版本接口文档…</div>
     <div v-else-if="query.error" class="panel api-empty" role="alert"><p>{{ query.error }}</p><button class="secondary" @click="query.load(scopeKey)">重试加载</button></div>
     <template v-else-if="query.document">
-      <div class="api-intro"><strong>OpenAPI {{ query.document.openapi }} · v{{ query.document.info.version }}</strong><p>{{ query.document.info.description }}</p><p>先登录取得令牌，再按接口权限调用。网络结果不明时，业务写入使用原幂等键和完全相同的请求重试；版本冲突需重新核对。</p></div>
+      <div class="api-intro"><strong>OpenAPI {{ query.document.openapi }} · v{{ query.document.info.version }}</strong><p>{{ query.document.info.description }}</p><p>下方 curl 示例使用演示 Bearer 令牌；企业模式通过浏览器会话登录，并按契约携带 CSRF 和页面身份请求头。网络结果不明时，业务写入使用原幂等键和完全相同的请求重试；版本冲突需重新核对。</p></div>
       <div class="api-filters"><label>搜索接口<input v-model="search" type="search" placeholder="路径、方法或用途，例如 publish" /></label><label>接口分组<select v-model="group"><option value="">全部分组</option><option v-for="tag in query.document.tags" :key="tag.name">{{ tag.name }}</option></select></label><span>{{ filtered.length }} / {{ catalog.length }} 个操作</span></div>
       <div v-if="!filtered.length" class="panel api-empty"><strong>没有匹配的接口</strong><p>调整关键词或分组继续查找。</p><button class="secondary" @click="search = ''; group = ''">清空筛选</button></div>
       <div v-else class="api-layout">

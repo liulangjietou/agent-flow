@@ -8,6 +8,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.agentflow.common.CurrentActor;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.web.csrf.CsrfToken;
 
 /**
  * 开发环境认证接口，生产接入 OIDC 后保留同一响应契约。
@@ -17,10 +22,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthService authService;
+    private final CurrentActor currentActor;
+    private final OidcProperties oidc;
+    private final boolean demoEnabled;
 
     /** 创建控制器。 */
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, CurrentActor currentActor, OidcProperties oidc,
+                          @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled) {
         this.authService = authService;
+        this.currentActor = currentActor;
+        this.oidc = oidc;
+        this.demoEnabled = demoEnabled;
+    }
+
+    /** 前端按服务端实际配置展示登录入口；CSRF 令牌只供当前同源会话使用。 */
+    @GetMapping("/options")
+    public AuthOptions options(HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        CsrfToken csrf = oidc.enabled() ? (CsrfToken) request.getAttribute(CsrfToken.class.getName()) : null;
+        return new AuthOptions(oidc.enabled() ? "OIDC" : demoEnabled ? "DEMO" : "UNCONFIGURED",
+                oidc.enabled() ? OidcClientConfiguration.AUTHORIZATION_BASE + "/" + OidcClientConfiguration.REGISTRATION_ID : null,
+                csrf == null ? null : csrf.getHeaderName(), csrf == null ? null : csrf.getToken());
     }
 
     /** 登录。 */
@@ -32,8 +54,8 @@ public class AuthController {
 
     /** 返回当前登录主体。 */
     @GetMapping("/me")
-    public AuthService.LoginResult me(@RequestHeader("Authorization") String authorization) {
-        return new AuthService.LoginResult(null, authService.authenticate(token(authorization)));
+    public AuthService.LoginResult me() {
+        return new AuthService.LoginResult(null, currentActor.actor());
     }
 
     /** 注销。 */
@@ -57,4 +79,8 @@ public class AuthController {
      * @author owlzhangfq@gmail.com
      */
     public record LoginResponse(String token, io.agentflow.common.Actor user) { }
+    /** 服务端登录模式与当前会话防伪令牌。
+     * @author owlzhangfq@gmail.com
+     */
+    public record AuthOptions(String mode, String loginUrl, String csrfHeader, String csrfToken) { }
 }

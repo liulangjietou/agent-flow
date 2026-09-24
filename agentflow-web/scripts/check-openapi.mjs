@@ -57,6 +57,7 @@ async function exercise(base) {
     return value
   }
   function example(path) { return structuredClone(spec.paths[path].post.requestBody.content['application/json'].example) }
+  assert.equal((await call('GET', '/api/v1/auth/options', { user: 'anonymous' })).mode, 'DEMO')
   const defs = '/api/v1/process-definitions', apps = '/api/v1/applications', tasksPath = '/api/v1/tasks'
   await call('GET', '/api/v1/openapi.json', { user: 'anonymous', status: 401 })
   for (const username of ['admin', 'alice', 'manager', 'bob']) tokens[username] = (await call('POST', '/api/v1/auth/login', { body: { tenantId: 'demo', username, password: 'demo' }, user: 'anonymous' })).token

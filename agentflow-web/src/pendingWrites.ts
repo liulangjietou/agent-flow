@@ -69,8 +69,8 @@ export class PendingWrites {
       return result
     }).catch((error: unknown) => {
       const failure = error as Partial<RequestFailure>
-      // 401只说明当前会话失效，原操作可能已成功；同账号重新登录后仍须用原键恢复。
-      if (failure.code !== 'SESSION_CHANGED' && typeof failure.status === 'number'
+      // 认证或 CSRF 失败不能证明前次请求未成功；恢复会话后仍须使用原键。
+      if (failure.code !== 'SESSION_CHANGED' && failure.code !== 'CSRF_INVALID' && typeof failure.status === 'number'
           && failure.status >= 400 && failure.status < 500 && failure.status !== 401) remove()
       if (epoch !== this.epoch) throw sessionChanged()
       throw error

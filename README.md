@@ -184,3 +184,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 [移动端工作空间导航](docs/mobile-workspace-navigation.md)：窄屏完整文字抽屉、键盘焦点、角色菜单和退出确认，桌面侧栏共用同一份入口配置。
 
 [待办分页查询性能验证](docs/pending-query-performance.md)：合并页面与完整总数的重复联查，保持当前权限、游标和空后续页的计数语义。
+
+企业登录协议接入和部署边界见 [企业 OIDC 登录](docs/enterprise-oidc.md)。默认演示入口保持演示认证，启用 OIDC 必须提供显式可信配置并关闭演示认证。

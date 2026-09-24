@@ -3,7 +3,7 @@
   "info": {
     "title": "AgentFlow API",
     "version": "0.1.0",
-    "description": "与当前工程同步的已实现 API。演示认证尚非企业身份服务；Agent、财务支付、外部 Webhook、组织和附件接口尚未交付。所有业务资源限定认证主体租户，客户端不能指定他人租户绕过授权。",
+    "description": "与当前工程同步的已实现 API。支持演示 Bearer 认证，或显式配置的企业 OIDC 会话认证；组织目录、真实模型和财务支付尚未接入。企业浏览器经同源入口使用 HttpOnly 会话 Cookie，写请求须携带 auth/options 返回的 X-CSRF-TOKEN，以及 URL 编码的 JSON 数组 [tenantId,userId] 作为 X-AgentFlow-Actor，后者仅用于核对页面身份，不授予权限。所有资源继续限定认证主体租户。",
     "contact": {
       "email": "owlzhangfq@gmail.com"
     }
@@ -17,6 +17,9 @@
   "security": [
     {
       "bearerAuth": []
+    },
+    {
+      "sessionCookie": []
     }
   ],
   "tags": [
@@ -61,7 +64,7 @@
           "认证"
         ],
         "summary": "演示登录",
-        "description": "仅演示认证启用时可用。账号 admin、manager、finance、employee、alice、bob；密码 demo。租户默认 demo。生产 IdP/OIDC 尚未接入。",
+        "description": "仅演示认证启用时可用。账号 admin、manager、finance、employee、alice、bob；密码 demo。租户默认 demo。企业 OIDC 模式关闭该登录方式。",
         "x-access": "匿名；受演示开关与租户限制",
         "x-idempotency": false,
         "responses": {
@@ -185,7 +188,7 @@
           "认证"
         ],
         "summary": "退出会话",
-        "description": "撤销当前 Bearer 令牌，成功为 HTTP 200 空正文。重复使用已撤销令牌返回 401。",
+        "description": "演示模式撤销当前 Bearer，返回 HTTP 200 空正文。企业模式须提供有效 CSRF 令牌，销毁平台会话并清除 Cookie，返回 204；不注销身份服务的全局会话。",
         "x-access": "当前已登录账号",
         "x-idempotency": false,
         "responses": {
@@ -211,8 +214,32 @@
                 }
               }
             }
+          },
+          "204": {
+            "description": "企业平台会话已销毁，空正文"
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/process-definitions": {
@@ -346,11 +373,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -395,6 +422,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -579,11 +624,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -648,6 +693,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -768,6 +831,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -821,7 +894,27 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/process-definitions/simulate": {
@@ -866,11 +959,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -948,7 +1041,27 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/process-definitions/{id}/simulate": {
@@ -1021,6 +1134,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1032,6 +1155,24 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1092,11 +1233,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -1141,6 +1282,24 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1251,11 +1410,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -1330,6 +1489,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1619,11 +1796,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -1687,6 +1864,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1831,6 +2026,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1842,6 +2047,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1991,11 +2214,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -2060,6 +2283,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2132,11 +2373,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -2201,6 +2442,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2269,11 +2528,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -2338,6 +2597,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2993,11 +3270,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -3061,6 +3338,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -3617,6 +3912,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -3638,6 +3943,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ]
@@ -4148,11 +4471,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -4235,6 +4558,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -4413,11 +4754,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -4472,6 +4813,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -4695,11 +5054,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -4764,6 +5123,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -5104,11 +5481,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -5153,6 +5530,24 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -5223,11 +5618,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -5292,6 +5687,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -6329,11 +6742,11 @@
             }
           },
           "403": {
-            "description": "角色或当前资源权限不足",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -6358,6 +6771,24 @@
             "schema": {
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -6606,11 +7037,11 @@
             }
           },
           "403": {
-            "description": "当前账号没有流程管理权限",
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RequestError"
                 }
               }
             }
@@ -6667,7 +7098,27 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/process-definitions/search": {
@@ -7303,6 +7754,31 @@
           }
         ]
       }
+    },
+    "/api/v1/auth/options": {
+      "get": {
+        "operationId": "authenticationOptions",
+        "tags": [
+          "认证"
+        ],
+        "summary": "查询可用登录方式",
+        "description": "匿名同源读取，Cache-Control: no-store。OIDC 模式返回固定授权入口 /api/v1/auth/oidc/authorize/enterprise；浏览器回调 /api/v1/auth/oidc/callback/enterprise，由 Spring Security 处理，返回固定前端首页，不接受自定义返回地址。",
+        "x-access": "匿名",
+        "x-idempotency": false,
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "服务端登录方式与当前会话防伪令牌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOptions"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7310,7 +7786,13 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "不透明会话令牌。演示登录取得；生产身份源尚未接入。"
+        "description": "仅演示模式的不透明令牌，由演示登录取得；企业模式不接受演示 Bearer 令牌。"
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "AGENTFLOW_SESSION",
+        "description": "仅企业 OIDC 模式；经浏览器授权码登录创建的 HttpOnly 会话。写请求还需 CSRF 及页面身份绑定请求头；不接受外部 access token 作为平台 API Bearer。"
       }
     },
     "schemas": {
@@ -11616,6 +12098,34 @@
           }
         },
         "additionalProperties": false
+      },
+      "AuthOptions": {
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "OIDC",
+              "UNCONFIGURED"
+            ]
+          },
+          "loginUrl": {
+            "type": "string",
+            "description": "仅 OIDC 模式提供的同源授权入口。"
+          },
+          "csrfHeader": {
+            "type": "string",
+            "const": "X-CSRF-TOKEN"
+          },
+          "csrfToken": {
+            "type": "string",
+            "description": "当前会话的防伪令牌，登录及退出后重新取得，不持久化。"
+          }
+        }
       }
     }
   }

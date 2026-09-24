@@ -24,6 +24,7 @@ public class SystemCheckService {
     private final SystemDiagnostics diagnostics;
     private final ClasspathProcessTemplateCatalog catalog;
     private final boolean demoEnabled;
+    private final boolean oidcEnabled;
     private final Duration timeout;
     private final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<>(1), task -> {
@@ -35,15 +36,26 @@ public class SystemCheckService {
     /** 创建自检查询服务。 */
     @Autowired
     public SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
-                              @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled) {
-        this(diagnostics, catalog, demoEnabled, PROBE_TIMEOUT);
+                              @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled,
+                              @Value("${agentflow.auth.oidc.enabled:false}") boolean oidcEnabled) {
+        this(diagnostics, catalog, demoEnabled, oidcEnabled, PROBE_TIMEOUT);
+    }
+
+    SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog, boolean demoEnabled) {
+        this(diagnostics, catalog, demoEnabled, false, PROBE_TIMEOUT);
     }
 
     SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
                        boolean demoEnabled, Duration timeout) {
+        this(diagnostics, catalog, demoEnabled, false, timeout);
+    }
+
+    private SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
+                       boolean demoEnabled, boolean oidcEnabled, Duration timeout) {
         this.diagnostics = diagnostics;
         this.catalog = catalog;
         this.demoEnabled = demoEnabled;
+        this.oidcEnabled = oidcEnabled;
         this.timeout = timeout;
     }
 
@@ -63,8 +75,10 @@ public class SystemCheckService {
         var templates = catalog.list();
         int scenarios = templates.stream().mapToInt(template -> template.scenarios().size()).sum();
         checks.add(up("templates", "已加载 " + templates.size() + " 个模板，启动时验证 " + scenarios + " 个路由场景。"));
-        checks.add(new Check("authentication", Status.WARNING, demoEnabled ? "DEMO_AUTH_ONLY" : "AUTH_PROVIDER_NOT_CONFIGURED",
-                demoEnabled ? "使用演示账号，企业身份认证尚未接入。" : "演示登录已关闭，企业身份认证尚未接入。"));
+        checks.add(new Check("authentication", Status.WARNING,
+                oidcEnabled ? "OIDC_CONFIGURED" : demoEnabled ? "DEMO_AUTH_ONLY" : "AUTH_PROVIDER_NOT_CONFIGURED",
+                oidcEnabled ? "已配置企业 OIDC 登录；本次未探测身份服务可用性，组织目录尚未接入。"
+                        : demoEnabled ? "使用演示账号，企业身份认证尚未接入。" : "演示登录已关闭，企业身份认证尚未接入。"));
         checks.add(inspect("notifications", () -> {
             diagnostics.notifications(actor.tenantId());
             return new Check("notifications", Status.WARNING, "IN_APP_ONLY", "站内消息存储查询成功；邮件、IM 和 SLA 尚未接入。");

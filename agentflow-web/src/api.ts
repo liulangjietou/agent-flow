@@ -16,6 +16,18 @@ import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
+/** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
+export interface AuthOptions { mode: 'DEMO' | 'OIDC' | 'UNCONFIGURED'; loginUrl?: string; csrfHeader?: string; csrfToken?: string }
+const AUTH_OPTIONS_TIMEOUT_MS = 10_000
+let authentication: AuthOptions | null = null
+let requestActor: Pick<Actor, 'tenantId' | 'userId'> | null = null
+
+/** 请求绑定页面已接受的账号，防止其他标签切换会话后以新账号提交旧页面。 */
+export function bindAuthenticationActor(actor: Actor | null) {
+  requestActor = actor
+  writeRequests.setActor(actor)
+}
+
 export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
 /** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
 export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown> }
@@ -133,7 +145,16 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
   const token = localStorage.getItem('agentflow.token')
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (token && authentication?.mode !== 'OIDC') headers.set('Authorization', `Bearer ${token}`)
+  if (authentication?.mode === 'OIDC' && !['GET', 'HEAD', 'OPTIONS'].includes((init.method ?? 'GET').toUpperCase())) {
+    if (!authentication.csrfToken || authentication.csrfHeader !== 'X-CSRF-TOKEN') {
+      throw { status: 403, code: 'CSRF_INVALID', message: '会话验证信息已失效，请刷新登录状态后恢复原操作。' } satisfies ApiError
+    }
+    headers.set(authentication.csrfHeader, authentication.csrfToken)
+  }
+  if (authentication?.mode === 'OIDC' && requestActor && !['/auth/me', '/auth/options'].includes(path)) {
+    headers.set('X-AgentFlow-Actor', encodeURIComponent(JSON.stringify([requestActor.tenantId, requestActor.userId])))
+  }
   const businessWrite = headers.has('Idempotency-Key')
   let response: Response
   try { response = await fetch(`${API_BASE}${path}`, { ...init, headers }) }
@@ -144,6 +165,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
     let details: ApiError['details']
     try { const body = await response.json() as { message?: string; code?: string; details?: ApiError['details'] }; message = body.message ?? message; code = body.code ?? code; details = body.details } catch { /* 已收到明确状态码，保留错误分类。 */ }
     const messages: Record<string, string> = {
+      CSRF_INVALID: '会话验证信息已失效，请刷新登录状态后恢复原操作。',
       AUDIT_EXPORT_LIMIT_EXCEEDED: '匹配操作超过 10,000 条，请按操作日期、账号或关联申请缩小筛选后再导出。未生成截断文件。',
       AUDIT_EXPORT_BUSY: '服务正在生成另一份审计导出，请稍后重试。',
       AUDIT_EXPORT_FAILED: '审计文件生成失败，请重试。',
@@ -186,6 +208,9 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       TEMPLATE_VERSION_CONFLICT: '模板版本已变化，请重新加载目录，核对后再复制。',
       DEFINITION_BINDING_AMBIGUOUS: '这份旧申请未保存原流程来源，当前存在同名版本。请保留原记录，核对流程后重新发起申请。'
     }
+    if (authentication?.mode === 'OIDC' && (response.status === 401 || code === 'CSRF_INVALID') && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('agentflow:authentication-required'))
+    }
     throw { status: response.status, code, message: messages[code] ?? message, details } satisfies ApiError
   }
   try {
@@ -210,6 +235,16 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  authOptions: async () => {
+    const options = await request<AuthOptions>('/auth/options', { cache: 'no-store', signal: AbortSignal.timeout(AUTH_OPTIONS_TIMEOUT_MS) })
+    if (!['DEMO', 'OIDC', 'UNCONFIGURED'].includes(options.mode)
+        || options.mode === 'OIDC' && (options.loginUrl !== '/api/v1/auth/oidc/authorize/enterprise'
+          || options.csrfHeader !== 'X-CSRF-TOKEN' || !options.csrfToken || API_BASE !== '/api/v1')) {
+      throw { status: 0, code: 'AUTH_CONFIGURATION_INVALID', message: '登录配置无效，企业登录需要使用同源入口，请联系管理员。' } satisfies ApiError
+    }
+    authentication = options
+    return options
+  },
   webhookTargets: (signal: AbortSignal) => request<WebhookTarget[]>('/integrations/webhooks', { signal }),
   webhookOverview: (filters: WebhookOverviewFilters, signal: AbortSignal) => request<WebhookOverview>('/integrations/webhooks/overview' + historyQuery(filters), { signal }),
   webhookDeliveries: (filters: WebhookFilters, signal: AbortSignal) => request<WebhookPage>('/integrations/webhooks/deliveries' + historyQuery(filters), { signal }),

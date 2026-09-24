@@ -53,7 +53,7 @@ import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoome
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
+import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
@@ -64,6 +64,9 @@ const simulationOpen = ref(false)
 const simulationResult = ref<SimulationResult | null>(null)
 const simulationGraph = computed(graphPayload)
 const loggedIn = ref(false)
+const authOptions = ref<AuthOptions | null>(null)
+const authLoading = ref(true)
+const sessionExpired = ref(false)
 const username = ref('')
 const password = ref('')
 const tenantId = ref('demo')
@@ -81,7 +84,7 @@ const templateRefresh = ref(0)
 const notice = ref('')
 const busy = ref(false)
 const pendingWrites = ref<PendingWrite[]>([])
-const writesBlocked = computed(() => pendingWrites.value.length > 0)
+const writesBlocked = computed(() => sessionExpired.value || pendingWrites.value.length > 0)
 const recordRefresh = ref(0)
 const recoveryError = ref('')
 const workspace = ref<HTMLElement | null>(null)
@@ -291,7 +294,10 @@ async function refreshWorkspace(restoreSelection = false) {
   try { await Promise.all([loadTasks(), ...(restoreSelection ? [restoreDesigner()] : [])]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
   catch (error) { if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) { serverAvailable.value = false; notice.value = errorMessage(error) } }
 }
-function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
+async function refreshPage() {
+  if (authOptions.value?.mode === 'OIDC' && !await restoreEnterpriseSession()) return
+  templateRefresh.value++; void refreshWorkspace()
+}
 async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
   const originalBody = { ...body }
   await confirmReplaceDefinition('放弃修改并复制', async () => {
@@ -340,21 +346,27 @@ function clearDesigner() {
   resetEditor(); savedSnapshot.value = snapshot()
 }
 async function login() {
-  if (busy.value) return
+  if (busy.value || authOptions.value?.mode !== 'DEMO') return
   if (!username.value.trim() || !password.value) { notice.value = '请输入用户名和密码'; return }
   busy.value = true
-  try { const result = await api.login({ tenantId: tenantId.value.trim(), username: username.value.trim(), password: password.value }); localStorage.setItem('agentflow.token', result.token); actor.value = result.user; writeRequests.setActor(result.user); loggedIn.value = true; password.value = ''; notice.value = '已进入工作空间'; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
+  try { const result = await api.login({ tenantId: tenantId.value.trim(), username: username.value.trim(), password: password.value }); localStorage.setItem('agentflow.token', result.token); actor.value = result.user; bindAuthenticationActor(result.user); loggedIn.value = true; password.value = ''; notice.value = '已进入工作空间'; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
 async function logout() {
   await confirmReplaceDefinition('放弃修改并退出', async () => {
     busy.value = true
-    try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
-    writeRequests.setActor(null)
+    try { if (authOptions.value?.mode === 'OIDC') await api.authOptions(); await api.logout() }
+    catch (error) {
+      // Cookie 会话只能由服务端退出；断网不能显示虚假的退出成功。
+      if (authOptions.value?.mode === 'OIDC') { notice.value = '退出未完成：' + errorMessage(error); busy.value = false; return }
+    }
+    bindAuthenticationActor(null)
     localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; restoredDefinition.clear(); applicationSelection.clear(); activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
     clearDesigner(); templateRefresh.value++
     recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
+    sessionExpired.value = false
+    await loadAuthentication(false)
   }, () => !busy.value && !pendingWrites.value.some(operation => operation.sending))
 }
 /** 打开摘要时取得最新任务版本，旧列表不能直接产生审批命令。 */
@@ -835,14 +847,57 @@ function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
+/** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */
+async function loadAuthentication(restore = true) {
+  authLoading.value = true
+  try {
+    authOptions.value = await api.authOptions()
+    if (authOptions.value.mode !== 'DEMO') localStorage.removeItem('agentflow.token')
+    if (!restore || (authOptions.value.mode !== 'OIDC' && !localStorage.getItem('agentflow.token'))) return
+    const result = await api.me()
+    actor.value = result.actor; bindAuthenticationActor(result.actor)
+    username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true
+    page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'
+    await refreshWorkspace(true)
+  } catch (error) {
+    if ((error as ApiError).status === 401) localStorage.removeItem('agentflow.token')
+    else notice.value = errorMessage(error)
+  } finally { authLoading.value = false }
+}
+function enterpriseLogin() {
+  if (authOptions.value?.mode === 'OIDC' && !busy.value) window.location.assign(authOptions.value.loginUrl!)
+}
+function authenticationRequired() { if (loggedIn.value) sessionExpired.value = true }
+function reopenEnterpriseLogin() {
+  if (authOptions.value?.mode === 'OIDC') window.open(authOptions.value.loginUrl!, '_blank', 'noopener,noreferrer')
+}
+async function restoreEnterpriseSession() {
+  if (pendingWrites.value.some(operation => operation.sending)) { notice.value = '请等待当前请求结束后恢复会话。'; return false }
+  try {
+    authOptions.value = await api.authOptions()
+    const result = await api.me()
+    if (actor.value?.tenantId !== result.actor.tenantId || actor.value?.userId !== result.actor.userId) {
+      sessionExpired.value = true
+      notice.value = '当前企业账号与本页不同，请在登录窗口恢复原账号后重试；原页面和未确认操作已保留。'
+      return false
+    }
+    actor.value = result.actor; bindAuthenticationActor(result.actor); sessionExpired.value = false
+    notice.value = '会话已恢复，可以继续核对并恢复原操作。'
+    return true
+  } catch (error) { sessionExpired.value = true; notice.value = errorMessage(error); return false }
+}
 onMounted(async () => {
   window.addEventListener('beforeunload', warnBeforeUnload)
-  if (!localStorage.getItem('agentflow.token')) return
-  try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
-  catch { localStorage.removeItem('agentflow.token') }
+  window.addEventListener('agentflow:authentication-required', authenticationRequired)
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('authError') === 'oidc') {
+    notice.value = '企业登录未完成，可能是登录已过期或账号尚未分配平台权限。请重试或联系管理员。'
+    url.searchParams.delete('authError'); window.history.replaceState(null, '', url)
+  }
+  await loadAuthentication()
 })
 onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
-onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
+onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload); window.removeEventListener('agentflow:authentication-required', authenticationRequired) })
 </script>
 
 <template>
@@ -851,17 +906,30 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       <form class="login-card" @submit.prevent="login">
         <div class="brand-mark">AF</div><p class="eyebrow">AGENTFLOW / WORKFLOW OS</p>
         <h1>让每一次审批<br /><em>都有依据。</em></h1><p class="login-copy">面向 OA、财务与业务团队的智能审批工作台。</p>
-        <label>租户空间<input v-model="tenantId" autocomplete="organization" placeholder="demo" /></label>
-        <label>用户名<input v-model="username" autocomplete="username" placeholder="admin" /></label>
-        <label>密码<input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" /></label>
-        <button class="primary wide" :disabled="busy">{{ busy ? '正在登录…' : '进入工作台 ↗' }}</button>
-        <small role="status">{{ notice || '演示租户 demo；账号 admin / manager / finance / alice，密码 demo' }}</small>
+        <p v-if="authLoading" role="status">正在读取登录配置…</p>
+        <template v-else-if="authOptions?.mode === 'DEMO'">
+          <label>租户空间<input v-model="tenantId" autocomplete="organization" placeholder="demo" /></label>
+          <label>用户名<input v-model="username" autocomplete="username" placeholder="admin" /></label>
+          <label>密码<input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" /></label>
+          <button class="primary wide" :disabled="busy">{{ busy ? '正在登录…' : '进入工作台 ↗' }}</button>
+          <small>演示租户 demo；账号 admin / manager / finance / alice，密码 demo</small>
+        </template>
+        <template v-else-if="authOptions?.mode === 'OIDC'">
+          <p class="login-copy">使用企业账号登录，租户空间和权限由管理员分配。</p>
+          <button type="button" class="primary wide" :disabled="busy" @click="enterpriseLogin">使用企业账号登录 ↗</button>
+        </template>
+        <template v-else>
+          <p role="status">{{ authOptions?.mode === 'UNCONFIGURED' ? '尚未配置登录服务，请联系管理员。' : '无法读取登录配置，请检查服务连接后重试。' }}</p>
+          <button type="button" class="primary wide" @click="loadAuthentication()">重新检查</button>
+        </template>
+        <small v-if="notice" role="status">{{ notice }}</small>
       </form>
     </section>
     <template v-else>
       <main ref="workspace" class="main" tabindex="-1">
         <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="logout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
-        <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
+        <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
+        <div v-if="notice && !sessionExpired" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
           <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
@@ -898,7 +966,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
         <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :scope-key="actorScope" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
-        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
+        <FirstWorkflow :enterprise-auth="authOptions?.mode === 'OIDC'" v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
         <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @open="recordApplicationId = $event" />
         <BusinessCalendars v-else-if="page === 'calendars' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @import="page = 'transfer'" @designer="page = 'designer'" />
@@ -1001,6 +1069,10 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 </template>
 
 <style scoped>
+.session-notice{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:22px 30px;padding:18px 22px;border:1px solid #dfcfac;border-radius:12px;background:#fff8e9;color:var(--ink);font-size:13px;line-height:1.7}
+.session-notice>div{flex:1 1 340px;min-width:0;overflow-wrap:anywhere}.session-notice p{margin:6px 0 0}.session-notice button{flex-shrink:0}
+@media(max-width:650px){.session-notice{margin:16px;padding:16px}.session-notice>div{flex-basis:100%}}
+
 .designer-validation{margin-top:16px;min-width:0}.validation-live-help{font-size:11px;color:var(--muted);line-height:1.8}.designer-validation>ul{padding-left:22px;font-size:12px;color:var(--red)}.designer-validation>ul li{margin:8px 0}.flow-node.invalid{border:2px solid var(--red);box-shadow:0 0 0 3px #ba4d3b20}.validation-strip .secondary{margin-left:auto;font-size:11px}
 .work-grid.board-work-grid{grid-template-columns:minmax(0,1fr)}
 .board-return{padding:16px 22px 0}

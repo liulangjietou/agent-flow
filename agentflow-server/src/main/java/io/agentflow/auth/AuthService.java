@@ -14,7 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 认证端口的首版实现；生产环境应替换为企业 IdP/OIDC 适配器。
+ * 演示认证及演示审批人目录；企业登录由独立 OIDC 接入层负责。
  * @author owlzhangfq@gmail.com
  */
 @Service

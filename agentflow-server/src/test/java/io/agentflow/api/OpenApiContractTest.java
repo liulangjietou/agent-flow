@@ -133,6 +133,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("InboxPage", io.agentflow.notification.InboxApplicationService.Page.class),
                 java.util.Map.entry("HistoryEvent", io.agentflow.approval.history.HistoryEvent.class),
                 java.util.Map.entry("HistoryPage", io.agentflow.approval.history.HistoryPage.class),
+                java.util.Map.entry("AuthOptions", io.agentflow.auth.AuthController.AuthOptions.class),
                 java.util.Map.entry("LoginResponse", io.agentflow.auth.AuthController.LoginResponse.class),
                 java.util.Map.entry("CurrentIdentity", io.agentflow.auth.AuthService.LoginResult.class),
                 java.util.Map.entry("SimulationResult", io.agentflow.definition.DefinitionSimulator.Result.class),
