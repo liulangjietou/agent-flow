@@ -8,6 +8,7 @@ spring:
     password: ${AGENTFLOW_DATASOURCE_PASSWORD}
     driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.postgresql.Driver}
   flyway:
+    # 保留 Flyway bean 与启动依赖顺序；ProductionSchemaConfiguration 将 migrate 替换为只校验。
     enabled: true
 
 flowable:

@@ -1,5 +1,6 @@
 package io.agentflow;
 
+import io.agentflow.database.DatabaseSchemaCommand;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.session.SessionAutoConfiguration;
@@ -13,6 +14,10 @@ import org.springframework.boot.autoconfigure.session.SessionAutoConfiguration;
 public class AgentflowApplication {
     /** 启动 Spring Boot 应用。 */
     public static void main(String[] args) {
+        if (DatabaseSchemaCommand.requested(args)) {
+            System.exit(DatabaseSchemaCommand.run(args, System.getenv(), System.out, System.err));
+            return;
+        }
         SpringApplication.run(AgentflowApplication.class, args);
     }
 }

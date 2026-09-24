@@ -33,6 +33,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 演示 PostgreSQL 支持[完整备份与隔离恢复](docs/demo-backup-recovery.md)：校验归档后使用原镜像恢复到新项目、新卷及新端口，保留旧实例；恢复后可继续办理未完成会签任务。工具不会覆盖已有数据，当前不包含生产灾备、跨版本升级或 H2 备份。
 
+生产部署使用[独立数据库迁移命令](docs/production-database-lifecycle.md)：同一发布 jar 提供 `--schema=migrate` 和 `--schema=validate`，前者初始化或升级业务及引擎结构，后者使用 PostgreSQL 只读连接校验。`prod` 服务启动只检查已迁移结构，未迁移时拒绝启动；生产安装、升级和备份流程见该文档。
+
 ## 本地启动
 
 需要 Java 17+、Maven 3.9+ 和 Node.js 20.19+ 或 22.12+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。

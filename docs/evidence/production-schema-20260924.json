@@ -1,0 +1,65 @@
+{
+  "jarSha256": "c38656f8b5fd816a29b57bce5603531fb4132988ae83e55157061767b90ae1b3",
+  "schema": "schema71_packaged",
+  "commands": [
+    {
+      "mode": "validate",
+      "exitCode": 1,
+      "seconds": 0.808,
+      "output": "Schema command failed, errorCode=DATABASE_SCHEMA_FAILED, phase=validate, errorType=IllegalStateException"
+    },
+    {
+      "mode": "migrate",
+      "exitCode": 0,
+      "seconds": 2.578,
+      "output": "Schema migrate completed; business migrations and Flowable schema verified"
+    },
+    {
+      "mode": "validate",
+      "exitCode": 0,
+      "seconds": 1.782,
+      "output": "Schema validate completed; business migrations and Flowable schema verified"
+    },
+    {
+      "mode": "migrate",
+      "exitCode": 0,
+      "seconds": 2.19,
+      "output": "Schema migrate completed; business migrations and Flowable schema verified"
+    }
+  ],
+  "serverPid": 27858,
+  "readiness": {
+    "status": "UP"
+  },
+  "authOptions": {
+    "mode": "UNCONFIGURED"
+  },
+  "serverStopped": true,
+  "sameDatabaseRowsAfterCommandsAndProductionStartup": true,
+  "tableCount": 67,
+  "businessVersion": "23",
+  "date": "2026-09-24",
+  "scope": "Offline PostgreSQL schema lifecycle and validation-only production startup",
+  "fullJavaTests": 716,
+  "domainTests": 181,
+  "serverTests": 535,
+  "postgresIntegrationTests": 5,
+  "frontendTests": 254,
+  "toolTests": 19,
+  "javaFiles": 289,
+  "namedTypes": 461,
+  "authorViolations": 0,
+  "contract": {
+    "operations": 65,
+    "schemas": 112,
+    "requestExamples": 21
+  },
+  "redTests": {
+    "productionStartup": 2,
+    "runtimeTargetOverride": 1
+  },
+  "productionReadiness": "Database startup validated; enterprise identity not configured in the isolated packaged test",
+  "liveDemoDeployment": "Unchanged stage 70; no main database migration or runtime replacement",
+  "remoteCI": "Not run; no Git remote configured",
+  "existingDemoReadiness": "Both 8080 and 8180 UP"
+}
