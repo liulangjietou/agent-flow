@@ -31,7 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 使用真实审批、事务、SQL 和 HTTP 权限边界验证 outbox 与人工重试。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:webhooks;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000",
+@SpringBootTest(properties = {"spring.datasource.url=${AGENTFLOW_WEBHOOK_TEST_URL:jdbc:h2:mem:webhooks;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000}",
+        "spring.datasource.username=${AGENTFLOW_WEBHOOK_TEST_USER:sa}",
+        "spring.datasource.password=${AGENTFLOW_WEBHOOK_TEST_PASSWORD:}",
+        "spring.datasource.driver-class-name=${AGENTFLOW_WEBHOOK_TEST_DRIVER:org.h2.Driver}",
         "agentflow.auth.demo-enabled=true", "agentflow.webhooks.worker-enabled=false",
         "agentflow.webhooks.targets.erp.tenant-id=demo", "agentflow.webhooks.targets.erp.label=演示 ERP",
         "agentflow.webhooks.targets.erp.url=https://example.invalid/webhook", "agentflow.webhooks.targets.erp.enabled=true",
@@ -131,6 +134,29 @@ class WebhookIntegrationTest {
             assertThat(store.attempts(id)).extracting(JdbcWebhookStore.Attempt::result).containsExactly("DELIVERED", "OUTCOME_UNKNOWN");
             assertThat(store.get("demo", id).body()).isEqualTo(first.body());
         } finally { executor.shutdownNow(); }
+    }
+
+    @Test
+    void receiverDeadlineSurvivesDatabaseReloadAndPreventsEarlyClaim() throws Exception {
+        UUID id = enqueue("demo");
+        Instant now = Instant.now().plusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        Instant deadline = now.plusSeconds(120);
+        var claimed = store.claim(id, now);
+        assertThat(store.finish(claimed, DeliveryProgress.Outcome.http(429, deadline), now)).isTrue();
+        var waiting = store.get("demo", id);
+        assertThat(waiting.progress().nextAttemptAt()).isEqualTo(deadline);
+        assertThat(store.due(deadline.minusMillis(1))).doesNotContain(id);
+        assertThat(store.claim(id, deadline.minusMillis(1))).isNull();
+        assertThat(store.attempts(id)).hasSize(1);
+        var detail = json.read(mvc.perform(get(ROOT + "/deliveries/" + id).header("Authorization", token("admin")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), JsonNode.class);
+        assertThat(detail.path("delivery").path("nextAttemptAt").asText()).isEqualTo(deadline.toString());
+        var retried = store.claim(id, deadline);
+        assertThat(retried).isNotNull();
+        assertThat(retried.eventId()).isEqualTo(claimed.eventId());
+        assertThat(retried.body()).isEqualTo(claimed.body());
+        assertThat(store.finish(retried, DeliveryProgress.Outcome.http(204), deadline)).isTrue();
+        assertThat(store.attempts(id)).extracting(JdbcWebhookStore.Attempt::httpStatus).containsExactly(204, 429);
     }
 
     @Test

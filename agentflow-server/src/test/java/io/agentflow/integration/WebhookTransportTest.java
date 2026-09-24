@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,6 +18,50 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 class WebhookTransportTest {
+    @Test
+    void receiverRetryAfterPreventsAnEarlyAutomaticRetry() throws Exception {
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/limited", exchange -> {
+            exchange.getResponseHeaders().set("Retry-After", "120");
+            exchange.sendResponseHeaders(429, -1); exchange.close();
+        });
+        server.start();
+        try {
+            Instant started = Instant.now();
+            var claimed = DeliveryProgress.pending(started).claim(started, "lease");
+            var outcome = new HttpWebhookTransport().send(target(server, "/limited"), "event", "{}");
+            var waiting = claimed.finish("lease", outcome, Instant.now());
+            assertThat(waiting.httpStatus()).isEqualTo(429);
+            assertThat(waiting.nextAttemptAt()).isAfterOrEqualTo(started.plusSeconds(120));
+            assertThat(waiting.due(started.plusSeconds(119))).isFalse();
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    void receivesHttpDateAndFallsBackOnRepeatedRetryAfterHeaders() throws Exception {
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        Instant deadline = Instant.now().plusSeconds(120).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        String date = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(deadline.atZone(java.time.ZoneOffset.UTC));
+        server.createContext("/date", exchange -> {
+            exchange.getResponseHeaders().set("Retry-After", date);
+            exchange.sendResponseHeaders(503, -1); exchange.close();
+        });
+        server.createContext("/repeated", exchange -> {
+            exchange.getResponseHeaders().add("Retry-After", "120");
+            exchange.getResponseHeaders().add("Retry-After", "240");
+            exchange.sendResponseHeaders(429, -1); exchange.close();
+        });
+        server.start();
+        try {
+            var sender = new HttpWebhookTransport();
+            assertThat(sender.send(target(server, "/date"), "event", "{}").retryNotBefore()).isEqualTo(deadline);
+            var repeated = sender.send(target(server, "/repeated"), "event", "{}");
+            assertThat(repeated.httpStatus()).isEqualTo(429);
+            assertThat(repeated.retryable()).isTrue();
+            assertThat(repeated.retryNotBefore()).isNull();
+        } finally { server.stop(0); }
+    }
+
     @Test
     void signsRawBodyAndDoesNotFollowRedirects() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); var received = new AtomicInteger();

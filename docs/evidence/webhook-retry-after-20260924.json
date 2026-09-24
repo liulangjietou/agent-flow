@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-24",
+  "scope": "Webhook Retry-After",
+  "result": "PASS",
+  "beforeFix": {
+    "test": "WebhookTransportTest.receiverRetryAfterPreventsAnEarlyAutomaticRetry",
+    "responseStatus": 429,
+    "retryAfterSeconds": 120,
+    "observedLocalBackoffSeconds": 5,
+    "result": "FAIL as expected"
+  },
+  "verification": {
+    "java": 636,
+    "domain": 181,
+    "server": 455,
+    "webhookIntegrationCasesPerDatabase": 9,
+    "databases": [
+      "H2",
+      "PostgreSQL 17.11"
+    ],
+    "frontend": 238,
+    "toolTests": 19,
+    "javaAuthorFiles": 253,
+    "javaAuthorTypes": 418,
+    "build": "PASS"
+  },
+  "runtime": {
+    "database": "isolated H2",
+    "receiver": "loopback synthetic HTTP receiver",
+    "responseStatuses": [
+      429,
+      204
+    ],
+    "retryAfterSeconds": 30,
+    "observedIntervalSeconds": 30.786025047302246,
+    "processRestartDuringWait": true,
+    "deadlineBefore": "2026-09-24T05:10:06.202272Z",
+    "deadlineAfterRestart": "2026-09-24T05:10:06.202272Z",
+    "noEarlyRequest": true,
+    "stableEventId": true,
+    "stableSignedBody": true,
+    "applicationStateAndVersionUnchanged": true,
+    "attemptCount": 2
+  },
+  "releaseSha256": "3760254d5c00a06049315c24add446d58115f1bf46a52b85c67c36b014365150",
+  "limitations": [
+    "Synthetic receiver only; no enterprise endpoint contacted",
+    "No destination-wide rate limiter or circuit breaker",
+    "No production capacity or availability claim"
+  ],
+  "harnessCorrection": "The first runtime script asserted nonexistent status IN_REVIEW; corrected to the actual IN_APPROVAL enum and before/after state+version comparison, then reran against a fresh isolated database."
+}

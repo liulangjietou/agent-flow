@@ -13,6 +13,45 @@ class DeliveryProgressTest {
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
     @Test
+    void receiverDeadlineCanOnlyLengthenAutomaticBackoff() {
+        for (long seconds : new long[]{-60, 0, 2, 120}) {
+            var result = DeliveryProgress.pending(NOW).claim(NOW, "lease")
+                    .finish("lease", DeliveryProgress.Outcome.http(429, NOW.plusSeconds(seconds)), NOW);
+            Instant expected = NOW.plusSeconds(Math.max(5, seconds));
+            assertThat(result.nextAttemptAt()).isEqualTo(expected);
+            assertThat(result.due(expected.minusNanos(1))).isFalse();
+            assertThat(result.due(expected)).isTrue();
+        }
+    }
+
+    @Test
+    void receiverDeadlineCannotRetryPermanentResultsOrExceedTheAttemptLimit() {
+        for (int status : new int[]{204, 302, 400, 401}) {
+            var result = DeliveryProgress.pending(NOW).claim(NOW, "lease")
+                    .finish("lease", DeliveryProgress.Outcome.http(status, NOW.plusSeconds(120)), NOW);
+            assertThat(result.nextAttemptAt()).isNull();
+            assertThat(result.status()).isEqualTo(status == 204 ? DeliveryProgress.Status.DELIVERED : DeliveryProgress.Status.FAILED);
+        }
+        var result = DeliveryProgress.pending(NOW);
+        for (int attempt = 0; attempt < DeliveryProgress.MAX_CYCLE_ATTEMPTS; attempt++) {
+            Instant at = result.nextAttemptAt();
+            result = result.claim(at, "lease").finish("lease", DeliveryProgress.Outcome.http(503, at.plusSeconds(86400)), at);
+        }
+        assertThat(result.status()).isEqualTo(DeliveryProgress.Status.FAILED);
+        assertThat(result.nextAttemptAt()).isNull();
+    }
+
+    @Test
+    void explicitManualRetryStillStartsImmediatelyAndKeepsLifetimeAttempts() {
+        var waiting = DeliveryProgress.pending(NOW).claim(NOW, "lease")
+                .finish("lease", DeliveryProgress.Outcome.http(429, NOW.plusSeconds(120)), NOW);
+        var manual = waiting.retry(waiting.version(), NOW);
+        assertThat(manual.nextAttemptAt()).isEqualTo(NOW);
+        assertThat(manual.attempts()).isEqualTo(1);
+        assertThat(manual.cycleAttempts()).isZero();
+    }
+
+    @Test
     void retriesTransientFailuresAndStopsAfterSixAttempts() {
         var progress = DeliveryProgress.pending(NOW);
         long[] delays = {5, 30, 120, 600, 3600};

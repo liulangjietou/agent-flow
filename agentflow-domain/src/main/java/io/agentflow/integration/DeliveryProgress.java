@@ -43,8 +43,13 @@ public record DeliveryProgress(Status status, long version, int attempts, int cy
         if (status != Status.IN_FLIGHT || !leaseToken.equals(token)) throw conflict();
         if (outcome.success()) return new DeliveryProgress(Status.DELIVERED, version + 1, attempts, cycleAttempts, null, null, null, outcome.httpStatus(), null);
         boolean retry = outcome.retryable() && cycleAttempts < MAX_CYCLE_ATTEMPTS;
+        Instant nextAttempt = retry ? now.plus(RETRY_DELAYS.get(cycleAttempts - 1)) : null;
+        // 接收端只能延长自动等待，不能缩短本地退避或突破尝试上限。
+        if (retry && outcome.retryNotBefore() != null && outcome.retryNotBefore().isAfter(nextAttempt)) {
+            nextAttempt = outcome.retryNotBefore();
+        }
         return new DeliveryProgress(retry ? Status.RETRY_WAIT : Status.FAILED, version + 1, attempts, cycleAttempts,
-                retry ? now.plus(RETRY_DELAYS.get(cycleAttempts - 1)) : null, null, null, outcome.httpStatus(), outcome.errorCode());
+                nextAttempt, null, null, outcome.httpStatus(), outcome.errorCode());
     }
 
     /** 人工重试开启新一轮投递，累计次数不清零，事件身份和原始请求体保持不变。 */
@@ -65,14 +70,19 @@ public record DeliveryProgress(Status status, long version, int attempts, int cy
      * 传输适配器只提供稳定错误码与状态码，不保留远端响应正文或异常中的密钥。
      * @author owlzhangfq@gmail.com
      */
-    public record Outcome(boolean success, boolean retryable, Integer httpStatus, String errorCode) {
+    public record Outcome(boolean success, boolean retryable, Integer httpStatus, String errorCode, Instant retryNotBefore) {
         /** 2xx 确认接收；重定向和普通客户端错误不自动重试。 */
         public static Outcome http(int status) {
+            return http(status, null);
+        }
+        /** 接收端等待期限由传输层解析，仅用于可自动重试的失败。 */
+        public static Outcome http(int status, Instant retryNotBefore) {
             boolean success = status >= 200 && status < 300;
-            return new Outcome(success, status == 408 || status == 425 || status == 429 || status >= 500,
-                    status, success ? null : "HTTP_" + status);
+            boolean retryable = status == 408 || status == 425 || status == 429 || status >= 500;
+            return new Outcome(success, retryable, status, success ? null : "HTTP_" + status,
+                    retryable ? retryNotBefore : null);
         }
         /** 传输失败由适配器明确标记能否重试。 */
-        public static Outcome failed(String code, boolean retryable) { return new Outcome(false, retryable, null, code); }
+        public static Outcome failed(String code, boolean retryable) { return new Outcome(false, retryable, null, code, null); }
     }
 }

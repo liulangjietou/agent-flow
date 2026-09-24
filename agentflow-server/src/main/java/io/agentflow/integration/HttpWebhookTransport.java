@@ -32,7 +32,11 @@ public class HttpWebhookTransport implements WebhookTransport {
                 .header("webhook-signature", signature(target.key(), eventId, timestamp, body))
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();
         var future = client.sendAsync(request, HttpResponse.BodyHandlers.discarding());
-        try { return DeliveryProgress.Outcome.http(future.get(6, TimeUnit.SECONDS).statusCode()); }
+        try {
+            var response = future.get(6, TimeUnit.SECONDS);
+            return DeliveryProgress.Outcome.http(response.statusCode(),
+                    WebhookRetryAfter.parse(response.headers().allValues("Retry-After"), Instant.now()));
+        }
         catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt(); return DeliveryProgress.Outcome.failed("INTERRUPTED", true);
         } catch (java.util.concurrent.TimeoutException timeout) { return DeliveryProgress.Outcome.failed("TIMEOUT", true); }
