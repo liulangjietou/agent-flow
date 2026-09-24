@@ -106,3 +106,18 @@ test('显示截断长条件但保留全文，图边界包含连线和标签', ()
   const bounds=graphBounds(arranged,routes)
   for(const item of routes) for(const point of item.points) assert.ok(point.x>=bounds.left && point.x<=bounds.right && point.y>=bounds.top && point.y<=bounds.bottom)
 })
+
+
+test('中文说明参与自动布局和截断，不修改原连线文本或分支顺序', () => {
+  const graph=split(), before=structuredClone(graph.edges)
+  const label=item=>item.condition ? '差旅报销申请金额 大于 100 且 所属部门 等于研发中心'.repeat(3) : item.defaultBranch ? '其他条件均不满足' : ''
+  const positions=arrangeNodes(graph.nodes,graph.edges,label).nodes
+  const routes=routeEdges(positions,graph.edges,label), route=routes.find(item=>item.edge.id==='gate-a')
+  assert.equal(route.fullText,label(graph.edges[1]))
+  assert.ok(route.text.endsWith('…'))
+  assert.equal(route.edge.condition,'amount > 100')
+  assert.deepEqual(graph.edges,before)
+  assert.ok(positions.find(item=>item.id==='a').x > arrangeNodes(graph.nodes,graph.edges).nodes.find(item=>item.id==='a').x)
+  const bounds=graphBounds(positions,routes)
+  assert.ok(route.label.x + route.text.length*5 <= bounds.right)
+})

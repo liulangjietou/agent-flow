@@ -1,3 +1,4 @@
+import { parseConditionExpression } from './conditionSyntax.js'
 import { validDecimal } from './formSchema.js'
 import type { FormField } from './formSchema'
 /** 可视化条件只表达同一连接符的比较列表，复杂表达式原文保留。@author owlzhangfq@gmail.com */
@@ -82,63 +83,26 @@ export function serializeConditionRows(value: ConditionRows, fields: FormField[]
   }).join(' ' + value.join + ' ')
 }
 
-/** 新语法只回显平面且/或列表，括号和取反始终保留为表达式。 */
+/** 新语法只回显平面且/或列表，显式括号和取反仍保留为表达式。 */
 function parseVersionTwo(source: string, fields: FormField[]): ConditionRows | null {
-  let rest = source.trim()
-  const rows: ConditionRow[] = [], joins: string[] = []
-  // 不能无损识别的单引号转义保持原表达式。
-  function quoted(): string | null {
-    const match = /^(?:"(?:[^"\\\r\n]|\\.)*"|'[^'\r\n]*')/.exec(rest)
-    if (!match) return null
-    let value: string
-    try { value = match[0][0] === '"' ? JSON.parse(match[0]) : match[0].slice(1, -1) } catch { return null }
-    if (match[0][0] === "'" && value.includes('\\')) return null
-    rest = rest.slice(match[0].length).trimStart()
-    return safeConditionLiteral(value, 2) ? value : null
-  }
-  while (rest) {
-    const match = /^([a-zA-Z][a-zA-Z0-9_.]{0,63})\s*((?:NOT_EXISTS|EXISTS|IN)(?![a-zA-Z0-9_.])|==|!=|>=|<=|>|<)\s*/i.exec(rest)
-    if (!match) return null
-    const field = fields.find(field => field.key === match[1]), operator = match[2]!.toUpperCase()
-    if (!field || !operatorsFor(field, 2).some(item => item.value === operator)) return null
-    rest = rest.slice(match[0].length)
-    const row: ConditionRow = { field: field.key, operator, value: '' }
-    if (operator === 'IN') {
-      if (!rest.startsWith('[')) return null
-      rest = rest.slice(1).trimStart(); row.values = []
-      while (!rest.startsWith(']')) {
-        const item = quoted()
-        if (item === null || !field.options?.some(option => option.value === item)) return null
-        row.values.push(item)
-        if (rest.startsWith(']')) break
-        if (!rest.startsWith(',')) return null
-        rest = rest.slice(1).trimStart()
-        if (rest.startsWith(']')) return null
-      }
-      if (row.values.length < 1 || row.values.length > 50) return null
-      rest = rest.slice(1).trimStart()
-    } else if (!['EXISTS', 'NOT_EXISTS'].includes(operator)) {
-      if (rest.startsWith('"') || rest.startsWith("'")) {
-        const value = quoted()
-        if (value === null) return null
-        row.value = value
-      } else {
-        const literal = /^(-?\d+(?:\.\d+)?|true|false)(?=\s|&&|\|\||$)/.exec(rest)
-        if (!literal) return null
-        row.value = literal[0]; rest = rest.slice(literal[0].length).trimStart()
-      }
-      if (field.type === 'NUMBER' && !validDecimal(row.value)
-        || field.type === 'BOOLEAN' && !['true', 'false'].includes(row.value)
-        || field.type === 'SELECT' && !field.options?.some(option => option.value === row.value)
-        || field.type === 'DATE' && (!/^\d{4}-\d{2}-\d{2}$/.test(row.value) || !Number.isFinite(Date.parse(row.value)) || new Date(row.value).toISOString().slice(0, 10) !== row.value)) return null
-    }
-    rows.push(row)
-    if (!rest) break
-    const join = /^(AND\b|OR\b|&&|\|\|)\s*/i.exec(rest)
-    if (!join) return null
-    joins.push(['AND', '&&'].includes(join[1]!.toUpperCase()) ? 'AND' : 'OR')
-    rest = rest.slice(join[0].length)
-    if (!rest) return null
-  }
-  return new Set(joins).size > 1 ? null : { join: (joins[0] ?? 'AND') as 'AND' | 'OR', rows }
+  const parsed = parseConditionExpression(source)
+  if (!parsed) return null
+  const terms = parsed.kind === 'comparison' ? [parsed] : parsed.kind === 'AND' || parsed.kind === 'OR' ? parsed.terms : []
+  if (!terms.length || terms.some(term => term.kind !== 'comparison' || !validConditionRow(term.row, fields, 2))) return null
+  return { join: parsed.kind === 'OR' ? 'OR' : 'AND', rows: terms.map(term => (term as { kind: 'comparison'; row: ConditionRow }).row) }
+}
+
+/** 回显与中文说明共用字段类型约束，服务端仍负责最终合法性。 */
+export function validConditionRow(row: ConditionRow, fields: FormField[], version: number): boolean {
+  const field = fields.find(field => field.key === row.field)
+  if (!field || !operatorsFor(field, version).some(operator => operator.value === row.operator)) return false
+  if (['EXISTS', 'NOT_EXISTS'].includes(row.operator)) return true
+  if (row.operator === 'IN') return !!row.values?.length && row.values.length <= 50
+    && row.values.every(value => safeConditionLiteral(value, version) && field.options?.some(option => option.value === value))
+  if (!safeConditionLiteral(row.value, version)) return false
+  if (field.type === 'NUMBER') return validDecimal(row.value)
+  if (field.type === 'BOOLEAN') return ['true', 'false'].includes(row.value)
+  if (field.type === 'SELECT') return !!field.options?.some(option => option.value === row.value)
+  if (field.type === 'DATE') return /^\d{4}-\d{2}-\d{2}$/.test(row.value) && Number.isFinite(Date.parse(row.value)) && new Date(row.value).toISOString().slice(0, 10) === row.value
+  return true
 }

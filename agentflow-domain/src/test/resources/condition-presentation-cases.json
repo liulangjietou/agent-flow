@@ -1,0 +1,204 @@
+[
+  {
+    "source": "amount > 2 OR flag == true AND memo EXISTS",
+    "tree": {
+      "kind": "OR",
+      "terms": [
+        {
+          "kind": "comparison",
+          "row": {
+            "field": "amount",
+            "operator": ">",
+            "value": "2"
+          }
+        },
+        {
+          "kind": "AND",
+          "terms": [
+            {
+              "kind": "comparison",
+              "row": {
+                "field": "flag",
+                "operator": "==",
+                "value": "true"
+              }
+            },
+            {
+              "kind": "comparison",
+              "row": {
+                "field": "memo",
+                "operator": "EXISTS",
+                "value": ""
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "source": "!(amount <= 9007199254740993.123456789012345678) && category IN [\"B\", \"A\"]",
+    "tree": {
+      "kind": "AND",
+      "terms": [
+        {
+          "kind": "not",
+          "term": {
+            "kind": "comparison",
+            "row": {
+              "field": "amount",
+              "operator": "<=",
+              "value": "9007199254740993.123456789012345678"
+            }
+          }
+        },
+        {
+          "kind": "comparison",
+          "row": {
+            "field": "category",
+            "operator": "IN",
+            "value": "",
+            "values": [
+              "B",
+              "A"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "memo == 'a\\'b\\\\c\\n\\u4e2d' ",
+    "tree": {
+      "kind": "comparison",
+      "row": {
+        "field": "memo",
+        "operator": "==",
+        "value": "a'b\\c\n中"
+      }
+    }
+  },
+  {
+    "source": "(flag NOT_EXISTS OR items EXISTS) AND !flag == false",
+    "tree": {
+      "kind": "AND",
+      "terms": [
+        {
+          "kind": "OR",
+          "terms": [
+            {
+              "kind": "comparison",
+              "row": {
+                "field": "flag",
+                "operator": "NOT_EXISTS",
+                "value": ""
+              }
+            },
+            {
+              "kind": "comparison",
+              "row": {
+                "field": "items",
+                "operator": "EXISTS",
+                "value": ""
+              }
+            }
+          ]
+        },
+        {
+          "kind": "not",
+          "term": {
+            "kind": "comparison",
+            "row": {
+              "field": "flag",
+              "operator": "==",
+              "value": "false"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "amount>=1&&amount<2||!!flag EXISTS",
+    "tree": {
+      "kind": "OR",
+      "terms": [
+        {
+          "kind": "AND",
+          "terms": [
+            {
+              "kind": "comparison",
+              "row": {
+                "field": "amount",
+                "operator": ">=",
+                "value": "1"
+              }
+            },
+            {
+              "kind": "comparison",
+              "row": {
+                "field": "amount",
+                "operator": "<",
+                "value": "2"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "not",
+          "term": {
+            "kind": "not",
+            "term": {
+              "kind": "comparison",
+              "row": {
+                "field": "flag",
+                "operator": "EXISTS",
+                "value": ""
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "memo EXISTSAND flag EXISTS",
+    "tree": null
+  },
+  {
+    "source": "memo NOT_EXISTSOR flag EXISTS",
+    "tree": null
+  },
+  {
+    "source": "category IN []",
+    "tree": null
+  },
+  {
+    "source": "category IN [\"A\",]",
+    "tree": null
+  },
+  {
+    "source": "memo == \"\\u003b\"",
+    "tree": null
+  },
+  {
+    "source": "memo == \"\\x20\"",
+    "tree": null
+  },
+  {
+    "source": "flag == True",
+    "tree": null
+  },
+  {
+    "source": "(amount > 1",
+    "tree": null
+  },
+  {
+    "source": "memo == \"x\" trailing",
+    "tree": null
+  },
+  {
+    "source": "unknown() == 1",
+    "tree": null
+  }
+]

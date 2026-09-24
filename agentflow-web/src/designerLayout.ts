@@ -46,7 +46,7 @@ export function draggedPosition(start: Point, screenDelta: Point, scrollDelta: P
 }
 
 /** 按最长路径分列，汇合节点始终排在所有前驱之后；回边仅在分层时忽略。 */
-export function arrangeNodes(nodes: DesignerNode[], edges: GraphEdge[]): { nodes: DesignerNode[]; hasCycle: boolean } {
+export function arrangeNodes(nodes: DesignerNode[], edges: GraphEdge[], labelFor: (edge: GraphEdge) => string = edgeLabel): { nodes: DesignerNode[]; hasCycle: boolean } {
   if (!nodes.length) return { nodes: [], hasCycle: false }
   const byId = new Map(nodes.map(node => [node.id, node]))
   if (byId.size !== nodes.length) throw new Error('存在重复节点标识，请修复后再自动布局。')
@@ -103,7 +103,7 @@ export function arrangeNodes(nodes: DesignerNode[], edges: GraphEdge[]): { nodes
       const rectangle = nodeRectangle(byId.get(id)!)
       positions.set(id, { x: Math.round(left + (width - rectangle.width) / 2), y: 84 + ROW_SPACING * nextRow - rectangle.height / 2 })
     }
-    const labels = ids.flatMap(id => outgoing.get(id)!.map(edge => shortLabel(edgeLabel(edge)).length * 10 + 32))
+    const labels = ids.flatMap(id => outgoing.get(id)!.map(edge => shortLabel(labelFor(edge)).length * 10 + 32))
     left += width + Math.max(COLUMN_GAP, ...labels)
   })
   return { nodes: nodes.map(node => ({ ...node, ...positions.get(node.id)! })), hasCycle: backEdges.size > 0 }
@@ -140,7 +140,7 @@ function pathLength(points: Point[]): number {
 }
 
 /** 从当前坐标重算连线；重新加载或手动移动后无需持久化另一份连线语义。 */
-export function routeEdges(nodes: DesignerNode[], edges: GraphEdge[]): RoutedEdge[] {
+export function routeEdges(nodes: DesignerNode[], edges: GraphEdge[], labelFor: (edge: GraphEdge) => string = edgeLabel): RoutedEdge[] {
   const rectangles = new Map(nodes.map(node => [node.id, nodeRectangle(node)]))
   const all = [...rectangles.values()]
   return edges.flatMap(edge => {
@@ -159,10 +159,10 @@ export function routeEdges(nodes: DesignerNode[], edges: GraphEdge[]): RoutedEdg
     const points = compactPoints(clear[0] ?? direct)
     const horizontal = points.slice(1).map((point, index) => [points[index]!, point] as const)
       .filter(([a, b]) => a.y === b.y).sort((a, b) => Math.abs(b[0].x - b[1].x) - Math.abs(a[0].x - a[1].x))[0]
-    const text = shortLabel(edgeLabel(edge))
+    const text = shortLabel(labelFor(edge))
     const label = horizontal ? { x: Math.max(text.length * 5 + 6, (horizontal[0].x + horizontal[1].x) / 2), y: Math.max(14, horizontal[0].y - 9) } : { x: middle, y: Math.max(14, start.y - 9) }
     return [{ edge, points, path: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' '), label, text,
-      fullText: edgeLabel(edge), obstructed: !clear.length }]
+      fullText: labelFor(edge), obstructed: !clear.length }]
   })
 }
 

@@ -40,6 +40,7 @@ import { DraftAutosave } from './draftAutosave'
 import type { GraphNode } from './api'
 import QuickDesigner from './components/QuickDesigner.vue'
 import ConditionEditor from './components/ConditionEditor.vue'
+import { describeBranch, branchTooltip } from './conditionPresentation'
 import { editQuickGraph, type QuickCommand } from './quickDesigner'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
 import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
@@ -168,7 +169,9 @@ const canvas = ref<HTMLElement | null>(null)
 const canvasZoom = ref(1)
 const canvasSize = ref({ width: 0, height: 0 })
 const canvasMessage = ref('缩放只改变视图，自动布局可撤销。')
-const routedEdges = computed(() => routeEdges(nodes.value, edges.value))
+const branchDescription = (edge: GraphEdge) => describeBranch(edge, definitionFormSchema.value?.fields ?? [], conditionLanguageVersion.value)
+const branchTitle = (edge: GraphEdge) => branchTooltip(edge, definitionFormSchema.value?.fields ?? [], conditionLanguageVersion.value)
+const routedEdges = computed(() => routeEdges(nodes.value, edges.value, branchDescription))
 const canvasBounds = computed(() => graphBounds(nodes.value, routedEdges.value))
 const stageSize = computed(() => ({ width: Math.max(canvasSize.value.width / canvasZoom.value, canvasBounds.value.right + CANVAS_PADDING * 2),
   height: Math.max(canvasSize.value.height / canvasZoom.value, canvasBounds.value.bottom + CANVAS_PADDING * 2) }))
@@ -680,7 +683,7 @@ async function autoLayout() {
   if (editorLocked.value || !canManageDefinitions.value) return
   try {
     stopNodeDrag?.()
-    const result = arrangeNodes(nodes.value, edges.value)
+    const result = arrangeNodes(nodes.value, edges.value, branchDescription)
     if (result.nodes.some((node, index) => node.x !== nodes.value[index]?.x || node.y !== nodes.value[index]?.y)) { remember(); nodes.value = result.nodes }
     await fitCanvas(true)
     canvasMessage.value = result.hasCycle ? '已整理布局；草稿仍有回环，发布前需要修复。' : '已自动布局，可撤销；审批规则和分支顺序保持不变。'
@@ -971,7 +974,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
                       <g v-for="route in routedEdges" :key="route.edge.id">
                         <path class="edge-hit" :d="route.path" @click.stop="selectEdge(route.edge)" />
                         <path :d="route.path" :data-edge-id="route.edge.id" marker-end="url(#flow-arrow)" :class="{ selected: selectedEdgeId === route.edge.id, simulated: simulationResult?.edgeIds.includes(route.edge.id) }" @click.stop="selectEdge(route.edge)" />
-                        <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ route.fullText }}</title></text>
+                        <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
                     <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
@@ -982,7 +985,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
             </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" v-model:approval-mode="selectedNode.approvalMode" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
-                <div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY'" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
+                <div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY'" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>
               </template>
               <template v-else-if="selectedEdge"><div class="inspector-head"><div><p class="eyebrow">EDGE PROPERTY</p><h3>连线条件</h3></div></div><ConditionEditor v-if="!selectedEdge.defaultBranch" :key="selectedEdge.id" :model-value="selectedEdge.condition" :language-version="conditionLanguageVersion" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchQuickEdge(selectedEdge.id, $event)" /><p v-else class="field-help">其他条件均不满足时进入默认分支。</p><button v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'EXCLUSIVE_GATEWAY'" class="secondary" @click="toggleDefault(selectedEdge)">{{ selectedEdge.defaultBranch ? '取消默认分支' : '设为默认分支' }}</button><button class="delete-button" @click="deleteSelected">删除连线</button></template>

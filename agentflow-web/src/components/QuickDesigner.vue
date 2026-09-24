@@ -6,6 +6,7 @@ import { projectQuickGraph, quickNodeIds, quickStep, type QuickCommand } from '.
 import QuickSequence from './QuickSequence.vue'
 import DefinitionAssignee from './DefinitionAssignee.vue'
 import ConditionEditor from './ConditionEditor.vue'
+import { describeBranch, branchTooltip } from '../conditionPresentation'
 const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
 const emit = defineEmits<{ command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
 const projection = computed(() => projectQuickGraph(props.graph))
@@ -38,7 +39,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
     <template v-if="projection.sequence">
       <section class="quick-stage" aria-label="快速流程步骤">
         <div class="quick-stage-heading"><strong>从上到下，安排每一步</strong><span>点击 ＋ 插入步骤，点击条件配置分支</span></div>
-        <div class="quick-scroll" tabindex="0" aria-label="可滚动的快速流程图"><QuickSequence :sequence="projection.sequence" :graph="graph" :selected-node="selectedNode" :selected-edge="selectedEdge" :locked="locked" :invalid-nodes="invalidNodes" :simulated-nodes="simulatedNodes" :simulated-edges="simulatedEdges" @select-node="emit('selectNode', $event)" @select-edge="emit('selectEdge', $event)" @command="emit('command', $event)" /></div>
+        <div class="quick-scroll" tabindex="0" aria-label="可滚动的快速流程图"><QuickSequence :sequence="projection.sequence" :graph="graph" :form-schema="formSchema" :selected-node="selectedNode" :selected-edge="selectedEdge" :locked="locked" :invalid-nodes="invalidNodes" :simulated-nodes="simulatedNodes" :simulated-edges="simulatedEdges" @select-node="emit('selectNode', $event)" @select-edge="emit('selectEdge', $event)" @command="emit('command', $event)" /></div>
       </section>
       <aside class="quick-inspector" aria-label="快速步骤配置"><fieldset :disabled="locked">
         <template v-if="selected">
@@ -51,7 +52,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
           </template>
           <template v-else-if="selected.type === 'EXCLUSIVE_GATEWAY'">
             <p class="quick-help">按列表顺序判断，先满足先走；“其他情况”在所有条件都不满足时进入。</p>
-            <ol class="quick-branch-list"><li v-for="(branch, index) in ordered" :key="branch.id"><button type="button" @click="emit('selectEdge', branch.id)"><strong>{{ branch.defaultBranch ? '其他情况' : `条件 ${index + 1}` }}</strong><span>{{ branch.defaultBranch ? '默认分支' : branch.condition || '尚未配置' }}</span></button></li></ol>
+            <ol class="quick-branch-list"><li v-for="(branch, index) in ordered" :key="branch.id"><button type="button" @click="emit('selectEdge', branch.id)"><strong>{{ branch.defaultBranch ? '其他情况' : `条件 ${index + 1}` }}</strong><span :title="branchTooltip(branch, formSchema?.fields ?? [], graph.conditionLanguageVersion ?? 1)">{{ describeBranch(branch, formSchema?.fields ?? [], graph.conditionLanguageVersion ?? 1) || '尚未配置' }}</span></button></li></ol>
             <button type="button" class="secondary" @click="emit('command', { kind: 'addBranch', nodeId: selected.id })">＋ 增加一条分支</button>
             <p class="quick-help">删除条件块将一并删除其中 {{ ownedCount }} 个步骤，接续汇合后的流程；可撤销。</p>
             <button type="button" class="quick-delete" @click="emit('command', { kind: 'removeGateway', nodeId: selected.id })">删除条件块及全部分支</button>

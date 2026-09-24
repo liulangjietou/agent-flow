@@ -155,3 +155,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 - [参与者申请检索：当前权限、历史办理与有界分页](docs/participant-application-search.md)
 
 - [重复明细表单：列配置、行编辑与历史快照](docs/detail-table-forms.md)
+
+流程设计器支持[条件中文说明与字段插入](docs/readable-conditions.md)，以本版本表单标签解释条件，保留原始表达式与执行顺序。
