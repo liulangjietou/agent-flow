@@ -145,6 +145,6 @@ export class PortableTemplateReview {
     } finally { clearTimeout(timeout); if (generation === this.generation) { this.loading = false; this.controller = null } }
   }
 
-  /** 账号缺失允许创建待配置草稿，发布仍须重新通过身份检查。 */
-  get canImport() { return this.reviewed && !!this.value && !this.loading && this.errors.every(error => error.startsWith('ASSIGNEE_NOT_AVAILABLE:')) }
+  /** 审批人缺失或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
+  get canImport() { return this.reviewed && !!this.value && !this.loading && this.errors.every(error => error.startsWith('ASSIGNEE_NOT_AVAILABLE:') || error.startsWith('BRANCH_COVERAGE_GAP:')) }
 }

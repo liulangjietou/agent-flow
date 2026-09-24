@@ -6,7 +6,7 @@ import { projectQuickGraph, quickNodeIds, quickStep, type QuickCommand } from '.
 import QuickSequence from './QuickSequence.vue'
 import DefinitionAssignee from './DefinitionAssignee.vue'
 import ConditionEditor from './ConditionEditor.vue'
-const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; simulatedNodes: string[]; simulatedEdges: string[] }>()
+const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
 const emit = defineEmits<{ command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
 const projection = computed(() => projectQuickGraph(props.graph))
 const selected = computed(() => props.graph.nodes.find(node => node.id === props.selectedNode))
@@ -38,7 +38,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
     <template v-if="projection.sequence">
       <section class="quick-stage" aria-label="快速流程步骤">
         <div class="quick-stage-heading"><strong>从上到下，安排每一步</strong><span>点击 ＋ 插入步骤，点击条件配置分支</span></div>
-        <div class="quick-scroll" tabindex="0" aria-label="可滚动的快速流程图"><QuickSequence :sequence="projection.sequence" :graph="graph" :selected-node="selectedNode" :selected-edge="selectedEdge" :locked="locked" :simulated-nodes="simulatedNodes" :simulated-edges="simulatedEdges" @select-node="emit('selectNode', $event)" @select-edge="emit('selectEdge', $event)" @command="emit('command', $event)" /></div>
+        <div class="quick-scroll" tabindex="0" aria-label="可滚动的快速流程图"><QuickSequence :sequence="projection.sequence" :graph="graph" :selected-node="selectedNode" :selected-edge="selectedEdge" :locked="locked" :invalid-nodes="invalidNodes" :simulated-nodes="simulatedNodes" :simulated-edges="simulatedEdges" @select-node="emit('selectNode', $event)" @select-edge="emit('selectEdge', $event)" @command="emit('command', $event)" /></div>
       </section>
       <aside class="quick-inspector" aria-label="快速步骤配置"><fieldset :disabled="locked">
         <template v-if="selected">

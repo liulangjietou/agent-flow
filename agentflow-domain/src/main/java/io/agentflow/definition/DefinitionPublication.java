@@ -30,6 +30,12 @@ public record DefinitionPublication(String tenantId, UUID definitionId, String p
     /** 在图与表单校验通过后生成待持久化事实，版本由应用服务在同一事务中分配。 */
     public static DefinitionPublication prepare(DefinitionModels.DefinitionDraft draft, long version, Actor publisher,
                                                 String changeNote, Instant publishedAt) {
+        return prepare(draft, version, publisher, changeNote, publishedAt, null);
+    }
+
+    /** 记录本次发布实际执行的分支检查与提醒；null 仅用于兼容未执行此检查的旧调用。 */
+    public static DefinitionPublication prepare(DefinitionModels.DefinitionDraft draft, long version, Actor publisher,
+                                                String changeNote, Instant publishedAt, List<BranchCoverageAnalyzer.Diagnostic> diagnostics) {
         String role;
         if (publisher.hasRole(ADMIN_ROLE)) role = ADMIN_ROLE;
         else if (publisher.hasRole(PROCESS_ADMIN_ROLE)) role = PROCESS_ADMIN_ROLE;
@@ -37,8 +43,13 @@ public record DefinitionPublication(String tenantId, UUID definitionId, String p
         var checks = draft.formSchema() == null
                 ? List.of(Check.GRAPH_STRUCTURE, Check.ASSIGNEE_SYNTAX, Check.RESTRICTED_CONDITIONS)
                 : List.of(Check.GRAPH_STRUCTURE, Check.ASSIGNEE_SYNTAX, Check.RESTRICTED_CONDITIONS, Check.FORM_FIELD_TYPES);
+        if (diagnostics != null) {
+            var completeChecks = new java.util.ArrayList<>(checks);
+            completeChecks.add(Check.BRANCH_COVERAGE);
+            checks = List.copyOf(completeChecks);
+        }
         var summary = new ValidationSummary(draft.graph().nodes().size(), draft.graph().edges().size(),
-                draft.formSchema() == null ? 0 : draft.formSchema().fields().size(), draft.formSchema() != null, checks);
+                draft.formSchema() == null ? 0 : draft.formSchema().fields().size(), draft.formSchema() != null, checks, diagnostics);
         return new DefinitionPublication(draft.tenantId(), draft.id(), draft.key(), version, publisher.userId(), role,
                 publishedAt, changeNote, summary);
     }
@@ -47,14 +58,18 @@ public record DefinitionPublication(String tenantId, UUID definitionId, String p
      * 仅列举当前验证器已实现的检查，不表示组织人员存在性或业务规则已核实。
      * @author owlzhangfq@gmail.com
      */
-    public enum Check { GRAPH_STRUCTURE, ASSIGNEE_SYNTAX, RESTRICTED_CONDITIONS, FORM_FIELD_TYPES }
+    public enum Check { GRAPH_STRUCTURE, ASSIGNEE_SYNTAX, RESTRICTED_CONDITIONS, FORM_FIELD_TYPES, BRANCH_COVERAGE }
 
     /**
      * 校验通过时的结构摘要，与发布定义一起保持不可变。
      * @author owlzhangfq@gmail.com
      */
-    public record ValidationSummary(int nodeCount, int edgeCount, int fieldCount, boolean formBound, List<Check> checks) {
+    public record ValidationSummary(int nodeCount, int edgeCount, int fieldCount, boolean formBound, List<Check> checks, List<BranchCoverageAnalyzer.Diagnostic> branchDiagnostics) {
+        /** 旧摘要没有分支检查事实，保持为空。 */
+        public ValidationSummary(int nodeCount, int edgeCount, int fieldCount, boolean formBound, List<Check> checks) {
+            this(nodeCount, edgeCount, fieldCount, formBound, checks, List.of());
+        }
         /** 防止调用方后续修改校验范围。 */
-        public ValidationSummary { checks = List.copyOf(checks); }
+        public ValidationSummary { checks = List.copyOf(checks); branchDiagnostics = branchDiagnostics == null ? List.of() : List.copyOf(branchDiagnostics); }
     }
 }

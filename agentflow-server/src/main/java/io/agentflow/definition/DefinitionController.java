@@ -45,9 +45,10 @@ public class DefinitionController {
     public ValidationResponse validate(@Valid @RequestBody GraphRequest request) {
         Actor actor = currentActor.actor();
         // 普通用户仍可检查图结构，但不得通过校验接口探测身份目录中的账号。
-        return new ValidationResponse(canManageDefinitions(actor)
-                ? service.validate(actor.tenantId(), request.graph(), request.formSchema())
-                : service.validate(request.graph(), request.formSchema()));
+        var validation = canManageDefinitions(actor)
+                ? service.inspect(actor.tenantId(), request.graph(), request.formSchema())
+                : service.inspect(request.graph(), request.formSchema());
+        return new ValidationResponse(validation.errors(), validation.branchDiagnostics());
     }
 
     /** 只读地将旧条件转换为等价新版表达式，结果仍须由既有草稿用例保存。 */
@@ -181,7 +182,7 @@ public class DefinitionController {
      * 校验结果。
      * @author owlzhangfq@gmail.com
      */
-    public record ValidationResponse(List<String> errors) { }
+    public record ValidationResponse(List<String> errors, List<BranchCoverageAnalyzer.Diagnostic> branchDiagnostics) { }
     /**
      * 模拟输入。
      * @author owlzhangfq@gmail.com

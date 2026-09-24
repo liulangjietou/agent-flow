@@ -715,7 +715,7 @@
           "流程设计"
         ],
         "summary": "校验流程设计",
-        "description": "只读，不创建草稿。HTTP 200 的 errors 数组非空表示设计未通过；结构/表单解码失败可为 422。 管理员同时检查身份源中是否存在有效审批人；普通用户只检查结构，不开放账号存在性探测。",
+        "description": "只读，不创建草稿。HTTP 200 的 errors 数组非空表示设计未通过；结构/表单解码失败可为 422。 管理员同时检查身份源中是否存在有效审批人；普通用户只检查结构，不开放账号存在性探测。 分支覆盖遗漏且无默认分支时为阻断错误，重叠或无法证明覆盖时为提醒；返回 branchDiagnostics 精确示例。草稿保存仍只要求结构与类型合法，发布重新执行完整检查。",
         "x-access": "当前已登录账号",
         "x-idempotency": false,
         "responses": {
@@ -7258,10 +7258,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "branchDiagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchDiagnostic"
+            }
           }
         },
         "required": [
-          "errors"
+          "errors",
+          "branchDiagnostics"
         ]
       },
       "PublishRequest": {
@@ -7304,8 +7311,15 @@
                 "GRAPH_STRUCTURE",
                 "ASSIGNEE_SYNTAX",
                 "RESTRICTED_CONDITIONS",
-                "FORM_FIELD_TYPES"
+                "FORM_FIELD_TYPES",
+                "BRANCH_COVERAGE"
               ]
+            }
+          },
+          "branchDiagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchDiagnostic"
             }
           }
         },
@@ -7314,7 +7328,8 @@
           "edgeCount",
           "fieldCount",
           "formBound",
-          "checks"
+          "checks",
+          "branchDiagnostics"
         ]
       },
       "Publication": {
@@ -10469,6 +10484,57 @@
           "label",
           "type",
           "required"
+        ]
+      },
+      "BranchDiagnostic": {
+        "type": "object",
+        "description": "分支覆盖检查：同一数字字段使用真实可提交的精确示例值；非数值/跨字段或超过分析限制且无默认分支时明确提醒。",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "ERROR",
+              "WARNING"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "BRANCH_COVERAGE_GAP",
+              "BRANCH_OVERLAP",
+              "BRANCH_COVERAGE_UNPROVEN"
+            ]
+          },
+          "gatewayId": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "edgeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sampleValue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "精确十进制字符串；missingValue=true 时为空。"
+          },
+          "missingValue": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "severity",
+          "code",
+          "gatewayId",
+          "field",
+          "edgeIds",
+          "missingValue"
         ]
       }
     }

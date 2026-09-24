@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
+import BranchDiagnostics from './components/BranchDiagnostics.vue'
+import { DesignerValidation } from './designerValidation'
 import ApplicationSearch from './components/ApplicationSearch.vue'
 import WebhookDeliveries from './components/WebhookDeliveries.vue'
 import AuditSearch from './components/AuditSearch.vue'
@@ -124,8 +126,20 @@ const autosaveLabel = computed(() => autosave.saving ? '正在保存草稿…' :
   : !autosaveEnabled.value ? '自动保存已关闭' : !definitionKey.value.trim() || !definitionName.value.trim() ? '填写流程标识和名称后自动保存'
   : !definitionId.value && !dirty.value ? '首次修改后自动保存'
   : autosave.scheduled || dirty.value ? '编辑停顿 2 秒后自动保存' : '草稿已保存')
-const validationMessage = ref('尚未校验，发布前将运行服务端校验。')
-const validationErrors = ref<string[]>([])
+const validationOpened = ref(false)
+const validation = reactive(new DesignerValidation((graph, schema, signal) => api.validateDefinition(graph, schema, signal)))
+let validationTimer: ReturnType<typeof setTimeout> | undefined
+const validationErrors = computed(() => validation.result?.errors ?? [])
+const branchDiagnostics = computed(() => validation.result?.branchDiagnostics ?? [])
+const validationOtherErrors = computed(() => validationErrors.value.filter(error => !error.startsWith('BRANCH_COVERAGE_GAP:')))
+const validationNodeIds = computed(() => [...new Set(validationErrors.value.map(error => {
+  const target = simulationIssue(error).target
+  return nodes.value.some(node => node.id === target) ? target : edges.value.find(edge => edge.id === target)?.source ?? ''
+}).filter(Boolean))])
+const validationMessage = computed(() => validation.loading ? '正在检查最新设计…' : validation.error
+  || (validation.result ? validationErrors.value.length ? `发现 ${validationErrors.value.length} 项阻断问题。`
+    : branchDiagnostics.value.length ? `未发现阻断错误，有 ${branchDiagnostics.value.length} 项提醒，请核对业务规则。` : '服务端校验通过。'
+    : validationOpened.value ? '内容已修改，正在等待重新校验。' : '尚未校验，发布前将运行服务端校验。'))
 const newApplicationOpen = ref(false)
 const recordApplicationId = ref('')
 const applicationDefinitionId = ref('')
@@ -203,7 +217,7 @@ function remember() { history.value.push(snapshot()); if (history.value.length >
 function restore(raw: string) { const value = JSON.parse(raw); conditionLanguageVersion.value = value.conditionLanguageVersion ?? 1; if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null) }
 function undo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
 function redo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
-function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; validationErrors.value = []; validationMessage.value = '尚未校验，发布前将运行服务端校验。' }
+function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; clearValidation(true) }
 function graphPayload(): Graph {
   return {
     conditionLanguageVersion: conditionLanguageVersion.value,
@@ -453,12 +467,17 @@ async function upgradeConditions() {
   finally { clearTimeout(timeout); busy.value = false }
 }
 
-async function validateGraph() {
-  const result = await api.validateDefinition(graphPayload(), definitionFormSchema.value); validationErrors.value = result.errors
-  validationMessage.value = result.errors.length ? `服务端校验发现 ${result.errors.length} 项问题。` : '服务端校验通过。'
-  return result.errors.length === 0
+/** 关闭或编辑立即取消旧校验，不能保留过期的通过结论。 */
+function clearValidation(close = false) {
+  clearTimeout(validationTimer); validation.clear()
+  if (close) validationOpened.value = false
 }
-async function validate() { if (busy.value) return; busy.value = true; try { await validateGraph() } catch (error) { validationMessage.value = '校验请求失败，请重试。'; notice.value = errorMessage(error) } finally { busy.value = false } }
+async function validateGraph() {
+  clearTimeout(validationTimer); validationOpened.value = true
+  const result = await validation.run(graphPayload(), definitionFormSchema.value)
+  return !!result && result.errors.length === 0
+}
+async function validate() { if (!busy.value) await validateGraph() }
 /** 只确认本次发送的快照；新输入、选中项、焦点和撤销栈均留在编辑器。 */
 function acknowledgeDraft(definition: Definition, checkpoint: DraftCheckpoint) {
   if (!viewActive || checkpoint.scope !== draftScope.value) return
@@ -509,6 +528,7 @@ function openPublication() {
   if (editorLocked.value || draftConflict.value || !canManageDefinitions.value) return
   publicationReturnFocus.value = document.activeElement as HTMLElement | null
   publicationError.value = ''; publicationOpen.value = true
+  void validateGraph()
 }
 async function publishDraft() {
   if (!publicationOpen.value || !canManageDefinitions.value || busy.value || writesBlocked.value || readonlyDefinition.value) return
@@ -737,7 +757,13 @@ watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publica
 watch([() => snapshot(), draftScope, page, loggedIn, canManageDefinitions, autosaveEnabled, readonlyDefinition,
   busy, writesBlocked, confirmationOpen, publicationOpen, dragging, composing, savedSnapshot], () => autosave.observe())
 
-watch([nodes, edges, definitionName, definitionFormSchema, conditionLanguageVersion], () => { validationErrors.value = []; validationMessage.value = '内容已修改，请重新校验。' }, { deep: true, flush: 'sync' })
+watch([nodes, edges, definitionName, definitionFormSchema, conditionLanguageVersion], () => {
+  clearValidation()
+  if (validationOpened.value && page.value === 'designer' && loggedIn.value) {
+    validationTimer = setTimeout(() => { void validateGraph() }, 450)
+  }
+}, { deep: true, flush: 'sync' })
+watch([draftScope, page], () => clearValidation(true), { flush: 'sync' })
 
 /** 恢复结果始终更新原资源；恢复成功后由用户决定是否继续提交或发布。 */
 async function recoverOperation(id: string) {
@@ -823,7 +849,7 @@ onMounted(async () => {
   try { const result = await api.me(); actor.value = result.actor; writeRequests.setActor(result.actor); username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
   catch { localStorage.removeItem('agentflow.token') }
 })
-onBeforeUnmount(() => { taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
+onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
 onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
@@ -926,7 +952,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
-          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
@@ -948,7 +974,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ route.fullText }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
@@ -967,7 +993,12 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <DefinitionSimulation v-if="simulationOpen && canManageDefinitions" :graph="simulationGraph" :form-schema="definitionFormSchema" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @result="simulationResult = $event" @locate="locateDesignTarget" @close="simulationOpen = false" />
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <FormSchemaEditor v-model="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
-          <div class="validation-strip" :class="{ invalid: validationErrors.length }"><span>●</span>{{ validationMessage }}<ul v-if="validationErrors.length"><li v-for="error in validationErrors" :key="error">{{ simulationIssue(error).label }}<button v-if="simulationIssue(error).target" type="button" class="secondary" @click="locateDesignTarget(simulationIssue(error).target)">定位 {{ simulationIssue(error).target }}</button></li></ul></div>
+          <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
+            <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>
+            <template v-if="validationOpened"><p class="validation-live-help">修改后自动重新检查。提醒不阻止发布，分支执行顺序保持不变。</p><ul v-if="validationOtherErrors.length"><li v-for="error in validationOtherErrors" :key="error">{{ simulationIssue(error).label }}<button v-if="simulationIssue(error).target" type="button" class="secondary" @click="locateDesignTarget(simulationIssue(error).target)">定位 {{ simulationIssue(error).target }}</button></li></ul>
+              <BranchDiagnostics :items="branchDiagnostics" :graph="quickGraph" :form-schema="definitionFormSchema" locatable @locate="locateDesignTarget" />
+            </template>
+          </section>
         </section>
         <section v-else class="content expense-page"><div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">报销领域正在接入，当前可使用通用表单验证审批流程。</p></div><button class="primary" @click="openApplicationForm">＋ 发起表单审批</button></div><div class="expense-cards"><article v-for="item in [{ title: '报销填报', detail: '发票、费用明细和借款冲销尚未接入。' }, { title: '财务审核', detail: '费用标准、预算校验和核减尚未接入。' }, { title: '出纳付款', detail: '付款授权、银行回执和对账尚未接入。' }]" :key="item.title"><span class="card-kicker">{{ item.title }}</span><strong>待接入</strong><p>{{ item.detail }}</p></article></div><div class="panel queue-empty"><strong>暂无报销领域数据</strong><p>通用审批申请可在“申请记录”中查看；此处不展示演示单据或虚构金额。</p></div></section>
       </main>
@@ -994,10 +1025,11 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
     </template>
   </div>
   <UnsavedConfirmationDialog v-if="confirmation.active" :key="confirmation.active.id" :request="confirmation.active" :return-focus="confirmationReturnFocus" :fallback-focus="workspace" @answer="(id, accepted) => confirmation.answer(id, accepted)" />
-  <PublicationDialog v-if="publicationOpen" v-model:note="publicationNote" :name="definitionName" :process-key="definitionKey" :busy="busy" :blocked="writesBlocked" :error="publicationError" :return-focus="publicationReturnFocus" :fallback-focus="workspace" @close="publicationOpen = false" @submit="publishDraft" />
+  <PublicationDialog v-if="publicationOpen" :validation="validation.result" :checking="validation.loading" :validation-error="validation.error" :graph="quickGraph" :form-schema="definitionFormSchema" v-model:note="publicationNote" :name="definitionName" :process-key="definitionKey" :busy="busy" :blocked="writesBlocked" :error="publicationError" :return-focus="publicationReturnFocus" :fallback-focus="workspace" @close="publicationOpen = false" @submit="publishDraft" />
 </template>
 
 <style scoped>
+.designer-validation{margin-top:16px;min-width:0}.validation-live-help{font-size:11px;color:var(--muted);line-height:1.8}.designer-validation>ul{padding-left:22px;font-size:12px;color:var(--red)}.designer-validation>ul li{margin:8px 0}.flow-node.invalid{border:2px solid var(--red);box-shadow:0 0 0 3px #ba4d3b20}.validation-strip .secondary{margin-left:auto;font-size:11px}
 .work-grid.board-work-grid{grid-template-columns:minmax(0,1fr)}
 .board-return{padding:16px 22px 0}
 </style>

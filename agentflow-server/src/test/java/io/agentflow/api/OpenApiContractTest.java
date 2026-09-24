@@ -112,6 +112,8 @@ class OpenApiContractTest {
                 java.util.Map.entry("Definition", io.agentflow.definition.DefinitionController.DefinitionResponse.class),
                 java.util.Map.entry("PublicationResult", io.agentflow.definition.DefinitionController.PublicationResponse.class),
                 java.util.Map.entry("Publication", io.agentflow.definition.DefinitionPublication.class),
+                java.util.Map.entry("ValidationResult", io.agentflow.definition.DefinitionController.ValidationResponse.class),
+                java.util.Map.entry("BranchDiagnostic", io.agentflow.definition.BranchCoverageAnalyzer.Diagnostic.class),
                 java.util.Map.entry("PublicationValidation", io.agentflow.definition.DefinitionPublication.ValidationSummary.class),
                 java.util.Map.entry("Task", io.agentflow.approval.process.FlowableTaskFacade.TaskView.class),
                 java.util.Map.entry("CountersignProgress", io.agentflow.approval.model.CountersignProgress.class),

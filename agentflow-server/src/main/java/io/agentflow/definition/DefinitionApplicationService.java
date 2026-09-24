@@ -25,6 +25,7 @@ public class DefinitionApplicationService {
     private final DefinitionPublicationRepository publications;
     private final DefinitionAssigneeDirectory assignees;
     private final DefinitionValidator validator = new DefinitionValidator();
+    private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
     private final DefinitionDiffService differences = new DefinitionDiffService();
 
@@ -51,11 +52,33 @@ public class DefinitionApplicationService {
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
         List<String> errors = validator.validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
-        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0)
-                .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
-        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
-                .filter(node -> !available.contains(node.properties().get("assigneeRule")))
-                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList();
+        return unavailableAssignees(tenantId, graph);
+    }
+
+    /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
+    public Validation inspect(Graph graph, FormSchema formSchema) {
+        List<String> errors = validator.validate(graph, formSchema);
+        if (!errors.isEmpty()) return new Validation(errors, List.of());
+        var diagnostics = coverage.analyze(graph, formSchema);
+        var routingErrors = diagnostics.stream().filter(issue -> issue.severity() == BranchCoverageAnalyzer.Severity.ERROR)
+                .map(issue -> issue.code().name() + ":" + issue.gatewayId()).distinct().toList();
+        return new Validation(routingErrors, diagnostics);
+    }
+
+    /** 管理员检查在纯领域结果之外核对当前租户的审批人目录。 */
+    public Validation inspect(String tenantId, Graph graph, FormSchema formSchema) {
+        Validation result = inspect(graph, formSchema);
+        if (!result.errors().isEmpty()) return result;
+        var errors = unavailableAssignees(tenantId, graph);
+        return new Validation(errors, result.branchDiagnostics());
+    }
+
+    /**
+     * 发布就绪结果保持错误兼容字段，并独立提供提醒及精确反例。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Validation(List<String> errors, List<BranchCoverageAnalyzer.Diagnostic> branchDiagnostics) {
+        public Validation { errors = List.copyOf(errors); branchDiagnostics = List.copyOf(branchDiagnostics); }
     }
 
     /** 读取当前租户设计器可用的审批规则，不改变流程或身份数据。 */
@@ -96,10 +119,10 @@ public class DefinitionApplicationService {
     @Transactional
     public DefinitionDraft publish(Actor publisher, UUID id, long expectedRevision, String changeNote) {
         DefinitionDraft draft = get(publisher.tenantId(), id);
-        List<String> errors = validate(publisher.tenantId(), draft.graph(), draft.formSchema());
-        if (!errors.isEmpty()) throw new DefinitionValidationException(errors);
+        Validation validation = inspect(publisher.tenantId(), draft.graph(), draft.formSchema());
+        if (!validation.errors().isEmpty()) throw new DefinitionValidationException(validation.errors());
         long version = repository.nextVersion(publisher.tenantId(), draft.key());
-        DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now());
+        DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now(), validation.branchDiagnostics());
         draft.publish(expectedRevision, version);
         DefinitionDraft published = repository.save(draft);
         deploymentPort.deploy(published);
@@ -159,6 +182,14 @@ public class DefinitionApplicationService {
     /** 查询定义列表。 */
     public List<DefinitionDraft> list(String tenantId, String status) {
         return repository.findAll(tenantId, status);
+    }
+
+    private List<String> unavailableAssignees(String tenantId, Graph graph) {
+        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0)
+                .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
+        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
+                .filter(node -> !available.contains(node.properties().get("assigneeRule")))
+                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList();
     }
 
     private void requireValid(Graph graph, FormSchema formSchema) {

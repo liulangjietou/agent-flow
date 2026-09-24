@@ -25,10 +25,18 @@ export interface ComparisonChange {
 }
 /** 服务端确认的基线和差异列表。@author owlzhangfq@gmail.com */
 export interface ComparisonResult { baseline: { id: string; key: string; name: string; version: number }; changes: ComparisonChange[] }
+/** 数字分支检查使用精确字符串示例，未填写单独表达。@author owlzhangfq@gmail.com */
+export interface BranchDiagnostic {
+  severity: 'ERROR' | 'WARNING'
+  code: 'BRANCH_COVERAGE_GAP' | 'BRANCH_OVERLAP' | 'BRANCH_COVERAGE_UNPROVEN'
+  gatewayId: string; field: string; edgeIds: string[]; sampleValue?: string | null; missingValue: boolean
+}
+/** 发布就绪检查同时返回阻断规则码与可定位的分支诊断。@author owlzhangfq@gmail.com */
+export interface ValidationResult { errors: string[]; branchDiagnostics: BranchDiagnostic[] }
 /** 服务端保存的发布事实；旧版本可能缺少完整记录。@author owlzhangfq@gmail.com */
 export interface PublicationResponse {
   recorded: boolean
-  publication: null | { definitionId: string; definitionVersion: number; publishedBy: string; authorizedRole: string; publishedAt: string; changeNote: string; validation: { nodeCount: number; edgeCount: number; fieldCount: number; formBound: boolean; checks: string[] } }
+  publication: null | { definitionId: string; definitionVersion: number; publishedBy: string; authorizedRole: string; publishedAt: string; changeNote: string; validation: { nodeCount: number; edgeCount: number; fieldCount: number; formBound: boolean; checks: string[]; branchDiagnostics?: BranchDiagnostic[] } }
 }
 /** 不包含原测试数据的路径与分支依据。@author owlzhangfq@gmail.com */
 export interface SimulationResult {
@@ -254,6 +262,6 @@ export const api = {
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
   upgradeConditions: (graph: Graph, signal?: AbortSignal) => request<Graph>('/process-definitions/upgrade-conditions', { method: 'POST', body: JSON.stringify({ graph }), signal }),
-  validateDefinition: (graph: Graph, formSchema?: FormSchema | null, signal?: AbortSignal) => request<{ errors: string[] }>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }), signal }),
+  validateDefinition: (graph: Graph, formSchema?: FormSchema | null, signal?: AbortSignal) => request<ValidationResult>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }), signal }),
   publishDefinition: (id: string, revision: number, changeNote: string) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程', { changeNote })
 }

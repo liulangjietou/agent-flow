@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
+import BranchDiagnostics from './BranchDiagnostics.vue'
 import { api, type ApiError, type PublicationResponse } from '../api'
 
 const props = defineProps<{ definitionId: string; scopeKey: string }>()
@@ -7,7 +8,7 @@ const result = ref<PublicationResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
 let active: AbortController | null = null
-const checkLabels: Record<string, string> = { GRAPH_STRUCTURE: '流程图结构', ASSIGNEE_SYNTAX: '审批人规则语法', RESTRICTED_CONDITIONS: '受限条件表达式', FORM_FIELD_TYPES: '表单字段与条件类型' }
+const checkLabels: Record<string, string> = { GRAPH_STRUCTURE: '流程图结构', ASSIGNEE_SYNTAX: '审批人规则语法', RESTRICTED_CONDITIONS: '受限条件表达式', FORM_FIELD_TYPES: '表单字段与条件类型', BRANCH_COVERAGE: '分支覆盖检查' }
 
 async function load() {
   active?.abort()
@@ -38,7 +39,8 @@ onBeforeUnmount(() => { const controller = active; active = null; controller?.ab
     <template v-else-if="result?.publication">
       <dl class="publication-meta"><div><dt>发布者</dt><dd>{{ result.publication.publishedBy }}</dd></div><div><dt>发布权限</dt><dd>{{ result.publication.authorizedRole === 'ADMIN' ? '平台管理员' : '流程管理员' }}</dd></div><div><dt>发布时间</dt><dd>{{ new Date(result.publication.publishedAt).toLocaleString('zh-CN') }}</dd></div></dl>
       <div class="publication-note"><h4>变更说明</h4><p>{{ result.publication.changeNote }}</p></div>
-      <div class="publication-validation"><h4>发布时校验通过</h4><p>{{ result.publication.validation.nodeCount }} 个节点 · {{ result.publication.validation.edgeCount }} 条连线 · {{ result.publication.validation.formBound ? `${result.publication.validation.fieldCount} 个表单字段` : '未绑定表单' }}</p><ul><li v-for="check in result.publication.validation.checks" :key="check">{{ checkLabels[check] ?? check }}</li></ul><p class="publication-boundary">检查范围为流程与表单配置；尚未核实组织人员是否存在、审批组是否有可用成员。</p></div>
+      <div class="publication-validation"><h4>发布时检查记录</h4><p>{{ result.publication.validation.nodeCount }} 个节点 · {{ result.publication.validation.edgeCount }} 条连线 · {{ result.publication.validation.formBound ? `${result.publication.validation.fieldCount} 个表单字段` : '未绑定表单' }}</p><ul><li v-for="check in result.publication.validation.checks" :key="check">{{ checkLabels[check] ?? check }}</li></ul><p class="publication-boundary">摘要只记录本次已执行的检查。分支重叠与未能证明覆盖的提醒仍需按业务制度核对。</p></div>
+      <BranchDiagnostics :items="result.publication.validation.branchDiagnostics ?? []" />
     </template>
   </section>
 </template>

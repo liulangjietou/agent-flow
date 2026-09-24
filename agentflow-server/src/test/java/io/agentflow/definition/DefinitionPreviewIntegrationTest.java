@@ -179,6 +179,67 @@ class DefinitionPreviewIntegrationTest {
         assertThat(runtime.createProcessInstanceQuery().processInstanceId(instance.getId()).count()).isZero();
     }
 
+    @Test
+    void incompleteNumericCoverageCanBeSavedButCannotPublishOrLeaveEngineArtifacts() throws Exception {
+        var template = catalog.get("leave-request");
+        Graph graph = coverageGraph("durationDays > 8", "durationDays <= 5", false);
+        var draft = definitions.create("demo", "gap-" + UUID.randomUUID(), "区间遗漏", graph, template.formSchema());
+        var before = snapshot();
+        String body = json.write(Map.of("graph", graph, "formSchema", template.formSchema()));
+        mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("admin"))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk())
+                .andExpect(jsonPath("errors[0]").value("BRANCH_COVERAGE_GAP:route"))
+                .andExpect(jsonPath("branchDiagnostics[0].severity").value("ERROR"))
+                .andExpect(jsonPath("branchDiagnostics[0].sampleValue").value("6.5"));
+        assertThat(snapshot()).isEqualTo(before);
+        mvc.perform(post("/api/v1/process-definitions/" + draft.id() + "/publish?expectedRevision=0")
+                .header("Authorization", token("admin")).header("Idempotency-Key", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("changeNote", "不能发布遗漏分支"))))
+                .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("details.definitionErrors[0]").value("BRANCH_COVERAGE_GAP:route"));
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(definitions.get("demo", draft.id()).revision()).isZero();
+        assertThat(definitions.get("demo", draft.id()).status()).isEqualTo(DraftStatus.DRAFT);
+        assertThat(engineRepository.createProcessDefinitionQuery().processDefinitionKey(draft.key()).count()).isZero();
+        assertThat(definitions.simulatePreview(graph, template.formSchema(), new EvaluationContext(values("4"))).path()).doesNotContain("review");
+        Graph fixed = coverageGraph("durationDays > 8", "", true);
+        var updated = definitions.update("demo", draft.id(), draft.name(), fixed, template.formSchema(), draft.revision());
+        assertThat(definitions.publish(new io.agentflow.common.Actor("demo", "admin", java.util.Set.of("ADMIN")), updated.id(), updated.revision(), "补齐默认分支").status())
+                .isEqualTo(DraftStatus.PUBLISHED);
+    }
+
+    @Test
+    void overlapRemainsWarningAndPublishedRecordPreservesActualOrderAndEvidence() {
+        var template = catalog.get("leave-request");
+        Graph graph = coverageGraph("durationDays >= 2", "durationDays <= 2", false);
+        var inspection = definitions.inspect("demo", graph, template.formSchema());
+        assertThat(inspection.errors()).isEmpty();
+        assertThat(inspection.branchDiagnostics()).singleElement().satisfies(issue -> {
+            assertThat(issue.code()).isEqualTo(BranchCoverageAnalyzer.Code.BRANCH_OVERLAP);
+            assertThat(issue.sampleValue()).isEqualTo("2");
+            assertThat(issue.edgeIds()).containsExactly("route_review", "route_end");
+        });
+        var draft = definitions.create("demo", "overlap-" + UUID.randomUUID(), "顺序命中", graph, template.formSchema());
+        var published = definitions.publish(new io.agentflow.common.Actor("demo", "admin", java.util.Set.of("ADMIN")), draft.id(), draft.revision(), "保留先复核的业务优先级");
+        var evidence = definitions.publication("demo", published.id()).orElseThrow().validation();
+        assertThat(evidence.checks()).contains(DefinitionPublication.Check.BRANCH_COVERAGE);
+        assertThat(evidence.branchDiagnostics()).isEqualTo(inspection.branchDiagnostics());
+        assertEngineRoute(published.key(), Map.of("formData", values("2"), "formFieldTypes", template.formSchema().fieldTypes()), true);
+        assertThat(definitions.simulatePreview(graph, template.formSchema(), new EvaluationContext(values("2"))).path()).contains("review");
+        assertThat(definitions.publication("demo", published.id()).orElseThrow().validation()).isEqualTo(evidence);
+        var legacy = json.read("{\"nodeCount\":2,\"edgeCount\":1,\"fieldCount\":0,\"formBound\":false,\"checks\":[\"GRAPH_STRUCTURE\"]}", DefinitionPublication.ValidationSummary.class);
+        assertThat(legacy.branchDiagnostics()).isEmpty();
+        assertThat(legacy.checks()).doesNotContain(DefinitionPublication.Check.BRANCH_COVERAGE);
+    }
+
+    private Graph coverageGraph(String first, String second, boolean fallback) {
+        var base = catalog.get("leave-request").graph();
+        return new Graph(base.nodes(), base.edges().stream().map(edge -> switch (edge.id()) {
+            case "route_review" -> new Edge(edge.id(), edge.source(), edge.target(), first);
+            case "route_end" -> new Edge(edge.id(), edge.source(), edge.target(), second, fallback);
+            default -> edge;
+        }).toList(), 2);
+    }
+
     private Map<String, Object> values(String days) {
         return Map.of("leaveType", "ANNUAL", "startDate", "2026-09-24", "durationDays", days, "reason", "仅用于模拟验收");
     }

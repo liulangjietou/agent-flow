@@ -158,3 +158,11 @@ test('导入导出保留条件语言版本，未知或强制转换版本拒绝',
     assert.throws(()=>parsePortableTemplate(JSON.stringify(value)),/版本/)
   }
 })
+
+test('区间遗漏可导入待修正草稿，结构错误仍阻止导入', async () => {
+  let errors=['BRANCH_COVERAGE_GAP:route']
+  const review=new PortableTemplateReview(async()=>({errors,branchDiagnostics:[]}))
+  await review.read(file(serializePortableTemplate(source())));await review.check()
+  assert.equal(review.canImport,true)
+  errors.push('INVALID_CONDITION:route');await review.check();assert.equal(review.canImport,false)
+})
