@@ -59,6 +59,14 @@ class OidcBackchannelIntegrationTest {
     }
 
     @Test
+    void acceptedProviderClockSkewCannotLetAnExistingSessionEscapeLogout() throws Exception {
+        PROVIDER.issuedSecondsAgo = -30;
+        HttpClient browser = login();
+        assertSuccess(post(second, token(PROVIDER.subject, null, Instant.now())));
+        assertThat(get(browser, first, CURRENT_USER).statusCode()).isEqualTo(401);
+    }
+
+    @Test
     void sidTargetsOnlyItsProviderSessionAcrossNodes() throws Exception {
         HttpClient matching = login();
         String sid = PROVIDER.sessionId;
@@ -99,11 +107,13 @@ class OidcBackchannelIntegrationTest {
     @Test
     void replayDoesNotLogOutFreshLoginAndOldCallbackCannotRecreateRevokedSession() throws Exception {
         HttpClient old = login();
+        HttpClient delayed = browser();
+        URI delayedCallback = authorize(delayed);
         String notification = token(PROVIDER.subject, null, Instant.now().minusSeconds(10));
         assertSuccess(post(second, notification));
         assertThat(get(old, first, CURRENT_USER).statusCode()).isEqualTo(401);
-        assertThat(callback(browser()).headers().firstValue("Location").orElseThrow()).endsWith("?authError=oidc");
-        PROVIDER.issuedSecondsAgo = 0;
+        assertThat(complete(delayed, delayedCallback).headers().firstValue("Location").orElseThrow()).endsWith("?authError=oidc");
+        // 新登录即使 Token 签发时间仍早于旧通知，也由新的授权请求和数据库顺序区分。
         HttpClient fresh = login();
         assertSuccess(post(first, notification));
         assertThat(get(fresh, second, CURRENT_USER).statusCode()).isEqualTo(200);
@@ -143,6 +153,8 @@ class OidcBackchannelIntegrationTest {
 
     @Test
     void concurrentDuplicatesAndOutOfOrderNotificationsNeverMoveWatermarkBackwards() throws Exception {
+        HttpClient delayed = browser();
+        URI delayedCallback = authorize(delayed);
         Instant older = Instant.now().minusSeconds(40);
         Instant newer = Instant.now().minusSeconds(5);
         String early = token(PROVIDER.subject, null, older);
@@ -153,9 +165,10 @@ class OidcBackchannelIntegrationTest {
                     HttpResponse.BodyHandlers.ofString()));
         }
         for (var call : calls) assertSuccess(call.get());
-        assertThat(callback(browser()).headers().firstValue("Location").orElseThrow()).endsWith("?authError=oidc");
+        assertThat(complete(delayed, delayedCallback).headers().firstValue("Location").orElseThrow()).endsWith("?authError=oidc");
+        HttpClient fresh = login();
         assertSuccess(post(first, early));
-        assertThat(callback(browser()).headers().firstValue("Location").orElseThrow()).endsWith("?authError=oidc");
+        assertThat(get(fresh, second, CURRENT_USER).statusCode()).isEqualTo(200);
     }
 
     @Test
@@ -181,14 +194,25 @@ class OidcBackchannelIntegrationTest {
     void databaseFailureNeverAcknowledgesLogoutOrAllowsAuthenticatedReads() throws Exception {
         HttpClient browser = login();
         var jdbc = first.getBean(JdbcTemplate.class);
+        String notification = token(PROVIDER.subject, null, Instant.now());
         jdbc.execute("ALTER TABLE AF_OIDC_LOGOUT_SCOPE RENAME TO AF_OIDC_LOGOUT_SCOPE_UNAVAILABLE");
         try {
-            assertThat(post(second, token(PROVIDER.subject, null, Instant.now())).statusCode()).isEqualTo(503);
+            assertThat(post(second, notification).statusCode()).isEqualTo(503);
             assertThat(get(browser, first, CURRENT_USER).statusCode()).isEqualTo(503);
         } finally {
             jdbc.execute("ALTER TABLE AF_OIDC_LOGOUT_SCOPE_UNAVAILABLE RENAME TO AF_OIDC_LOGOUT_SCOPE");
         }
         assertThat(get(browser, second, CURRENT_USER).statusCode()).isEqualTo(200);
+        assertSuccess(post(second, notification));
+        assertThat(get(browser, first, CURRENT_USER).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void aSessionCreatedBeforeLogoutOrderingWasEnabledMustAuthenticateAgain() throws Exception {
+        HttpClient browser = login();
+        first.getBean(JdbcTemplate.class).update("DELETE FROM AF_HTTP_SESSION_ATTRIBUTES WHERE ATTRIBUTE_NAME=?",
+                OidcLogoutScopes.SESSION_ORDER);
+        assertThat(get(browser, second, CURRENT_USER).statusCode()).isEqualTo(401);
     }
 
     private static ServletWebServerApplicationContext node() {
@@ -226,12 +250,19 @@ class OidcBackchannelIntegrationTest {
     }
 
     private HttpResponse<String> callback(HttpClient browser) throws Exception {
+        return complete(browser, authorize(browser));
+    }
+
+    private URI authorize(HttpClient browser) throws Exception {
         var authorization = get(browser, first, "/api/v1/auth/oidc/authorize/enterprise");
         assertThat(authorization.statusCode()).isEqualTo(302);
         var grant = DIRECT.send(HttpRequest.newBuilder(URI.create(authorization.headers().firstValue("Location").orElseThrow()))
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(grant.statusCode()).isEqualTo(302);
-        URI callback = URI.create(grant.headers().firstValue("Location").orElseThrow());
+        return URI.create(grant.headers().firstValue("Location").orElseThrow());
+    }
+
+    private HttpResponse<String> complete(HttpClient browser, URI callback) throws Exception {
         return get(browser, second, callback.getRawPath() + "?" + callback.getRawQuery());
     }
 

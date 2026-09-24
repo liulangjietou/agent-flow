@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
- * 验证迁移保护、签发方/客户端隔离和同秒边界，避免注销水位被错误清理或扩展。
+ * 验证迁移保护、签发方/客户端隔离和数据库顺序，避免身份源时钟影响注销范围。
  * @author owlzhangfq@gmail.com
  */
 class OidcLogoutScopesTest {
@@ -41,14 +41,19 @@ class OidcLogoutScopesTest {
         var otherIssuer = new OidcLogoutScopes(jdbc, json, properties("https://other.example", "flow"), manager);
         Instant time = Instant.parse("2026-09-24T00:00:00Z");
         var logout = Jwt.withTokenValue("verified-in-test").header("alg", "RS256")
-                .subject("person").issuedAt(time).expiresAt(time.plusSeconds(120)).build();
+                .subject("person").jti("unique-event").issuedAt(time).expiresAt(time.plusSeconds(120)).build();
+        long loginOrder = original.beginLogin();
         original.revoke(logout);
         var sameSecond = new OidcIdToken("fixture", time, time.plusSeconds(300), Map.of("sub", "person"));
-        assertThatExceptionOfType(OAuth2AuthenticationException.class).isThrownBy(() -> original.requireActive(sameSecond, time));
-        otherClient.requireActive(sameSecond, time);
-        otherIssuer.requireActive(sameSecond, time);
-        original.requireActive(new OidcIdToken("fixture", time.plusSeconds(1), time.plusSeconds(301), Map.of("sub", "person")),
-                time.plusSeconds(1));
+        assertThatExceptionOfType(OAuth2AuthenticationException.class).isThrownBy(() -> original.requireActive(sameSecond, loginOrder));
+        assertThatExceptionOfType(OAuth2AuthenticationException.class).isThrownBy(() -> original.requireActive(sameSecond, null));
+        otherClient.requireActive(sameSecond, loginOrder);
+        otherIssuer.requireActive(sameSecond, loginOrder);
+        long freshOrder = original.beginLogin();
+        original.requireActive(sameSecond, freshOrder);
+        original.revoke(logout);
+        assertThat(original.beginLogin()).isEqualTo(freshOrder);
+        original.requireActive(sameSecond, freshOrder);
         assertThat(jdbc.queryForList("SELECT SCOPE_HASH FROM AF_OIDC_LOGOUT_SCOPE", String.class))
                 .hasSize(1).allMatch(hash -> hash.matches("[0-9a-f]{64}"));
     }

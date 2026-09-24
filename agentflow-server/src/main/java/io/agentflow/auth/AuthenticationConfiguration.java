@@ -19,6 +19,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * 登录协议在接入层完成，资源授权仍由 CurrentActor 下游的应用服务负责。
@@ -61,15 +63,32 @@ public class AuthenticationConfiguration {
                 }))
                 .oauth2Login(login -> login.clientRegistrationRepository(repository)
                         .authorizedClientRepository(new DiscardingAuthorizedClientRepository()).loginPage(home)
-                        .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(resolver))
+                        .authorizationEndpoint(endpoint -> {
+                            endpoint.authorizationRequestResolver(resolver);
+                            if (revocations != null) endpoint.authorizationRequestRepository(
+                                    new LogoutAwareAuthorizationRequestRepository(revocations));
+                        })
                         .redirectionEndpoint(endpoint -> endpoint.baseUri(OidcClientConfiguration.CALLBACK_BASE + "/*"))
                         .userInfoEndpoint(endpoint -> endpoint.oidcUserService(request -> {
                             // 签名、签发方、受众和 nonce 由 Spring 协议链路校验；这里仅映射签名声明。
                             var actor = mapper.map(request.getIdToken(), Instant.now());
-                            if (revocations != null) revocations.requireActive(request.getIdToken(), Instant.now());
                             return new PlatformOidcUser(request.getIdToken(), actor.tenantId(), actor.userId(), actor.roles());
                         }))
-                        .successHandler((request, response, authentication) -> response.sendRedirect(home))
+                        .successHandler((request, response, authentication) -> {
+                            if (revocations != null) {
+                                Long order = (Long) request.getAttribute(LogoutAwareAuthorizationRequestRepository.CALLBACK_ORDER);
+                                try {
+                                    revocations.requireActive(((PlatformOidcUser) authentication.getPrincipal()).getIdToken(), order);
+                                    request.getSession().setAttribute(OidcLogoutScopes.SESSION_ORDER, order);
+                                } catch (OAuth2AuthenticationException revoked) {
+                                    request.getSession().invalidate();
+                                    SecurityContextHolder.clearContext();
+                                    response.sendRedirect(home + "?authError=oidc");
+                                    return;
+                                }
+                            }
+                            response.sendRedirect(home);
+                        })
                         .failureHandler((request, response, exception) -> {
                             var session = request.getSession(false);
                             if (session != null) session.invalidate();

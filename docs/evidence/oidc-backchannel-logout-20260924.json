@@ -1,44 +1,55 @@
 {
   "stage": 69,
-  "recordedAt": "2026-09-24T09:42:00.542759+00:00",
+  "recordedAt": "2026-09-24T12:24:12.126232+00:00",
   "branch": "codex/oidc-backchannel-logout",
   "baseline": "33221ce2f8a8ef6dc481152e5f894d74280d0ff3",
-  "scope": "Opt-in signed OIDC back-channel logout; durable issuer/client/subject/session revocation watermarks",
+  "scope": "Opt-in signed OIDC back-channel logout; durable authorization ordering and notification ID deduplication",
   "checks": {
     "java": {
-      "tests": 694,
+      "tests": 696,
       "domain": 181,
-      "server": 513,
+      "server": 515,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
     "frontend": 252,
     "maintenanceTools": 19,
-    "postgresqlBackchannelIntegration": 8,
-    "javaAuthorFiles": 278,
-    "javaNamedTypes": 448,
+    "postgresqlBackchannelIntegration": 10,
+    "javaAuthorFiles": 279,
+    "javaNamedTypes": 449,
     "missingAuthors": 0,
     "frontendBuild": true,
     "openapiOperations": 65,
-    "diffCheck": true
+    "diffCheck": true,
+    "authenticationFocused": 32
   },
   "regressions": [
     "Raw null claims were removed by JWT conversion and an invalid notification was acknowledged; input shape is now checked before conversion and signature verification",
-    "Authentication store failure returned generic 500; now returns retryable 503 without allowing protected reads"
+    "Authentication store failure returned generic 500; now returns retryable 503 without allowing protected reads",
+    "A valid ID token issued 30 seconds ahead survived logout under timestamp comparison; server-stored authorization order now decides revocation independently of provider clock skew"
   ],
   "browser": {
     "isolatedUrl": "http://localhost:5198/",
     "secondNodeLogoutRejectedFirstNodeLogin": true,
     "sameAccountLoginRestoresOriginalPage": true,
-    "oldNotificationReplayPreservesFreshLogin": true
+    "oldNotificationReplayPreservesFreshLogin": true,
+    "providerIdTokenClockAheadSeconds": 30
   },
   "artifact": {
-    "sha256": "0b4fbbcd00b81cce7bba738fac1b2702f498d750d4aa4dd9e6be6b689bb2b36d"
+    "sha256": "df5342362757951267ab65f332f58ef51609cb910d948a07610335c29b787f13"
   },
-  "migration": "V22__oidc_logout_scopes.sql",
   "productionIdentityProviderVerified": false,
   "productionClusterSloVerified": false,
   "remoteConfigured": false,
-  "pullRequestCreated": false
+  "pullRequestCreated": false,
+  "migrations": [
+    "V22__oidc_logout_scopes.sql",
+    "V23__oidc_logout_ordering.sql"
+  ],
+  "upgrade": {
+    "preV23SharedSessionsRequireReauthentication": true,
+    "postgresLegacyScopeRowsPreserved": 6,
+    "mixedVersionClusterSupported": false
+  }
 }

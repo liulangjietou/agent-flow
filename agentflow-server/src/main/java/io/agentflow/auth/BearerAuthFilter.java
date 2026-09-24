@@ -108,7 +108,11 @@ public class BearerAuthFilter extends OncePerRequestFilter {
                 try {
                     Actor actor = oidcActors.restoreSession(user, Instant.now());
                     var revocations = logoutScopes.getIfAvailable();
-                    if (revocations != null) revocations.requireActive(user.getIdToken(), Instant.now());
+                    if (revocations != null) {
+                        var session = request.getSession(false);
+                        Long order = session == null ? null : (Long) session.getAttribute(OidcLogoutScopes.SESSION_ORDER);
+                        revocations.requireActive(user.getIdToken(), order);
+                    }
                     return actor;
                 } catch (OAuth2AuthenticationException exception) {
                     var session = request.getSession(false);

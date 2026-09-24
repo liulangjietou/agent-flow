@@ -18,6 +18,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 public final class OidcLogoutTokenValidator implements OAuth2TokenValidator<Jwt> {
     static final String EVENT = "http://schemas.openid.net/event/backchannel-logout";
     static final Duration CLOCK_SKEW = Duration.ofSeconds(60);
+    static final int MAX_SESSION_ID_LENGTH = 512;
+    private static final int MAX_TOKEN_ID_LENGTH = 512;
+    private static final int MAX_SUBJECT_LENGTH = 128;
     private static final Duration MAX_AGE = Duration.ofMinutes(5);
     private final String issuer;
     private final String clientId;
@@ -56,11 +59,11 @@ public final class OidcLogoutTokenValidator implements OAuth2TokenValidator<Jwt>
         Object sid = claims.get("sid");
         Object audience = claims.get("aud");
         Object events = claims.get("events");
-        boolean valid = claims.get("iss") instanceof String && identifier(claims.get("jti"), 512)
+        boolean valid = claims.get("iss") instanceof String && identifier(claims.get("jti"), MAX_TOKEN_ID_LENGTH)
                 && (audience instanceof String || audience instanceof Collection<?> values
                         && values.stream().allMatch(String.class::isInstance))
-                && (!claims.containsKey("sub") || identifier(subject, 128))
-                && (!claims.containsKey("sid") || identifier(sid, 512)) && (subject != null || sid != null)
+                && (!claims.containsKey("sub") || identifier(subject, MAX_SUBJECT_LENGTH))
+                && (!claims.containsKey("sid") || identifier(sid, MAX_SESSION_ID_LENGTH)) && (subject != null || sid != null)
                 && !claims.containsKey("nonce") && events instanceof Map<?, ?> values
                 && values.get(EVENT) instanceof Map<?, ?>
                 && claims.get("iat") instanceof Number && claims.get("exp") instanceof Number
