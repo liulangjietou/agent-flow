@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { api, type Definition, type PendingTaskItem, type PendingTaskQuery } from '../api'
+import { api, type PendingTaskItem, type PendingTaskQuery } from '../api'
 import { PendingTaskQueueQuery } from '../pendingTaskQueue'
+import DefinitionPicker from './DefinitionPicker.vue'
 import PendingTaskCard from './PendingTaskCard.vue'
-const props = defineProps<{ view: 'list' | 'board'; scopeKey: string; refreshVersion: number; locked: boolean; selectedId?: string; definitions: Definition[] }>()
+const props = defineProps<{ view: 'list' | 'board'; scopeKey: string; refreshVersion: number; locked: boolean; selectedId?: string }>()
 const emit = defineEmits<{ select: [item: PendingTaskItem]; clearSelection: []; 'update:view': [view: 'list' | 'board'] }>()
 const query = reactive(new PendingTaskQueueQuery(api.taskPage))
 const filters = reactive({ q: '', processKey: '', applicant: '', assignment: 'all', minAmount: '', maxAmount: '' })
@@ -46,7 +47,8 @@ onUnmounted(() => query.clear())
         <div class="search-line"><label class="search-box"><span class="sr-only">搜索待办</span><input v-model="filters.q" type="search" maxlength="100" placeholder="单号、申请标题或任务名称" /></label><button class="secondary" type="submit">查询</button></div>
         <div class="filter-line"><label>办理范围<select v-model="filters.assignment"><option value="all">全部可办理</option><option value="assigned">指派给我</option><option value="unclaimed">待领取</option><option value="delegated">待我回交</option></select></label><button class="quiet" type="button" :aria-expanded="expanded" aria-controls="task-more-filters" @click="expanded = !expanded">{{ expanded ? '收起筛选 −' : '更多筛选 ＋' }}</button></div>
         <div v-show="expanded" id="task-more-filters" class="more-filters">
-          <label>流程标识<input v-model="filters.processKey" list="pending-process-options" maxlength="128" placeholder="全部流程，可选择或输入" /><datalist id="pending-process-options"><option v-for="definition in definitions.filter((item, index, all) => all.findIndex(other => other.key === item.key) === index)" :key="definition.key" :value="definition.key">{{ definition.name }}</option></datalist></label>
+          <label>流程标识<input v-model="filters.processKey" maxlength="128" placeholder="全部流程，可输入准确标识" /></label>
+          <DefinitionPicker :scope-key="scopeKey" label="待办流程" published-only :selected-label="filters.processKey || '全部流程'" :locked="locked" @select="filters.processKey = $event.key" />
           <label>申请人账号<input v-model="filters.applicant" maxlength="128" placeholder="输入完整账号" /></label>
           <div class="amount-range"><label>最低金额<input v-model="filters.minAmount" inputmode="decimal" maxlength="80" placeholder="不限" /></label><span aria-hidden="true">—</span><label>最高金额<input v-model="filters.maxAmount" inputmode="decimal" maxlength="80" placeholder="不限" /></label></div>
           <p>金额范围仅匹配可识别的数值金额；未提供金额的申请不会计入。</p>

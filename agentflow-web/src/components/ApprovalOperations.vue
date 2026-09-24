@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { api, type Definition } from '../api'
+import { api } from '../api'
+import DefinitionPicker from './DefinitionPicker.vue'
 import { ApprovalOperationsQuery, defaultOperationsFilter, operationsDuration, operationsFilter, type OperationsProcess } from '../approvalOperations'
 
-const props = defineProps<{ scopeKey: string; refreshVersion: number; definitions: Definition[] }>()
+const props = defineProps<{ scopeKey: string; refreshVersion: number }>()
 const emit = defineEmits<{ open: [applicationId: string] }>()
 const query = reactive(new ApprovalOperationsQuery(api.approvalOperations))
 const initial = defaultOperationsFilter()
 const filters = reactive({ from: initial.from, to: initial.to, processKey: '', version: '' })
 const inputError = ref('')
 const report = computed(() => query.report)
-const processes = computed(() => [...new Map(props.definitions.map(item => [item.key, item.name])).entries()].sort(([a], [b]) => a.localeCompare(b)))
 const trendMax = computed(() => Math.max(1, ...(report.value?.daily.map(day => day.submittedRounds) ?? [])))
 const number = (value: number) => new Intl.NumberFormat('zh-CN').format(value)
 const percent = (value?: number) => value == null ? '—' : value.toFixed(1) + '%'
@@ -40,7 +40,8 @@ onUnmounted(() => query.clear())
     <form class="panel operations-filters" aria-label="统计筛选" @submit.prevent="refresh">
       <label>开始日期（UTC）<input v-model="filters.from" type="date" required /></label>
       <label>结束日期（UTC）<input v-model="filters.to" type="date" required /></label>
-      <label class="process-filter">流程<select v-model="filters.processKey" @change="filters.version = ''"><option value="">全部流程</option><option v-if="filters.processKey && !processes.some(([key]) => key === filters.processKey)" :value="filters.processKey">{{ filters.processKey }}</option><option v-for="[key,name] in processes" :key="key" :value="key">{{ name }} · {{ key }}</option></select></label>
+      <label class="process-filter">流程标识<input v-model="filters.processKey" maxlength="128" placeholder="全部流程，可输入准确标识" @input="filters.version = ''" /></label>
+      <DefinitionPicker :scope-key="scopeKey" label="统计流程" published-only :selected-label="filters.processKey || '全部流程'" @select="filters.processKey = $event.key; filters.version = ''" />
       <label class="version-filter">版本<input v-model="filters.version" type="number" min="1" step="1" max="2147483647" :disabled="!filters.processKey" placeholder="全部" /></label>
       <div class="operations-filter-actions"><button class="primary" :disabled="query.loading">查询统计</button><button class="quiet" type="button" @click="reset">重置近 30 天</button></div>
     </form>

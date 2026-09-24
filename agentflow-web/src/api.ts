@@ -256,7 +256,6 @@ export const api = {
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   cancelApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/cancel`, 'POST', '作废申请', body),
   definitionAssignees: (signal: AbortSignal) => request<AssigneeOption[]>('/process-definitions/assignee-options', { signal }),
-  definitions: () => request<Definition[]>('/process-definitions'),
   searchDefinitions: (filters: DefinitionCatalogFilters, signal: AbortSignal) => request<DefinitionCatalogPage>('/process-definitions/search?' + new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)])), { signal }),
   getDefinition: (id: string, signal?: AbortSignal) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { signal }),
   templates: () => request<ProcessTemplate[]>('/process-templates'),

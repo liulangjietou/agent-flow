@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { api, type Definition } from '../api'
+import { api } from '../api'
+import DefinitionPicker from './DefinitionPicker.vue'
 import { FirstWorkflowQuery, guideHidden, guideSelection, hideGuide, rememberGuideSelection, workflowSteps } from '../firstWorkflow'
 import { SystemChecksQuery } from '../systemChecks'
 
-const props = defineProps<{ scopeKey: string; refreshVersion: number; definitions: Definition[]; locked: boolean }>()
+const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ templates: []; import: []; examples: []; new: []; edit: [id: string]; apply: [id: string]; open: [id: string]; checks: []; workbench: [] }>()
 const query = reactive(new FirstWorkflowQuery(api.firstWorkflow))
 const diagnostics = reactive(new SystemChecksQuery(api.systemChecks))
@@ -20,8 +21,8 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN')
 const stepLabels = ['保存流程', '发布版本', '提交申请', '完成批准']
 const evidence = computed(() => report.value?.latestApproval ?? report.value?.latestSubmission)
 function refresh() { void query.load(props.scopeKey, selectedId.value) }
-function select(event: Event) {
-  selectedId.value = (event.target as HTMLSelectElement).value
+function select(id: string) {
+  selectedId.value = id
   rememberGuideSelection(props.scopeKey, selectedId.value); refresh()
 }
 function updatePreference() { hideGuide(props.scopeKey, hidden.value) }
@@ -47,13 +48,8 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
     <div class="guide-layout">
       <section class="panel guide-progress" :aria-busy="query.loading" aria-labelledby="guide-progress-title">
         <div class="guide-section-heading"><div><p class="eyebrow">YOUR WORKFLOW</p><h3 id="guide-progress-title">接着上一次继续</h3></div><button class="quiet" :disabled="query.loading" @click="refresh">刷新进度</button></div>
-        <label class="guide-selector">要验证的流程版本
-          <select :value="selectedId || report?.definition?.id || ''" @change="select">
-            <option value="">自动选择最近更新的流程</option>
-            <option v-if="selectedId && !definitions.some(item => item.id === selectedId)" :value="selectedId">上次选择的流程（重新核对中）</option>
-            <option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ status(definition.status) }}{{ definition.version ? ' v' + definition.version : '' }} · {{ definition.key }}</option>
-          </select>
-        </label>
+        <DefinitionPicker :scope-key="scopeKey" label="验证流程" :refresh-version="refreshVersion" :selected-id="selectedId || report?.definition?.id" :selected-label="report?.definition ? report.definition.name + (report.definition.version ? ' · v' + report.definition.version : ' · 草稿') : ''" :locked="locked" @select="select($event.id)" />
+        <button type="button" class="quiet" :disabled="query.loading" @click="select('')">自动选择最近更新的流程</button>
         <p v-if="query.loading" class="guide-empty" role="status">正在读取当前租户的流程与轮次记录…</p>
         <div v-else-if="query.error" class="guide-empty" role="alert"><strong>未取得流程进度</strong><p>{{ query.error }}</p><button class="secondary" @click="refresh">重试读取</button><p>也可以在上方重新选择流程。</p></div>
         <template v-else-if="report">
@@ -95,7 +91,6 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
 .guide-path{padding:25px;display:flex;flex-direction:column;align-items:start}.guide-path.featured{border-color:#b7dcd4;background:#f4faf8}
 .guide-number{color:var(--deep);font-size:10px;letter-spacing:1px}.guide-path h3{font-size:20px;margin:21px 0 10px}.guide-path p{font-size:12px;line-height:1.9;color:var(--muted);margin:0 0 23px;flex:1}.guide-path button{font-size:12px}
 .guide-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}.guide-progress{padding:26px;min-width:0}.guide-section-heading{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:23px}.guide-section-heading h3{margin:10px 0 0;font-size:20px}.guide-section-heading button{font-size:12px;color:var(--deep);white-space:nowrap}
-.guide-selector{display:grid;gap:9px;font-size:11px;color:var(--muted)}.guide-selector select{min-width:0;width:100%;border:1px solid var(--line);border-radius:7px;background:white;color:var(--ink);padding:11px;font-size:12px}
 .guide-steps{list-style:none;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:26px 0}.guide-steps li{display:flex;gap:9px;align-items:center;min-width:0}.guide-steps li>span{display:grid;place-items:center;flex-shrink:0;width:29px;height:29px;border-radius:50%;border:1px solid var(--line);color:var(--muted);font-size:11px}.guide-steps li.complete>span{background:var(--deep);border-color:var(--deep);color:white}.guide-steps strong{font-size:11px;font-weight:500}.guide-steps small{display:block;font-size:10px;color:var(--muted);margin-top:6px;line-height:1.6}
 .guide-next{border:1px solid var(--line);background:#fafcfc;padding:23px;border-radius:9px}.guide-next h4{font-size:17px;margin:17px 0 11px}.guide-next p{font-size:12px;line-height:1.9;color:var(--muted)}.guide-next button{font-size:12px;margin:10px 10px 0 0}.guide-definition{display:grid;gap:7px;padding-bottom:15px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.guide-definition strong{font-size:13px}.guide-definition span{font-size:11px;color:var(--muted)}.guide-evidence{display:grid;gap:6px;font-size:11px;color:var(--deep);margin-top:20px;line-height:1.8;overflow-wrap:anywhere}.guide-evidence small{color:var(--muted)}.guide-footnote{font-size:11px;color:var(--muted);line-height:1.9;margin-top:17px}
 .guide-environment{padding:25px}.guide-environment h3{font-size:18px;margin:16px 0}.guide-environment p{font-size:12px;color:var(--muted);line-height:1.9}.guide-environment button{display:block;width:100%;margin-top:13px;font-size:12px}.guide-ready,.guide-caution{font-size:13px;line-height:1.8}.guide-ready{color:var(--deep)}.guide-caution{color:#816425}.guide-account-note{border-top:1px solid var(--line);padding-top:22px;margin-top:24px}.guide-account-note strong{font-size:12px}.guide-account-note p{font-size:11px}

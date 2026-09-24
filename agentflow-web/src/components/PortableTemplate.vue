@@ -1,18 +1,26 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { DefinitionCatalogQuery } from '../definitionCatalog'
 import { PortableTemplateReview, serializePortableTemplate, type PortableProcess } from '../portableTemplate'
 import { validateTemplateCopy } from '../templateCenter'
 import { simulationIssue } from '../definitionSimulation'
 import { fieldTypes } from '../formSchema'
 
-const props = defineProps<{ current: PortableProcess; locked: boolean; existingKeys: string[]; hasUnsavedDefinition: boolean }>()
+const props = defineProps<{ current: PortableProcess; locked: boolean; scopeKey: string; hasUnsavedDefinition: boolean }>()
 const emit = defineEmits<{ import: [value: PortableProcess]; back: [] }>()
 const review = reactive(new PortableTemplateReview(api.validateDefinition))
 const targetKey = ref(''), targetName = ref(''), fileName = ref(''), attempted = ref(false)
 const exportUrl = ref(''), exportError = ref('')
 const targetErrors = computed(() => validateTemplateCopy({ key: targetKey.value.trim(), name: targetName.value.trim(), templateVersion: 1 }))
-const sameKey = computed(() => props.existingKeys.includes(targetKey.value.trim()))
+const keyQuery = reactive(new DefinitionCatalogQuery(api.searchDefinitions))
+const KEY_CHECK_DELAY_MS = 300
+let keyTimer: ReturnType<typeof setTimeout> | undefined
+const sameKey = computed(() => keyQuery.loaded && keyQuery.items.length > 0)
+watch(() => [props.scopeKey, targetKey.value.trim()], () => {
+  clearTimeout(keyTimer); keyQuery.clear()
+  if (targetKey.value.trim() && !targetErrors.value.key) keyTimer = setTimeout(() => { void keyQuery.load(props.scopeKey, { processKey: targetKey.value.trim() }) }, KEY_CHECK_DELAY_MS)
+}, { flush: 'sync' })
 const issues = computed(() => review.errors.map(code => {
   const issue = simulationIssue(code)
   const nodeName = review.value?.graph.nodes.find(node => node.id === issue.target)?.name
@@ -42,7 +50,7 @@ function create() {
   emit('import', { ...review.value, key: targetKey.value.trim(), name: targetName.value.trim() })
 }
 watch(() => props.current, clearExport, { deep: true })
-onUnmounted(() => { review.clear(); clearExport() })
+onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); clearExport() })
 </script>
 
 <template>
@@ -65,6 +73,7 @@ onUnmounted(() => { review.clear(); clearExport() })
           <p v-if="review.canImport && review.errors.length" class="explanation">可先创建草稿，在设计器中修正审批人或分支覆盖。发布前必须重新通过检查。</p>
           <p v-else-if="review.reviewed && review.errors.length" class="transfer-error">模板存在结构或条件问题，请在来源设计器修正并重新导出。</p>
           <fieldset :disabled="locked || review.loading" class="target-fields"><legend>新草稿</legend><label>目标流程标识<input v-model="targetKey" maxlength="64" placeholder="例如 team-leave" :aria-invalid="attempted && !!targetErrors.key" /><small v-if="attempted && targetErrors.key" class="transfer-error">{{ targetErrors.key }}</small></label><label>流程名称<input v-model="targetName" maxlength="128" :aria-invalid="attempted && !!targetErrors.name" /><small v-if="attempted && targetErrors.name" class="transfer-error">{{ targetErrors.name }}</small></label></fieldset>
+          <p v-if="keyQuery.error" class="unsaved-note">未能检查同名流程。导入始终创建独立草稿，相同标识以后发布为该流程的新版本。</p>
           <p v-if="sameKey" class="unsaved-note">此标识已有流程。将创建独立草稿；以后发布时会成为该流程的新版本，已有版本和申请保持不变。</p>
           <button class="primary" :disabled="locked || !review.canImport" @click="create">创建独立草稿</button><p class="explanation">创建后进入设计器，不会自动发布或发起申请。</p>
         </template>

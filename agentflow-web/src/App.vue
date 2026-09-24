@@ -32,6 +32,8 @@ import ApiReference from './components/ApiReference.vue'
 import DefinitionSimulation from './components/DefinitionSimulation.vue'
 import DefinitionComparison from './components/DefinitionComparison.vue'
 import DefinitionCatalog from './components/DefinitionCatalog.vue'
+import DefinitionPicker from './components/DefinitionPicker.vue'
+import { DefinitionSelection } from './definitionSelection'
 import DefinitionAssignee from './components/DefinitionAssignee.vue'
 import { assigneeLabel } from './definitionAssignees'
 import { simulationIssue } from './definitionSimulation'
@@ -98,7 +100,9 @@ const detailLoading = ref(false)
 const taskDetailPanel = ref<HTMLElement | null>(null)
 const taskTab = ref<'detail' | 'compare' | 'timeline' | 'audit' | 'comments'>('detail')
 const commentRefresh = ref(0)
-const definitions = ref<Definition[]>([])
+const restoredDefinition = new DefinitionSelection(api.searchDefinitions, api.getDefinition)
+const applicationSelection = reactive(new DefinitionSelection(api.searchDefinitions, api.getDefinition))
+const requestedApplicationDefinition = ref('')
 const definitionId = ref('')
 const definitionRevision = ref(0)
 const definitionVersion = ref(0)
@@ -144,7 +148,7 @@ const validationMessage = computed(() => validation.loading ? '正在检查最�
     : validationOpened.value ? '内容已修改，正在等待重新校验。' : '尚未校验，发布前将运行服务端校验。'))
 const newApplicationOpen = ref(false)
 const recordApplicationId = ref('')
-const applicationDefinitionId = ref('')
+const applicationDefinitionId = computed(() => applicationSelection.definition?.id ?? '')
 const applicationTitle = ref('')
 const applicationBusinessNo = ref('')
 const applicationAmount = ref('')
@@ -153,7 +157,7 @@ const createdApplication = ref<Application | null>(null)
 const applicationPayload = ref<Record<string, unknown>>({})
 const applicationFieldErrors = ref<FieldErrors>({})
 const applicationFormError = ref('')
-const applicationFormSchema = computed(() => createdApplication.value ? createdApplication.value.formSchema ?? null : publishedDefinitions.value.find(item => item.id === applicationDefinitionId.value)?.formSchema ?? null)
+const applicationFormSchema = computed(() => createdApplication.value ? createdApplication.value.formSchema ?? null : applicationSelection.definition?.formSchema ?? null)
 const conditionLanguageVersion = ref<1 | 2>(2)
 const designerMode = ref<'quick' | 'advanced'>('quick')
 // 编辑视图保留输入中的空格，提交时才调用 graphPayload 规范化。
@@ -184,7 +188,6 @@ const palette: Array<{ type: NodeType; label: string; icon: string }> = [
 ]
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedId.value) ?? null)
 const selectedEdge = computed(() => edges.value.find(edge => edge.id === selectedEdgeId.value) ?? null)
-const publishedDefinitions = computed(() => definitions.value.filter(definition => definition.status === 'PUBLISHED'))
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
 const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
@@ -263,16 +266,14 @@ async function newDefinition(copy = false) {
     notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value, !copy && !readonlyDefinition.value && dirty.value)
 }
-async function loadDefinitions(restoreSelection = false) {
-  const scope = actorScope.value
-  const result = await api.definitions()
-  if (!scope || actorScope.value !== scope) return
-  definitions.value = result
-  if (restoreSelection) {
-    const remembered = localStorage.getItem(`agentflow.definition.${tenantId.value}`)
-    const definition = definitions.value.find(item => item.id === remembered) ?? definitions.value[0]
-    if (definition) applyDefinition(definition)
-  }
+/** 恢复一份已授权的配置，不再读取当前租户的全部流程图和表单。 */
+async function restoreDesigner() {
+  const scope = actorScope.value, session = editorSession.value
+  const remembered = localStorage.getItem(`agentflow.definition.${tenantId.value}`) ?? ''
+  const definition = await restoredDefinition.load(scope, remembered, { restoreMissing: true })
+  if (!viewActive || actorScope.value !== scope || editorSession.value !== session) return
+  if (restoredDefinition.error) throw new Error(restoredDefinition.error)
+  if (definition) applyDefinition(definition)
 }
 async function loadTasks() {
   const scope = actorScope.value, controller = new AbortController()
@@ -285,7 +286,7 @@ async function refreshWorkspace(restoreSelection = false) {
   taskRefresh.value++
   const generation = ++workspaceRefreshGeneration
   const scope = actorScope.value
-  try { await Promise.all([loadTasks(), loadDefinitions(restoreSelection)]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
+  try { await Promise.all([loadTasks(), ...(restoreSelection ? [restoreDesigner()] : [])]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
   catch (error) { if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) { serverAvailable.value = false; notice.value = errorMessage(error) } }
 }
 function refreshPage() { templateRefresh.value++; void refreshWorkspace() }
@@ -296,7 +297,7 @@ async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
     try {
       const definition = await api.copyTemplate(templateKey, originalBody)
       applyDefinition(definition); rememberGuideSelection(actorScope.value, definition.id); page.value = 'designer'; templateRefresh.value++
-      await loadDefinitions(); notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
+      notice.value = '模板已复制为独立草稿，请核对字段、审批角色与分支后再发布。'
     } catch (error) { notice.value = errorMessage(error) }
     finally { busy.value = false }
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
@@ -311,7 +312,7 @@ async function importTemplate(input: PortableProcess) {
       const definition = await api.definition(body)
       if (!viewActive || actorScope.value !== scope) return
       applyDefinition(definition); rememberGuideSelection(scope, definition.id); page.value = 'designer'; templateRefresh.value++
-      await loadDefinitions(); notice.value = '模板已导入为独立草稿，请核对审批人、运行模拟后再发布。'
+      notice.value = '模板已导入为独立草稿，请核对审批人、运行模拟后再发布。'
     } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
     finally { busy.value = false }
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
@@ -349,7 +350,7 @@ async function logout() {
     busy.value = true
     try { await api.logout() } catch { /* 本地会话始终清除，失效令牌由服务端校验。 */ }
     writeRequests.setActor(null)
-    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; definitions.value = []; activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; restoredDefinition.clear(); applicationSelection.clear(); activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
     clearDesigner(); templateRefresh.value++
     recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
   }, () => !busy.value && !pendingWrites.value.some(operation => operation.sending))
@@ -481,9 +482,7 @@ function acknowledgeDraft(definition: Definition, checkpoint: DraftCheckpoint) {
   definitionKey.value = definition.key
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
   savedSnapshot.value = checkpoint.snapshot
-  const index = definitions.value.findIndex(item => item.id === definition.id)
-  if (index < 0) definitions.value.unshift(definition)
-  else definitions.value[index] = definition
+  templateRefresh.value++
   localStorage.setItem(`agentflow.definition.${actor.value!.tenantId}`, definition.id)
 }
 async function persistDraft(): Promise<Definition> {
@@ -536,7 +535,7 @@ async function publishDraft() {
     autosave.saved()
     const published = await api.publishDefinition(saved.id, saved.revision, changeNote)
     applyDefinition(published); publicationOpen.value = false; publicationNote.value = ''
-    await loadDefinitions(); notice.value = `流程${statusLabel(published.status)}，版本 v${published.version}，发布记录已保存。`
+    notice.value = `流程${statusLabel(published.status)}，版本 v${published.version}，发布记录已保存。`
   } catch (error) { autosave.pause(error); publicationError.value = errorMessage(error); notice.value = publicationError.value } finally { busy.value = false }
 }
 function selectNode(node: FlowNode) { selectedId.value = node.id; selectedEdgeId.value = ''; connectionTarget.value = '' }
@@ -686,28 +685,25 @@ function keyHandler(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo() }
   if (['Delete', 'Backspace'].includes(event.key)) { event.preventDefault(); if (designerMode.value === 'advanced') deleteSelected(); else notice.value = '请使用步骤配置中的删除按钮，以便核对分支内的删除范围。' }
 }
-async function openApplicationForm() {
+/** 表单只依赖当前选中的完整发布配置；切换选择立即取消旧读取。 */
+async function selectApplicationDefinition(id: string) {
+  requestedApplicationDefinition.value = id
+  applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
+  await applicationSelection.load(actorScope.value, id, { publishedOnly: true })
+}
+async function prepareApplication(id = '') {
   if (busy.value || writesBlocked.value) { notice.value = '请先恢复上次操作，再发起新申请。'; return }
-  try {
-    await loadDefinitions(); createdApplication.value = null
-    applicationDefinitionId.value = publishedDefinitions.value[0]?.id ?? ''; applicationTitle.value = ''; applicationBusinessNo.value = `APP-${Date.now()}`
-    applicationAmount.value = ''; applicationDescription.value = ''; applicationPayload.value = {}; applicationFieldErrors.value = {}; applicationFormError.value = ''; newApplicationOpen.value = true
-  } catch (error) { notice.value = errorMessage(error) }
+  createdApplication.value = null; applicationTitle.value = ''; applicationBusinessNo.value = `APP-${Date.now()}`
+  newApplicationOpen.value = true
+  await selectApplicationDefinition(id)
 }
-/** 引导发起必须仍绑定用户选中的已发布版本，不能静默切换为另一份定义。 */
-async function startGuidedApplication(id: string) {
-  const scope = actorScope.value
-  await openApplicationForm()
-  if (actorScope.value !== scope || !newApplicationOpen.value) return
-  if (!publishedDefinitions.value.some(item => item.id === id)) {
-    newApplicationOpen.value = false; notice.value = '所选版本当前不可发起，请刷新引导重新选择。'; return
-  }
-  applicationDefinitionId.value = id
-}
+async function openApplicationForm() { await prepareApplication() }
+/** 引导始终读取指定版本，目标失效时不能静默切换到另一流程。 */
+async function startGuidedApplication(id: string) { await prepareApplication(id) }
 async function createAndSubmitApplication(submit = true) {
-  if (busy.value || writesBlocked.value) return
+  if (busy.value || writesBlocked.value || applicationSelection.loading) return
   applicationFormError.value = ''; applicationFieldErrors.value = {}
-  const definition = publishedDefinitions.value.find(item => item.id === applicationDefinitionId.value)
+  const definition = applicationSelection.definition
   if ((!definition && !createdApplication.value) || !applicationTitle.value.trim() || !applicationBusinessNo.value.trim()) { applicationFormError.value = '请选择已发布流程，并填写申请标题和业务单号。'; return }
   let payload: Record<string, unknown>
   if (createdApplication.value) payload = createdApplication.value.payload
@@ -732,10 +728,8 @@ async function createAndSubmitApplication(submit = true) {
     applicationFormError.value = `${errorMessage(error)}${createdApplication.value ? '；草稿已保留，可在申请记录中补充填写或重试提交。' : ''}`
   } finally { busy.value = false }
 }
-watch(applicationDefinitionId, () => {
-  if (createdApplication.value) return
-  applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
-})
+watch(newApplicationOpen, open => { if (!open) applicationSelection.clear() }, { flush: 'sync' })
+watch(actorScope, () => { restoredDefinition.clear(); applicationSelection.clear(); newApplicationOpen.value = false }, { flush: 'sync' })
 
 watch([actorScope, page], () => { catalogOpen.value = false }, { flush: 'sync' })
 watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
@@ -804,7 +798,7 @@ async function recoverOperation(id: string) {
           createdApplication.value = value; applicationTitle.value = value.title; applicationBusinessNo.value = value.businessNo
           applicationPayload.value = { ...value.payload }; applicationFieldErrors.value = {}; applicationFormError.value = ''
           applicationAmount.value = String(value.payload.amount ?? ''); applicationDescription.value = String(value.payload.description ?? '')
-          applicationDefinitionId.value = definitions.value.find(item => item.key === value.processKey && item.version === value.definitionVersion)?.id ?? ''
+          applicationSelection.clear(); requestedApplicationDefinition.value = ''
           newApplicationOpen.value = true
           notice.value = '原申请草稿已确认，请核对后再提交。'
         } else {
@@ -846,7 +840,7 @@ onMounted(async () => {
   catch { localStorage.removeItem('agentflow.token') }
 })
 onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
-onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
+onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload) })
 </script>
 
 <template>
@@ -897,7 +891,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
           <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
 
           <div class="work-grid" :class="{ 'board-work-grid': taskQueueView === 'board' }">
-            <PendingTaskQueue ref="taskQueuePanel" v-model:view="taskQueueView" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" :definitions="publishedDefinitions" @select="selectTask" @clear-selection="clearTaskSelection" />
+            <PendingTaskQueue ref="taskQueuePanel" v-model:view="taskQueueView" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" @select="selectTask" @clear-selection="clearTaskSelection" />
             <div ref="taskDetailPanel" class="detail panel" tabindex="-1" aria-label="当前待办详情">
               <div v-if="taskQueueView === 'board'" class="board-return"><button type="button" class="quiet" @click="taskQueuePanel?.focusTask(activeTask?.taskId)">↑ 返回待办看板</button></div>
               <div v-if="activeTask" class="detail-body">
@@ -926,9 +920,9 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
-        <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :existing-keys="definitions.map(item => item.key)" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
-        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="definitions" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
-        <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="publishedDefinitions" @open="recordApplicationId = $event" />
+        <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :scope-key="actorScope" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
+        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
+        <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @open="recordApplicationId = $event" />
         <BusinessCalendars v-else-if="page === 'calendars' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @import="page = 'transfer'" @designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page" @compositionstart="composing = true" @compositionend="composing = false">
@@ -986,7 +980,7 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
               <div v-else class="inspector-empty"><span>＋</span><h3>选择节点或连线</h3><p>在这里配置流程属性。</p></div>
             </fieldset></aside>
           </div>
-          <DefinitionComparison v-if="comparisonOpen && canManageDefinitions" :input="comparisonInput" :definitions="definitions" :current-id="definitionId" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @locate="locateComparisonChange" @close="comparisonOpen = false" />
+          <DefinitionComparison v-if="comparisonOpen && canManageDefinitions" :input="comparisonInput" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @locate="locateComparisonChange" @close="comparisonOpen = false" />
           <DefinitionSimulation v-if="simulationOpen && canManageDefinitions" :graph="simulationGraph" :form-schema="definitionFormSchema" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @result="simulationResult = $event" @locate="locateDesignTarget" @close="simulationOpen = false" />
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <FormSchemaEditor v-model="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
@@ -1003,19 +997,23 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
           <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>
-          <p v-if="!publishedDefinitions.length && !createdApplication" class="unavailable">当前没有已发布流程，请先由流程管理员创建并发布。</p>
+          <DefinitionPicker v-if="!createdApplication" :scope-key="actorScope" label="申请流程" published-only :selected-id="applicationDefinitionId" :selected-label="applicationSelection.definition ? applicationSelection.definition.name + ' · v' + applicationSelection.definition.version : ''" :locked="busy || writesBlocked" @select="selectApplicationDefinition($event.id)" />
+          <p v-if="applicationSelection.loading" role="status" class="unavailable">正在读取所选流程的表单配置…</p>
+          <p v-else-if="applicationSelection.error" role="alert" class="inline-error">{{ applicationSelection.error }}<button type="button" class="quiet" @click="selectApplicationDefinition(requestedApplicationDefinition)">重试读取表单</button></p>
+          <p v-else-if="!applicationSelection.definition && !createdApplication" class="unavailable">尚未取得可发起的发布版本，请选择流程；没有已发布流程时需先由流程管理员发布。</p>
+          <p v-if="createdApplication" class="field-help">已绑定流程 {{ createdApplication.processKey }} · v{{ createdApplication.definitionVersion }}，表单取自这份申请的保存快照。</p>
           <RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" />
           <p v-if="applicationFormError" class="inline-error" role="alert">{{ applicationFormError }}</p>
-          <form novalidate @submit.prevent="createAndSubmitApplication(true)">
+          <form v-if="applicationSelection.definition || createdApplication" novalidate @submit.prevent="createAndSubmitApplication(true)">
             <fieldset :disabled="busy || writesBlocked || !!createdApplication">
-              <label>已发布流程<select v-model="applicationDefinitionId"><option value="">请选择流程</option><option v-for="definition in publishedDefinitions" :key="definition.id" :value="definition.id">{{ definition.name }} · v{{ definition.version }} · {{ definition.key }}</option></select></label>
+
               <label>申请标题<input v-model="applicationTitle" maxlength="200" /></label><label>业务单号<input v-model="applicationBusinessNo" /></label>
               <FormFields v-if="applicationFormSchema" v-model="applicationPayload" :schema="applicationFormSchema" :disabled="busy || writesBlocked || !!createdApplication" :errors="applicationFieldErrors" @update:model-value="applicationFieldErrors = {}" />
               <template v-else><label>申请金额<input v-model="applicationAmount" type="number" min="0" step="0.01" /></label><label>申请说明<textarea v-model="applicationDescription" rows="3" /></label></template>
             </fieldset>
             <p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿；需要修改时请关闭后从申请记录打开。</p>
             <p v-else class="field-help">必填字段在提交时检查，未填完整也可先保存草稿。</p>
-            <div class="form-actions"><button type="button" class="secondary" :disabled="busy" @click="newApplicationOpen = false">关闭</button><button v-if="!createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked || !publishedDefinitions.length" @click="createAndSubmitApplication(false)">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || (!createdApplication && !publishedDefinitions.length)">{{ busy ? '处理中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="busy" @click="newApplicationOpen = false">关闭</button><button v-if="!createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked || !applicationSelection.definition" @click="createAndSubmitApplication(false)">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || (!createdApplication && !applicationSelection.definition)">{{ busy ? '处理中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div>
           </form>
         </section>
       </div>

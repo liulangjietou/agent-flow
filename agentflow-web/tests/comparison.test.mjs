@@ -1,20 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-const { DefinitionComparisonQuery, comparisonBaselines, comparisonProperty, comparisonValue } = await import(process.env.AGENTFLOW_TEST_COMPARISON)
+const { DefinitionComparisonQuery, comparisonProperty, comparisonValue } = await import(process.env.AGENTFLOW_TEST_COMPARISON)
 const input = () => ({ key: 'leave', name: '请假', graph: { nodes: [], edges: [] }, formSchema: null })
 const response = id => ({ baseline: { id, key: 'leave', name: '请假', version: 1 }, changes: [] })
-
-test('比较基线只含同 key 的发布版本，版本降序且不修改原列表', () => {
-  const versions = [
-    { id: 'one', key: 'leave', status: 'PUBLISHED', version: 1 },
-    { id: 'draft', key: 'leave', status: 'DRAFT', version: 0 },
-    { id: 'foreign', key: 'expense', status: 'PUBLISHED', version: 9 },
-    { id: 'two', key: 'leave', status: 'PUBLISHED', version: 2 }
-  ]
-  assert.deepEqual(comparisonBaselines(versions, ' leave ').map(item => item.id), ['two', 'one'])
-  assert.equal(versions[0].id, 'one')
-  assert.deepEqual(comparisonBaselines(versions, 'new'), [])
-})
 
 test('当前设计按快照发送，切换或编辑后取消旧比较，迟到响应不回填', async () => {
   const pending = []

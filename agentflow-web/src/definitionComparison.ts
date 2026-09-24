@@ -1,4 +1,4 @@
-import type { ApiError, ComparisonInput, ComparisonResult, Definition } from './api'
+import type { ApiError, ComparisonInput, ComparisonResult } from './api'
 
 /**
  * 版本比较属于当前设计快照；切换基线或编辑内容后不得展示旧差异。
@@ -53,12 +53,6 @@ export class DefinitionComparisonQuery {
       if (generation === this.generation) { this.loading = false; this.controller = null }
     }
   }
-}
-
-/** 只提供当前 key 的不可变发布版本，不把其他流程或草稿作为基线。 */
-export function comparisonBaselines(definitions: Definition[], key: string) {
-  return definitions.filter(definition => definition.status === 'PUBLISHED' && definition.key === key.trim())
-    .sort((a, b) => b.version - a.version)
 }
 
 const labels: Record<string, string> = {
