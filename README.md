@@ -168,3 +168,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 流程设计器支持[条件中文说明与字段插入](docs/readable-conditions.md)，以本版本表单标签解释条件，保留原始表达式与执行顺序。
 
 流程设计器支持[可视化嵌套条件组](docs/visual-condition-groups.md)，可配置分组且/或、整组与单项取反，共用原有校验、模拟及发布链路。
+
+部署验收提供 [PostgreSQL 容量基线](docs/capacity-baseline.md)：新建隔离容器，通过真实申请与审批 API 生成负载，记录延迟、并发吞吐和业务一致性，结束后停止并保留数据。报告按实际资源与负载解释，不代替生产容量目标验收。

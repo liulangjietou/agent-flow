@@ -79,3 +79,5 @@ python3 scripts/check-process-templates.py http://127.0.0.1:8180
 实现依据：[Docker Compose 启动依赖与健康检查](https://docs.docker.com/compose/how-tos/startup-order/)、[Spring Boot 3.5 Actuator 健康与探针](https://docs.spring.io/spring-boot/3.5/reference/actuator/endpoints.html)。
 
 管理员首次登录默认进入“开始使用”，可选择模板、新建流程或只读预览样例，并按真实保存、发布、提交和批准记录继续验证。可勾选以后直接进入工作台；侧栏始终保留返回入口。这不是租户/法人/企业身份初始化的完成标记。
+
+部署维护者可运行[独立 PostgreSQL 容量基线](capacity-baseline.md)，生成新的隔离数据库与审批样本，测量不同数据量和并发下的查询、提交与批准。该工具不接受本演示入口作为压测目标，结束后停止并保留本次资源。

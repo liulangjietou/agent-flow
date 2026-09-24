@@ -18,10 +18,10 @@ jobs:
         run: java scripts/CheckAuthors.java .
       - name: Verify backend
         run: mvn -B -ntp verify
-      - name: Verify database recovery guards
+      - name: Verify maintenance and capacity tool guards
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
-          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_demo_database.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

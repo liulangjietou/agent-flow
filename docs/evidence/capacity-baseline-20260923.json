@@ -1,0 +1,307 @@
+{
+  "scope": "Local closed-loop PostgreSQL baseline; not a production capacity acceptance",
+  "apiWrites": "Original application and task APIs only; new database per run",
+  "measurement": "One HTTP connection per request; client connect + body + JSON time; 100 samples per endpoint per measured concurrency; 5 warmups per endpoint excluded",
+  "datasets": [
+    {
+      "applications": 1000,
+      "expected": {
+        "applications": 1000,
+        "approved": 250,
+        "pending": 750,
+        "definitions": 40,
+        "aliceApplications": 500
+      },
+      "verification": {
+        "applicationStates": "EXACT_MATCH",
+        "activeTaskSet": "EXACT_MATCH",
+        "participantPaging": "PASS",
+        "unrelatedAccount": "EMPTY",
+        "roundMetrics": "EXACT_MATCH",
+        "managerNotifications": "EXACT_MATCH",
+        "definitionCount": "EXACT_MATCH"
+      },
+      "configuration": {
+        "server_image": "agentflow-server:agent-records-20260923",
+        "postgres_image": "postgres:17",
+        "port": 8192,
+        "applications": 1000,
+        "definitions": 40,
+        "seed_concurrency": 4,
+        "concurrency": [
+          1,
+          4,
+          8
+        ],
+        "requests": 100,
+        "warmup": 5
+      },
+      "startedAt": "2026-09-24T03:50:19.652043+00:00",
+      "finishedAt": "2026-09-24T03:51:21.969546+00:00",
+      "environment": {
+        "images": {
+          "server": "sha256:459d0ce3e97c1f84c42cf3a5018cbcd09ed5fd71e832574a3436024095aa80f4",
+          "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "architecture": "arm64",
+        "dockerHost": {
+          "ServerVersion": "29.6.2",
+          "NCPU": 5,
+          "MemTotal": 16484818944,
+          "Architecture": "aarch64",
+          "KernelVersion": "6.12.76-linuxkit"
+        },
+        "resources": {
+          "serverCpuLimit": 2,
+          "serverMemoryMiB": 1536,
+          "javaHeapMiB": 1024,
+          "databaseCpuLimit": 1,
+          "databaseMemoryMiB": 768,
+          "hikariMaximumPoolSize": 10
+        },
+        "postgresVersion": 170011,
+        "javaVersion": "openjdk 17.0.20 2026-07-21"
+      },
+      "client": {
+        "python": "3.10.1",
+        "platform": "Darwin",
+        "architecture": "arm64"
+      },
+      "seedWallSeconds": 7.017,
+      "actionsWallSeconds": 1.825,
+      "readPhases": [
+        {
+          "phase": "read_c1",
+          "concurrency": 1,
+          "requests": 700,
+          "wallSeconds": 10.23,
+          "completedRequestsPerSecond": 68.423,
+          "p95Ms": {
+            "application_admin": 7.378,
+            "application_participant": 22.583,
+            "approval_operations": 40.414,
+            "definition_catalog": 8.063,
+            "notification_inbox": 8.01,
+            "pending_first": 23.265,
+            "pending_second": 22.341
+          },
+          "p99Ms": {
+            "application_admin": 8.476,
+            "application_participant": 24.99,
+            "approval_operations": 48.74,
+            "definition_catalog": 12.803,
+            "notification_inbox": 12.992,
+            "pending_first": 25.265,
+            "pending_second": 26.507
+          },
+          "failed": 0
+        },
+        {
+          "phase": "read_c4",
+          "concurrency": 4,
+          "requests": 700,
+          "wallSeconds": 8.076,
+          "completedRequestsPerSecond": 86.675,
+          "p95Ms": {
+            "application_admin": 66.933,
+            "application_participant": 91.876,
+            "approval_operations": 179.563,
+            "definition_catalog": 64.132,
+            "notification_inbox": 64.082,
+            "pending_first": 91.658,
+            "pending_second": 89.388
+          },
+          "p99Ms": {
+            "application_admin": 71.536,
+            "application_participant": 101.038,
+            "approval_operations": 190.086,
+            "definition_catalog": 70.255,
+            "notification_inbox": 72.45,
+            "pending_first": 93.299,
+            "pending_second": 95.224
+          },
+          "failed": 0
+        },
+        {
+          "phase": "read_c8",
+          "concurrency": 8,
+          "requests": 700,
+          "wallSeconds": 9.792,
+          "completedRequestsPerSecond": 71.487,
+          "p95Ms": {
+            "application_admin": 83.181,
+            "application_participant": 201.415,
+            "approval_operations": 398.95,
+            "definition_catalog": 83.833,
+            "notification_inbox": 84.135,
+            "pending_first": 201.402,
+            "pending_second": 200.197
+          },
+          "p99Ms": {
+            "application_admin": 89.563,
+            "application_participant": 213.062,
+            "approval_operations": 489.555,
+            "definition_catalog": 87.699,
+            "notification_inbox": 88.77,
+            "pending_first": 207.949,
+            "pending_second": 218.737
+          },
+          "failed": 0
+        }
+      ],
+      "reportPath": "/fyoung/tmp/agentflow-capacity-1000-20260923/report.json",
+      "reportSha256": "2d460fffad7fea5ebf9a1af0b105e726c88c6e86c13e5db85e441e8c751f6eae",
+      "samplesSha256": "01adfbe170d7a76588d9e2e55ac94ba1ed2c84a3cd2ba725d044dbe3ec1bbc40"
+    },
+    {
+      "applications": 5000,
+      "expected": {
+        "applications": 5000,
+        "approved": 1250,
+        "pending": 3750,
+        "definitions": 40,
+        "aliceApplications": 2500
+      },
+      "verification": {
+        "applicationStates": "EXACT_MATCH",
+        "activeTaskSet": "EXACT_MATCH",
+        "participantPaging": "PASS",
+        "unrelatedAccount": "EMPTY",
+        "roundMetrics": "EXACT_MATCH",
+        "managerNotifications": "EXACT_MATCH",
+        "definitionCount": "EXACT_MATCH"
+      },
+      "configuration": {
+        "server_image": "agentflow-server:agent-records-20260923",
+        "postgres_image": "postgres:17",
+        "port": 8192,
+        "applications": 5000,
+        "definitions": 40,
+        "seed_concurrency": 4,
+        "concurrency": [
+          1,
+          4,
+          8
+        ],
+        "requests": 100,
+        "warmup": 5
+      },
+      "startedAt": "2026-09-24T03:52:41.879475+00:00",
+      "finishedAt": "2026-09-24T03:56:45.381867+00:00",
+      "environment": {
+        "images": {
+          "server": "sha256:459d0ce3e97c1f84c42cf3a5018cbcd09ed5fd71e832574a3436024095aa80f4",
+          "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "architecture": "arm64",
+        "dockerHost": {
+          "ServerVersion": "29.6.2",
+          "NCPU": 5,
+          "MemTotal": 16484818944,
+          "Architecture": "aarch64",
+          "KernelVersion": "6.12.76-linuxkit"
+        },
+        "resources": {
+          "serverCpuLimit": 2,
+          "serverMemoryMiB": 1536,
+          "javaHeapMiB": 1024,
+          "databaseCpuLimit": 1,
+          "databaseMemoryMiB": 768,
+          "hikariMaximumPoolSize": 10
+        },
+        "postgresVersion": 170011,
+        "javaVersion": "openjdk 17.0.20 2026-07-21"
+      },
+      "client": {
+        "python": "3.10.1",
+        "platform": "Darwin",
+        "architecture": "arm64"
+      },
+      "seedWallSeconds": 38.107,
+      "actionsWallSeconds": 8.248,
+      "readPhases": [
+        {
+          "phase": "read_c1",
+          "concurrency": 1,
+          "requests": 700,
+          "wallSeconds": 43.098,
+          "completedRequestsPerSecond": 16.242,
+          "p95Ms": {
+            "application_admin": 7.615,
+            "application_participant": 89.325,
+            "approval_operations": 197.369,
+            "definition_catalog": 6.887,
+            "notification_inbox": 8.216,
+            "pending_first": 101.178,
+            "pending_second": 91.63
+          },
+          "p99Ms": {
+            "application_admin": 10.356,
+            "application_participant": 121.609,
+            "approval_operations": 280.498,
+            "definition_catalog": 12.766,
+            "notification_inbox": 10.53,
+            "pending_first": 135.308,
+            "pending_second": 136.16
+          },
+          "failed": 0
+        },
+        {
+          "phase": "read_c4",
+          "concurrency": 4,
+          "requests": 700,
+          "wallSeconds": 50.933,
+          "completedRequestsPerSecond": 13.744,
+          "p95Ms": {
+            "application_admin": 9.781,
+            "application_participant": 403.661,
+            "approval_operations": 982.024,
+            "definition_catalog": 11.356,
+            "notification_inbox": 76.112,
+            "pending_first": 410.956,
+            "pending_second": 408.111
+          },
+          "p99Ms": {
+            "application_admin": 77.877,
+            "application_participant": 470.857,
+            "approval_operations": 1002.944,
+            "definition_catalog": 77.373,
+            "notification_inbox": 79.975,
+            "pending_first": 484.655,
+            "pending_second": 481.468
+          },
+          "failed": 0
+        },
+        {
+          "phase": "read_c8",
+          "concurrency": 8,
+          "requests": 700,
+          "wallSeconds": 60.612,
+          "completedRequestsPerSecond": 11.549,
+          "p95Ms": {
+            "application_admin": 90.883,
+            "application_participant": 1296.869,
+            "approval_operations": 2703.654,
+            "definition_catalog": 88.568,
+            "notification_inbox": 91.566,
+            "pending_first": 1306.733,
+            "pending_second": 1314.564
+          },
+          "p99Ms": {
+            "application_admin": 93.646,
+            "application_participant": 1388.173,
+            "approval_operations": 2899.899,
+            "definition_catalog": 92.551,
+            "notification_inbox": 93.907,
+            "pending_first": 1388.894,
+            "pending_second": 1488.198
+          },
+          "failed": 0
+        }
+      ],
+      "reportPath": "/fyoung/tmp/agentflow-capacity-5000-20260923/report.json",
+      "reportSha256": "3aa0dfe9a04accafbf2e37d80fa650d0e4af12360c6b6073e8f0627400b22e18",
+      "samplesSha256": "899dbe1c810941e8ed28bf88da0d5d3e61b2fda532c6cd89bff8dfdf8ffbe9bd"
+    }
+  ]
+}
