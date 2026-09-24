@@ -3,6 +3,9 @@ package io.agentflow.approval;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
+import io.agentflow.common.CurrentActor;
+import io.agentflow.approval.workspace.FlowablePendingTaskReadAdapter;
+import io.agentflow.approval.workspace.PendingTaskController;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
 import io.agentflow.approval.workspace.PendingTaskReadPort;
@@ -16,6 +19,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +31,8 @@ import java.util.UUID;
 import static io.agentflow.definition.DefinitionModels.*;
 import static io.agentflow.support.MutationRequests.post;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,7 +41,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 在真实 HTTP、申请仓储与 Flowable 任务上验证筛选、分页和办理权限的一致性。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:pending-task-queue;DB_CLOSE_DELAY=-1",
+@SpringBootTest(properties = {
+        "spring.datasource.url=${AGENTFLOW_QUEUE_TEST_URL:jdbc:h2:mem:pending-task-queue;DB_CLOSE_DELAY=-1}",
+        "spring.datasource.username=${AGENTFLOW_QUEUE_TEST_USER:sa}",
+        "spring.datasource.password=${AGENTFLOW_QUEUE_TEST_PASSWORD:}",
+        "spring.datasource.driver-class-name=${AGENTFLOW_QUEUE_TEST_DRIVER:org.h2.Driver}",
         "agentflow.auth.demo-enabled=true", "agentflow.auth.demo-tenant=demo"})
 @AutoConfigureMockMvc
 class PendingTaskQueueIntegrationTest {
@@ -118,8 +130,10 @@ class PendingTaskQueueIntegrationTest {
         assertThat(seen).isEqualTo(ids);
         var other = new Actor("other", "manager", Set.of("APPROVER", "MANAGER", "ADMIN"));
         var filter = TaskQueryParameters.parse(other, Map.of("processKey", key), json).query();
-        assertThat(reader.list(other, filter)).isEmpty(); assertThat(reader.count(other, filter)).isZero();
-        assertThat(reader.list(new Actor("demo", "manager", Set.of("ADMIN")), filter)).isEmpty();
+        var otherPage = reader.read(other, filter);
+        assertThat(otherPage.items()).isEmpty(); assertThat(otherPage.total()).isZero();
+        var nonApprover = reader.read(new Actor("demo", "manager", Set.of("ADMIN")), filter);
+        assertThat(nonApprover.items()).isEmpty(); assertThat(nonApprover.total()).isZero();
     }
 
     @Test
@@ -180,6 +194,80 @@ class PendingTaskQueueIntegrationTest {
         assertThat(page.path("total").asInt()).isEqualTo(1);
         assertThat(page.path("items").get(0).path("amount").isTextual()).isFalse();
         assertThat(query("manager", Map.of("processKey", key, "minAmount", "0")).path("total").asInt()).isZero();
+    }
+
+    @Test
+    void pageAndTotalReadTheAuthorizedTaskSetOnceBeforeCursorAndLimit() throws Exception {
+        String key = definition("user:manager");
+        for (int index = 0; index < 5; index++) submit(key, "alice", "合并待办 " + index, "1");
+        var statements = new ArrayList<String>();
+        var actor = mock(CurrentActor.class);
+        when(actor.actor()).thenReturn(new Actor("demo", "manager", Set.of("APPROVER", "MANAGER")));
+        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements)), json);
+        var first = controller.list(Map.of("processKey", key, "limit", "2"));
+        assertThat(first.items()).hasSize(2);
+        assertThat(first.total()).isEqualTo(5);
+        assertThat(first.nextCursor()).isNotBlank();
+        assertThat(statements.stream().filter(sql -> sql.contains("FROM ACT_RU_TASK")).count())
+                .as("nonempty pending page and full total share one current task set read").isEqualTo(1);
+        statements.clear();
+        var second = controller.list(Map.of("processKey", key, "limit", "2", "cursor", first.nextCursor()));
+        assertThat(second.items()).hasSize(2);
+        assertThat(second.total()).isEqualTo(5); // 总数包含游标之前的待办。
+        assertThat(second.items()).doesNotContainAnyElementsOf(first.items());
+        assertThat(statements.stream().filter(sql -> sql.contains("FROM ACT_RU_TASK")).count()).isEqualTo(1);
+        var last = controller.list(Map.of("processKey", key, "limit", "2", "cursor", second.nextCursor()));
+        assertThat(last.items()).hasSize(1);
+        assertThat(last.total()).isEqualTo(5);
+        assertThat(last.nextCursor()).isNull();
+        act(last.items().get(0).taskId(), "manager", "APPROVE", null, 2);
+        var removedPage = controller.list(Map.of("processKey", key, "limit", "2", "cursor", second.nextCursor()));
+        assertThat(removedPage.items()).isEmpty();
+        assertThat(removedPage.total()).isEqualTo(4); // 游标之后全部办结，之前仍有待办。
+        assertThat(removedPage.nextCursor()).isNull();
+        var empty = controller.list(Map.of("processKey", key, "q", "no-such-task"));
+        assertThat(empty.items()).isEmpty();
+        assertThat(empty.total()).isZero();
+    }
+
+    @Test
+    void countersignPagesCountOnlyTheCurrentUsersRemainingTasks() throws Exception {
+        String key = "queue-all-" + UUID.randomUUID();
+        var draft = definitions.create("demo", key, "待办会签统计", new Graph(List.of(
+                new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("review", "财务会签", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE", "approvalMode", "ALL")),
+                new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "review", ""), new Edge("b", "review", "end", ""))));
+        definitions.publish(new Actor("demo", "admin", Set.of("ADMIN")), draft.id(), 0, "会签待办分页验收");
+        String app = submit(key, "alice", "会签待办", "100").path("id").asText();
+        var finance = query("finance", Map.of("processKey", key));
+        assertThat(finance.path("total").asInt()).isEqualTo(1);
+        assertThat(finance.path("items").get(0).path("applicationId").asText()).isEqualTo(app);
+        var admin = query("admin", Map.of("processKey", key));
+        assertThat(admin.path("total").asInt()).isEqualTo(1);
+        assertThat(admin.path("items").get(0).path("taskId").asText())
+                .isNotEqualTo(finance.path("items").get(0).path("taskId").asText());
+        act(finance.path("items").get(0).path("taskId").asText(), "finance", "APPROVE", null, 2);
+        assertThat(query("finance", Map.of("processKey", key)).path("total").asInt()).isZero();
+        assertThat(query("admin", Map.of("processKey", key)).path("total").asInt()).isEqualTo(1);
+    }
+
+    /** 在真实 JDBC 连接上记录 SQL，避免把宿主机耗时波动当作功能回归。 */
+    private JdbcTemplate observedJdbc(List<String> statements) throws SQLException {
+        var source = mock(javax.sql.DataSource.class);
+        when(source.getConnection()).thenAnswer(invocation -> {
+            Connection connection = jdbc.getDataSource().getConnection();
+            return java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[]{Connection.class},
+                    (proxy, method, arguments) -> {
+                        if (method.getName().equals("prepareStatement")) statements.add((String) arguments[0]);
+                        try {
+                            return method.invoke(connection, arguments);
+                        } catch (java.lang.reflect.InvocationTargetException exception) {
+                            throw exception.getCause();
+                        }
+                    });
+        });
+        return new JdbcTemplate(source);
     }
 
     private String definition(String rule) { return definition(rule, null); }

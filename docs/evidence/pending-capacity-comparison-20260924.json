@@ -1,0 +1,1826 @@
+{
+  "1000": {
+    "beforeStage": 58,
+    "beforeReport": "/fyoung/tmp/agentflow-operations-capacity-1000-20260924/report.json",
+    "beforeReportSha256": "14ac3bfbd17e09f59a1823ce8e448cbd4d5bb3fba794c1723f76f5cb00203a18",
+    "afterReport": "/fyoung/tmp/agentflow-pending61-capacity-1000-20260924/report.json",
+    "afterReportSha256": "3f54cb1ecfa84195325982e2bd858e29f054574dc45d6ea711d013f5ea0942d8",
+    "configuration": {
+      "server_image": "agentflow-server:pending61-20260924",
+      "postgres_image": "postgres:17",
+      "output": "/fyoung/tmp/agentflow-pending61-capacity-1000-20260924",
+      "port": 8194,
+      "applications": 1000,
+      "definitions": 40,
+      "seed_concurrency": 4,
+      "concurrency": [
+        1,
+        4,
+        8
+      ],
+      "requests": 100,
+      "warmup": 5
+    },
+    "expected": {
+      "applications": 1000,
+      "approved": 250,
+      "pending": 750,
+      "definitions": 40,
+      "aliceApplications": 500
+    },
+    "verification": {
+      "applicationStates": "EXACT_MATCH",
+      "activeTaskSet": "EXACT_MATCH",
+      "participantPaging": "PASS",
+      "unrelatedAccount": "EMPTY",
+      "roundMetrics": "EXACT_MATCH",
+      "managerNotifications": "EXACT_MATCH",
+      "definitionCount": "EXACT_MATCH"
+    },
+    "resources": {
+      "runId": "15cca69847c54a328fdf17f5197cef11",
+      "network": "agentflow-capacity-15cca69847c5",
+      "volume": "agentflow-capacity-15cca69847c5-data",
+      "containers": {
+        "database": "f74a2d29d95f77452697a0eeba13d6fcc8abad71e1530ad5c5e3f8cbbe69ec65",
+        "server": "c99e831ab772c2b4a5de0b9dd60483441f88409e3fed37a73926a92301cf26b8"
+      },
+      "images": {
+        "server": "sha256:fdf69e0f306fb8e92617f57ac335f02224475cce9c638fab0c41ebc1e9fbac5d",
+        "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+      },
+      "architecture": "arm64",
+      "dockerHost": {
+        "ServerVersion": "29.6.2",
+        "NCPU": 5,
+        "MemTotal": 16484818944,
+        "Architecture": "aarch64",
+        "KernelVersion": "6.12.76-linuxkit"
+      },
+      "resources": {
+        "serverCpuLimit": 2,
+        "serverMemoryMiB": 1536,
+        "javaHeapMiB": 1024,
+        "databaseCpuLimit": 1,
+        "databaseMemoryMiB": 768,
+        "hikariMaximumPoolSize": 10
+      },
+      "postgresVersion": 170011,
+      "javaVersion": "openjdk 17.0.20 2026-07-21"
+    },
+    "beforeReadPhases": [
+      {
+        "phase": "read_c1",
+        "concurrency": 1,
+        "requests": 700,
+        "wallSeconds": 9.759,
+        "completedRequestsPerSecond": 71.726
+      },
+      {
+        "phase": "read_c4",
+        "concurrency": 4,
+        "requests": 700,
+        "wallSeconds": 6.315,
+        "completedRequestsPerSecond": 110.84
+      },
+      {
+        "phase": "read_c8",
+        "concurrency": 8,
+        "requests": 700,
+        "wallSeconds": 7.466,
+        "completedRequestsPerSecond": 93.754
+      }
+    ],
+    "afterReadPhases": [
+      {
+        "phase": "read_c1",
+        "concurrency": 1,
+        "requests": 700,
+        "wallSeconds": 7.484,
+        "completedRequestsPerSecond": 93.536
+      },
+      {
+        "phase": "read_c4",
+        "concurrency": 4,
+        "requests": 700,
+        "wallSeconds": 4.733,
+        "completedRequestsPerSecond": 147.905
+      },
+      {
+        "phase": "read_c8",
+        "concurrency": 8,
+        "requests": 700,
+        "wallSeconds": 5.196,
+        "completedRequestsPerSecond": 134.725
+      }
+    ],
+    "beforeSummary": [
+      {
+        "phase": "actions",
+        "operation": "approve_task",
+        "requests": 250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 17.771,
+        "p95Ms": 53.999,
+        "p99Ms": 63.961,
+        "maxMs": 82.374
+      },
+      {
+        "phase": "actions",
+        "operation": "read_task_for_action",
+        "requests": 250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.141,
+        "p95Ms": 32.047,
+        "p99Ms": 60.11,
+        "maxMs": 66.91
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.703,
+        "p95Ms": 10.221,
+        "p99Ms": 21.772,
+        "maxMs": 26.429
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.869,
+        "p95Ms": 12.031,
+        "p99Ms": 17.027,
+        "maxMs": 17.082
+      },
+      {
+        "phase": "read_c1",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 32.298,
+        "p95Ms": 38.704,
+        "p99Ms": 43.153,
+        "maxMs": 47.534
+      },
+      {
+        "phase": "read_c1",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.095,
+        "p95Ms": 7.944,
+        "p99Ms": 9.979,
+        "maxMs": 10.035
+      },
+      {
+        "phase": "read_c1",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.325,
+        "p95Ms": 8.882,
+        "p99Ms": 11.507,
+        "maxMs": 13.147
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 18.973,
+        "p95Ms": 27.228,
+        "p99Ms": 43.064,
+        "maxMs": 44.136
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 19.09,
+        "p95Ms": 26.605,
+        "p99Ms": 31.672,
+        "maxMs": 36.151
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.872,
+        "p95Ms": 14.291,
+        "p99Ms": 64.35,
+        "maxMs": 67.076
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 10.153,
+        "p95Ms": 75.96,
+        "p99Ms": 84.174,
+        "maxMs": 88.692
+      },
+      {
+        "phase": "read_c4",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 93.415,
+        "p95Ms": 108.48,
+        "p99Ms": 172.803,
+        "maxMs": 190.624
+      },
+      {
+        "phase": "read_c4",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.127,
+        "p95Ms": 17.619,
+        "p99Ms": 69.408,
+        "maxMs": 71.954
+      },
+      {
+        "phase": "read_c4",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.57,
+        "p95Ms": 44.642,
+        "p99Ms": 66.629,
+        "maxMs": 70.689
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 71.507,
+        "p95Ms": 89.924,
+        "p99Ms": 97.2,
+        "maxMs": 98.394
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 70.017,
+        "p95Ms": 88.144,
+        "p99Ms": 90.148,
+        "maxMs": 96.33
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.2,
+        "p95Ms": 81.487,
+        "p99Ms": 86.943,
+        "maxMs": 98.462
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 79.18,
+        "p95Ms": 101.512,
+        "p99Ms": 108.528,
+        "maxMs": 151.824
+      },
+      {
+        "phase": "read_c8",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 195.268,
+        "p95Ms": 290.933,
+        "p99Ms": 297.3,
+        "maxMs": 297.983
+      },
+      {
+        "phase": "read_c8",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.851,
+        "p95Ms": 84.643,
+        "p99Ms": 90.099,
+        "maxMs": 93.487
+      },
+      {
+        "phase": "read_c8",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 9.451,
+        "p95Ms": 86.951,
+        "p99Ms": 91.972,
+        "maxMs": 100.414
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 107.783,
+        "p95Ms": 207.208,
+        "p99Ms": 282.819,
+        "maxMs": 288.124
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 106.236,
+        "p95Ms": 193.205,
+        "p99Ms": 217.957,
+        "maxMs": 243.455
+      },
+      {
+        "phase": "seed",
+        "operation": "create_application",
+        "requests": 1000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.743,
+        "p95Ms": 30.338,
+        "p99Ms": 45.9,
+        "maxMs": 63.959
+      },
+      {
+        "phase": "seed",
+        "operation": "create_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.84,
+        "p95Ms": 12.574,
+        "p99Ms": 28.967,
+        "maxMs": 28.967
+      },
+      {
+        "phase": "seed",
+        "operation": "publish_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 18.638,
+        "p95Ms": 42.504,
+        "p99Ms": 62.347,
+        "maxMs": 62.347
+      },
+      {
+        "phase": "seed",
+        "operation": "submit_application",
+        "requests": 1000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 16.125,
+        "p95Ms": 52.243,
+        "p99Ms": 72.173,
+        "maxMs": 199.807
+      },
+      {
+        "phase": "verify",
+        "operation": "login",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.164,
+        "p95Ms": 46.644,
+        "p99Ms": 46.644,
+        "maxMs": 46.644
+      },
+      {
+        "phase": "verify",
+        "operation": "verify",
+        "requests": 49,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.998,
+        "p95Ms": 1523.844,
+        "p99Ms": 1856.045,
+        "maxMs": 1856.045
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_admin",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.999,
+        "p95Ms": 6.314,
+        "p99Ms": 6.314,
+        "maxMs": 6.314
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_participant",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 9.184,
+        "p95Ms": 13.3,
+        "p99Ms": 13.3,
+        "maxMs": 13.3
+      },
+      {
+        "phase": "warmup",
+        "operation": "approval_operations",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 38.174,
+        "p95Ms": 53.886,
+        "p99Ms": 53.886,
+        "maxMs": 53.886
+      },
+      {
+        "phase": "warmup",
+        "operation": "definition_catalog",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.743,
+        "p95Ms": 8.239,
+        "p99Ms": 8.239,
+        "maxMs": 8.239
+      },
+      {
+        "phase": "warmup",
+        "operation": "notification_inbox",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.972,
+        "p95Ms": 17.696,
+        "p99Ms": 17.696,
+        "maxMs": 17.696
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_first",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 22.697,
+        "p95Ms": 23.677,
+        "p99Ms": 23.677,
+        "maxMs": 23.677
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_second",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 20.894,
+        "p95Ms": 22.149,
+        "p99Ms": 22.149,
+        "maxMs": 22.149
+      }
+    ],
+    "afterSummary": [
+      {
+        "phase": "actions",
+        "operation": "approve_task",
+        "requests": 250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 16.281,
+        "p95Ms": 50.153,
+        "p99Ms": 57.729,
+        "maxMs": 59.438
+      },
+      {
+        "phase": "actions",
+        "operation": "read_task_for_action",
+        "requests": 250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.036,
+        "p95Ms": 28.99,
+        "p99Ms": 38.991,
+        "maxMs": 41.176
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.892,
+        "p95Ms": 7.149,
+        "p99Ms": 9.58,
+        "maxMs": 13.417
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.988,
+        "p95Ms": 13.044,
+        "p99Ms": 15.094,
+        "maxMs": 20.188
+      },
+      {
+        "phase": "read_c1",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 29.91,
+        "p95Ms": 36.964,
+        "p99Ms": 40.796,
+        "maxMs": 50.155
+      },
+      {
+        "phase": "read_c1",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.754,
+        "p95Ms": 7.322,
+        "p99Ms": 12.345,
+        "maxMs": 17.63
+      },
+      {
+        "phase": "read_c1",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.438,
+        "p95Ms": 7.369,
+        "p99Ms": 11.383,
+        "maxMs": 14.177
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 10.987,
+        "p95Ms": 16.037,
+        "p99Ms": 18.428,
+        "maxMs": 23.03
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 11.248,
+        "p95Ms": 17.7,
+        "p99Ms": 25.172,
+        "maxMs": 31.932
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.356,
+        "p95Ms": 9.597,
+        "p99Ms": 64.465,
+        "maxMs": 71.422
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.438,
+        "p95Ms": 67.147,
+        "p99Ms": 70.617,
+        "maxMs": 77.528
+      },
+      {
+        "phase": "read_c4",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 91.405,
+        "p95Ms": 100.007,
+        "p99Ms": 102.27,
+        "maxMs": 106.225
+      },
+      {
+        "phase": "read_c4",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.721,
+        "p95Ms": 7.005,
+        "p99Ms": 59.748,
+        "maxMs": 65.304
+      },
+      {
+        "phase": "read_c4",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.058,
+        "p95Ms": 6.069,
+        "p99Ms": 9.405,
+        "maxMs": 54.763
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 13.706,
+        "p95Ms": 76.622,
+        "p99Ms": 78.733,
+        "maxMs": 80.289
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 14.254,
+        "p95Ms": 78.284,
+        "p99Ms": 79.583,
+        "maxMs": 81.745
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.603,
+        "p95Ms": 78.249,
+        "p99Ms": 82.072,
+        "maxMs": 84.111
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 13.683,
+        "p95Ms": 90.382,
+        "p99Ms": 94.524,
+        "maxMs": 95.4
+      },
+      {
+        "phase": "read_c8",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 192.919,
+        "p95Ms": 213.393,
+        "p99Ms": 295.8,
+        "maxMs": 305.633
+      },
+      {
+        "phase": "read_c8",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.375,
+        "p95Ms": 77.15,
+        "p99Ms": 81.425,
+        "maxMs": 86.839
+      },
+      {
+        "phase": "read_c8",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.232,
+        "p95Ms": 82.472,
+        "p99Ms": 86.869,
+        "maxMs": 88.023
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 91.331,
+        "p95Ms": 104.208,
+        "p99Ms": 179.024,
+        "maxMs": 180.152
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 91.421,
+        "p95Ms": 101.362,
+        "p99Ms": 103.987,
+        "maxMs": 107.711
+      },
+      {
+        "phase": "seed",
+        "operation": "create_application",
+        "requests": 1000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.183,
+        "p95Ms": 34.421,
+        "p99Ms": 48.95,
+        "maxMs": 57.482
+      },
+      {
+        "phase": "seed",
+        "operation": "create_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.386,
+        "p95Ms": 25.258,
+        "p99Ms": 48.183,
+        "maxMs": 48.183
+      },
+      {
+        "phase": "seed",
+        "operation": "publish_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 15.939,
+        "p95Ms": 33.139,
+        "p99Ms": 37.582,
+        "maxMs": 37.582
+      },
+      {
+        "phase": "seed",
+        "operation": "submit_application",
+        "requests": 1000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 14.125,
+        "p95Ms": 50.992,
+        "p99Ms": 80.627,
+        "maxMs": 168.83
+      },
+      {
+        "phase": "verify",
+        "operation": "login",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.911,
+        "p95Ms": 49.448,
+        "p99Ms": 49.448,
+        "maxMs": 49.448
+      },
+      {
+        "phase": "verify",
+        "operation": "verify",
+        "requests": 49,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.883,
+        "p95Ms": 758.364,
+        "p99Ms": 764.843,
+        "maxMs": 764.843
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_admin",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.115,
+        "p95Ms": 7.473,
+        "p99Ms": 7.473,
+        "maxMs": 7.473
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_participant",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 99.898,
+        "p95Ms": 105.071,
+        "p99Ms": 105.071,
+        "maxMs": 105.071
+      },
+      {
+        "phase": "warmup",
+        "operation": "approval_operations",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 756.422,
+        "p95Ms": 1019.574,
+        "p99Ms": 1019.574,
+        "maxMs": 1019.574
+      },
+      {
+        "phase": "warmup",
+        "operation": "definition_catalog",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.022,
+        "p95Ms": 8.459,
+        "p99Ms": 8.459,
+        "maxMs": 8.459
+      },
+      {
+        "phase": "warmup",
+        "operation": "notification_inbox",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.937,
+        "p95Ms": 12.514,
+        "p99Ms": 12.514,
+        "maxMs": 12.514
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_first",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 498.82,
+        "p95Ms": 512.603,
+        "p99Ms": 512.603,
+        "maxMs": 512.603
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_second",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 20.485,
+        "p95Ms": 498.507,
+        "p99Ms": 498.507,
+        "maxMs": 498.507
+      }
+    ]
+  },
+  "5000": {
+    "beforeStage": 58,
+    "beforeReport": "/fyoung/tmp/agentflow-operations-capacity-5000-20260924/report.json",
+    "beforeReportSha256": "64ccd7f91e904595bcb599e2e2cb1b3e6804d4ea684fc9d5e231535a345f76f8",
+    "afterReport": "/fyoung/tmp/agentflow-pending61-capacity-5000-20260924/report.json",
+    "afterReportSha256": "6e04333d709637d6603008a61c09d74400a613f9839569d48bf7632d4a3f0a20",
+    "configuration": {
+      "server_image": "agentflow-server:pending61-20260924",
+      "postgres_image": "postgres:17",
+      "output": "/fyoung/tmp/agentflow-pending61-capacity-5000-20260924",
+      "port": 8195,
+      "applications": 5000,
+      "definitions": 40,
+      "seed_concurrency": 4,
+      "concurrency": [
+        1,
+        4,
+        8
+      ],
+      "requests": 100,
+      "warmup": 5
+    },
+    "expected": {
+      "applications": 5000,
+      "approved": 1250,
+      "pending": 3750,
+      "definitions": 40,
+      "aliceApplications": 2500
+    },
+    "verification": {
+      "applicationStates": "EXACT_MATCH",
+      "activeTaskSet": "EXACT_MATCH",
+      "participantPaging": "PASS",
+      "unrelatedAccount": "EMPTY",
+      "roundMetrics": "EXACT_MATCH",
+      "managerNotifications": "EXACT_MATCH",
+      "definitionCount": "EXACT_MATCH"
+    },
+    "resources": {
+      "runId": "8bff70747de048d5b968fecf6221647e",
+      "network": "agentflow-capacity-8bff70747de0",
+      "volume": "agentflow-capacity-8bff70747de0-data",
+      "containers": {
+        "database": "795c79670a42d63518f5ce2b9f18506cb5fe4548327b65d9da7e08bea6a2d699",
+        "server": "70ba70816686dcfc84853cebee027520bae370d0eddaf062a1282bd048dba118"
+      },
+      "images": {
+        "server": "sha256:fdf69e0f306fb8e92617f57ac335f02224475cce9c638fab0c41ebc1e9fbac5d",
+        "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+      },
+      "architecture": "arm64",
+      "dockerHost": {
+        "ServerVersion": "29.6.2",
+        "NCPU": 5,
+        "MemTotal": 16484818944,
+        "Architecture": "aarch64",
+        "KernelVersion": "6.12.76-linuxkit"
+      },
+      "resources": {
+        "serverCpuLimit": 2,
+        "serverMemoryMiB": 1536,
+        "javaHeapMiB": 1024,
+        "databaseCpuLimit": 1,
+        "databaseMemoryMiB": 768,
+        "hikariMaximumPoolSize": 10
+      },
+      "postgresVersion": 170011,
+      "javaVersion": "openjdk 17.0.20 2026-07-21"
+    },
+    "beforeReadPhases": [
+      {
+        "phase": "read_c1",
+        "concurrency": 1,
+        "requests": 700,
+        "wallSeconds": 37.97,
+        "completedRequestsPerSecond": 18.436
+      },
+      {
+        "phase": "read_c4",
+        "concurrency": 4,
+        "requests": 700,
+        "wallSeconds": 35.416,
+        "completedRequestsPerSecond": 19.765
+      },
+      {
+        "phase": "read_c8",
+        "concurrency": 8,
+        "requests": 700,
+        "wallSeconds": 38.304,
+        "completedRequestsPerSecond": 18.275
+      }
+    ],
+    "afterReadPhases": [
+      {
+        "phase": "read_c1",
+        "concurrency": 1,
+        "requests": 700,
+        "wallSeconds": 28.443,
+        "completedRequestsPerSecond": 24.611
+      },
+      {
+        "phase": "read_c4",
+        "concurrency": 4,
+        "requests": 700,
+        "wallSeconds": 29.53,
+        "completedRequestsPerSecond": 23.705
+      },
+      {
+        "phase": "read_c8",
+        "concurrency": 8,
+        "requests": 700,
+        "wallSeconds": 29.112,
+        "completedRequestsPerSecond": 24.045
+      }
+    ],
+    "beforeSummary": [
+      {
+        "phase": "actions",
+        "operation": "approve_task",
+        "requests": 1250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 17.67,
+        "p95Ms": 46.851,
+        "p99Ms": 56.763,
+        "maxMs": 164.01
+      },
+      {
+        "phase": "actions",
+        "operation": "read_task_for_action",
+        "requests": 1250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.869,
+        "p95Ms": 14.206,
+        "p99Ms": 32.699,
+        "maxMs": 52.681
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.793,
+        "p95Ms": 9.663,
+        "p99Ms": 13.094,
+        "maxMs": 60.17
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 21.451,
+        "p95Ms": 26.409,
+        "p99Ms": 31.079,
+        "maxMs": 49.632
+      },
+      {
+        "phase": "read_c1",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 154.913,
+        "p95Ms": 209.812,
+        "p99Ms": 252.899,
+        "maxMs": 273.889
+      },
+      {
+        "phase": "read_c1",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.355,
+        "p95Ms": 6.899,
+        "p99Ms": 8.913,
+        "maxMs": 10.466
+      },
+      {
+        "phase": "read_c1",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.081,
+        "p95Ms": 9.993,
+        "p99Ms": 13.503,
+        "maxMs": 14.152
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 85.961,
+        "p95Ms": 126.402,
+        "p99Ms": 135.52,
+        "maxMs": 154.84
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 86.675,
+        "p95Ms": 124.26,
+        "p99Ms": 138.911,
+        "maxMs": 185.186
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.874,
+        "p95Ms": 10.346,
+        "p99Ms": 77.927,
+        "maxMs": 78.383
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 92.242,
+        "p95Ms": 104.527,
+        "p99Ms": 106.713,
+        "maxMs": 187.021
+      },
+      {
+        "phase": "read_c4",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 604.176,
+        "p95Ms": 685.686,
+        "p99Ms": 694.451,
+        "maxMs": 697.035
+      },
+      {
+        "phase": "read_c4",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.008,
+        "p95Ms": 69.073,
+        "p99Ms": 73.272,
+        "maxMs": 83.549
+      },
+      {
+        "phase": "read_c4",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.217,
+        "p95Ms": 73.459,
+        "p99Ms": 75.396,
+        "maxMs": 86.03
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 313.999,
+        "p95Ms": 391.25,
+        "p99Ms": 399.569,
+        "maxMs": 404.079
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 316.069,
+        "p95Ms": 392.65,
+        "p99Ms": 397.877,
+        "maxMs": 398.44
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.243,
+        "p95Ms": 88.311,
+        "p99Ms": 93.0,
+        "maxMs": 112.162
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 198.402,
+        "p95Ms": 296.362,
+        "p99Ms": 304.625,
+        "maxMs": 349.899
+      },
+      {
+        "phase": "read_c8",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 1214.656,
+        "p95Ms": 1715.188,
+        "p99Ms": 1979.673,
+        "maxMs": 2001.018
+      },
+      {
+        "phase": "read_c8",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.645,
+        "p95Ms": 86.723,
+        "p99Ms": 90.759,
+        "maxMs": 90.844
+      },
+      {
+        "phase": "read_c8",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 8.854,
+        "p95Ms": 90.766,
+        "p99Ms": 95.238,
+        "maxMs": 96.322
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 797.769,
+        "p95Ms": 1094.483,
+        "p99Ms": 1196.476,
+        "maxMs": 1286.208
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 785.425,
+        "p95Ms": 1016.953,
+        "p99Ms": 1100.871,
+        "maxMs": 1287.5
+      },
+      {
+        "phase": "seed",
+        "operation": "create_application",
+        "requests": 5000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.99,
+        "p95Ms": 23.721,
+        "p99Ms": 46.089,
+        "maxMs": 164.091
+      },
+      {
+        "phase": "seed",
+        "operation": "create_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 8.341,
+        "p95Ms": 15.727,
+        "p99Ms": 30.42,
+        "maxMs": 30.42
+      },
+      {
+        "phase": "seed",
+        "operation": "publish_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 18.951,
+        "p95Ms": 31.533,
+        "p99Ms": 38.498,
+        "maxMs": 38.498
+      },
+      {
+        "phase": "seed",
+        "operation": "submit_application",
+        "requests": 5000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 14.888,
+        "p95Ms": 44.393,
+        "p99Ms": 72.637,
+        "maxMs": 2917.308
+      },
+      {
+        "phase": "verify",
+        "operation": "login",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.912,
+        "p95Ms": 49.614,
+        "p99Ms": 49.614,
+        "maxMs": 49.614
+      },
+      {
+        "phase": "verify",
+        "operation": "verify",
+        "requests": 219,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 23.068,
+        "p95Ms": 114.129,
+        "p99Ms": 124.245,
+        "maxMs": 151.142
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_admin",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.103,
+        "p95Ms": 4.617,
+        "p99Ms": 4.617,
+        "maxMs": 4.617
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_participant",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 21.169,
+        "p95Ms": 27.917,
+        "p99Ms": 27.917,
+        "maxMs": 27.917
+      },
+      {
+        "phase": "warmup",
+        "operation": "approval_operations",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 142.374,
+        "p95Ms": 164.848,
+        "p99Ms": 164.848,
+        "maxMs": 164.848
+      },
+      {
+        "phase": "warmup",
+        "operation": "definition_catalog",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.455,
+        "p95Ms": 8.721,
+        "p99Ms": 8.721,
+        "maxMs": 8.721
+      },
+      {
+        "phase": "warmup",
+        "operation": "notification_inbox",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.069,
+        "p95Ms": 17.474,
+        "p99Ms": 17.474,
+        "maxMs": 17.474
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_first",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 86.292,
+        "p95Ms": 96.44,
+        "p99Ms": 96.44,
+        "maxMs": 96.44
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_second",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 88.897,
+        "p95Ms": 94.567,
+        "p99Ms": 94.567,
+        "maxMs": 94.567
+      }
+    ],
+    "afterSummary": [
+      {
+        "phase": "actions",
+        "operation": "approve_task",
+        "requests": 1250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 16.193,
+        "p95Ms": 50.679,
+        "p99Ms": 57.508,
+        "maxMs": 80.122
+      },
+      {
+        "phase": "actions",
+        "operation": "read_task_for_action",
+        "requests": 1250,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.329,
+        "p95Ms": 16.951,
+        "p99Ms": 37.446,
+        "maxMs": 44.317
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.728,
+        "p95Ms": 6.594,
+        "p99Ms": 9.773,
+        "maxMs": 17.039
+      },
+      {
+        "phase": "read_c1",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 20.178,
+        "p95Ms": 24.336,
+        "p99Ms": 24.912,
+        "maxMs": 26.242
+      },
+      {
+        "phase": "read_c1",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 154.64,
+        "p95Ms": 164.349,
+        "p99Ms": 172.655,
+        "maxMs": 199.739
+      },
+      {
+        "phase": "read_c1",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.806,
+        "p95Ms": 5.757,
+        "p99Ms": 6.924,
+        "maxMs": 8.068
+      },
+      {
+        "phase": "read_c1",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.279,
+        "p95Ms": 10.33,
+        "p99Ms": 12.29,
+        "maxMs": 13.462
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 48.851,
+        "p95Ms": 55.229,
+        "p99Ms": 59.508,
+        "maxMs": 63.22
+      },
+      {
+        "phase": "read_c1",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 48.583,
+        "p95Ms": 53.895,
+        "p99Ms": 62.672,
+        "maxMs": 62.906
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.968,
+        "p95Ms": 18.049,
+        "p99Ms": 79.209,
+        "maxMs": 79.759
+      },
+      {
+        "phase": "read_c4",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 92.505,
+        "p95Ms": 102.888,
+        "p99Ms": 109.333,
+        "maxMs": 181.257
+      },
+      {
+        "phase": "read_c4",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 668.24,
+        "p95Ms": 800.029,
+        "p99Ms": 897.825,
+        "maxMs": 903.97
+      },
+      {
+        "phase": "read_c4",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 2.464,
+        "p95Ms": 6.471,
+        "p99Ms": 9.324,
+        "maxMs": 72.78
+      },
+      {
+        "phase": "read_c4",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.377,
+        "p95Ms": 79.814,
+        "p99Ms": 86.657,
+        "maxMs": 88.094
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 196.718,
+        "p95Ms": 288.103,
+        "p99Ms": 292.475,
+        "maxMs": 300.681
+      },
+      {
+        "phase": "read_c4",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 198.672,
+        "p95Ms": 292.252,
+        "p99Ms": 299.015,
+        "maxMs": 310.806
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_admin",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 4.739,
+        "p95Ms": 87.876,
+        "p99Ms": 91.057,
+        "maxMs": 96.82
+      },
+      {
+        "phase": "read_c8",
+        "operation": "application_participant",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 191.801,
+        "p95Ms": 282.465,
+        "p99Ms": 287.298,
+        "maxMs": 296.201
+      },
+      {
+        "phase": "read_c8",
+        "operation": "approval_operations",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 1200.082,
+        "p95Ms": 1700.076,
+        "p99Ms": 1803.438,
+        "maxMs": 2096.959
+      },
+      {
+        "phase": "read_c8",
+        "operation": "definition_catalog",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.456,
+        "p95Ms": 84.433,
+        "p99Ms": 89.793,
+        "maxMs": 101.781
+      },
+      {
+        "phase": "read_c8",
+        "operation": "notification_inbox",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 7.129,
+        "p95Ms": 88.203,
+        "p99Ms": 89.228,
+        "maxMs": 90.231
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_first",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 408.225,
+        "p95Ms": 514.059,
+        "p99Ms": 679.428,
+        "maxMs": 696.285
+      },
+      {
+        "phase": "read_c8",
+        "operation": "pending_second",
+        "requests": 100,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 492.686,
+        "p95Ms": 595.203,
+        "p99Ms": 605.606,
+        "maxMs": 619.075
+      },
+      {
+        "phase": "seed",
+        "operation": "create_application",
+        "requests": 5000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.697,
+        "p95Ms": 24.827,
+        "p99Ms": 48.142,
+        "maxMs": 178.216
+      },
+      {
+        "phase": "seed",
+        "operation": "create_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 6.141,
+        "p95Ms": 29.036,
+        "p99Ms": 31.651,
+        "maxMs": 31.651
+      },
+      {
+        "phase": "seed",
+        "operation": "publish_definition",
+        "requests": 40,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 16.21,
+        "p95Ms": 40.308,
+        "p99Ms": 58.197,
+        "maxMs": 58.197
+      },
+      {
+        "phase": "seed",
+        "operation": "submit_application",
+        "requests": 5000,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 13.953,
+        "p95Ms": 47.009,
+        "p99Ms": 67.037,
+        "maxMs": 4067.627
+      },
+      {
+        "phase": "verify",
+        "operation": "login",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.467,
+        "p95Ms": 44.806,
+        "p99Ms": 44.806,
+        "maxMs": 44.806
+      },
+      {
+        "phase": "verify",
+        "operation": "verify",
+        "requests": 219,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 21.478,
+        "p95Ms": 67.568,
+        "p99Ms": 87.726,
+        "maxMs": 155.881
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_admin",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.429,
+        "p95Ms": 4.415,
+        "p99Ms": 4.415,
+        "maxMs": 4.415
+      },
+      {
+        "phase": "warmup",
+        "operation": "application_participant",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 22.474,
+        "p95Ms": 27.394,
+        "p99Ms": 27.394,
+        "maxMs": 27.394
+      },
+      {
+        "phase": "warmup",
+        "operation": "approval_operations",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 142.027,
+        "p95Ms": 158.266,
+        "p99Ms": 158.266,
+        "maxMs": 158.266
+      },
+      {
+        "phase": "warmup",
+        "operation": "definition_catalog",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 3.694,
+        "p95Ms": 7.686,
+        "p99Ms": 7.686,
+        "maxMs": 7.686
+      },
+      {
+        "phase": "warmup",
+        "operation": "notification_inbox",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 5.591,
+        "p95Ms": 11.932,
+        "p99Ms": 11.932,
+        "maxMs": 11.932
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_first",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 49.679,
+        "p95Ms": 51.391,
+        "p99Ms": 51.391,
+        "maxMs": 51.391
+      },
+      {
+        "phase": "warmup",
+        "operation": "pending_second",
+        "requests": 5,
+        "failed": 0,
+        "errors": {},
+        "p50Ms": 46.345,
+        "p95Ms": 52.432,
+        "p99Ms": 52.432,
+        "maxMs": 52.432
+      }
+    ]
+  }
+}

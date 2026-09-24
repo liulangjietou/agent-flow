@@ -30,11 +30,12 @@ public class PendingTaskController {
     public Page list(@RequestParam Map<String, String> raw) {
         var actor = currentActor.actor();
         var parameters = TaskQueryParameters.parse(actor, raw, json);
-        var rows = reader.list(actor, parameters.query());
+        var result = reader.read(actor, parameters.query());
+        var rows = result.items();
         int count = Math.min(rows.size(), parameters.query().limit());
         var last = count == 0 ? null : rows.get(count - 1);
         return new Page(List.copyOf(rows.subList(0, count)), rows.size() > count ? parameters.cursor(last.createdAt(), last.taskId()) : null,
-                reader.count(actor, parameters.query()));
+                result.total());
     }
 
     /**

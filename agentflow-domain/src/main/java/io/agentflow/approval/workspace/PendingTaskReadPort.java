@@ -10,10 +10,14 @@ import java.util.List;
  * @author owlzhangfq@gmail.com
  */
 public interface PendingTaskReadPort {
-    /** 在存储侧同时限定租户、处理人、筛选与分页位置。 */
-    List<Item> list(Actor actor, Query query);
-    /** 当前筛选匹配总量，不受翻页位置影响。 */
-    long count(Actor actor, Query query);
+    /** 返回当前授权筛选下的一页及完整总数，总数不受游标位置影响。 */
+    Result read(Actor actor, Query query);
+
+    /**
+     * 同一查询快照的一页（最多 limit + 1 条，供入口判断后续页）及完整匹配总数。
+     * @author owlzhangfq@gmail.com
+     */
+    record Result(List<Item> items, long total) { }
 
     /**
      * 任务与申请摘要；金额使用十进制文本，避免前端浮点精度损失。
