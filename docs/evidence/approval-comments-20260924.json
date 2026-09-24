@@ -1,0 +1,100 @@
+{
+  "date": "2026-09-24",
+  "result": "PASS",
+  "scope": "Approval comment entry in the existing task panel",
+  "verification": {
+    "java": 648,
+    "domain": 181,
+    "server": 467,
+    "frontend": 247,
+    "tools": 19,
+    "javaAuthorFiles": 259,
+    "javaAuthorTypes": 426,
+    "openapiOperations": 64,
+    "build": "PASS"
+  },
+  "regression": {
+    "expected": "First APPROVE click opens form without emitting execute",
+    "before": "APPROVE emitted immediately with undefined comment",
+    "after": "Explicit form submit emits original version and supplied comment"
+  },
+  "browser": {
+    "database": "PostgreSQL 17.11",
+    "backendStage": 63,
+    "fixturePrefix": "approval64-2457da6c",
+    "cancel": {
+      "applicationVersion": 2,
+      "applicationStatus": "IN_APPROVAL",
+      "approvalAuditCount": 0
+    },
+    "offlineRecovery": "Original comment retained; restored original request; one approval audit",
+    "countersign": "First approver leaves IN_APPROVAL, second sees 1/2 and completes; both opinions visible in audit",
+    "focus": "Opinion textarea focused when opened; action button focused after cancellation",
+    "mobile": {
+      "cssViewport": 390,
+      "documentWidth": 390,
+      "opinionWidth": 306
+    },
+    "applications": {
+      "填写意见": {
+        "id": "cfa7dafb-a4f5-4742-b67c-0590fc1e9df7",
+        "status": "APPROVED",
+        "version": 4,
+        "approvalAudits": [
+          {
+            "actor": "finance",
+            "comment": "已核对用途与申请内容。\n同意当前节点通过。",
+            "currentStatus": "APPROVED"
+          }
+        ]
+      },
+      "空意见": {
+        "id": "e64f2f83-ba8f-4b42-b199-862ac6fae50b",
+        "status": "APPROVED",
+        "version": 4,
+        "approvalAudits": [
+          {
+            "actor": "finance",
+            "comment": "",
+            "currentStatus": "APPROVED"
+          }
+        ]
+      },
+      "回交后批准": {
+        "id": "1624f57c-8d37-4a6d-8e6d-5357036953ad",
+        "status": "APPROVED",
+        "version": 6,
+        "approvalAudits": [
+          {
+            "actor": "finance",
+            "comment": "已核对受托人的处理意见，同意。",
+            "currentStatus": "APPROVED"
+          }
+        ]
+      },
+      "会签": {
+        "id": "a575a8a0-ed1a-4126-bb98-9fe52117c780",
+        "status": "APPROVED",
+        "version": 5,
+        "approvalAudits": [
+          {
+            "actor": "admin",
+            "comment": "会签：完成第二人复核。",
+            "currentStatus": "APPROVED"
+          },
+          {
+            "actor": "finance",
+            "comment": "会签：本人的核实已完成。",
+            "currentStatus": "IN_APPROVAL"
+          }
+        ]
+      }
+    }
+  },
+  "limits": [
+    "Component unit checks run real setup and watchers, without DOM rendering",
+    "Browser scenario sends no real business or external messages",
+    "No Java, database schema, or API contract changes",
+    "No Git remote or remote CI"
+  ]
+}

@@ -8,6 +8,8 @@ AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。�
 
 申请、首次引导、版本比较和筛选也已接入[按需流程选择](docs/definition-selection.md)：列表只读摘要，选择后再取得所需配置；Web 不再启动时加载全部流程图和表单。
 
+待办办理支持[批准意见填写与确认](docs/approval-comments.md)：意见选填，确认后提交；支持取消、原请求恢复和会签分别留痕，可在已办记录与操作审计追溯。
+
 [Agent 审批摘要核心](docs/agent-summary-core.md)正在开发：已建立领域状态、证据绑定与事务存储；真实模型、应用 API、执行器和 UI 尚未接入，不计为可用 Agent 功能。
 - [Agent 摘要运行记录](docs/agent-summary-records.md)：有申请授权的分页目录与详情展示；模型生成和人工复核写入尚未启用。
 

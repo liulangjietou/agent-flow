@@ -35,7 +35,7 @@ test('重新读取目录失败不保留过期人员，空会话不查询', async
   await query.load('', 'task'); assert.equal(calls, 2)
 })
 
-test('回交响应丢失后复用原请求，目录查询只读并编码任务标识', async () => {
+test('批准与回交响应丢失后复用原意见和幂等键，目录查询保持只读', async () => {
   globalThis.localStorage = { getItem: () => 'test-token' }
   const { api, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
   const reads = []
@@ -45,15 +45,18 @@ test('回交响应丢失后复用原请求，目录查询只读并编码任务�
   assert.ok(reads[0].url.endsWith('/tasks/task%2F1/recipients'))
   assert.equal(reads[0].signal, controller.signal); assert.equal(reads[0].headers.has('Idempotency-Key'), false)
   writeRequests.setActor({ tenantId: 'demo', userId: 'bob' })
-  const writes = []
-  globalThis.fetch = async (_url, init) => {
-    writes.push(init)
-    if (writes.length === 1) throw new Error('lost response')
-    return Response.json({ taskId: 'task', action: 'RESOLVE', applicationStatus: 'IN_APPROVAL', version: 4 })
+  for (const action of ['APPROVE', 'RESOLVE']) {
+    const writes = []
+    globalThis.fetch = async (_url, init) => {
+      writes.push(init)
+      if (writes.length === 1) throw new Error('lost response')
+      return Response.json({ taskId: 'task', action, applicationStatus: 'IN_APPROVAL', version: 4 })
+    }
+    await assert.rejects(api.taskAction('task', { action, expectedVersion: 3, comment: '原意见' }))
+    await writeRequests.recover(writeRequests.pending()[0].id)
+    assert.equal(writes[0].body, writes[1].body)
+    assert.equal(JSON.parse(writes[1].body).comment, '原意见')
+    assert.equal(writes[0].headers.get('Idempotency-Key'), writes[1].headers.get('Idempotency-Key'))
+    assert.equal(writeRequests.pending().length, 0)
   }
-  await assert.rejects(api.taskAction('task', { action: 'RESOLVE', expectedVersion: 3, comment: '原意见' }))
-  await writeRequests.recover(writeRequests.pending()[0].id)
-  assert.equal(writes[0].body, writes[1].body)
-  assert.equal(writes[0].headers.get('Idempotency-Key'), writes[1].headers.get('Idempotency-Key'))
-  assert.equal(writeRequests.pending().length, 0)
 })
