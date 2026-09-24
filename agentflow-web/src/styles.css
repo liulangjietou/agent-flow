@@ -21,3 +21,7 @@ button:disabled{cursor:not-allowed;opacity:.48;transform:none}textarea{font:inhe
 .edges path.simulated.selected{stroke:var(--amber);stroke-width:4}
 /* 导航数量增加时只滚动菜单，品牌与会话入口始终保留在视口内。 */
 .sidebar nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}.sidebar>.brand,.sidebar>.space-label,.sidebar-bottom{flex-shrink:0}
+
+/* 窄屏用完整文字抽屉导航，正文不再为图标侧栏预留宽度。 */
+.header-location{display:flex;align-items:center;gap:12px;min-width:0}.header-location .crumb{overflow-wrap:anywhere}
+@media(max-width:650px){.main{margin-left:0}.main>header{height:auto;min-height:66px;padding:8px 12px;gap:10px}.header-location{gap:10px}.header-actions{gap:8px;flex-shrink:0}.header-actions .quiet{padding:8px;min-height:44px}.header-location .crumb{font-size:10px}.header-actions .avatar{display:none}}

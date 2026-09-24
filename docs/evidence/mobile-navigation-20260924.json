@@ -1,0 +1,83 @@
+{
+  "date": "2026-09-24",
+  "scope": "Workspace navigation",
+  "result": "PASS",
+  "beforeFix": {
+    "cssViewport": [
+      390,
+      844
+    ],
+    "symptom": "Hidden text left repeated arrow-only accessible menu names",
+    "sidebarScrollAlreadyImplemented": true
+  },
+  "browser": {
+    "engine": "Codex in-app Chromium",
+    "roles": [
+      "ADMIN",
+      "alice"
+    ],
+    "cssWidths": [
+      320,
+      390,
+      520,
+      651,
+      1280,
+      1707
+    ],
+    "390": {
+      "pageWidth": 390,
+      "detailWidth": 360,
+      "keyboardApproval": "PASS",
+      "keyboardReturn": "PASS"
+    },
+    "320": {
+      "pageWidth": 320,
+      "dialogWidth": 282,
+      "dialogScrollWidth": 282,
+      "viewportHeight": 740,
+      "footerBottom": 720
+    },
+    "651": {
+      "element": "ASIDE",
+      "bodyOverflow": "",
+      "focus": "我发起",
+      "triggerDisplay": "none"
+    },
+    "checks": [
+      "All navigation names remain accessible",
+      "Tab and Shift+Tab wrap inside drawer",
+      "Escape restores trigger focus and background scrolling",
+      "Unsaved logout cancellation preserves designer input",
+      "Role switch removes administrator entries",
+      "Resizing an open drawer releases modal state",
+      "Mouse opening and backdrop close at actual 520 CSS pixels"
+    ],
+    "limitations": [
+      "Phone sizes are desktop Chromium emulation",
+      "No real iOS/Android touch or soft-keyboard verification"
+    ]
+  },
+  "businessResults": [
+    {
+      "title": "手机导航验收-批准",
+      "status": "APPROVED",
+      "version": 4
+    },
+    {
+      "title": "手机导航验收-退回",
+      "status": "RETURNED",
+      "version": 3
+    }
+  ],
+  "verification": {
+    "java": 636,
+    "domain": 181,
+    "server": 455,
+    "frontend": 238,
+    "tools": 19,
+    "javaAuthorFiles": 253,
+    "javaAuthorTypes": 418,
+    "build": "PASS"
+  },
+  "backendAndSchemaChanged": false
+}

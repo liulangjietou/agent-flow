@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
+import WorkspaceNavigation from './components/WorkspaceNavigation.vue'
+import type { WorkspacePage as Page } from './workspaceNavigation'
 import BranchDiagnostics from './components/BranchDiagnostics.vue'
 import { DesignerValidation } from './designerValidation'
 import ApplicationSearch from './components/ApplicationSearch.vue'
@@ -54,7 +56,6 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, writeRequests, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type Page = 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
@@ -858,34 +859,8 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       </form>
     </section>
     <template v-else>
-      <aside class="sidebar">
-        <div class="brand"><div class="brand-mark">AF</div><div><strong>agentflow</strong><small>审批工作台</small></div></div>
-        <div class="space-label">{{ tenantId }} WORKSPACE</div>
-        <nav>
-          <button v-if="canInspectSystem" :class="{ active: page === 'guide' }" @click="page = 'guide'"><b>◎</b><span>开始使用</span></button>
-          <button :class="{ active: page === 'workbench' }" @click="page = 'workbench'"><b>◉</b><span>待我审批</span><i>{{ taskCount ?? '—' }}</i></button>
-          <button :class="{ active: page === 'started' }" @click="page = 'started'"><b>↗</b><span>我发起</span></button>
-          <button :class="{ active: page === 'drafts' }" @click="page = 'drafts'"><b>▧</b><span>我的草稿</span></button>
-          <button :class="{ active: page === 'handled' }" @click="page = 'handled'"><b>✓</b><span>已办记录</span></button>
-          <button aria-label="消息中心" :class="{ active: page === 'notifications' }" @click="page = 'notifications'"><b>◌</b><span>消息中心</span></button>
-          <button :class="{ active: page === 'applications' }" @click="page = 'applications'"><b>↗</b><span>申请记录</span></button>
-          <div class="nav-divider"></div>
-          <button :class="{ active: page === 'designer' }" @click="page = 'designer'"><b>⌘</b><span>流程管理</span></button>
-          <button v-if="canManageDefinitions" :class="{ active: page === 'templates' }" @click="page = 'templates'"><b>▤</b><span>模板中心</span></button>
-          <button disabled title="Agent 证据服务尚未接入"><b>✦</b><span>Agent 助理</span><small>未接入</small></button>
-          <div class="nav-divider"></div>
-          <button :class="{ active: page === 'expense' }" @click="page = 'expense'"><b>▣</b><span>费用报销</span></button>
-          <button :class="{ active: page === 'api' }" @click="page = 'api'"><b>⌁</b><span>接口文档</span></button>
-          <button v-if="canInspectSystem" :class="{ active: page === 'webhooks' }" @click="page = 'webhooks'"><b>↗</b><span>集成投递</span></button>
-          <button v-if="canInspectSystem" :class="{ active: page === 'audit' }" @click="page = 'audit'"><b>≡</b><span>操作审计</span></button>
-          <button v-if="canInspectSystem" :class="{ active: page === 'operations' }" @click="page = 'operations'"><b>▥</b><span>审批运营</span></button>
-          <button v-if="canInspectSystem" :class="{ active: page === 'calendars' }" @click="page = 'calendars'"><b>▦</b><span>工作日历</span></button>
-          <button v-if="canInspectSystem" :class="{ active: page === 'system' }" @click="page = 'system'"><b>◈</b><span>系统自检</span></button>
-        </nav>
-        <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }"></div><span>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</span><button title="退出登录" aria-label="退出登录" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="logout">↪</button></div>
-      </aside>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="logout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="notice" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">

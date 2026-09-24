@@ -77,7 +77,7 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
         <template v-else-if="diagnostics.report"><strong :class="coreReady ? 'guide-ready' : 'guide-caution'">{{ coreReady ? '四项运行基础检查通过' : '运行基础尚未全部确认' }}</strong><p>检查于 {{ time(diagnostics.report.checkedAt) }}。企业认证、组织、对象存储和模型仍有待接入项。</p></template>
         <p v-else class="guide-footnote">尚未执行检查，不能据此判断服务就绪。</p>
         <button class="secondary" :disabled="diagnostics.loading" @click="diagnostics.load(scopeKey)">{{ diagnostics.loading ? '正在检查…' : '检查运行环境' }}</button><button class="quiet" @click="emit('checks')">查看完整系统自检 →</button>
-        <div class="guide-account-note"><strong>切换账号验证</strong><p>演示环境可用申请人 alice、审批人 manager / finance，以及 admin；具体处理人由你配置的节点规则决定。</p><p>从左下角退出，再以对应账号登录。引导不代办审批，也不更改角色。</p></div>
+        <div class="guide-account-note"><strong>切换账号验证</strong><p>演示环境可用申请人 alice、审批人 manager / finance，以及 admin；具体处理人由你配置的节点规则决定。</p><p>使用导航中的“退出登录”，再以对应账号登录。引导不代办审批，也不更改角色。</p></div>
       </aside>
     </div>
     <label class="guide-preference"><input v-model="hidden" type="checkbox" @change="updatePreference" />以后登录直接进入工作台<span>随时可以从侧栏“开始使用”返回。</span></label>
