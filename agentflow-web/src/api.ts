@@ -1,3 +1,4 @@
+import type { AssistRunDetail, AssistRunFilter, AssistRunPage } from './assistRuns'
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem } from './webhooks'
 import type { RoundDiagram } from './roundDiagram'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
@@ -225,6 +226,8 @@ export const api = {
   firstWorkflow: (id: string, signal: AbortSignal) => request<FirstWorkflowReport>('/system/first-workflow' + (id ? '?definitionId=' + encodeURIComponent(id) : ''), { signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
+  assistRuns: (id: string, query: AssistRunFilter, signal: AbortSignal) => request<AssistRunPage>('/applications/' + encodeURIComponent(id) + '/assist-runs' + historyQuery(query), { signal }),
+  assistRun: (id: string, runId: string, signal: AbortSignal) => request<AssistRunDetail>('/applications/' + encodeURIComponent(id) + '/assist-runs/' + encodeURIComponent(runId), { signal }),
   applicationComments: (id: string, query: CommentQuery, signal: AbortSignal) => request<CommentPage>('/applications/' + encodeURIComponent(id) + '/comments' + historyQuery(query), { signal }),
   addApplicationComment: (id: string, body: CommentDraft) => write<ApplicationComment>('/applications/' + encodeURIComponent(id) + '/comments', 'POST', '追加申请评论', body),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),

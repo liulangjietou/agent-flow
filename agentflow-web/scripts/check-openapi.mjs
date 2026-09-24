@@ -158,6 +158,11 @@ async function exercise(base) {
   assert.equal(cancellationAudit.items.length, 1); assert.equal(cancellationAudit.items[0].comment, cancelBody.comment)
   assert.equal(cancellationAudit.items[0].previousStatus, 'DRAFT'); assert.equal(cancellationAudit.items[0].currentStatus, 'CANCELLED')
   assert.deepEqual((await call('GET', operationsPath, { path: operationsPath + '?processKey=' + definition.key })).metrics, operations.metrics)
+  const assistPath = apps + '/{id}/assist-runs', assistUrl = apps + '/' + application.id + '/assist-runs'
+  assert.deepEqual((await call('GET', assistPath, { user: 'alice', path: assistUrl })).items, [])
+  await call('GET', assistPath, { user: 'anonymous', path: assistUrl, status: 401 })
+  await call('GET', assistPath, { user: 'alice', path: assistUrl + '?tenantId=other', status: 400 })
+  await call('GET', assistPath + '/{runId}', { user: 'alice', path: assistUrl + '/' + randomUUID(), status: 404 })
   const auditPath = '/api/v1/operations/audit'
   const auditFilters = '?applicationId=' + application.id
   const fullAudit = await call('GET', auditPath, { path: auditPath + auditFilters })

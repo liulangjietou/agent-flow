@@ -15,6 +15,7 @@ import WorkspaceRecords from './components/WorkspaceRecords.vue'
 import ApplicationHistory from './components/ApplicationHistory.vue'
 import RoundComparison from './components/RoundComparison.vue'
 import ApplicationComments from './components/ApplicationComments.vue'
+import AssistRunRecords from './components/AssistRunRecords.vue'
 import { commentDrafts, type CommentDraft, type ApplicationComment } from './applicationComments'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
@@ -98,7 +99,7 @@ const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
 const detailLoading = ref(false)
 const taskDetailPanel = ref<HTMLElement | null>(null)
-const taskTab = ref<'detail' | 'compare' | 'timeline' | 'audit' | 'comments'>('detail')
+const taskTab = ref<'detail' | 'compare' | 'timeline' | 'audit' | 'comments' | 'assist'>('detail')
 const commentRefresh = ref(0)
 const restoredDefinition = new DefinitionSelection(api.searchDefinitions, api.getDefinition)
 const applicationSelection = reactive(new DefinitionSelection(api.searchDefinitions, api.getDefinition))
@@ -896,16 +897,17 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
               <div v-if="taskQueueView === 'board'" class="board-return"><button type="button" class="quiet" @click="taskQueuePanel?.focusTask(activeTask?.taskId)">↑ 返回待办看板</button></div>
               <div v-if="activeTask" class="detail-body">
                 <div class="detail-top"><div><span class="status-chip">● {{ activeApplication ? statusLabel(activeApplication.status) : '待处理' }}</span><h3>{{ activeApplication?.title ?? activeTask.taskName }}</h3><p>{{ activeApplication?.businessNo ?? activeTask.taskName }} · 任务创建于 {{ dateLabel(activeTask.createdAt) }}</p></div></div>
-                <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
+                <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }, { key: 'assist', label: 'Agent 摘要' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
                 <div v-if="taskTab === 'detail'" class="detail-content">
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
                   <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" readonly /></template>
                   <p v-else class="unavailable">正在加载申请详情…</p>
-                  <div class="agent-note"><span>✦</span><div><strong>Agent 证据尚未接入</strong><p>当前审批请以申请内容及线下核实结果为依据。</p></div></div>
+                  <div class="agent-note"><span>✦</span><div><strong>Agent 摘要</strong><p>模型生成尚未接入，已有记录可在「Agent 摘要」中查看。审批请以申请内容及核实结果为依据。</p></div></div>
                 </div>
                 <div v-else-if="taskTab === 'compare'" class="timeline-full"><RoundComparison v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><ApplicationHistory :application-id="activeTask.applicationId" mode="timeline" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <div v-else-if="taskTab === 'audit'" class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
+                <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
                 <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
               </div>
