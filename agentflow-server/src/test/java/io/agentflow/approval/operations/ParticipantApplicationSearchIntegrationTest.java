@@ -31,7 +31,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 通过真实审批动作对照既有详情授权，验证参与者分页不会扩大或丢失可见范围。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:participant-search;DB_CLOSE_DELAY=-1", "agentflow.auth.demo-enabled=true"})
+@SpringBootTest(properties = {
+        "spring.datasource.url=${AGENTFLOW_SEARCH_TEST_URL:jdbc:h2:mem:participant-search;DB_CLOSE_DELAY=-1}",
+        "spring.datasource.username=${AGENTFLOW_SEARCH_TEST_USER:sa}",
+        "spring.datasource.password=${AGENTFLOW_SEARCH_TEST_PASSWORD:}",
+        "spring.datasource.driver-class-name=${AGENTFLOW_SEARCH_TEST_DRIVER:org.h2.Driver}",
+        "agentflow.auth.demo-enabled=true"})
 @AutoConfigureMockMvc
 class ParticipantApplicationSearchIntegrationTest {
     private static final String PATH = "/api/v1/applications/search";
@@ -102,6 +107,50 @@ class ParticipantApplicationSearchIntegrationTest {
         assertVisibility(id, "manager", true); assertVisibility(id, "finance", false);
         String unclaimed = draft("role:MANAGER"); submit(unclaimed); withdraw(unclaimed, 2);
         assertVisibility(unclaimed, "manager", false);
+    }
+
+    @Test
+    void participationBindsTenantOnTheSameProcessAndIgnoresTaskLocalVariables() throws Exception {
+        String id = draft("user:manager"); submit(id);
+        String taskId = task(id);
+        String process = tasks.createTaskQuery().taskId(taskId).singleResult().getProcessInstanceId();
+        jdbc.update("UPDATE ACT_RU_VARIABLE SET TEXT_='foreign' WHERE PROC_INST_ID_=? AND NAME_='tenantId'", process);
+        jdbc.update("UPDATE ACT_HI_VARINST SET TEXT_='foreign' WHERE PROC_INST_ID_=? AND NAME_='tenantId'", process);
+        assertVisibility(id, "manager", false);
+
+        // 同一任务的局部租户值与其他流程的合法租户值，均不能替代该流程的租户绑定。
+        tasks.setVariableLocal(taskId, "tenantId", "demo");
+        String other = draft("user:manager"); submit(other);
+        assertVisibility(id, "manager", false);
+        assertVisibility(other, "manager", true);
+
+        jdbc.update("UPDATE ACT_RU_VARIABLE SET TEXT_='demo' WHERE PROC_INST_ID_=? AND NAME_='tenantId' AND TASK_ID_ IS NULL", process);
+        jdbc.update("UPDATE ACT_HI_VARINST SET TEXT_='demo' WHERE PROC_INST_ID_=? AND NAME_='tenantId' AND TASK_ID_ IS NULL", process);
+        assertVisibility(id, "manager", true);
+        jdbc.update("UPDATE ACT_RU_VARIABLE SET TYPE_='long' WHERE PROC_INST_ID_=? AND NAME_='applicationId'", process);
+        jdbc.update("UPDATE ACT_HI_VARINST SET VAR_TYPE_='long' WHERE PROC_INST_ID_=? AND NAME_='applicationId'", process);
+        assertVisibility(id, "manager", false);
+    }
+
+    @Test
+    void multipleBindingsAndIdentitiesRemainOneApplicationAndDoNotRequireRootExecution() throws Exception {
+        String id = draft("role:MANAGER"); submit(id);
+        String taskId = task(id);
+        String process = tasks.createTaskQuery().taskId(taskId).singleResult().getProcessInstanceId();
+        tasks.addCandidateUser(taskId, "manager");
+        // 参与关系沿用详情的流程变量语义，不能套用待办的根执行与当前轮次限制。
+        jdbc.update("INSERT INTO ACT_RU_VARIABLE (ID_,REV_,TYPE_,NAME_,PROC_INST_ID_,TEXT_) VALUES (?,1,'string','applicationId',?,?)",
+                UUID.randomUUID().toString(), process, id);
+        jdbc.update("INSERT INTO ACT_RU_VARIABLE (ID_,REV_,TYPE_,NAME_,PROC_INST_ID_,TEXT_) VALUES (?,1,'string','tenantId',?,'demo')",
+                UUID.randomUUID().toString(), process);
+        assertThat(ids(read("manager", Map.of("q", id, "limit", "1")))).containsExactly(id);
+        assertThat(read("manager", Map.of("q", id, "limit", "1")).path("nextCursor").asText("")).isEmpty();
+        jdbc.update("DELETE FROM ACT_RU_VARIABLE WHERE PROC_INST_ID_=? AND EXECUTION_ID_ IS NOT NULL AND NAME_ IN ('applicationId','tenantId')", process);
+        assertThat(ids(read("manager", Map.of("q", id)))).containsExactly(id);
+        doReturn(new Actor("demo", "manager", Set.of())).when(auth).authenticate("no-role-token");
+        // 无角色仍可读取指派给自己的申请，空角色集合不能生成无效 IN 子句。
+        String assigned = draft("user:manager"); submit(assigned);
+        assertThat(ids(readToken("no-role-token", Map.of("q", assigned)))).containsExactly(assigned);
     }
 
     @Test
