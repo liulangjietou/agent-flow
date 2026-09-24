@@ -1,0 +1,222 @@
+{
+  "fields": [
+    {
+      "key": "amount",
+      "label": "金额",
+      "type": "NUMBER",
+      "required": false
+    },
+    {
+      "key": "urgent",
+      "label": "紧急",
+      "type": "BOOLEAN",
+      "required": false
+    },
+    {
+      "key": "description",
+      "label": "说明",
+      "type": "TEXT",
+      "required": false
+    },
+    {
+      "key": "category",
+      "label": "类别",
+      "type": "SELECT",
+      "required": false,
+      "options": [
+        {
+          "value": "TRAVEL",
+          "label": "差旅"
+        },
+        {
+          "value": "DAILY",
+          "label": "日常"
+        },
+        {
+          "value": "OTHER",
+          "label": "其他"
+        }
+      ]
+    },
+    {
+      "key": "dueDate",
+      "label": "日期",
+      "type": "DATE",
+      "required": false
+    }
+  ],
+  "cases": [
+    {
+      "name": "混合且或保持优先级",
+      "source": "amount > 5000 OR urgent == true AND description EXISTS",
+      "serialized": "amount > \"5000\" OR (urgent == \"true\" AND description EXISTS)",
+      "samples": [
+        {
+          "values": {
+            "amount": "6000"
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "amount": "1",
+            "urgent": true,
+            "description": "事实"
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "amount": "1",
+            "urgent": true
+          },
+          "expected": false
+        },
+        {
+          "values": {},
+          "expected": false
+        }
+      ]
+    },
+    {
+      "name": "整组取反保留未填写语义",
+      "source": "!(category IN [\"TRAVEL\", \"DAILY\"] OR urgent == true) AND amount EXISTS",
+      "serialized": "!(category IN [\"TRAVEL\", \"DAILY\"] OR urgent == \"true\") AND amount EXISTS",
+      "samples": [
+        {
+          "values": {
+            "amount": "1"
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "amount": "1",
+            "category": "OTHER",
+            "urgent": false
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "amount": "1",
+            "category": "TRAVEL"
+          },
+          "expected": false
+        },
+        {
+          "values": {
+            "amount": "1",
+            "urgent": true
+          },
+          "expected": false
+        },
+        {
+          "values": {},
+          "expected": false
+        }
+      ]
+    },
+    {
+      "name": "单项分组与重复取反",
+      "source": "(urgent EXISTS) OR !!description EXISTS",
+      "serialized": "(urgent EXISTS) OR description EXISTS",
+      "samples": [
+        {
+          "values": {
+            "urgent": false
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "description": "已填写"
+          },
+          "expected": true
+        },
+        {
+          "values": {},
+          "expected": false
+        }
+      ]
+    },
+    {
+      "name": "数字精度与单项取反",
+      "source": "amount EXISTS AND !(amount >= 9007199254740993.123456789012345678)",
+      "serialized": "amount EXISTS AND !(amount >= \"9007199254740993.123456789012345678\")",
+      "samples": [
+        {
+          "values": {
+            "amount": "9007199254740993.123456789012345677"
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "amount": "9007199254740993.123456789012345678"
+          },
+          "expected": false
+        },
+        {
+          "values": {},
+          "expected": false
+        }
+      ]
+    },
+    {
+      "name": "同连接符子组保存后可识别",
+      "source": "amount > 1 AND (urgent == true AND description EXISTS)",
+      "serialized": "amount > \"1\" AND (urgent == \"true\" AND description EXISTS)",
+      "samples": [
+        {
+          "values": {
+            "amount": "2",
+            "urgent": true,
+            "description": "依据"
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "amount": "2",
+            "urgent": false,
+            "description": "依据"
+          },
+          "expected": false
+        }
+      ]
+    },
+    {
+      "name": "日期和含引号连接词的文本",
+      "source": "dueDate >= \"2026-09-24\" OR (description == \"O'Reilly AND \\\"R&D\\\"\" AND !urgent EXISTS)",
+      "serialized": "dueDate >= \"2026-09-24\" OR (description == \"O'Reilly AND \\\"R&D\\\"\" AND !urgent EXISTS)",
+      "samples": [
+        {
+          "values": {
+            "dueDate": "2026-09-24"
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "description": "O'Reilly AND \"R&D\""
+          },
+          "expected": true
+        },
+        {
+          "values": {
+            "description": "O'Reilly AND \"R&D\"",
+            "urgent": false
+          },
+          "expected": false
+        },
+        {
+          "values": {
+            "dueDate": "2026-09-23"
+          },
+          "expected": false
+        }
+      ]
+    }
+  ]
+}

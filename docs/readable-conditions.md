@@ -21,8 +21,8 @@ amount > 5000 OR urgent == true AND reason EXISTS
 
 ## 职责与兼容
 
-- `conditionSyntax.ts` 只为前端提供 v2 只读语法树；平面条件回显与中文说明复用它，不求值、不授权、不发布。
-- `conditionBuilder.ts` 保留平面配置限制；括号、取反和混用且/或仍在表达式模式编辑。
+- `conditionSyntax.ts` 只为前端提供 v2 只读语法树；平面/嵌套条件回显与中文说明复用它，不求值、不授权、不发布。
+- `conditionBuilder.ts` 保留旧版平面转换和共用字段规则；`conditionGroups.ts` 提供 v2 的[嵌套条件编辑](visual-condition-groups.md)，不参与业务求值。
 - `conditionPresentation.ts` 根据本版本表单生成说明和插入结果；未知字段、非法类型、无效语法、超限或缺少表单时保留原文，不显示猜测的业务含义。
 - 保存与发布继续发送原表达式，服务器领域解析器仍是校验、模拟和运行的依据。没有增加 API、数据库迁移或新的条件语言版本。
 - 前端及 Java 领域测试共同读取 `agentflow-domain/src/test/resources/condition-presentation-cases.json`，核对固定语义树，覆盖优先级、转义、取反、成员条件和拒绝项。
