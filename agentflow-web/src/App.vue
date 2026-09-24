@@ -31,6 +31,7 @@ import ApprovalOperations from './components/ApprovalOperations.vue'
 import ApiReference from './components/ApiReference.vue'
 import DefinitionSimulation from './components/DefinitionSimulation.vue'
 import DefinitionComparison from './components/DefinitionComparison.vue'
+import DefinitionCatalog from './components/DefinitionCatalog.vue'
 import DefinitionAssignee from './components/DefinitionAssignee.vue'
 import { assigneeLabel } from './definitionAssignees'
 import { simulationIssue } from './definitionSimulation'
@@ -105,7 +106,7 @@ const definitionStatus = ref('DRAFT')
 const definitionKey = ref('expense-reimbursement')
 const definitionName = ref('费用报销审批')
 const definitionFormSchema = ref<FormSchema | null>(defaultFormSchema())
-const selectedDefinitionId = ref('')
+const catalogOpen = ref(false)
 const savedSnapshot = ref('')
 const editorSession = ref(0)
 const autosaveEnabled = ref(true)
@@ -230,7 +231,7 @@ function graphPayload(): Graph {
 }
 function applyDefinition(definition: Definition) {
   editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
-  definitionId.value = definition.id; selectedDefinitionId.value = definition.id
+  definitionId.value = definition.id
   definitionKey.value = definition.key; definitionName.value = definition.name; definitionFormSchema.value = cloneSchema(definition.formSchema ?? null)
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
   conditionLanguageVersion.value = definition.graph.conditionLanguageVersion ?? 1
@@ -252,24 +253,13 @@ async function confirmReplaceDefinition(confirmLabel: string, operation: () => v
     if (current()) await operation()
   }
 }
-async function chooseDefinition() {
-  if (busy.value || writesBlocked.value) return
-  const targetId = selectedDefinitionId.value
-  selectedDefinitionId.value = definitionId.value
-  if (!targetId || targetId === definitionId.value) return
-  await confirmReplaceDefinition('放弃修改并切换', () => {
-    const definition = definitions.value.find(item => item.id === targetId)
-    if (definition) applyDefinition(definition)
-    else notice.value = '该流程已不在当前列表，请刷新后重试。'
-  })
-}
 async function newDefinition(copy = false) {
   await confirmReplaceDefinition('放弃修改并新建', () => {
     editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
-    page.value = 'designer'
+    page.value = 'designer'; catalogOpen.value = false
     if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
     else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
-    definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
+    definitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
     notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value, !copy && !readonlyDefinition.value && dirty.value)
 }
@@ -326,21 +316,23 @@ async function importTemplate(input: PortableProcess) {
     finally { busy.value = false }
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
 }
-async function openTemplateCopy(id: string) {
+/** 目录和模板记录共用读取入口；写权限仍由编辑器与服务端单独判断。 */
+async function openSavedDefinition(id: string) {
   await confirmReplaceDefinition('放弃修改并打开', async () => {
     busy.value = true
-    const scope = actorScope.value
+    const scope = actorScope.value, controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12_000)
     try {
-      const definition = await api.getDefinition(id)
-      if (actorScope.value !== scope) return
-      applyDefinition(definition); rememberGuideSelection(actorScope.value, definition.id); page.value = 'designer'; notice.value = '已打开当前租户的流程版本。'
-    } catch (error) { if (actorScope.value === scope) notice.value = errorMessage(error) }
-    finally { busy.value = false }
-  }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value)
+      const definition = await api.getDefinition(id, controller.signal)
+      if (!viewActive || actorScope.value !== scope) return
+      applyDefinition(definition); rememberGuideSelection(actorScope.value, definition.id); page.value = 'designer'; catalogOpen.value = false; notice.value = '已打开当前租户的流程版本。'
+    } catch (error) { if (actorScope.value === scope) notice.value = controller.signal.aborted ? '读取流程超时，当前设计已保留，请重新打开。' : errorMessage(error) }
+    finally { clearTimeout(timeout); busy.value = false }
+  })
 }
 function clearDesigner() {
   editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
-  defaultGraph(); definitionId.value = ''; selectedDefinitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0
+  defaultGraph(); definitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0
   definitionStatus.value = 'DRAFT'; definitionKey.value = 'expense-reimbursement'; definitionName.value = '费用报销审批'; definitionFormSchema.value = defaultFormSchema()
   resetEditor(); savedSnapshot.value = snapshot()
 }
@@ -485,7 +477,7 @@ async function validate() { if (!busy.value) await validateGraph() }
 function acknowledgeDraft(definition: Definition, checkpoint: DraftCheckpoint) {
   if (!viewActive || checkpoint.scope !== draftScope.value) return
   rememberGuideSelection(actorScope.value, definition.id)
-  definitionId.value = definition.id; selectedDefinitionId.value = definition.id
+  definitionId.value = definition.id
   definitionKey.value = definition.key
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
   savedSnapshot.value = checkpoint.snapshot
@@ -745,6 +737,7 @@ watch(applicationDefinitionId, () => {
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
 })
 
+watch([actorScope, page], () => { catalogOpen.value = false }, { flush: 'sync' })
 watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
 watch([actor, editorSession, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
 watch(editorSession, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
@@ -931,10 +924,10 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openTemplateCopy" @return-designer="page = 'designer'" @import="page = 'transfer'" />
+        <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
         <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :existing-keys="definitions.map(item => item.key)" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
-        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="definitions" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openTemplateCopy" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
+        <FirstWorkflow v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="definitions" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
         <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :definitions="publishedDefinitions" @open="recordApplicationId = $event" />
         <BusinessCalendars v-else-if="page === 'calendars' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @import="page = 'transfer'" @designer="page = 'designer'" />
@@ -950,7 +943,8 @@ onUnmounted(() => { unsubscribeWrites(); window.removeEventListener('beforeunloa
               <p v-else-if="!writesBlocked">修正后点击“保存草稿”，成功后恢复自动保存。</p>
             </div>
           </section>
-          <div class="definition-switcher"><label>已保存流程<select v-model="selectedDefinitionId" :disabled="busy || writesBlocked" @change="chooseDefinition"><option value="">未保存草稿</option><option v-for="definition in definitions" :key="definition.id" :value="definition.id">{{ definition.name }} · {{ statusLabel(definition.status) }}{{ definition.version ? ` v${definition.version}` : '' }} · {{ definition.key }}</option></select></label><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="page = 'transfer'">导入 / 导出模板</button></div>
+          <div class="definition-switcher"><button class="secondary" :disabled="busy || writesBlocked" :aria-expanded="catalogOpen" @click="catalogOpen = !catalogOpen">流程目录</button><span>{{ definitionId ? '当前：' + definitionName + (definitionVersion ? ' · v' + definitionVersion : ' · 草稿') : '当前：未保存草稿' }}</span><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="newDefinition()">＋ 新建流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" @click="page = 'transfer'">导入 / 导出模板</button></div>
+          <DefinitionCatalog v-if="catalogOpen" :manage-definitions="canManageDefinitions" :scope-key="actorScope" :current-id="definitionId" :locked="busy || writesBlocked || confirmationOpen" :refresh-version="templateRefresh" @open="openSavedDefinition" @close="catalogOpen = false" />
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>

@@ -6669,6 +6669,148 @@
           }
         }
       }
+    },
+    "/api/v1/process-definitions/search": {
+      "get": {
+        "operationId": "searchDefinitions",
+        "tags": [
+          "流程定义"
+        ],
+        "summary": "检索流程目录",
+        "description": "返回认证租户内的定义版本摘要，不加载 graph/formSchema。ADMIN 和 PROCESS_ADMIN 可查草稿及发布版本，其他角色只能查询发布版本，显式请求草稿返回 403。q 对名称或标识作大小写不敏感的字面量包含匹配；processKey/version 精确匹配。每页默认 30、最多 100，按不可变创建时间和 ID 倒序，游标绑定账号、角色、租户及筛选。翻页不冻结状态和名称，新增记录需重新查询。拒绝未知参数。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefinitionCatalogPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存流程目录摘要",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_DEFINITION_QUERY：筛选、版本或游标无效，包含未知参数与其他账号、角色、租户或筛选的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "流程名称或标识包含文本；百分号和下划线按字面量匹配",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "管理员默认全部状态，其他角色默认且仅允许已发布",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "DRAFT",
+                "PUBLISHED"
+              ]
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "description": "精确发布版本，须同时指定 processKey，不能与 DRAFT 状态组合",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "每页返回上限",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "原查询下一页位置，绑定租户、账号、角色及筛选条件",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -10535,6 +10677,78 @@
           "field",
           "edgeIds",
           "missingValue"
+        ]
+      },
+      "DefinitionCatalogItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "草稿为0，已发布为实际版本"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "revision"
+        ]
+      },
+      "DefinitionCatalogPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/DefinitionCatalogItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
         ]
       }
     }
