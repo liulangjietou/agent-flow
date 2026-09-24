@@ -48,6 +48,7 @@ class OidcAuthenticationIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
     @Autowired io.agentflow.approval.repository.ApplicationRepository applications;
+    @Autowired org.springframework.context.ApplicationContext context;
 
     @DynamicPropertySource
     static void issuer(DynamicPropertyRegistry registry) {
@@ -62,6 +63,7 @@ class OidcAuthenticationIntegrationTest {
 
     @Test
     void realCodeExchangeMapsOnlyExplicitIdentityAndRotatesSession() throws Exception {
+        assertThat(context.getBeansOfType(org.springframework.session.SessionRepository.class)).isEmpty();
         LoginAttempt attempt = authorize();
         String previousId = attempt.session().getId();
         MockHttpSession session = complete(attempt);

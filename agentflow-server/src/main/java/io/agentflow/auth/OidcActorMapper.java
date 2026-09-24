@@ -41,5 +41,16 @@ public final class OidcActorMapper {
         return new Actor(tenantId, user, mapped);
     }
 
+    /** 恢复会话时复核当前部署策略；身份源、客户端或权限映射变化要求重新登录。 */
+    public Actor restoreSession(PlatformOidcUser user, Instant now) {
+        var token = user.getIdToken();
+        // Spring 解码器会把 iss 规范化为 URL；使用声明访问器，不能与原始字符串直接比较。
+        if (token.getIssuer() == null || !properties.issuer().equals(token.getIssuer().toExternalForm())
+                || token.getAudience() == null || !token.getAudience().contains(properties.clientId())) throw unmapped();
+        Actor mapped = map(token, now);
+        if (!mapped.equals(user.actor())) throw unmapped();
+        return mapped;
+    }
+
     private OAuth2AuthenticationException unmapped() { return new OAuth2AuthenticationException("identity_not_mapped"); }
 }

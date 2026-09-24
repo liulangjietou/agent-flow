@@ -25,6 +25,7 @@ public class SystemCheckService {
     private final ClasspathProcessTemplateCatalog catalog;
     private final boolean demoEnabled;
     private final boolean oidcEnabled;
+    private final boolean jdbcSessions;
     private final Duration timeout;
     private final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<>(1), task -> {
@@ -37,25 +38,32 @@ public class SystemCheckService {
     @Autowired
     public SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
                               @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled,
-                              @Value("${agentflow.auth.oidc.enabled:false}") boolean oidcEnabled) {
-        this(diagnostics, catalog, demoEnabled, oidcEnabled, PROBE_TIMEOUT);
+                              @Value("${agentflow.auth.oidc.enabled:false}") boolean oidcEnabled,
+                              @Value("${agentflow.auth.session.jdbc-enabled:false}") boolean jdbcSessions) {
+        this(diagnostics, catalog, demoEnabled, oidcEnabled, jdbcSessions, PROBE_TIMEOUT);
     }
 
     SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog, boolean demoEnabled) {
-        this(diagnostics, catalog, demoEnabled, false, PROBE_TIMEOUT);
+        this(diagnostics, catalog, demoEnabled, false, false, PROBE_TIMEOUT);
+    }
+
+    SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
+                       boolean demoEnabled, boolean oidcEnabled) {
+        this(diagnostics, catalog, demoEnabled, oidcEnabled, false, PROBE_TIMEOUT);
     }
 
     SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
                        boolean demoEnabled, Duration timeout) {
-        this(diagnostics, catalog, demoEnabled, false, timeout);
+        this(diagnostics, catalog, demoEnabled, false, false, timeout);
     }
 
     private SystemCheckService(SystemDiagnostics diagnostics, ClasspathProcessTemplateCatalog catalog,
-                       boolean demoEnabled, boolean oidcEnabled, Duration timeout) {
+                       boolean demoEnabled, boolean oidcEnabled, boolean jdbcSessions, Duration timeout) {
         this.diagnostics = diagnostics;
         this.catalog = catalog;
         this.demoEnabled = demoEnabled;
         this.oidcEnabled = oidcEnabled;
+        this.jdbcSessions = jdbcSessions;
         this.timeout = timeout;
     }
 
@@ -83,6 +91,12 @@ public class SystemCheckService {
             diagnostics.notifications(actor.tenantId());
             return new Check("notifications", Status.WARNING, "IN_APP_ONLY", "站内消息存储查询成功；邮件、IM 和 SLA 尚未接入。");
         }));
+        checks.add(jdbcSessions ? inspect("sessionStorage", () -> {
+            diagnostics.sessions();
+            return up("sessionStorage", "共享会话存储查询成功；空闲超时、令牌到期和当前身份映射仍受校验。");
+        }) : new Check("sessionStorage", Status.WARNING, "JDBC_SESSIONS_DISABLED", oidcEnabled
+                ? "当前使用单实例内存会话；多实例部署需显式启用共享会话。"
+                : "共享会话未启用；此能力适用于企业 OIDC 登录。"));
         for (String id : List.of("objectStorage", "organization", "model")) {
             checks.add(new Check(id, Status.NOT_IMPLEMENTED, "ADAPTER_NOT_IMPLEMENTED", "当前版本尚未实现此服务接入，未执行连接检查。"));
         }

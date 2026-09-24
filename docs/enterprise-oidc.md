@@ -1,6 +1,6 @@
 # 企业 OIDC 登录
 
-本阶段实现可配置的标准 OIDC 登录和平台会话。真实企业身份服务、组织目录、审批人同步、多实例会话和账号停用通知仍需接入，不能把本地协议夹具验收当成企业上线验收。
+本阶段实现可配置的标准 OIDC 登录和平台会话。JDBC 共享会话支持见 [多实例会话](shared-enterprise-sessions.md)。真实企业身份服务、组织目录、审批人同步和账号停用通知仍需接入，不能把本地协议夹具验收当成企业上线验收。
 
 ## 调用链和职责
 
@@ -55,9 +55,9 @@ server:
 
 授权请求由 Spring Security 生成 state、nonce 和 PKCE，回调固定取部署配置，不取 Host、转发头或用户提供的返回地址。成功回到固定首页，失败只显示通用提示，不向浏览器暴露协议异常和令牌。
 
-浏览器持有 `AGENTFLOW_SESSION`：HttpOnly、SameSite=Lax、Path=/，HTTPS 部署强制 Secure。登录轮换会话标识。平台不持久化 access token 或 refresh token，也不把 OIDC 令牌写入 localStorage 或 URL。身份上下文保留 ID Token；会话位于服务端内存，后端重启后需要重新登录。
+浏览器持有 `AGENTFLOW_SESSION`：HttpOnly、SameSite=Lax、Path=/，HTTPS 部署强制 Secure。登录轮换会话标识。平台不持久化 access token 或 refresh token，也不把 OIDC 令牌写入 localStorage 或 URL。身份上下文保留 ID Token；默认会话位于服务端内存，后端重启后需要重新登录。企业部署可以显式启用 JDBC 共享会话，使授权回调和后续请求由不同实例处理，并在重启后恢复尚未过期的登录。
 
-请求同时受会话空闲过期和 ID Token 到期约束，到期后不自动刷新权限。身份服务的全局退出、账号禁用回调和即时权限撤销尚未接入。
+请求同时受会话空闲过期和 ID Token 到期约束，到期后不自动刷新权限。每次恢复身份还核对当前 issuer、client-id、租户及角色映射；失配时销毁会话并要求重新登录，不静默改变页面身份或权限。身份服务的全局退出、账号禁用回调和上游即时权限撤销尚未接入。
 
 所有企业模式的写请求需要 `GET /api/v1/auth/options` 返回的 `X-CSRF-TOKEN`。业务写请求还携带 `X-AgentFlow-Actor`，值为 `encodeURIComponent(JSON.stringify([tenantId, userId]))`；该请求头只核对页面身份，服务端身份仍来自已验证会话。带该头的读请求同样核对身份，防止其他标签切换账号后旧页面读取或提交另一账号的数据。`/auth/me` 用于读取实际身份。
 
@@ -76,7 +76,7 @@ server:
 ## 尚未完成
 
 - 真实企业身份供应商及客户端联调，组织权威来源、目录同步和动态审批人解析。
-- 多实例会话共享、后端重启后保留登录、全局退出与即时停用通知。
+- 身份源全局退出、上游权限变更与即时停用通知；共享会话不替代这些身份源事件。
 - 生产 HTTPS 代理、真实浏览器/设备与企业 SLO 验收。
 - 平台其余财务、Agent、附件、SLA 与初始化能力。
 

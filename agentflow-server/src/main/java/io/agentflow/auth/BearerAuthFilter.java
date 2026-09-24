@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import jakarta.servlet.FilterChain;
@@ -37,6 +38,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final CurrentActor currentActor;
     private final JsonUtil jsonUtil;
     private final OidcProperties oidc;
+    private final OidcActorMapper oidcActors;
 
     /** 创建过滤器。 */
     public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc) {
@@ -44,6 +46,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         this.currentActor = currentActor;
         this.jsonUtil = jsonUtil;
         this.oidc = oidc;
+        this.oidcActors = new OidcActorMapper(oidc);
     }
 
     @Override
@@ -89,10 +92,13 @@ public class BearerAuthFilter extends OncePerRequestFilter {
             var authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.isAuthenticated()
                     && authentication.getPrincipal() instanceof PlatformOidcUser user) {
-                if (user.getIdToken().getExpiresAt().isAfter(Instant.now())) return user.actor();
-                var session = request.getSession(false);
-                if (session != null) session.invalidate();
-                SecurityContextHolder.clearContext();
+                try {
+                    return oidcActors.restoreSession(user, Instant.now());
+                } catch (OAuth2AuthenticationException exception) {
+                    var session = request.getSession(false);
+                    if (session != null) session.invalidate();
+                    SecurityContextHolder.clearContext();
+                }
             }
             throw new DomainException("UNAUTHENTICATED", "Enterprise session is missing or expired");
         }

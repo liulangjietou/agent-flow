@@ -72,6 +72,26 @@ class OidcIdentityPolicyTest {
         return new OidcIdToken("verified-fixture", Instant.now().minusSeconds(1), Instant.now().plusSeconds(60), claims);
     }
 
+    @Test
+    void persistedIdentityMustStillMatchIssuerAudienceAndCurrentMapping() throws Exception {
+        var mapper = new OidcActorMapper(properties(false));
+        Map<String, Object> claims = new HashMap<>(Map.of("sub", "stable-sub", "tenant", "external",
+                "roles", List.of("staff"), "iss", "https://identity.example", "aud", List.of("client")));
+        var user = new PlatformOidcUser(token(claims), "tenant-a", "stable-sub", Set.of("EMPLOYEE"));
+        assertThat(mapper.restoreSession(user, Instant.now())).isEqualTo(user.actor());
+        claims.put("iss", java.net.URI.create("https://identity.example").toURL());
+        assertThat(mapper.restoreSession(new PlatformOidcUser(token(claims), "tenant-a", "stable-sub", Set.of("EMPLOYEE")), Instant.now()))
+                .isEqualTo(user.actor());
+        assertThatThrownBy(() -> mapper.restoreSession(new PlatformOidcUser(token(claims), "tenant-a", "stable-sub", Set.of("ADMIN")), Instant.now()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+        claims.put("iss", "https://old-identity.example");
+        assertThatThrownBy(() -> mapper.restoreSession(new PlatformOidcUser(token(claims), "tenant-a", "stable-sub", Set.of("EMPLOYEE")), Instant.now()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+        claims.put("iss", "https://identity.example"); claims.put("aud", List.of("old-client"));
+        assertThatThrownBy(() -> mapper.restoreSession(new PlatformOidcUser(token(claims), "tenant-a", "stable-sub", Set.of("EMPLOYEE")), Instant.now()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
     private OidcProperties properties(boolean loopback) {
         return new OidcProperties(true, "https://identity.example", "client", "secret", "tenant", "roles",
                 Map.of("external", "tenant-a"), Map.of("staff", Set.of("EMPLOYEE")), loopback);

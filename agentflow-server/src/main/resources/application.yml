@@ -26,6 +26,8 @@ flowable:
 agentflow:
   auth:
     demo-enabled: ${AGENTFLOW_DEMO_AUTH:true}
+    session:
+      jdbc-enabled: ${AGENTFLOW_JDBC_SESSIONS:false}
   web:
     allowed-origin: ${AGENTFLOW_WEB_ORIGIN:http://localhost:5173}
 

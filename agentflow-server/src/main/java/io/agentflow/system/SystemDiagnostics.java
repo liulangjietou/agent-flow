@@ -77,4 +77,17 @@ public class SystemDiagnostics {
             throw new IllegalStateException("Notification storage probe failed", exception);
         }
     }
+
+    /** 只验证会话表可查询，不读取标识、身份或令牌内容，也不创建测试会话。 */
+    public void sessions() {
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            try (var result = statement.executeQuery("""
+                    SELECT S.PRIMARY_ID, A.ATTRIBUTE_NAME FROM AF_HTTP_SESSION S
+                    LEFT JOIN AF_HTTP_SESSION_ATTRIBUTES A ON A.SESSION_PRIMARY_ID=S.PRIMARY_ID WHERE 1=0
+                    """)) { result.next(); }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Session storage probe failed", exception);
+        }
+    }
 }

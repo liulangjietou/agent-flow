@@ -1,0 +1,44 @@
+{
+  "stage": 68,
+  "recordedAt": "2026-09-24T09:11:20.309548+00:00",
+  "branch": "codex/shared-enterprise-sessions",
+  "baseline": "ffcd3fd1f37feaff3972af7ae0d85c27f5d297fc",
+  "scope": "Opt-in JDBC enterprise sessions; deployment diagnostics; current identity policy revalidation",
+  "checks": {
+    "java": {
+      "tests": 684,
+      "domain": 181,
+      "server": 503,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "frontend": 252,
+    "maintenanceTools": 19,
+    "postgresqlSharedSessionIntegration": 7,
+    "javaAuthorFiles": 272,
+    "javaNamedTypes": 442,
+    "missingAuthors": 0,
+    "frontendBuild": true,
+    "diffCheck": true
+  },
+  "regressions": [
+    "Changed role mapping previously retained persisted privileges; now invalidates the shared session",
+    "Legacy raw Cookie was decoded as Base64 and produced invalid PostgreSQL text; raw encoding preserves login recovery"
+  ],
+  "browser": {
+    "isolatedUrl": "http://localhost:5197/",
+    "oldCookieLoginRecovery": true,
+    "sharedSessionStorageCheck": true,
+    "firstBackendStoppedAndSecondBackendKeptLogin": true,
+    "logoutOnSecondBackend": true
+  },
+  "artifact": {
+    "sha256": "6642c8d5fca4fb9f9324794158f7b6f2c30de3f3257cd828cd59ca9205c74751"
+  },
+  "migration": "V21__shared_http_sessions.sql",
+  "productionIdentityProviderVerified": false,
+  "productionClusterSloVerified": false,
+  "remoteConfigured": false,
+  "pullRequestCreated": false
+}

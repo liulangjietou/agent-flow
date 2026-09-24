@@ -64,6 +64,21 @@ class SystemCheckServiceTest {
     }
 
     @Test
+    void sharedSessionStorageMustActuallyAnswerAndFailuresAreRedacted() {
+        when(catalog.list()).thenReturn(List.of());
+        var service = new SystemCheckService(diagnostics, catalog, false, true, true);
+        try {
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("sessionStorage"))
+                    .singleElement().satisfies(check -> assertThat(check.status()).isEqualTo(SystemCheckService.Status.UP));
+            doThrow(new IllegalStateException("session secret-data")).when(diagnostics).sessions();
+            var report = service.check(admin);
+            assertThat(report.checks()).filteredOn(check -> check.id().equals("sessionStorage"))
+                    .singleElement().satisfies(check -> assertThat(check.status()).isEqualTo(SystemCheckService.Status.DOWN));
+            assertThat(report.toString()).doesNotContain("secret-data");
+        } finally { service.close(); }
+    }
+
+    @Test
     void uninterruptibleDependencyTimesOutWithoutLaunchingMoreQueries() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch completed = new CountDownLatch(1);

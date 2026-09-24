@@ -56,13 +56,14 @@ class SystemChecksIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("checkedAt").isNotEmpty())
-                .andExpect(jsonPath("checks.length()").value(9))
+                .andExpect(jsonPath("checks.length()").value(10))
                 .andExpect(jsonPath("checks[?(@.id == 'database')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'migrations')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'flowable')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'templates')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'authentication')].code").value("DEMO_AUTH_ONLY"))
                 .andExpect(jsonPath("checks[?(@.id == 'notifications')].code").value("IN_APP_ONLY"))
+                .andExpect(jsonPath("checks[?(@.id == 'sessionStorage')].code").value("JDBC_SESSIONS_DISABLED"))
                 .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.hasSize(3)));
     }
 

@@ -10,7 +10,7 @@ const coreIds = ['database', 'migrations', 'flowable', 'templates']
 const core = computed(() => query.report?.checks.filter(check => coreIds.includes(check.id)) ?? [])
 const connections = computed(() => query.report?.checks.filter(check => !coreIds.includes(check.id)) ?? [])
 const passed = computed(() => core.value.filter(check => check.status === 'UP').length)
-const labels: Record<string, string> = { database: '数据库', migrations: '数据库迁移', flowable: '流程引擎', templates: '官方流程模板', authentication: '身份认证', objectStorage: '文件与对象存储', notifications: '审批通知', organization: '组织与人员同步', model: 'Agent 模型服务' }
+const labels: Record<string, string> = { database: '数据库', migrations: '数据库迁移', flowable: '流程引擎', templates: '官方流程模板', authentication: '身份认证', sessionStorage: '登录会话存储', objectStorage: '文件与对象存储', notifications: '审批通知', organization: '组织与人员同步', model: 'Agent 模型服务' }
 const states = { UP: '检查通过', DOWN: '检查失败', UNKNOWN: '结果未确认', WARNING: '待完善', NOT_IMPLEMENTED: '尚未接入' }
 const time = computed(() => query.report ? new Date(query.report.checkedAt).toLocaleString('zh-CN') : '')
 function refresh() { void query.load(props.scopeKey) }

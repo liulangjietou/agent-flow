@@ -186,3 +186,5 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 [待办分页查询性能验证](docs/pending-query-performance.md)：合并页面与完整总数的重复联查，保持当前权限、游标和空后续页的计数语义。
 
 企业登录协议接入和部署边界见 [企业 OIDC 登录](docs/enterprise-oidc.md)。默认演示入口保持演示认证，启用 OIDC 必须提供显式可信配置并关闭演示认证。
+
+企业多实例部署可显式启用 [JDBC 共享会话](docs/shared-enterprise-sessions.md)，支持跨实例回调、登录恢复和平台退出同步；系统自检展示会话存储状态。真实企业身份源、组织同步和生产集群仍需另行验收。
