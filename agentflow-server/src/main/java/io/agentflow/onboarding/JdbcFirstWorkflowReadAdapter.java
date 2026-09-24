@@ -1,5 +1,6 @@
 package io.agentflow.onboarding;
 
+import io.agentflow.approval.history.JdbcSubmissionHistoryGapQuery;
 import io.agentflow.common.DomainException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -23,9 +24,12 @@ public class JdbcFirstWorkflowReadAdapter implements FirstWorkflowReadPort {
             WHERE r.tenant_id=? AND a.process_key=? AND r.definition_version=?
             """;
     private final JdbcTemplate jdbc;
+    private final JdbcSubmissionHistoryGapQuery historyGaps;
 
     /** 使用审批数据源查询事实，不修改业务数据或初始化账号。 */
-    public JdbcFirstWorkflowReadAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public JdbcFirstWorkflowReadAdapter(JdbcTemplate jdbc, JdbcSubmissionHistoryGapQuery historyGaps) {
+        this.jdbc = jdbc; this.historyGaps = historyGaps;
+    }
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -43,11 +47,7 @@ public class JdbcFirstWorkflowReadAdapter implements FirstWorkflowReadPort {
         Object[] parameters = {tenantId, definition.key(), definition.version()};
         long submitted = jdbc.queryForObject("SELECT COUNT(*) " + ROUND_FROM, Long.class, parameters);
         long approved = jdbc.queryForObject("SELECT COUNT(*) " + ROUND_FROM + " AND r.status='APPROVED'", Long.class, parameters);
-        long unrecorded = jdbc.queryForObject("""
-                SELECT COALESCE(SUM(GREATEST(0,a.round_no-(SELECT COUNT(*) FROM approval_submission_round r
-                  WHERE r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.definition_version=a.definition_version))),0)
-                FROM approval_application a WHERE a.tenant_id=? AND a.process_key=? AND a.definition_version=?
-                """, Long.class, parameters);
+        long unrecorded = historyGaps.count(tenantId, definition.key(), definition.version());
         return new Report(checkedAt, definition, submitted, approved, unrecorded, evidence(parameters, false), evidence(parameters, true));
     }
 

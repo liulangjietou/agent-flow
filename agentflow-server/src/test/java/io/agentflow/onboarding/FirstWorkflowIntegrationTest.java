@@ -55,6 +55,7 @@ class FirstWorkflowIntegrationTest {
         var returned = report(draft.id());
         assertThat(returned.path("submittedRounds").asLong()).isEqualTo(1);
         assertThat(returned.path("approvedRounds").asLong()).isZero();
+        assertThat(returned.path("unrecordedHistoricalRounds").asLong()).isZero();
         assertThat(returned.path("latestSubmission").path("status").asText()).isEqualTo("RETURNED");
         application = submit(application(application.path("id").asText()));
         mvc.perform(post("/api/v1/applications/" + application.path("id").asText() + "/withdraw")
@@ -62,6 +63,7 @@ class FirstWorkflowIntegrationTest {
                 .content(json.write(Map.of("expectedVersion", application.path("version").asLong(), "comment", "补充说明"))))
                 .andExpect(status().isOk());
         assertThat(report(draft.id()).path("approvedRounds").asLong()).isZero();
+        assertThat(report(draft.id()).path("unrecordedHistoricalRounds").asLong()).isZero();
         application = submit(application(application.path("id").asText()));
         act(application, "APPROVE");
         String appId = application.path("id").asText();
@@ -69,6 +71,7 @@ class FirstWorkflowIntegrationTest {
         var completed = report(draft.id());
         assertThat(completed.path("submittedRounds").asLong()).isEqualTo(3);
         assertThat(completed.path("approvedRounds").asLong()).isEqualTo(1);
+        assertThat(completed.path("unrecordedHistoricalRounds").asLong()).isZero();
         assertThat(completed.path("latestApproval").path("roundNo").asInt()).isEqualTo(3);
         assertThat(completed.path("latestApproval").path("applicationId").asText()).isEqualTo(appId);
         assertThat(completed.toString()).doesNotContain("do-not-leak", "payload", "reason");

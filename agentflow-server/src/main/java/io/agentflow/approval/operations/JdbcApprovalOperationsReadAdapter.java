@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.approval.history.JdbcSubmissionHistoryGapQuery;
 import io.agentflow.approval.process.FlowableActiveTaskSql;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -43,9 +44,12 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
                 THEN EXTRACT(EPOCH FROM r.completed_at)-EXTRACT(EPOCH FROM r.submitted_at) END) AS average_seconds
             """;
     private final JdbcTemplate jdbc;
+    private final JdbcSubmissionHistoryGapQuery historyGaps;
 
     /** 复用审批与 Flowable 数据源，只读查询不写入统计状态。 */
-    public JdbcApprovalOperationsReadAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public JdbcApprovalOperationsReadAdapter(JdbcTemplate jdbc, JdbcSubmissionHistoryGapQuery historyGaps) {
+        this.jdbc = jdbc; this.historyGaps = historyGaps;
+    }
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -91,19 +95,7 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
         return new Report(generatedAt, query.from(), query.to(), "UTC", query.processKey(), query.definitionVersion(), metrics, daily,
                 head(processes, PROCESS_LIMIT), processes.size() > PROCESS_LIMIT, pending, head(nodes, WAITING_LIMIT),
                 nodes.size() > WAITING_LIMIT, head(oldestTasks, WAITING_LIMIT), oldestTasks.size() > WAITING_LIMIT,
-                unrecorded(tenantId, query));
-    }
-
-    private long unrecorded(String tenantId, Query query) {
-        var parameters = new ArrayList<Object>(List.of(tenantId));
-        var sql = new StringBuilder("""
-                SELECT COALESCE(SUM(GREATEST(0,a.round_no-(SELECT COUNT(*) FROM approval_submission_round r
-                    WHERE r.tenant_id=a.tenant_id AND r.application_id=a.id))),0)
-                FROM approval_application a WHERE a.tenant_id=?
-                """);
-        // 旧轮次没有可信提交日期，单独披露缺失量，不能归入任意日期或按当前状态补造历史。
-        filters(sql, parameters, query, "a.definition_version");
-        return jdbc.queryForObject(sql.toString(), Long.class, parameters.toArray());
+                historyGaps.count(tenantId, query.processKey(), query.definitionVersion()));
     }
 
     private static Metrics metrics(ResultSet row) throws SQLException {
