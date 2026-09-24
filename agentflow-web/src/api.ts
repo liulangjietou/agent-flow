@@ -1,5 +1,5 @@
 import type { AssistRunDetail, AssistRunFilter, AssistRunPage } from './assistRuns'
-import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem } from './webhooks'
+import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
 import type { RoundDiagram } from './roundDiagram'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
@@ -211,6 +211,7 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 
 export const api = {
   webhookTargets: (signal: AbortSignal) => request<WebhookTarget[]>('/integrations/webhooks', { signal }),
+  webhookOverview: (filters: WebhookOverviewFilters, signal: AbortSignal) => request<WebhookOverview>('/integrations/webhooks/overview' + historyQuery(filters), { signal }),
   webhookDeliveries: (filters: WebhookFilters, signal: AbortSignal) => request<WebhookPage>('/integrations/webhooks/deliveries' + historyQuery(filters), { signal }),
   webhookDelivery: (id: string, signal: AbortSignal) => request<WebhookDetail>('/integrations/webhooks/deliveries/' + encodeURIComponent(id), { signal }),
   retryWebhook: (id: string, expectedVersion: number) => write<WebhookItem>('/integrations/webhooks/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '重新排队 Webhook 投递', { expectedVersion }),

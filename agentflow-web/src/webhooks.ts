@@ -5,6 +5,14 @@ export interface WebhookItem {
   nextAttemptAt?: string; leaseUntil?: string; httpStatus?: number; errorCode?: string
 }
 export interface WebhookFilters { target?: string; status?: string; applicationId?: string; limit?: number; cursor?: string }
+/** 概况只按目的地与申请收窄范围。@author owlzhangfq@gmail.com */
+export type WebhookOverviewFilters = Pick<WebhookFilters, 'target' | 'applicationId'>
+/** 完整当前状态数量；2xx 确认接收不表示外部业务已完成。@author owlzhangfq@gmail.com */
+export interface WebhookOverview { queriedAt: string; total: number; pending: number; inFlight: number; retryWait: number; delivered: number; failed: number }
+/** 从已提交筛选取范围，状态卡片切换与后续分页不改变概况口径。 */
+export function webhookOverviewFilters(filters: WebhookFilters): WebhookOverviewFilters {
+  return { ...(filters.target ? { target: filters.target } : {}), ...(filters.applicationId ? { applicationId: filters.applicationId } : {}) }
+}
 export interface WebhookPage { items: WebhookItem[]; nextCursor?: string | null }
 export interface WebhookTarget { id: string; label: string; enabled: boolean }
 export interface WebhookAttempt { attemptNo: number; startedAt: string; finishedAt?: string; result: string; httpStatus?: number; errorCode?: string }

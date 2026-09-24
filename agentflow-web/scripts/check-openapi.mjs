@@ -240,6 +240,10 @@ async function exercise(base) {
   await call('POST', '/api/v1/auth/logout', { user: 'bob' }); await call('GET', '/api/v1/auth/me', { user: 'bob', status: 401 })
   const wh = '/api/v1/integrations/webhooks'
   await call('GET', wh)
+  const overview = await call('GET', wh + '/overview', { path: wh + '/overview?applicationId=' + application.id })
+  assert.equal(overview.total, overview.pending + overview.inFlight + overview.retryWait + overview.delivered + overview.failed)
+  await call('GET', wh + '/overview', { user: 'alice', status: 403 })
+  await call('GET', wh + '/overview', { path: wh + '/overview?status=FAILED', status: 400 })
   await call('GET', wh, { user: 'alice', status: 403 })
   const deliveries = await call('GET', wh + '/deliveries', { path: wh + '/deliveries?applicationId=' + application.id })
   await call('GET', wh + '/deliveries', { path: wh + '/deliveries?tenantId=other', status: 400 })

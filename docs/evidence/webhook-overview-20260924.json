@@ -1,0 +1,89 @@
+{
+  "date": "2026-09-24",
+  "result": "PASS",
+  "scope": "Webhook current-state overview",
+  "verification": {
+    "java": 648,
+    "domain": 181,
+    "server": 467,
+    "frontend": 243,
+    "tools": 19,
+    "javaAuthorFiles": 259,
+    "javaAuthorTypes": 426,
+    "webhookIntegrationPerDatabase": 12,
+    "openapiOperations": 64,
+    "openapiSchemas": 111,
+    "requestExamples": 21,
+    "build": "PASS"
+  },
+  "databases": [
+    "H2 2.5.250",
+    "PostgreSQL 17.11"
+  ],
+  "contractRed": {
+    "newTests": 3,
+    "expected": 200,
+    "actual": 404
+  },
+  "sqlChecks": [
+    "Full 37-record scope despite 30-row page",
+    "Historic target retained",
+    "Cross-tenant same application ID isolated",
+    "Same event delivered to two destinations counts twice",
+    "Attempts and manual retries do not inflate totals",
+    "Current-state changes reflected",
+    "Empty range returns zero",
+    "Read does not mutate delivery records"
+  ],
+  "browser": {
+    "engine": "Codex in-app Chromium",
+    "beforeRetry": {
+      "total": 64,
+      "pending": 31,
+      "inFlight": 7,
+      "retryWait": 7,
+      "delivered": 11,
+      "failed": 8
+    },
+    "afterRetry": {
+      "total": 64,
+      "pending": 32,
+      "inFlight": 7,
+      "retryWait": 7,
+      "delivered": 11,
+      "failed": 7
+    },
+    "scopedAfterRetry": {
+      "total": 36,
+      "pending": 9,
+      "inFlight": 7,
+      "retryWait": 7,
+      "delivered": 7,
+      "failed": 6
+    },
+    "checks": [
+      "Status card filters detail list",
+      "Keyboard Enter selects all states",
+      "Dirty filters disable cards",
+      "Offline clears counts; retry restores counts",
+      "Invalid application ID clears counts",
+      "Account switch removes administrator view"
+    ],
+    "responsive": {
+      "cssViewport": 390,
+      "documentWidth": 390,
+      "overviewWidth": 362,
+      "columns": [
+        "159px",
+        "159px"
+      ]
+    },
+    "limitations": [
+      "Desktop Chromium emulation; no physical mobile device",
+      "Worker disabled for deterministic fixture state; browser verified real requeue API, not HTTP delivery"
+    ]
+  },
+  "schemaVersion": 20,
+  "migrationsAdded": 0,
+  "releaseJarSha256": "51c1b73ee406dd042bb84f0081db13d55219496a6f9e5559362090b3614e3bbf"
+}

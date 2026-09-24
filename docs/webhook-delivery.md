@@ -100,6 +100,7 @@ V17 新增 `webhook_delivery`、`webhook_attempt`、`webhook_retry_request`。�
 所有接口要求认证租户内的 ADMIN，PROCESS_ADMIN 不自动获得权限。跨租户资源返回 404。成功响应 `Cache-Control: no-store`。
 
 - `GET /api/v1/integrations/webhooks`：当前租户的目的地名称与状态。
+- `GET /api/v1/integrations/webhooks/overview`：按 target、applicationId 统计完整当前状态数量，不受状态和分页限制；具体口径见[集成投递概况](webhook-overview.md)。
 - `GET /api/v1/integrations/webhooks/deliveries`：按 target、status、applicationId 精确筛选。默认 30、最多 100；cursor 绑定租户、账号、角色及原筛选，未知参数拒绝。
 - `GET /api/v1/integrations/webhooks/deliveries/{id}`：摘要、最近 50 次尝试、最近 20 条人工请求；累计尝试次数另行披露，不把已加载数量当全库总数。
 - `POST /api/v1/integrations/webhooks/deliveries/{id}/retry`：正文 `{"expectedVersion":3}`，必须使用 `Idempotency-Key`。仅 FAILED、DELIVERED、RETRY_WAIT 可以重新排队；PENDING、IN_FLIGHT 或版本变化返回 409。

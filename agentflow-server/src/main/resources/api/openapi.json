@@ -7210,6 +7210,99 @@
           }
         ]
       }
+    },
+    "/api/v1/integrations/webhooks/overview": {
+      "get": {
+        "operationId": "webhookOverview",
+        "tags": [
+          "集成投递"
+        ],
+        "summary": "查看完整投递状态概况",
+        "description": "仅当前租户 ADMIN，按 target 与 applicationId 统计完整当前状态。每个事件和目的地组合计一条，自动与人工重试不增加总量，历史目的地保留。拒绝 status、limit、cursor 及租户覆盖；与明细独立查询，不保证两个响应共享快照。queriedAt 为聚合查询开始时间，DELIVERED 只表示 HTTP 2xx 接收。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookOverview"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户投递摘要",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选、游标或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "applicationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -11474,6 +11567,55 @@
           "currentApplicationVersion",
           "inputCurrent"
         ]
+      },
+      "WebhookOverview": {
+        "type": "object",
+        "required": [
+          "queriedAt",
+          "total",
+          "pending",
+          "inFlight",
+          "retryWait",
+          "delivered",
+          "failed"
+        ],
+        "properties": {
+          "queriedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "inFlight": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "retryWait": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

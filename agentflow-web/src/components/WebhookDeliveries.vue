@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import { WebhookQuery, WebhookRead, webhookStatuses, webhookEvents, webhookErrors, webhookRetryable, type WebhookTarget, type WebhookDetail, type WebhookFilters } from '../webhooks'
+import { WebhookQuery, WebhookRead, webhookStatuses, webhookEvents, webhookErrors, webhookRetryable, webhookOverviewFilters, type WebhookTarget, type WebhookDetail, type WebhookFilters, type WebhookOverview } from '../webhooks'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ open: [id: string] }>()
 const fields = reactive({ target: '', status: '', applicationId: '' })
 const query = reactive(new WebhookQuery((filters, signal) => api.webhookDeliveries(filters, signal)))
 const targets = reactive(new WebhookRead<WebhookTarget[]>())
+const overview = reactive(new WebhookRead<WebhookOverview>())
+const appliedFilters = ref<WebhookFilters>({})
+const overviewCards = [
+  { key: 'total', status: '', label: '全部投递' }, { key: 'pending', status: 'PENDING', label: '待投递' },
+  { key: 'inFlight', status: 'IN_FLIGHT', label: '投递中' }, { key: 'retryWait', status: 'RETRY_WAIT', label: '等待重试' },
+  { key: 'delivered', status: 'DELIVERED', label: '已送达' }, { key: 'failed', status: 'FAILED', label: '停止投递' }
+] as const
 const detail = reactive(new WebhookRead<WebhookDetail>())
 const selected = ref(''), confirmation = ref(false), sending = ref(false), writeError = ref(''), notice = ref(''), validation = ref(''), submitted = ref('')
 const detailRegion = ref<HTMLElement | null>(null)
@@ -17,14 +24,20 @@ const targetLabel = (id: string) => targets.value?.find(target => target.id === 
 const time = (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
 const errorLabel = (code?: string) => code ? webhookErrors[code] ?? (code.startsWith('HTTP_') ? '接收服务返回 ' + code.slice(5) : code) : ''
 function refresh() {
-  validation.value = ''; closeDetail()
+  validation.value = ''; closeDetail(); overview.clear()
   const app = fields.applicationId.trim()
   if (app && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(app)) { validation.value = '申请标识需要填写完整 UUID。'; query.clear(); return }
   const filters: WebhookFilters = { target: fields.target, status: fields.status }
   if (app) filters.applicationId = app
   submitted.value = JSON.stringify(fields)
-  void targets.load(signal => api.webhookTargets(signal)); void query.load(props.scopeKey, filters)
+  appliedFilters.value = { ...filters }
+  void targets.load(signal => api.webhookTargets(signal)); void query.load(props.scopeKey, filters); void refreshOverview()
 }
+function refreshOverview() {
+  const filters = webhookOverviewFilters(appliedFilters.value)
+  return overview.load(signal => api.webhookOverview(filters, signal))
+}
+function selectStatus(status: string) { fields.status = status; refresh() }
 function closeDetail() { epoch++; selected.value = ''; detail.clear(); confirmation.value = false; writeError.value = ''; notice.value = '' }
 async function inspect(id: string) {
   closeDetail(); selected.value = id
@@ -42,13 +55,13 @@ async function retry() {
     await api.retryWebhook(value.id, value.version)
     if (generation !== epoch) return
     notice.value = '已重新排队。发送结果请刷新查看。'
-    await detail.load(signal => api.webhookDelivery(value.id, signal))
+    await Promise.all([detail.load(signal => api.webhookDelivery(value.id, signal)), query.load(props.scopeKey, appliedFilters.value), refreshOverview()])
   } catch (cause) { if (generation === epoch) writeError.value = (cause as { message?: string })?.message ?? '操作结果未确认，请使用页面上方的恢复入口。' }
   finally { sending.value = false }
 }
 watch(() => props.scopeKey, () => { Object.assign(fields, { target: '', status: '', applicationId: '' }); refresh() }, { immediate: true, flush: 'sync' })
 watch(() => props.refreshVersion, refresh)
-onUnmounted(() => { closeDetail(); query.clear(); targets.clear() })
+onUnmounted(() => { closeDetail(); query.clear(); targets.clear(); overview.clear() })
 </script>
 
 <template>
@@ -66,6 +79,15 @@ onUnmounted(() => { closeDetail(); query.clear(); targets.clear() })
     <p v-if="validation" class="feedback error" role="alert">{{ validation }}</p>
     <p v-if="changed && query.loaded" class="feedback" role="status">筛选已修改，下方仍显示上次查询结果。</p>
     <p class="help">自动重试最多 6 次尝试，失败不会改变审批结论。同一事件可能多次送达，接收服务须按事件 ID 去重；不保证事件到达顺序。“已送达”表示收到 HTTP 2xx，不代表外部业务处理完成。</p>
+    <section class="panel delivery-overview" aria-label="投递概况" :aria-busy="overview.loading">
+      <div class="overview-heading"><h3>投递概况</h3><time v-if="overview.value">查询于 {{ time(overview.value.queriedAt) }}</time></div>
+      <p class="help">统计已查询的目的地和申请范围内的全部状态，不受状态筛选或分页影响。每个事件投向一个目的地计一条，重试不增加条数。</p>
+      <p v-if="overview.loading" class="help" role="status">正在统计投递…</p>
+      <div v-else-if="overview.error" class="failure error" role="alert"><span>概况读取失败：{{ overview.error }}</span><button class="secondary" :disabled="changed || !!validation" @click="refreshOverview">重试概况</button></div>
+      <div v-else-if="overview.value" class="overview-cards" role="group" aria-label="按投递状态查看明细">
+        <button v-for="card in overviewCards" :key="card.key" type="button" :class="{ active: appliedFilters.status === card.status, failed: card.status === 'FAILED' }" :aria-pressed="appliedFilters.status === card.status" :disabled="changed || query.loading || sending" @click="selectStatus(card.status)"><span>{{ card.label }}</span><strong>{{ overview.value[card.key].toLocaleString('zh-CN') }}</strong></button>
+      </div>
+    </section>
     <div v-if="query.error" class="panel failure" role="alert"><span>{{ query.error }}</span><button class="secondary" :disabled="query.loading || changed" @click="query.items.length ? query.more() : refresh()">重试查询</button></div>
     <p class="summary">事件时间倒序 · <span v-if="query.loaded">已加载 {{ query.items.length }} 条投递 · </span>时间按当前设备时区显示</p>
     <div v-if="query.loading && !query.items.length" class="panel empty" role="status">正在读取投递…</div>
@@ -98,6 +120,9 @@ onUnmounted(() => { closeDetail(); query.clear(); targets.clear() })
 </template>
 
 <style scoped>
+.delivery-overview{padding:20px 22px;margin:20px 0}.overview-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.overview-heading h3{font-size:14px;margin:0}.overview-heading time{font-size:10px;color:var(--muted)}.delivery-overview .help{margin:10px 0 16px;font-size:11px}.overview-cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.overview-cards button{display:flex;flex-direction:column;gap:10px;align-items:start;min-width:0;padding:14px;border:1px solid var(--line);border-radius:7px;background:white;color:var(--ink);cursor:pointer;text-align:left}.overview-cards button.active{background:var(--soft);border-color:var(--deep)}.overview-cards button span{font-size:11px;color:var(--muted)}.overview-cards button strong{font-size:23px;font-weight:500;overflow-wrap:anywhere}.overview-cards button.failed strong{color:var(--red)}.overview-cards button:disabled{cursor:default;opacity:.65}.overview-cards button:focus-visible{outline:2px solid var(--deep);outline-offset:3px}
+@media(max-width:1100px){.overview-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.delivery-overview{padding:16px}.overview-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .admin-label{font-size:11px;background:var(--soft);color:var(--deep);padding:8px 12px;border-radius:6px;white-space:nowrap}.setup{padding:22px;margin-bottom:20px}.setup h3{font-size:15px;margin:0 0 8px}.setup p,.help{font-size:12px;color:var(--muted);line-height:1.9}.destinations{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}.destinations>span{padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:12px}.destinations small{color:var(--muted);margin-left:6px}.destinations i{display:inline-block;width:6px;height:6px;background:#aaa;border-radius:50%;margin-right:8px}.destinations i.enabled{background:var(--deep)}.filters{display:grid;grid-template-columns:1fr 1fr 1.4fr auto;gap:16px;padding:22px;align-items:end}.filters label{min-width:0;display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--muted)}.filters input,.filters select{width:100%;min-width:0;height:40px;border:1px solid var(--line);border-radius:6px;padding:8px;background:white;color:var(--ink);font:inherit}.summary,.pagination{font-size:11px;color:var(--muted);margin:18px 0}.pagination{text-align:center}.delivery-row{display:grid;grid-template-columns:180px minmax(0,1fr) auto;gap:20px;padding:22px;align-items:center}.delivery-row+.delivery-row{border-top:1px solid var(--line)}.delivery-row.selected{background:var(--soft)}.state{display:flex;flex-direction:column;align-items:start;gap:8px}.state time,.state small,.subject p{font-size:11px;color:var(--muted);margin:0}.badge{font-size:11px;padding:5px 8px;border-radius:5px;background:#eef1f0;color:#52635b}.badge.delivered{color:var(--deep);background:#e6f3ec}.badge.failed{color:var(--red);background:#fff0ed}.badge.retry_wait{color:#8b682e;background:#fff4df}.subject{min-width:0;overflow-wrap:anywhere}.subject h3{font-size:13px;margin:0 0 10px}.subject h3 span{font-weight:400}.subject p+p{margin-top:8px}.empty{text-align:center;padding:38px;color:var(--muted);font-size:13px}.empty h3{color:var(--ink);font-size:15px}.failure{padding:18px;display:flex;gap:15px;align-items:center;justify-content:space-between;font-size:12px}.feedback,.confirm{font-size:12px;background:#f6f5ee;padding:14px;line-height:1.8;border-radius:6px}.error,.subject .error{color:var(--red)}.detail{padding:24px;margin-top:20px;overflow-wrap:anywhere}.detail-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}.detail-heading h3{font-size:17px}.detail dl{display:grid;grid-template-columns:100px minmax(0,1fr);font-size:12px;line-height:2.2;gap:3px 15px}.detail dt{color:var(--muted)}.detail dd{margin:0}.actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.detail h4{font-size:13px;margin-top:28px}.detail h4 small{font-size:10px;font-weight:400;color:var(--muted);margin-left:8px}.attempts{list-style:none;padding:0}.attempts li{display:flex;flex-direction:column;gap:7px;font-size:11px;padding:14px 0;border-top:1px solid var(--line)}.attempts span,.attempts small{color:var(--muted)}
 @media(max-width:1100px){.filters{grid-template-columns:1fr 1fr}.delivery-row{grid-template-columns:150px minmax(0,1fr)}.delivery-row>button{grid-column:2;justify-self:start}}
 @media(max-width:650px){.webhooks .page-heading{align-items:start;flex-direction:column;gap:16px}.filters{padding:16px}.delivery-row{display:flex;flex-direction:column;align-items:start;padding:18px}.detail{padding:18px}.detail dl{grid-template-columns:75px minmax(0,1fr)}.subject,.state{width:100%}.failure{align-items:start;flex-direction:column}}

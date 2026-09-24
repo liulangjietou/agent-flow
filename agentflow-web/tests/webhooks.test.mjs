@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const { WebhookQuery, WebhookRead, webhookRetryable } = await import(process.env.AGENTFLOW_TEST_WEBHOOKS)
+const { WebhookQuery, WebhookRead, webhookRetryable, webhookOverviewFilters } = await import(process.env.AGENTFLOW_TEST_WEBHOOKS)
 
 test('切换租户、筛选和详情时取消旧读取，迟到响应不能回填', async () => {
   const pending = []
@@ -60,4 +60,38 @@ test('人工重试发送原版本，未知响应通过原幂等键恢复，不�
   assert.equal(writeRequests.pending().length, 0)
   for (const status of ['PENDING', 'IN_FLIGHT']) assert.equal(webhookRetryable({ status }), false)
   for (const status of ['FAILED', 'DELIVERED', 'RETRY_WAIT']) assert.equal(webhookRetryable({ status }), true)
+})
+
+
+test('投递概况只发送已查询的目的地和申请，状态分页不改变统计范围', async () => {
+  globalThis.localStorage = { getItem: () => 'overview-token' }
+  const { api } = await import(process.env.AGENTFLOW_TEST_API)
+  const fields = { target: 'erp', applicationId: '12345678-1234-1234-1234-123456789012', status: 'FAILED', limit: 30, cursor: 'next' }
+  const filters = webhookOverviewFilters(fields); fields.target = 'edited'
+  assert.deepEqual(filters, { target: 'erp', applicationId: fields.applicationId })
+  assert.deepEqual(webhookOverviewFilters({ status: 'FAILED', target: '' }), {})
+  let sent
+  const value = { queriedAt: '2026-09-24T00:00:00Z', total: 40, pending: 20, inFlight: 3, retryWait: 5, delivered: 7, failed: 5 }
+  globalThis.fetch = async (url, init) => { sent = { url, ...init }; return Response.json(value) }
+  const signal = new AbortController().signal
+  assert.deepEqual(await api.webhookOverview(filters, signal), value)
+  const url = new URL(sent.url, 'http://localhost')
+  assert.equal(url.pathname, '/api/v1/integrations/webhooks/overview')
+  assert.deepEqual(Object.fromEntries(url.searchParams), filters)
+  assert.equal(sent.signal, signal); assert.equal(sent.headers.get('Authorization'), 'Bearer overview-token')
+  assert.equal(sent.headers.has('Idempotency-Key'), false)
+})
+
+test('概况加载和失败清除旧数字，跨账号迟到响应不能恢复，空结果才显示零', async () => {
+  const state = new WebhookRead()
+  await state.load(async () => ({ total: 42 }))
+  let finish, signal
+  const old = state.load(s => { signal = s; return new Promise(resolve => { finish = resolve }) })
+  assert.equal(state.value, null); assert.equal(state.loading, true)
+  const current = state.load(async () => { throw { message: 'Unavailable' } }); await current
+  finish({ total: 99 }); await old
+  assert.equal(signal.aborted, true); assert.equal(state.value, null); assert.equal(state.error, 'Unavailable')
+  await state.load(async () => ({ total: 0, pending: 0, inFlight: 0, retryWait: 0, delivered: 0, failed: 0 }))
+  assert.equal(state.value.total, 0); assert.equal(state.error, '')
+  state.clear(); assert.equal(state.value, null)
 })

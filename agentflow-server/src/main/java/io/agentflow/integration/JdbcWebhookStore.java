@@ -115,6 +115,25 @@ public class JdbcWebhookStore {
                 row.getObject("http_status", Integer.class), row.getString("error_code")), parameters.toArray());
     }
 
+    /** 单次聚合读取完整范围；每个事件与目的地的投递只计一次，不联查重试明细或当前配置。 */
+    public Overview overview(String tenant, WebhookQueryParameters query) {
+        Instant queriedAt = Instant.now();
+        var parameters = new ArrayList<Object>(List.of(tenant));
+        var sql = new StringBuilder("""
+                SELECT COUNT(*) AS total,
+                    COALESCE(SUM(CASE WHEN status='PENDING' THEN 1 ELSE 0 END),0) AS pending,
+                    COALESCE(SUM(CASE WHEN status='IN_FLIGHT' THEN 1 ELSE 0 END),0) AS in_flight,
+                    COALESCE(SUM(CASE WHEN status='RETRY_WAIT' THEN 1 ELSE 0 END),0) AS retry_wait,
+                    COALESCE(SUM(CASE WHEN status='DELIVERED' THEN 1 ELSE 0 END),0) AS delivered,
+                    COALESCE(SUM(CASE WHEN status='FAILED' THEN 1 ELSE 0 END),0) AS failed
+                FROM webhook_delivery WHERE tenant_id=?
+                """);
+        if (!query.target().isEmpty()) { sql.append(" AND target_id=?"); parameters.add(query.target()); }
+        if (query.applicationId() != null) { sql.append(" AND application_id=?"); parameters.add(query.applicationId().toString()); }
+        return jdbc.queryForObject(sql.toString(), (row, index) -> new Overview(queriedAt, row.getLong("total"), row.getLong("pending"),
+                row.getLong("in_flight"), row.getLong("retry_wait"), row.getLong("delivered"), row.getLong("failed")), parameters.toArray());
+    }
+
     /** 返回最近 50 次真实尝试；总次数在摘要中单独披露。 */
     public List<Attempt> attempts(UUID id) {
         return jdbc.query("SELECT * FROM webhook_attempt WHERE delivery_id=? ORDER BY attempt_no DESC LIMIT 50", (row, index) -> new Attempt(
@@ -158,6 +177,11 @@ public class JdbcWebhookStore {
     public record Summary(UUID id, String targetId, String eventId, String eventType, UUID applicationId, long aggregateVersion,
                           Instant occurredAt, Instant updatedAt, String status, long version, int attempts, int cycleAttempts,
                           Instant nextAttemptAt, Instant leaseUntil, Integer httpStatus, String errorCode) { }
+    /**
+     * 查询开始时刻及完整状态数量，记录当前投递状态，不表达外部业务成功率。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Overview(Instant queriedAt, long total, long pending, long inFlight, long retryWait, long delivered, long failed) { }
     /**
      * 一次网络尝试的真实结果；租约失联时可能为 OUTCOME_UNKNOWN。
      * @author owlzhangfq@gmail.com

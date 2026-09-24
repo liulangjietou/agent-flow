@@ -51,6 +51,13 @@ public class WebhookController {
         return noStore(new Page(List.copyOf(rows.subList(0, count)), rows.size() > count ? query.cursor(last.occurredAt(), last.id()) : null));
     }
 
+    /** 按目的地和申请范围统计完整当前状态，不把分页或尝试次数当投递总量。 */
+    @GetMapping("/overview")
+    public ResponseEntity<JdbcWebhookStore.Overview> overview(@RequestParam Map<String, String> raw) {
+        var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        return noStore(store.overview(actor.tenantId(), WebhookQueryParameters.parseOverview(actor, raw, json)));
+    }
+
     /** 读取单条投递及有界尝试历史，跨租户标识返回 404。 */
     @GetMapping("/deliveries/{id}")
     public ResponseEntity<Detail> detail(@PathVariable UUID id) {

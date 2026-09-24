@@ -20,7 +20,14 @@ import java.util.UUID;
 public record WebhookQueryParameters(String target, String status, UUID applicationId, int limit,
                                      Instant beforeTime, UUID beforeId, String context) {
     private static final Set<String> KEYS = Set.of("target", "status", "applicationId", "limit", "cursor");
+    private static final Set<String> OVERVIEW_KEYS = Set.of("target", "applicationId");
     private static final String UUID_PATTERN = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
+    /** 概况覆盖所选目的地和申请的全部状态，拒绝状态与分页覆盖。 */
+    public static WebhookQueryParameters parseOverview(Actor actor, Map<String, String> raw, JsonUtil json) {
+        if (!OVERVIEW_KEYS.containsAll(raw.keySet())) throw invalid();
+        return parse(actor, raw, json);
+    }
 
     /** 一次解析有界条件，不允许覆盖租户或排序。 */
     public static WebhookQueryParameters parse(Actor actor, Map<String, String> raw, JsonUtil json) {

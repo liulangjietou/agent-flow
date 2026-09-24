@@ -231,6 +231,89 @@ class WebhookIntegrationTest {
         assertThat(targetList).contains("erp").doesNotContain("url", "secret", "whsec_");
     }
 
+    @Test
+    void overviewCountsAllMatchingDeliveriesAcrossPagesAndKeepsHistoricalTargets() throws Exception {
+        UUID app = UUID.randomUUID(); Instant time = Instant.now().minusSeconds(60);
+        String historic = "historic-" + UUID.randomUUID().toString().substring(0, 8);
+        for (int index = 0; index < 36; index++) {
+            UUID id = enqueueOverview("demo", "erp", app, UUID.randomUUID().toString(), time);
+            if (index % 5 == 0) continue;
+            var claim = store.claim(id, time.plusSeconds(1));
+            if (index % 5 != 1) store.finish(claim, DeliveryProgress.Outcome.http(index % 5 == 2 ? 503 : index % 5 == 3 ? 204 : 400), time.plusSeconds(2));
+        }
+        String event = UUID.randomUUID().toString();
+        enqueueOverview("demo", historic, app, event, time);
+        enqueueOverview("other", "erp", app, event, time);
+        var before = jdbc.queryForList("SELECT * FROM webhook_delivery WHERE application_id=? ORDER BY tenant_id,id", app.toString());
+        assertThat(read("?applicationId=" + app).path("items").size()).isEqualTo(30);
+        var all = overview("?applicationId=" + app, token("admin"));
+        assertCounts(all, 37, 9, 7, 7, 7, 7);
+        assertCounts(overview("?applicationId=" + app + "&target=erp", token("admin")), 36, 8, 7, 7, 7, 7);
+        assertCounts(overview("?applicationId=" + app + "&target=" + historic, token("admin")), 1, 1, 0, 0, 0, 0);
+        assertThat(Instant.parse(all.path("queriedAt").asText())).isBeforeOrEqualTo(Instant.now());
+        assertThat(all.toString()).doesNotContain("private-body", "example.invalid", "whsec_", "leaseToken", "eventId");
+        assertThat(jdbc.queryForList("SELECT * FROM webhook_delivery WHERE application_id=? ORDER BY tenant_id,id", app.toString())).isEqualTo(before);
+    }
+
+    @Test
+    void overviewCountsDestinationDeliveriesAndLatestStateInsteadOfEventsOrAttempts() throws Exception {
+        UUID app = UUID.randomUUID(); Instant time = Instant.now().minusSeconds(60);
+        String event = UUID.randomUUID().toString();
+        UUID first = enqueueOverview("demo", "erp", app, event, time);
+        UUID second = enqueueOverview("demo", "archived", app, event, time);
+        assertCounts(overview("?applicationId=" + app, token("admin")), 2, 2, 0, 0, 0, 0);
+        var claim = store.claim(first, time.plusSeconds(1));
+        assertCounts(overview("?applicationId=" + app, token("admin")), 2, 1, 1, 0, 0, 0);
+        store.finish(claim, DeliveryProgress.Outcome.http(503), time.plusSeconds(2));
+        assertCounts(overview("?applicationId=" + app, token("admin")), 2, 1, 0, 1, 0, 0);
+        claim = store.claim(first, time.plusSeconds(8));
+        store.finish(claim, DeliveryProgress.Outcome.http(400), time.plusSeconds(9));
+        var secondClaim = store.claim(second, time.plusSeconds(1));
+        store.finish(secondClaim, DeliveryProgress.Outcome.http(204), time.plusSeconds(2));
+        assertCounts(overview("?applicationId=" + app, token("admin")), 2, 0, 0, 0, 1, 1);
+        write(ROOT + "/deliveries/" + first + "/retry", "admin", Map.of("expectedVersion", 5), UUID.randomUUID().toString(), 200);
+        assertCounts(overview("?applicationId=" + app, token("admin")), 2, 1, 0, 0, 1, 0);
+        assertThat(store.attempts(first)).hasSize(2); assertThat(store.retries(first)).hasSize(1);
+    }
+
+    @Test
+    void overviewEnforcesTenantAdministratorAndScopeFiltersWithoutInventingEmptyCounts() throws Exception {
+        UUID app = UUID.randomUUID(); Instant time = Instant.now().minusSeconds(60);
+        enqueueOverview("demo", "erp", app, UUID.randomUUID().toString(), time);
+        UUID other = enqueueOverview("other", "erp", app, UUID.randomUUID().toString(), time);
+        store.finish(store.claim(other, time.plusSeconds(1)), DeliveryProgress.Outcome.http(400), time.plusSeconds(2));
+        doReturn(new Actor("other", "admin", Set.of("ADMIN"))).when(auth).authenticate("overview-other");
+        doReturn(new Actor("demo", "designer", Set.of("PROCESS_ADMIN"))).when(auth).authenticate("overview-designer");
+        assertCounts(overview("?applicationId=" + app, token("admin")), 1, 1, 0, 0, 0, 0);
+        assertCounts(overview("?applicationId=" + app, "Bearer overview-other"), 1, 0, 0, 0, 0, 1);
+        assertCounts(overview("?applicationId=" + UUID.randomUUID(), token("admin")), 0, 0, 0, 0, 0, 0);
+        mvc.perform(get(ROOT + "/overview")).andExpect(status().isUnauthorized());
+        for (String actor : List.of(token("alice"), "Bearer overview-designer"))
+            mvc.perform(get(ROOT + "/overview").header("Authorization", actor)).andExpect(status().isForbidden());
+        for (String query : List.of("?tenantId=other", "?status=FAILED", "?limit=1", "?cursor=abc", "?target=bad!", "?applicationId=1-1-1-1-1"))
+            mvc.perform(get(ROOT + "/overview" + query).header("Authorization", token("admin")))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_WEBHOOK_QUERY"));
+    }
+
+    private UUID enqueueOverview(String tenant, String targetId, UUID app, String eventId, Instant time) {
+        var configured = targets.find("demo", "erp").orElseThrow();
+        var target = new WebhookTargets.Destination(targetId, tenant, "概况测试", configured.uri(), configured.key(), true, configured.digest());
+        new TransactionTemplate(transactions).executeWithoutResult(status -> store.append(tenant, target, eventId, "ApplicationSubmitted", app, 2, "private-body", time));
+        return UUID.fromString(jdbc.queryForObject("SELECT id FROM webhook_delivery WHERE tenant_id=? AND target_id=? AND event_id=?", String.class, tenant, targetId, eventId));
+    }
+    private JsonNode overview(String query, String authorization) throws Exception {
+        return json.read(mvc.perform(get(ROOT + "/overview" + query).header("Authorization", authorization))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store")).andReturn().getResponse().getContentAsString(), JsonNode.class);
+    }
+    private void assertCounts(JsonNode value, long total, long pending, long inFlight, long retryWait, long delivered, long failed) {
+        assertThat(value.path("total").asLong(-1)).isEqualTo(total);
+        assertThat(value.path("pending").asLong(-1)).isEqualTo(pending);
+        assertThat(value.path("inFlight").asLong(-1)).isEqualTo(inFlight);
+        assertThat(value.path("retryWait").asLong(-1)).isEqualTo(retryWait);
+        assertThat(value.path("delivered").asLong(-1)).isEqualTo(delivered);
+        assertThat(value.path("failed").asLong(-1)).isEqualTo(failed);
+    }
+
     private UUID enqueue(String tenant) { return enqueue(tenant, UUID.randomUUID(), Instant.now()); }
     private UUID enqueue(String tenant, UUID app, Instant time) {
         new TransactionTemplate(transactions).executeWithoutResult(status -> store.append(tenant, targets.find("demo", "erp").orElseThrow(), UUID.randomUUID().toString(), "ApplicationSubmitted", app, 2, "private-body", time));
