@@ -37,7 +37,9 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 [企业 HTTPS 容器部署](docs/production-container-deployment.md)提供独立 `compose.production.yml`、文件密钥、PostgreSQL CA、企业 OIDC 配置和 HTTPS 代理；连接外部数据库，迁移仅由维护命令执行。正式企业身份、组织和完整上线验收仍需完成。
 
-[生产指标采集与告警](docs/production-monitoring.md)提供默认关闭的专用凭证入口、Prometheus 叠加配置及六条经过时间序列测试的告警规则。指标不包含表单正文，控制台只绑定本机；企业通知渠道、生产阈值和多实例监控仍需目标环境验收。
+[生产指标采集与告警](docs/production-monitoring.md)提供默认关闭的专用凭证入口、Prometheus DNS 逐实例采集及七条告警规则，包括副本数不足。指标不包含表单正文，控制台只绑定本机；企业通知渠道、生产阈值和监控高可用仍需目标环境验收。
+
+[多实例部署与故障接续](docs/multi-instance-deployment.md)说明同版本副本配置、统一 HTTPS 入口、请求重放边界和升级停写要求；已有流程的幂等及租约竞争通过双实例测试，不代表组织接入或完整生产高可用已完成。
 
 ## 本地启动
 

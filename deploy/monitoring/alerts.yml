@@ -2,6 +2,16 @@
 groups:
   - name: agentflow-runtime
     rules:
+      - alert: AgentFlowReplicaShortfall
+        expr: |
+          (count by (job) (up{job="agentflow"} == 1)
+          or on (job) (0 * max by (job) (agentflow_runtime_expected_instances{job="agentflow"})))
+          < on (job) max by (job) (agentflow_runtime_expected_instances{job="agentflow"})
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: AgentFlow 可采集实例少于部署期望
+          description: 对照期望副本数检查实例退出和服务发现；剩余目标正常不代表副本数量足够。
       - alert: AgentFlowInstanceDown
         expr: up{job="agentflow"} == 0
         for: 2m

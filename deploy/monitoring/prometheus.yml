@@ -12,8 +12,11 @@ scrape_configs:
     authorization:
       type: Bearer
       credentials_file: /run/secrets/metrics_token
-    static_configs:
-      - targets: [server:8080]
+    dns_sd_configs:
+      - names: [server]
+        type: A
+        port: 8080
+        refresh_interval: 5s
 
 # 站外通知需要接入企业自己的 Alertmanager，并验收收件人和通知通道。
 # alerting:

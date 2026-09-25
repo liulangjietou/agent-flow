@@ -2,6 +2,22 @@ package io.agentflow.auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.AgentflowApplication;
+import io.agentflow.definition.DefinitionModels.Graph;
+import io.agentflow.definition.DefinitionModels.Node;
+import io.agentflow.definition.DefinitionModels.NodeType;
+import io.agentflow.definition.DefinitionModels.Edge;
+import io.agentflow.definition.DefinitionModels.DefinitionDraft;
+import io.agentflow.definition.DefinitionDraftRepository;
+import io.agentflow.definition.DefinitionDeploymentPort;
+import io.agentflow.integration.JdbcWebhookStore;
+import io.agentflow.integration.WebhookTargets;
+import io.agentflow.integration.DeliveryProgress;
+import org.flowable.engine.TaskService;
+import org.flowable.engine.RuntimeService;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.Arrays;
+import java.util.concurrent.Executors;
 import io.agentflow.common.JsonUtil;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -13,6 +29,13 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SharedSessionIntegrationTest {
     private static final OidcTestProvider PROVIDER = new OidcTestProvider();
-    private static final String JDBC_URL = System.getProperty("agentflow.session-test.jdbc-url",
+    private static final String JDBC_URL = setting("url", "URL",
             "jdbc:h2:mem:shared-session-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
     private static final String AUTHORIZATION_PATH = "/api/v1/auth/oidc/authorize/enterprise";
     private static final String CURRENT_USER_PATH = "/api/v1/auth/me";
@@ -36,12 +59,14 @@ class SharedSessionIntegrationTest {
     private static ServletWebServerApplicationContext first;
     private static ServletWebServerApplicationContext second;
     private static JsonUtil json;
+    private static final String PROCESS_KEY = "shared-runtime-fixture";
 
     @BeforeAll
     static void start() {
         first = node(Map.of());
         second = node(Map.of());
         json = first.getBean(JsonUtil.class);
+        seedPublishedDefinition();
     }
 
     @BeforeEach
@@ -52,6 +77,140 @@ class SharedSessionIntegrationTest {
         if (second != null) second.close();
         if (first != null) first.close();
         PROVIDER.close();
+    }
+
+    @Test
+    void concurrentWritesAcrossNodesCommitOneApplicationRoundAndApproval() throws Exception {
+        Browser browser = browser();
+        login(browser, first, second);
+        String csrf = json.read(browser.get(first, "/api/v1/auth/options").body(), JsonNode.class).path("csrfToken").asText();
+        String cookie = browser.cookie();
+        String businessNo = "CLUSTER-" + UUID.randomUUID();
+        String body = json.write(Map.of("businessNo", businessNo, "processKey", PROCESS_KEY, "definitionVersion", 1,
+                "title", "跨实例审批", "payload", Map.of()));
+        var created = sameWriteOnBothNodes(cookie, csrf, "/api/v1/applications", body);
+        String id = json.read(created.body(), JsonNode.class).path("id").asText();
+        sameWriteOnBothNodes(cookie, csrf, "/api/v1/applications/" + id + "/submit", "{\"expectedVersion\":1}");
+        var jdbc = second.getBean(JdbcTemplate.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_application WHERE business_no=?", Integer.class, businessNo)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_submission_round WHERE application_id=?", Integer.class, id)).isEqualTo(1);
+        var task = second.getBean(TaskService.class).createTaskQuery()
+                .processVariableValueEquals("applicationId", id).singleResult();
+        sameWriteOnBothNodes(cookie, csrf, "/api/v1/tasks/" + task.getId() + "/actions",
+                "{\"expectedVersion\":2,\"action\":\"APPROVE\",\"comment\":\"跨实例只执行一次\"}");
+        assertThat(jdbc.queryForObject("SELECT status FROM approval_application WHERE id=?", String.class, id)).isEqualTo("APPROVED");
+        assertThat(jdbc.queryForList("SELECT action FROM audit_event WHERE application_id=?", String.class, id))
+                .containsExactlyInAnyOrder("CREATE", "SUBMIT", "APPROVE");
+        assertThat(second.getBean(RuntimeService.class).createProcessInstanceQuery()
+                .variableValueEquals("applicationId", id).count()).isZero();
+    }
+
+    @Test
+    void anotherNodeReplaysCommittedResponseAndFinishesPendingTaskAfterNodeStops() throws Exception {
+        Browser browser = browser();
+        login(browser, first, second);
+        String csrf = json.read(browser.get(first, "/api/v1/auth/options").body(), JsonNode.class).path("csrfToken").asText();
+        String cookie = browser.cookie();
+        String createKey = UUID.randomUUID().toString();
+        String body = json.write(Map.of("businessNo", "FAILOVER-" + UUID.randomUUID(), "processKey", PROCESS_KEY,
+                "definitionVersion", 1, "title", "节点退出后继续办理", "payload", Map.of()));
+        var created = mutation(first, cookie, csrf, createKey, "/api/v1/applications", body);
+        assertThat(created.statusCode()).isEqualTo(201);
+        String id = json.read(created.body(), JsonNode.class).path("id").asText();
+        assertThat(mutation(first, cookie, csrf, UUID.randomUUID().toString(), "/api/v1/applications/" + id + "/submit",
+                "{\"expectedVersion\":1}").statusCode()).isEqualTo(200);
+        first.close();
+        try {
+            var replay = mutation(second, cookie, csrf, createKey, "/api/v1/applications", body);
+            assertThat(replay.statusCode()).isEqualTo(201);
+            assertThat(replay.body()).isEqualTo(created.body());
+            assertThat(replay.headers().firstValue("Idempotency-Replayed")).contains("true");
+            var task = second.getBean(TaskService.class).createTaskQuery()
+                    .processVariableValueEquals("applicationId", id).singleResult();
+            var approved = mutation(second, cookie, csrf, UUID.randomUUID().toString(), "/api/v1/tasks/" + task.getId() + "/actions",
+                    "{\"expectedVersion\":2,\"action\":\"APPROVE\"}");
+            assertThat(approved.statusCode()).isEqualTo(200);
+            assertThat(json.read(approved.body(), JsonNode.class).path("applicationStatus").asText()).isEqualTo("APPROVED");
+        } finally { first = node(Map.of()); }
+    }
+
+    @Test
+    void deliveryLeaseHasOneOwnerAcrossNodesAndRejectsLateConfirmation() throws Exception {
+        var left = first.getBean(JdbcWebhookStore.class);
+        var right = second.getBean(JdbcWebhookStore.class);
+        var now = Instant.now();
+        String event = UUID.randomUUID().toString();
+        var target = new WebhookTargets.Destination("fixture", "tenant-a", "验收目的地",
+                URI.create("https://fixture.invalid/webhook"), new byte[32], true, "fixture-digest");
+        new TransactionTemplate(first.getBean(PlatformTransactionManager.class)).executeWithoutResult(status ->
+                left.append("tenant-a", target, event, "ApplicationSubmitted", UUID.randomUUID(), 2, "{}", now));
+        var jdbc = second.getBean(JdbcTemplate.class);
+        UUID id = UUID.fromString(jdbc.queryForObject("SELECT id FROM webhook_delivery WHERE event_id=?", String.class, event));
+        var claimed = race(() -> left.claim(id, now.plusSeconds(1)), () -> right.claim(id, now.plusSeconds(1)));
+        assertThat(claimed.stream().filter(Objects::nonNull).count()).isEqualTo(1);
+        var winner = claimed.stream().filter(Objects::nonNull).findFirst().orElseThrow();
+        var replacement = right.claim(id, winner.progress().leaseUntil().plusSeconds(1));
+        var success = DeliveryProgress.Outcome.http(204);
+        assertThat(left.finish(winner, success, now.plusSeconds(2))).isFalse();
+        assertThat(right.finish(replacement, success, replacement.updatedAt().plusSeconds(1))).isTrue();
+        assertThat(jdbc.queryForList("SELECT result FROM webhook_attempt WHERE delivery_id=? ORDER BY attempt_no", String.class, id.toString()))
+                .containsExactly("OUTCOME_UNKNOWN", "DELIVERED");
+    }
+
+    private HttpResponse<String> sameWriteOnBothNodes(String cookie, String csrf, String path, String body) throws Exception {
+        String key = UUID.randomUUID().toString();
+        var responses = race(() -> mutation(first, cookie, csrf, key, path, body),
+                () -> mutation(second, cookie, csrf, key, path, body));
+        assertThat(responses.get(0).statusCode()).isIn(200, 201);
+        assertThat(responses.get(1).statusCode()).isEqualTo(responses.get(0).statusCode());
+        assertThat(responses.get(1).body()).isEqualTo(responses.get(0).body());
+        assertThat(responses.stream().map(r -> r.headers().firstValue("Idempotency-Replayed").orElseThrow()))
+                .containsExactlyInAnyOrder("true", "false");
+        return responses.get(0);
+    }
+
+    private static HttpResponse<String> mutation(ServletWebServerApplicationContext node, String cookie, String csrf,
+                                                  String key, String path, String body) {
+        try {
+            return DIRECT.send(HttpRequest.newBuilder(uri(node, path)).timeout(Duration.ofSeconds(15))
+                    .header("Cookie", cookie).header("X-CSRF-TOKEN", csrf).header("Idempotency-Key", key)
+                    .header("X-AgentFlow-Actor", "%5B%22tenant-a%22%2C%22employee-42%22%5D")
+                    .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                    HttpResponse.BodyHandlers.ofString());
+        } catch (Exception failure) { throw new AssertionError("Business request failed", failure); }
+    }
+
+    private static <T> List<T> race(Supplier<T> left, Supplier<T> right) throws Exception {
+        var barrier = new CyclicBarrier(2);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var jobs = List.of(left, right).stream().map(operation -> CompletableFuture.supplyAsync(() -> {
+                try { barrier.await(5, TimeUnit.SECONDS); }
+                catch (Exception failure) { throw new AssertionError("Concurrent request barrier failed", failure); }
+                return operation.get();
+            }, executor)).toList();
+            // claim 竞争的败方合法返回 null，不能使用拒绝 null 的 List.of 收集结果。
+            return Arrays.asList(jobs.get(0).get(20, TimeUnit.SECONDS), jobs.get(1).get(20, TimeUnit.SECONDS));
+        } finally { executor.shutdownNow(); }
+    }
+
+    private static void seedPublishedDefinition() {
+        // 生产发布仍受组织目录约束；这里只准备已发布版本的测试前置数据。
+        var graph = new Graph(List.of(
+                new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("review", "审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:employee-42")),
+                new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "review", ""),
+                        new Edge("b", "review", "end", "")));
+        new TransactionTemplate(first.getBean(PlatformTransactionManager.class)).executeWithoutResult(status -> {
+            var repository = first.getBean(DefinitionDraftRepository.class);
+            if (repository.findPublished("tenant-a", PROCESS_KEY, 1).isPresent()) return;
+            var definition = DefinitionDraft.create(UUID.randomUUID(), "tenant-a", PROCESS_KEY, "已有发布流程夹具", graph);
+            repository.save(definition);
+            definition.publish(0, 1);
+            repository.save(definition);
+            first.getBean(DefinitionDeploymentPort.class).deploy(definition);
+        });
     }
 
     @Test
@@ -155,9 +314,9 @@ class SharedSessionIntegrationTest {
         properties.put("server.port", "0");
         properties.put("server.address", "127.0.0.1");
         properties.put("spring.datasource.url", JDBC_URL);
-        properties.put("spring.datasource.driver-class-name", System.getProperty("agentflow.session-test.jdbc-driver", "org.h2.Driver"));
-        properties.put("spring.datasource.username", System.getProperty("agentflow.session-test.jdbc-user", "sa"));
-        properties.put("spring.datasource.password", System.getProperty("agentflow.session-test.jdbc-password", ""));
+        properties.put("spring.datasource.driver-class-name", setting("driver", "DRIVER", "org.h2.Driver"));
+        properties.put("spring.datasource.username", setting("user", "USERNAME", "sa"));
+        properties.put("spring.datasource.password", setting("password", "PASSWORD", ""));
         properties.put("agentflow.auth.demo-enabled", false);
         properties.put("agentflow.auth.oidc.enabled", true);
         properties.put("agentflow.auth.session.jdbc-enabled", true);
@@ -169,6 +328,8 @@ class SharedSessionIntegrationTest {
         properties.put("agentflow.auth.oidc.tenant-mappings.external", "tenant-a");
         properties.put("agentflow.auth.oidc.tenant-mappings.external-b", "tenant-b");
         properties.put("agentflow.auth.oidc.role-mappings.staff[0]", "EMPLOYEE");
+        properties.put("agentflow.auth.oidc.role-mappings.staff[1]", "APPROVER");
+        properties.put("agentflow.webhooks.worker-enabled", false);
         properties.put("agentflow.auth.oidc.allow-insecure-loopback", true);
         properties.put("agentflow.web.allowed-origin", "http://127.0.0.1:5197");
         properties.put("logging.level.root", "WARN");
@@ -191,6 +352,11 @@ class SharedSessionIntegrationTest {
 
     private static URI uri(ServletWebServerApplicationContext node, String path) {
         return URI.create("http://127.0.0.1:" + node.getWebServer().getPort() + path);
+    }
+
+    private static String setting(String property, String environment, String fallback) {
+        return System.getProperty("agentflow.session-test.jdbc-" + property,
+                System.getenv().getOrDefault("AGENTFLOW_SESSION_TEST_" + environment, fallback));
     }
 
     private static HttpResponse<String> rawGet(ServletWebServerApplicationContext node, String path, String cookie) throws Exception {

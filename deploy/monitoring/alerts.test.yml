@@ -223,3 +223,37 @@ tests:
       - eval_time: "20m"
         alertname: "AgentFlowHeapPressure"
         exp_alerts: []
+  - name: "DNS 移除一个实例仍需告警，恢复后解除"
+    interval: "1m"
+    input_series:
+      - series: 'up{job="agentflow",instance="a:8080"}'
+        values: '1+0x10'
+      - series: 'up{job="agentflow",instance="b:8080"}'
+        values: '1 stale _ _ _ 1+0x5'
+      - series: 'agentflow_runtime_expected_instances{job="agentflow",instance="a:8080"}'
+        values: '2+0x10'
+    alert_rule_test:
+      - eval_time: "2m"
+        alertname: AgentFlowReplicaShortfall
+        exp_alerts: []
+      - eval_time: "4m"
+        alertname: AgentFlowReplicaShortfall
+        exp_alerts:
+          - exp_labels: {job: agentflow, severity: warning}
+            exp_annotations:
+              summary: AgentFlow 可采集实例少于部署期望
+              description: 对照期望副本数检查实例退出和服务发现；剩余目标正常不代表副本数量足够。
+      - eval_time: "6m"
+        alertname: AgentFlowReplicaShortfall
+        exp_alerts: []
+  - name: "单实例部署不要求两个目标"
+    interval: "1m"
+    input_series:
+      - series: 'up{job="agentflow",instance="a:8080"}'
+        values: '1+0x10'
+      - series: 'agentflow_runtime_expected_instances{job="agentflow",instance="a:8080"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: "6m"
+        alertname: AgentFlowReplicaShortfall
+        exp_alerts: []

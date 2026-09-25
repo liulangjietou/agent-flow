@@ -1,6 +1,6 @@
 # 生产指标采集与告警规则
 
-该能力为运维人员提供 JVM、HTTP、进程和 Hikari 连接池指标，以及六条基础告警规则。默认关闭，不读取审批表单、身份声明、附件或 Agent 内容。通知收件人、外部 Alertmanager、生产 SLO 和多实例服务发现仍需目标环境配置与验收。
+该能力为运维人员提供 JVM、HTTP、进程、Hikari 连接池和期望副本数指标，以及七条基础告警规则。默认关闭，不读取审批表单、身份声明、附件或 Agent 内容。通知收件人、外部 Alertmanager、生产 SLO 和监控高可用仍需目标环境配置与验收。
 
 ## 调用链和职责
 
@@ -26,7 +26,9 @@ docker compose --env-file /etc/agentflow/production.env \
 
 叠加配置只给服务器和 Prometheus 挂载采集令牌；迁移和 Web 容器不获得它。服务器没有宿主机端口，公网 Nginx 仍拒绝该指标路径。Prometheus 控制台只绑定宿主机 `127.0.0.1:9090`，适合本机或受控 SSH 隧道访问；不要直接向公网发布未鉴权的控制台。
 
-采集配置使用 `server:8080` 单目标，适用于本 Compose 的单实例安装。容器内部采集为 HTTP；跨主机或不可信网络必须另行配置 TLS/mTLS 和网络隔离。多实例必须为每个实例配置独立目标或服务发现，不能把负载均衡地址当作全部实例的观测结果。
+采集配置每五秒通过 Docker DNS 查询 `server` 的 A 记录，按每个 IP 的 8080 端口分别采集；`instance` 标签为该 IP 与端口。容器退出后 DNS 可能移除目标，因此另外比较可采集实例数和 `agentflow_runtime_expected_instances`，避免剩余实例正常掩盖副本缺口。期望值与 Compose 的 `AGENTFLOW_SERVER_REPLICAS` 共用一项配置；独立部署时所有节点须配置相同的 `AGENTFLOW_EXPECTED_INSTANCES`。
+
+容器内部采集为 HTTP；跨主机或不可信网络必须另行配置 TLS/mTLS 和网络隔离。其他编排平台需配置对应服务发现，不能把负载均衡地址当作全部实例的观测结果。实例 IP 改变会开始新的时间序列；应结合发布记录解释历史曲线。
 
 指标数据使用独立 `monitoring-data` 卷，保留上限为 15 天或 2 GB（先达到者）。停用时保留该卷。令牌轮换后重新创建服务器和采集器，使两侧读取同一新文件；只重启可能仍保留旧文件绑定。
 
@@ -34,6 +36,7 @@ docker compose --env-file /etc/agentflow/production.env \
 
 | 规则 | 初始阈值 | 排查方向 |
 |---|---|---|
+| AgentFlowReplicaShortfall | 可采集实例数少于部署期望，持续 2 分钟 | 节点退出、发现缺口；不会把仅剩一台正常误报为全部正常 |
 | AgentFlowInstanceDown | 同一目标采集失败持续 2 分钟 | 实例、采集鉴权和网络；不直接认定业务停机 |
 | AgentFlowScrapeTargetMissing | 整个 job 没有目标持续 5 分钟 | 配置或服务发现；无法检测采集器自身停机 |
 | AgentFlowHttpServerErrors | 5 分钟至少 20 个 API 请求，5xx 比例超过 5%，持续 5 分钟 | 应用异常、数据库故障 |
@@ -47,6 +50,6 @@ Prometheus 会展示 pending/firing 状态。需要邮件、IM 等通知时，�
 
 ## 验证和依据
 
-`MetricsScrapeIntegrationTest` 使用真实 HTTP 验证凭证隔离、路由标签、数据库/JVM 指标；`MetricsScrapeAuthenticationTest` 覆盖文件和请求头边界。`SystemChecksIntegrationTest` 验证默认关闭。`deploy/monitoring/alerts.test.yml` 使用确定时间序列验证六条规则的触发、等待、恢复、正常值及低流量；CI 用固定摘要镜像中的 promtool 执行配置校验和规则测试。
+`MetricsScrapeIntegrationTest` 使用真实 HTTP 验证凭证隔离、路由标签、数据库/JVM 指标；`MetricsScrapeAuthenticationTest` 覆盖文件和请求头边界。`SystemChecksIntegrationTest` 验证默认关闭。`deploy/monitoring/alerts.test.yml` 使用确定时间序列验证七条规则的触发、等待、恢复、正常值、低流量及 DNS 移除节点；CI 用固定摘要镜像中的 promtool 执行配置校验和规则测试。
 
 指标和端点配置依据 [Spring Boot 3.5 指标文档](https://docs.spring.io/spring-boot/3.5/reference/actuator/metrics.html)和[端点文档](https://docs.spring.io/spring-boot/3.5/reference/actuator/endpoints.html)；规则验证依据 [Prometheus 规则测试文档](https://prometheus.io/docs/prometheus/latest/configuration/unit_testing_rules/)。实际依赖由本项目 Spring Boot 3.5.6 管理，验收以锁定构建为准。

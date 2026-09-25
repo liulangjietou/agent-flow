@@ -58,6 +58,8 @@ docker compose --env-file /etc/agentflow/production.env -f compose.production.ym
 
 访问配置的 HTTPS Origin。检查证书和 `/actuator/health/readiness`，然后进行真实企业登录、授权范围及业务验证。后端和数据库没有本文件发布的宿主机端口；Nginx 的 8080 健康检查仅监听容器回环地址。
 
+需要两个同版本应用副本时设置 `AGENTFLOW_SERVER_REPLICAS=2`，使用同一数据库和身份配置；设置会同时更新监控期望值。连接预算、代理重试、故障接续与限制见[多实例部署](multi-instance-deployment.md)。
+
 ## 升级与停止
 
 先在隔离数据库副本演练新版本，按照[数据库升级说明](production-database-lifecycle.md)停写、备份并保留旧镜像和配置。在维护窗口停止所有应用节点及 worker；本文件只管理当前 Compose 项目，不能代替其他节点的停机。
@@ -78,7 +80,7 @@ docker compose --env-file /etc/agentflow/production.env -f compose.production.ym
 - 会话使用 JDBC，容器重启后可恢复尚未过期且身份配置仍匹配的登录。共享会话不是多实例高可用验收。
 - 代理覆盖或移除外来转发头，应用不依赖这些头生成回调；生产 Cookie 为 Secure、HttpOnly、SameSite=Lax。
 - 代理访问日志只记录无查询参数的路径与状态，不记录 Cookie、Authorization、请求体或 Referer。OIDC 路径的 Nginx 原始错误日志关闭，保留无参数的状态日志，具体失败通过后端受控日志和身份服务诊断。
-- 只开放 readiness，其他 actuator 路径返回 404。监控告警、审计留存、证书自动续期、正式压测及灾备仍需完成。
+- 只开放 readiness，其他 actuator 路径返回 404。可叠加[指标与告警规则](production-monitoring.md)；企业通知渠道、审计留存、证书自动续期、正式压测及灾备仍需完成。
 - 本阶段使用本地测试 CA 和签名身份夹具验证协议与部署；企业 IdP、企业 CA、域名及防火墙必须在目标环境重新验收。
 
 参考：[Compose secrets](https://docs.docker.com/compose/how-tos/use-secrets/)、[Compose 必需变量](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)、[Nginx HTTPS 配置](https://nginx.org/en/docs/http/configuring_https_servers.html)。

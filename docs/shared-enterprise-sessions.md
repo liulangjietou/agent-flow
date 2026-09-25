@@ -47,11 +47,13 @@ agentflow.session-test.jdbc-user
 agentflow.session-test.jdbc-password
 ```
 
-测试会修改该专用库的会话时间，**不得指向业务数据库**。迁移测试验证旧定义逐字段保留；配置测试验证认证组合、超时和 HTTPS Cookie。既有 OIDC 集成同时验证默认不开启共享仓储，避免引入依赖改变原运行模式。
+也可使用 `AGENTFLOW_SESSION_TEST_URL`、`AGENTFLOW_SESSION_TEST_DRIVER`、`AGENTFLOW_SESSION_TEST_USERNAME`、`AGENTFLOW_SESSION_TEST_PASSWORD` 环境变量；密码应通过受控环境传入，避免写进启动参数。测试会修改该专用库的会话时间并创建流程、申请和租约记录，**不得指向业务数据库**。迁移测试验证旧定义逐字段保留；配置测试验证认证组合、超时和 HTTPS Cookie。既有 OIDC 集成同时验证默认不开启共享仓储，避免引入依赖改变原运行模式。
+
+当前 10 项用例还包括并发创建/提交/批准只生成一份业务结果、单节点停止后重放响应并继续审批，以及 Webhook 租约竞争和迟到确认；两个真实 JVM 容器的部署证据见[多实例验收](multi-instance-deployment.md)。
 
 ## 尚未覆盖的生产目标
 
-真实企业 IdP、组织同步、账号即时停用、IdP 全局退出、生产代理及集群故障转移仍需单独验收。共享会话通过双实例协议验证，不代表完整平台已经生产可用。
+真实企业 IdP、组织同步、账号即时停用、IdP 全局退出及目标企业集群仍需单独验收。本地代理和双实例协议/执行验证，不代表完整平台已经生产可用。
 
 依据：[Spring Boot 3.5 会话配置](https://docs.spring.io/spring-boot/3.5/reference/web/spring-session.html)、[Spring Session JDBC](https://docs.spring.io/spring-session/reference/3.5/configuration/jdbc.html)、[Cookie 属性](https://docs.spring.io/spring-session/reference/3.5/configuration/common.html)。在线文档可能展示后续补丁，工程使用的具体 API 以编译和运行验证为准。
 

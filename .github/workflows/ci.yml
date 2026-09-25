@@ -32,6 +32,13 @@ jobs:
           cache: maven
       - name: Verify offline migrations and production startup on PostgreSQL
         run: mvn -B -ntp -pl agentflow-server -am -Dtest=DatabaseSchemaPostgresIT -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Verify shared sessions and concurrent workflow operations on PostgreSQL
+        env:
+          AGENTFLOW_SESSION_TEST_URL: jdbc:postgresql://localhost:5432/agentflow_schema_test
+          AGENTFLOW_SESSION_TEST_DRIVER: org.postgresql.Driver
+          AGENTFLOW_SESSION_TEST_USERNAME: agentflow_test
+          AGENTFLOW_SESSION_TEST_PASSWORD: isolated-ci-database-only
+        run: mvn -B -ntp -pl agentflow-server -am -Dtest=SharedSessionIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
   verify:
     runs-on: ubuntu-latest
@@ -59,6 +66,8 @@ jobs:
           docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 check config --syntax-only prometheus.yml
           docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 check rules alerts.yml
           docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 test rules alerts.test.yml
+      - name: Verify proxy failover and one-time authorization callback handling
+        run: python3 scripts/verify_cluster_proxy.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

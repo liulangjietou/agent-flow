@@ -26,6 +26,7 @@ flowable:
 agentflow:
   monitoring:
     enabled: ${AGENTFLOW_METRICS_ENABLED:false}
+    expected-instances: ${AGENTFLOW_EXPECTED_INSTANCES:1}
     token-file: ${AGENTFLOW_METRICS_TOKEN_FILE:}
   auth:
     demo-enabled: ${AGENTFLOW_DEMO_AUTH:true}

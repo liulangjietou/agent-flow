@@ -3,6 +3,8 @@ name: agentflow-production
 services:
   server:
     image: ${AGENTFLOW_SERVER_IMAGE:?Set the verified server release image}
+    deploy:
+      replicas: ${AGENTFLOW_SERVER_REPLICAS:-1}
     entrypoint: [/bin/sh, /opt/agentflow/production-entrypoint.sh]
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -14,6 +16,7 @@ services:
       AGENTFLOW_DATASOURCE_PASSWORD_FILE: /run/secrets/database_password
       AGENTFLOW_DEMO_AUTH: "false"
       AGENTFLOW_JDBC_SESSIONS: "true"
+      AGENTFLOW_EXPECTED_INSTANCES: ${AGENTFLOW_SERVER_REPLICAS:-1}
       AGENTFLOW_WEB_ORIGIN: ${AGENTFLOW_WEB_ORIGIN:?Set the public HTTPS origin}
       AGENTFLOW_OIDC_ISSUER: ${AGENTFLOW_OIDC_ISSUER:?Set the trusted HTTPS issuer}
       AGENTFLOW_OIDC_CLIENT_ID: ${AGENTFLOW_OIDC_CLIENT_ID:?Set the registered OIDC client}

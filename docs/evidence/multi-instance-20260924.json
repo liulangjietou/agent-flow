@@ -1,0 +1,136 @@
+{
+  "stage": 74,
+  "date": "2026-09-24",
+  "baseline": "f372a1295344525bfccbc356cb7813f5d866dda5",
+  "branch": "codex/multi-instance-runtime",
+  "java": {
+    "agentflow-domain": {
+      "tests": 181,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "agentflow-server": {
+      "tests": 546,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "postgresSharedSessionTests": 10,
+  "frontendTests": 254,
+  "frontendBuild": "PASS",
+  "openApiOperations": 65,
+  "toolTests": 23,
+  "authorCheck": {
+    "javaFiles": 294,
+    "namedTypes": 466,
+    "missing": 0
+  },
+  "alertRules": 7,
+  "alertTestScenarios": 12,
+  "proxyChecks": [
+    {
+      "bothNodesServed": true,
+      "unsafeRequestsNotReplayed": true,
+      "readsSurviveNodeStop": true,
+      "nodeRecoveryDiscovered": true,
+      "nginxImage": "nginx@sha256:bf3201ab56f23e5954646379c775d511fc466e9f11376d9725361064ad07ed35",
+      "evidenceDirectory": "/fyoung/tmp/agentflow-proxy-cluster-io4_tey5"
+    },
+    {
+      "bothNodesServed": true,
+      "unsafeRequestsNotReplayed": true,
+      "readsSurviveNodeStop": true,
+      "nodeRecoveryDiscovered": true,
+      "nginxImage": "nginx@sha256:bf3201ab56f23e5954646379c775d511fc466e9f11376d9725361064ad07ed35",
+      "evidenceDirectory": "/fyoung/tmp/agentflow-proxy-cluster-jqhozcil"
+    },
+    {
+      "bothNodesServed": true,
+      "unsafeRequestsNotReplayed": true,
+      "readsSurviveNodeStop": true,
+      "nodeRecoveryDiscovered": true,
+      "nginxImage": "nginx@sha256:bf3201ab56f23e5954646379c775d511fc466e9f11376d9725361064ad07ed35",
+      "evidenceDirectory": "/fyoung/tmp/agentflow-proxy-cluster-1fu3ju59"
+    },
+    {
+      "bothNodesServed": true,
+      "unsafeRequestsNotReplayed": true,
+      "readsSurviveNodeStop": true,
+      "nodeRecoveryDiscovered": true,
+      "nginxImage": "nginx@sha256:bf3201ab56f23e5954646379c775d511fc466e9f11376d9725361064ad07ed35",
+      "evidenceDirectory": "/fyoung/tmp/agentflow-proxy-cluster-rr1quzn0"
+    }
+  ],
+  "runtime": {
+    "sharedOidcSessionOnBothProcesses": true,
+    "dnsDiscoversTwoInstances": true,
+    "bothProcessesServeAuthenticatedRequests": true,
+    "concurrentCreateAndSubmitExactlyOnce": true,
+    "remainingProcessCompletesPendingTask": true,
+    "replicaShortfallAlertSeconds": 130.75,
+    "recoveredProcessReplaysCompletedApproval": true,
+    "replicaAlertResolved": true,
+    "auditActions": [
+      "CREATE",
+      "SUBMIT",
+      "APPROVE"
+    ],
+    "jarSha256": "a1558b901f750eec7392c401cfb3afd33681c09e7e73bafad8274f49e62dd020",
+    "applicationId": "b7c7a78a-9ad6-492b-a417-42b8f96bf589",
+    "realEnterpriseProvider": false,
+    "existingDefinitionFixture": true,
+    "organizationProvisioningVerified": false,
+    "mainBusinessEnvironmentModified": false
+  },
+  "configuration": {
+    "replicas": 2,
+    "expectedInstances": 2,
+    "serverPortsPublished": false,
+    "nginxConfigSha256": "e5bb49532279f4e3a081923aee7cb52278141f83cd7d41745fa7ea7d037be59c",
+    "mainReadinessPorts": [
+      8080,
+      8180
+    ],
+    "mainJarSha256": "9b2e5116d145377f288bbf7696bdf270153db6ecb71d2ef7dcac7a25ccd6ed67"
+  },
+  "cleanup": {
+    "containersStopped": [
+      "3b51c21529cb5814fbd39659167fac6f0c347d59ac54f53080a3d2e2a5e963c5",
+      "2d18a283e4a36840599a68a0afa00ed250f8f4356e1d84915650da913334e303",
+      "24813b2c7e2350333ce84c0508323662e79a0e67279d3d2713aed1100531f05b",
+      "29c8f0e743e5802940679d38cd13a5cc114202124ca91e79bccfd1129d1680ae",
+      "098388dfc0535a58f92d7e3c7f91443c8b12f1bd618bed48e0fc788874c3ab41",
+      "1321fc2861377303a921725f56c3455f5a3338618424e0517b604591eb52f53c"
+    ],
+    "nativeProviderStopped": 47761,
+    "databaseRetained": true,
+    "monitoringVolumeRetained": true,
+    "worktreeRetained": true,
+    "dependencySymlinkRemoved": true
+  },
+  "regressions": [
+    {
+      "case": "One-time OIDC GET response loss must not cause proxy replay",
+      "red": "/fyoung/tmp/agentflow-cluster74-proxy-red.log",
+      "fix": "Disable upstream retry for OIDC routes"
+    },
+    {
+      "case": "DNS membership shrink while a shared upstream request waits for a stopped node",
+      "red": [
+        "/fyoung/tmp/agentflow-cluster74-proxy-repeat-3.log",
+        "/fyoung/tmp/agentflow-cluster74-proxy-repeat-4.log"
+      ],
+      "fix": "Resolve a private address list per request so DNS changes do not remove in-flight retry opportunities"
+    }
+  ],
+  "limits": [
+    "Existing published fixture only; enterprise organization provisioning is not implemented",
+    "No real enterprise IdP or external notification receiver",
+    "No claim of exactly-once external Webhook effects",
+    "No cross-version rolling upgrade, database HA, production SLO or browser UI acceptance",
+    "Main demo runtime remains stage 70",
+    "No Git remote, push, PR or remote CI"
+  ]
+}
