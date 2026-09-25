@@ -1,0 +1,84 @@
+{
+  "stage": 73,
+  "date": "2026-09-24",
+  "baseline": "06a81b14bcb98382ba00340bee97e92d2e185e91",
+  "branch": "codex/production-monitoring",
+  "java": {
+    "agentflow-domain": {
+      "tests": 181,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "agentflow-server": {
+      "tests": 542,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "frontendTests": 254,
+  "frontendBuild": "PASS",
+  "toolTests": 23,
+  "authorCheck": {
+    "javaFiles": 292,
+    "namedTypes": 464,
+    "missing": 0
+  },
+  "alertRules": 6,
+  "alertTestScenarios": 10,
+  "promtoolVersion": "3.13.2",
+  "prometheusImage": "prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69",
+  "imageArchitecturesVerified": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "compose": {
+    "defaultOff": true,
+    "serverNotPublished": true,
+    "consoleLoopbackOnly": true,
+    "scrapeSecretLeastPrivilege": true
+  },
+  "runtime": {
+    "httpsOidcLogin": true,
+    "dedicatedCredentialAndEncodedPathIsolation": true,
+    "publicProxyBlocksMetrics": true,
+    "prometheusScrapeUp": true,
+    "instanceDownAlert": {
+      "state": "firing",
+      "elapsedSeconds": 142.717
+    },
+    "alertResolvedAfterRestart": true,
+    "realEnterpriseProvider": false,
+    "externalNotificationsSent": false,
+    "mainBusinessEnvironmentModified": false,
+    "jarSha256": "775328d9d9d8a5cc9f11865e0d2206a02063d4e75fd7ddcd4ee193054de6284c",
+    "containerJarMatchesTestedArtifact": true
+  },
+  "cleanup": {
+    "containersStopped": [
+      "e07c46dc217d2f4b3aedafbd0039a8ac6e69f96926d625e71d303a25eaa0ed48",
+      "6aeafb8b5605cd09875a94b67d7eedbdfb57f08749aa8f72f192ee8c75d3931d",
+      "5e705757e5642203aa5aef9a9ebc5e16a2e0d410dbe2de8d50a5614aaeff2a39",
+      "83f43e4a7bc0b468bdef004cb42296eedb334b731553358b791092e57b354b60",
+      "1321fc2861377303a921725f56c3455f5a3338618424e0517b604591eb52f53c"
+    ],
+    "nativeProviderStopped": 41008,
+    "databaseRetained": true,
+    "monitoringVolumeRetained": true,
+    "worktreeRetained": true,
+    "dependencySymlinkRemoved": true
+  },
+  "regression": {
+    "cause": "Raw URI matching allowed encoded actuator path to fall back to business authentication",
+    "red": "/fyoung/tmp/agentflow-monitoring73-encoded-red.log",
+    "green": "/fyoung/tmp/agentflow-monitoring73-final-full.log"
+  },
+  "limits": [
+    "Real enterprise identity provider is not connected",
+    "No external alert receiver or notifications configured",
+    "Not a production SLO or multi-instance monitoring acceptance",
+    "Main demo runtime remains stage 70",
+    "No Git remote, push, PR or remote CI"
+  ]
+}

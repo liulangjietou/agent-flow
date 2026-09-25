@@ -1,0 +1,225 @@
+# 使用确定时间序列验证触发、持续时间、恢复及低流量边界。
+rule_files:
+  - "alerts.yml"
+evaluation_interval: "1m"
+tests:
+  - name: "采集失败需要持续两分钟，恢复后解除"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "0+0x4 1+0x10"
+    alert_rule_test:
+      - eval_time: "1m"
+        alertname: "AgentFlowInstanceDown"
+        exp_alerts: []
+      - eval_time: "3m"
+        alertname: "AgentFlowInstanceDown"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              instance: "server:8080"
+              severity: "critical"
+            exp_annotations:
+              summary: "AgentFlow 指标采集持续失败"
+              description: "检查实例、采集凭证和网络；采集失败不直接证明审批业务已停机。"
+      - eval_time: "6m"
+        alertname: "AgentFlowInstanceDown"
+        exp_alerts: []
+  - name: "目标缺失五分钟告警"
+    interval: "1m"
+    input_series: []
+    alert_rule_test:
+      - eval_time: "4m"
+        alertname: "AgentFlowScrapeTargetMissing"
+        exp_alerts: []
+      - eval_time: "6m"
+        alertname: "AgentFlowScrapeTargetMissing"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              severity: "critical"
+            exp_annotations:
+              summary: "AgentFlow 采集目标缺失"
+              description: "检查采集配置和服务发现；该规则无法检测 Prometheus 自身停机。"
+  - name: "高错误率达到请求量且持续五分钟才告警"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"200\"}"
+        values: "0+90x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"500\"}"
+        values: "0+10x25"
+    alert_rule_test:
+      - eval_time: "4m"
+        alertname: "AgentFlowHttpServerErrors"
+        exp_alerts: []
+      - eval_time: "7m"
+        alertname: "AgentFlowHttpServerErrors"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              instance: "server:8080"
+              severity: "warning"
+            exp_annotations:
+              summary: "AgentFlow API 服务端错误比例偏高"
+              description: "五分钟窗口至少二十个请求且 5xx 超过百分之五，持续五分钟；排查应用和数据库日志。"
+  - name: "两秒桶兼容标签 2"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"200\"}"
+        values: "0+100x25"
+      - series: "http_server_requests_seconds_bucket{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",le=\"2\"}"
+        values: "0+80x25"
+    alert_rule_test:
+      - eval_time: "9m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts: []
+      - eval_time: "12m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              instance: "server:8080"
+              severity: "warning"
+            exp_annotations:
+              summary: "AgentFlow API 慢请求比例偏高"
+              description: "五分钟窗口至少二十个请求且超过两秒的请求多于百分之五，持续十分钟。"
+  - name: "两秒桶兼容标签 2.0"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"200\"}"
+        values: "0+100x25"
+      - series: "http_server_requests_seconds_bucket{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",le=\"2.0\"}"
+        values: "0+80x25"
+    alert_rule_test:
+      - eval_time: "9m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts: []
+      - eval_time: "12m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              instance: "server:8080"
+              severity: "warning"
+            exp_annotations:
+              summary: "AgentFlow API 慢请求比例偏高"
+              description: "五分钟窗口至少二十个请求且超过两秒的请求多于百分之五，持续十分钟。"
+  - name: "数据库连接超时按增量告警，不因旧累计值持续误报"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "hikaricp_connections_timeout_total{job=\"agentflow\",instance=\"server:8080\",pool=\"HikariPool-1\"}"
+        values: "10+1x5 15+0x20"
+    alert_rule_test:
+      - eval_time: "3m"
+        alertname: "AgentFlowDatabaseConnectionTimeouts"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              instance: "server:8080"
+              severity: "warning"
+              pool: "HikariPool-1"
+            exp_annotations:
+              summary: "AgentFlow 数据库连接获取超时"
+              description: "检查数据库可达性、连接池等待和长事务；不要直接扩大连接池。"
+      - eval_time: "15m"
+        alertname: "AgentFlowDatabaseConnectionTimeouts"
+        exp_alerts: []
+  - name: "堆压力持续十分钟才告警"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "jvm_memory_used_bytes{job=\"agentflow\",instance=\"server:8080\",area=\"heap\"}"
+        values: "95+0x25"
+      - series: "jvm_memory_max_bytes{job=\"agentflow\",instance=\"server:8080\",area=\"heap\"}"
+        values: "100+0x25"
+    alert_rule_test:
+      - eval_time: "9m"
+        alertname: "AgentFlowHeapPressure"
+        exp_alerts: []
+      - eval_time: "11m"
+        alertname: "AgentFlowHeapPressure"
+        exp_alerts:
+          - exp_labels:
+              job: "agentflow"
+              instance: "server:8080"
+              severity: "warning"
+            exp_annotations:
+              summary: "AgentFlow JVM 堆使用率持续偏高"
+              description: "堆使用率超过百分之九十持续十分钟；结合 GC 和流量排查，指标不会导出堆内容。"
+  - name: "低流量或无流量不误报 0"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"500\"}"
+        values: "0+0x25"
+      - series: "http_server_requests_seconds_bucket{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",le=\"2\"}"
+        values: "0+0x25"
+    alert_rule_test:
+      - eval_time: "20m"
+        alertname: "AgentFlowHttpServerErrors"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts: []
+  - name: "低流量或无流量不误报 1"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"500\"}"
+        values: "0+1x25"
+      - series: "http_server_requests_seconds_bucket{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",le=\"2\"}"
+        values: "0+0x25"
+    alert_rule_test:
+      - eval_time: "20m"
+        alertname: "AgentFlowHttpServerErrors"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts: []
+  - name: "健康实例、低错误率与正常堆不告警"
+    interval: "1m"
+    input_series:
+      - series: "up{job=\"agentflow\",instance=\"server:8080\"}"
+        values: "1+0x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"200\"}"
+        values: "0+99x25"
+      - series: "http_server_requests_seconds_count{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",status=\"500\"}"
+        values: "0+1x25"
+      - series: "http_server_requests_seconds_bucket{job=\"agentflow\",instance=\"server:8080\",uri=\"/api/v1/applications\",le=\"2\"}"
+        values: "0+99x25"
+      - series: "jvm_memory_used_bytes{job=\"agentflow\",instance=\"server:8080\",area=\"heap\"}"
+        values: "50+0x25"
+      - series: "jvm_memory_max_bytes{job=\"agentflow\",instance=\"server:8080\",area=\"heap\"}"
+        values: "100+0x25"
+      - series: "hikaricp_connections_timeout_total{job=\"agentflow\",instance=\"server:8080\",pool=\"HikariPool-1\"}"
+        values: "10+0x25"
+    alert_rule_test:
+      - eval_time: "20m"
+        alertname: "AgentFlowInstanceDown"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowScrapeTargetMissing"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowHttpServerErrors"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowSlowRequests"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowDatabaseConnectionTimeouts"
+        exp_alerts: []
+      - eval_time: "20m"
+        alertname: "AgentFlowHeapPressure"
+        exp_alerts: []

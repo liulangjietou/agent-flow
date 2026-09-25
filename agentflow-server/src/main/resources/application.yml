@@ -24,6 +24,9 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  monitoring:
+    enabled: ${AGENTFLOW_METRICS_ENABLED:false}
+    token-file: ${AGENTFLOW_METRICS_TOKEN_FILE:}
   auth:
     demo-enabled: ${AGENTFLOW_DEMO_AUTH:true}
     session:
@@ -34,10 +37,18 @@ agentflow:
     allowed-origin: ${AGENTFLOW_WEB_ORIGIN:http://localhost:5173}
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: ${agentflow.monitoring.enabled}
+  metrics:
+    distribution:
+      slo:
+        http.server.requests: 500ms,1s,2s,5s
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never

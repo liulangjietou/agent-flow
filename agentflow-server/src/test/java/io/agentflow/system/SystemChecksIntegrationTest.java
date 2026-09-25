@@ -45,6 +45,13 @@ class SystemChecksIntegrationTest {
     }
 
     @Test
+    void metricsAreDisabledEvenForBusinessAdministrators() throws Exception {
+        mvc.perform(get("/actuator/prometheus")).andExpect(status().isNotFound());
+        mvc.perform(get("/actuator/prometheus").header("Authorization", token("admin")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void businessApproverCannotInspectDeployment() throws Exception {
         mvc.perform(get("/api/v1/system/checks").header("Authorization", token("manager")))
                 .andExpect(status().isForbidden());

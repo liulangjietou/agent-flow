@@ -1,0 +1,44 @@
+# 与 compose.production.yml 叠加使用；不向公网代理开放指标或监控控制台。
+services:
+  server:
+    environment:
+      AGENTFLOW_METRICS_ENABLED: "true"
+      AGENTFLOW_METRICS_TOKEN_FILE: /run/secrets/metrics_token
+    secrets: [metrics_token]
+
+  prometheus:
+    image: ${AGENTFLOW_PROMETHEUS_IMAGE:?Set the verified Prometheus image}
+    command:
+      - --config.file=/etc/prometheus/agentflow.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=2GB
+      - --web.listen-address=0.0.0.0:9090
+    ports: ["127.0.0.1:${AGENTFLOW_PROMETHEUS_PORT:-9090}:9090"]
+    volumes:
+      - type: bind
+        source: ./deploy/monitoring/prometheus.yml
+        target: /etc/prometheus/agentflow.yml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./deploy/monitoring/alerts.yml
+        target: /etc/prometheus/alerts.yml
+        read_only: true
+        bind:
+          create_host_path: false
+      - monitoring-data:/prometheus
+    secrets: [metrics_token]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+secrets:
+  metrics_token:
+    file: ${AGENTFLOW_METRICS_TOKEN_FILE:?Set the dedicated scrape token file}
+
+volumes:
+  monitoring-data:

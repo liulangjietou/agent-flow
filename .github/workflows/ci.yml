@@ -51,7 +51,14 @@ jobs:
           sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
       - name: Validate production Compose configuration
-        run: docker compose --env-file deploy/production/production.env.example -f compose.production.yml config --quiet
+        run: |
+          docker compose --env-file deploy/production/production.env.example -f compose.production.yml config --quiet
+          docker compose --env-file deploy/production/production.env.example -f compose.production.yml -f compose.monitoring.yml config --quiet
+      - name: Verify monitoring configuration and alert behavior
+        run: |
+          docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 check config --syntax-only prometheus.yml
+          docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 check rules alerts.yml
+          docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 test rules alerts.test.yml
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

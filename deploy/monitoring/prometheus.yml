@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: agentflow
+    metrics_path: /actuator/prometheus
+    scrape_timeout: 5s
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/metrics_token
+    static_configs:
+      - targets: [server:8080]
+
+# 站外通知需要接入企业自己的 Alertmanager，并验收收件人和通知通道。
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: [alertmanager.internal:9093]

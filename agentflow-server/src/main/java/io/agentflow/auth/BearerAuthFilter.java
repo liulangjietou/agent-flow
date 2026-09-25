@@ -42,21 +42,27 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final OidcProperties oidc;
     private final OidcActorMapper oidcActors;
     private final ObjectProvider<OidcLogoutScopes> logoutScopes;
+    private final MetricsScrapeAuthentication metrics;
 
     /** 创建过滤器。 */
     public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc,
-                           ObjectProvider<OidcLogoutScopes> logoutScopes) {
+                           ObjectProvider<OidcLogoutScopes> logoutScopes, MetricsScrapeAuthentication metrics) {
         this.authService = authService;
         this.currentActor = currentActor;
         this.jsonUtil = jsonUtil;
         this.oidc = oidc;
         this.oidcActors = new OidcActorMapper(oidc);
         this.logoutScopes = logoutScopes;
+        this.metrics = metrics;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        if (metrics.matches(request)) {
+            if (metrics.authorize(request, response)) chain.doFilter(request, response);
+            return;
+        }
         if (isPublic(request)) {
             chain.doFilter(request, response);
             return;

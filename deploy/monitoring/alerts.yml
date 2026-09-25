@@ -1,0 +1,54 @@
+# 以下为初始运维阈值，不代表已承诺的生产 SLO。
+groups:
+  - name: agentflow-runtime
+    rules:
+      - alert: AgentFlowInstanceDown
+        expr: up{job="agentflow"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: AgentFlow 指标采集持续失败
+          description: 检查实例、采集凭证和网络；采集失败不直接证明审批业务已停机。
+      - alert: AgentFlowScrapeTargetMissing
+        expr: absent(up{job="agentflow"})
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: AgentFlow 采集目标缺失
+          description: 检查采集配置和服务发现；该规则无法检测 Prometheus 自身停机。
+      - alert: AgentFlowHttpServerErrors
+        expr: |
+          (sum by (job, instance) (rate(http_server_requests_seconds_count{job="agentflow",uri=~"/api/.*",status=~"5.."}[5m]))
+          / sum by (job, instance) (rate(http_server_requests_seconds_count{job="agentflow",uri=~"/api/.*"}[5m])) > 0.05)
+          and (sum by (job, instance) (increase(http_server_requests_seconds_count{job="agentflow",uri=~"/api/.*"}[5m])) >= 20)
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: AgentFlow API 服务端错误比例偏高
+          description: 五分钟窗口至少二十个请求且 5xx 超过百分之五，持续五分钟；排查应用和数据库日志。
+      - alert: AgentFlowSlowRequests
+        expr: |
+          (1 - sum by (job, instance) (rate(http_server_requests_seconds_bucket{job="agentflow",uri=~"/api/.*",le=~"2(\\.0)?"}[5m]))
+          / sum by (job, instance) (rate(http_server_requests_seconds_count{job="agentflow",uri=~"/api/.*"}[5m])) > 0.05)
+          and (sum by (job, instance) (increase(http_server_requests_seconds_count{job="agentflow",uri=~"/api/.*"}[5m])) >= 20)
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: AgentFlow API 慢请求比例偏高
+          description: 五分钟窗口至少二十个请求且超过两秒的请求多于百分之五，持续十分钟。
+      - alert: AgentFlowDatabaseConnectionTimeouts
+        expr: increase(hikaricp_connections_timeout_total{job="agentflow"}[5m]) > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: AgentFlow 数据库连接获取超时
+          description: 检查数据库可达性、连接池等待和长事务；不要直接扩大连接池。
+      - alert: AgentFlowHeapPressure
+        expr: |
+          sum by (job, instance) (jvm_memory_used_bytes{job="agentflow",area="heap"})
+          / sum by (job, instance) (jvm_memory_max_bytes{job="agentflow",area="heap"} > 0) > 0.9
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: AgentFlow JVM 堆使用率持续偏高
+          description: 堆使用率超过百分之九十持续十分钟；结合 GC 和流量排查，指标不会导出堆内容。
