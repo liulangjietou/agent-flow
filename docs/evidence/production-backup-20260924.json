@@ -1,0 +1,109 @@
+{
+  "stage": 75,
+  "date": "2026-09-24",
+  "baseline": "a598fa90e0334f60949f5c481ca463246856ec32",
+  "branch": "codex/production-backup",
+  "java": {
+    "agentflow-domain": {
+      "tests": 181,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    },
+    "agentflow-server": {
+      "tests": 546,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    }
+  },
+  "frontendTests": 254,
+  "frontendBuild": "PASS",
+  "openApiOperations": 65,
+  "toolTests": 38,
+  "newToolTests": 15,
+  "authorCheck": {
+    "javaFiles": 294,
+    "namedJavaTypes": 466,
+    "newPythonTypes": 3,
+    "missing": 0
+  },
+  "backupManifest": {
+    "format": "agentflow-production-postgres-v1",
+    "createdAt": "2026-09-25T03:18:39.676161+00:00",
+    "sourceDatabase": "agentflow_backup75_source",
+    "schema": "public",
+    "postgresVersion": 170011,
+    "archive": "database.dump",
+    "bytes": 206102,
+    "sha256": "a2162ff674a939f630d939b72d640a657d684d4d4a358cf081301a3dfff31125",
+    "clientImage": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+  },
+  "restore": {
+    "tlsCertificateAndHostnameVerified": true,
+    "sourceUnchanged": true,
+    "allTablesIdentical": 67,
+    "allSequencesIdentical": 2,
+    "pendingTasksPreserved": 1,
+    "newDatabase": "agentflow_restore_62f00acb17ff43c2a08e36ff4bffcddf",
+    "noApplicationAutoStarted": true
+  },
+  "application": {
+    "restoredDatabase": "agentflow_restore_62f00acb17ff43c2a08e36ff4bffcddf",
+    "schemaValidateExit": 0,
+    "originalTaskIdPreserved": true,
+    "restoredPendingTaskApproved": true,
+    "sourceApplicationStillInApproval": true,
+    "fixtureUsesDemoIdentity": true,
+    "targetServiceStopped": true
+  },
+  "edgeCases": {
+    "wrongCaRejected": true,
+    "missingCreateDatabasePrivilegeRejected": true,
+    "failedRestoreCreatedNoDatabase": true,
+    "customSchemaRestored": true,
+    "customSchemaPendingTaskPreserved": true,
+    "customSourceDatabase": "agentflow_backup75_custom_final",
+    "customRestoredDatabase": "agentflow_restore_9dd2b8340ccc4161928ab61f522a4f29"
+  },
+  "runtimeJarSha256": "a1558b901f750eec7392c401cfb3afd33681c09e7e73bafad8274f49e62dd020",
+  "cleanup": {
+    "databaseStopped": "1321fc2861377303a921725f56c3455f5a3338618424e0517b604591eb52f53c",
+    "sourceAndRestoredApplicationsStopped": true,
+    "allDatabasesRetained": true,
+    "worktreeRetained": true,
+    "dependencySymlinkRemoved": true,
+    "mainReadinessPorts": [
+      8080,
+      8180
+    ],
+    "mainRuntimeStage": 70
+  },
+  "limits": [
+    "Database restore only; no application startup or traffic switching by the tool",
+    "No roles or original ACL restoration; runtime grants require target provisioning",
+    "Backup checksum does not establish trusted provenance",
+    "No object storage, offsite disaster recovery or RTO/RPO acceptance",
+    "Manual application recovery fixture uses demo identity and JDBC sslmode=require; backup tool enforces verify-full",
+    "No Git remote, PR or remote CI",
+    "Attachment storage and access policy await user answers"
+  ],
+  "credentialOwnership": {
+    "linuxFilesystemOwnerCheck": true,
+    "rootWithoutDacCannotReadOtherOwners0600File": true,
+    "matchingUidCanRead": true
+  },
+  "regressions": [
+    {
+      "issue": "PostgreSQL --version must remain the first native client argument",
+      "red": "/fyoung/tmp/agentflow-backup75-version-red.log",
+      "green": "/fyoung/tmp/agentflow-backup75-tools-final.log"
+    },
+    {
+      "issue": "Docker Desktop hides Linux bind mount ownership; a root client without DAC capability cannot read an operator-owned 0600 credential",
+      "red": "/fyoung/tmp/agentflow-backup75-owner-red.log",
+      "green": "/fyoung/tmp/agentflow-backup75-tools-final.log",
+      "fix": "Run client with operator UID and GID; preserve mode 0600"
+    }
+  ]
+}

@@ -41,6 +41,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 [多实例部署与故障接续](docs/multi-instance-deployment.md)说明同版本副本配置、统一 HTTPS 入口、请求重放边界和升级停写要求；已有流程的幂等及租约竞争通过双实例测试，不代表组织接入或完整生产高可用已完成。
 
+[生产数据库备份与隔离恢复](docs/production-backup-recovery.md)提供外部 PostgreSQL 17 的完整逻辑备份、离线校验和随机新库恢复，强制 TLS 主机名校验并保留失败现场。原待办已通过隔离恢复后的办理验证；对象存储、生产切流、异地副本和 RTO/RPO 仍需独立验收。
+
 ## 本地启动
 
 需要 Java 17+、Maven 3.9+ 和 Node.js 20.19+ 或 22.12+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。
