@@ -33,6 +33,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 演示 PostgreSQL 支持[完整备份与隔离恢复](docs/demo-backup-recovery.md)：校验归档后使用原镜像恢复到新项目、新卷及新端口，保留旧实例；恢复后可继续办理未完成会签任务。工具不会覆盖已有数据，当前不包含生产灾备、跨版本升级或 H2 备份。
 
+本地 Docker 演示已完成[阶段 70 → 75 升级与回退验收](docs/demo-stage75-upgrade.md)：隔离恢复和原待办继续办理通过，主入口切换前后 67 张表及原待办／定义响应一致，数据库保持 V23。该记录仅覆盖这次同结构版本升级。
+
 生产部署使用[独立数据库迁移命令](docs/production-database-lifecycle.md)：同一发布 jar 提供 `--schema=migrate` 和 `--schema=validate`，前者初始化或升级业务及引擎结构，后者使用 PostgreSQL 只读连接校验。`prod` 服务启动只检查已迁移结构，未迁移时拒绝启动；生产安装、升级和备份流程见该文档。
 
 [企业 HTTPS 容器部署](docs/production-container-deployment.md)提供独立 `compose.production.yml`、文件密钥、PostgreSQL CA、企业 OIDC 配置和 HTTPS 代理；连接外部数据库，迁移仅由维护命令执行。正式企业身份、组织和完整上线验收仍需完成。

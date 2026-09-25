@@ -1,0 +1,188 @@
+{
+  "recordedAt": "2026-09-25T03:43:42.173875-04:00",
+  "scope": "已验收源码阶段 75 的本地 Docker 演示部署与升级回退验证",
+  "sourceCommit": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+  "branch": "codex/demo-stage75-upgrade",
+  "mainUrl": "http://127.0.0.1:8180/",
+  "previousRuntimeStage": 70,
+  "currentRuntimeStage": 75,
+  "migrationVersion": "23",
+  "jarSha256": "86926e6d02d012fa0dba0e3a43dc075162e149c4a0a221e17bf9e8e6f46cec02",
+  "candidateImages": {
+    "server": "sha256:d8200adb2db8066c54797e77bc0bcc7cee65870f9fac24e0d9fbf2c318d67fee",
+    "web": "sha256:fc2d6b53f2afee36d9fe607795b8e394ee15f49b6253faf08adf828baba78c13"
+  },
+  "gates": {
+    "java": {
+      "agentflow-domain": {
+        "tests": 181,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "agentflow-server": {
+        "tests": 546,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "javaTotal": 727,
+    "frontendTests": 254,
+    "frontendTypecheckAndBuild": "PASS",
+    "toolsTests": 38,
+    "openapiOperations": 65,
+    "javaFiles": 294,
+    "javaNamedTypes": 466,
+    "missingAuthors": 0
+  },
+  "backup": {
+    "beforeValidation": {
+      "format": "agentflow-demo-postgres-v1",
+      "createdAt": "2026-09-25T07:29:24.838810+00:00",
+      "sourceProject": "agentflow-demo",
+      "postgresVersion": 170011,
+      "database": "agentflow",
+      "archive": "database.dump",
+      "bytes": 214426,
+      "sha256": "df380c44021691b401ad26c6e6668f61ae0f9f8a60ddf797fbe7be7c93079bec",
+      "images": {
+        "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c",
+        "server": "sha256:41b97c946ba34591ecb539ec038cbef036015400a38b4557cb1a6aef839842aa",
+        "web": "sha256:5d62ff5d36990ee99bba74e372daf82611d46f3d63499e29f10430725218a71a"
+      }
+    },
+    "beforeCutover": {
+      "format": "agentflow-demo-postgres-v1",
+      "createdAt": "2026-09-25T07:38:41.445996+00:00",
+      "sourceProject": "agentflow-demo",
+      "postgresVersion": 170011,
+      "database": "agentflow",
+      "archive": "database.dump",
+      "bytes": 214426,
+      "sha256": "2b819beda2ab5063dea558fd08216a76966ac5e28b8bf269aa36a5f9d0695bad",
+      "images": {
+        "database": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c",
+        "server": "sha256:41b97c946ba34591ecb539ec038cbef036015400a38b4557cb1a6aef839842aa",
+        "web": "sha256:5d62ff5d36990ee99bba74e372daf82611d46f3d63499e29f10430725218a71a"
+      }
+    },
+    "restoreTablesEqual": 67
+  },
+  "isolatedUpgrade": {
+    "project": "agentflow-upgrade75-20260925",
+    "port": 8295,
+    "allApiOperations": {
+      "result": "PASS",
+      "base": "http://127.0.0.1:8295",
+      "operations": 65,
+      "statuses": [
+        200,
+        201,
+        400,
+        401,
+        403,
+        404,
+        409,
+        422
+      ],
+      "processKey": "api-contract-b191406c",
+      "approved": "bdc83828-1a4a-4169-a428-e14eedb11283",
+      "withdrawn": "39299b1e-b944-47f1-b376-9776330eed97"
+    },
+    "rollback": {
+      "stage70ImagesRestored": true,
+      "pendingTaskAndHistoryPreserved": true,
+      "schemaRollbackRequired": false,
+      "status": "PASS"
+    },
+    "browser": {
+      "browser": "Chrome / CUA",
+      "port": 8295,
+      "applicationId": "63b2abd6-1638-43df-8130-1ff4668e92b2",
+      "beforeCountersign": {
+        "completed": 1,
+        "total": 2
+      },
+      "afterApplicationStatus": "APPROVED",
+      "remainingAdminTasks": 0,
+      "oldRoundAndCommentsPreserved": true,
+      "result": "PASS"
+    }
+  },
+  "mainVerification": {
+    "tableCount": 67,
+    "changedTables": [],
+    "allTablesEqual": true,
+    "health": {
+      "/healthz": {
+        "httpStatus": 200
+      },
+      "/actuator/health/readiness": {
+        "httpStatus": 200,
+        "body": {
+          "status": "UP"
+        }
+      },
+      "/actuator/prometheus": {
+        "httpStatus": 404
+      }
+    },
+    "containers": {
+      "server": {
+        "id": "d9dece8eb3ac25e06cbf8fc4fadaa5fa9f42a7114fa49585245532e734701db8",
+        "image": "sha256:d8200adb2db8066c54797e77bc0bcc7cee65870f9fac24e0d9fbf2c318d67fee",
+        "health": "healthy",
+        "defaultEnvironmentMismatchKeys": []
+      },
+      "web": {
+        "id": "698be55ab31837ad1495fb79e638ac9a1d43f7f7619d5e7fff07e0168350ab26",
+        "image": "sha256:fc2d6b53f2afee36d9fe607795b8e394ee15f49b6253faf08adf828baba78c13",
+        "health": "healthy",
+        "defaultEnvironmentMismatchKeys": []
+      }
+    },
+    "databaseContainerUnchanged": true
+  },
+  "mainApiReadback": {
+    "requests": 6,
+    "identical": true,
+    "sha256": "576ad1e34bb4b3a3930ed4522998248ed0ae1ac00097f3868cac808cb20d9aeb"
+  },
+  "mainBrowser": {
+    "login": "PASS",
+    "systemChecks": 4,
+    "systemChecksTotal": 4,
+    "schemaVersion": "V23",
+    "mainBusinessWrites": false,
+    "tabsClosed": true
+  },
+  "cleanup": {
+    "recordedAt": "2026-09-25T03:41:53.758710-04:00",
+    "fixtureContainersStopped": {
+      "web": "e8c09cd79d1e466b5c210e22aa9f2d615102b221b308144dc2d6044cb75f79e4",
+      "server": "0936c541af2bcc4c602a7eedb5397da12f2131187671592303f7711fc01677a4",
+      "database": "075cb7f1c38eee41f06278ea85a1bff221d2c9db42531c7decb4ca66010ae684"
+    },
+    "fixturePortClosed": 8295,
+    "fixtureDatabaseAndVolumeRetained": true,
+    "fixtureVolume": "agentflow-upgrade75-20260925_demo-postgres",
+    "oldMainContainersRetainedStopped": true,
+    "backupsRetained": true,
+    "worktreeRetained": true,
+    "ownedNodeModulesSymlinkRemoved": true,
+    "mainServerAndWebHealthy": true
+  },
+  "privateArtifacts": "/fyoung/tmp/agentflow-demo75-upgrade-20260925",
+  "delivery": {
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "remoteCi": "NOT_RUN"
+  },
+  "limits": [
+    "仅本地演示部署，企业生产接入和完整平台仍未完成",
+    "停用／恢复与期限配置联合分支未发布，实际 SLA 未实现",
+    "原生 H2 和 5193 入口未启动或变更",
+    "业务来源、字段／附件、重提、财务、Agent 和 SLA 的待决事项不因本次部署被自动确认"
+  ]
+}
