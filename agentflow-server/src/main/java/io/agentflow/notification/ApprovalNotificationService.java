@@ -82,6 +82,21 @@ public class ApprovalNotificationService {
         }
     }
 
+    /** 超时只提醒当时实际处理人；同一任务的事件标识不随申请版本或调度重试变化。 */
+    public boolean overdue(Application application, String taskId, Instant occurredAt) {
+        var task = audience.pending(application.tenantId(), application.id()).stream()
+                .filter(item -> item.taskId().equals(taskId)).findFirst();
+        if (task.isEmpty() || task.get().recipients().isEmpty()) return false;
+        String eventKey = "task-overdue:" + taskId;
+        for (String recipient : task.get().recipients()) {
+            UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + recipient).getBytes(StandardCharsets.UTF_8));
+            inbox.append(eventKey, new InboxMessage(id, application.tenantId(), recipient, application.id(), application.title(),
+                    application.businessNo(), Kind.TASK_OVERDUE, "system:sla", taskId, task.get().nodeName(),
+                    application.roundNo(), occurredAt, null, "审批任务已超过处理期限，请查看当前待办。"));
+        }
+        return true;
+    }
+
     private void send(Application application, String actor, String recipient, Kind kind, String taskId, String nodeName) {
         String eventKey = application.id() + ":" + application.version() + ":" + kind + ":" + (taskId == null ? "" : taskId);
         UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + recipient).getBytes(StandardCharsets.UTF_8));

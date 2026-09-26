@@ -20,9 +20,10 @@ public class FlowableCountersignMembers {
     static final String TOTAL = "nrOfInstances";
     static final String COMPLETED = "nrOfCompletedInstances";
     private final TaskRecipientDirectory directory;
+    private final FlowableOrganizationMembers organization;
 
     /** 注入当前租户的有效审批账号来源。 */
-    public FlowableCountersignMembers(TaskRecipientDirectory directory) { this.directory = directory; }
+    public FlowableCountersignMembers(TaskRecipientDirectory directory, FlowableOrganizationMembers organization) { this.directory = directory; this.organization = organization; }
 
     /** Flowable 会为基数和每个子执行反复求集合，本轮始终复用根执行中的首次快照。 */
     public List<String> resolve(DelegateExecution execution, String encodedRule) {
@@ -36,7 +37,8 @@ public class FlowableCountersignMembers {
         String rule = new String(Base64.getDecoder().decode(encodedRule), StandardCharsets.UTF_8);
         Set<String> users = rule.startsWith("user:") ? Set.of(rule.substring("user:".length())) : Set.of();
         Set<String> roles = rule.startsWith("role:") ? Set.of(rule.substring("role:".length())) : Set.of();
-        List<String> members = new ArrayList<>(directory.members(tenant, users, roles).stream().distinct().sorted().toList());
+        List<String> members = new ArrayList<>((io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
+                ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles)).stream().distinct().sorted().toList());
         if (members.isEmpty()) throw new DomainException("COUNTERSIGN_NO_MEMBERS", "No active approvers are available for the countersign node");
         root.setVariableLocal(MEMBERS, members);
         return members;

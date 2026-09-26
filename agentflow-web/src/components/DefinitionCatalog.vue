@@ -5,7 +5,7 @@ import { DefinitionCatalogQuery, type DefinitionCatalogFilters } from '../defini
 
 const props = defineProps<{ scopeKey: string; manageDefinitions: boolean; currentId: string; locked: boolean; refreshVersion: number }>()
 const emit = defineEmits<{ open: [id: string]; close: [] }>()
-const empty = () => ({ q: '', status: '', processKey: '', version: '' })
+const empty = () => ({ q: '', status: '', availability: '', processKey: '', version: '' })
 const fields = reactive(empty())
 const query = reactive(new DefinitionCatalogQuery(api.searchDefinitions))
 const submitted = ref(''), validation = ref('')
@@ -19,7 +19,7 @@ function search() {
     validation.value = '版本筛选需填写准确的流程标识，并选择已发布或全部状态。版本须为正整数。'
     query.clear(); return
   }
-  const filters: DefinitionCatalogFilters = { q: fields.q.trim(), status: fields.status, processKey: key }
+  const filters: DefinitionCatalogFilters = { q: fields.q.trim(), status: fields.status, processKey: key, ...(fields.status === 'PUBLISHED' && fields.availability ? { startEnabled: fields.availability === 'true' } : {}) }
   if (version) filters.version = Number(version)
   submitted.value = JSON.stringify(fields)
   void query.load(props.scopeKey, filters)
@@ -38,6 +38,7 @@ onUnmounted(() => query.clear())
       <label class="catalog-keyword">名称或标识<input v-model="fields.q" type="search" maxlength="100" placeholder="搜索请假、合同或流程标识" /></label>
       <label>流程状态<select v-model="fields.status"><option value="">{{ manageDefinitions ? '全部状态' : '已发布版本' }}</option><option v-if="manageDefinitions" value="DRAFT">草稿</option><option value="PUBLISHED">已发布</option></select></label>
       <label>准确流程标识<input v-model="fields.processKey" maxlength="128" placeholder="查看同一流程的所有版本" /></label>
+      <label v-if="fields.status === 'PUBLISHED'">发起状态<select v-model="fields.availability"><option value="">全部</option><option value="true">允许新发起</option><option value="false">已停用</option></select></label>
       <label>发布版本<input v-model="fields.version" inputmode="numeric" maxlength="10" placeholder="全部版本" :disabled="!fields.processKey.trim() || fields.status === 'DRAFT'" /></label>
       <div class="catalog-actions"><button class="primary" :disabled="query.loading">查询流程</button><button type="button" class="secondary" @click="reset">重置筛选</button></div>
     </form>
@@ -51,7 +52,7 @@ onUnmounted(() => query.clear())
       <table><caption class="catalog-sr-only">当前租户流程目录</caption><thead><tr><th scope="col">流程</th><th scope="col">状态 / 版本</th><th scope="col">最近修改</th><th scope="col">操作</th></tr></thead>
         <tbody><tr v-for="item in query.items" :key="item.id" :class="{ current: item.id === currentId }">
           <td data-label="流程"><strong>{{ item.name }}</strong><code>{{ item.key }}</code></td>
-          <td data-label="状态 / 版本"><span class="catalog-status" :class="item.status.toLowerCase()">{{ item.status === 'PUBLISHED' ? `已发布 v${item.version}` : '草稿' }}</span><small v-if="item.id === currentId">当前打开</small></td>
+          <td data-label="状态 / 版本"><span class="catalog-status" :class="item.status.toLowerCase()">{{ item.status === 'PUBLISHED' ? `已发布 v${item.version}${item.startEnabled ? '' : ' · 已停用'}` : '草稿' }}</span><small v-if="item.id === currentId">当前打开</small></td>
           <td data-label="最近修改"><time :datetime="item.updatedAt">{{ time(item.updatedAt) }}</time><small>创建于 {{ time(item.createdAt) }}</small></td>
           <td data-label="操作"><button class="secondary" :disabled="locked" :aria-label="`${item.status === 'DRAFT' ? '编辑草稿' : '查看版本'} ${item.name} ${item.key}${item.version ? ' v' + item.version : ''}`" @click="emit('open', item.id)">{{ item.status === 'DRAFT' ? '编辑草稿' : '查看版本' }} ↗</button></td>
         </tr></tbody>

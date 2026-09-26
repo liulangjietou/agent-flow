@@ -66,6 +66,7 @@ public class FlowableTaskFacade {
             throw new DomainException("INVALID_REQUEST", "Only pending task status is supported");
         }
         query.active();
+        if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return List.of();
         return query.list().stream().filter(task -> canAct(actor, task)).map(task -> view(actor, task)).toList();
     }
 
@@ -86,7 +87,8 @@ public class FlowableTaskFacade {
         return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
                 application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
                 delegation(task).allowedActions(task.getAssignee() != null).stream()
-                        .filter(action -> countersign == null || countersign.allows(action)).toList(), countersign);
+                        .filter(action -> countersign == null || countersign.allows(action)).toList(), countersign,
+                task.getDueDate() == null ? null : task.getDueDate().toInstant());
     }
 
     private CountersignProgress countersign(Task task) {
@@ -199,6 +201,7 @@ public class FlowableTaskFacade {
     }
 
     private Task authorizedTask(String taskId, Actor actor) {
+        if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException("FORBIDDEN", "Current organization approval eligibility is missing");
         Task task = taskService.createTaskQuery().taskId(taskId).includeProcessVariables().includeIdentityLinks().singleResult();
         if (task == null || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
             throw new DomainException("NOT_FOUND", "Task not found");
@@ -236,7 +239,7 @@ public class FlowableTaskFacade {
     }
 
     private boolean canAct(Actor actor, Task task) {
-        if (!actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
+        if (!actor.hasRole("APPROVER") || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
             return false;
         }
         if (actor.userId().equals(task.getAssignee())) {
@@ -282,7 +285,7 @@ public class FlowableTaskFacade {
      */
     public record TaskView(String taskId, String taskName, String assignee, String applicationId,
                            java.util.Date createdAt, long version, String owner, String delegationState,
-                           List<TaskAction> allowedActions, CountersignProgress countersign) { }
+                           List<TaskAction> allowedActions, CountersignProgress countersign, Instant dueAt) { }
 
     /**
      * 动作结果。

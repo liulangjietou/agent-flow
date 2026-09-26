@@ -59,11 +59,12 @@ public class ApprovalApplicationFacade {
     public Application create(String businessNo, String processKey, long definitionVersion, String title,
                               Map<String, Object> payload) {
         Actor actor = currentActor.actor();
-        DefinitionModels.DefinitionDraft definition = definitions.findPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
+        DefinitionModels.DefinitionDraft definition = definitions.lockPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
         // classpath 内置报销 v1 是唯一没有平台定义行的公开 legacy 模板。
         if (definition == null && !(BUNDLED_LEGACY_PROCESS.equals(processKey) && definitionVersion == BUNDLED_LEGACY_VERSION)) {
             throw new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published process definition is not available");
         }
+        if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
         return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,

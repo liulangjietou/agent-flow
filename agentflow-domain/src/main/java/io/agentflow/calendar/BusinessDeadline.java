@@ -23,6 +23,22 @@ public final class BusinessDeadline {
             throw new DomainException("INVALID_CALENDAR_CALCULATION", "Start year must be 1..9998 and working minutes 1..527040");
         }
         Instant start = rules.resolveStart(startLocal, overlapChoice);
+        return calculateFrom(rules, start, workingMinutes);
+    }
+
+    /** 引擎已有真实创建时刻，直接沿时间轴计算，避免夏令时重复钟点被重新解释。 */
+    public static Result calculate(CalendarRules rules, Instant start, int workingMinutes) {
+        if (start == null || workingMinutes < 1 || workingMinutes > MAX_WORKING_MINUTES) {
+            throw new DomainException("INVALID_CALENDAR_CALCULATION", "A start instant and supported working minutes are required");
+        }
+        LocalDate date = start.atZone(ZoneId.of(rules.zoneId())).toLocalDate();
+        if (date.getYear() < 1 || date.getYear() > 9998) {
+            throw new DomainException("INVALID_CALENDAR_CALCULATION", "Start year must be 1..9998");
+        }
+        return calculateFrom(rules, start, workingMinutes);
+    }
+
+    private static Result calculateFrom(CalendarRules rules, Instant start, int workingMinutes) {
         LocalDate date = start.atZone(ZoneId.of(rules.zoneId())).toLocalDate();
         Duration remaining = Duration.ofMinutes(workingMinutes);
         int usedPeriods = 0;

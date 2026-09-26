@@ -25,7 +25,7 @@ public interface PendingTaskReadPort {
      */
     record Item(String taskId, String taskName, String applicationId, String businessNo, String title,
                 String processKey, long definitionVersion, String applicant, String amount, int roundNo,
-                String assignee, String owner, String delegationState, Instant createdAt) { }
+                String assignee, String owner, String delegationState, Instant createdAt, Instant dueAt) { }
 
     /**
      * 已通过入口校验的查询条件；按创建时间和任务标识升序，先处理较早任务。

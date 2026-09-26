@@ -73,31 +73,37 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
         var taskParameters = new ArrayList<Object>(List.of(tenantId));
         StringBuilder tasks = new StringBuilder(FlowableActiveTaskSql.fromCurrentApplications());
         filters(tasks, taskParameters, query, "a.definition_version");
+        var nodeParameters = new ArrayList<Object>(List.of(java.sql.Timestamp.from(generatedAt), java.sql.Timestamp.from(generatedAt)));
+        nodeParameters.addAll(taskParameters);
         // 窗口在 LIMIT 前汇总全部分组，待办总数不会随展示截断，也不必重新联查引擎表。
         List<WaitingNodeRow> nodeRows = jdbc.query("""
                 SELECT a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_,COUNT(*) AS tasks,
-                       MIN(t.CREATE_TIME_) AS oldest,SUM(COUNT(*)) OVER () AS total_tasks
+                       MIN(t.CREATE_TIME_) AS oldest,SUM(COUNT(*)) OVER () AS total_tasks,
+                       SUM(CASE WHEN t.DUE_DATE_<=? THEN 1 ELSE 0 END) AS overdue_tasks,
+                       SUM(SUM(CASE WHEN t.DUE_DATE_<=? THEN 1 ELSE 0 END)) OVER () AS overdue_total
                 """ + tasks + "\n" + """
                 GROUP BY a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_
                 ORDER BY oldest ASC,a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_
                 """ + " LIMIT " + (WAITING_LIMIT + 1), (row, index) -> {
             Instant oldest = row.getTimestamp("oldest").toInstant();
             var node = new WaitingNode(row.getString("process_key"), row.getLong("definition_version"), row.getString("TASK_DEF_KEY_"),
-                    row.getString("NAME_"), row.getLong("tasks"), oldest, elapsed(oldest, generatedAt));
-            return new WaitingNodeRow(node, row.getLong("total_tasks"));
-        }, taskParameters.toArray());
+                    row.getString("NAME_"), row.getLong("tasks"), oldest, elapsed(oldest, generatedAt), row.getLong("overdue_tasks"));
+            return new WaitingNodeRow(node, row.getLong("total_tasks"), row.getLong("overdue_total"));
+        }, nodeParameters.toArray());
         long pending = nodeRows.isEmpty() ? 0 : nodeRows.get(0).totalTasks();
+        long overdue = nodeRows.isEmpty() ? 0 : nodeRows.get(0).overdueTasks();
         List<WaitingNode> nodes = nodeRows.stream().map(WaitingNodeRow::node).toList();
         List<WaitingTask> oldestTasks = jdbc.query("""
-                SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.CREATE_TIME_,a.id,a.business_no,a.title,a.process_key,a.definition_version,a.round_no
+                SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.CREATE_TIME_,t.DUE_DATE_,a.id,a.business_no,a.title,a.process_key,a.definition_version,a.round_no
                 """ + tasks + " ORDER BY t.CREATE_TIME_,t.ID_ LIMIT " + (WAITING_LIMIT + 1), (row, index) -> {
             Instant created = row.getTimestamp("CREATE_TIME_").toInstant();
             return new WaitingTask(row.getString("ID_"), row.getString("NAME_"), row.getString("id"), row.getString("business_no"),
                     row.getString("title"), row.getString("process_key"), row.getLong("definition_version"), row.getInt("round_no"),
-                    row.getString("ASSIGNEE_"), created, elapsed(created, generatedAt));
+                    row.getString("ASSIGNEE_"), created, elapsed(created, generatedAt),
+                    row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant());
         }, taskParameters.toArray());
         return new Report(generatedAt, query.from(), query.to(), "UTC", query.processKey(), query.definitionVersion(), metrics, daily,
-                head(processes, PROCESS_LIMIT), processes.size() > PROCESS_LIMIT, pending, head(nodes, WAITING_LIMIT),
+                head(processes, PROCESS_LIMIT), processes.size() > PROCESS_LIMIT, pending, overdue, head(nodes, WAITING_LIMIT),
                 nodes.size() > WAITING_LIMIT, head(oldestTasks, WAITING_LIMIT), oldestTasks.size() > WAITING_LIMIT,
                 historyGaps.count(tenantId, query.processKey(), query.definitionVersion()));
     }
@@ -121,5 +127,5 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
      * 节点聚合行附带截断前的任务总数，仅用于基础设施层结果映射。
      * @author owlzhangfq@gmail.com
      */
-    private record WaitingNodeRow(WaitingNode node, long totalTasks) { }
+    private record WaitingNodeRow(WaitingNode node, long totalTasks, long overdueTasks) { }
 }

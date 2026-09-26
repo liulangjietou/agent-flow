@@ -1,10 +1,10 @@
 /** 流程目录只读摘要。@author owlzhangfq@gmail.com */
 export interface DefinitionCatalogItem {
-  id: string; key: string; name: string; status: 'DRAFT' | 'PUBLISHED'; version: number; revision: number
+  id: string; key: string; name: string; status: 'DRAFT' | 'PUBLISHED'; version: number; revision: number; startEnabled: boolean
   createdAt: string; updatedAt: string
 }
 /** 目录已提交筛选。@author owlzhangfq@gmail.com */
-export interface DefinitionCatalogFilters { q?: string; status?: string; processKey?: string; version?: number; limit?: number; cursor?: string }
+export interface DefinitionCatalogFilters { q?: string; status?: string; processKey?: string; version?: number; startEnabled?: boolean; limit?: number; cursor?: string }
 /** 不包含全库总数的有界分页。@author owlzhangfq@gmail.com */
 export interface DefinitionCatalogPage { items: DefinitionCatalogItem[]; nextCursor?: string | null }
 

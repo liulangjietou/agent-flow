@@ -117,6 +117,8 @@ class OpenApiContractTest {
                 java.util.Map.entry("Application", io.agentflow.approval.ApplicationResponse.class),
                 java.util.Map.entry("SubmissionRound", io.agentflow.approval.SubmissionRoundResponse.class),
                 java.util.Map.entry("Definition", io.agentflow.definition.DefinitionController.DefinitionResponse.class),
+                java.util.Map.entry("DefinitionAvailabilityChange", io.agentflow.definition.DefinitionAvailabilityChange.class),
+                java.util.Map.entry("DefinitionAvailabilityHistory", io.agentflow.definition.DefinitionAvailabilityController.HistoryPage.class),
                 java.util.Map.entry("PublicationResult", io.agentflow.definition.DefinitionController.PublicationResponse.class),
                 java.util.Map.entry("Publication", io.agentflow.definition.DefinitionPublication.class),
                 java.util.Map.entry("ValidationResult", io.agentflow.definition.DefinitionController.ValidationResponse.class),
@@ -180,5 +182,14 @@ class OpenApiContractTest {
 
     private JsonNode resolve(JsonNode spec, JsonNode schema) {
         return schema.has("$ref") ? spec.at(schema.get("$ref").asText().substring(1)) : schema;
+    }
+
+    @Test
+    void availabilityIsOptionalOnlyOnLegacyDefinitionWriteReplays() throws Exception {
+        var schemas = document().path("components").path("schemas");
+        assertThat(java.util.stream.StreamSupport.stream(schemas.path("Definition").path("required").spliterator(), false)
+                .map(JsonNode::asText)).doesNotContain("startEnabled");
+        assertThat(java.util.stream.StreamSupport.stream(schemas.path("DefinitionCatalogItem").path("required").spliterator(), false)
+                .map(JsonNode::asText)).contains("startEnabled");
     }
 }

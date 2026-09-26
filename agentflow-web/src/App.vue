@@ -11,6 +11,7 @@ import ApplicationSearch from './components/ApplicationSearch.vue'
 import WebhookDeliveries from './components/WebhookDeliveries.vue'
 import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
+import TaskDeadlineStatus from './components/TaskDeadlineStatus.vue'
 import PendingTaskQueue from './components/PendingTaskQueue.vue'
 import NotificationInbox from './components/NotificationInbox.vue'
 import { isTaskNotification } from './notificationInbox'
@@ -30,6 +31,8 @@ import type { PortableProcess } from './portableTemplate'
 import SystemChecks from './components/SystemChecks.vue'
 import FirstWorkflow from './components/FirstWorkflow.vue'
 import { guideHidden, rememberGuideSelection } from './firstWorkflow'
+import OrganizationDirectory from './components/OrganizationDirectory.vue'
+import { organizationDrafts, type OrganizationRecord } from './organization'
 import BusinessCalendars from './components/BusinessCalendars.vue'
 import { calendarDrafts, type BusinessCalendar } from './businessCalendars'
 import ApprovalOperations from './components/ApprovalOperations.vue'
@@ -40,9 +43,12 @@ import DefinitionCatalog from './components/DefinitionCatalog.vue'
 import DefinitionPicker from './components/DefinitionPicker.vue'
 import { DefinitionSelection } from './definitionSelection'
 import DefinitionAssignee from './components/DefinitionAssignee.vue'
+import DefinitionDeadline from './components/DefinitionDeadline.vue'
 import { assigneeLabel } from './definitionAssignees'
 import { simulationIssue } from './definitionSimulation'
 import DefinitionPublication from './components/DefinitionPublication.vue'
+import DefinitionAvailability from './components/DefinitionAvailability.vue'
+import type { DefinitionAvailabilityInput } from './api'
 import PublicationDialog from './components/PublicationDialog.vue'
 import { DraftAutosave } from './draftAutosave'
 import type { GraphNode } from './api'
@@ -50,7 +56,7 @@ import QuickDesigner from './components/QuickDesigner.vue'
 import ConditionEditor from './components/ConditionEditor.vue'
 import { describeBranch, branchTooltip } from './conditionPresentation'
 import { editQuickGraph, type QuickCommand } from './quickDesigner'
-import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode } from './designerGraph'
+import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode, type DesignerDeadline } from './designerGraph'
 import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
@@ -119,6 +125,8 @@ const definitionId = ref('')
 const definitionRevision = ref(0)
 const definitionVersion = ref(0)
 const definitionStatus = ref('DRAFT')
+const definitionStartEnabled = ref<boolean | undefined>(true)
+const availabilityError = ref('')
 const definitionKey = ref('expense-reimbursement')
 const definitionName = ref('费用报销审批')
 const definitionFormSchema = ref<FormSchema | null>(defaultFormSchema())
@@ -251,6 +259,7 @@ function applyDefinition(definition: Definition) {
   definitionId.value = definition.id
   definitionKey.value = definition.key; definitionName.value = definition.name; definitionFormSchema.value = cloneSchema(definition.formSchema ?? null); definitionNotificationTexts.value = copyNotificationTexts(definition.notificationTexts)
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
+  definitionStartEnabled.value = definition.startEnabled; availabilityError.value = ''
   conditionLanguageVersion.value = definition.graph.conditionLanguageVersion ?? 1
   nodes.value = loadDesignerNodes(definition.graph.nodes)
   edges.value = definition.graph.edges.map(edge => ({ ...edge, defaultBranch: edge.defaultBranch ?? false }))
@@ -276,9 +285,37 @@ async function newDefinition(copy = false) {
     page.value = 'designer'; catalogOpen.value = false
     if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema(); definitionNotificationTexts.value = copyNotificationTexts() }
     else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
-    definitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
+    definitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; definitionStartEnabled.value = true; availabilityError.value = ''; resetEditor(); savedSnapshot.value = ''
     notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
   }, () => canManageDefinitions.value && !busy.value && !writesBlocked.value, !copy && !readonlyDefinition.value && dirty.value)
+}
+
+/** 治理操作绑定当前版本和身份；结果未知时交给原请求恢复，不自动生成新请求。 */
+async function changeDefinitionAvailability(input: DefinitionAvailabilityInput) {
+  if (!canManageDefinitions.value || !readonlyDefinition.value || busy.value || writesBlocked.value) return
+  const scope = actorScope.value, id = definitionId.value
+  busy.value = true; availabilityError.value = ''
+  try {
+    const definition = await api.changeDefinitionAvailability(id, input)
+    if (actorScope.value !== scope || definitionId.value !== id) return
+    applyDefinition(definition); templateRefresh.value++
+    notice.value = definition.startEnabled ? '此版本已恢复，可新建申请和提交（包括重提）。' : '此版本已停用，首次提交和重提暂停，运行中的审批继续办理。'
+  } catch (cause) {
+    if (actorScope.value === scope && definitionId.value === id) availabilityError.value = errorMessage(cause)
+  } finally { busy.value = false }
+}
+
+/** 冲突后重新读取当前状态，保留原发布内容及历史依据。 */
+async function refreshDefinitionAvailability() {
+  if (busy.value || writesBlocked.value || !canManageDefinitions.value) return
+  const scope = actorScope.value, id = definitionId.value
+  busy.value = true; availabilityError.value = ''
+  try {
+    const definition = await api.getDefinition(id)
+    if (actorScope.value === scope && definitionId.value === id) { applyDefinition(definition); templateRefresh.value++ }
+  } catch (cause) {
+    if (actorScope.value === scope && definitionId.value === id) availabilityError.value = errorMessage(cause)
+  } finally { busy.value = false }
 }
 /** 恢复一份已授权的配置，不再读取当前租户的全部流程图和表单。 */
 async function restoreDesigner() {
@@ -670,6 +707,12 @@ function patchQuickNode(id: string, patch: Partial<GraphNode>) {
     node.approvalMode = patch.properties.approvalMode ?? node.approvalMode
   }
 }
+/** 快速模式与画布共用同一个节点编辑模型，清除期限时不影响审批人及其他属性。 */
+function patchQuickDeadline(id: string, deadline: DesignerDeadline | undefined) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type === 'USER_TASK') node.deadline = deadline ? { ...deadline } : undefined
+}
 function patchQuickEdge(id: string, condition: string) {
   if (editorLocked.value || !canManageDefinitions.value) return
   const edge = edges.value.find(edge => edge.id === id)
@@ -754,7 +797,7 @@ function keyHandler(event: KeyboardEvent) {
 async function selectApplicationDefinition(id: string) {
   requestedApplicationDefinition.value = id
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
-  await applicationSelection.load(actorScope.value, id, { publishedOnly: true })
+  await applicationSelection.load(actorScope.value, id, { publishedOnly: true, startEnabledOnly: true })
 }
 async function prepareApplication(id = '') {
   if (busy.value || writesBlocked.value) { notice.value = '请先恢复上次操作，再发起新申请。'; return }
@@ -839,8 +882,9 @@ async function recoverOperation(id: string) {
         else autosave.saved()
         notice.value = '已确认原草稿保存结果，保留发送后的本地修改。'
       } else if (request.path.startsWith('/process-definitions')) {
-        applyDefinition(result as Definition); page.value = 'designer'
-        notice.value = request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
+        applyDefinition(result as Definition); page.value = 'designer'; templateRefresh.value++
+        notice.value = request.path.endsWith('/availability') ? '已确认原版本治理操作，请刷新版本状态核对当前结果。'
+          : request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
       } else if (request.path.startsWith('/integrations/webhooks/deliveries/')) {
         templateRefresh.value++
         notice.value = '已确认原投递重试请求，请刷新投递状态查看发送结果。'
@@ -852,6 +896,10 @@ async function recoverOperation(id: string) {
         if (request.body) commentDrafts.acknowledge(actorScope.value, value.applicationId, JSON.parse(request.body) as CommentDraft)
         commentRefresh.value++
         notice.value = '已确认原评论追加成功，审批状态未改变。'
+      } else if (request.path.startsWith('/organization')) {
+        if (request.body) organizationDrafts.acknowledge(actorScope.value, request.path, request.body, result as OrganizationRecord)
+        templateRefresh.value++
+        notice.value = '已确认原组织保存结果，请核对目录。'
       } else if (request.path.startsWith('/business-calendars')) {
         if (request.body) calendarDrafts.acknowledge(actorScope.value, request.path, request.body, result as BusinessCalendar)
         templateRefresh.value++
@@ -896,7 +944,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */
@@ -979,7 +1027,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
     </section>
     <template v-else>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
         <div v-if="notice && !sessionExpired" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
@@ -1004,6 +1052,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div v-else-if="taskTab === 'audit'" class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
+                <TaskDeadlineStatus :due-at="activeTask.dueAt" />
                 <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
               </div>
               <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
@@ -1020,10 +1069,11 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :scope-key="actorScope" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
         <FirstWorkflow :enterprise-auth="authOptions?.mode === 'OIDC'" v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
         <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @open="recordApplicationId = $event" />
+        <OrganizationDirectory v-else-if="page === 'organization' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <BusinessCalendars v-else-if="page === 'calendars' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <SystemChecks v-else-if="page === 'system' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @templates="page = 'templates'" @import="page = 'transfer'" @designer="page = 'designer'" />
         <section v-else-if="page === 'designer'" class="designer-page" @compositionstart="composing = true" @compositionend="composing = false">
-          <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy || writesBlocked" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked || draftConflict" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || draftConflict" @click="openPublication">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
+          <div class="designer-heading"><div><p class="eyebrow">PROCESS DEFINITION / {{ statusLabel(definitionStatus) }} {{ definitionVersion ? `V${definitionVersion}` : '' }}</p><h2>{{ definitionName }} <span v-if="dirty && !readonlyDefinition" class="draft-dot"></span></h2><p class="subhead">{{ readonlyDefinition ? '已发布定义只读；复制为新草稿后可继续编辑。' : !definitionId ? '尚未保存草稿。' : dirty ? '有未保存的修改；发布时会先保存当前内容。' : '当前草稿已保存。' }}</p></div></div><div class="designer-toolbar" aria-label="流程设计操作"><span class="toolbar-context">{{ readonlyDefinition ? '已发布版本' + (definitionStartEnabled === false ? ' · 已停用' : definitionStartEnabled === undefined ? ' · 发起状态待刷新' : ' · 允许新发起') : !definitionId ? '尚未保存草稿' : dirty ? '有未保存修改' : '草稿已保存' }}</span><div class="designer-actions"><button class="secondary" :disabled="editorLocked || !history.length" aria-label="撤销" @click="undo">↶</button><button class="secondary" :disabled="editorLocked || !future.length" aria-label="重做" @click="redo">↷</button><button class="secondary" :disabled="busy || writesBlocked" @click="validate">校验流程</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="simulationOpen" @click="openSimulation">{{ simulationOpen ? '收起模拟' : '模拟运行' }}</button><button v-if="canManageDefinitions" class="secondary" :disabled="busy || writesBlocked" :aria-expanded="comparisonOpen" @click="openComparison">{{ comparisonOpen ? '收起比较' : '版本比较' }}</button><template v-if="canManageDefinitions"><button v-if="readonlyDefinition" class="primary" :disabled="busy || writesBlocked" @click="newDefinition(true)">复制为新草稿</button><template v-else><button class="secondary" :disabled="busy || writesBlocked || draftConflict" @click="saveDraft">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || draftConflict" @click="openPublication">{{ busy ? '处理中…' : '保存并发布 ↗' }}</button></template></template></div></div>
           <section v-if="canManageDefinitions && !readonlyDefinition" class="draft-save-status" aria-label="草稿保存状态">
             <label><input v-model="autosaveEnabled" type="checkbox" :disabled="busy || writesBlocked" />自动保存</label>
             <span role="status" aria-live="polite">{{ autosaveLabel }}<time v-if="autosave.savedAt && !dirty" :datetime="autosave.savedAt.toISOString()"> · {{ autosave.savedAt.toLocaleTimeString('zh-CN') }}</time></span>
@@ -1040,7 +1090,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
-          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @deadline="patchQuickDeadline" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
@@ -1070,6 +1120,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" v-model:approval-mode="selectedNode.approvalMode" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+                <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><p v-if="isExclusiveMerge(selectedNode.id)" class="field-help">条件汇合：选中的路径到达后直接继续，不等待未选中的路径。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedNode.id)" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>
               </template>
@@ -1081,6 +1132,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <DefinitionSimulation v-if="simulationOpen && canManageDefinitions" :graph="simulationGraph" :form-schema="definitionFormSchema" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @result="simulationResult = $event" @locate="locateDesignTarget" @close="simulationOpen = false" />
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <DefinitionNotificationTexts v-model="definitionNotificationTexts" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+          <DefinitionAvailability v-if="definitionStatus === 'PUBLISHED' && definitionId && canManageDefinitions" :definition-id="definitionId" :revision="definitionRevision" :start-enabled="definitionStartEnabled" :scope-key="actorScope" :locked="busy || writesBlocked || confirmationOpen" :error="availabilityError" :refresh-version="templateRefresh" @change="changeDefinitionAvailability" @refresh="refreshDefinitionAvailability" />
           <FormSchemaEditor v-model="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
             <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>
@@ -1095,7 +1147,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
           <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>
-          <DefinitionPicker v-if="!createdApplication" :scope-key="actorScope" label="申请流程" published-only :selected-id="applicationDefinitionId" :selected-label="applicationSelection.definition ? applicationSelection.definition.name + ' · v' + applicationSelection.definition.version : ''" :locked="busy || writesBlocked" @select="selectApplicationDefinition($event.id)" />
+          <DefinitionPicker v-if="!createdApplication" :scope-key="actorScope" label="申请流程" published-only start-enabled-only :selected-id="applicationDefinitionId" :selected-label="applicationSelection.definition ? applicationSelection.definition.name + ' · v' + applicationSelection.definition.version : ''" :locked="busy || writesBlocked" @select="selectApplicationDefinition($event.id)" />
           <p v-if="applicationSelection.loading" role="status" class="unavailable">正在读取所选流程的表单配置…</p>
           <p v-else-if="applicationSelection.error" role="alert" class="inline-error">{{ applicationSelection.error }}<button type="button" class="quiet" @click="selectApplicationDefinition(requestedApplicationDefinition)">重试读取表单</button></p>
           <p v-else-if="!applicationSelection.definition && !createdApplication" class="unavailable">尚未取得可发起的发布版本，请选择流程；没有已发布流程时需先由流程管理员发布。</p>

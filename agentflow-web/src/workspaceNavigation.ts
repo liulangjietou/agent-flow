@@ -1,5 +1,5 @@
 /** 工作空间已有页面标识；导航展示不授予业务权限。@author owlzhangfq@gmail.com */
-export type WorkspacePage = 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
+export type WorkspacePage = 'organization' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
 
 /** 同一份菜单供桌面侧栏与窄屏抽屉使用。@author owlzhangfq@gmail.com */
 export interface WorkspaceMenuItem { label: string; icon: string; page?: WorkspacePage; access?: 'manage' | 'inspect' }
@@ -25,6 +25,7 @@ export const workspaceMenu: { label: string; items: WorkspaceMenuItem[] }[] = [
     { page: 'webhooks', label: '集成投递', icon: '↗', access: 'inspect' },
     { page: 'audit', label: '操作审计', icon: '≡', access: 'inspect' },
     { page: 'operations', label: '审批运营', icon: '▥', access: 'inspect' },
+    { page: 'organization', label: '组织与人员', icon: '◫', access: 'inspect' },
     { page: 'calendars', label: '工作日历', icon: '▦', access: 'inspect' },
     { page: 'system', label: '系统自检', icon: '◈', access: 'inspect' }
   ] }

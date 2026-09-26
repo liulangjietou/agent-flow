@@ -10,7 +10,9 @@ const roleLabels: Record<string, string> = {
 }
 
 /** 已保存规则始终可读，不因目录暂时不可用而变为空白。 */
-export function assigneeLabel(rule: string): string {
+export function assigneeLabel(rule: string, directoryLabel?: string): string {
+  if (rule.startsWith('role:ORG_PERSON_')) return directoryLabel || '本地指定人员'
+  if (rule.startsWith('role:ORG_UNIT_')) return directoryLabel || '本地组织成员'
   if (rule.startsWith('user:')) return `指定账号 · ${rule.slice(5)}`
   if (rule.startsWith('role:')) return roleLabels[rule.slice(5)] ?? `角色 · ${rule.slice(5)}`
   return rule || '待配置'

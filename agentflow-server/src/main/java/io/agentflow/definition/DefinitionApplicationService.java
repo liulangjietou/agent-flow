@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.calendar.BusinessCalendarRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ public class DefinitionApplicationService {
     private final DefinitionDeploymentPort deploymentPort;
     private final DefinitionPublicationRepository publications;
     private final DefinitionAssigneeDirectory assignees;
+    private final BusinessCalendarRepository calendars;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
@@ -32,11 +34,13 @@ public class DefinitionApplicationService {
 
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
-                                        DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees) {
+                                        DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees,
+                                        BusinessCalendarRepository calendars) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
         this.assignees = assignees;
+        this.calendars = calendars;
     }
 
     /** 校验流程图，不改变持久化状态。 */
@@ -49,11 +53,11 @@ public class DefinitionApplicationService {
         return validator.validate(graph, formSchema);
     }
 
-    /** 结构通过后查询真实身份源；目录解析属于跨上下文编排，不进入纯领域校验器。 */
+    /** 结构通过后核对身份源与明确日历修订；跨上下文读取由应用层编排。 */
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
         List<String> errors = validator.validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
-        return unavailableAssignees(tenantId, graph);
+        return unavailableAssigneesAndCalendars(tenantId, graph);
     }
 
     /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
@@ -71,16 +75,16 @@ public class DefinitionApplicationService {
         return new Validation(routingErrors, diagnostics);
     }
 
-    /** 管理员检查在纯领域结果之外核对当前租户的审批人目录。 */
+    /** 发布检查在纯领域结果之外核对当前租户审批人及固定日历修订。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema) {
         return inspect(tenantId, graph, formSchema, null);
     }
 
-    /** 先检查标识和图结构，再核对当前租户审批人，发布与设计预检共用。 */
+    /** 先检查标识和图结构，再核对当前租户审批人及固定日历修订，发布与设计预检共用。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
         Validation result = inspect(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
-        var errors = unavailableAssignees(tenantId, graph);
+        var errors = unavailableAssigneesAndCalendars(tenantId, graph);
         return new Validation(errors, result.branchDiagnostics());
     }
 
@@ -209,12 +213,20 @@ public class DefinitionApplicationService {
         return repository.findAll(tenantId, status);
     }
 
-    private List<String> unavailableAssignees(String tenantId, Graph graph) {
+    private List<String> unavailableAssigneesAndCalendars(String tenantId, Graph graph) {
         var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0)
                 .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
-        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
+        var errors = new java.util.ArrayList<>(graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
                 .filter(node -> !available.contains(node.properties().get("assigneeRule")))
-                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList();
+                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList());
+        for (var node : graph.nodes()) {
+            TaskDeadlinePolicy.fromProperties(node.properties()).ifPresent(policy -> {
+                if (calendars.findVersion(tenantId, policy.calendarId(), policy.calendarRevision()).isEmpty()) {
+                    errors.add("DEADLINE_CALENDAR_UNAVAILABLE:" + node.id());
+                }
+            });
+        }
+        return List.copyOf(errors);
     }
 
     private void requireValid(Graph graph, FormSchema formSchema, String processKey) {

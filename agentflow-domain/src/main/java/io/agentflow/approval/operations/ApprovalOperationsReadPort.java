@@ -58,20 +58,20 @@ public interface ApprovalOperationsReadPort {
      * @author owlzhangfq@gmail.com
      */
     record WaitingNode(String processKey, long definitionVersion, String nodeId, String nodeName,
-                       long tasks, Instant oldestCreatedAt, long oldestWaitSeconds) { }
+                       long tasks, Instant oldestCreatedAt, long oldestWaitSeconds, long overdueTasks) { }
     /**
      * 管理员可追溯到申请的待办摘要，不含审批正文。
      * @author owlzhangfq@gmail.com
      */
     record WaitingTask(String taskId, String taskName, String applicationId, String businessNo, String title,
                        String processKey, long definitionVersion, int roundNo, String assignee,
-                       Instant createdAt, long waitingSeconds) { }
+                       Instant createdAt, long waitingSeconds, Instant dueAt) { }
     /**
      * 日期窗口按提交时间划定；当前待办和缺失历史轮次只受流程筛选影响。
      * @author owlzhangfq@gmail.com
      */
     record Report(Instant generatedAt, LocalDate from, LocalDate to, String timeZone, String processKey,
                   Long definitionVersion, Metrics metrics, List<Daily> daily, List<ProcessSummary> processes,
-                  boolean moreProcesses, long pendingTasks, List<WaitingNode> waitingNodes, boolean moreWaitingNodes,
+                  boolean moreProcesses, long pendingTasks, long overdueTasks, List<WaitingNode> waitingNodes, boolean moreWaitingNodes,
                   List<WaitingTask> oldestTasks, boolean moreOldestTasks, long unrecordedHistoricalRounds) { }
 }

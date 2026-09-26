@@ -119,7 +119,11 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                         .append("</userTask>");
                 return;
             }
-            if (rule.startsWith("role:")) {
+            if (io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)) {
+                String encoded = java.util.Base64.getEncoder().encodeToString(rule.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                xml.append(" flowable:candidateUsers=\"${flowableOrganizationMembers.resolve(execution, '")
+                        .append(encoded).append("')}\"");
+            } else if (rule.startsWith("role:")) {
                 xml.append(" flowable:candidateGroups=\"").append(escape(rule.substring("role:".length()))).append("\"");
             } else if (rule.startsWith("user:")) {
                 xml.append(" flowable:assignee=\"").append(escape(rule.substring("user:".length()))).append("\"");

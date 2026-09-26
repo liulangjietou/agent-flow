@@ -11,14 +11,14 @@ export interface OperationsProcess { processKey: string; definitionVersion: numb
 /** 当前积压任务摘要，管理员从此打开申请原有详情。@author owlzhangfq@gmail.com */
 export interface OperationsTask {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
-  definitionVersion: number; roundNo: number; assignee?: string; createdAt: string; waitingSeconds: number
+  definitionVersion: number; roundNo: number; assignee?: string; createdAt: string; waitingSeconds: number; dueAt?: string | null
 }
 /** 提交窗口与当前积压来自同一查询快照，但日期口径分别标明。@author owlzhangfq@gmail.com */
 export interface OperationsReport extends OperationsFilter {
   generatedAt: string; timeZone: 'UTC'; metrics: OperationsMetrics
   daily: Array<{ date: string; submittedRounds: number }>
-  processes: OperationsProcess[]; moreProcesses: boolean; pendingTasks: number
-  waitingNodes: Array<{ processKey: string; definitionVersion: number; nodeId: string; nodeName: string; tasks: number; oldestCreatedAt: string; oldestWaitSeconds: number }>
+  processes: OperationsProcess[]; moreProcesses: boolean; pendingTasks: number; overdueTasks: number
+  waitingNodes: Array<{ processKey: string; definitionVersion: number; nodeId: string; nodeName: string; tasks: number; oldestCreatedAt: string; oldestWaitSeconds: number; overdueTasks: number }>
   moreWaitingNodes: boolean; oldestTasks: OperationsTask[]; moreOldestTasks: boolean; unrecordedHistoricalRounds: number
 }
 

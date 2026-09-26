@@ -36,20 +36,35 @@ test('无表单与显式空表单往返不混淆', () => {
   }
 })
 
-test('并行模板往返保留拆分、汇合及全部分支，审批方式仍属于各自节点', () => {
+test('并行模板往返保留分支、固定期限与通知文案，不携带版本停用状态', () => {
   const value = source()
+  value.notificationTexts = { submitted: '已收到申请', returned: '请补充说明', approved: '已完成审核' }
   value.graph = { nodes: [
     { id: 'start', name: '开始', type: 'START', properties: {} },
     { id: 'fork', name: '同时审批', type: 'PARALLEL_GATEWAY', properties: { x: '180', y: '100' } },
-    { id: 'a', name: '主管', type: 'USER_TASK', properties: { assigneeRule: 'user:manager' } },
+    { id: 'a', name: '主管', type: 'USER_TASK', properties: { assigneeRule: 'user:manager',
+      deadlineCalendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688', deadlineCalendarRevision: '1', deadlineWorkingMinutes: '480' } },
     { id: 'b', name: '财务', type: 'USER_TASK', properties: { assigneeRule: 'role:FINANCE', approvalMode: 'ALL' } },
     { id: 'join', name: '全部完成', type: 'PARALLEL_GATEWAY', properties: {} },
     { id: 'end', name: '结束', type: 'END', properties: {} }
   ], edges: [['start', 'fork'], ['fork', 'a'], ['fork', 'b'], ['a', 'join'], ['b', 'join'], ['join', 'end']]
     .map(([source, target], index) => ({ id: `edge-${index}`, source, target, condition: '', defaultBranch: false })), conditionLanguageVersion: 1 }
   const before = structuredClone(value)
-  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), before)
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate({ ...value, startEnabled: false })), before)
   assert.deepEqual(value, before)
+})
+
+test('目标租户缺失日历允许导入待配置草稿，非法期限仍阻止导入', async () => {
+  let errors = ['DEADLINE_CALENDAR_UNAVAILABLE:review']
+  const review = new PortableTemplateReview(async () => ({ errors }))
+  const value = source()
+  Object.assign(value.graph.nodes[1].properties, { deadlineCalendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688',
+    deadlineCalendarRevision: '1', deadlineWorkingMinutes: '480' })
+  await review.read(file(serializePortableTemplate(value))); await review.check()
+  assert.equal(review.canImport, true)
+  assert.deepEqual(review.value.graph.nodes[1].properties, value.graph.nodes[1].properties)
+  errors = ['DEADLINE_RULE_INVALID:review']; await review.check()
+  assert.equal(review.canImport, false)
 })
 
 test('格式版本、租户数据、脚本扩展、原型属性、非白名单节点整份拒绝', () => {
@@ -221,4 +236,21 @@ test('导入按目标流程标识校验，修改标识后保留文件但取消�
   const corrected = review.check('new-process')
   calls[1].resolve({ errors: [] }); await corrected
   assert.equal(calls[1].key, 'new-process'); assert.equal(review.canImport, true)
+})
+
+test('期限日历缺失允许待配置草稿，但不能放行同时存在的目标标识冲突', async () => {
+  const value = source()
+  Object.assign(value.graph.nodes[1].properties, {
+    deadlineCalendarId: '00000000-0000-0000-0000-000000000001', deadlineCalendarRevision: '1', deadlineWorkingMinutes: '480'
+  })
+  value.notificationTexts = { submitted: '提交提示。', returned: '', approved: '批准提示。' }
+  const review = new PortableTemplateReview(async (_graph, _form, _signal, key) => ({
+    errors: key === 'review' ? ['DEADLINE_CALENDAR_UNAVAILABLE:review', 'PROCESS_KEY_CONFLICT:review'] : ['DEADLINE_CALENDAR_UNAVAILABLE:review']
+  }))
+  await review.read(file(serializePortableTemplate(value)))
+  await review.check('review'); assert.equal(review.canImport, false)
+  review.invalidateCheck()
+  await review.check('new-process'); assert.equal(review.canImport, true)
+  assert.deepEqual(review.value.graph, value.graph)
+  assert.deepEqual(review.value.notificationTexts, value.notificationTexts)
 })

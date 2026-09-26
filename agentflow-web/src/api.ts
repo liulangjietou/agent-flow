@@ -1,3 +1,4 @@
+import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { NotificationTexts } from './notificationTexts'
 import type { AssistRunDetail, AssistRunFilter, AssistRunPage } from './assistRuns'
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
@@ -7,7 +8,7 @@ import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicat
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
 import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
 import type { AuditExportFilters } from './auditSearch'
-import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation } from './businessCalendars'
+import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation, CalendarSummary } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
@@ -63,7 +64,13 @@ export interface Actor { tenantId: string; userId: string; roles: string[] }
 export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
 export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
 export interface Graph { nodes: GraphNode[]; edges: GraphEdge[]; conditionLanguageVersion?: 1 | 2 }
-export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph; formSchema: FormSchema | null; notificationTexts?: NotificationTexts }
+export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph; formSchema: FormSchema | null; startEnabled?: boolean; notificationTexts?: NotificationTexts }
+/** 版本停用恢复的实际操作依据。@author owlzhangfq@gmail.com */
+export interface DefinitionAvailabilityChange { tenantId: string; definitionId: string; revision: number; previousEnabled: boolean; startEnabled: boolean; changedBy: string; authorizedRole: string; changedAt: string; reason: string }
+/** 按修订降序的操作记录页。@author owlzhangfq@gmail.com */
+export interface DefinitionAvailabilityHistory { items: DefinitionAvailabilityChange[]; nextBeforeRevision?: number }
+/** 身份由服务端确定的治理操作。@author owlzhangfq@gmail.com */
+export interface DefinitionAvailabilityInput { startEnabled: boolean; expectedRevision: number; reason: string }
 export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
 export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
 export interface ProcessTemplate {
@@ -80,12 +87,12 @@ export interface SystemCheckReport {
 }
 export type TaskAction = 'CLAIM' | 'RELEASE' | 'TRANSFER' | 'DELEGATE' | 'RESOLVE' | 'RETURN' | 'REJECT' | 'APPROVE'
 /** 当前可操作的任务快照；动作由服务端按委派状态限制。@author owlzhangfq@gmail.com */
-export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number } }
+export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number }; dueAt?: string | null }
 /** 待办只读摘要不携带审批正文或可直接提交的动作版本。@author owlzhangfq@gmail.com */
 export interface PendingTaskItem {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
   definitionVersion: number; applicant: string; amount: string | null; roundNo: number; assignee?: string
-  owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; createdAt: string
+  owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; createdAt: string; dueAt?: string | null
 }
 /** 服务端筛选与分页参数。@author owlzhangfq@gmail.com */
 export interface PendingTaskQuery {
@@ -126,7 +133,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED'
+  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -205,6 +212,20 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       WEBHOOK_TARGET_UNAVAILABLE: '原目的地已停用、移除或改址，请联系部署管理员核对配置。',
       INVALID_WEBHOOK_QUERY: '投递筛选或分页位置已失效，请重新查询。',
       INVALID_PUBLICATION_NOTE: '请填写 1 至 2000 字的发布变更说明。',
+      INVALID_AVAILABILITY_REASON: '请填写 1 至 2000 字的停用或恢复原因。',
+      ORGANIZATION_NOT_INITIALIZED: '请先明确启用本地组织目录。',
+  ORGANIZATION_ALREADY_INITIALIZED: '本地组织目录已经启用，请刷新状态。',
+  ORGANIZATION_IDENTITY_CONFLICT: '该身份已绑定本租户人员，请修改原人员记录。',
+  ORGANIZATION_APPOINTMENT_CONFLICT: '该任职关系已存在，请修改原任职的在用状态。',
+  ORGANIZATION_DEPARTMENT_CYCLE: '部门层级形成了循环，请选择其他上级部门。',
+  ORGANIZATION_RELATION_INVALID: '请选择同一法人下的有效部门和岗位。',
+  ORGANIZATION_RELATION_INACTIVE: '在用关系引用的法人、部门、岗位和人员必须处于在用状态。',
+  ORGANIZATION_NO_APPROVERS: '当前组织规则已无人可审批，请联系管理员核对人员与任职。',
+  INVALID_ORGANIZATION_UNIT: '请检查组织单元名称、类型和归属。',
+  INVALID_ORGANIZATION_PERSON: '请填写稳定身份标识和有效的人员名称。',
+  INVALID_ORGANIZATION_APPOINTMENT: '请选择人员、部门和岗位。',
+  DEFINITION_DISABLED: '此流程版本已停用，无法新建申请或提交（包括重提）。请联系流程管理员恢复原版本后重试。',
+      DEFINITION_AVAILABILITY_UNCHANGED: '版本状态已与本次操作相同，请刷新版本状态后核对记录。',
       INVALID_TEMPLATE_COPY_REQUEST: '复制信息无效，请检查流程标识、名称和模板版本。',
       TEMPLATE_VERSION_CONFLICT: '模板版本已变化，请重新加载目录，核对后再复制。',
       DEFINITION_BINDING_AMBIGUOUS: '这份旧申请未保存原流程来源，当前存在同名版本。请保留原记录，核对流程后重新发起申请。'
@@ -253,7 +274,17 @@ export const api = {
   webhookDeliveries: (filters: WebhookFilters, signal: AbortSignal) => request<WebhookPage>('/integrations/webhooks/deliveries' + historyQuery(filters), { signal }),
   webhookDelivery: (id: string, signal: AbortSignal) => request<WebhookDetail>('/integrations/webhooks/deliveries/' + encodeURIComponent(id), { signal }),
   retryWebhook: (id: string, expectedVersion: number) => write<WebhookItem>('/integrations/webhooks/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '重新排队 Webhook 投递', { expectedVersion }),
+  organizationStatus: (signal: AbortSignal) => request<{ initialized: boolean }>('/organization', { signal }),
+  initializeOrganization: () => write<{ initialized: boolean }>('/organization/initialize', 'POST', '启用本地组织目录'),
+  organizationUnits: (kind: OrganizationUnit['kind'], afterId: string | undefined, signal: AbortSignal) => request<OrganizationPage<OrganizationUnit>>('/organization/units' + historyQuery({ kind, afterId, limit: 30 }), { signal }),
+  organizationPeople: (afterId: string | undefined, signal: AbortSignal) => request<OrganizationPage<OrganizationPerson>>('/organization/people' + historyQuery({ afterId, limit: 30 }), { signal }),
+  organizationAppointments: (afterId: string | undefined, signal: AbortSignal) => request<OrganizationPage<OrganizationAppointment>>('/organization/appointments' + historyQuery({ afterId, limit: 30 }), { signal }),
+  organizationChanges: (beforeRevision: number | undefined, signal: AbortSignal) => request<{ items: OrganizationChange[]; nextBeforeRevision?: number | null }>('/organization/changes' + historyQuery({ beforeRevision, limit: 30 }), { signal }),
+  saveOrganization: (path: string, editing: boolean, label: string, body: Record<string, unknown>) => write<OrganizationRecord>(path, editing ? 'PUT' : 'POST', label, body),
   calendars: (afterKey: string | undefined, signal: AbortSignal) => request<CalendarPage>('/business-calendars' + historyQuery({ afterKey, limit: 30 }), { signal }),
+  definitionCalendars: (afterKey: string | undefined, signal: AbortSignal) => request<CalendarPage>('/process-definitions/calendar-options' + historyQuery({ afterKey, limit: 30 }), { signal }),
+  definitionCalendarVersions: (id: string, beforeRevision: number | undefined, signal: AbortSignal) => request<CalendarVersionPage>(`/process-definitions/calendar-options/${encodeURIComponent(id)}/versions` + historyQuery({ beforeRevision, limit: 30 }), { signal }),
+  definitionCalendarVersion: (id: string, revision: string, signal: AbortSignal) => request<CalendarSummary>(`/process-definitions/calendar-options/${encodeURIComponent(id)}/versions/${encodeURIComponent(revision)}`, { signal }),
   calendar: (id: string, signal: AbortSignal) => request<BusinessCalendar>(`/business-calendars/${encodeURIComponent(id)}`, { signal }),
   calendarVersions: (id: string, beforeRevision: number | undefined, signal: AbortSignal) => request<CalendarVersionPage>(`/business-calendars/${encodeURIComponent(id)}/versions` + historyQuery({ beforeRevision, limit: 30 }), { signal }),
   calendarVersion: (id: string, revision: number, signal: AbortSignal) => request<BusinessCalendar>(`/business-calendars/${encodeURIComponent(id)}/versions/${revision}`, { signal }),
@@ -264,6 +295,8 @@ export const api = {
   workspaceApplications: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceApplication>>('/workspace/applications' + historyQuery(query), { signal }),
   workspaceHandled: (query: WorkspaceQuery, signal: AbortSignal) => request<WorkspacePage<WorkspaceHandled>>('/workspace/handled' + historyQuery(query), { signal }),
   definitionPublication: (id: string, signal: AbortSignal) => request<PublicationResponse>(`/process-definitions/${encodeURIComponent(id)}/publication`, { signal }),
+  definitionAvailabilityHistory: (id: string, beforeRevision: number | undefined, signal: AbortSignal) => request<DefinitionAvailabilityHistory>(`/process-definitions/${encodeURIComponent(id)}/availability-history?limit=30${beforeRevision === undefined ? '' : '&beforeRevision=' + beforeRevision}`, { signal }),
+  changeDefinitionAvailability: (id: string, body: DefinitionAvailabilityInput) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/availability`, 'POST', body.startEnabled ? '恢复流程版本' : '停用流程版本', body),
   compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
   approvalOperations: (filter: OperationsFilter, signal: AbortSignal) => request<OperationsReport>('/operations/approvals' + historyQuery(filter), { signal }),

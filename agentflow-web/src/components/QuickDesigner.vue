@@ -5,12 +5,15 @@ import type { FormSchema } from '../formSchema'
 import { projectQuickGraph, quickNodeIds, quickStep, type QuickCommand } from '../quickDesigner'
 import QuickSequence from './QuickSequence.vue'
 import DefinitionAssignee from './DefinitionAssignee.vue'
+import DefinitionDeadline from './DefinitionDeadline.vue'
+import { readDesignerDeadline, type DesignerDeadline } from '../designerGraph'
 import ConditionEditor from './ConditionEditor.vue'
 import { describeBranch, branchTooltip } from '../conditionPresentation'
 const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
-const emit = defineEmits<{ command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
+const emit = defineEmits<{ command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
 const projection = computed(() => projectQuickGraph(props.graph))
 const selected = computed(() => props.graph.nodes.find(node => node.id === props.selectedNode))
+const selectedDeadline = computed(() => selected.value ? readDesignerDeadline(selected.value.properties) : undefined)
 const selectedLine = computed(() => props.graph.edges.find(edge => edge.id === props.selectedEdge))
 const source = computed(() => props.graph.nodes.find(node => node.id === selectedLine.value?.source))
 const isGateway = (node: GraphNode | undefined) => !!node && ['EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(node.type)
@@ -37,6 +40,9 @@ const adjacent = computed(() => {
   return { before: before?.id, after: after && props.graph.edges.filter(edge => edge.target === after.id).length === 1 ? after.id : undefined }
 })
 function properties(key: string, value: string) { if (selected.value) emit('node', selected.value.id, { properties: { ...selected.value.properties, [key]: value } }) }
+function changeDeadline(value: DesignerDeadline | undefined) {
+  if (!props.locked && selected.value?.type === 'USER_TASK') emit('deadline', selected.value.id, value)
+}
 function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value) emit('command', { kind: 'moveBranch', nodeId: gateway.value.id, edgeId: selectedLine.value.id, direction }) }
 </script>
 <template>
@@ -52,6 +58,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
           <label>步骤名称<input :value="selected.name" @focus="emit('beforeChange')" @input="emit('node', selected.id, { name: ($event.target as HTMLInputElement).value })" /></label>
           <template v-if="selected.type === 'USER_TASK'">
             <DefinitionAssignee :key="selected.id" :model-value="selected.properties.assigneeRule ?? ''" :approval-mode="selected.properties.approvalMode ?? 'SINGLE'" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('assigneeRule', $event)" @update:approval-mode="properties('approvalMode', $event)" />
+            <DefinitionDeadline :key="selected.id" :model-value="selectedDeadline" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="changeDeadline" />
             <div class="quick-move"><button type="button" class="secondary" :disabled="!adjacent.before" @click="emit('command', { kind: 'swapTasks', firstId: adjacent.before!, secondId: selected.id })">上移一步</button><button type="button" class="secondary" :disabled="!adjacent.after" @click="emit('command', { kind: 'swapTasks', firstId: selected.id, secondId: adjacent.after! })">下移一步</button></div>
             <button type="button" class="quick-delete" @click="emit('command', { kind: 'removeTask', nodeId: selected.id })">删除此审批步骤并接续流程</button>
           </template>

@@ -20,20 +20,21 @@ import java.util.Locale;
 @Repository
 public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
     private final JdbcTemplate jdbc;
+    private final io.agentflow.approval.service.TaskRecipientDirectory recipients;
 
     /** 共享审批与引擎数据源；所有写入仍通过原审批应用服务。 */
-    public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc, io.agentflow.approval.service.TaskRecipientDirectory recipients) { this.jdbc = jdbc; this.recipients = recipients; }
 
     /** 将授权分页和完整计数组合读取，空的后续页在同一只读事务内补取计数。 */
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Result read(Actor actor, Query query) {
-        if (!actor.hasRole("APPROVER")) return new Result(List.of(), 0);
+        if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return new Result(List.of(), 0);
         var parameters = new ArrayList<Object>();
         // 窗口先统计全部授权匹配项，外层再应用游标与上限，避免翻页后总数缩水。
         StringBuilder sql = new StringBuilder("""
                 SELECT p.* FROM (
-                    SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.OWNER_,t.DELEGATION_,t.CREATE_TIME_,
+                    SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.OWNER_,t.DELEGATION_,t.CREATE_TIME_,t.DUE_DATE_,
                            a.id,a.business_no,a.title,a.process_key,a.definition_version,a.created_by,a.search_amount,a.round_no,
                            COUNT(*) OVER () AS matching_total
                 """).append(where(actor, query, parameters)).append(") p");
@@ -66,7 +67,8 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                 row.getString("title"), row.getString("process_key"), row.getLong("definition_version"), row.getString("created_by"),
                 amount == null ? null : amount.stripTrailingZeros().toPlainString(), row.getInt("round_no"),
                 row.getString("ASSIGNEE_"), row.getString("OWNER_"), delegation == null ? "NONE" : delegation,
-                row.getTimestamp("CREATE_TIME_").toInstant());
+                row.getTimestamp("CREATE_TIME_").toInstant(),
+                row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant());
     }
 
     private StringBuilder where(Actor actor, Query query, List<Object> parameters) {

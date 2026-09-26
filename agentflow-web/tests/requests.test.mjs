@@ -7,6 +7,24 @@ globalThis.localStorage = { getItem: () => currentToken }
 const { api, writeRequests } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_API))
 const body = { key: 'expense', name: '费用审批', graph: { nodes: [], edges: [] } }
 
+test('版本停用响应丢失后保留原修订、原因与幂等键，禁止改成恢复请求', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'availability-recovery' })
+  const sent = [], body = { expectedRevision: 3, startEnabled: false, reason: '制度调整' }
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, ...init })
+    if (sent.length === 1) throw new TypeError('lost')
+    return Response.json({ id: 'definition', revision: 4, startEnabled: false })
+  }
+  await assert.rejects(api.changeDefinitionAvailability('definition', body))
+  await assert.rejects(api.changeDefinitionAvailability('definition', { ...body, startEnabled: true }), error => error.code === 'PENDING_REQUEST_CHANGED')
+  const recovered = await writeRequests.recover(writeRequests.pending()[0].id)
+  assert.equal(recovered.result.startEnabled, false)
+  assert.equal(sent[0].url, '/api/v1/process-definitions/definition/availability')
+  assert.equal(sent[0].body, sent[1].body)
+  assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+  assert.equal(writeRequests.pending().length, 0)
+})
+
 test('作废响应丢失后只恢复原版本和说明，不新建动作或修改请求', async () => {
   writeRequests.setActor({ tenantId: 'demo', userId: 'cancel-recovery' })
   const sent = [], body = { expectedVersion: 7, comment: '计划已取消' }

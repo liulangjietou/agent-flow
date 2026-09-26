@@ -55,7 +55,8 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')
     text(n.id, '节点标识', 128); text(n.name, '节点名称', 256)
     if (!['START', 'END', 'USER_TASK', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
-    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'approvalMode'], [], '节点配置')
+    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'approvalMode',
+      'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes'], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
       text(value, `节点配置 ${key}`, 256)
       if ((key === 'x' || key === 'y') && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 1_000_000)) throw new Error('节点位置必须在 0 至 1000000 之间。')
@@ -155,6 +156,9 @@ export class PortableTemplateReview {
     } finally { clearTimeout(timeout); if (generation === this.generation) { this.loading = false; this.controller = null } }
   }
 
-  /** 审批人缺失或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
-  get canImport() { return this.reviewed && !!this.value && !this.loading && this.errors.every(error => error.startsWith('ASSIGNEE_NOT_AVAILABLE:') || error.startsWith('BRANCH_COVERAGE_GAP:')) }
+  /** 缺失租户引用或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
+  get canImport() {
+    const repairable = ['ASSIGNEE_NOT_AVAILABLE:', 'DEADLINE_CALENDAR_UNAVAILABLE:', 'BRANCH_COVERAGE_GAP:']
+    return this.reviewed && !!this.value && !this.loading && this.errors.every(error => repairable.some(prefix => error.startsWith(prefix)))
+  }
 }

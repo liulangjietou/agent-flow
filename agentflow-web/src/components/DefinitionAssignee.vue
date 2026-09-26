@@ -38,7 +38,7 @@ onUnmounted(() => query.clear())
         <option value="">请选择审批人或角色</option>
         <option v-if="modelValue && !selected" :value="modelValue">{{ assigneeLabel(modelValue) }}（已有配置）</option>
         <optgroup label="指定审批人"><option v-for="option in users" :key="option.rule" :value="option.rule" :disabled="!option.memberCount">{{ option.label }}</option></optgroup>
-        <optgroup label="审批角色"><option v-for="option in roles" :key="option.rule" :value="option.rule" :disabled="!option.memberCount">{{ assigneeLabel(option.rule) }} · {{ option.memberCount }} 人</option></optgroup>
+        <optgroup label="组织与审批角色"><option v-for="option in roles" :key="option.rule" :value="option.rule" :disabled="!option.memberCount">{{ assigneeLabel(option.rule, option.label) }} · {{ option.memberCount }} 人</option></optgroup>
       </select>
     </label>
     <p v-if="query.loading" role="status">正在读取当前租户审批人…</p>
@@ -50,7 +50,7 @@ onUnmounted(() => query.clear())
     </template>
     <p v-if="approvalMode === 'ALL'" class="assignee-help">进入节点时固定审批名单；全部同意才流转，任一驳回结束整轮。支持委派后回交，不支持转交和释放。</p>
     <button v-if="scopeKey" type="button" class="secondary" :disabled="disabled || query.loading" @click="query.load(scopeKey)">{{ query.error ? '重试读取审批人' : '刷新审批人' }}</button>
-    <p class="assignee-help">名单来自当前身份源，发布时重新核对；组织负责人和多级上级尚未接入。</p>
+    <p class="assignee-help">名单来自当前租户配置的选人目录，发布时重新核对；组织负责人和多级上级尚未接入。</p>
   </section>
 </template>
 

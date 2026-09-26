@@ -20,6 +20,9 @@ public interface DefinitionDraftRepository {
     /** 只返回指定租户和业务版本的已发布快照。 */
     Optional<DefinitionDraft> findPublished(String tenantId, String key, long version);
 
+    /** 发起用例锁定该版本直到事务结束，与停用更新形成明确先后顺序。 */
+    Optional<DefinitionDraft> lockPublished(String tenantId, String key, long version);
+
     /** 查询租户下的流程草稿。 */
     List<DefinitionDraft> findAll(String tenantId, String status);
 

@@ -62,6 +62,7 @@ const labels: Record<string, string> = {
   helpText: '填写提示', maxLength: '最多字符数', minimum: '最小值', maximum: '最大值', options: '可选项', columns: '明细列', maxRows: '最多明细行数',
   properties: '节点属性', assigneeRule: '审批人规则', 'properties.assigneeRule': '审批人规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
+  'properties.deadlineCalendarId': '期限工作日历', 'properties.deadlineCalendarRevision': '期限日历修订', 'properties.deadlineWorkingMinutes': '期限工作分钟',
   x: '水平位置', y: '垂直位置', 'properties.x': '水平位置', 'properties.y': '垂直位置', value: '保存值'
 }
 const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', EXCLUSIVE_GATEWAY: '条件网关',

@@ -100,6 +100,7 @@ public final class DefinitionModels {
         private Graph graph;
         private FormSchema formSchema;
         private NotificationTexts notificationTexts;
+        private boolean startEnabled = true;
 
         /** 创建新草稿。 */
         public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph) {
@@ -137,6 +138,23 @@ public final class DefinitionModels {
                                               long revision, DraftStatus status, Graph graph, FormSchema formSchema,
                                               NotificationTexts notificationTexts) {
             return new DefinitionDraft(id, tenantId, key, name, version, revision, status, graph, formSchema, notificationTexts);
+        }
+
+        /** 恢复版本自己的发起开关，开关不改变已发布图和表单。 */
+        public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
+                                              long revision, DraftStatus status, Graph graph, FormSchema formSchema,
+                                              boolean startEnabled) {
+            return restore(id, tenantId, key, name, version, revision, status, graph, formSchema,
+                    NotificationTexts.EMPTY, startEnabled);
+        }
+
+        /** 恢复同一记录的通知配置与发起开关，不使用当前模板或默认文案替换。 */
+        public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
+                                              long revision, DraftStatus status, Graph graph, FormSchema formSchema,
+                                              NotificationTexts notificationTexts, boolean startEnabled) {
+            DefinitionDraft draft = restore(id, tenantId, key, name, version, revision, status, graph, formSchema, notificationTexts);
+            draft.startEnabled = startEnabled;
+            return draft;
         }
 
         private DefinitionDraft(UUID id, String tenantId, String key, String name, long version, long revision,
@@ -177,6 +195,24 @@ public final class DefinitionModels {
             this.status = DraftStatus.PUBLISHED; this.version = nextVersion; this.revision++;
         }
 
+        /** 停用和恢复只修改发起开关；已发布内容、版本号和现有实例保持原样。 */
+        public void changeAvailability(long expectedRevision, boolean enabled) {
+            if (status != DraftStatus.PUBLISHED) {
+                throw new DomainException("DEFINITION_NOT_PUBLISHED", "Only published definitions can change availability");
+            }
+            ensureRevision(expectedRevision);
+            if (startEnabled == enabled) {
+                throw new DomainException("DEFINITION_AVAILABILITY_UNCHANGED", "Definition already has the requested availability");
+            }
+            startEnabled = enabled;
+            revision++;
+        }
+
+        /** 新发起入口复核当前状态，历史读取不受此开关限制。 */
+        public void requireStartEnabled() {
+            if (!startEnabled) throw new DomainException("DEFINITION_DISABLED", "This process version is disabled for new starts");
+        }
+
         private void ensureDraft() { if (status != DraftStatus.DRAFT) throw new DomainException("DEFINITION_IMMUTABLE", "Published definition cannot be changed"); }
         private void ensureRevision(long expected) { if (revision != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Definition revision has changed"); }
 
@@ -184,6 +220,7 @@ public final class DefinitionModels {
         public String name() { return name; } public long version() { return version; } public long revision() { return revision; }
         public FormSchema formSchema() { return formSchema; }
         public NotificationTexts notificationTexts() { return notificationTexts; }
+        public boolean startEnabled() { return startEnabled; }
         public DraftStatus status() { return status; } public Graph graph() { return graph; }
     }
 

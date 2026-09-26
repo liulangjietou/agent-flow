@@ -1,0 +1,198 @@
+{
+  "recordedAt": "2026-09-25T02:37:45.035547-04:00",
+  "status": "VALIDATED_NOT_DELIVERED",
+  "baseline": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+  "branch": "codex/governance-deadlines-integration",
+  "worktree": "/fyoung/tmp/agentflow-governance-deadlines-integration",
+  "committed": false,
+  "merged": false,
+  "deployed": false,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "scope": "流程版本停用／恢复与节点期限配置的联合整合，不包含重提策略和实际任务计时",
+  "sourcePreservation": {
+    "availability": {
+      "unchanged": true,
+      "head": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+      "trackedPatchSha256": "ba812a9a2779441ff81479c4bfeac0a5e9f0f30b37a017d5e26ab87dca6360ca",
+      "untrackedFiles": 14
+    },
+    "deadlines": {
+      "unchanged": true,
+      "head": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+      "trackedPatchSha256": "bb625c15b2ca157cdb21f13521f242639e1e15d3bc9fec2acee73f6ab8b38603",
+      "untrackedFiles": 8
+    },
+    "publishedMigrations": {
+      "unchanged": true,
+      "files": 20,
+      "onlyNewMigration": "V24__definition_availability.sql"
+    }
+  },
+  "merge": {
+    "openapi": "使用三方 JSON 结构合并，两侧新增路径及模型均保留",
+    "conflictsRemaining": 0,
+    "mainPublishedMigrationsUnchanged": true,
+    "newMigration": "V24__definition_availability.sql"
+  },
+  "additionalRegression": "DefinitionAvailabilityIntegrationTest.availabilityAndCopyKeepFixedDeadlineWhenCalendarHasNewRevision",
+  "gates": {
+    "java": {
+      "total": 757,
+      "modules": {
+        "agentflow-domain": {
+          "tests": 192,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "agentflow-server": {
+          "tests": 565,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "frontend": {
+      "tests": 266,
+      "failures": 0,
+      "skipped": 0,
+      "typecheck": "PASS",
+      "build": "PASS",
+      "warning": "压缩后主 JavaScript 包为 504.92 kB，超过 500 kB 构建提示阈值"
+    },
+    "tools": {
+      "tests": 38,
+      "failures": 0
+    },
+    "authors": {
+      "javaFiles": 307,
+      "namedTypes": 481,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "openapi": {
+      "paths": 63,
+      "operations": 70,
+      "schemas": 115,
+      "requestExamples": 22,
+      "static": "PASS",
+      "postgresqlExercise": "PASS",
+      "statuses": [
+        200,
+        201,
+        400,
+        401,
+        403,
+        404,
+        409,
+        422
+      ]
+    },
+    "diffCheck": "PASS"
+  },
+  "runtime": {
+    "jarSha256": "e199166a342b4c487577dc7f2786b7f886baad33f58f0da2b9efd7364814470c",
+    "database": "governance_deadlines_eac71be3a5",
+    "backendPort": 18179,
+    "frontendPort": 5199,
+    "browser": "Chrome / CUA",
+    "browserTabClosed": true,
+    "report": {
+      "disabledGraphPreserved": true,
+      "disabledRevision": 2,
+      "calendarCurrentRevision": 2,
+      "nodeCalendarRevision": 1,
+      "nodeWorkingMinutes": 480,
+      "copyDefinitionId": "e450c286-52e1-4803-8c3b-99ce40fd2c1e",
+      "copyPublishedVersion": 2,
+      "copyWorkingMinutes": 960,
+      "copyCalendarRevision": 1,
+      "copyStartEnabled": true,
+      "originalStillDisabledAfterCopy": true,
+      "originalGraphStillUnchanged": true,
+      "unrelatedNodePropertiesPreserved": true,
+      "restoredOriginalRevision": 3,
+      "restoredOriginalContentUnchanged": true,
+      "restoredOriginalWorkingMinutes": 480,
+      "copyStillWorkingMinutes": 960,
+      "originalHistoryRevisions": [
+        3,
+        2
+      ],
+      "copyHistoryEmpty": true,
+      "engineVersions": [
+        1,
+        2
+      ],
+      "bothEngineVersionsActive": true,
+      "result": "PASS"
+    }
+  },
+  "cleanup": {
+    "processes": {
+      "backend": {
+        "pid": 77494,
+        "owned": true,
+        "signal": "SIGTERM"
+      },
+      "frontend": {
+        "pid": 77495,
+        "owned": true,
+        "signal": "SIGTERM"
+      }
+    },
+    "database": {
+      "containerId": "50a78bbf250cd7fb6c1c3ab55c05a932412d144556ae9ee85539aeed04635a30",
+      "running": false,
+      "containerRetained": true,
+      "volumesRetained": true,
+      "databaseRetained": true
+    },
+    "nodeModulesSymlinkRemoved": true,
+    "fixturePortsClosed": [
+      18179,
+      5199
+    ],
+    "main": {
+      "head": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+      "clean": true,
+      "remoteConfigured": false,
+      "nativeBackend": {
+        "checkError": "URLError"
+      },
+      "dockerWeb": {
+        "httpStatus": 200,
+        "containerId": "95c79f0001d8855d8a4879d1defcead3bd5076db1272ce0151e7e32eaa04ff88",
+        "running": true,
+        "health": "healthy"
+      },
+      "portsNotListening": [
+        8080,
+        5173,
+        5193
+      ],
+      "dockerBackend": {
+        "containerId": "c8a2ccb006c8f61be9d7f133d81a578ce572ebba9c04e89f45b3ea2b206e0df6",
+        "running": true,
+        "health": "healthy"
+      }
+    },
+    "checkedAt": "2026-09-25T02:36:00-0400"
+  },
+  "limits": [
+    "旧申请退回／撤回后的停用版本重提策略仍待确认与实现",
+    "任务实际到期计时、超时提醒和升级尚未实现",
+    "使用演示身份和隔离 PostgreSQL，不是企业身份源或生产环境验收",
+    "本轮未重新执行此前单分支已完成的 V23 到 V24 迁移演练",
+    "主源码仍阶段 75；Docker 演示按最近部署记录仍阶段 70；本轮未升级主运行服务"
+  ],
+  "logs": {
+    "java": "/fyoung/tmp/agentflow-governance-integration-verify.log",
+    "frontendTests": "/fyoung/tmp/agentflow-governance-integration-web-tests.log",
+    "frontendBuild": "/fyoung/tmp/agentflow-governance-integration-web-build.log",
+    "tools": "/fyoung/tmp/agentflow-governance-integration-tools.log",
+    "postgresqlContract": "/fyoung/tmp/agentflow-governance-integration-pg-contract.log"
+  }
+}

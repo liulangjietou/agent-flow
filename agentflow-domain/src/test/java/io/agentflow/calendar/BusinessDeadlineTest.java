@@ -50,6 +50,15 @@ class BusinessDeadlineTest {
     }
 
     @Test
+    void realTaskCreationInstantPreservesWhichRepeatedClockHourOccurred() {
+        var rules = rules("America/New_York", Map.of(DayOfWeek.SUNDAY, List.of(period("01:15", "01:45"))), List.of());
+        assertThat(BusinessDeadline.calculate(rules, Instant.parse("2024-11-03T05:30:00Z"), 1).dueAt())
+                .isEqualTo(Instant.parse("2024-11-03T05:31:00Z"));
+        assertThat(BusinessDeadline.calculate(rules, Instant.parse("2024-11-03T06:30:00Z"), 1).dueAt())
+                .isEqualTo(Instant.parse("2024-11-03T06:31:00Z"));
+    }
+
+    @Test
     void skippedWholeLocalDateDoesNotCreateImaginaryWork() {
         var week = new EnumMap<DayOfWeek, List<CalendarRules.Period>>(DayOfWeek.class);
         for (var day : DayOfWeek.values()) week.put(day, List.of(period("09:00", "17:00")));

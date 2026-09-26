@@ -1,0 +1,173 @@
+{
+  "recordedAt": "2026-09-26T00:57:45.341777-04:00",
+  "status": "INTEGRATED_VALIDATED_NOT_DELIVERED",
+  "baseCommit": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "committed": false,
+  "merged": false,
+  "deployed": false,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "scope": "未发布治理与期限配置整合当前标识冲突修复；不包含旧申请重提策略或实际 SLA",
+  "conflictsResolved": [
+    "DefinitionValidator.java",
+    "PortableTemplate.vue"
+  ],
+  "tests": {
+    "java": 800,
+    "domain": 209,
+    "server": 591,
+    "frontend": 283,
+    "tools": 38,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "typecheck": true,
+    "productionBuild": true,
+    "javaFiles": 317,
+    "namedJavaTypes": 492,
+    "missingAuthors": 0
+  },
+  "openapi": {
+    "operations": 70,
+    "schemas": 116,
+    "requestExamples": 22,
+    "static": "PASS",
+    "postgresqlExercise": "PASS"
+  },
+  "fixture": {
+    "containerId": "69dd950b069bfaed88a800812c13c3dfd19d2508e0eaca3359f1f19fc3071911",
+    "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c",
+    "database": "agentflow_gov_identifier",
+    "backendPort": 18187,
+    "frontendPort": 5207,
+    "databasePort": 18647,
+    "oldJarSha256": "dcf6ee5a0591fddd826820c36bd44c0db7b0a30b1a81e7380af4afb8d263308c",
+    "candidateJarSha256": "72e79459d986c1d0c4a0608ed93ac0bdcdbd76f6c0bb5238d89cb896ae5241c3"
+  },
+  "migration": {
+    "result": "PASS",
+    "migration": "24 -> 25",
+    "originalTablesPreserved": 66,
+    "originalHistoryPreserved": true
+  },
+  "runtime": {
+    "result": "PASS",
+    "oldParallelApplicationCompleted": true,
+    "oldDraftGuardAndRecovery": true,
+    "frozenNotificationPreserved": true,
+    "versionCopyIndependent": true,
+    "fixedCalendarRevision": "1",
+    "currentCalendarRevision": 2,
+    "originalWorkingMinutes": "480",
+    "copyWorkingMinutes": "960",
+    "originalDefinition": "d0ef932a-4dae-41c4-8ec2-17ca157c4327",
+    "originalRevision": 3,
+    "copyDefinition": "65a2ffcd-946d-4d18-a4e6-10602b191a62",
+    "browserDefinitionId": "e0cb5ae5-879c-41cb-8e76-983673de3d38",
+    "browserDefinitionName": "治理通知浏览器验收"
+  },
+  "identifierAndCalendar": {
+    "result": "PASS",
+    "processKeyCollisionRejected": true,
+    "nodeEdgeCollisionRejected": true,
+    "failedUpdatePreservesDraft": true,
+    "calendarDiagnosticAfterIdentifierCorrection": true,
+    "ordinaryAccountCalendarDirectoryNotExposed": true,
+    "missingCalendarDraftAllowedButPublishRejected": true,
+    "correctedCalendarPublished": true,
+    "fixedRevisionPreserved": "1",
+    "notificationTextsPreserved": true
+  },
+  "browser": {
+    "result": "PASS",
+    "chromeTab": "1593458215",
+    "quickAndAdvancedDeadlinePreserved": true,
+    "workingMinutes": "720",
+    "calendarRevision": "1",
+    "publishedVersion": 1,
+    "stopAndRestoreRecordedInUi": true,
+    "restoredStartEnabled": true,
+    "browserNotificationPersisted": true,
+    "processKeyConflictDisplayed": true,
+    "keyChangeInvalidatedOldValidation": true,
+    "correctedKeyValidationPassed": true,
+    "browserConsoleErrors": [],
+    "tabClosed": true,
+    "templateUploadRetried": false
+  },
+  "preservation": {
+    "result": "PASS",
+    "originalWorkingPatchPreserved": true,
+    "originalIndexPreserved": true,
+    "originalUntrackedFilesPreserved": 25,
+    "publishedMigrationFilesUnchanged": 21,
+    "tests": {
+      "agentflow-domain": {
+        "tests": 209,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "agentflow-server": {
+        "tests": 591,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "mainHead": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "mainClean": true,
+    "remoteConfigured": false
+  },
+  "cleanup": {
+    "result": "PASS",
+    "fixtureServicesStopped": true,
+    "portsClosed": [
+      18187,
+      5207,
+      18647
+    ],
+    "databaseContainerRetained": true,
+    "worktreeRetained": true,
+    "nodeModulesLinkRemoved": true,
+    "mainServerHealthy": true,
+    "mainWebHealthy": true
+  },
+  "logs": {
+    "verify": {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-verify.log",
+      "sha256": "3d76a2eadbcf7a2e7070cb59d74510d33f18311a5e12661817457023f68bf460"
+    },
+    "web": {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-web.log",
+      "sha256": "ace598047cf3e299736b62983a3f55f0bcb49adb7071d1382deb5c20ffe9e4fc"
+    },
+    "build": {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-build.log",
+      "sha256": "55367ea88bb4fab51e8dea48c5ac63399f163a8f81d35df4129d9654061c706c"
+    },
+    "tools": {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-tools.log",
+      "sha256": "3885d4aa126e789504c736f5a49c0fb3cb50bc470a47b2c93d42f4f9107c1f9a"
+    },
+    "authors": {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-authors.log",
+      "sha256": "b3f141389f26cf45353daa58000dd4d00ca0cfcf26b5b443c671566fe4657305"
+    },
+    "openapi": {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-openapi.log",
+      "sha256": "1c9f8358afdcae7157647f632f3ec1aad8c0b17d616a9ecad0413738e3929822"
+    }
+  },
+  "limits": [
+    "治理与期限配置未正式交付",
+    "停用版本退回或撤回重提策略尚待确认",
+    "实际计时与提醒尚未实现",
+    "候选版未做回退部署验收",
+    "未进行浏览器模板上传",
+    "主 JS 514.84 kB 构建提示",
+    "无 Git 远端、PR 或远程 CI"
+  ]
+}

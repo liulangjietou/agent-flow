@@ -3,7 +3,6 @@ package io.agentflow.calendar;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
-import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -25,8 +23,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/business-calendars")
 public class BusinessCalendarController {
-    private static final int DEFAULT_LIMIT = 30;
-    private static final int MAX_LIMIT = 100;
     private final BusinessCalendarService service;
     private final CurrentActor currentActor;
     private final IdempotencyExecutor idempotency;
@@ -40,10 +36,8 @@ public class BusinessCalendarController {
     @GetMapping
     public ResponseEntity<BusinessCalendarService.CalendarPage> list(@RequestParam Map<String, String> query) {
         var actor = administrator();
-        requireKeys(query, Set.of("afterKey", "limit"));
-        String after = query.get("afterKey");
-        if (after != null && (after.isBlank() || after.length() > 64)) throw invalidQuery();
-        return noStore(service.list(actor.tenantId(), after, limit(query)));
+        var parameters = CalendarQuery.directory(query);
+        return noStore(service.list(actor.tenantId(), parameters.afterKey(), parameters.limit()));
     }
 
     /** 新日历唯一键限定在当前租户，成功后保留首版历史。 */
@@ -67,14 +61,14 @@ public class BusinessCalendarController {
     /** 按版本倒序读取历史摘要。 */
     @GetMapping("/{id}/versions")
     public ResponseEntity<BusinessCalendarService.VersionPage> versions(@PathVariable UUID id, @RequestParam Map<String, String> query) {
-        var actor = administrator(); requireKeys(query, Set.of("beforeRevision", "limit"));
-        return noStore(service.versions(actor.tenantId(), id, query.containsKey("beforeRevision") ? positive(query.get("beforeRevision")) : null, limit(query)));
+        var actor = administrator(); var parameters = CalendarQuery.versions(query);
+        return noStore(service.versions(actor.tenantId(), id, parameters.beforeRevision(), parameters.limit()));
     }
 
     /** 读取当时保存的完整规则，不用当前配置补写历史。 */
     @GetMapping("/{id}/versions/{revision}")
     public ResponseEntity<CalendarResponse> version(@PathVariable UUID id, @PathVariable long revision) {
-        var actor = administrator(); if (revision < 1) throw invalidQuery();
+        var actor = administrator(); CalendarQuery.requireRevision(revision);
         return noStore(CalendarResponse.from(service.version(actor.tenantId(), id, revision)));
     }
 
@@ -87,18 +81,6 @@ public class BusinessCalendarController {
 
     private Actor administrator() { var actor = currentActor.actor(); actor.requireRole("ADMIN"); return actor; }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
-    private static void requireKeys(Map<String, String> query, Set<String> allowed) { if (!allowed.containsAll(query.keySet())) throw invalidQuery(); }
-    private static long positive(String value) {
-        try { long parsed = Long.parseLong(value); if (parsed < 1) throw invalidQuery(); return parsed; }
-        catch (NumberFormatException exception) { throw invalidQuery(); }
-    }
-    private static int limit(Map<String, String> query) {
-        long value = query.containsKey("limit") ? positive(query.get("limit")) : DEFAULT_LIMIT;
-        if (value > MAX_LIMIT) throw invalidQuery();
-        return (int) value;
-    }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_CALENDAR_QUERY", "Invalid calendar pagination query"); }
-
     /**
      * 首版请求只包含管理员明确输入的业务设置。
      * @author owlzhangfq@gmail.com

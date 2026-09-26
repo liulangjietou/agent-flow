@@ -25,7 +25,7 @@ class DefinitionApplicationServiceTest {
         DefinitionAssigneeDirectory directory = mock(DefinitionAssigneeDirectory.class);
         when(directory.options("tenant-a")).thenReturn(List.of(new DefinitionAssigneeDirectory.Option("role:FINANCE", "FINANCE", 1)))
                 .thenReturn(List.of(new DefinitionAssigneeDirectory.Option("role:FINANCE", "FINANCE", 0)));
-        var service = new DefinitionApplicationService(repository, deployment, mock(DefinitionPublicationRepository.class), directory);
+        var service = new DefinitionApplicationService(repository, deployment, mock(DefinitionPublicationRepository.class), directory, mock(io.agentflow.calendar.BusinessCalendarRepository.class));
         var draft = service.create("tenant-a", "directory-change", "目录变化", graph());
         org.assertj.core.api.Assertions.assertThat(service.validate("tenant-a", graph(), null)).isEmpty();
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.publish(
@@ -40,7 +40,7 @@ class DefinitionApplicationServiceTest {
         InMemoryRepository repository = new InMemoryRepository();
         RecordingDeployment deployment = new RecordingDeployment();
         DefinitionApplicationService service = new DefinitionApplicationService(repository, deployment, mock(DefinitionPublicationRepository.class),
-                tenant -> List.of(new DefinitionAssigneeDirectory.Option("role:FINANCE", "FINANCE", 1)));
+                tenant -> List.of(new DefinitionAssigneeDirectory.Option("role:FINANCE", "FINANCE", 1)), mock(io.agentflow.calendar.BusinessCalendarRepository.class));
         DefinitionDraft draft = service.create("tenant-a", "travel", "出差审批", graph());
 
         DefinitionDraft published = service.publish(new io.agentflow.common.Actor("tenant-a", "test-admin", java.util.Set.of("ADMIN")), draft.id(), 0, "集成测试发布");
@@ -93,6 +93,9 @@ class DefinitionApplicationServiceTest {
         public Optional<DefinitionDraft> findPublished(String tenantId, String key, long version) {
             return value != null && value.tenantId().equals(tenantId) && value.key().equals(key)
                     && value.version() == version && value.status() == DraftStatus.PUBLISHED ? Optional.of(value) : Optional.empty();
+        }
+        public Optional<DefinitionDraft> lockPublished(String tenantId, String key, long version) {
+            return findPublished(tenantId, key, version);
         }
         public List<DefinitionDraft> findAll(String tenantId, String status) { return List.of(); }
     }

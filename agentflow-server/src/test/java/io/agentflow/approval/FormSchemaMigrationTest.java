@@ -53,6 +53,7 @@ class FormSchemaMigrationTest {
         definitionAfter.remove("FORM_SCHEMA_JSON"); applicationAfter.remove("FORM_SCHEMA_JSON"); applicationAfter.remove("RUNTIME_DEFINITION_ID"); roundAfter.remove("FORM_SCHEMA_JSON");
         assertThat(definitionAfter.remove("NOTIFICATION_TEXTS_JSON")).isNull();
         assertThat(applicationAfter.remove("NOTIFICATION_TEXTS_JSON")).isNull();
+        assertThat(definitionAfter.remove("START_ENABLED")).isEqualTo(true);
         assertThat(definitionAfter).isEqualTo(definitionBefore);
         assertThat(applicationAfter.remove("SEARCH_AMOUNT")).isNull();
         assertThat(applicationAfter).isEqualTo(applicationBefore);

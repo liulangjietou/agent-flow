@@ -30,6 +30,13 @@ public final class DefinitionValidator {
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
             if (n.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + n.id());
+            if (TaskDeadlinePolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
+                if (n.type() != NodeType.USER_TASK) errors.add("DEADLINE_REQUIRES_USER_TASK:" + n.id());
+                else {
+                    try { TaskDeadlinePolicy.fromProperties(n.properties()); }
+                    catch (io.agentflow.common.DomainException exception) { errors.add("DEADLINE_RULE_INVALID:" + n.id()); }
+                }
+            }
             String approvalMode = n.properties().get("approvalMode");
             if (approvalMode != null) {
                 if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_MODE_REQUIRES_USER_TASK:" + n.id());

@@ -98,7 +98,7 @@ onUnmounted(() => { active = false; directory.clear(); detail.clear(); history.c
 <template>
   <section class="content business-calendars">
     <div class="page-heading"><div><p class="eyebrow">SETTINGS / BUSINESS CALENDARS</p><h2>工作日历</h2><p class="subhead">按当地作息计算工作时间，让每次试算都有可追溯的版本。</p></div><button class="primary" :disabled="dirty || locked" @click="create">＋ 新建日历</button></div>
-    <div class="calendar-scope"><span>管理员配置</span><p>节假日与调休由管理员明确维护。当前支持保存和试算，尚未关联审批任务期限。</p></div>
+    <div class="calendar-scope"><span>管理员配置</span><p>节假日与调休由管理员明确维护。流程节点可引用明确日历修订计算新任务期限；后续日历修改不会改变既有任务。</p></div>
     <p v-if="accessDenied" class="calendar-error" role="alert">当前账号已无法访问日历配置，请重新登录并核对管理员权限。</p>
     <div v-if="!accessDenied" class="calendar-layout">
       <aside class="panel calendar-directory" aria-label="日历目录">

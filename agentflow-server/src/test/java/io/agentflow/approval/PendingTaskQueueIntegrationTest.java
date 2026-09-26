@@ -203,7 +203,7 @@ class PendingTaskQueueIntegrationTest {
         var statements = new ArrayList<String>();
         var actor = mock(CurrentActor.class);
         when(actor.actor()).thenReturn(new Actor("demo", "manager", Set.of("APPROVER", "MANAGER")));
-        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements)), json);
+        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements), auth), json);
         var first = controller.list(Map.of("processKey", key, "limit", "2"));
         assertThat(first.items()).hasSize(2);
         assertThat(first.total()).isEqualTo(5);

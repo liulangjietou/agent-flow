@@ -3,7 +3,7 @@ import type { InboxMessage, InboxPage, InboxQuery } from './api'
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
   APPLICATION_SUBMITTED: '申请已提交', TASK_PENDING: '有新的待办', APPLICATION_RETURNED: '申请已退回',
   APPLICATION_REJECTED: '申请已驳回', APPLICATION_APPROVED: '申请已批准', APPLICATION_WITHDRAWN: '申请已撤回',
-  TASK_TRANSFERRED: '收到转交任务', TASK_DELEGATED: '收到委派任务', TASK_RESOLVED: '受托意见已回交'
+  TASK_TRANSFERRED: '收到转交任务', TASK_DELEGATED: '收到委派任务', TASK_RESOLVED: '受托意见已回交', TASK_OVERDUE: '审批任务已超时'
 }
 export const isTaskNotification = (item: InboxMessage) => item.kind.startsWith('TASK_')
 
