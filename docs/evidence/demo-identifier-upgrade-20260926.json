@@ -1,0 +1,263 @@
+{
+  "date": "2026-09-26",
+  "result": "PASS",
+  "businessSourceCommit": "d65b625e0112f7f703d306a8390824a886341d4f",
+  "localUrl": "http://127.0.0.1:8180/",
+  "jarSha256": "dcf6ee5a0591fddd826820c36bd44c0db7b0a30b1a81e7380af4afb8d263308c",
+  "images": {
+    "server": "sha256:fe37958c200785e57a6d9795bdc690ebd05564f9862a2c8fa0b063a9956917a3",
+    "web": "sha256:fe12999a9c79fb86325961a1dcb524d19180732a0a3fd8e3c583e5189106047c"
+  },
+  "runtime": {
+    "result": "PASS",
+    "target": "main",
+    "sourceCommit": "d65b625e0112f7f703d306a8390824a886341d4f",
+    "jarSha256": "dcf6ee5a0591fddd826820c36bd44c0db7b0a30b1a81e7380af4afb8d263308c",
+    "webFilesSha256": {
+      "index.html": "9e68838586b93e99ffcb4d5ff5fe657f5b03c030e5dfa2c304aeec3ac058a1dc",
+      "assets/index-BHF0q-tt.css": "bb1f1b3bd970e92feb7d0e119b6dbbdafe35923fe1413257c045354e82f9e16e",
+      "assets/index-BcjwjK4f.js": "cd86c760fc8c651e799b703247fcd12f00518b43b1159605a917d6af36df8afb"
+    },
+    "readiness": "UP",
+    "schemaVersion": "24",
+    "containers": {
+      "database": {
+        "id": "307a9af8b6d8c834be1e5949c415f708a3514e4694e228ec73b492208103a641",
+        "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+      },
+      "server": {
+        "id": "1cae5adebdd895a8f9c65d4755662a358c8a0aa962c0711904567ac1fa7bca3c",
+        "image": "sha256:fe37958c200785e57a6d9795bdc690ebd05564f9862a2c8fa0b063a9956917a3"
+      },
+      "web": {
+        "id": "15e7d7911c7b89881345fd17b9420e4e726d8ebbc58d802516b35b5176114fb7",
+        "image": "sha256:fe12999a9c79fb86325961a1dcb524d19180732a0a3fd8e3c583e5189106047c"
+      }
+    }
+  },
+  "restoreSourceComparison": {
+    "result": "PASS",
+    "sourceUnchangedDuringBackup": true,
+    "restoredTablesMatch": 67,
+    "mainLatestVersion": "24"
+  },
+  "switches": {
+    "fixture-upgrade": {
+      "result": "PASS",
+      "preservedTables": 67,
+      "oldMigrationHistoryUnchanged": true,
+      "preservedSequences": 2,
+      "migration": "24 unchanged",
+      "mode": "candidate",
+      "containers": {
+        "database": {
+          "id": "27883714f6a35184742eefdab4d2a49d14b0142d4451d03859bf47963d840bab",
+          "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "server": {
+          "id": "e499d7f634265cc50cdfbfe32c5fff262f0f77bcbfd36cd2a5aea3851c58d2e4",
+          "image": "sha256:fe37958c200785e57a6d9795bdc690ebd05564f9862a2c8fa0b063a9956917a3"
+        },
+        "web": {
+          "id": "a403ad0739ce95bf54bc0df5ea0585756322768fdc1410cc4edc3922313f139f",
+          "image": "sha256:fe12999a9c79fb86325961a1dcb524d19180732a0a3fd8e3c583e5189106047c"
+        }
+      }
+    },
+    "fixture-rollback": {
+      "result": "PASS",
+      "preservedTables": 67,
+      "oldMigrationHistoryUnchanged": true,
+      "preservedSequences": 2,
+      "migration": "24 unchanged",
+      "mode": "original",
+      "containers": {
+        "database": {
+          "id": "27883714f6a35184742eefdab4d2a49d14b0142d4451d03859bf47963d840bab",
+          "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "server": {
+          "id": "9dff29841f4b7a8820e21324e4aab7ead0d705a7edc9b36805b463e247933160",
+          "image": "sha256:b99aac94cd7d29dc0102bf16ce4367cd123f8981a5bd004cd7b7913d719a9901"
+        },
+        "web": {
+          "id": "5b833bbab69356197d3e67584cc8f46b97ae7256a8f3e4e0619f4343f9c98b4c",
+          "image": "sha256:22420a5759509ac3ba8e0ce121580232e603981f9e7d7d86538d28b9bb1b1899"
+        }
+      }
+    },
+    "fixture-upgrade-again": {
+      "result": "PASS",
+      "preservedTables": 67,
+      "oldMigrationHistoryUnchanged": true,
+      "preservedSequences": 2,
+      "migration": "24 unchanged",
+      "mode": "candidate",
+      "containers": {
+        "database": {
+          "id": "27883714f6a35184742eefdab4d2a49d14b0142d4451d03859bf47963d840bab",
+          "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "server": {
+          "id": "68dc09d06ff6b2a5563d0e845ebd7b6acf1690fc17ce6356cac2fbba7f0822b3",
+          "image": "sha256:fe37958c200785e57a6d9795bdc690ebd05564f9862a2c8fa0b063a9956917a3"
+        },
+        "web": {
+          "id": "fa904d5fa8fd9c38c39d83f7b8cc2e54fd1064a9953894acbe71f73f4b453453",
+          "image": "sha256:fe12999a9c79fb86325961a1dcb524d19180732a0a3fd8e3c583e5189106047c"
+        }
+      }
+    }
+  },
+  "businessChecks": {
+    "fixture-business-upgraded.json": {
+      "result": "PASS",
+      "legacyInvalidDraftsCorrected": 3,
+      "oldPartialCountersignUnchanged": true,
+      "rollbackApplications": [
+        "4f352fb0-a49a-494b-9bd4-c7e9074c9607",
+        "c2ca21cc-044f-4499-9074-7cbd9760d87e"
+      ]
+    },
+    "rollback-old-proof.json": {
+      "result": "PASS",
+      "newApplicationsApprovedOrReturned": true,
+      "frozenNotificationsPreserved": true,
+      "oldPartialCountersignUnchanged": true,
+      "identifierPrecheckFixAbsentAsExpected": true
+    },
+    "rollback-final-proof.json": {
+      "result": "PASS",
+      "precheckRestored": true,
+      "returnedApplicationResubmittedAndApproved": true,
+      "frozenNotificationsPreserved": true,
+      "oldPartialCountersignReadyForBrowser": true
+    },
+    "fixture-browser.json": {
+      "result": "PASS",
+      "applicationId": "552174fd-1ac2-4b29-994e-81fbd78c611a",
+      "finalStatus": "APPROVED",
+      "browserCompletedRemainingCountersign": true,
+      "oldCommentAndTwoRoundsPreserved": true,
+      "existingApplicantNotificationsUnchanged": true
+    },
+    "old-rounds-final-proof.json": {
+      "result": "PASS",
+      "originalReturnedRoundAllFieldsPreserved": true,
+      "secondRoundSubmissionSnapshotPreserved": true,
+      "secondRoundFinallyApprovedBy": "admin"
+    }
+  },
+  "mainPreservation": {
+    "result": "PASS",
+    "preservedTables": 67,
+    "oldMigrationHistoryUnchanged": true,
+    "preservedSequences": 2,
+    "migration": "24 unchanged",
+    "preservedReadOnlyResponses": 6,
+    "systemChecks": "4/4",
+    "schemaVersion": "24",
+    "existingDraftLoadedAndValidated": true,
+    "browserBusinessWrites": false
+  },
+  "mainCutover": "UPGRADED",
+  "mainRollbackExecuted": false,
+  "retainedOldContainers": {
+    "server": "4d286c2365ede97e68c5df25850cdfdbaac73c7c2d823ce5c4f27529a6fca29a",
+    "web": "33a827b0bdac9a1a4b02b98d15739fcbce3beaea07a9f20b398f3fa76bf18f10"
+  },
+  "openapi": [
+    {
+      "result": "PASS",
+      "operations": 65,
+      "schemas": 113,
+      "requestExamples": 21
+    },
+    {
+      "result": "PASS",
+      "base": "http://127.0.0.1:8299",
+      "operations": 65,
+      "statuses": [
+        200,
+        201,
+        400,
+        401,
+        403,
+        404,
+        409,
+        422
+      ],
+      "processKey": "api-contract-3a69ab1f",
+      "approved": "f72be3da-9dbf-4fc4-80b2-375855c8ec44",
+      "withdrawn": "204b4b8e-e395-42ba-8739-57dc64d7e5ed"
+    }
+  ],
+  "fullGateBasis": {
+    "sourceCommit": "d65b625e0112f7f703d306a8390824a886341d4f",
+    "javaTests": 769,
+    "frontendTests": 269,
+    "toolTests": 38,
+    "authorTypes": 477,
+    "rerunInDeploymentTurn": false,
+    "reference": "definition-identifier-collisions-20260926.json"
+  },
+  "cleanup": {
+    "result": "PASS",
+    "fixtureStopped": {
+      "database": "27883714f6a35184742eefdab4d2a49d14b0142d4451d03859bf47963d840bab",
+      "server": "68dc09d06ff6b2a5563d0e845ebd7b6acf1690fc17ce6356cac2fbba7f0822b3",
+      "web": "fa904d5fa8fd9c38c39d83f7b8cc2e54fd1064a9953894acbe71f73f4b453453"
+    },
+    "dataVolumeRetained": "agentflow-identifier-upgrade-20260926_demo-postgres",
+    "dependencySymlinkRemoved": true,
+    "browserTabsClosed": true,
+    "mainHealthy": true,
+    "oldMainContainersRetained": {
+      "server": "4d286c2365ede97e68c5df25850cdfdbaac73c7c2d823ce5c4f27529a6fca29a",
+      "web": "33a827b0bdac9a1a4b02b98d15739fcbce3beaea07a9f20b398f3fa76bf18f10"
+    }
+  },
+  "remote": {
+    "configured": false,
+    "pushed": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "privateEvidenceSha256": {
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/metadata.json": "2d26ff19c910775ea2dc5fb0d6fd67100d17ea6ff8bc4b09cd330e37b0544453",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/restore-source-comparison.json": "0234dd06433d64c2c796d507c9caa766acd35a68fc0fa1a5595130c4b6914e49",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-upgrade/before.json": "10102db74c4f25098d346b040f529dbc964af0041424af1d356785c6c60f0bdc",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-upgrade/after.json": "10102db74c4f25098d346b040f529dbc964af0041424af1d356785c6c60f0bdc",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-upgrade/result.json": "5d5d774e816bbf56604afac5fc96486775c2371d936f881cee44caf1107f2067",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-rollback/before.json": "d171813f6805b9a15c7d18b59c2e0093d2c7c774c2f52215980a591418af7589",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-rollback/after.json": "d171813f6805b9a15c7d18b59c2e0093d2c7c774c2f52215980a591418af7589",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-rollback/result.json": "40d59aada29992a2aa1235749cae79fc3ac35b1acb8c53d61a5c42419a2f7df4",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-upgrade-again/before.json": "2ef69ab50e1e306e6621c39366e426afd0c3eca8bb234c0342c9739ffe6577ae",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-upgrade-again/after.json": "2ef69ab50e1e306e6621c39366e426afd0c3eca8bb234c0342c9739ffe6577ae",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-upgrade-again/result.json": "6799aeda15094c3a21b1df2102bd7386c6bc70a616a7713eb9a8f53128d82045",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/rollback-old-proof.json": "94c1a6f6c093528aee63aebafa2224359e4a42ee36af19dd7da969f880f7e856",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/rollback-final-proof.json": "5e14a656e88131dadb171448d5ab65b7b38d06cdf7a7fe9957846f04a611bec7",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-browser.json": "9d93516e1694779fe3ce5d6dd39b6b815c1041510060f29fa6ce8ead0638d3e0",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/fixture-runtime-verification.json": "e1838f565e12238d6d4c59806e0b593ca1de08f259419eb7ce82cb2c93cba754",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/cutover-before-inventory.json": "aad8b146316b6fde1210e592f7423ff46f7dfd1dcd8507feaaceecff7fa93b2a",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/main-after-inventory.json": "aad8b146316b6fde1210e592f7423ff46f7dfd1dcd8507feaaceecff7fa93b2a",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/main-after-browser-inventory.json": "aad8b146316b6fde1210e592f7423ff46f7dfd1dcd8507feaaceecff7fa93b2a",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/main-runtime-verification.json": "6d9e6460a77b1cbeff38939847c55dfffd7256f5c587801e2ff751e82ea3adad",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/main-browser.json": "06903e46d9e419b31e7ac43c7b832cb3853918817e08ee39d6613a49a0cf36a1",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/deployment.json": "351ae9e08565254a14aa9987c66ea1ce63e6c6cd6eea57ba3320b2d06790c6bb",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/cleanup.json": "77d6c170e80809b08070598813071572f9cdf45d155aa8c23bb2cf4de334fd3c",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/openapi-runtime.log": "8e66c199769c64320e722cc95becbcb49d79ea952e73ca01f688cdbd25c942d8",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/migration_check.py": "18d45f6413536f9ead6e235cd5d078d62967d17eb64c8e92880dbade77d5907e",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/upgrade_main.py": "1f56e1f7f21f4bf52f41e8a6a7d54c5fa00eba04b89a69a6e3142f11cb48578c",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/acceptance.py": "6727b9cfd4f09aef9c594f6dedd0b516eafd8cb0044daa6ce966b1db950d5bbd",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/switch_fixture.py": "90c960303f126de028a826d3cc70e0179bf3179237715489429aa7c1e73f989d",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/capture_readonly.py": "0aa5ecddbfb1856767eca9ab5e76a49abdf4b06d6f40d759749c86da73e88e88",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/verify_artifacts.py": "64a422fe9d2d016beba695198e11d9475c8e2b7ead05639c68cf597fa00e9350",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/build/Dockerfile.server": "7b2389d0e4ed04dde2c3fe728c327cdf75f137da98cc078bbe103a5f3b3572f8",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/build/Dockerfile.web": "4740513ba89799b907ba3eea29ceb56b847d5536013236f5e3f588dca8212252",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/main-backup/manifest.json": "66000a3cdbcad2c2f790a8f7e427f5c97abb081792bceacec69d10dc301559bc",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/cutover-backup/manifest.json": "374c411709e54f14eb636f971ec09054e3bbdb309ca5b7f706bc9cd4f54da82b",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/verify_old_rounds.py": "88fc79fcd8eff7dac64871d8f6a413015d2a557abf9f80b43bba45086d47cfa9",
+    "/fyoung/tmp/agentflow-identifier-upgrade-20260926/old-rounds-final-proof.json": "34ac03977b6ea6cfb91a2c0823069c0869f06de13b94b3b707effb65a7c1dfd5"
+  }
+}
