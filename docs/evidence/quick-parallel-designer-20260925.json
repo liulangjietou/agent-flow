@@ -1,0 +1,197 @@
+{
+  "date": "2026-09-25",
+  "branch": "codex/quick-parallel-designer",
+  "baseCommit": "751f239811f071382103f2825e068e6d0650ad45",
+  "verification": "PASS",
+  "java": {
+    "agentflow-domain": {
+      "tests": 192,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "agentflow-server": {
+      "tests": 555,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "frontend": {
+    "tests": 264,
+    "failures": 0,
+    "typecheck": "PASS",
+    "build": "PASS",
+    "assets": [
+      "index-DTXiWWLq.css",
+      "index-BI-YvJK9.js"
+    ]
+  },
+  "tools": {
+    "tests": 38,
+    "status": "PASS"
+  },
+  "authors": {
+    "javaFiles": 297,
+    "namedTypes": 470,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "openapi": {
+    "operations": 65,
+    "schemas": 112,
+    "requestExamples": 21,
+    "runtime": "PASS",
+    "statuses": [
+      200,
+      201,
+      400,
+      401,
+      403,
+      404,
+      409,
+      422
+    ]
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/BranchCoverageAnalyzer.java": "65cfeae04f91e03b7b5433116661afacbc315059ea71a123c939a4ac09e11492",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionSimulator.java": "6fc61d02eb0c5dabe668c4db22102e1101c19324c2764ba16f9fa99fcf569d6e",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "70b9aa48a217edfb4eac715117decf811ec5d7386634e044b5421702e0ecae23",
+    "agentflow-domain/src/test/java/io/agentflow/definition/ParallelGatewayTest.java": "fd98e764bb532e306a1980b78647f11ed5bce9377b259d1d9147ef038918fd2e",
+    "agentflow-server/src/test/java/io/agentflow/approval/ParallelApprovalIntegrationTest.java": "490ab8a08e18ac67264ade35eca174a3be88910e6eddaad56b05a77870d2c61d",
+    "agentflow-web/src/App.vue": "e92010cfafa58718484d2105e9b3458d1a8c3dcb09a75b23ce9b25bbe55739bb",
+    "agentflow-web/src/components/QuickDesigner.vue": "c74878d9383e109412039c25111dfcaaf51a3bbd532d3dac2504e19d24255298",
+    "agentflow-web/src/components/QuickSequence.vue": "5bd62b910f6a6ec0c67dff7cb0d3eb67367680da0a921edf3c75b81f14909092",
+    "agentflow-web/src/components/RoundDiagram.vue": "9cc3d91d505cfc7c0b7b914b0d0b41493c9255d8913fb30f632a71f8957498aa",
+    "agentflow-web/src/definitionComparison.ts": "b6343c242170618054ef029f8f92df37bfedd20098fa6de3a481e08ed39619ca",
+    "agentflow-web/src/definitionSimulation.ts": "b2b681256f33355e3abf0f45fed0687980733dff5d995fb00a76de6c87e59e8f",
+    "agentflow-web/src/quickDesigner.ts": "565738a9c99c45a67fcb05d42c8f524f8d6efe2f0e13c4404cf40e8bc868e91f",
+    "agentflow-web/tests/quick-designer.test.mjs": "6c1facece859b3959eb759b9b128af87d5e54bb23418ac4c03c3d70280a1580f",
+    "agentflow-web/scripts/check-quick-parallel-designer.mjs": "79801c044f5bb9fc261c270541f0e90bc748ebc1a2a61975216cb48b8184ee79"
+  },
+  "jarSha256": "22d86e51e0399637bb1733be220d1b418aeb0cf2936451b3eb2fc0108780c0ba",
+  "generatedGraphRuntime": {
+    "result": "PASS",
+    "base": "http://127.0.0.1:18181",
+    "operations": 92,
+    "processKey": "quick-parallel-c9f9c1f0",
+    "definitionId": "79915559-f2fc-4080-9bb8-cfe85549bae7",
+    "nodes": 14,
+    "edges": 17,
+    "cases": [
+      {
+        "amount": "5",
+        "applicationId": "89225ba8-acf2-4037-880a-e31972124dc6",
+        "status": "APPROVED",
+        "completed": [
+          "审批 1",
+          "审批 5",
+          "审批 6",
+          "审批 2",
+          "审批 3"
+        ]
+      },
+      {
+        "amount": "20",
+        "applicationId": "3ffb6a3f-7aee-4921-b69c-15709ff75053",
+        "status": "APPROVED",
+        "completed": [
+          "审批 1",
+          "审批 5",
+          "审批 6",
+          "审批 2",
+          "审批 3",
+          "审批 4"
+        ]
+      }
+    ]
+  },
+  "browserRuntime": {
+    "result": "PASS",
+    "definitionId": "523e4997-b9c5-4171-bc03-600fcaf48dc6",
+    "definitionVersion": 1,
+    "graphAndSchemaPreserved": true,
+    "cases": [
+      {
+        "amount": "5",
+        "applicationId": "847d464b-2f4e-48ab-a88c-5f3e6177a70a",
+        "completed": [
+          "协作并行审批",
+          "财务并行审批",
+          "主管并行审批"
+        ],
+        "status": "APPROVED"
+      },
+      {
+        "amount": "20",
+        "applicationId": "50b86a7f-a8b6-47c9-9716-3cc14913b211",
+        "completed": [
+          "协作并行审批",
+          "财务并行审批",
+          "主管并行审批",
+          "大额复核"
+        ],
+        "status": "APPROVED"
+      }
+    ],
+    "operations": 28
+  },
+  "browser": {
+    "site": "http://127.0.0.1:5201",
+    "checks": [
+      "empty draft insert parallel",
+      "third branch add/remove/undo",
+      "assignee and condition editing",
+      "explicit exclusive merge",
+      "advanced and quick mode roundtrip",
+      "graph/schema/revision unchanged after switch and simulation",
+      "simulation includes three branches and conditional review",
+      "publish v1",
+      "published controls read only",
+      "final build reload and published graph display"
+    ],
+    "consoleWarnings": 0,
+    "consoleErrors": 0
+  },
+  "parallelRegression": {
+    "result": "PASS",
+    "approvedApplication": "8ecd83bb-2fe8-414a-bd6c-9c2b197688f9",
+    "negativeApplications": {
+      "REJECT": "b5a6d50a-c988-4da0-8979-186a9cfb568c",
+      "RETURN": "a3a45f66-8925-4947-811b-ed94cfc6da56"
+    },
+    "nestedApplication": "b6a2282f-5692-47aa-a1d6-4b1085a2128d",
+    "definitionId": "080bf6e8-b289-4c1f-a0bd-b625c37f81fb",
+    "browserDraft": "edc96bce-96ef-41a0-9d48-1fc429131fec",
+    "browserKey": "parallel-a4022dba58",
+    "browserName": "并行设计器验收 afeae4",
+    "simulationPath": [
+      "start",
+      "fork",
+      "manager",
+      "finance",
+      "join",
+      "final",
+      "end"
+    ]
+  },
+  "cleanup": {
+    "result": "PASS",
+    "serverStopped": true,
+    "webStopped": true,
+    "databaseStopped": true,
+    "databaseDataRetained": true,
+    "worktreeRetained": true,
+    "browserTabClosed": true,
+    "mainRuntimeChanged": false
+  },
+  "delivery": {
+    "mainDemoUpdated": false,
+    "databaseMigrationAdded": false,
+    "databaseVersion": "V23",
+    "gitRemoteConfigured": false,
+    "prCreated": false,
+    "remoteCiRun": false
+  },
+  "localEvidenceRoot": "/fyoung/tmp/agentflow-quick-parallel-fixture"
+}

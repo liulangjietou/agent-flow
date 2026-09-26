@@ -55,13 +55,17 @@ public final class DefinitionValidator {
         Set<String> incoming = new HashSet<>(), outgoing = new HashSet<>();
         Set<String> edgeIds = new HashSet<>();
         Map<String, List<Edge>> outgoingEdges = new HashMap<>();
+        Map<String, Integer> incomingCounts = new HashMap<>();
+        graph.edges().forEach(edge -> {
+            outgoingEdges.computeIfAbsent(edge.source(), ignored -> new ArrayList<>()).add(edge);
+            incomingCounts.merge(edge.target(), 1, Integer::sum);
+        });
         Map<String, Integer> defaultBranches = new HashMap<>();
         ConditionParser parser = new ConditionParser();
         for (Edge e : graph.edges()) {
             if (!edgeIds.add(e.id())) errors.add("DUPLICATE_EDGE:" + e.id());
             if (!nodes.containsKey(e.source()) || !nodes.containsKey(e.target())) errors.add("EDGE_NODE_NOT_FOUND:" + e.id());
             outgoing.add(e.source()); incoming.add(e.target());
-            outgoingEdges.computeIfAbsent(e.source(), ignored -> new ArrayList<>()).add(e);
             try {
                 ConditionAst condition = parser.parse(e.condition(), graph.conditionLanguageVersion());
                 if (formSchema != null) formSchema.validateCondition(condition);
@@ -73,8 +77,13 @@ public final class DefinitionValidator {
                 errors.add("PARALLEL_CONDITION_FORBIDDEN:" + e.id());
             }
             if (sourceNode != null && sourceNode.type() == NodeType.EXCLUSIVE_GATEWAY
+                    && outgoingEdges.get(sourceNode.id()).size() > 1
                     && !e.defaultBranch() && e.condition().isBlank()) {
                 errors.add("GATEWAY_BRANCH_CONDITION_REQUIRED:" + e.id());
+            }
+            if (sourceNode != null && sourceNode.type() == NodeType.EXCLUSIVE_GATEWAY
+                    && outgoingEdges.get(sourceNode.id()).size() == 1 && (!e.condition().isBlank() || e.defaultBranch())) {
+                errors.add("GATEWAY_MERGE_EDGE_UNCONDITIONAL:" + e.id());
             }
             if (e.defaultBranch()) {
                 defaultBranches.merge(e.source(), 1, Integer::sum);
@@ -97,7 +106,9 @@ public final class DefinitionValidator {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
-            if (n.type() == NodeType.EXCLUSIVE_GATEWAY && outgoingEdges.getOrDefault(n.id(), List.of()).size() < 2) {
+            // 多入单出是互斥路径的汇合，不再次判断条件，也不等待未选中的路径。
+            if (n.type() == NodeType.EXCLUSIVE_GATEWAY && outgoingCount < 2
+                    && !(outgoingCount == 1 && incomingCounts.getOrDefault(n.id(), 0) > 1)) {
                 errors.add("GATEWAY_BRANCH_REQUIRED:" + n.id());
             }
         }

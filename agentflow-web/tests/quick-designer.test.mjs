@@ -6,8 +6,120 @@ const node = (id, type='USER_TASK') => ({ id, name:id, type, properties:{ assign
 const edge = (id, source, target, condition='', defaultBranch=false) => ({id, source,target,condition,defaultBranch})
 const line = () => ({nodes:[node('start','START'),node('a'),node('b'),node('end','END')],edges:[edge('one','start','a'),edge('two','a','b'),edge('three','b','end')]})
 const branch = () => ({nodes:[node('start','START'),node('gate','EXCLUSIVE_GATEWAY'),node('a'),node('join'),node('end','END')],edges:[edge('one','start','gate'),edge('default','gate','join','',true),edge('condition','gate','a','amount > 5000'),edge('a-join','a','join'),edge('join-end','join','end')]})
+const parallel = () => ({nodes:[node('start','START'),node('fork','PARALLEL_GATEWAY'),node('a'),node('b'),node('join','PARALLEL_GATEWAY'),node('end','END')],edges:[edge('sf','start','fork'),edge('fa','fork','a'),edge('fb','fork','b'),edge('aj','a','join'),edge('bj','b','join'),edge('je','join','end')]})
 let counter=0
 const edit = (graph, command) => editQuickGraph(graph,command,()=>String(++counter))
+
+test('并行投影完整保留原图，拆分与汇合各出现一次', () => {
+  const graph=parallel(), before=structuredClone(graph), view=projectQuickGraph(graph)
+  assert.equal(view.reason,'')
+  assert.deepEqual(graph,before)
+  assert.deepEqual(view.sequence.steps.map(step=>step.nodeId),['start','fork','join','end'])
+  assert.equal(quickStep(view.sequence,'fork').joinId,'join')
+  assert.deepEqual(quickStep(view.sequence,'fork').branches.map(branch=>branch.sequence.tailEdge),['aj','bj'])
+  assert.equal(new Set(quickNodeIds(view.sequence)).size,graph.nodes.length)
+})
+
+test('插入和整体删除并行块可还原原图，节点属性及条件语言版本保持', () => {
+  const graph={...line(),conditionLanguageVersion:2},before=structuredClone(graph)
+  const inserted=edit(graph,{kind:'insert',edgeId:'two',type:'PARALLEL_GATEWAY'})
+  const fork=inserted.nodes.find(node=>node.type==='PARALLEL_GATEWAY'&&inserted.edges.filter(edge=>edge.source===node.id).length===2)
+  const step=quickStep(projectQuickGraph(inserted).sequence,fork.id)
+  assert.equal(step.branches.length,2)
+  assert.equal(inserted.nodes.find(node=>node.id===step.joinId).type,'PARALLEL_GATEWAY')
+  assert.ok(inserted.edges.every(edge=>!edge.condition&&!edge.defaultBranch))
+  assert.deepEqual(edit(inserted,{kind:'removeGateway',nodeId:fork.id}),graph)
+  assert.deepEqual(graph,before)
+})
+
+test('并行增删和左右排序保留其余分支，至少保留两条路径', () => {
+  const graph=parallel(), expanded=edit(graph,{kind:'addBranch',nodeId:'fork'})
+  const added=expanded.edges.find(edge=>edge.source==='fork'&&!graph.edges.some(old=>old.id===edge.id))
+  const moved=edit(expanded,{kind:'moveBranch',nodeId:'fork',edgeId:added.id,direction:-1})
+  assert.deepEqual(quickStep(projectQuickGraph(moved).sequence,'fork').branches.map(branch=>branch.edgeId),['fa',added.id,'fb'])
+  const removed=edit(moved,{kind:'removeBranch',nodeId:'fork',edgeId:added.id})
+  assert.deepEqual(removed.nodes,graph.nodes)
+  assert.deepEqual(removed.edges.filter(edge=>edge.source==='fork'),graph.edges.filter(edge=>edge.source==='fork'))
+  assert.deepEqual([...removed.edges].sort((a,b)=>a.id.localeCompare(b.id)),[...graph.edges].sort((a,b)=>a.id.localeCompare(b.id)))
+  assert.throws(()=>edit(graph,{kind:'removeBranch',nodeId:'fork',edgeId:'fa'}),/至少保留/)
+  assert.throws(()=>edit(graph,{kind:'addBranch',nodeId:'join'}),/汇合节点/)
+})
+
+test('嵌套并行删除只删除所属区域，不删除共同后继', () => {
+  const graph=parallel(), nested=edit(graph,{kind:'insert',edgeId:'fa',type:'PARALLEL_GATEWAY'})
+  const view=projectQuickGraph(nested)
+  assert.equal(view.reason,'')
+  assert.equal(new Set(quickNodeIds(view.sequence)).size,nested.nodes.length)
+  const inner=nested.nodes.find(node=>node.type==='PARALLEL_GATEWAY'&&!graph.nodes.some(old=>old.id===node.id))
+  assert.deepEqual(edit(nested,{kind:'removeGateway',nodeId:inner.id}),graph)
+  const removed=edit(nested,{kind:'removeGateway',nodeId:'fork'})
+  assert.deepEqual(removed.nodes.map(node=>node.id),['start','end'])
+  assert.deepEqual(removed.edges.map(edge=>[edge.source,edge.target]),[['start','end']])
+})
+
+test('并行入口或分支末尾插入条件时建立互斥汇合，避免缺少并行令牌', () => {
+  for(const edgeId of ['sf','aj']) {
+    const graph=parallel(), inserted=edit(graph,{kind:'insert',edgeId,type:'EXCLUSIVE_GATEWAY'})
+    const fork=inserted.nodes.find(node=>node.type==='EXCLUSIVE_GATEWAY'&&inserted.edges.filter(edge=>edge.source===node.id).length===2)
+    const merge=inserted.nodes.find(node=>node.type==='EXCLUSIVE_GATEWAY'&&node.id!==fork.id)
+    assert.ok(merge)
+    assert.equal(quickStep(projectQuickGraph(inserted).sequence,fork.id).joinId,merge.id)
+    assert.deepEqual(inserted.edges.filter(edge=>edge.source===merge.id).map(edge=>[edge.target,edge.condition,edge.defaultBranch]),[[edgeId==='sf'?'fork':'join','',false]])
+    assert.deepEqual(edit(inserted,{kind:'removeGateway',nodeId:fork.id}),graph)
+  }
+})
+
+test('共同插入不能绕过并行汇合，分支内插入和汇合后插入仍可用', () => {
+  const graph=parallel(),before=structuredClone(graph)
+  assert.throws(()=>edit(graph,{kind:'insert',beforeNodeId:'join',type:'USER_TASK'}),/不能绕过汇合/)
+  assert.equal(projectQuickGraph(edit(graph,{kind:'insert',edgeId:'aj',type:'USER_TASK'})).reason,'')
+  assert.equal(projectQuickGraph(edit(graph,{kind:'insert',edgeId:'je',type:'USER_TASK'})).reason,'')
+  assert.deepEqual(graph,before)
+})
+
+test('一个网关先汇合再拆分时，删除任一块均保留另一块的职责', () => {
+  const base=parallel(),graph=structuredClone(base)
+  graph.nodes.push(node('c'),node('d'),node('lastJoin','PARALLEL_GATEWAY'))
+  graph.edges=graph.edges.filter(edge=>edge.id!=='je')
+  graph.edges.push(edge('jc','join','c'),edge('jd','join','d'),edge('cl','c','lastJoin'),edge('dl','d','lastJoin'),edge('le','lastJoin','end'))
+  assert.equal(projectQuickGraph(graph).reason,'')
+  const removeFirst=edit(graph,{kind:'removeGateway',nodeId:'fork'})
+  assert.deepEqual(removeFirst.nodes.map(node=>node.id),['start','join','end','c','d','lastJoin'])
+  assert.equal(quickStep(projectQuickGraph(removeFirst).sequence,'join').branches.length,2)
+  const removeSecond=edit(graph,{kind:'removeGateway',nodeId:'join'})
+  assert.deepEqual(removeSecond.nodes,base.nodes)
+  assert.deepEqual(removeSecond.edges.map(edge=>[edge.source,edge.target]),base.edges.map(edge=>[edge.source,edge.target]))
+})
+
+test('错接并行、互斥入口和带条件的并行连线均保留原图并退出快速编辑', () => {
+  const ordinary=parallel();ordinary.nodes.find(node=>node.id==='join').type='USER_TASK'
+  const missing=parallel();missing.edges.find(edge=>edge.id==='bj').target='end'
+  const conditional=parallel();conditional.edges.find(edge=>edge.id==='fa').condition='amount > 1'
+  const exclusive=parallel();exclusive.nodes.find(node=>node.id==='fork').type='EXCLUSIVE_GATEWAY'
+  exclusive.edges.find(edge=>edge.id==='fa').condition='amount > 1';exclusive.edges.find(edge=>edge.id==='fb').defaultBranch=true
+  for(const graph of [ordinary,missing,conditional,exclusive]) {
+    const before=structuredClone(graph)
+    assert.equal(projectQuickGraph(graph).sequence,null)
+    assert.throws(()=>edit(graph,{kind:'removeTask',nodeId:'a'}))
+    assert.deepEqual(graph,before)
+  }
+})
+
+test('删除或前插并行时保留审批步骤原本承担的互斥汇合', () => {
+  const graph=parallel()
+  graph.nodes.push(node('choice','EXCLUSIVE_GATEWAY'),node('optional'))
+  graph.edges=graph.edges.filter(edge=>edge.id!=='fa')
+  graph.edges.push(edge('fc','fork','choice'),edge('co','choice','optional','amount > 10'),edge('ca','choice','a','',true),edge('oa','optional','a'))
+  assert.equal(projectQuickGraph(graph).reason,'')
+  const removed=edit(graph,{kind:'removeTask',nodeId:'a'})
+  assert.equal(projectQuickGraph(removed).reason,'')
+  const merge=removed.nodes.find(node=>node.type==='EXCLUSIVE_GATEWAY'&&node.id!=='choice')
+  assert.ok(merge)
+  assert.ok(removed.edges.some(edge=>edge.source===merge.id&&edge.target==='join'))
+  const inserted=edit(graph,{kind:'insert',beforeNodeId:'a',type:'PARALLEL_GATEWAY'})
+  assert.equal(projectQuickGraph(inserted).reason,'')
+  assert.equal(inserted.edges.filter(edge=>edge.target==='a').length,1)
+})
 
 test('快速投影保留原图，默认分支最后展示且汇合节点只出现一次', () => {
   const graph=branch(), before=structuredClone(graph), view=projectQuickGraph(graph)

@@ -64,7 +64,7 @@ const labels: Record<string, string> = {
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   x: '水平位置', y: '垂直位置', 'properties.x': '水平位置', 'properties.y': '垂直位置', value: '保存值'
 }
-const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', EXCLUSIVE_GATEWAY: '条件分支',
+const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', EXCLUSIVE_GATEWAY: '条件网关',
   SERVICE_TASK: '服务任务', PARALLEL_GATEWAY: '并行网关', TEXT: '单行文本', TEXTAREA: '多行文本', NUMBER: '数字', DATE: '日期', SELECT: '单选', BOOLEAN: '是 / 否', TABLE: '重复明细' }
 const own = <T>(values: Record<string, T>, key: string): T | undefined => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined
 

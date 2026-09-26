@@ -6,6 +6,7 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +52,31 @@ class ParallelApprovalIntegrationTest {
     @Autowired TaskService tasks;
     @Autowired JdbcTemplate jdbc;
     @MockitoSpyBean ProcessRuntimePort runtime;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"5", "20"})
+    void exclusiveMergeDoesNotWaitForAnUnselectedPathInsideAParallelBranch(String amount) throws Exception {
+        Graph base = graph(false);
+        var nodes = new ArrayList<>(base.nodes());
+        nodes.add(new Node("choice", "条件判断", NodeType.EXCLUSIVE_GATEWAY, Map.of()));
+        nodes.add(new Node("merge", "条件汇合", NodeType.EXCLUSIVE_GATEWAY, Map.of()));
+        var edges = new ArrayList<>(base.edges());
+        edges.removeIf(edge -> edge.id().equals("ff") || edge.id().equals("fj"));
+        edges.addAll(List.of(new Edge("fc", "fork", "choice", ""), new Edge("cf", "choice", "finance", "amount > 10"),
+                new Edge("cm", "choice", "merge", "", true), new Edge("finance-merge", "finance", "merge", ""),
+                new Edge("merge-join", "merge", "join", "")));
+        String id = submitted(new Graph(nodes, edges), Map.of("amount", amount));
+        assertThat(pending(id)).hasSize(amount.equals("20") ? 2 : 1);
+        act(task(id, "manager"), "APPROVE", 2).andExpect(status().isOk());
+        long version = 3;
+        if (amount.equals("20")) {
+            assertThat(pending(id)).extracting(Task::getTaskDefinitionKey).containsExactly("finance");
+            act(task(id, "finance"), "APPROVE", version++).andExpect(status().isOk());
+        }
+        assertThat(pending(id)).extracting(Task::getTaskDefinitionKey).containsExactly("final");
+        assertThat(messages(id, "admin", "TASK_PENDING")).isEqualTo(1);
+        act(task(id, "final"), "APPROVE", version).andExpect(status().isOk()).andExpect(jsonPath("applicationStatus").value("APPROVED"));
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -131,12 +157,16 @@ class ParallelApprovalIntegrationTest {
     }
 
     private String submitted(boolean countersign) throws Exception {
+        return submitted(graph(countersign), Map.of());
+    }
+
+    private String submitted(Graph graph, Map<String, Object> payload) throws Exception {
         String key = "parallel-" + UUID.randomUUID();
-        var draft = definitions.create("demo", key, "并行审批", graph(countersign));
+        var draft = definitions.create("demo", key, "并行审批", graph);
         definitions.publish(new Actor("demo", "admin", Set.of("ADMIN")), draft.id(), 0, "并行分支全部完成后继续");
         JsonNode application = json.read(mvc.perform(post("/api/v1/applications").header("Authorization", token("alice"))
                 .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("businessNo", "PG-" + UUID.randomUUID(),
-                        "processKey", key, "definitionVersion", 1, "title", "并行审批验证", "payload", Map.of()))))
+                        "processKey", key, "definitionVersion", 1, "title", "并行审批验证", "payload", payload))))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), JsonNode.class);
         String id = application.path("id").asText();
         submit(id, 1).andExpect(status().isOk());

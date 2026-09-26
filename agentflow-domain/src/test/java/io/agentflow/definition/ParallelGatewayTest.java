@@ -14,6 +14,37 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ParallelGatewayTest {
     @Test
+    void exclusiveMergeCannotFilterOrDeclareADefaultOutgoingEdge() {
+        var nodes = List.of(node("start", NodeType.START), node("choice", NodeType.EXCLUSIVE_GATEWAY),
+                node("a", NodeType.USER_TASK), node("merge", NodeType.EXCLUSIVE_GATEWAY), node("end", NodeType.END));
+        for (Edge exit : List.of(new Edge("me", "merge", "end", "amount > 0"), new Edge("me", "merge", "end", "", true))) {
+            var graph = new Graph(nodes, List.of(edge("sc", "start", "choice"), new Edge("ca", "choice", "a", "amount > 10"),
+                    new Edge("cm", "choice", "merge", "", true), edge("am", "a", "merge"), exit));
+            assertThat(new DefinitionValidator().validate(graph)).contains("GATEWAY_MERGE_EDGE_UNCONDITIONAL:me");
+        }
+    }
+
+    @Test
+    void exclusiveMergePassesOneSelectedBranchIntoTheParallelJoin() {
+        var nodes = new ArrayList<>(parallelGraph().nodes());
+        nodes.add(node("choice", NodeType.EXCLUSIVE_GATEWAY));
+        nodes.add(node("merge", NodeType.EXCLUSIVE_GATEWAY));
+        var edges = new ArrayList<>(parallelGraph().edges());
+        edges.removeIf(edge -> edge.id().equals("fa") || edge.id().equals("aj"));
+        edges.addAll(List.of(edge("fc", "fork", "choice"), new Edge("ca", "choice", "a", "amount > 10"),
+                new Edge("cm", "choice", "merge", "", true), edge("am", "a", "merge"), edge("mj", "merge", "join")));
+        Graph graph = new Graph(nodes, edges);
+        assertThat(new DefinitionValidator().validate(graph)).isEmpty();
+        for (String amount : List.of("5", "20")) {
+            var result = new DefinitionSimulator().simulateDetailed(graph, null, new EvaluationContext(Map.of("amount", amount)));
+            assertThat(result.path()).contains("b", "merge", "join", "end").doesNotHaveDuplicates();
+            assertThat(result.path().contains("a")).isEqualTo(amount.equals("20"));
+            assertThat(result.decisions()).extracting(DefinitionSimulator.Decision::nodeId).containsExactly("choice");
+        }
+        assertThat(new BranchCoverageAnalyzer().analyze(graph, null)).isEmpty();
+    }
+
+    @Test
     void allBranchesAreVisitedAndJoinContinuesOnlyOnce() {
         Graph graph = parallelGraph();
         assertThat(new DefinitionValidator().validate(graph)).isEmpty();

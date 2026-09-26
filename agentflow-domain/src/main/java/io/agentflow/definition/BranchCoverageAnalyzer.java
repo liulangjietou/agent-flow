@@ -21,7 +21,7 @@ public final class BranchCoverageAnalyzer {
         Map<String, List<Edge>> outgoing = new LinkedHashMap<>();
         graph.edges().forEach(edge -> outgoing.computeIfAbsent(edge.source(), key -> new ArrayList<>()).add(edge));
         for (Node node : graph.nodes()) {
-            if (node.type() == NodeType.EXCLUSIVE_GATEWAY) {
+            if (node.type() == NodeType.EXCLUSIVE_GATEWAY && outgoing.getOrDefault(node.id(), List.of()).size() > 1) {
                 result.addAll(analyzeGateway(node.id(), outgoing.getOrDefault(node.id(), List.of()), graph.conditionLanguageVersion(), schema));
             }
         }

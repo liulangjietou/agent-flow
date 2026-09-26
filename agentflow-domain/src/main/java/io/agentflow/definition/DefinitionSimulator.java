@@ -48,7 +48,7 @@ public final class DefinitionSimulator {
             List<Edge> selected = outgoing;
             if (current.type() != NodeType.PARALLEL_GATEWAY) {
                 Decision decision = select(source, outgoing, context, graph.conditionLanguageVersion());
-                if (current.type() == NodeType.EXCLUSIVE_GATEWAY) decisions.add(decision);
+                if (current.type() == NodeType.EXCLUSIVE_GATEWAY && outgoing.size() > 1) decisions.add(decision);
                 selected = outgoing.stream().filter(edge -> edge.id().equals(decision.selectedEdgeId())).toList();
             }
             for (Edge edge : selected) {
