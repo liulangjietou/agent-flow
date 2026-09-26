@@ -1,0 +1,49 @@
+{
+  "recordedAt": "2026-09-26T12:26:06.540971+00:00",
+  "baseline": "a61b6b31d894e23d11f845d1498e4ad04b639a6a",
+  "scope": "申请授权后的组织初始候选历史投影与UI",
+  "javaRegressionTests": 18,
+  "postgresTests": 5,
+  "webTests": 293,
+  "staticContract": {
+    "operations": 82,
+    "schemas": 132
+  },
+  "runtime": "读取上一版本创建并已批准的H2申请；响应符合契约，读前后申请一致，匿名401",
+  "fullGoalComplete": false,
+  "productionDeployed": false,
+  "files": [
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/red.log",
+      "sha256": "3724872acd15246df7edaa014812685333253a2f9a15e7b8d2a34e209ad498f6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/regression-package.log",
+      "sha256": "5afffd6894f7df4b414d2039da86f6724e4890feef2e91e5e6d4a9d7ae5dcbf3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/postgres.log",
+      "sha256": "bff0c7f40fa0387a455ee0339b3379b705374d217ff1ba5713232b0d1a142341"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/web-tests.log",
+      "sha256": "a066f84423b5f790a98b2728a31fce93e1dde63330cee009eb66575b9c01711a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/web-build.log",
+      "sha256": "a22f445f7d5aa885d2ad920af251fbd99d3467ff64808a1b5babccad883541b7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/authors.log",
+      "sha256": "66b3dc5a6a5d2610e436133e0435e0e18e55558193eac0dc7222dd1a43717563"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/runtime.json",
+      "sha256": "be01c69fe2c6666709f710ad5f00dd9cb3b5e07c02f462c48ac00f5fd8f99148"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-responsibility-20260926/browser-candidates.png",
+      "sha256": "99cb3913122a7412b63f56c685ff17a75e22efe181334c2f985039a32b7c3a23"
+    }
+  ]
+}

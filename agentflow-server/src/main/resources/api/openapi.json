@@ -13402,6 +13402,13 @@
           "lastLeftAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "candidateSnapshots": {
+            "type": "array",
+            "description": "节点创建时保存的本地组织候选快照。空数组表示未记录，不代表没有审批人；不返回内部规则，不能作为当前办理授权。",
+            "items": {
+              "$ref": "#/components/schemas/RoundCandidateSnapshot"
+            }
           }
         },
         "required": [
@@ -13409,7 +13416,8 @@
           "name",
           "type",
           "state",
-          "activeTasks"
+          "activeTasks",
+          "candidateSnapshots"
         ],
         "additionalProperties": false
       },
@@ -14948,6 +14956,31 @@
         },
         "required": [
           "items"
+        ],
+        "additionalProperties": false
+      },
+      "RoundCandidateSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "directoryRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "candidateUserIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "directoryRevision",
+          "candidateUserIds"
         ],
         "additionalProperties": false
       }

@@ -80,6 +80,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("WebhookRetryRequest", io.agentflow.integration.JdbcWebhookStore.RetryRequest.class),
                 java.util.Map.entry("WebhookDetail", io.agentflow.integration.WebhookController.Detail.class),
                 java.util.Map.entry("RoundDiagram", io.agentflow.approval.history.RoundDiagramPort.Diagram.class),
+                java.util.Map.entry("RoundCandidateSnapshot", io.agentflow.approval.history.RoundDiagramPort.CandidateSnapshot.class),
                 java.util.Map.entry("RoundDiagramNode", io.agentflow.approval.history.RoundDiagramPort.Node.class),
                 java.util.Map.entry("RoundDiagramEdge", io.agentflow.approval.history.RoundDiagramPort.Edge.class),
                 java.util.Map.entry("AuditSearchItem", io.agentflow.approval.operations.AuditSearchPort.Item.class),

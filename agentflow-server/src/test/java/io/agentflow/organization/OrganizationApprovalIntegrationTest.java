@@ -124,12 +124,57 @@ class OrganizationApprovalIntegrationTest {
         var app = submit(key);
         var pending = tasks.createTaskQuery().processVariableValueEquals("applicationId", app.path("id").asText()).list();
         assertThat(pending).hasSize(2).extracting(org.flowable.task.api.Task::getAssignee).containsExactlyInAnyOrder(first.subject(), second.subject());
+        String diagramPath = "/applications/" + app.path("id").asText() + "/rounds/1/diagram";
+        var originalCandidates = candidateSnapshots(read(diagramPath, applicantToken, 200));
+        assertThat(originalCandidates).hasSize(1);
+        assertThat(originalCandidates.get(0).path("candidateUserIds")).hasSize(2);
         organization.updateAppointment(admin, firstJob.id(), false, 1);
         var own = pending.stream().filter(value -> first.subject().equals(value.getAssignee())).findFirst().orElseThrow();
         write(post("/api/v1/tasks/" + own.getId() + "/actions"), firstToken, Map.of("action", "APPROVE", "expectedVersion", 2), 200);
         var last = tasks.createTaskQuery().processVariableValueEquals("applicationId", app.path("id").asText()).singleResult();
         write(post("/api/v1/tasks/" + last.getId() + "/actions"), secondToken, Map.of("action", "APPROVE", "expectedVersion", 3), 200);
         assertThat(read("/applications/" + app.path("id").asText(), applicantToken, 200).path("status").asText()).isEqualTo("APPROVED");
+        assertThat(candidateSnapshots(read(diagramPath, applicantToken, 200))).isEqualTo(originalCandidates);
+    }
+
+    @Test
+    void applicantReadsFrozenCandidateEvidenceAfterReturnAndResubmission() throws Exception {
+        String key = publish("role:" + LocalOrganizationDirectory.UNIT_ROLE + department.id(), "SINGLE");
+        var app = submit(key);
+        String id = app.path("id").asText();
+        String firstDiagram = "/applications/" + id + "/rounds/1/diagram";
+        var original = candidateSnapshots(read(firstDiagram, applicantToken, 200));
+        assertThat(original).hasSize(1);
+        assertThat(original.get(0).path("candidateUserIds")).containsExactlyInAnyOrder(json.read(json.write(first.subject()), JsonNode.class), json.read(json.write(second.subject()), JsonNode.class));
+        assertThat(original.get(0).path("directoryRevision").asLong()).isPositive();
+        assertThat(original.toString()).doesNotContain("role:", "rule", "tenantId");
+        read(firstDiagram, identity("outsider", Set.of("EMPLOYEE")), 404);
+        String foreignToken = UUID.randomUUID().toString();
+        doReturn(new Actor("foreign", "applicant", Set.of("EMPLOYEE"))).when(auth).authenticate(foreignToken);
+        read(firstDiagram, foreignToken, 404);
+
+        var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+        write(post("/api/v1/tasks/" + task.getId() + "/actions"), secondToken,
+                Map.of("action", "RETURN", "comment", "补充后重提", "expectedVersion", app.path("version").asLong()), 200);
+        organization.updateAppointment(admin, firstJob.id(), false, 1);
+        var third = organization.createPerson(admin, "new-candidate", "新任职人员", true, true);
+        organization.createAppointment(admin, third.id(), department.id(), position.id(), true);
+        var returned = read("/applications/" + id, applicantToken, 200);
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", returned.path("version").asLong()), 200);
+        assertThat(candidateSnapshots(read(firstDiagram, applicantToken, 200))).isEqualTo(original);
+        var current = candidateSnapshots(read("/applications/" + id + "/rounds/2/diagram", applicantToken, 200));
+        assertThat(current).hasSize(1);
+        assertThat(current.get(0).path("candidateUserIds").toString()).contains(second.subject(), third.subject()).doesNotContain(first.subject());
+        task = tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+        long version = read("/applications/" + id, applicantToken, 200).path("version").asLong();
+        write(post("/api/v1/tasks/" + task.getId() + "/actions"), secondToken, Map.of("action", "APPROVE", "expectedVersion", version), 200);
+        assertThat(candidateSnapshots(read("/applications/" + id + "/rounds/2/diagram", applicantToken, 200))).isEqualTo(current);
+    }
+
+    private JsonNode candidateSnapshots(JsonNode diagram) {
+        for (JsonNode node : diagram.path("nodes")) if ("review".equals(node.path("id").asText())) return node.path("candidateSnapshots");
+        throw new AssertionError("Missing review node");
     }
 
     @Test
