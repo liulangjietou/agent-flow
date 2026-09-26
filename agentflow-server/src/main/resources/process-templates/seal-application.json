@@ -1,6 +1,6 @@
 {
   "key": "seal-application",
-  "templateVersion": 1,
+  "templateVersion": 2,
   "name": "用印申请",
   "category": "OA",
   "description": "普通用印经经理审批后结束，急件在经理审批后增加一次复核。",
@@ -24,7 +24,7 @@
   "risks": [
     "使用前请配置审批组并确认急件复核规则；示例角色不代表真实的印章管理人员。",
     "审批通过不授予印章操作权限；当前不管理印章库存、领取归还、用印核销或电子签章。",
-    "模板通知文案仅供参考；站内消息使用平台统一文案，邮件和 IM 尚未接入。"
+    "复制后携带提交、退回、批准的站内通知文案，可在设计器调整；邮件和 IM 尚未接入。"
   ],
   "upgradePolicy": "升级后需重新复制；已有草稿、发布版本和申请保持原样。",
   "notificationTexts": {
@@ -32,7 +32,7 @@
     "RETURNED": "您的用印申请已退回，请查看审批意见并补正。",
     "APPROVED": "您的用印申请已审批通过，请按业务规定办理后续事项。"
   },
-  "notificationsAvailable": false,
+  "notificationsAvailable": true,
   "graph": {
     "nodes": [
       {

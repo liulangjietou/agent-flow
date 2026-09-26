@@ -2,6 +2,7 @@ package io.agentflow.approval.model;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.NotificationTexts;
 
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +20,7 @@ public final class Application {
     private final long definitionVersion;
     private final FormSchema formSchema;
     private final String runtimeDefinitionId;
+    private final NotificationTexts notificationTexts;
     private final String createdBy;
     private String title;
     private Map<String, Object> payload;
@@ -44,9 +46,17 @@ public final class Application {
     public static Application draft(UUID id, String tenantId, String businessNo, String processKey,
                                     long definitionVersion, String createdBy, String title, Map<String, Object> payload,
                                     FormSchema formSchema, String runtimeDefinitionId) {
+        return draft(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, formSchema,
+                runtimeDefinitionId, NotificationTexts.EMPTY);
+    }
+
+    /** 在申请创建时冻结发布文案，不接受表单字段或调用方覆盖通知内容。 */
+    public static Application draft(UUID id, String tenantId, String businessNo, String processKey,
+                                    long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                    FormSchema formSchema, String runtimeDefinitionId, NotificationTexts notificationTexts) {
         if (formSchema != null) formSchema.validateDraft(payload);
         return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy,
-                title, payload, ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId);
+                title, payload, ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId, notificationTexts);
     }
 
     /** 从仓储恢复聚合。 */
@@ -74,9 +84,25 @@ public final class Application {
                 title, payload, status, roundNo, version, formSchema, runtimeDefinitionId);
     }
 
+    /** 恢复原申请的通知配置，重提继续使用创建时的流程版本。 */
+    public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
+                                      long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                      ApplicationStatus status, int roundNo, long version, FormSchema formSchema,
+                                      String runtimeDefinitionId, NotificationTexts notificationTexts) {
+        return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy,
+                title, payload, status, roundNo, version, formSchema, runtimeDefinitionId, notificationTexts);
+    }
+
     private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
                         String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
                         int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId) {
+        this(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, status,
+                roundNo, version, formSchema, runtimeDefinitionId, NotificationTexts.EMPTY);
+    }
+
+    private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
+                        String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
+                        int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId, NotificationTexts notificationTexts) {
         this.id = Objects.requireNonNull(id);
         this.tenantId = Objects.requireNonNull(tenantId);
         this.businessNo = require(businessNo, "businessNo");
@@ -84,6 +110,7 @@ public final class Application {
         this.definitionVersion = definitionVersion;
         this.formSchema = formSchema;
         this.runtimeDefinitionId = runtimeDefinitionId;
+        this.notificationTexts = notificationTexts == null ? NotificationTexts.EMPTY : notificationTexts;
         this.createdBy = require(createdBy, "createdBy");
         this.title = require(title, "title");
         this.payload = copyPayload(payload);
@@ -211,6 +238,7 @@ public final class Application {
     public long definitionVersion() { return definitionVersion; }
     public FormSchema formSchema() { return formSchema; }
     public String runtimeDefinitionId() { return runtimeDefinitionId; }
+    public NotificationTexts notificationTexts() { return notificationTexts; }
     public String createdBy() { return createdBy; }
     public String title() { return title; }
     public Map<String, Object> payload() { return payload; }

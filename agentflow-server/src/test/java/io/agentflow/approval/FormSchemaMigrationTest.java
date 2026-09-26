@@ -51,6 +51,8 @@ class FormSchemaMigrationTest {
         var applicationAfter = jdbc.queryForMap("SELECT * FROM approval_application WHERE id=?", applicationId);
         var roundAfter = jdbc.queryForMap("SELECT * FROM approval_submission_round WHERE application_id=?", applicationId);
         definitionAfter.remove("FORM_SCHEMA_JSON"); applicationAfter.remove("FORM_SCHEMA_JSON"); applicationAfter.remove("RUNTIME_DEFINITION_ID"); roundAfter.remove("FORM_SCHEMA_JSON");
+        assertThat(definitionAfter.remove("NOTIFICATION_TEXTS_JSON")).isNull();
+        assertThat(applicationAfter.remove("NOTIFICATION_TEXTS_JSON")).isNull();
         assertThat(definitionAfter).isEqualTo(definitionBefore);
         assertThat(applicationAfter.remove("SEARCH_AMOUNT")).isNull();
         assertThat(applicationAfter).isEqualTo(applicationBefore);

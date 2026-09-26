@@ -14,12 +14,12 @@
 
 ## 文件契约
 
-UTF-8 JSON（允许 BOM），最大 1 MiB，格式 `agentflow-process-template`，`formatVersion=1`。
+UTF-8 JSON（允许 BOM），最大 1 MiB，格式 `agentflow-process-template`。当前设计器导出 `formatVersion=2`，读取仍兼容版本 1。版本 2 必须带 `notificationTexts` 对象；版本 1 不接受该新属性。
 
 ```json
 {
   "format": "agentflow-process-template",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "process": {
     "key": "team-leave",
     "name": "团队请假",
@@ -34,13 +34,15 @@ UTF-8 JSON（允许 BOM），最大 1 MiB，格式 `agentflow-process-template`�
         {"id": "e2", "source": "review", "target": "end", "condition": "", "defaultBranch": false}
       ]
     },
-    "formSchema": {"schemaVersion": 1, "fields": []}
+    "formSchema": {"schemaVersion": 1, "fields": []},
+    "notificationTexts": {"submitted": "已收到申请。", "returned": "请查看退回意见。", "approved": "审批已完成。"}
   }
 }
 ```
 
-- 只含 `key/name/graph/formSchema`；不导出定义 ID、租户、状态、版本号、发布记录、申请、审计、账号凭证。角色和指定审批账号是配置的一部分，分享前应核对。
-- 最多 200 节点、400 连线；节点只允许开始、结束、人工审批和排他分支。节点属性白名单为 `x/y/assigneeRule/approvalMode`，位置在 0 至 1000000 之间。不接受服务任务、脚本或未支持扩展。
+- 版本 2 只含 `key/name/graph/formSchema/notificationTexts`，版本 1 保持前四项；不导出定义 ID、租户、状态、版本号、发布记录、申请、审计、账号凭证。角色、指定审批账号及配置文案是文件内容的一部分，分享前应核对。
+- `notificationTexts` 仅允许 `submitted/returned/approved` 字符串，每项最多 500 个 UTF-16 字符单元，缺省单项为空。拒绝未知事件和不可显示控制字符；HTML 与表达式保持纯文本。完整语义见[通知文案](definition-notification-texts.md)。
+- 最多 200 节点、400 连线；节点只允许开始、结束、人工审批、排他分支和结构化并行网关。节点属性白名单为 `x/y/assigneeRule/approvalMode`，位置在 0 至 1000000 之间。不接受服务任务、脚本或未支持扩展。
 - 来源标识最多 128 字符、名称最多 128 字符；节点标识最多 128、名称最多 256、条件最多 4000 字符。创建时目标标识以字母开头，最多 64 字符，可含字母、数字、下划线、短横线。
 - 表单复用现有六种字段和配置规则，最多 50 字段。金额边界是十进制字符串，不转换为浮点数。`formSchema: null` 与空字段表单保持区别。
 - 文件不包含目录模板的分类、样例、说明或复制来源记录，不会上传到内置模板目录；导入结果位于当前租户的“流程管理”。不接受 BPMN XML 或其他工作流产品的文件。
@@ -51,7 +53,7 @@ UTF-8 JSON（允许 BOM），最大 1 MiB，格式 `agentflow-process-template`�
 
 文件读取、格式检查、下载、预览和未保存确认属于表示层，实现在 `portableTemplate.ts`、`PortableTemplate.vue`。App 只编排创建后打开设计器，调用既有 `POST /api/v1/process-definitions`。
 
-`DefinitionApplicationService.create` 继续编排领域校验和仓储；`DefinitionDraft` 负责聚合身份与生命周期。审批人目录检查属于发布应用服务。没有新增 Java 领域分支、数据库迁移、文件上传存储服务或独立引擎部署入口。
+`DefinitionApplicationService.create` 继续编排领域校验和仓储；`DefinitionDraft` 负责聚合身份、生命周期及版本通知配置。审批人目录检查属于发布应用服务。模板文件入口复用流程定义保存；通知文案持久化依赖 V24，文件功能本身不新增文件上传存储服务或独立引擎部署入口。
 
 预检使用既有 `POST /process-definitions/validate`，不写库。创建要求 `ADMIN` 或 `PROCESS_ADMIN`，租户取自认证，使用原 `Idempotency-Key` 和请求恢复机制。即使修改前端文件检查，也不能绕过服务端授权、条件白名单和发布校验。
 

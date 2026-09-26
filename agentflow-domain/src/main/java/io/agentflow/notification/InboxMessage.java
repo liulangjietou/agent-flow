@@ -9,12 +9,19 @@ import java.util.UUID;
  */
 public record InboxMessage(UUID id, String tenantId, String recipient, UUID applicationId, String title,
                            String businessNo, Kind kind, String actor, String taskId, String nodeName,
-                           int roundNo, Instant createdAt, Instant readAt) {
+                           int roundNo, Instant createdAt, Instant readAt, String content) {
+    /** 历史消息未记录文案时保持缺失，不能从当前配置补写。 */
+    public InboxMessage(UUID id, String tenantId, String recipient, UUID applicationId, String title,
+                        String businessNo, Kind kind, String actor, String taskId, String nodeName,
+                        int roundNo, Instant createdAt, Instant readAt) {
+        this(id, tenantId, recipient, applicationId, title, businessNo, kind, actor, taskId, nodeName,
+                roundNo, createdAt, readAt, null);
+    }
     /** 重复标记保持第一次阅读时间，不改变消息对应的业务事实。 */
     public InboxMessage markRead(Instant time) {
         if (readAt != null) return this;
         return new InboxMessage(id, tenantId, recipient, applicationId, title, businessNo, kind, actor,
-                taskId, nodeName, roundNo, createdAt, time);
+                taskId, nodeName, roundNo, createdAt, time, content);
     }
 
     /**

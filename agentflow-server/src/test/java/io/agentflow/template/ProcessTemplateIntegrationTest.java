@@ -72,7 +72,7 @@ class ProcessTemplateIntegrationTest {
                         .header("Authorization", "Bearer " + auth.login("demo", "admin", "demo").token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
-                .andExpect(jsonPath("$[0].templateVersion").value(1))
+                .andExpect(jsonPath("$[0].templateVersion").value(2))
                 .andExpect(jsonPath("$[0].copies").isArray());
     }
 
@@ -92,7 +92,7 @@ class ProcessTemplateIntegrationTest {
         String id = draft.path("id").asText();
         var source = jdbc.queryForMap("SELECT * FROM template_copy WHERE definition_id=?", id);
         assertThat(source).containsEntry("TENANT_ID", "demo").containsEntry("TEMPLATE_KEY", "leave-request")
-                .containsEntry("TEMPLATE_VERSION", 1L).containsEntry("COPIED_BY", "admin");
+                .containsEntry("TEMPLATE_VERSION", 2L).containsEntry("COPIED_BY", "admin");
         assertThat(source.get("COPIED_AT")).isNotNull();
 
         var original = catalog.get("leave-request");
@@ -111,7 +111,7 @@ class ProcessTemplateIntegrationTest {
         JsonNode listedCopy = findCopy(listed, id);
         assertThat(listedCopy.path("name").asText()).isEqualTo("已经修改的副本");
         assertThat(listedCopy.path("revision").asLong()).isEqualTo(1);
-        assertThat(listedCopy.path("templateVersion").asLong()).isEqualTo(1);
+        assertThat(listedCopy.path("templateVersion").asLong()).isEqualTo(2);
         assertThat(listedCopy.has("tenantId")).isFalse();
         assertThat(catalog.get("leave-request").name()).isEqualTo(original.name());
         MockHttpServletResponse second = copy("leave-request", token("admin"), uniqueKey(), body(uniqueKey()));
@@ -154,7 +154,7 @@ class ProcessTemplateIntegrationTest {
     @Test
     void staleVersionUnknownTemplateAndMissingIdempotencyKeyHaveExplicitErrors() throws Exception {
         String admin = token("admin");
-        MockHttpServletResponse stale = copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", uniqueKey(), "name", "复制", "templateVersion", 2)));
+        MockHttpServletResponse stale = copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", uniqueKey(), "name", "复制", "templateVersion", 999)));
         assertThat(stale.getStatus()).isEqualTo(409);
         assertThat(tree(stale).path("code").asText()).isEqualTo("TEMPLATE_VERSION_CONFLICT");
         assertThat(copy("missing", admin, uniqueKey(), body(uniqueKey())).getStatus()).isEqualTo(404);
@@ -190,9 +190,9 @@ class ProcessTemplateIntegrationTest {
     @Test
     void copyAcceptsBoundaryLengthsAndRejectsLongerNamesOrKeys() throws Exception {
         String admin = token("admin");
-        assertThat(copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", "A".repeat(64), "name", "名".repeat(128), "templateVersion", 1))).getStatus()).isEqualTo(200);
-        assertThat(copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", "A".repeat(65), "name", "复制", "templateVersion", 1))).getStatus()).isEqualTo(400);
-        assertThat(copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", uniqueKey(), "name", "名".repeat(129), "templateVersion", 1))).getStatus()).isEqualTo(400);
+        assertThat(copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", "A".repeat(64), "name", "名".repeat(128), "templateVersion", 2))).getStatus()).isEqualTo(200);
+        assertThat(copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", "A".repeat(65), "name", "复制", "templateVersion", 2))).getStatus()).isEqualTo(400);
+        assertThat(copy("leave-request", admin, uniqueKey(), json.write(Map.of("key", uniqueKey(), "name", "名".repeat(129), "templateVersion", 2))).getStatus()).isEqualTo(400);
     }
 
     @Test
@@ -291,7 +291,7 @@ class ProcessTemplateIntegrationTest {
 
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
     private String uniqueKey() { return "test-" + UUID.randomUUID(); }
-    private String body(String key) { return json.write(Map.of("key", key, "name", "模板副本", "templateVersion", 1)); }
+    private String body(String key) { return json.write(Map.of("key", key, "name", "模板副本", "templateVersion", 2)); }
     private JsonNode tree(MockHttpServletResponse response) throws Exception { return json.read(response.getContentAsString(), JsonNode.class); }
 
     private MockHttpServletResponse copy(String template, String token, String key, String body) throws Exception {

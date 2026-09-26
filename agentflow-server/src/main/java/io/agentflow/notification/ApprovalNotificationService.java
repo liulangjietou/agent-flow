@@ -86,6 +86,7 @@ public class ApprovalNotificationService {
         String eventKey = application.id() + ":" + application.version() + ":" + kind + ":" + (taskId == null ? "" : taskId);
         UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + recipient).getBytes(StandardCharsets.UTF_8));
         inbox.append(eventKey, new InboxMessage(id, application.tenantId(), recipient, application.id(), application.title(),
-                application.businessNo(), kind, actor, taskId, nodeName, application.roundNo(), Instant.now(), null));
+                application.businessNo(), kind, actor, taskId, nodeName, application.roundNo(), Instant.now(), null,
+                application.notificationTexts().forEvent(kind)));
     }
 }

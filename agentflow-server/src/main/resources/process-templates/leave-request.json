@@ -1,6 +1,6 @@
 {
   "key": "leave-request",
-  "templateVersion": 1,
+  "templateVersion": 2,
   "name": "请假申请",
   "category": "OA",
   "description": "先经经理审批，超过 3 天再进入额外复核；复制后可调整字段、示例阈值和审批角色。",
@@ -23,7 +23,7 @@
   "risks": [
     "使用前请配置审批组和 3 天分级阈值；示例角色不代表自动识别的直属上级。",
     "不计算假期余额或工作日，也不限制半天步进；请按企业制度填写请假天数。",
-    "模板通知文案仅供参考；站内消息使用平台统一文案，邮件和 IM 尚未接入。"
+    "复制后携带提交、退回、批准的站内通知文案，可在设计器调整；邮件和 IM 尚未接入。"
   ],
   "upgradePolicy": "升级后需重新复制；已有草稿、发布版本和申请保持原样。",
   "notificationTexts": {
@@ -31,7 +31,7 @@
     "RETURNED": "您的请假申请已退回，请查看审批意见并补正。",
     "APPROVED": "您的请假申请已审批通过，请按业务规定办理后续事项。"
   },
-  "notificationsAvailable": false,
+  "notificationsAvailable": true,
   "graph": {
     "nodes": [
       {

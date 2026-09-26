@@ -2,6 +2,7 @@ package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.NotificationTexts;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -98,6 +99,7 @@ public final class DefinitionModels {
         private DraftStatus status;
         private Graph graph;
         private FormSchema formSchema;
+        private NotificationTexts notificationTexts;
 
         /** 创建新草稿。 */
         public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph) {
@@ -106,10 +108,16 @@ public final class DefinitionModels {
 
         /** 新建携带表单契约的草稿，表单与流程图共同发布。 */
         public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph, FormSchema formSchema) {
+            return create(id, tenantId, key, name, graph, formSchema, NotificationTexts.EMPTY);
+        }
+
+        /** 通知配置与表单、流程图共同绑定到本草稿版本。 */
+        public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph,
+                                             FormSchema formSchema, NotificationTexts notificationTexts) {
             if (id == null || tenantId == null || tenantId.isBlank() || key == null || key.isBlank()) {
                 throw new DomainException("INVALID_DEFINITION", "Definition id, tenant and key are required");
             }
-            return new DefinitionDraft(id, tenantId, key, name, 0, 0, DraftStatus.DRAFT, graph, formSchema);
+            return new DefinitionDraft(id, tenantId, key, name, 0, 0, DraftStatus.DRAFT, graph, formSchema, notificationTexts);
         }
 
         /** 从持久化状态恢复草稿。 */
@@ -121,16 +129,24 @@ public final class DefinitionModels {
         /** 恢复当前记录自己的表单契约；旧记录保持无 schema 状态。 */
         public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
                                               long revision, DraftStatus status, Graph graph, FormSchema formSchema) {
-            return new DefinitionDraft(id, tenantId, key, name, version, revision, status, graph, formSchema);
+            return restore(id, tenantId, key, name, version, revision, status, graph, formSchema, NotificationTexts.EMPTY);
+        }
+
+        /** 恢复该版本自身文案；旧记录不读取后来变更的模板。 */
+        public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
+                                              long revision, DraftStatus status, Graph graph, FormSchema formSchema,
+                                              NotificationTexts notificationTexts) {
+            return new DefinitionDraft(id, tenantId, key, name, version, revision, status, graph, formSchema, notificationTexts);
         }
 
         private DefinitionDraft(UUID id, String tenantId, String key, String name, long version, long revision,
-                                DraftStatus status, Graph graph, FormSchema formSchema) {
+                                DraftStatus status, Graph graph, FormSchema formSchema, NotificationTexts notificationTexts) {
             this.id = Objects.requireNonNull(id); this.tenantId = Objects.requireNonNull(tenantId);
             this.key = Objects.requireNonNull(key); this.name = Objects.requireNonNullElse(name, key);
             this.version = version; this.revision = revision; this.status = Objects.requireNonNull(status);
             this.graph = Objects.requireNonNull(graph);
             this.formSchema = formSchema;
+            this.notificationTexts = Objects.requireNonNullElse(notificationTexts, NotificationTexts.EMPTY);
         }
 
         /** 更新草稿图并校验版本。 */
@@ -140,9 +156,15 @@ public final class DefinitionModels {
 
         /** null 保留已有表单；显式空字段列表才将表单清空。 */
         public void update(String name, Graph graph, FormSchema formSchema, long expectedRevision) {
+            update(name, graph, formSchema, null, expectedRevision);
+        }
+
+        /** 缺省配置保留旧值；显式空文案恢复平台提示，与草稿 revision 原子更新。 */
+        public void update(String name, Graph graph, FormSchema formSchema, NotificationTexts notificationTexts, long expectedRevision) {
             ensureDraft(); ensureRevision(expectedRevision);
             Graph updatedGraph = Objects.requireNonNull(graph);
             if (formSchema != null) this.formSchema = formSchema;
+            if (notificationTexts != null) this.notificationTexts = notificationTexts;
             this.name = Objects.requireNonNullElse(name, key); this.graph = updatedGraph; this.revision++;
         }
 
@@ -161,6 +183,7 @@ public final class DefinitionModels {
         public UUID id() { return id; } public String tenantId() { return tenantId; } public String key() { return key; }
         public String name() { return name; } public long version() { return version; } public long revision() { return revision; }
         public FormSchema formSchema() { return formSchema; }
+        public NotificationTexts notificationTexts() { return notificationTexts; }
         public DraftStatus status() { return status; } public Graph graph() { return graph; }
     }
 

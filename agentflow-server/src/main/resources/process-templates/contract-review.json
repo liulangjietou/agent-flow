@@ -1,6 +1,6 @@
 {
   "key": "contract-review",
-  "templateVersion": 1,
+  "templateVersion": 2,
   "name": "合同审批",
   "category": "OA",
   "description": "合同先经经理审批，人民币金额达到 100000 元时增加复核；审批通过不等于签约、付款或记账。",
@@ -24,7 +24,7 @@
   "risks": [
     "使用前请配置审批组和人民币 100000 元分级阈值；额外复核示例角色不代表法务人员。",
     "合同审批通过不代表签约或付款；当前不提供法务审查、归档、汇率换算或财务核算。",
-    "模板通知文案仅供参考；站内消息使用平台统一文案，邮件和 IM 尚未接入。"
+    "复制后携带提交、退回、批准的站内通知文案，可在设计器调整；邮件和 IM 尚未接入。"
   ],
   "upgradePolicy": "升级后需重新复制；已有草稿、发布版本和申请保持原样。",
   "notificationTexts": {
@@ -32,7 +32,7 @@
     "RETURNED": "您的合同审批已退回，请查看审批意见并补正。",
     "APPROVED": "您的合同审批已审批通过，请按业务规定办理后续事项。"
   },
-  "notificationsAvailable": false,
+  "notificationsAvailable": true,
   "graph": {
     "nodes": [
       {

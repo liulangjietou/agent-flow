@@ -3,6 +3,7 @@ package io.agentflow.definition;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.NotificationTexts;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -36,15 +37,16 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
     public DefinitionDraft save(DefinitionDraft draft) {
         String graphJson = jsonUtil.write(draft.graph());
         String schemaJson = draft.formSchema() == null ? null : jsonUtil.write(draft.formSchema());
+        String textsJson = jsonUtil.write(draft.notificationTexts());
         Object persistedVersion = draft.status() == DraftStatus.DRAFT ? null : draft.version();
         long expectedRevision = draft.revision() - 1;
         int updated;
         try {
             updated = jdbcTemplate.update("""
-                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?, form_schema_json=?,
+                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?, form_schema_json=?, notification_texts_json=?,
                         published_at=CASE WHEN ?='PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END,
                         updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=? AND revision=?
-                    """, draft.name(), persistedVersion, draft.revision(), draft.status().name(), graphJson, schemaJson,
+                    """, draft.name(), persistedVersion, draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson,
                     draft.status().name(), draft.tenantId(), draft.id().toString(), expectedRevision);
         } catch (DuplicateKeyException exception) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Definition version already exists");
@@ -59,10 +61,10 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
             }
             try {
                 jdbcTemplate.update("""
-                    INSERT INTO approval_definition (id, tenant_id, process_key, name, version, revision, status, graph_json, form_schema_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO approval_definition (id, tenant_id, process_key, name, version, revision, status, graph_json, form_schema_json, notification_texts_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, draft.id().toString(), draft.tenantId(), draft.key(), draft.name(), persistedVersion,
-                        draft.revision(), draft.status().name(), graphJson, schemaJson);
+                        draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson);
             } catch (DuplicateKeyException exception) {
                 throw new DomainException("CONCURRENCY_CONFLICT", "Definition version or id already exists");
             }
@@ -107,6 +109,8 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
                 resultSet.getString("process_key"), resultSet.getString("name"), version == null ? 0 : version.longValue(),
                 resultSet.getLong("revision"), DraftStatus.valueOf(resultSet.getString("status")),
                 jsonUtil.read(resultSet.getString("graph_json"), Graph.class),
-                resultSet.getString("form_schema_json") == null ? null : jsonUtil.read(resultSet.getString("form_schema_json"), FormSchema.class));
+                resultSet.getString("form_schema_json") == null ? null : jsonUtil.read(resultSet.getString("form_schema_json"), FormSchema.class),
+                resultSet.getString("notification_texts_json") == null ? null
+                        : jsonUtil.read(resultSet.getString("notification_texts_json"), NotificationTexts.class));
     }
 }

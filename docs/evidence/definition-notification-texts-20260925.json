@@ -1,0 +1,134 @@
+{
+  "date": "2026-09-25",
+  "timezone": "America/New_York",
+  "branch": "codex/definition-notification-texts",
+  "baseCommit": "5d95307406b93456d4384ac1acc57c4bba9e4d0a",
+  "scope": "Versioned plain text for applicant submitted, returned and approved inbox messages",
+  "tests": {
+    "java": {
+      "domain": 194,
+      "server": 561,
+      "total": 755,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "frontend": 266,
+    "tools": 38,
+    "typecheckAndBuild": "PASS",
+    "authors": {
+      "javaFiles": 302,
+      "namedTypes": 475,
+      "missingTags": 0,
+      "parseErrors": 0
+    }
+  },
+  "openapi": {
+    "operations": 65,
+    "schemas": 113,
+    "requestExamples": 21,
+    "static": "PASS",
+    "runtime": "PASS",
+    "runtimeStatuses": [
+      200,
+      201,
+      400,
+      401,
+      403,
+      404,
+      409,
+      422
+    ]
+  },
+  "postgresMigration": {
+    "result": "PASS",
+    "preservedTables": 66,
+    "migration": "23 -> 24",
+    "oldMigrationHistoryUnchanged": true
+  },
+  "runtime": {
+    "result": "PASS",
+    "operations": 32,
+    "legacyApplicationId": "d03292ca-67f9-42a4-93a2-8fb4ac0dca65",
+    "applicationId": "bba2069c-1cc7-4fd2-aebc-25e7a42345de",
+    "secondApplicationId": "feb636f9-fa6c-4227-ad27-23073fdc0943",
+    "publishedId": "fe9e032d-fc6f-47ea-af11-1b1e20c46834",
+    "draftId": "0c8a6b78-f0ec-4c61-8c96-66e6bd16b492",
+    "draftKey": "ui-b1b42a9f36",
+    "texts": {
+      "submitted": "通知申请已提交。",
+      "returned": "请补充说明后重提。",
+      "approved": "<b>已批准</b> ${privateValue} 按原文保存。"
+    }
+  },
+  "browser": {
+    "browser": "Chrome",
+    "viewport": "desktop default",
+    "result": "PASS",
+    "steps": [
+      "Template v2 copied texts shown",
+      "Edit submitted and approved texts",
+      "Undo and redo",
+      "Save and publish",
+      "Published controls read-only",
+      "Create and approve application through actual HTTP",
+      "Applicant inbox shows configured texts",
+      "Literal HTML and expression remain text with no child elements"
+    ],
+    "mobileTested": false,
+    "applicationConsoleErrorsObserved": 0,
+    "unrelatedExtensionErrors": 1,
+    "runtimeEvidence": "/fyoung/tmp/agentflow-notification-texts-fixture/verified/browser-runtime.json",
+    "tabClosed": true
+  },
+  "artifacts": {
+    "java": {
+      "path": "/fyoung/tmp/agentflow-notification-texts-verify-final.log",
+      "sha256": "5a66d9fa6926b74abc024deaf5603e4fa62e6c1746ac96f41733868c7a98d65e"
+    },
+    "frontend": {
+      "path": "/fyoung/tmp/agentflow-notification-texts-web-final.log",
+      "sha256": "2d62a5d3676afb4c80b8a4977563b2977a9a6009107a1d4e6e43db4d16193f0e"
+    },
+    "build": {
+      "path": "/fyoung/tmp/agentflow-notification-texts-build-final.log",
+      "sha256": "622556c402ea6fff9d1fb22c6b254284278a7c77717b2910b3c9a2351db5485c"
+    },
+    "tools": {
+      "path": "/fyoung/tmp/agentflow-notification-texts-tools.log",
+      "sha256": "ec2791cf8a7e1b95f56e25f065cf3d813df52ca64e6fc86a8ce7f3b8a8e6f019"
+    },
+    "openapi": {
+      "path": "/fyoung/tmp/agentflow-notification-texts-openapi.log",
+      "sha256": "f4f4ba00e6a10289168c6fdff38caaec9a2baecfa15550043a3b57991f949621"
+    }
+  },
+  "candidateJar": {
+    "path": "/fyoung/tmp/agentflow-notification-texts-fixture/candidate.jar",
+    "sha256": "ca23d9c6d71a9f422a0b671c9c0869a9555a368475c6cefa11d0ed731e9b699b"
+  },
+  "fixture": {
+    "directory": "/fyoung/tmp/agentflow-notification-texts-fixture/verified",
+    "database": "agentflow_notice_verified",
+    "postgresContainer": "agentflow-notification-texts-postgres",
+    "postgresVolume": "agentflow-notification-texts-postgres",
+    "dataRetained": true,
+    "frontendPort": 5204,
+    "backendPort": 18184,
+    "servicesStopped": true
+  },
+  "mainDemo": {
+    "url": "http://127.0.0.1:8180/",
+    "newFeatureDeployed": false,
+    "sourceCommit": "a23b1b55dd3b3d2bad1b3a25cb8b96171a50d632",
+    "schemaVersion": 23
+  },
+  "limits": [
+    "No target enterprise environment acceptance",
+    "No feature rollback rehearsal",
+    "No email or IM delivery",
+    "No remote, pull request or remote CI",
+    "Other unpublished migration V24 files must be renumbered during their future integration"
+  ],
+  "initialAttempt": "First fixture attempt had harness projection and task-response assertion errors; final proof was rerun in the separate verified database. First database retained."
+}

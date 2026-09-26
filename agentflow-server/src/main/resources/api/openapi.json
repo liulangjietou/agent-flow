@@ -8270,6 +8270,9 @@
                 "type": "null"
               }
             ]
+          },
+          "notificationTexts": {
+            "$ref": "#/components/schemas/NotificationTexts"
           }
         },
         "required": [
@@ -8307,6 +8310,9 @@
                 "type": "null"
               }
             ]
+          },
+          "notificationTexts": {
+            "$ref": "#/components/schemas/NotificationTexts"
           }
         },
         "required": [
@@ -8338,6 +8344,9 @@
                 "type": "null"
               }
             ]
+          },
+          "notificationTexts": {
+            "$ref": "#/components/schemas/NotificationTexts"
           }
         },
         "description": "请始终提交已读取的 expectedRevision。省略或 null formSchema 保留旧表单；显式 fields=[] 才清空字段。",
@@ -8678,6 +8687,9 @@
                 "type": "null"
               }
             ]
+          },
+          "notificationTexts": {
+            "$ref": "#/components/schemas/NotificationTexts"
           }
         },
         "description": "与指定同 key 已发布基线比较；这里 null formSchema 表示当前快照未绑定表单。",
@@ -8922,7 +8934,8 @@
             }
           },
           "notificationsAvailable": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "模板复制后是否携带已实现的站内通知文案，不代表邮件或 IM。"
           },
           "graph": {
             "$ref": "#/components/schemas/Graph"
@@ -9863,6 +9876,12 @@
           "readAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true,
+            "description": "事件发生时保存的文案快照；旧消息可能缺失。"
           }
         },
         "required": [
@@ -12133,6 +12152,25 @@
           "providerLogoutUrl": {
             "type": "string",
             "description": "可选同源企业退出 POST 入口，仅身份服务支持时返回"
+          }
+        }
+      },
+      "NotificationTexts": {
+        "type": "object",
+        "description": "流程版本的申请人站内纯文本文案；省略或空串使用平台提示，不解释表达式。",
+        "additionalProperties": false,
+        "properties": {
+          "submitted": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "returned": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "approved": {
+            "type": "string",
+            "maxLength": 500
           }
         }
       }

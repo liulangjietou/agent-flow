@@ -16,7 +16,7 @@
 
 `manager` 配置 `role:MANAGER`，`review` 配置 `role:ADMIN`。这些是演示角色，不代表已接入的直属上级、部门负责人或法务。`ADMIN` 在这里仅演示额外复核；模板复制后应按本租户制度修改审批人和阈值。当前模板不提供动态组织解析、无人审批阻断、自审批控制或代理有效期管理；组织权威来源、同步方式和相关授权规则仍待明确。
 
-通知文案保存在 `notificationTexts`，事件名为 `SUBMITTED`、`RETURNED`、`APPROVED`。`notificationsAvailable` 固定为 `false`：文案用于说明，不发送站内信、邮件或其他通知。
+通知文案保存在 `notificationTexts`，事件名为 `SUBMITTED`、`RETURNED`、`APPROVED`。三个内置模板的版本 2 将 `notificationsAvailable` 设为 `true`：复制时转为流程定义的申请人站内文案，可在设计器修改后发布。文案随申请创建冻结，不替换申请字段；邮件和 IM 尚未接入。详见[版本通知文案](definition-notification-texts.md)。
 
 ## 字段
 
@@ -59,7 +59,7 @@
 
 ## 资源与版本
 
-官方资源位于 `agentflow-server/src/main/resources/process-templates/`，文件名与模板 key 相同。本阶段三份资源的 `templateVersion` 均为 `1`，`category` 为 `OA`。模板版本、表单格式版本和租户流程发布版本是不同概念：复制模板 v1 会创建租户流程草稿，发布后由流程定义服务分配该租户流程的业务版本。
+官方资源位于 `agentflow-server/src/main/resources/process-templates/`，文件名与模板 key 相同。当前三份资源的 `templateVersion` 均为 `2`，`category` 为 `OA`。模板版本、表单格式版本和租户流程发布版本是不同概念：复制模板 v2 会创建租户流程草稿，发布后由流程定义服务分配该租户流程的业务版本。原 v1 副本保持原配置，不自动启用文案。
 
 资源只使用以下顶层属性：
 
@@ -69,7 +69,7 @@
 | `scope`、`businessType`、`dependencies` | 适用范围、业务类型、依赖能力与前置条件 |
 | `defaultRoles`、`fieldDescriptions` | 示例角色代码和按字段 key 索引的说明 |
 | `risks`、`upgradePolicy` | 未实现能力、示例边界和升级方式 |
-| `notificationTexts`、`notificationsAvailable` | 通知文案及其尚不可执行的状态 |
+| `notificationTexts`、`notificationsAvailable` | 三类申请人站内文案及复制时是否启用 |
 | `graph`、`formSchema` | 复制给流程定义的真实图和表单 |
 | `scenarios` | 合法输入、路由边界与字段错误的可执行预期 |
 
@@ -95,7 +95,7 @@
 {
   "key": "team-leave",
   "name": "团队请假审批",
-  "templateVersion": 1
+  "templateVersion": 2
 }
 ```
 
@@ -127,7 +127,7 @@
 
 本阶段验收应另行验证：复制后编辑不改变官方资源或其他副本；跨租户不能读取、改动对方草稿；相同幂等键重放只产生一个草稿；模板版本不被静默切换；复制后可发布并完成真实申请审批；后续模板更新不改变已发布定义与旧实例。这些要求不能用资源静态检查代替。
 
-租户自建模板、模板编辑发布、模板升级差异合并、初始化向导、通知执行、动态组织与代理、节点级字段权限、附件和重复明细尚不属于本阶段交付。费用报销、采购付款与预算调整须继续按各自结构化领域设计实现，不以 FORM 占位补齐模板数量。
+模板目录管理、模板升级差异合并、动态组织与代理、节点级字段权限及附件尚不属于模板中心交付。站内文案、开始使用引导和重复明细的后续能力分别见相应功能文档；邮件和 IM 尚未接入。费用报销、采购付款与预算调整须继续按各自结构化领域设计实现，不以 FORM 占位补齐模板数量。
 
 ## 模板文件复用
 

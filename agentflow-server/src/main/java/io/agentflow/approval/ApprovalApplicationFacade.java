@@ -66,7 +66,8 @@ public class ApprovalApplicationFacade {
         }
         FormSchema formSchema = definition == null ? null : definition.formSchema();
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
-        return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload, formSchema, runtimeDefinitionId);
+        return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
+                formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts());
     }
 
     /** 提交申请并启动流程。 */

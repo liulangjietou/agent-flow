@@ -182,3 +182,23 @@ test('区间遗漏可导入待修正草稿，结构错误仍阻止导入', async
   assert.equal(review.canImport,true)
   errors.push('INVALID_CONDITION:route');await review.check();assert.equal(review.canImport,false)
 })
+
+
+test('带通知文案导出为 v2，纯文本完整往返，旧 v1 不能偷偷携带新增配置', () => {
+  const notificationTexts = { submitted: '已收到申请。', returned: '请补充\n说明。', approved: '<b>${amount}</b>' }
+  const value = { ...source(), notificationTexts }
+  const raw = serializePortableTemplate(value)
+  assert.equal(JSON.parse(raw).formatVersion, 2)
+  assert.deepEqual(parsePortableTemplate(raw), value)
+  const legacy = JSON.parse(raw); legacy.formatVersion = 1
+  assert.throws(() => parsePortableTemplate(JSON.stringify(legacy)), /不支持/)
+  assert.equal(JSON.parse(serializePortableTemplate(source())).formatVersion, 1)
+})
+
+test('通知文案拒绝未知事件、超长和控制字符，空配置不会继承其他文件内容', () => {
+  for (const notificationTexts of [{ approved: 2 }, { approved: '长'.repeat(501) }, { returned: '\u0000' }, { approoved: '拼错' }, null]) {
+    assert.throws(() => serializePortableTemplate({ ...source(), notificationTexts }))
+  }
+  const empty = parsePortableTemplate(serializePortableTemplate({ ...source(), notificationTexts: {} }))
+  assert.deepEqual(empty.notificationTexts, { submitted: '', returned: '', approved: '' })
+})

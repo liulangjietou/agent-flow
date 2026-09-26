@@ -1,3 +1,4 @@
+import { readNotificationTexts, type NotificationTexts } from './notificationTexts.js'
 import type { Graph } from './api'
 import { validateFormSchema, type FormSchema } from './formSchema.js'
 
@@ -5,7 +6,7 @@ export const TEMPLATE_FILE_LIMIT = 1024 * 1024
 export const TEMPLATE_FORMAT = 'agentflow-process-template'
 
 /** 仅承载可编辑配置；不包含来源租户、实例、发布状态或身份凭证。@author owlzhangfq@gmail.com */
-export interface PortableProcess { key: string; name: string; graph: Graph; formSchema: FormSchema | null }
+export interface PortableProcess { key: string; name: string; graph: Graph; formSchema: FormSchema | null; notificationTexts?: NotificationTexts }
 
 function object(value: unknown, allowed: string[], required: string[], path: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path} 必须是对象。`)
@@ -42,8 +43,10 @@ function readField(raw: unknown, column = false) {
     }
 
 /** 文件边界只校验表示和白名单；图连通性、条件与审批人仍由现有服务端校验。 */
-function process(value: unknown): PortableProcess {
-  const p = object(value, ['key', 'name', 'graph', 'formSchema'], ['key', 'name', 'graph', 'formSchema'], '流程')
+function process(value: unknown, version: 1 | 2): PortableProcess {
+  const fields = ['key', 'name', 'graph', 'formSchema', ...(version === 2 ? ['notificationTexts'] : [])]
+  const p = object(value, fields, fields, '流程')
+  if (version === 2) p.notificationTexts = readNotificationTexts(p.notificationTexts)
   text(p.key, '来源流程标识', 128); text(p.name, '流程名称', 128)
   const g = object(p.graph, ['nodes', 'edges', 'conditionLanguageVersion'], ['nodes', 'edges'], '流程图')
   if (g.conditionLanguageVersion !== undefined && g.conditionLanguageVersion !== 1 && g.conditionLanguageVersion !== 2) throw new Error('条件语言版本不受支持。')
@@ -81,14 +84,15 @@ export function parsePortableTemplate(raw: string): PortableProcess {
   let value: unknown
   try { value = JSON.parse(raw.replace(/^\uFEFF/, '')) } catch { throw new Error('无法读取 JSON，请选择平台导出的流程模板。') }
   const envelope = object(value, ['format', 'formatVersion', 'process'], ['format', 'formatVersion', 'process'], '模板文件')
-  if (envelope.format !== TEMPLATE_FORMAT || envelope.formatVersion !== 1) throw new Error('模板格式或版本不受支持，请使用当前平台导出的模板。')
-  return process(envelope.process)
+  if (envelope.format !== TEMPLATE_FORMAT || (envelope.formatVersion !== 1 && envelope.formatVersion !== 2)) throw new Error('模板格式或版本不受支持，请使用当前平台导出的模板。')
+  return process(envelope.process, envelope.formatVersion as 1 | 2)
 }
 
 /** 显式选择配置字段，导出当前设计而非定义响应、租户信息或业务数据。 */
 export function serializePortableTemplate(input: PortableProcess): string {
-  const raw = JSON.stringify({ format: TEMPLATE_FORMAT, formatVersion: 1, process: {
-    key: input.key, name: input.name, graph: input.graph, formSchema: input.formSchema
+  const raw = JSON.stringify({ format: TEMPLATE_FORMAT, formatVersion: input.notificationTexts === undefined ? 1 : 2, process: {
+    key: input.key, name: input.name, graph: input.graph, formSchema: input.formSchema,
+    ...(input.notificationTexts === undefined ? {} : { notificationTexts: input.notificationTexts })
   } }, null, 2) + '\n'
   parsePortableTemplate(raw)
   return raw

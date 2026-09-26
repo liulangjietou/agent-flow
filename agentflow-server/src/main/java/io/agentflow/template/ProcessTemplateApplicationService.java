@@ -30,7 +30,7 @@ public class ProcessTemplateApplicationService {
     public DefinitionDraft copy(String tenantId, String copiedBy, String templateKey, long templateVersion,
                                 String processKey, String name) {
         ProcessTemplate template = catalog.requireVersion(templateKey, templateVersion);
-        DefinitionDraft draft = definitions.create(tenantId, processKey, name, template.graph(), template.formSchema());
+        DefinitionDraft draft = definitions.create(tenantId, processKey, name, template.graph(), template.formSchema(), template.copiedNotificationTexts());
         copies.save(new TemplateCopy(tenantId, draft.id(), template.key(), template.templateVersion(), copiedBy, Instant.now()));
         return draft;
     }

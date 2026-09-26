@@ -5,6 +5,7 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.NotificationTexts;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -72,7 +73,7 @@ public class DefinitionController {
     public ResponseEntity<String> create(@Valid @RequestBody DefinitionRequest request, HttpServletRequest httpRequest) {
         requireProcessAdmin();
         return idempotency.execute(httpRequest, HttpStatus.OK,
-                () -> DefinitionResponse.from(service.create(currentActor.actor().tenantId(), request.key(), request.name(), request.graph(), request.formSchema())));
+                () -> DefinitionResponse.from(service.create(currentActor.actor().tenantId(), request.key(), request.name(), request.graph(), request.formSchema(), request.notificationTexts())));
     }
 
     /** 查询租户流程定义。 */
@@ -99,7 +100,7 @@ public class DefinitionController {
                                          HttpServletRequest httpRequest) {
         requireProcessAdmin();
         return idempotency.execute(httpRequest, HttpStatus.OK, () -> DefinitionResponse.from(service.update(
-                currentActor.actor().tenantId(), id, request.name(), request.graph(), request.formSchema(), request.expectedRevision())));
+                currentActor.actor().tenantId(), id, request.name(), request.graph(), request.formSchema(), request.notificationTexts(), request.expectedRevision())));
     }
 
     /** 发布流程定义。 */
@@ -154,14 +155,14 @@ public class DefinitionController {
     public DefinitionApplicationService.Comparison compare(@PathVariable UUID id, @Valid @RequestBody ComparisonRequest request) {
         requireProcessAdmin();
         return service.compare(currentActor.actor().tenantId(), id, request.key(),
-                new DefinitionDiffService.Snapshot(request.name(), request.graph(), request.formSchema()));
+                new DefinitionDiffService.Snapshot(request.name(), request.graph(), request.formSchema(), request.notificationTexts()));
     }
 
     /**
      * formSchema 表示完整快照；null 明确表示未绑定表单。
      * @author owlzhangfq@gmail.com
      */
-    public record ComparisonRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema) { }
+    public record ComparisonRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema, NotificationTexts notificationTexts) { }
 
     /**
      * 设计器请求图。
@@ -172,12 +173,12 @@ public class DefinitionController {
      * 创建定义请求。
      * @author owlzhangfq@gmail.com
      */
-    public record DefinitionRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema) { }
+    public record DefinitionRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema, NotificationTexts notificationTexts) { }
     /**
      * 更新定义请求。
      * @author owlzhangfq@gmail.com
      */
-    public record UpdateDefinitionRequest(@NotBlank String name, @NotNull Graph graph, long expectedRevision, FormSchema formSchema) { }
+    public record UpdateDefinitionRequest(@NotBlank String name, @NotNull Graph graph, long expectedRevision, FormSchema formSchema, NotificationTexts notificationTexts) { }
     /**
      * 校验结果。
      * @author owlzhangfq@gmail.com
@@ -204,11 +205,11 @@ public class DefinitionController {
      * @author owlzhangfq@gmail.com
      */
     public record DefinitionResponse(UUID id, String tenantId, String key, String name, long version, long revision,
-                                     String status, Graph graph, @JsonInclude(JsonInclude.Include.ALWAYS) FormSchema formSchema) {
+                                     String status, Graph graph, @JsonInclude(JsonInclude.Include.ALWAYS) FormSchema formSchema, NotificationTexts notificationTexts) {
         /** 将定义聚合转换为统一响应，供模板复制等创建入口复用。 */
         public static DefinitionResponse from(DefinitionDraft draft) {
             return new DefinitionResponse(draft.id(), draft.tenantId(), draft.key(), draft.name(), draft.version(),
-                    draft.revision(), draft.status().name(), draft.graph(), draft.formSchema());
+                    draft.revision(), draft.status().name(), draft.graph(), draft.formSchema(), draft.notificationTexts());
         }
     }
 

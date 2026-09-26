@@ -30,7 +30,9 @@ class TemplateCopyMigrationTest {
 
         Flyway.configure().dataSource(dataSource).load().migrate();
 
-        assertThat(jdbc.queryForMap("SELECT * FROM approval_definition WHERE id=?", id)).isEqualTo(before);
+        var after = jdbc.queryForMap("SELECT * FROM approval_definition WHERE id=?", id);
+        assertThat(after.remove("NOTIFICATION_TEXTS_JSON")).isNull();
+        assertThat(after).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM template_copy", Integer.class)).isZero();
         assertThatThrownBy(() -> jdbc.update("""
                 INSERT INTO template_copy (definition_id,tenant_id,template_key,template_version,copied_by,copied_at)

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import DefinitionNotificationTexts from './components/DefinitionNotificationTexts.vue'
+import { copyNotificationTexts } from './notificationTexts'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
 import WorkspaceNavigation from './components/WorkspaceNavigation.vue'
@@ -60,7 +62,7 @@ import type { PendingWrite } from './pendingWrites.js'
 type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
-const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value }))
+const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }))
 const simulationOpen = ref(false)
 const simulationResult = ref<SimulationResult | null>(null)
 const simulationGraph = computed(graphPayload)
@@ -120,6 +122,7 @@ const definitionStatus = ref('DRAFT')
 const definitionKey = ref('expense-reimbursement')
 const definitionName = ref('费用报销审批')
 const definitionFormSchema = ref<FormSchema | null>(defaultFormSchema())
+const definitionNotificationTexts = ref(copyNotificationTexts())
 const catalogOpen = ref(false)
 const savedSnapshot = ref('')
 const editorSession = ref(0)
@@ -229,10 +232,10 @@ function defaultGraph() {
   selectedId.value = 'amount'
   selectedEdgeId.value = ''
 }
-function snapshot() { return JSON.stringify({ key: definitionKey.value, name: definitionName.value, conditionLanguageVersion: conditionLanguageVersion.value, nodes: nodes.value, edges: edges.value, formSchema: definitionFormSchema.value }) }
+function snapshot() { return JSON.stringify({ key: definitionKey.value, name: definitionName.value, conditionLanguageVersion: conditionLanguageVersion.value, nodes: nodes.value, edges: edges.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }) }
 function remember() { history.value.push(snapshot()); if (history.value.length > 50) history.value.shift(); future.value = [] }
 // 首次保存前的撤销快照可能尚无标识；已落库草稿的身份不能随内容撤销。
-function restore(raw: string) { const value = JSON.parse(raw); conditionLanguageVersion.value = value.conditionLanguageVersion ?? 1; if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null) }
+function restore(raw: string) { const value = JSON.parse(raw); conditionLanguageVersion.value = value.conditionLanguageVersion ?? 1; if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null); definitionNotificationTexts.value = copyNotificationTexts(value.notificationTexts) }
 function undo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
 function redo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
 function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; clearValidation(true) }
@@ -246,7 +249,7 @@ function graphPayload(): Graph {
 function applyDefinition(definition: Definition) {
   editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
   definitionId.value = definition.id
-  definitionKey.value = definition.key; definitionName.value = definition.name; definitionFormSchema.value = cloneSchema(definition.formSchema ?? null)
+  definitionKey.value = definition.key; definitionName.value = definition.name; definitionFormSchema.value = cloneSchema(definition.formSchema ?? null); definitionNotificationTexts.value = copyNotificationTexts(definition.notificationTexts)
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
   conditionLanguageVersion.value = definition.graph.conditionLanguageVersion ?? 1
   nodes.value = loadDesignerNodes(definition.graph.nodes)
@@ -271,7 +274,7 @@ async function newDefinition(copy = false) {
   await confirmReplaceDefinition('放弃修改并新建', () => {
     editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
     page.value = 'designer'; catalogOpen.value = false
-    if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema() }
+    if (!copy) { defaultGraph(); definitionKey.value = ''; definitionName.value = '新审批流程'; definitionFormSchema.value = defaultFormSchema(); definitionNotificationTexts.value = copyNotificationTexts() }
     else definitionFormSchema.value = cloneSchema(definitionFormSchema.value)
     definitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0; definitionStatus.value = 'DRAFT'; resetEditor(); savedSnapshot.value = ''
     notice.value = copy ? '已复制为新草稿，保存后可继续编辑并发布新版本。' : '填写流程标识和名称，完成设计后保存草稿。'
@@ -348,7 +351,7 @@ async function openSavedDefinition(id: string) {
 function clearDesigner() {
   editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; composing.value = false
   defaultGraph(); definitionId.value = ''; definitionRevision.value = 0; definitionVersion.value = 0
-  definitionStatus.value = 'DRAFT'; definitionKey.value = 'expense-reimbursement'; definitionName.value = '费用报销审批'; definitionFormSchema.value = defaultFormSchema()
+  definitionStatus.value = 'DRAFT'; definitionKey.value = 'expense-reimbursement'; definitionName.value = '费用报销审批'; definitionFormSchema.value = defaultFormSchema(); definitionNotificationTexts.value = copyNotificationTexts()
   resetEditor(); savedSnapshot.value = snapshot()
 }
 async function login() {
@@ -544,8 +547,8 @@ async function persistDraft(): Promise<Definition> {
   pendingDraftCheckpoint = checkpoint
   try {
     const definition = definitionId.value
-      ? await api.updateDefinition(definitionId.value, { name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value, expectedRevision: definitionRevision.value })
-      : await api.definition({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value })
+      ? await api.updateDefinition(definitionId.value, { name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value, expectedRevision: definitionRevision.value })
+      : await api.definition({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: graphPayload(), formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value })
     acknowledgeDraft(definition, checkpoint)
     if (pendingDraftCheckpoint === checkpoint) pendingDraftCheckpoint = null
     return definition
@@ -1077,6 +1080,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <DefinitionComparison v-if="comparisonOpen && canManageDefinitions" :input="comparisonInput" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @locate="locateComparisonChange" @close="comparisonOpen = false" />
           <DefinitionSimulation v-if="simulationOpen && canManageDefinitions" :graph="simulationGraph" :form-schema="definitionFormSchema" :scope-key="actorScope + ':' + definitionId + ':' + definitionKey" :locked="busy || writesBlocked || confirmationOpen" @result="simulationResult = $event" @locate="locateDesignTarget" @close="simulationOpen = false" />
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
+          <DefinitionNotificationTexts v-model="definitionNotificationTexts" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <FormSchemaEditor v-model="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
             <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>

@@ -3,6 +3,7 @@ package io.agentflow.definition;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.NotificationTexts;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,8 +96,15 @@ public class DefinitionApplicationService {
     /** 新建携带表单契约的流程草稿。 */
     @Transactional
     public DefinitionDraft create(String tenantId, String key, String name, Graph graph, FormSchema formSchema) {
+        return create(tenantId, key, name, graph, formSchema, null);
+    }
+
+    /** 保存与流程版本共同发布的站内通知配置。 */
+    @Transactional
+    public DefinitionDraft create(String tenantId, String key, String name, Graph graph, FormSchema formSchema,
+                                  NotificationTexts notificationTexts) {
         requireValid(graph, formSchema);
-        DefinitionDraft draft = DefinitionDraft.create(UUID.randomUUID(), tenantId, key, name, graph, formSchema);
+        DefinitionDraft draft = DefinitionDraft.create(UUID.randomUUID(), tenantId, key, name, graph, formSchema, notificationTexts);
         return repository.save(draft);
     }
 
@@ -109,9 +117,16 @@ public class DefinitionApplicationService {
     /** 使用同一个草稿 revision 原子更新表单和流程图。 */
     @Transactional
     public DefinitionDraft update(String tenantId, UUID id, String name, Graph graph, FormSchema formSchema, long expectedRevision) {
+        return update(tenantId, id, name, graph, formSchema, null, expectedRevision);
+    }
+
+    /** 同一 revision 保护图、表单与通知配置，旧调用未传文案时保持原配置。 */
+    @Transactional
+    public DefinitionDraft update(String tenantId, UUID id, String name, Graph graph, FormSchema formSchema,
+                                  NotificationTexts notificationTexts, long expectedRevision) {
         DefinitionDraft draft = get(tenantId, id);
         requireValid(graph, formSchema == null ? draft.formSchema() : formSchema);
-        draft.update(name, graph, formSchema, expectedRevision);
+        draft.update(name, graph, formSchema, notificationTexts, expectedRevision);
         return repository.save(draft);
     }
 
@@ -158,7 +173,7 @@ public class DefinitionApplicationService {
         }
         if (!baseline.key().equals(key)) throw new DomainException("COMPARISON_KEY_MISMATCH", "Comparison requires the same process key");
         return new Comparison(new Baseline(baseline.id(), baseline.key(), baseline.name(), baseline.version()), differences.compare(
-                new DefinitionDiffService.Snapshot(baseline.name(), baseline.graph(), baseline.formSchema()), current));
+                new DefinitionDiffService.Snapshot(baseline.name(), baseline.graph(), baseline.formSchema(), baseline.notificationTexts()), current));
     }
 
     /**

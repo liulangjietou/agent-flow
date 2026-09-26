@@ -72,7 +72,7 @@ class ClasspathProcessTemplateCatalogTest {
             case "unknown-property" -> template.put("unavailable-feature", true);
             case "path" -> ((ObjectNode) template.path("scenarios").get(0)).putArray("expectedPath").add("start").add("end");
             case "field-errors" -> ((ObjectNode) template.path("scenarios").get(0)).putObject("expectedFieldErrors").put("reason", "REQUIRED");
-            case "notification" -> template.put("notificationsAvailable", true);
+            case "notification" -> ((ObjectNode) template.get("notificationTexts")).put("APPROVED", "长".repeat(501));
             case "version-fraction" -> template.put("templateVersion", 1.5);
             case "version-string" -> template.put("templateVersion", "1");
             case "business-type" -> template.put("businessType", "EXPENSE");

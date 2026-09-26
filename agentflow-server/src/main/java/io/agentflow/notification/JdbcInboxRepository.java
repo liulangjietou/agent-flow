@@ -22,7 +22,7 @@ public class JdbcInboxRepository implements InboxRepository {
             UUID.fromString(row.getString("application_id")), row.getString("title"), row.getString("business_no"),
             InboxMessage.Kind.valueOf(row.getString("kind")), row.getString("actor_id"), row.getString("task_id"),
             row.getString("node_name"), row.getInt("round_no"), row.getTimestamp("created_at").toInstant(),
-            row.getTimestamp("read_at") == null ? null : row.getTimestamp("read_at").toInstant());
+            row.getTimestamp("read_at") == null ? null : row.getTimestamp("read_at").toInstant(), row.getString("content"));
 
     /** 复用审批事务所用数据源。 */
     public JdbcInboxRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -31,12 +31,12 @@ public class JdbcInboxRepository implements InboxRepository {
     public void append(String eventKey, InboxMessage message) {
         jdbc.update("""
                 INSERT INTO notification_inbox
-                (id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,task_id,node_name,round_no,created_at)
-                SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS
+                (id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,task_id,node_name,round_no,created_at,content)
+                SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS
                 (SELECT 1 FROM notification_inbox WHERE tenant_id=? AND recipient_id=? AND event_key=?)
                 """, message.id().toString(), message.tenantId(), message.recipient(), eventKey,
                 message.applicationId().toString(), message.title(), message.businessNo(), message.kind().name(),
-                message.actor(), message.taskId(), message.nodeName(), message.roundNo(), Timestamp.from(message.createdAt()),
+                message.actor(), message.taskId(), message.nodeName(), message.roundNo(), Timestamp.from(message.createdAt()), message.content(),
                 message.tenantId(), message.recipient(), eventKey);
     }
 

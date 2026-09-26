@@ -6,6 +6,7 @@ import io.agentflow.definition.DefinitionSimulator;
 import io.agentflow.definition.DefinitionValidator;
 import io.agentflow.form.FormSchema;
 import io.agentflow.form.FormValidationException;
+import io.agentflow.notification.NotificationTexts;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,7 +27,7 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
                               Graph graph, FormSchema formSchema, List<Scenario> scenarios) {
     private static final String SUPPORTED_BUSINESS_TYPE = "FORM";
 
-    /** 冻结目录说明和业务图，禁止将尚未实现的通知能力声明为可用。 */
+    /** 冻结目录说明与业务图；启用通知的模板仅支持已实现的三类站内文案。 */
     public ProcessTemplate {
         if (key == null || !key.matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || templateVersion < 1) {
             throw new IllegalArgumentException("Template identity is invalid");
@@ -45,9 +46,16 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
         graph = Objects.requireNonNull(graph);
         formSchema = Objects.requireNonNull(formSchema);
         scenarios = List.copyOf(scenarios);
-        if (scenarios.isEmpty() || notificationsAvailable) {
+        if (scenarios.isEmpty() || !java.util.Set.of("SUBMITTED", "RETURNED", "APPROVED").containsAll(notificationTexts.keySet())) {
             throw new IllegalArgumentException("Template scenarios or notification capability is invalid");
         }
+        new NotificationTexts(notificationTexts.get("SUBMITTED"), notificationTexts.get("RETURNED"), notificationTexts.get("APPROVED"));
+    }
+
+    /** 复制时显式启用目录声明的文案；参考文案不被悄悄启用。 */
+    public NotificationTexts copiedNotificationTexts() {
+        return notificationsAvailable ? new NotificationTexts(notificationTexts.get("SUBMITTED"),
+                notificationTexts.get("RETURNED"), notificationTexts.get("APPROVED")) : NotificationTexts.EMPTY;
     }
 
     /** 启动时执行同一套表单与条件语义，目录损坏必须阻止应用启动。 */

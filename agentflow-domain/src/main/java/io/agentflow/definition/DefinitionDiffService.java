@@ -2,6 +2,7 @@ package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
+import io.agentflow.notification.NotificationTexts;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,6 +28,7 @@ public final class DefinitionDiffService {
         compareNodes(changes, before.graph(), after.graph());
         compareEdges(changes, before.graph(), after.graph());
         compareForm(changes, before.formSchema(), after.formSchema());
+        modified(changes, Area.DEFINITION, "", "站内通知", "notificationTexts", before.notificationTexts(), after.notificationTexts());
         return List.copyOf(changes);
     }
 
@@ -133,7 +135,11 @@ public final class DefinitionDiffService {
      * 定义配置快照，不包含租户数据或申请内容。
      * @author owlzhangfq@gmail.com
      */
-    public record Snapshot(String name, Graph graph, FormSchema formSchema) { }
+    public record Snapshot(String name, Graph graph, FormSchema formSchema, NotificationTexts notificationTexts) {
+        /** 旧比较调用未配置通知文案。 */
+        public Snapshot(String name, Graph graph, FormSchema formSchema) { this(name, graph, formSchema, NotificationTexts.EMPTY); }
+        public Snapshot { notificationTexts = Objects.requireNonNullElse(notificationTexts, NotificationTexts.EMPTY); }
+    }
 
     /**
      * 布局单独分组，避免与执行配置混淆。
