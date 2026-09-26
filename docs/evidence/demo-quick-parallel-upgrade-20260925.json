@@ -1,0 +1,141 @@
+{
+  "date": "2026-09-25",
+  "status": "PASS",
+  "businessSourceCommit": "a23b1b55dd3b3d2bad1b3a25cb8b96171a50d632",
+  "entry": "http://127.0.0.1:8180/",
+  "sourceGate": {
+    "java": 747,
+    "frontend": 264,
+    "tools": 38,
+    "javaFiles": 297,
+    "namedJavaTypes": 470,
+    "reusedVerifiedArtifacts": true,
+    "businessSourceChanged": false
+  },
+  "fixture": {
+    "result": "PASS",
+    "restoredTablesMatch": 67,
+    "upgradeAndRollbackPreservedTables": 67,
+    "quickParallelActualOperations": 92,
+    "actualOpenapiOperations": 65,
+    "originalCountersignContinuedInBrowser": true,
+    "originalReturnedRoundAndCommentPreserved": true,
+    "rollbackCases": 2,
+    "mainBusinessDataWritten": false
+  },
+  "quickRuntime": {
+    "result": "PASS",
+    "base": "http://127.0.0.1:8297",
+    "operations": 92,
+    "processKey": "quick-parallel-fb812c80",
+    "definitionId": "0fdfb464-95af-45a9-9ef4-ce2f42cd5fa1",
+    "nodes": 14,
+    "edges": 17,
+    "cases": [
+      {
+        "amount": "5",
+        "applicationId": "f4de2325-f0a8-4a69-93b5-5b894dbf96a6",
+        "status": "APPROVED",
+        "completed": [
+          "审批 1",
+          "审批 5",
+          "审批 6",
+          "审批 2",
+          "审批 3"
+        ]
+      },
+      {
+        "amount": "20",
+        "applicationId": "3597f872-9d64-46c8-8239-d96b691ad582",
+        "status": "APPROVED",
+        "completed": [
+          "审批 1",
+          "审批 5",
+          "审批 6",
+          "审批 2",
+          "审批 3",
+          "审批 4"
+        ]
+      }
+    ]
+  },
+  "quickRollback": {
+    "result": "PASS",
+    "pendingTasksPreserved": true,
+    "oldRuntimeContinuedExclusiveMerge": true,
+    "cases": [
+      {
+        "amount": "5",
+        "applicationId": "aaa02230-733e-4874-b743-8ad4bf25a106",
+        "taskCount": 5,
+        "status": "APPROVED"
+      },
+      {
+        "amount": "20",
+        "applicationId": "47a921ac-c51c-4f45-b65a-b8fa5467fa02",
+        "taskCount": 6,
+        "status": "APPROVED"
+      }
+    ]
+  },
+  "main": {
+    "result": "PASS",
+    "target": "main",
+    "sourceCommit": "a23b1b55dd3b3d2bad1b3a25cb8b96171a50d632",
+    "jarSha256": "22d86e51e0399637bb1733be220d1b418aeb0cf2936451b3eb2fc0108780c0ba",
+    "webFilesSha256": {
+      "index.html": "7aad56c627a2a12c2cb2bfe311e45b230f47c3417eeb7c40213edcc47ef03fd4",
+      "assets/index-DTXiWWLq.css": "62874efe3cffa6d388bd0c288a7f8796d6dda4dd0325f7499e0960bc59db5d10",
+      "assets/index-BI-YvJK9.js": "86b251fe8ce7ed6fd97ad6ac36daf5fb2470d39d63196f054d259493832bf44e"
+    },
+    "readiness": "UP",
+    "schemaVersion": "23",
+    "containers": {
+      "database": {
+        "id": "307a9af8b6d8c834be1e5949c415f708a3514e4694e228ec73b492208103a641",
+        "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+      },
+      "server": {
+        "id": "909985151f45a56f65c6a7051f40114234211411dfe1ed4378541d922c486110",
+        "image": "sha256:6122ed2535a6f7a0ab646ea44b90b06a7a21539e460834ca9175b9d2e06470e3"
+      },
+      "web": {
+        "id": "e98e7439328d65c4341fa4d1414574c8d8c7d17380e8c81a06682eddbaec75d8",
+        "image": "sha256:38b00ae603c18d8d76b875a0522ecca06964aa5c25cb740d31c53f9f1c96500b"
+      }
+    }
+  },
+  "mainPreservation": {
+    "tableCount": 67,
+    "readOnlyResponses": 6,
+    "checkedAfterCutoverAndBrowser": true,
+    "databaseContainerAndVolumeRetained": true,
+    "migrationVersion": "V23"
+  },
+  "browser": {
+    "mainQuickParallelMenuVisible": true,
+    "mainSystemChecks": "4/4",
+    "mainBusinessMutations": false,
+    "fixtureOriginalCountersignApproved": true,
+    "consoleErrors": 0,
+    "consoleWarnings": 0
+  },
+  "cleanup": {
+    "result": "PASS",
+    "fixtureServicesStopped": true,
+    "fixtureDataRetained": true,
+    "backupsRetained": true,
+    "oldMainContainersStoppedAndRetained": true,
+    "dependencySymlinkRemoved": true,
+    "browserTabsClosed": true,
+    "mainTablesPreservedAfterBrowser": 67,
+    "mainReadOnlyResponsesPreservedAfterBrowser": 6
+  },
+  "delivery": {
+    "gitRemoteConfigured": false,
+    "prCreated": false,
+    "remoteCiRun": false,
+    "remainingMajorPackages": 8
+  },
+  "privateEvidenceRoot": "/fyoung/tmp/agentflow-quick-parallel-upgrade-20260925"
+}

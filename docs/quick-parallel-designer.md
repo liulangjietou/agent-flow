@@ -46,4 +46,4 @@ python3 scripts/check-parallel-gateways.py http://127.0.0.1:18181 --exercise
 node agentflow-web/scripts/check-openapi.mjs http://127.0.0.1:18181 --exercise
 ```
 
-机器可读记录见 [验收证据](evidence/quick-parallel-designer-20260925.json)。分支为 `codex/quick-parallel-designer`。本次源码验收不代表主演示已升级，8180 仍运行上一版结构化并行网关；部署需要后续独立验证。仓库没有 Git 远端，未推送、未创建 PR 或执行远端 CI。企业组织、财务、Agent、SLA 及完整生产验收仍未完成。
+机器可读记录见 [源码验收证据](evidence/quick-parallel-designer-20260925.json)。分支为 `codex/quick-parallel-designer`。后续已完成[主演示升级验收](demo-quick-parallel-upgrade.md)：8180 运行该功能，隔离升级／回退及原数据保留通过；源码验收 JSON 保留当时尚未部署的历史状态。仓库没有 Git 远端，未推送、未创建 PR 或执行远端 CI。企业组织、财务、Agent、SLA 及完整生产验收仍未完成。
