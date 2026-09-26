@@ -1,0 +1,104 @@
+{
+  "verifiedOn": "2026-09-25",
+  "sourceCommit": "02dd10ba4898a6455179975ca908be2c2c9ec3e7",
+  "sourceVerification": "parallel-gateways-20260925.json",
+  "runtime": {
+    "status": "PASS",
+    "sourceCommit": "02dd10ba4898a6455179975ca908be2c2c9ec3e7",
+    "jarSha256": "54aa6ab15a6a19eb5a442a4bd653f4276246d3eb8a6f898e026a5e85a72c46c9",
+    "webBuildMatches": true,
+    "readiness": "UP",
+    "httpStatus": 200,
+    "databaseId": "307a9af8b6d8c834be1e5949c415f708a3514e4694e228ec73b492208103a641",
+    "unchangedTables": 67,
+    "unchangedReadOnlyResponses": 6,
+    "oldContainersRetained": true,
+    "defaultImageTagsUpdated": true,
+    "browser": {
+      "login": "PASS",
+      "parallelPalette": "PASS",
+      "systemChecks": "4/4",
+      "schema": "V23",
+      "businessWrites": false
+    }
+  },
+  "images": {
+    "server": "sha256:04cb6cc4899c2ad0e88c33bee6a1635d0c79fd15525339eef603c1a07ad2ba52",
+    "web": "sha256:cc0717b0b5b8b880bbd34d719dea807f946aa32707a2d195b4be2d6a6c8f3cfc"
+  },
+  "containers": {
+    "server": {
+      "id": "410f6588314699bd5be7f1906101ce2bb5a8aec1fd530885d1f9f321ada05b55",
+      "oldId": "d9dece8eb3ac25e06cbf8fc4fadaa5fa9f42a7114fa49585245532e734701db8",
+      "retainedName": "agentflow-before-parallel-20260925-server"
+    },
+    "web": {
+      "id": "d8eca263c15736a2d711ee3040d5f0f3f6daba08b43ccba5f321bc3207df476b",
+      "oldId": "698be55ab31837ad1495fb79e638ac9a1d43f7f7619d5e7fff07e0168350ab26",
+      "retainedName": "agentflow-before-parallel-20260925-web"
+    }
+  },
+  "isolatedAcceptance": {
+    "status": "PASS",
+    "restoredTablesMatch": 67,
+    "upgradeOldTasksPreserved": true,
+    "rollbackOldTasksPreserved": true,
+    "newParallelContinuedOnOldRuntime": true,
+    "browserContinuedOriginalCountersign": "APPROVED",
+    "verifiedJarSha256": "54aa6ab15a6a19eb5a442a4bd653f4276246d3eb8a6f898e026a5e85a72c46c9",
+    "runtimeImages": {
+      "server": "sha256:04cb6cc4899c2ad0e88c33bee6a1635d0c79fd15525339eef603c1a07ad2ba52",
+      "web": "sha256:cc0717b0b5b8b880bbd34d719dea807f946aa32707a2d195b4be2d6a6c8f3cfc"
+    }
+  },
+  "rollback": {
+    "status": "PASS",
+    "applicationId": "acc19fa9-5c90-4646-baf7-02c2e7eed654",
+    "oldRuntimeContinuedPublishedParallel": true,
+    "pendingTaskIdsPreserved": true,
+    "allBranchesRequired": true,
+    "finalStatus": "APPROVED"
+  },
+  "firstAttempt": {
+    "result": "PASS",
+    "primaryRuntime": "restored stage75",
+    "preservedTables": 67,
+    "preservedReadResponses": 6,
+    "reason": "Transient Docker CLI daemon connection failure during read-only artifact check",
+    "isolatedCandidateStillHealthy": true
+  },
+  "readRetryTest": {
+    "originalTransientReadFailed": true,
+    "boundedReadRetryPassed": true,
+    "mutationNotRetried": true,
+    "test": "PASS"
+  },
+  "cleanup": {
+    "isolatedContainersStopped": [
+      "f9234507e659b85c40aab93e482f241fdc213b0a5be7bd14315dc70f4e94d88a",
+      "1409b15600457fc8bd3337cad4356ff7b9296dd14c82c816a0ee40801a358722",
+      "0098582497b94d66387c459bce1c5699bfd85eb08324b611cf170b6e059d9f7e",
+      "4d757612ac195ac63c69971a38957a02ffb4c6bf4f597f25a8d782669124caa1"
+    ],
+    "previewProcessesStopped": [
+      23911,
+      23912
+    ],
+    "closedPorts": [
+      8296,
+      18180,
+      5200,
+      59280
+    ],
+    "volumesBackupsAndWorktreesRetained": true,
+    "dependencySymlinkRemoved": true,
+    "browserTabClosed": true
+  },
+  "delivery": {
+    "remoteConfigured": false,
+    "pushed": false,
+    "pullRequestCreated": false,
+    "remoteCiRun": false,
+    "fullPlatformComplete": false
+  }
+}

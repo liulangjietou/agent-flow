@@ -91,7 +91,8 @@
     "remoteConfigured": false,
     "pushed": false,
     "pullRequestCreated": false,
-    "mainRuntimeUpdated": false
+    "mainRuntimeUpdated": true,
+    "runtimeEvidence": "demo-parallel-upgrade-20260925.json"
   },
   "verificationBoundary": "Isolated development validation; enterprise production acceptance and full platform are incomplete."
 }

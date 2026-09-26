@@ -41,4 +41,4 @@ python3 scripts/check-parallel-gateways.py http://127.0.0.1:18180 --exercise
 
 ## 当前交付状态
 
-本次源码位于 `codex/parallel-gateways`，以上验证来自独立 H2、PostgreSQL 和浏览器环境。主 Docker 演示仍运行阶段 75，尚未更新本功能；源码提交或同步不等于运行环境已升级。仓库尚未配置 Git 远端，因此没有推送、PR 或远程 CI 结果。
+源码提交 `02dd10b` 位于 `codex/parallel-gateways`，已同步 main 和本地 Docker 演示 8180。独立恢复副本完成升级、回退及原待办继续办理，主演示切换前后 67 张表和六个业务只读响应一致；页面确认并行入口和系统自检通过。详见 [本地部署验收](demo-parallel-upgrade.md)。仓库尚未配置 Git 远端，因此没有推送、PR 或远程 CI 结果。
