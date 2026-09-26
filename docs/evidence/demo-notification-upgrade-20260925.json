@@ -1,0 +1,243 @@
+{
+  "date": "2026-09-25",
+  "timezone": "America/New_York",
+  "sourceCommit": "d9f698821155ca24646295cb7533b9ffaf148ac6",
+  "branch": "codex/notification-demo-delivery",
+  "mainUrl": "http://127.0.0.1:8180/",
+  "status": "DEPLOYED",
+  "privateArtifacts": "/fyoung/tmp/agentflow-notification-upgrade-20260925",
+  "priorFullGate": {
+    "reusedSameArtifacts": true,
+    "rerunThisDeployment": false,
+    "sourceEvidence": "definition-notification-texts-20260925.json",
+    "tests": {
+      "java": {
+        "domain": 194,
+        "server": 561,
+        "total": 755,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "frontend": 266,
+      "tools": 38,
+      "typecheckAndBuild": "PASS",
+      "authors": {
+        "javaFiles": 302,
+        "namedTypes": 475,
+        "missingTags": 0,
+        "parseErrors": 0
+      }
+    }
+  },
+  "initialRestore": {
+    "matchedSourceTables": 67,
+    "archiveSha256": "6468b5822c59fd94e8a118e4c53dd808ebf4b987fb075b63adf6ea6a87df6d99"
+  },
+  "switches": {
+    "fixture-upgrade": {
+      "result": "PASS",
+      "preservedBusinessAndEngineTables": 66,
+      "oldMigrationHistoryUnchanged": true,
+      "migration": "23 -> 24",
+      "mode": "candidate",
+      "containers": {
+        "database": {
+          "id": "30d57891c08190794a5c8e19020d6c1d8fa73a7da7482401cd65a24b7e7ee991",
+          "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "server": {
+          "id": "e7d36bb7ecf105c948fbf206a81ba83a86f44ec23f21c5a80e1dcdb76db68b95",
+          "image": "sha256:b99aac94cd7d29dc0102bf16ce4367cd123f8981a5bd004cd7b7913d719a9901"
+        },
+        "web": {
+          "id": "da6a4f17398f797b549c924b84d55d4d5f30302eb1e602146bb5dd2892f58e55",
+          "image": "sha256:22420a5759509ac3ba8e0ce121580232e603981f9e7d7d86538d28b9bb1b1899"
+        }
+      }
+    },
+    "fixture-rollback": {
+      "result": "PASS",
+      "preservedBusinessAndEngineTables": 66,
+      "oldMigrationHistoryUnchanged": true,
+      "migration": "24 unchanged",
+      "mode": "original",
+      "containers": {
+        "database": {
+          "id": "30d57891c08190794a5c8e19020d6c1d8fa73a7da7482401cd65a24b7e7ee991",
+          "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "server": {
+          "id": "25dc3fb062f9a3ad1eae0065f2f0589e2fb4247d0f207a2cdda4be236adfe9dd",
+          "image": "sha256:6122ed2535a6f7a0ab646ea44b90b06a7a21539e460834ca9175b9d2e06470e3"
+        },
+        "web": {
+          "id": "df08d5baaa1c1d5aa8e02c2ec1f5c4d3908c0db185bd688247335018d406fd16",
+          "image": "sha256:38b00ae603c18d8d76b875a0522ecca06964aa5c25cb740d31c53f9f1c96500b"
+        }
+      }
+    },
+    "fixture-upgrade-again": {
+      "result": "PASS",
+      "preservedBusinessAndEngineTables": 66,
+      "oldMigrationHistoryUnchanged": true,
+      "migration": "24 unchanged",
+      "mode": "candidate",
+      "containers": {
+        "database": {
+          "id": "30d57891c08190794a5c8e19020d6c1d8fa73a7da7482401cd65a24b7e7ee991",
+          "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+        },
+        "server": {
+          "id": "b45ca47fa535b326fa27c7c2a2d92e03992d749a15d9fb0dd5a13a70bcbfe1b4",
+          "image": "sha256:b99aac94cd7d29dc0102bf16ce4367cd123f8981a5bd004cd7b7913d719a9901"
+        },
+        "web": {
+          "id": "7b2d798fe45057aff9013f27192fd8bc91a8bace5b93c16dc2c516e170f1528d",
+          "image": "sha256:22420a5759509ac3ba8e0ce121580232e603981f9e7d7d86538d28b9bb1b1899"
+        }
+      }
+    }
+  },
+  "rollbackBusinessProof": {
+    "result": "PASS",
+    "rollbackApplications": [
+      "dc48e45b-462d-4a14-907c-8aebf71dd197",
+      "92ef89f5-4adc-4434-9b62-088a6d46c01d"
+    ],
+    "snapshotsPreserved": true,
+    "oldMessagesNotBackfilled": true,
+    "customTextsResumeAfterUpgrade": true
+  },
+  "rollbackLimitation": "Old application preserves stored texts but does not display or generate custom message content. Events during rollback keep the old platform presentation; reupgrade does not backfill them.",
+  "comparisonGuards": {
+    "result": "PASS",
+    "acceptedValidTransitions": 2,
+    "rejectedUnexpectedMutations": [
+      "comment-content",
+      "row-count",
+      "old-history",
+      "extra-column",
+      "backfill",
+      "wrong-migration",
+      "rollback-custom-content"
+    ]
+  },
+  "notificationRuntimeOperations": 32,
+  "openapi": [
+    {
+      "result": "PASS",
+      "operations": 65,
+      "schemas": 113,
+      "requestExamples": 21
+    },
+    {
+      "result": "PASS",
+      "base": "http://127.0.0.1:8298",
+      "operations": 65,
+      "statuses": [
+        200,
+        201,
+        400,
+        401,
+        403,
+        404,
+        409,
+        422
+      ],
+      "processKey": "api-contract-0b204f31",
+      "approved": "403d1e3b-afb2-4eae-9941-10bdc49f6286",
+      "withdrawn": "90f77719-75d6-40e8-9eb5-7a495e561593"
+    }
+  ],
+  "fixtureBrowser": {
+    "result": "PASS",
+    "browser": "Chrome",
+    "base": "http://127.0.0.1:8298",
+    "applicationId": "dbf34c57-1406-4535-ab3a-80aa934271b6",
+    "action": "Approve remaining countersign after upgrade, rollback and reupgrade",
+    "visibleResult": "批准申请已完成，申请状态：已批准",
+    "remainingTasks": 0,
+    "apiFinish": "PASS",
+    "oldReturnedRoundAndCommentsPreserved": true
+  },
+  "mainBrowser": {
+    "result": "PASS",
+    "base": "http://127.0.0.1:8180",
+    "actions": [
+      "Login",
+      "Open existing draft",
+      "Read three empty notification text controls",
+      "Open system checks"
+    ],
+    "businessWrites": 0,
+    "systemChecks": "4/4",
+    "schemaVersion": 24,
+    "consoleWarningsOrErrorsObserved": 0,
+    "tabClosed": true,
+    "databaseAfterBrowser": {
+      "result": "PASS",
+      "preservedBusinessAndEngineTables": 66,
+      "oldMigrationHistoryUnchanged": true,
+      "migration": "24 unchanged"
+    },
+    "preservedApiResponses": 6
+  },
+  "deployment": {
+    "status": "UPGRADED",
+    "preservedBusinessAndEngineTables": 66,
+    "preservedReadOnlyResponses": 6,
+    "allowedApiAddition": "Empty notificationTexts on legacy definition responses",
+    "oldMigrationHistoryUnchanged": true,
+    "newColumnsRemainNull": true,
+    "databaseContainerUnchanged": true,
+    "databaseVolume": "agentflow-demo_demo-postgres",
+    "rollbackInvoked": false
+  },
+  "runtime": {
+    "result": "PASS",
+    "target": "main",
+    "sourceCommit": "d9f698821155ca24646295cb7533b9ffaf148ac6",
+    "jarSha256": "ca23d9c6d71a9f422a0b671c9c0869a9555a368475c6cefa11d0ed731e9b699b",
+    "webFilesSha256": {
+      "index.html": "a0cc538cba5e983f7127fb8d98c1a7c5af31dfcf5c2e4b93aa5d24921250a351",
+      "assets/index-xX5nuj1I.css": "2f096047db67f614481f47f68303c0a2a58b7989d1a418df40c0c2eb5360ee94",
+      "assets/index-Q2LoURQ4.js": "02eb34410853704468991f8e30c0c63b7d26ace2a7d7a45111373d8cd3a19bda"
+    },
+    "readiness": "UP",
+    "schemaVersion": "24",
+    "containers": {
+      "database": {
+        "id": "307a9af8b6d8c834be1e5949c415f708a3514e4694e228ec73b492208103a641",
+        "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c"
+      },
+      "server": {
+        "id": "4d286c2365ede97e68c5df25850cdfdbaac73c7c2d823ce5c4f27529a6fca29a",
+        "image": "sha256:b99aac94cd7d29dc0102bf16ce4367cd123f8981a5bd004cd7b7913d719a9901"
+      },
+      "web": {
+        "id": "33a827b0bdac9a1a4b02b98d15739fcbce3beaea07a9f20b398f3fa76bf18f10",
+        "image": "sha256:22420a5759509ac3ba8e0ce121580232e603981f9e7d7d86538d28b9bb1b1899"
+      }
+    }
+  },
+  "retainedContainers": {
+    "server": "agentflow-before-notification-20260925-server",
+    "web": "agentflow-before-notification-20260925-web"
+  },
+  "cleanup": {
+    "fixtureServicesStopped": true,
+    "oldContainersStoppedAndRetained": true,
+    "databaseVolumesRetained": true,
+    "backupRetained": true,
+    "ownedBrowserTabClosed": true,
+    "dependencySymlinkRemoved": true,
+    "worktreeRetained": true
+  },
+  "remote": {
+    "configured": false,
+    "pushed": false,
+    "pullRequest": null,
+    "ci": null
+  }
+}
