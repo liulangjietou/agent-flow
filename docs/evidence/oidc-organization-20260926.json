@@ -1,0 +1,39 @@
+{
+  "recordedAt": "2026-09-26T12:35:23.057560+00:00",
+  "result": "PASS",
+  "baseline": "814c391c008ffd69017daedb3441a34bf753c91c",
+  "productionCodeChanged": false,
+  "demoAuthenticationEnabled": false,
+  "httpTransport": "real loopback HTTP server and RSA/PKCE OIDC fixture with JDBC sessions",
+  "h2RegressionTests": 30,
+  "postgresJourneyTests": 1,
+  "postgresApplication": {
+    "tenant_id": "oidc-organization-a",
+    "status": "APPROVED",
+    "definition_version": 1,
+    "round_no": 1
+  },
+  "databaseContainerStopped": true,
+  "initialFailure": "新测试将动态observedAt作为不变字段比较；修正为比较节点及候选，未修改业务实现",
+  "enterpriseIdentityProviderVerified": false,
+  "browserVerificationThisTurn": false,
+  "fullGoalComplete": false,
+  "files": [
+    {
+      "path": "/fyoung/tmp/agentflow-oidc-organization-20260926/authors.log",
+      "sha256": "c1d9c1ae169aefbc75c870a1f99c1d3f1696b9e77a677f90b749bc106d2d8a63"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-oidc-organization-20260926/initial.log",
+      "sha256": "4d43a380c6d611fbcc606696437bf6460d5aae0e2e41963145a55be3185cb5d0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-oidc-organization-20260926/postgres.log",
+      "sha256": "6fbb17169e19b180a91fbbda948164c006fb23eeeb710f2bde1714fab8f9eb56"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-oidc-organization-20260926/regression.log",
+      "sha256": "f660f442752fb923c18fc7a7e9ba1999298bb8b0e4cb54044bcb4b3f0431ca2e"
+    }
+  ]
+}
