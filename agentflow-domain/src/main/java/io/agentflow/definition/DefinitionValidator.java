@@ -32,7 +32,7 @@ public final class DefinitionValidator {
                 }
             }
             if (nodes.put(n.id(), n) != null) errors.add("DUPLICATE_NODE:" + n.id());
-            if (n.type() == NodeType.SERVICE_TASK || n.type() == NodeType.PARALLEL_GATEWAY) {
+            if (n.type() == NodeType.SERVICE_TASK) {
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
             }
             if (n.type() == NodeType.USER_TASK) {
@@ -69,6 +69,9 @@ public final class DefinitionValidator {
             } catch (ConditionSyntaxException ex) { errors.add("INVALID_CONDITION_AT:" + e.id() + ":" + ex.position());
             } catch (RuntimeException ex) { errors.add("INVALID_CONDITION:" + e.id()); }
             Node sourceNode = nodes.get(e.source());
+            if (sourceNode != null && sourceNode.type() == NodeType.PARALLEL_GATEWAY && !e.condition().isBlank()) {
+                errors.add("PARALLEL_CONDITION_FORBIDDEN:" + e.id());
+            }
             if (sourceNode != null && sourceNode.type() == NodeType.EXCLUSIVE_GATEWAY
                     && !e.defaultBranch() && e.condition().isBlank()) {
                 errors.add("GATEWAY_BRANCH_CONDITION_REQUIRED:" + e.id());
@@ -89,7 +92,7 @@ public final class DefinitionValidator {
             int outgoingCount = outgoingEdges.getOrDefault(n.id(), List.of()).size();
             if (n.type() == NodeType.START && incoming.contains(n.id())) errors.add("START_MUST_HAVE_NO_INCOMING:" + n.id());
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
-            // 当前只支持顺序与排他分支，普通节点的多出线会在引擎中产生隐式并行。
+            // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
             if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
@@ -115,6 +118,7 @@ public final class DefinitionValidator {
             }
         }
         if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
+        if (errors.isEmpty()) errors.addAll(new ParallelStructureValidator().validate(graph));
         return List.copyOf(errors);
     }
 

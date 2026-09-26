@@ -1,0 +1,97 @@
+{
+  "verifiedOn": "2026-09-25",
+  "baseCommit": "166ae40a47657616b1a8c29dc911989c53e120cd",
+  "branch": "codex/parallel-gateways",
+  "java": {
+    "total": 743,
+    "domain": 190,
+    "server": 553,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "frontend": {
+    "tests": 255,
+    "typecheck": "PASS",
+    "build": "PASS"
+  },
+  "tools": {
+    "tests": 38,
+    "result": "PASS"
+  },
+  "authors": {
+    "javaFiles": 297,
+    "namedTypes": 470,
+    "missing": 0
+  },
+  "openapi": {
+    "operations": 65,
+    "schemas": 112,
+    "requestExamples": 21,
+    "static": "PASS",
+    "postgresExercise": "PASS",
+    "statuses": [
+      200,
+      201,
+      400,
+      401,
+      403,
+      404,
+      409,
+      422
+    ]
+  },
+  "runtime": {
+    "jarSha256": "54aa6ab15a6a19eb5a442a4bd653f4276246d3eb8a6f898e026a5e85a72c46c9",
+    "database": "PostgreSQL 17",
+    "databaseMigration": "V23",
+    "parallelApi": {
+      "result": "PASS",
+      "approvedApplication": "3f67278c-e803-4d82-a4cd-b066680d0f85",
+      "negativeApplications": {
+        "REJECT": "bf0b4571-a550-4855-bc5c-ba012c2b2c5e",
+        "RETURN": "d9b4c037-9e09-4f00-a25c-630f2d263eb7"
+      },
+      "nestedApplication": "0f0bbe63-1856-47ba-8a1d-6709429027ef",
+      "definitionId": "4c0c0b19-5473-4f68-a5a1-4195dcca3b72",
+      "browserDraft": "2d6ae156-917e-4ba0-af48-c8512d7b5511",
+      "browserKey": "parallel-4f84df4e18",
+      "browserName": "并行设计器验收 a2219e",
+      "simulationPath": [
+        "start",
+        "fork",
+        "manager",
+        "finance",
+        "join",
+        "final",
+        "end"
+      ]
+    },
+    "browserEditedDefinition": {
+      "result": "PASS",
+      "definitionId": "4cf20dae-309b-499c-9632-e51e40293a13",
+      "version": 1,
+      "nodeCount": 8,
+      "edgeCount": 9,
+      "parallelBranchCount": 3,
+      "applicationId": "472ce859-f023-4697-896e-4a85f65c1fb5",
+      "status": "APPROVED"
+    }
+  },
+  "browser": [
+    "Chrome / CUA",
+    "added third branch preserving existing branches",
+    "configured user bob and same join",
+    "auto layout and validation",
+    "simulated all three branches before join",
+    "published via UI and read back graph",
+    "executed published flow to APPROVED"
+  ],
+  "delivery": {
+    "remoteConfigured": false,
+    "pushed": false,
+    "pullRequestCreated": false,
+    "mainRuntimeUpdated": false
+  },
+  "verificationBoundary": "Isolated development validation; enterprise production acceptance and full platform are incomplete."
+}

@@ -14,6 +14,8 @@
 .canvas-stage .edge-hit { stroke: transparent; stroke-width: 16px; pointer-events: stroke; }
 .canvas-stage .flow-node { height: 64px; touch-action: none; user-select: none; }
 .canvas-stage .flow-node.start, .canvas-stage .flow-node.end { height: 42px; }
+.canvas-stage .flow-node.parallel_gateway { border-color: var(--purple); background: #f7f3ff; }
+.canvas-stage .flow-node.parallel_gateway .node-icon { color: var(--purple); font-weight: 700; }
 .canvas-hint { flex: 0 0 auto; margin: 0; padding: 10px 13px; color: var(--muted); font-size: 10px; line-height: 1.6; background: #fff; border-top: 1px solid var(--line); }
 @media (max-width: 650px) {
   .designer-layout .canvas-wrap { height: 480px; }

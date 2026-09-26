@@ -73,6 +73,12 @@ export function parseSimulationValues(raw: string): Record<string, unknown> {
 }
 
 const ruleLabels: Record<string, string> = {
+  PARALLEL_BRANCH_REQUIRED: '并行网关需要至少两条入线或两条出线',
+  PARALLEL_CONDITION_FORBIDDEN: '并行出线全部执行，不能设置条件',
+  PARALLEL_JOIN_MISMATCH: '并行汇合必须接齐同一拆分的全部分支，不能把互斥路径分别作为入口',
+  PARALLEL_MERGE_REQUIRES_GATEWAY: '并行分支必须先经并行网关汇合，再进入共同的后续节点',
+  PARALLEL_JOIN_REQUIRED: '并行分支结束前必须先汇合',
+  PARALLEL_BRANCH_CONDITION_REQUIRES_GATEWAY: '并行区域内的条件判断必须通过条件网关，避免丢失待汇合分支',
   BRANCH_COVERAGE_GAP: '数字条件存在未覆盖输入，发布前请补齐条件或设置默认分支',
   CONDITION_MEMBERSHIP_REQUIRES_SCHEMA: '属于判断需要绑定包含单选字段的表单',
   DUPLICATE_NODE: '节点标识重复', DUPLICATE_EDGE: '连线标识重复', EDGE_NODE_NOT_FOUND: '连线引用了不存在的节点',

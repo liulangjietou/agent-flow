@@ -36,6 +36,22 @@ test('无表单与显式空表单往返不混淆', () => {
   }
 })
 
+test('并行模板往返保留拆分、汇合及全部分支，审批方式仍属于各自节点', () => {
+  const value = source()
+  value.graph = { nodes: [
+    { id: 'start', name: '开始', type: 'START', properties: {} },
+    { id: 'fork', name: '同时审批', type: 'PARALLEL_GATEWAY', properties: { x: '180', y: '100' } },
+    { id: 'a', name: '主管', type: 'USER_TASK', properties: { assigneeRule: 'user:manager' } },
+    { id: 'b', name: '财务', type: 'USER_TASK', properties: { assigneeRule: 'role:FINANCE', approvalMode: 'ALL' } },
+    { id: 'join', name: '全部完成', type: 'PARALLEL_GATEWAY', properties: {} },
+    { id: 'end', name: '结束', type: 'END', properties: {} }
+  ], edges: [['start', 'fork'], ['fork', 'a'], ['fork', 'b'], ['a', 'join'], ['b', 'join'], ['join', 'end']]
+    .map(([source, target], index) => ({ id: `edge-${index}`, source, target, condition: '', defaultBranch: false })), conditionLanguageVersion: 1 }
+  const before = structuredClone(value)
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), before)
+  assert.deepEqual(value, before)
+})
+
 test('格式版本、租户数据、脚本扩展、原型属性、非白名单节点整份拒绝', () => {
   const changes = [p => { p.formatVersion = 2 }, p => { p.tenantId = 'foreign' }, p => { p.process.id = 'foreign' },
     p => { p.process.graph.nodes[1].properties.delegateExpression = '${bean.run()}' },

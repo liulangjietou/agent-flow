@@ -8151,7 +8151,8 @@
               "START",
               "END",
               "USER_TASK",
-              "EXCLUSIVE_GATEWAY"
+              "EXCLUSIVE_GATEWAY",
+              "PARALLEL_GATEWAY"
             ]
           },
           "properties": {

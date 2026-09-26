@@ -4,6 +4,9 @@ import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
 import static io.agentflow.definition.DefinitionModels.*;
 
 /**
@@ -27,19 +30,32 @@ public final class DefinitionSimulator {
         List<String> path = new ArrayList<>();
         List<String> edgeIds = new ArrayList<>();
         List<Decision> decisions = new ArrayList<>();
-        Node current = graph.nodes().stream().filter(node -> node.type() == NodeType.START).findFirst().orElseThrow();
-        // 入口已验证无环，因此访问节点数不会超过图中节点数。
-        while (current.type() != NodeType.END) {
+        Node start = graph.nodes().stream().filter(node -> node.type() == NodeType.START).findFirst().orElseThrow();
+        var ready = new ArrayDeque<Node>();
+        ready.add(start);
+        Map<String, Integer> arrivals = new HashMap<>();
+        // 合法并行区域的每条入线只产生一个令牌；全部到齐才记录和越过汇合点。
+        while (!ready.isEmpty()) {
+            Node current = ready.removeFirst();
+            if (current.type() == NodeType.PARALLEL_GATEWAY) {
+                long expected = graph.edges().stream().filter(edge -> edge.target().equals(current.id())).count();
+                if (arrivals.merge(current.id(), 1, Integer::sum) < expected) continue;
+            }
             path.add(current.id());
+            if (current.type() == NodeType.END) continue;
             String source = current.id();
             List<Edge> outgoing = graph.edges().stream().filter(edge -> edge.source().equals(source)).toList();
-            Decision decision = select(source, outgoing, context, graph.conditionLanguageVersion());
-            if (current.type() == NodeType.EXCLUSIVE_GATEWAY) decisions.add(decision);
-            Edge selected = outgoing.stream().filter(edge -> edge.id().equals(decision.selectedEdgeId())).findFirst().orElseThrow();
-            edgeIds.add(selected.id());
-            current = graph.node(selected.target());
+            List<Edge> selected = outgoing;
+            if (current.type() != NodeType.PARALLEL_GATEWAY) {
+                Decision decision = select(source, outgoing, context, graph.conditionLanguageVersion());
+                if (current.type() == NodeType.EXCLUSIVE_GATEWAY) decisions.add(decision);
+                selected = outgoing.stream().filter(edge -> edge.id().equals(decision.selectedEdgeId())).toList();
+            }
+            for (Edge edge : selected) {
+                edgeIds.add(edge.id());
+                ready.addLast(graph.node(edge.target()));
+            }
         }
-        path.add(current.id());
         return new Result(path, edgeIds, decisions);
     }
 

@@ -76,7 +76,9 @@ npm run dev -- --host 127.0.0.1
 - `agentflow-server`：Spring Boot、Flowable/Flyway/JDBC 适配器、认证过滤器和 REST API。
 - `agentflow-web`：Vue 3 + TypeScript 的任务中心、申请表单和流程设计器。
 
-流程设计器只接受 `START`、`END`、`USER_TASK` 和 `EXCLUSIVE_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
+流程设计器接受 `START`、`END`、`USER_TASK`、`EXCLUSIVE_GATEWAY` 和 `PARALLEL_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
+
+高级画布支持[并行拆分与汇合](docs/parallel-gateways.md)：同时启动多个审批分支，全部完成后进入后续步骤；支持嵌套、分支内会签与条件选择，发布前阻止缺分支或交叉汇合造成的永久等待。
 
 Web 端的流程管理、申请记录和待办动作均调用服务端接口。流程设计器支持从当前身份源选择指定账号或审批角色，显示有效成员人数，发布前重新检查无人审批节点；组织关系解析、Agent 预检、发票核验、预算控制和付款台显示为未接入状态，不使用演示数据冒充真实结果。详见[审批人配置与发布检查](docs/designer-assignees.md)。
 

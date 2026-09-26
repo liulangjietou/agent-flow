@@ -72,6 +72,8 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                             .append(escape(node.name())).append("\"/>");
                     case USER_TASK -> appendUserTask(xml, node);
                     case EXCLUSIVE_GATEWAY -> appendGateway(xml, node, graph);
+                    case PARALLEL_GATEWAY -> xml.append("<parallelGateway id=\"").append(escape(node.id()))
+                            .append("\" name=\"").append(escape(node.name())).append("\"/>");
                     default -> throw new IllegalArgumentException("Unsupported publish node type: " + node.type());
                 }
             }

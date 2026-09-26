@@ -57,7 +57,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'END'
+type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value }))
@@ -194,6 +194,7 @@ let stopNodeDrag: (() => void) | null = null
 const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'USER_TASK', label: '人工审批', icon: '人' },
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
+  { type: 'PARALLEL_GATEWAY', label: '并行网关', icon: '＋' },
   { type: 'END', label: '结束节点', icon: '●' }
 ]
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedId.value) ?? null)
@@ -627,7 +628,7 @@ function addNode(type: NodeType, position?: Point) {
   if (editorLocked.value) return
   remember(); const base = selectedNode.value; const id = `${type.toLowerCase()}-${crypto.randomUUID()}`
   nodes.value.push({ id, name: palette.find(item => item.type === type)?.label ?? '节点', type, x: position?.x ?? (base?.x ?? 160) + 180, y: position?.y ?? (base?.y ?? 140) + 80, assigneeRule: '' })
-  if (base && base.type !== 'END' && base.type !== 'EXCLUSIVE_GATEWAY') {
+  if (base && base.type !== 'END' && !['EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(base.type)) {
     const old = edges.value.find(edge => edge.source === base.id)
     if (old) old.source = id
     edges.value.push({ id: `edge-${crypto.randomUUID()}`, source: base.id, target: id, condition: '', defaultBranch: false })
@@ -675,7 +676,7 @@ function connectNode() {
   const node = selectedNode.value
   if (editorLocked.value || !node || node.type === 'END' || !connectionTarget.value || edges.value.some(edge => edge.source === node.id && edge.target === connectionTarget.value)) return
   remember()
-  if (node.type !== 'EXCLUSIVE_GATEWAY') edges.value = edges.value.filter(edge => edge.source !== node.id)
+  if (!['EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(node.type)) edges.value = edges.value.filter(edge => edge.source !== node.id)
   edges.value.push({ id: `edge-${crypto.randomUUID()}`, source: node.id, target: connectionTarget.value, condition: '', defaultBranch: false }); connectionTarget.value = ''
 }
 function toggleDefault(edge: GraphEdge) {
@@ -1047,7 +1048,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
@@ -1055,10 +1056,10 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" v-model:approval-mode="selectedNode.approvalMode" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
-                <div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY'" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
+                <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY'" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>
               </template>
-              <template v-else-if="selectedEdge"><div class="inspector-head"><div><p class="eyebrow">EDGE PROPERTY</p><h3>连线条件</h3></div></div><ConditionEditor v-if="!selectedEdge.defaultBranch" :key="selectedEdge.id" :model-value="selectedEdge.condition" :language-version="conditionLanguageVersion" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchQuickEdge(selectedEdge.id, $event)" /><p v-else class="field-help">其他条件均不满足时进入默认分支。</p><button v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'EXCLUSIVE_GATEWAY'" class="secondary" @click="toggleDefault(selectedEdge)">{{ selectedEdge.defaultBranch ? '取消默认分支' : '设为默认分支' }}</button><button class="delete-button" @click="deleteSelected">删除连线</button></template>
+              <template v-else-if="selectedEdge"><div class="inspector-head"><div><p class="eyebrow">EDGE PROPERTY</p><h3>连线条件</h3></div></div><p v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'PARALLEL_GATEWAY'" class="field-help">并行连线全部执行，不设置条件或默认分支。</p><ConditionEditor v-else-if="!selectedEdge.defaultBranch" :key="selectedEdge.id" :model-value="selectedEdge.condition" :language-version="conditionLanguageVersion" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchQuickEdge(selectedEdge.id, $event)" /><p v-else class="field-help">其他条件均不满足时进入默认分支。</p><button v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'EXCLUSIVE_GATEWAY'" class="secondary" @click="toggleDefault(selectedEdge)">{{ selectedEdge.defaultBranch ? '取消默认分支' : '设为默认分支' }}</button><button class="delete-button" @click="deleteSelected">删除连线</button></template>
               <div v-else class="inspector-empty"><span>＋</span><h3>选择节点或连线</h3><p>在这里配置流程属性。</p></div>
             </fieldset></aside>
           </div>
