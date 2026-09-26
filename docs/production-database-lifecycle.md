@@ -86,3 +86,7 @@ mvn -B -ntp -pl agentflow-server -am \
 测试 URL 不带查询参数，测试会在该库中创建随机 `schema71_*` schema；仅用于隔离库，数据保留供排障。GitHub 工作流增加了对应 PostgreSQL 17 job；是否实际执行远程 CI 以仓库交付记录为准。
 
 技术依据：[Flowable 数据库配置](https://www.flowable.com/open-source/docs/bpmn/ch03-Configuration)、[Flyway 校验语义](https://documentation.red-gate.com/flyway/reference/commands/validate)。具体行为以项目锁定的 Flowable 7.2.0、Flyway 11.7.2 及实际数据库验证为准。
+
+## 当前 V26 升级证据
+
+已补充当前发布包从 V24 直接升级到 V26 的隔离 PostgreSQL 验证：原业务字段与迁移历史保留，旧在途申请继续批准，旧包严格拒绝 V26，重复迁移无数据变化。环境、版本和边界见 [V26 升级兼容记录](v26-upgrade-compatibility.md)。
