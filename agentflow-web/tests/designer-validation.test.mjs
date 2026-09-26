@@ -27,3 +27,22 @@ test('切换账号与卸载后的迟到失败不会恢复旧校验，错误和�
   const stuck=new DesignerValidation(()=>new Promise(()=>{}),5)
   assert.equal(await stuck.run(graph(),null),undefined);assert.match(stuck.error,/超时/);assert.equal(stuck.loading,false)
 })
+
+test('流程标识随校验快照发送，图未变但标识改变后旧结果仍失效', async () => {
+  globalThis.localStorage = { getItem: () => 'identifier-token' }
+  const { api } = await import(process.env.AGENTFLOW_TEST_API)
+  const calls = []
+  globalThis.fetch = async (_url, init) => {
+    const call = { body: JSON.parse(init.body), signal: init.signal, ...deferred() }
+    calls.push(call); return call.promise
+  }
+  const view = new DesignerValidation(api.validateDefinition)
+  const old = view.run(graph(), null, 'approve')
+  assert.equal(calls[0].body.key, 'approve')
+  const current = view.run(graph(), null, 'corrected-process')
+  assert.equal(calls[0].signal.aborted, true)
+  assert.equal(calls[1].body.key, 'corrected-process')
+  calls[1].resolve(Response.json({ errors: [], branchDiagnostics: [] })); await current
+  calls[0].resolve(Response.json({ errors: ['PROCESS_KEY_CONFLICT:approve'], branchDiagnostics: [] })); await old
+  assert.deepEqual(view.result.errors, [])
+})

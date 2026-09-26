@@ -18,6 +18,7 @@ const KEY_CHECK_DELAY_MS = 300
 let keyTimer: ReturnType<typeof setTimeout> | undefined
 const sameKey = computed(() => keyQuery.loaded && keyQuery.items.length > 0)
 watch(() => [props.scopeKey, targetKey.value.trim()], () => {
+  review.invalidateCheck()
   clearTimeout(keyTimer); keyQuery.clear()
   if (targetKey.value.trim() && !targetErrors.value.key) keyTimer = setTimeout(() => { void keyQuery.load(props.scopeKey, { processKey: targetKey.value.trim() }) }, KEY_CHECK_DELAY_MS)
 }, { flush: 'sync' })
@@ -68,10 +69,10 @@ onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); cl
         <template v-if="review.value">
           <div class="template-summary"><strong>{{ review.value.name }}</strong><span>来源标识 {{ review.value.key }}</span><p>{{ review.value.graph.nodes.length }} 个节点 · {{ review.value.graph.edges.length }} 条连线 · {{ review.value.formSchema?.fields.length ?? 0 }} 个字段</p></div>
           <details><summary>预览审批人和表单</summary><ul class="config-list"><li v-for="node in approvals" :key="node.id"><strong>{{ node.name }}</strong><span>{{ node.properties.assigneeRule || '未配置审批人' }} · {{ node.properties.approvalMode === 'ALL' ? '全员会签' : '单人办理' }}</span></li></ul><ul class="config-list"><li v-for="field in review.value.formSchema?.fields ?? []" :key="field.key"><strong>{{ field.label }}</strong><span>{{ fieldTypes.find(type => type.value === field.type)?.label }} · {{ field.required ? '必填' : '选填' }}</span></li></ul><p v-if="!review.value.formSchema" class="explanation">来源流程未绑定版本化表单。</p></details>
-          <div class="check-row"><button class="secondary" :disabled="locked || review.loading" @click="review.check()">{{ review.reviewed ? '重新检查模板' : '检查模板' }}</button><span v-if="review.reviewed && !review.errors.length" class="check-success" role="status">结构、表单与当前审批人检查通过。</span></div>
+          <div class="check-row"><button class="secondary" :disabled="locked || review.loading" @click="review.check(targetKey.trim())">{{ review.reviewed ? '重新检查模板' : '检查模板' }}</button><span v-if="review.reviewed && !review.errors.length" class="check-success" role="status">结构、表单与当前审批人检查通过。</span></div>
           <ul v-if="issues.length" class="transfer-issues" role="status"><li v-for="(issue, index) in issues" :key="index">{{ issue }}</li></ul>
           <p v-if="review.canImport && review.errors.length" class="explanation">可先创建草稿，在设计器中修正审批人或分支覆盖。发布前必须重新通过检查。</p>
-          <p v-else-if="review.reviewed && review.errors.length" class="transfer-error">模板存在结构或条件问题，请在来源设计器修正并重新导出。</p>
+          <p v-else-if="review.reviewed && review.errors.length" class="transfer-error">请按上方提示修正后重新检查。目标流程标识冲突可在下方修改；结构或条件问题需在来源设计器修正并重新导出。</p>
           <fieldset :disabled="locked || review.loading" class="target-fields"><legend>新草稿</legend><label>目标流程标识<input v-model="targetKey" maxlength="64" placeholder="例如 team-leave" :aria-invalid="attempted && !!targetErrors.key" /><small v-if="attempted && targetErrors.key" class="transfer-error">{{ targetErrors.key }}</small></label><label>流程名称<input v-model="targetName" maxlength="128" :aria-invalid="attempted && !!targetErrors.name" /><small v-if="attempted && targetErrors.name" class="transfer-error">{{ targetErrors.name }}</small></label></fieldset>
           <p v-if="keyQuery.error" class="unsaved-note">未能检查同名流程。导入始终创建独立草稿，相同标识以后发布为该流程的新版本。</p>
           <p v-if="sameKey" class="unsaved-note">此标识已有流程。将创建独立草稿；以后发布时会成为该流程的新版本，已有版本和申请保持不变。</p>

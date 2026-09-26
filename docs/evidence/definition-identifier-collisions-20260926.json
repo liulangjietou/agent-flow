@@ -1,0 +1,396 @@
+{
+  "date": "2026-09-26",
+  "branch": "codex/definition-identifier-collisions",
+  "base": "b111d32478233e060773af42d835a8fcc28cc1c0",
+  "scope": "Reject collisions across process, node and edge identifiers before save or deployment",
+  "java": {
+    "tests": 769,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "frontend": {
+    "tests": 269,
+    "failed": 0,
+    "build": "PASS"
+  },
+  "tools": {
+    "tests": 38,
+    "failed": 0
+  },
+  "authors": {
+    "javaFiles": 304,
+    "namedTypes": 477,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "openapi": {
+    "operations": 65,
+    "schemas": 113,
+    "requestExamples": 21,
+    "runtime": "PASS"
+  },
+  "database": {
+    "result": "PASS",
+    "migration": "V24 unchanged",
+    "originalTablesPreserved": 66,
+    "originalHistoryPreserved": true
+  },
+  "runtime": {
+    "result": "PASS",
+    "cases": [
+      {
+        "scenario": "node-edge",
+        "diagnostic": "NODE_EDGE_ID_CONFLICT:approve",
+        "definitionId": "f5538251-5718-4e56-b933-4d8342b4d0b5",
+        "invalidCreateUpdatePublishRejected": true,
+        "rejectedWritesPreservedDraft": true,
+        "rejectedPublishCreatedNoEngineDefinition": true,
+        "correctedPublishedAndApproved": true
+      },
+      {
+        "scenario": "process-node",
+        "diagnostic": "PROCESS_KEY_CONFLICT:approve",
+        "definitionId": "d5017712-8d86-432d-ae79-6fd0aea587f8",
+        "invalidCreateUpdatePublishRejected": true,
+        "rejectedWritesPreservedDraft": true,
+        "rejectedPublishCreatedNoEngineDefinition": true,
+        "correctedPublishedAndApproved": true
+      },
+      {
+        "scenario": "process-edge",
+        "diagnostic": "PROCESS_KEY_CONFLICT:first",
+        "definitionId": "8bcb3814-b6da-4791-a8bc-e0387f9a6d09",
+        "invalidCreateUpdatePublishRejected": true,
+        "rejectedWritesPreservedDraft": true,
+        "rejectedPublishCreatedNoEngineDefinition": true,
+        "correctedPublishedAndApproved": true
+      }
+    ],
+    "graphOnlyPreviewCompatible": true,
+    "oldRunningApplicationApproved": true,
+    "oldDefinitionAndFrozenNotificationsPreserved": true,
+    "operations": [
+      {
+        "method": "GET",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/validate",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "status": 422
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5/publish?expectedRevision=0",
+        "status": 422
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5/publication",
+        "status": 422
+      },
+      {
+        "method": "PUT",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5",
+        "status": 422
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5",
+        "status": 200
+      },
+      {
+        "method": "PUT",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/f5538251-5718-4e56-b933-4d8342b4d0b5/publish?expectedRevision=1",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/3f62a40e-6f60-4a6e-9135-ee917bf205c4/submit",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/tasks",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/tasks/efd10db8-b960-11f1-a19d-ce71447a37f7/actions",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/validate",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "status": 422
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8/publish?expectedRevision=0",
+        "status": 422
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8/publication",
+        "status": 422
+      },
+      {
+        "method": "PUT",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8",
+        "status": 422
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8",
+        "status": 200
+      },
+      {
+        "method": "PUT",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/d5017712-8d86-432d-ae79-6fd0aea587f8/publish?expectedRevision=1",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/17c52f55-b4d3-4cf7-b5a5-e8fd868320f2/submit",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/tasks",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/tasks/f0203f41-b960-11f1-a19d-ce71447a37f7/actions",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/validate",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "status": 422
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09/publish?expectedRevision=0",
+        "status": 422
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09/publication",
+        "status": 422
+      },
+      {
+        "method": "PUT",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09",
+        "status": 422
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09",
+        "status": 200
+      },
+      {
+        "method": "PUT",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/8bcb3814-b6da-4791-a8bc-e0387f9a6d09/publish?expectedRevision=1",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/1d7fefa3-117e-4154-a13f-6020f1069f4d/submit",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/tasks",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/tasks/f071458a-b960-11f1-a19d-ce71447a37f7/actions",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/validate",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/a4445b9f-eabe-41f4-ad80-b05fa42164f1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/tasks",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/tasks/c36fa9e4-b960-11f1-9b47-5ee8bace1680/actions",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/notifications?limit=100",
+        "status": 200
+      }
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "definitionId": "f871780f-390f-4d0e-8753-723abda04de7",
+    "processKey": "identifier-browser-20260926",
+    "publishedVersion": 1,
+    "browser": {
+      "processKeyStartRejectedWithFriendlyMessage": true,
+      "keyEditInvalidatedOldValidation": true,
+      "correctedKeyPublishedFromUI": true
+    },
+    "actualWorkflowCases": [
+      {
+        "amount": 1000,
+        "approvers": [
+          "manager"
+        ],
+        "applicationId": "dda0a649-4296-47e4-957c-17d8d5a84659",
+        "status": "APPROVED"
+      },
+      {
+        "amount": 6000,
+        "approvers": [
+          "manager",
+          "finance"
+        ],
+        "applicationId": "8de426d9-917d-40f7-a06d-bcc3b6a14adc",
+        "status": "APPROVED"
+      }
+    ],
+    "fileUploadNotRetested": "Previously denied by Chrome extension file URL permission; no bypass attempted"
+  },
+  "artifacts": {
+    "verifiedRuntimeJarSha256": "e79a09d0948f6905696a3b0b5567b434f7d92fb3e0431fc04c14168ec05cb56d",
+    "finalBuildJarSha256": "dcf6ee5a0591fddd826820c36bd44c0db7b0a30b1a81e7380af4afb8d263308c",
+    "allJarEntryContentsEqual": true,
+    "comparedEntries": 648
+  },
+  "redReproduction": {
+    "javaNewTests": 14,
+    "domainFailures": 3,
+    "serverFailures": 6,
+    "serverErrors": 3,
+    "testFailureIgnoreUsedOnlyToCollectInitialFailures": true,
+    "frontendFailures": 3
+  },
+  "limitations": [
+    "No additional browser file upload verification because the prior extension file URL permission denial remains unresolved",
+    "Three asynchronous message channel close errors observed in Chrome; source not established",
+    "No main demo deployment in this change",
+    "No Git remote, push, PR or remote CI"
+  ],
+  "cleanup": {
+    "browserTabClosed": true,
+    "backendStopped": true,
+    "frontendStopped": true,
+    "databaseStoppedAndRetained": true,
+    "nodeModulesSymlinkRemoved": true,
+    "worktreeRetainedWithoutRemote": true
+  },
+  "evidenceFiles": {
+    "/fyoung/tmp/agentflow-identifier-fixture/acceptance.py": "66a4bffde4c5940f9cc3e0c095ac5198cd9ece1a8705e0822fe85671f7e1f042",
+    "/fyoung/tmp/agentflow-identifier-fixture/api.py": "6aa018812a3ae787d3f47a551117157621183271f3f9e1b6b9c6229497dc6fcb",
+    "/fyoung/tmp/agentflow-identifier-fixture/control.py": "3f39e56872ffe5178feffdb0c75f4ee79dae51127a6ddabc8c7edd5fd8510eff",
+    "/fyoung/tmp/agentflow-identifier-fixture/browser_verify.py": "780731a8265368a97d8acc4c6f6e4fde5080162bf063d0225ebc3c3f49232988",
+    "/fyoung/tmp/agentflow-identifier-fixture/seed.json": "b567c487d9dbf7db44631af17c6d6e458e52d7cb6448d1e58a27c25feb1d2e50",
+    "/fyoung/tmp/agentflow-identifier-fixture/migration-report.json": "368c720e2074a9e7d0635e6ead5d382c179a59afdd118b9b8b705c32b12aefdf",
+    "/fyoung/tmp/agentflow-identifier-fixture/runtime-report.json": "368208abb2c60730534136b3bcdf3dd56032f9c1efe58ee782c760a7f7605ad9",
+    "/fyoung/tmp/agentflow-identifier-fixture/browser-report.json": "a40ae0969ec10c418a6e17af05f1ee9b1593ff9b6081e4abf974e434566a8862",
+    "/fyoung/tmp/agentflow-identifier-fixture/artifact-comparison.json": "62175239984b74dec76fc6b69da854453b4eb6b70936dbb44a9eb11fe5e62e38",
+    "/fyoung/tmp/agentflow-identifier-fixture/before-tables.json": "2c499d2eb11d718992b127d35df7f1874b7bca1cf9788602c7083e8446984925",
+    "/fyoung/tmp/agentflow-identifier-fixture/after-tables.json": "2c499d2eb11d718992b127d35df7f1874b7bca1cf9788602c7083e8446984925",
+    "/fyoung/tmp/agentflow-identifier-fixture/before-history.json": "ab754c1f2a3ee24165b23b243d953e45a9a47b586acfd093e33126f3a347bf9f",
+    "/fyoung/tmp/agentflow-identifier-fixture/after-history.json": "ab754c1f2a3ee24165b23b243d953e45a9a47b586acfd093e33126f3a347bf9f"
+  },
+  "logs": {
+    "/fyoung/tmp/agentflow-identifier-red.log": "0762c04fd777f622343d3615520863d5c555a99df30e0756016ef647d312ca31",
+    "/fyoung/tmp/agentflow-identifier-web-red.log": "9b4601c523058b7660c016b9f601de3dbf726241b3f9bbb2c1564cd128890e2d",
+    "/fyoung/tmp/agentflow-identifier-focused.log": "b03e496eb79214173ca7dc121714b15c378d38a964d16d89aa5c3eeeec7c2011",
+    "/fyoung/tmp/agentflow-identifier-verify-final2.log": "6eac2bb75929c873c6d6c30dbb8255fc5e2464b145f4f1c7b814d77b1bc03c4a",
+    "/fyoung/tmp/agentflow-identifier-web-tests-final.log": "1b2d70a1066e36230056df0c1eada6f9f0932fe4a8ea378f8da0c0b0c9d38c0d",
+    "/fyoung/tmp/agentflow-identifier-web-build-final.log": "74c3d97d690d2fe4f6f1d51f35a40779abe47a42c8c3740c2008be3d4479e848",
+    "/fyoung/tmp/agentflow-identifier-tools.log": "7ffb8ce1790b78e9f55c134847f33154ee5bae3cdb0eee774f876b90a9b832c7",
+    "/fyoung/tmp/agentflow-identifier-authors-final.log": "d164449f92b2114404c7b6a99c93467002edf52a229b2d3d7353f780e4b0afda",
+    "/fyoung/tmp/agentflow-identifier-openapi-runtime.log": "6fb0054489e8095d4de9716ea658db69b4484016772f2e4f6042e09b24ce43fd"
+  }
+}

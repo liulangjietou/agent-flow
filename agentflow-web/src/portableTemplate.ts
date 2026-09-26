@@ -108,12 +108,18 @@ export class PortableTemplateReview {
   private generation = 0
   private controller: AbortController | null = null
 
-  constructor(private validate: (graph: Graph, schema: FormSchema | null, signal: AbortSignal) => Promise<{ errors: string[] }>) {}
+  constructor(private validate: (graph: Graph, schema: FormSchema | null, signal: AbortSignal, key?: string) => Promise<{ errors: string[] }>) {}
 
   /** 清空文件及预检；不触及设计器内容和持久化状态。 */
   clear() {
+    this.invalidateCheck()
+    this.value = null
+  }
+
+  /** 目标流程标识改变后保留已读文件，但原检查结果与迟到响应不能继续放行。 */
+  invalidateCheck() {
     this.generation++; this.controller?.abort(); this.controller = null
-    this.value = null; this.loading = false; this.reviewed = false; this.errors = []; this.error = ''
+    this.loading = false; this.reviewed = false; this.errors = []; this.error = ''
   }
 
   /** 文件选择并不会创建或覆盖草稿。 */
@@ -133,14 +139,14 @@ export class PortableTemplateReview {
   }
 
   /** 复用服务端结构校验与当前租户身份目录，不产生定义或引擎实例。 */
-  async check() {
+  async check(key?: string) {
     if (!this.value || this.loading) return
     const generation = this.generation, controller = new AbortController(), value = this.value
     this.controller = controller; this.loading = true; this.reviewed = false; this.errors = []; this.error = ''
     let timeout: ReturnType<typeof setTimeout> | undefined
     try {
       const result = await Promise.race([
-        this.validate(value.graph, value.formSchema, controller.signal),
+        this.validate(value.graph, value.formSchema, controller.signal, key),
         new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('检查超时，请重试检查。')) }, 12_000) })
       ])
       if (generation === this.generation) { this.errors = result.errors; this.reviewed = true }

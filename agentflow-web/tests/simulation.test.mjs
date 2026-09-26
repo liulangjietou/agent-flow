@@ -77,6 +77,11 @@ test('条件错误定位保留含冒号的连线标识和字符位置', () => {
   assert.equal(issue.target,'edge:part');assert.match(issue.label,/第 9 个字符/)
 })
 
+test('标识冲突提示说明冲突类型，保留定位标识', () => {
+  assert.deepEqual(simulationIssue('NODE_EDGE_ID_CONFLICT:approve'), { label: '连线与节点标识重复，请在高级画布删除该连线后重新连接', target: 'approve' })
+  assert.deepEqual(simulationIssue('PROCESS_KEY_CONFLICT:edge:part'), { label: '流程标识与节点或连线标识重复，请更换流程标识', target: 'edge:part' })
+})
+
 test('条件升级只读请求携带原图与取消信号，不创建幂等写入', async () => {
   const {api,writeRequests}=await import(process.env.AGENTFLOW_TEST_API)
   const controller=new AbortController(), graph={nodes:[],edges:[],conditionLanguageVersion:1}

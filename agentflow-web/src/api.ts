@@ -323,6 +323,6 @@ export const api = {
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null; notificationTexts?: NotificationTexts }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null; notificationTexts?: NotificationTexts }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
   upgradeConditions: (graph: Graph, signal?: AbortSignal) => request<Graph>('/process-definitions/upgrade-conditions', { method: 'POST', body: JSON.stringify({ graph }), signal }),
-  validateDefinition: (graph: Graph, formSchema?: FormSchema | null, signal?: AbortSignal) => request<ValidationResult>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema }), signal }),
+  validateDefinition: (graph: Graph, formSchema?: FormSchema | null, signal?: AbortSignal, key?: string) => request<ValidationResult>('/process-definitions/validate', { method: 'POST', body: JSON.stringify({ graph, formSchema, key }), signal }),
   publishDefinition: (id: string, revision: number, changeNote: string) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/publish?expectedRevision=${revision}`, 'POST', '发布流程', { changeNote })
 }

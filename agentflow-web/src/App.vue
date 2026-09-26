@@ -146,7 +146,7 @@ const autosaveLabel = computed(() => autosave.saving ? '正在保存草稿…' :
   : !definitionId.value && !dirty.value ? '首次修改后自动保存'
   : autosave.scheduled || dirty.value ? '编辑停顿 2 秒后自动保存' : '草稿已保存')
 const validationOpened = ref(false)
-const validation = reactive(new DesignerValidation((graph, schema, signal) => api.validateDefinition(graph, schema, signal)))
+const validation = reactive(new DesignerValidation(api.validateDefinition))
 let validationTimer: ReturnType<typeof setTimeout> | undefined
 const validationErrors = computed(() => validation.result?.errors ?? [])
 const branchDiagnostics = computed(() => validation.result?.branchDiagnostics ?? [])
@@ -524,7 +524,7 @@ function clearValidation(close = false) {
 }
 async function validateGraph() {
   clearTimeout(validationTimer); validationOpened.value = true
-  const result = await validation.run(graphPayload(), definitionFormSchema.value)
+  const result = await validation.run(graphPayload(), definitionFormSchema.value, definitionKey.value.trim())
   return !!result && result.errors.length === 0
 }
 async function validate() { if (!busy.value) await validateGraph() }
@@ -812,7 +812,7 @@ watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publica
 watch([() => snapshot(), draftScope, page, loggedIn, canManageDefinitions, autosaveEnabled, readonlyDefinition,
   busy, writesBlocked, confirmationOpen, publicationOpen, logoutOpen, dragging, composing, savedSnapshot], () => autosave.observe())
 
-watch([nodes, edges, definitionName, definitionFormSchema, conditionLanguageVersion], () => {
+watch([nodes, edges, definitionKey, definitionName, definitionFormSchema, conditionLanguageVersion], () => {
   clearValidation()
   if (validationOpened.value && page.value === 'designer' && loggedIn.value) {
     validationTimer = setTimeout(() => { void validateGraph() }, 450)

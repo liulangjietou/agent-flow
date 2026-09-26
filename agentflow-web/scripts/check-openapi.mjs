@@ -85,7 +85,12 @@ async function exercise(base) {
   await call('GET', guidePath, {user:'alice',status:403})
   await call('GET', guidePath, {path:guidePath + '?tenantId=other',status:400})
 
-  assert.deepEqual((await call('POST', defs + '/validate', { body: { graph: create.graph } })).errors, [])
+  assert.deepEqual((await call('POST', defs + '/validate', { body: { graph: create.graph, key: create.key } })).errors, [])
+  const conflictingId = create.graph.nodes[0].id
+  assert.ok((await call('POST', defs + '/validate', { body: { graph: create.graph, key: conflictingId } })).errors.includes('PROCESS_KEY_CONFLICT:' + conflictingId))
+  const collidingGraph = structuredClone(create.graph)
+  collidingGraph.edges[0].id = conflictingId
+  assert.ok((await call('POST', defs + '/validate', { body: { graph: collidingGraph } })).errors.includes('NODE_EDGE_ID_CONFLICT:' + conflictingId))
   await call('POST', defs + '/simulate', { body: { graph: create.graph, values: {} } })
   await call('POST', defs + '/{id}/simulate', { path: defPath + '/simulate', body: { values: {} } })
   definition = await call('PUT', defs + '/{id}', { path: defPath, body: { name: '接口契约验收流程', graph: create.graph, expectedRevision: definition.revision } })

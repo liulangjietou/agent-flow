@@ -202,3 +202,23 @@ test('通知文案拒绝未知事件、超长和控制字符，空配置不会�
   const empty = parsePortableTemplate(serializePortableTemplate({ ...source(), notificationTexts: {} }))
   assert.deepEqual(empty.notificationTexts, { submitted: '', returned: '', approved: '' })
 })
+
+test('导入按目标流程标识校验，修改标识后保留文件但取消旧检查', async () => {
+  const calls = []
+  const review = new PortableTemplateReview((graph, schema, signal, key) => {
+    const call = { graph, schema, signal, key, ...deferred() }; calls.push(call); return call.promise
+  })
+  await review.read(file(serializePortableTemplate(source())))
+  const original = review.value
+  const pending = review.check('review')
+  assert.equal(calls[0].key, 'review')
+  review.invalidateCheck()
+  assert.equal(calls[0].signal.aborted, true)
+  assert.equal(review.value, original)
+  assert.equal(review.canImport, false)
+  calls[0].resolve({ errors: [] }); await pending
+  assert.equal(review.reviewed, false)
+  const corrected = review.check('new-process')
+  calls[1].resolve({ errors: [] }); await corrected
+  assert.equal(calls[1].key, 'new-process'); assert.equal(review.canImport, true)
+})

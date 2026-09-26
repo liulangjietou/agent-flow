@@ -10,7 +10,7 @@ export class DesignerValidation {
   private controller: AbortController | null = null
 
   /** 注入只读校验请求；超时同样使本次结果失效。 */
-  constructor(private fetch: (graph: Graph, form: FormSchema | null, signal: AbortSignal) => Promise<ValidationResult>, private timeoutMs = 12_000) {}
+  constructor(private fetch: (graph: Graph, form: FormSchema | null, signal: AbortSignal, key?: string) => Promise<ValidationResult>, private timeoutMs = 12_000) {}
 
   /** 编辑、切换和卸载立即清除旧高亮，并取消正在执行的读取。 */
   clear() {
@@ -19,7 +19,7 @@ export class DesignerValidation {
   }
 
   /** 仅返回本次仍有效的结果；结果未知时不能允许发布。 */
-  async run(graph: Graph, form: FormSchema | null) {
+  async run(graph: Graph, form: FormSchema | null, key?: string) {
     this.clear()
     const generation = this.generation, controller = new AbortController()
     const input = JSON.parse(JSON.stringify({ graph, form })) as { graph: Graph; form: FormSchema | null }
@@ -27,7 +27,7 @@ export class DesignerValidation {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       const result = await Promise.race([
-        this.fetch(input.graph, input.form, controller.signal),
+        this.fetch(input.graph, input.form, controller.signal, key),
         new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('校验超时，请重试。')) }, this.timeoutMs) })
       ])
       if (generation !== this.generation) return

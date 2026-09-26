@@ -82,6 +82,8 @@ const ruleLabels: Record<string, string> = {
   BRANCH_COVERAGE_GAP: '数字条件存在未覆盖输入，发布前请补齐条件或设置默认分支',
   CONDITION_MEMBERSHIP_REQUIRES_SCHEMA: '属于判断需要绑定包含单选字段的表单',
   DUPLICATE_NODE: '节点标识重复', DUPLICATE_EDGE: '连线标识重复', EDGE_NODE_NOT_FOUND: '连线引用了不存在的节点',
+  NODE_EDGE_ID_CONFLICT: '连线与节点标识重复，请在高级画布删除该连线后重新连接',
+  PROCESS_KEY_CONFLICT: '流程标识与节点或连线标识重复，请更换流程标识',
   START_COUNT_MUST_BE_ONE: '流程必须只有一个开始节点', END_REQUIRED: '流程缺少结束节点',
   NODE_UNREACHABLE: '节点无法从开始节点到达', NODE_DEAD_END: '节点没有后续路径', GRAPH_LOOP: '流程存在循环，请移除回流连线',
   APPROVAL_MODE_INVALID: '审批方式不合法，请选择单人审批或全员会签',

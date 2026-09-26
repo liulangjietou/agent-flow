@@ -58,7 +58,12 @@ public class DefinitionApplicationService {
 
     /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
     public Validation inspect(Graph graph, FormSchema formSchema) {
-        List<String> errors = validator.validate(graph, formSchema);
+        return inspect(graph, formSchema, null);
+    }
+
+    /** 预检携带当前流程标识时，同图元素一起验证，不查询或修改流程定义。 */
+    public Validation inspect(Graph graph, FormSchema formSchema, String processKey) {
+        List<String> errors = validator.validate(graph, formSchema, processKey);
         if (!errors.isEmpty()) return new Validation(errors, List.of());
         var diagnostics = coverage.analyze(graph, formSchema);
         var routingErrors = diagnostics.stream().filter(issue -> issue.severity() == BranchCoverageAnalyzer.Severity.ERROR)
@@ -68,7 +73,12 @@ public class DefinitionApplicationService {
 
     /** 管理员检查在纯领域结果之外核对当前租户的审批人目录。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema) {
-        Validation result = inspect(graph, formSchema);
+        return inspect(tenantId, graph, formSchema, null);
+    }
+
+    /** 先检查标识和图结构，再核对当前租户审批人，发布与设计预检共用。 */
+    public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
+        Validation result = inspect(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
         var errors = unavailableAssignees(tenantId, graph);
         return new Validation(errors, result.branchDiagnostics());
@@ -103,7 +113,7 @@ public class DefinitionApplicationService {
     @Transactional
     public DefinitionDraft create(String tenantId, String key, String name, Graph graph, FormSchema formSchema,
                                   NotificationTexts notificationTexts) {
-        requireValid(graph, formSchema);
+        requireValid(graph, formSchema, key);
         DefinitionDraft draft = DefinitionDraft.create(UUID.randomUUID(), tenantId, key, name, graph, formSchema, notificationTexts);
         return repository.save(draft);
     }
@@ -125,7 +135,7 @@ public class DefinitionApplicationService {
     public DefinitionDraft update(String tenantId, UUID id, String name, Graph graph, FormSchema formSchema,
                                   NotificationTexts notificationTexts, long expectedRevision) {
         DefinitionDraft draft = get(tenantId, id);
-        requireValid(graph, formSchema == null ? draft.formSchema() : formSchema);
+        requireValid(graph, formSchema == null ? draft.formSchema() : formSchema, draft.key());
         draft.update(name, graph, formSchema, notificationTexts, expectedRevision);
         return repository.save(draft);
     }
@@ -134,7 +144,7 @@ public class DefinitionApplicationService {
     @Transactional
     public DefinitionDraft publish(Actor publisher, UUID id, long expectedRevision, String changeNote) {
         DefinitionDraft draft = get(publisher.tenantId(), id);
-        Validation validation = inspect(publisher.tenantId(), draft.graph(), draft.formSchema());
+        Validation validation = inspect(publisher.tenantId(), draft.graph(), draft.formSchema(), draft.key());
         if (!validation.errors().isEmpty()) throw new DefinitionValidationException(validation.errors());
         long version = repository.nextVersion(publisher.tenantId(), draft.key());
         DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now(), validation.branchDiagnostics());
@@ -207,8 +217,8 @@ public class DefinitionApplicationService {
                 .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList();
     }
 
-    private void requireValid(Graph graph, FormSchema formSchema) {
-        List<String> errors = validator.validate(graph, formSchema);
+    private void requireValid(Graph graph, FormSchema formSchema, String processKey) {
+        List<String> errors = validator.validate(graph, formSchema, processKey);
         if (!errors.isEmpty()) {
             throw new DefinitionValidationException(errors);
         }

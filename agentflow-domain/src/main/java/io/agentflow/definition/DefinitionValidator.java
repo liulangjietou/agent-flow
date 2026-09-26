@@ -21,9 +21,15 @@ public final class DefinitionValidator {
 
     /** 在结构检查之外验证条件字段和表单类型。 */
     public List<String> validate(Graph graph, FormSchema formSchema) {
+        return validate(graph, formSchema, null);
+    }
+
+    /** 图元素共享标识空间；已知流程标识时一并检查，避免部署时才发生冲突。 */
+    public List<String> validate(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (n.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + n.id());
             String approvalMode = n.properties().get("approvalMode");
             if (approvalMode != null) {
                 if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_MODE_REQUIRES_USER_TASK:" + n.id());
@@ -64,6 +70,8 @@ public final class DefinitionValidator {
         ConditionParser parser = new ConditionParser();
         for (Edge e : graph.edges()) {
             if (!edgeIds.add(e.id())) errors.add("DUPLICATE_EDGE:" + e.id());
+            if (nodes.containsKey(e.id())) errors.add("NODE_EDGE_ID_CONFLICT:" + e.id());
+            if (e.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + e.id());
             if (!nodes.containsKey(e.source()) || !nodes.containsKey(e.target())) errors.add("EDGE_NODE_NOT_FOUND:" + e.id());
             outgoing.add(e.source()); incoming.add(e.target());
             try {

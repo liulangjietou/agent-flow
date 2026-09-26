@@ -47,8 +47,8 @@ public class DefinitionController {
         Actor actor = currentActor.actor();
         // 普通用户仍可检查图结构，但不得通过校验接口探测身份目录中的账号。
         var validation = canManageDefinitions(actor)
-                ? service.inspect(actor.tenantId(), request.graph(), request.formSchema())
-                : service.inspect(request.graph(), request.formSchema());
+                ? service.inspect(actor.tenantId(), request.graph(), request.formSchema(), request.key())
+                : service.inspect(request.graph(), request.formSchema(), request.key());
         return new ValidationResponse(validation.errors(), validation.branchDiagnostics());
     }
 
@@ -165,10 +165,10 @@ public class DefinitionController {
     public record ComparisonRequest(@NotBlank String key, @NotBlank String name, @NotNull Graph graph, FormSchema formSchema, NotificationTexts notificationTexts) { }
 
     /**
-     * 设计器请求图。
+     * 设计器请求图；可选 key 用于预检流程标识，旧图校验请求保持兼容。
      * @author owlzhangfq@gmail.com
      */
-    public record GraphRequest(@NotNull Graph graph, FormSchema formSchema) { }
+    public record GraphRequest(@NotNull Graph graph, FormSchema formSchema, String key) { }
     /**
      * 创建定义请求。
      * @author owlzhangfq@gmail.com
