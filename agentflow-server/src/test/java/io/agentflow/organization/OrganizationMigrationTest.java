@@ -17,9 +17,9 @@ class OrganizationMigrationTest {
     @Test
     void upgradesV25WithoutRewritingExistingDataAndRejectsCrossTenantReferences() {
         var source = new DriverManagerDataSource(
-                System.getProperty("agentflow.organization-migration.jdbc-url", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
-                System.getProperty("agentflow.organization-migration.jdbc-user", "sa"),
-                System.getProperty("agentflow.organization-migration.jdbc-password", ""));
+                System.getProperty("agentflow.organization-migration.jdbc-url", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_MIGRATION_URL", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1")),
+                System.getProperty("agentflow.organization-migration.jdbc-user", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_MIGRATION_USER", "sa")),
+                System.getProperty("agentflow.organization-migration.jdbc-password", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_MIGRATION_PASSWORD", "")));
         Flyway.configure().dataSource(source).target("25").load().migrate();
         var jdbc = new JdbcTemplate(source);
         String definition = UUID.randomUUID().toString();
@@ -56,9 +56,9 @@ class OrganizationMigrationTest {
     @Test
     void upgradesV26PreservingAppointmentsAndAddingNoInventedHistoricalContext() {
         var source = new DriverManagerDataSource(
-                System.getProperty("agentflow.context-migration.jdbc-url", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
-                System.getProperty("agentflow.context-migration.jdbc-user", "sa"),
-                System.getProperty("agentflow.context-migration.jdbc-password", ""));
+                System.getProperty("agentflow.context-migration.jdbc-url", System.getenv().getOrDefault("AGENTFLOW_CONTEXT_MIGRATION_URL", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1")),
+                System.getProperty("agentflow.context-migration.jdbc-user", System.getenv().getOrDefault("AGENTFLOW_CONTEXT_MIGRATION_USER", "sa")),
+                System.getProperty("agentflow.context-migration.jdbc-password", System.getenv().getOrDefault("AGENTFLOW_CONTEXT_MIGRATION_PASSWORD", "")));
         Flyway.configure().dataSource(source).target("26").load().migrate();
         var jdbc = new JdbcTemplate(source);
         String legal = UUID.randomUUID().toString(), department = UUID.randomUUID().toString(), position = UUID.randomUUID().toString();

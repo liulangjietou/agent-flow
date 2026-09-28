@@ -43,10 +43,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FieldPermissionsIntegrationTest {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> System.getProperty("agentflow.field-test.jdbc-url", "jdbc:h2:mem:field-permissions;DB_CLOSE_DELAY=-1"));
-        registry.add("spring.datasource.driver-class-name", () -> System.getProperty("agentflow.field-test.jdbc-driver", "org.h2.Driver"));
-        registry.add("spring.datasource.username", () -> System.getProperty("agentflow.field-test.jdbc-user", "sa"));
-        registry.add("spring.datasource.password", () -> System.getProperty("agentflow.field-test.jdbc-password", ""));
+        registry.add("spring.datasource.url", () -> System.getProperty("agentflow.field-test.jdbc-url", System.getenv().getOrDefault("AGENTFLOW_FIELD_TEST_URL", "jdbc:h2:mem:field-permissions;DB_CLOSE_DELAY=-1")));
+        registry.add("spring.datasource.driver-class-name", () -> System.getProperty("agentflow.field-test.jdbc-driver", System.getenv().getOrDefault("AGENTFLOW_FIELD_TEST_DRIVER", "org.h2.Driver")));
+        registry.add("spring.datasource.username", () -> System.getProperty("agentflow.field-test.jdbc-user", System.getenv().getOrDefault("AGENTFLOW_FIELD_TEST_USER", "sa")));
+        registry.add("spring.datasource.password", () -> System.getProperty("agentflow.field-test.jdbc-password", System.getenv().getOrDefault("AGENTFLOW_FIELD_TEST_PASSWORD", "")));
     }
 
     @Autowired MockMvc mvc;

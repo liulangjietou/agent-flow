@@ -40,6 +40,40 @@ jobs:
           AGENTFLOW_SESSION_TEST_PASSWORD: isolated-ci-database-only
         run: mvn -B -ntp -pl agentflow-server -am -Dtest=SharedSessionIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
+      - name: Verify organization, field access and query boundaries on PostgreSQL
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+          PG_TEST_DATABASE_PREFIX: agentflow_business
+          AGENTFLOW_PG_TEST_BASE_URL: jdbc:postgresql://localhost:5432/
+          PGPASSWORD: isolated-ci-database-only
+        run: |
+          postgres_cases=(
+            'AGENTFLOW_ORGANIZATION_TEST:organization'
+            'AGENTFLOW_ORGANIZATION_MIGRATION:organization_migration'
+            'AGENTFLOW_CONTEXT_MIGRATION:context_migration'
+            'AGENTFLOW_FIELD_TEST:field_permissions'
+            'AGENTFLOW_QUEUE_TEST:pending_queue'
+            'AGENTFLOW_OPERATIONS_TEST:operations'
+            'AGENTFLOW_ROUND_ORGANIZATION_MIGRATION:round_organization'
+          )
+          for test_case in "${postgres_cases[@]}"; do
+            IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
+            test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"
+            docker exec -e PGPASSWORD "$PG_CONTAINER" createdb -h 127.0.0.1 -U "$AGENTFLOW_SCHEMA_TEST_USERNAME" "$test_database"
+            export "${test_config_prefix}_URL=${AGENTFLOW_PG_TEST_BASE_URL}${test_database}"
+            export "${test_config_prefix}_USER=${AGENTFLOW_SCHEMA_TEST_USERNAME}"
+            export "${test_config_prefix}_PASSWORD=${AGENTFLOW_SCHEMA_TEST_PASSWORD}"
+            export "${test_config_prefix}_DRIVER=org.postgresql.Driver"
+          done
+          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+          for test_case in "${postgres_cases[@]}"; do
+            IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
+            test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"
+            actual_version=$(docker exec -e PGPASSWORD "$PG_CONTAINER" psql -h 127.0.0.1 -U "$AGENTFLOW_SCHEMA_TEST_USERNAME" -d "$test_database" -Atc 'SELECT max(version::integer) FROM flyway_schema_history')
+            test "$actual_version" -gt 0
+            printf '%s: schema V%s verified\n' "$test_database_suffix" "$actual_version"
+          done
+
   verify:
     runs-on: ubuntu-latest
     steps:
