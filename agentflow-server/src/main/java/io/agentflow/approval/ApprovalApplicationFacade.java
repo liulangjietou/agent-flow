@@ -3,6 +3,7 @@ package io.agentflow.approval;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.expense.ExpenseFormContract;
+import io.agentflow.expense.ExpensePlanFormContract;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -86,8 +87,13 @@ public class ApprovalApplicationFacade {
         }
         if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
-        if (reference == null && ExpenseFormContract.structured(formSchema)) throw businessEndpointRequired();
-        if (reference != null) ExpenseFormContract.requireSchema(formSchema);
+        if (reference == null && (ExpenseFormContract.structured(formSchema) || ExpensePlanFormContract.structured(formSchema))) throw businessEndpointRequired();
+        if (reference != null) {
+            switch (reference.type()) {
+                case EXPENSE -> ExpenseFormContract.requireSchema(formSchema);
+                case EXPENSE_PLAN -> ExpensePlanFormContract.requireSchema(formSchema);
+            }
+        }
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
         var application = service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
                 formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts(), reference);

@@ -73,6 +73,19 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("ExpensePlanView", io.agentflow.expense.ExpensePlanService.View.class),
+                java.util.Map.entry("ExpensePlanReceipt", io.agentflow.expense.ExpensePlanService.Receipt.class),
+                java.util.Map.entry("ExpensePlanContent", io.agentflow.expense.ExpensePlanContent.class),
+                java.util.Map.entry("ExpensePlanLine", io.agentflow.expense.ExpensePlanContent.Line.class),
+                java.util.Map.entry("ExpensePlanRound", io.agentflow.expense.ExpensePlanRound.class),
+                java.util.Map.entry("ExpensePlanFrozenLine", io.agentflow.expense.ExpensePlanRound.FrozenLine.class),
+                java.util.Map.entry("ExpensePlanItem", io.agentflow.expense.ExpensePlanQuery.Item.class),
+                java.util.Map.entry("ExpensePlanPage", io.agentflow.expense.ExpensePlanQuery.Page.class),
+                java.util.Map.entry("ExpensePlanCheckOptions", io.agentflow.expense.ExpensePlanCheckService.Options.class),
+                java.util.Map.entry("ExpensePlanCheckSummary", io.agentflow.expense.ExpensePlanCheckService.Summary.class),
+                java.util.Map.entry("ExpensePlanCheckReceipt", io.agentflow.expense.ExpensePlanCheckService.Receipt.class),
+                java.util.Map.entry("ExpensePlanCheckPage", io.agentflow.expense.ExpensePlanCheckService.Page.class),
+                java.util.Map.entry("ExpensePlanCheckView", io.agentflow.expense.ExpensePlanCheckService.View.class),
                 java.util.Map.entry("ExpenseReportItem", io.agentflow.expense.ExpenseWorkspaceQuery.ReportItem.class),
                 java.util.Map.entry("ExpenseReportPage", io.agentflow.expense.ExpenseWorkspaceQuery.ReportPage.class),
                 java.util.Map.entry("ExpensePriorLine", io.agentflow.expense.ExpenseWorkspaceQuery.PriorLine.class),

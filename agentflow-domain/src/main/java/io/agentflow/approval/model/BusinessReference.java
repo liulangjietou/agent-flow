@@ -17,5 +17,5 @@ public record BusinessReference(Type type, UUID id) {
      * 已经接入结构化写入入口的业务种类。
      * @author owlzhangfq@gmail.com
      */
-    public enum Type { EXPENSE }
+    public enum Type { EXPENSE, EXPENSE_PLAN }
 }
