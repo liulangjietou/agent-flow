@@ -53,7 +53,9 @@ public class FinanceGatewayClient {
     /** 业务适配器核对结果与请求一致性，基础传输只认固定操作及封闭结果类型。 */
     public <T> FinanceResult<T> read(String tenantId, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.BUDGET_QUERY
-                || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY) {
+                || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
+                || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
+                || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
         return exchange(tenantId, null, operation, UUID.randomUUID(), data, resultType, matchesRequest);
@@ -85,6 +87,26 @@ public class FinanceGatewayClient {
         return exchange(tenantId, targetDigest, Operation.PAYMENT_COMMAND, authorizationId, data, resultType, matchesRequest);
     }
 
+    /** 结算准备中的只读事实仍绑定原财务系统，期间和映射不能来自不同目标。 */
+    public <T> FinanceResult<T> readAccounting(String tenantId, String targetDigest, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operation != Operation.ACCOUNTING_PERIOD && operation != Operation.ACCOUNT_MAPPING) throw new IllegalArgumentException("An accounting read operation is required");
+        return exchange(tenantId, targetDigest, operation, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 凭证重发只能保留原持久化编号，ERP 必须按同一编号与摘要幂等。 */
+    public <T> FinanceResult<T> postVoucher(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A voucher operation identity is required");
+        return exchange(tenantId, targetDigest, Operation.VOUCHER_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 查询过账事实无需重发明细，传输号与业务操作号分别保存。 */
+    public <T> FinanceResult<T> queryVoucher(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.VOUCHER_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
     private <T> FinanceResult<T> exchange(String tenantId, String targetDigest, Operation operation, UUID requestId,
                                         Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Finance gateway must run outside a transaction");
@@ -95,7 +117,7 @@ public class FinanceGatewayClient {
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(operation.path)).timeout(destination.timeout())
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
-        if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
+        if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -155,7 +177,11 @@ public class FinanceGatewayClient {
         BUDGET_COMMAND("budget-command", Set.of()),
         BUDGET_QUERY("budget-query", Set.of()),
         PAYMENT_COMMAND("payment-command", Set.of()),
-        PAYMENT_QUERY("payment-query", Set.of());
+        PAYMENT_QUERY("payment-query", Set.of()),
+        ACCOUNTING_PERIOD("accounting-period", Set.of(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
+        ACCOUNT_MAPPING("account-mapping", Set.of(FinanceResult.Reason.ACCOUNT_MAPPING_UNAVAILABLE, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
+        VOUCHER_COMMAND("voucher-command", Set.of()),
+        VOUCHER_QUERY("voucher-query", Set.of());
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
         Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }

@@ -1,0 +1,49 @@
+{
+  "recordedAt": "2026-09-28T21:17:35.719652+00:00",
+  "status": "LOCAL_CONTRACT_ACCEPTANCE_PASSED",
+  "syntheticErp": true,
+  "enterpriseAcceptance": false,
+  "tests": {
+    "newDomain": 11,
+    "newHttp": 9,
+    "domainScope": 16,
+    "serverScope": 50,
+    "scopeTotal": 66,
+    "scopesOverlap": true,
+    "red": {
+      "tests": 1,
+      "failures": 1,
+      "reason": "payment evidence could be reused by another tenant with matching business identities"
+    },
+    "javaAuthors": {
+      "files": 569,
+      "namedTypes": 1000,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "digestVector": "99de112e40fd24e5c91b5aaac01d92e0b306b1e874f97db515bb5828dbac8b80",
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "accounting-domain-tests.log",
+    "voucher-cross-tenant-red.log",
+    "accounting-ports-tests.log"
+  ],
+  "implemented": [
+    "Exact original accounting period, no automatic date rollover",
+    "Complete versioned external account mappings",
+    "Balanced purpose-specific immutable voucher commands",
+    "Payment vouchers require original successful payment in same tenant",
+    "Persistent identity and target required by transport",
+    "Authoritative original query survives expired sending evidence",
+    "Timeout never retries posting automatically"
+  ],
+  "notImplementedInThisSlice": [
+    "Settlement queue and voucher persistence",
+    "Authorization and actual payment execution",
+    "Business API and UI",
+    "External callbacks and sequence handling",
+    "Enterprise ERP acceptance"
+  ],
+  "databaseMigration": null
+}
