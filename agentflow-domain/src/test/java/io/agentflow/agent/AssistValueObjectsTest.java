@@ -25,6 +25,13 @@ class AssistValueObjectsTest {
     }
 
     @Test
+    void supportsMaximumFormTableAndColumnKeyLengths() {
+        String sourceId = "form:" + "a".repeat(64) + "." + "b".repeat(64);
+        assertThat(new AssistInput.Reference(sourceId, "a".repeat(64)).sourceId()).isEqualTo(sourceId);
+        fails("INVALID_AGENT_INPUT", () -> new AssistInput.Reference(sourceId + "x", "a".repeat(64)));
+    }
+
+    @Test
     void duplicateSourcesDifferentDigestsAndOversizedListsAreRejected() {
         var otherDigest = new AssistInput.Reference(SOURCE.sourceId(), "b".repeat(64));
         fails("INVALID_AGENT_INPUT", () -> input(List.of(SOURCE, otherDigest)));

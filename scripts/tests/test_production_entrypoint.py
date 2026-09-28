@@ -24,7 +24,7 @@ class ProductionEntrypointTest(unittest.TestCase):
         self.java = self.root / "java"
         self.java.write_text("""#!/usr/bin/env python3
 import hashlib,json,os,sys
-print(json.dumps({'arguments':sys.argv[1:], 'database':hashlib.sha256(os.environ.get('AGENTFLOW_DATASOURCE_PASSWORD','').encode()).hexdigest(), 'oidc':hashlib.sha256(os.environ.get('AGENTFLOW_OIDC_CLIENT_SECRET','').encode()).hexdigest()}))
+print(json.dumps({'assist':hashlib.sha256(os.environ.get('AGENTFLOW_ASSIST_API_KEY','').encode()).hexdigest(),'arguments':sys.argv[1:], 'database':hashlib.sha256(os.environ.get('AGENTFLOW_DATASOURCE_PASSWORD','').encode()).hexdigest(), 'oidc':hashlib.sha256(os.environ.get('AGENTFLOW_OIDC_CLIENT_SECRET','').encode()).hexdigest()}))
 sys.exit(int(os.environ.get('FIXTURE_EXIT_CODE','0')))
 """)
         self.java.chmod(0o700)
@@ -44,16 +44,18 @@ sys.exit(int(os.environ.get('FIXTURE_EXIT_CODE','0')))
         database = "db-'$(touch /fyoung/tmp/never-created-by-secret)'-$VALUE"
         oidc = "oidc-`uname`-special;&"
         result = self.invoke(AGENTFLOW_DATASOURCE_PASSWORD_FILE=self.secret("database", database + "\n"),
-                             AGENTFLOW_OIDC_CLIENT_SECRET_FILE=self.secret("oidc", oidc + "\n"))
+                             AGENTFLOW_OIDC_CLIENT_SECRET_FILE=self.secret("oidc", oidc + "\n"),
+                             AGENTFLOW_ASSIST_API_KEY_FILE=self.secret("assist", "synthetic-model-key\n"))
         self.assertEqual(result.returncode, 0)
         observed = json.loads(result.stdout)
         self.assertEqual(observed["database"], hashlib.sha256(database.encode()).hexdigest())
         self.assertEqual(observed["oidc"], hashlib.sha256(oidc.encode()).hexdigest())
+        self.assertEqual(observed["assist"], hashlib.sha256(b"synthetic-model-key").hexdigest())
         self.assertEqual(observed["arguments"], ["-jar", "/app/app.jar", "--schema=migrate"])
         self.assertEqual(result.stderr, "")
 
     def test_missing_or_empty_secret_prevents_process_start(self):
-        for variable in ("AGENTFLOW_DATASOURCE_PASSWORD_FILE", "AGENTFLOW_OIDC_CLIENT_SECRET_FILE"):
+        for variable in ("AGENTFLOW_DATASOURCE_PASSWORD_FILE", "AGENTFLOW_OIDC_CLIENT_SECRET_FILE", "AGENTFLOW_ASSIST_API_KEY_FILE"):
             for value in (str(self.root / "missing"), self.secret("empty", "\n")):
                 with self.subTest(variable=variable, empty=value.endswith("empty")):
                     result = self.invoke(**{variable: value})
@@ -61,7 +63,7 @@ sys.exit(int(os.environ.get('FIXTURE_EXIT_CODE','0')))
                     self.assertEqual(result.stdout, "")
 
     def test_ambiguous_environment_and_file_secrets_fail_without_leaking_values(self):
-        for variable in ("AGENTFLOW_DATASOURCE_PASSWORD", "AGENTFLOW_OIDC_CLIENT_SECRET"):
+        for variable in ("AGENTFLOW_DATASOURCE_PASSWORD", "AGENTFLOW_OIDC_CLIENT_SECRET", "AGENTFLOW_ASSIST_API_KEY"):
             with self.subTest(variable=variable):
                 result = self.invoke(**{variable: "private-environment-value",
                                         variable + "_FILE": self.secret("secret", "private-file-value")})

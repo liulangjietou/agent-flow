@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-28",
+  "baseCommit": "728a5ae34d5fd14b7c8234199eb78c5aa35c7bf7",
+  "scope": "Agent explicit input, persisted execution, model HTTP and human review",
+  "fixtureOnly": true,
+  "migration": "V32",
+  "backend": {
+    "domainTests": 14,
+    "serverScopedTests": 60,
+    "postgresTests": 13,
+    "result": "PASS",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/assist-boundaries-final.log",
+    "postgresLog": "/fyoung/tmp/agentflow-remaining-20260928/assist-postgres-final.log",
+    "additionalCompatibilityLog": "/fyoung/tmp/agentflow-remaining-20260928/assist-legacy-green.log",
+    "scopesOverlap": true
+  },
+  "frontend": {
+    "tests": 49,
+    "result": "PASS",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/assist-frontend-final.log",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/assist-build.log"
+  },
+  "openapi": {
+    "operations": 98,
+    "schemas": 147,
+    "requestExamples": 34
+  },
+  "http": {
+    "result": "PASS",
+    "httpRequests": 31,
+    "applicationId": "1824b461-541d-4bae-922c-fd2a8ad93e49",
+    "runId": "bd3049dc-da9a-4f11-ad01-321d37b64695",
+    "browserApplicationId": "e528cf3b-f7f9-45ba-bda0-67dc7109f4fd",
+    "definitionId": "08692c7a-af38-47bb-836e-878468234d78",
+    "processKey": "assist-94140fdf4f",
+    "fixtureOnly": true,
+    "applicationVersionAfterReview": 2
+  },
+  "browser": {
+    "sourceIds": [
+      "form:reason"
+    ],
+    "status": "ADOPTED",
+    "applicationStillInApproval": true,
+    "approvalControlStillSeparate": true,
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/assist-reviewed.png",
+    "screenshotSha256": "23eadf45715d68702f686f67759c9c79276ff7e10ea6195ebbf27c7e2db48dff"
+  },
+  "deployment": {
+    "secretEntrypointTests": 4,
+    "composeOverlay": "compose.assist.yml",
+    "result": "PASS"
+  },
+  "unverified": [
+    "External model credentials and behavior",
+    "Enterprise identity provider and production workload",
+    "GitHub remote PR and CI"
+  ],
+  "finalPackagedHttp": {
+    "result": "PASS",
+    "httpRequests": 31,
+    "applicationId": "e4fc7a31-a1c3-4d7c-bfd0-55f9c14def44",
+    "runId": "77965686-d27d-46c0-ac1b-26efbf7a1098",
+    "browserApplicationId": "7cda4c35-fd62-4bf2-af43-fdc4e99050e1",
+    "definitionId": "5eecdd88-44e2-4a44-9244-cbcba02d7275",
+    "processKey": "assist-145f7f6082",
+    "fixtureOnly": true,
+    "applicationVersionAfterReview": 2
+  },
+  "finalPackageSha256": "7eca52d7a120ea1a7f8857bf3f20ee22246cf0214baa3b788be8353008d9c590"
+}

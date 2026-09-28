@@ -363,3 +363,31 @@ test('响应丢失后遇到 CSRF 失效仍保留原请求键，重新认证后�
   assert.equal(new Set(sent.map(request => request.body)).size, 1)
   assert.equal(writeRequests.pending().length, 0)
 })
+
+test('摘要生成及复核响应丢失后保留已选择来源、目标指纹和人工稿原字节', async () => {
+  const cases = [
+    { name: 'generate', invoke: body => api.generateAssist('app/one', body), path: '/api/v1/applications/app%2Fone/assist-runs',
+      body: { taskId: 'task', expectedVersion: 2, targetDigest: 'a'.repeat(64), sourceIds: ['form:reason'] },
+      mutate: body => { body.sourceIds.push('application:title') } },
+    { name: 'review', invoke: body => api.reviewAssist('app/one', 'run/one', body), path: '/api/v1/applications/app%2Fone/assist-runs/run%2Fone/review',
+      body: { taskId: 'task', expectedVersion: 2, expectedRunVersion: 3, action: 'ADOPT', acceptedText: '已核对的人工稿', comment: '保留原文' },
+      mutate: body => { body.acceptedText = '后续编辑内容' } }
+  ]
+  for (const scenario of cases) {
+    writeRequests.setActor({ tenantId: 'demo', userId: 'assist-' + scenario.name })
+    const sent = [], original = JSON.stringify(scenario.body)
+    globalThis.fetch = async (url, init) => {
+      sent.push({ url, ...init })
+      if (sent.length === 1) throw new TypeError('lost')
+      return Response.json({ id: 'run', status: scenario.name === 'generate' ? 'QUEUED' : 'ADOPTED', version: 1 })
+    }
+    await assert.rejects(scenario.invoke(scenario.body))
+    scenario.mutate(scenario.body)
+    await assert.rejects(scenario.invoke(scenario.body), error => error.code === 'PENDING_REQUEST_CHANGED')
+    await writeRequests.recover(writeRequests.pending()[0].id)
+    assert.equal(sent.length, 2); assert.equal(sent[0].url, scenario.path)
+    assert.equal(sent[0].body, original); assert.equal(sent[1].body, original)
+    assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+    assert.equal(writeRequests.pending().length, 0)
+  }
+})

@@ -1,0 +1,17 @@
+# 与 compose.production.yml 合用；显式启用模型，凭据从容器密钥文件读取。
+services:
+  server:
+    environment:
+      AGENTFLOW_ASSIST_ENABLED: "true"
+      AGENTFLOW_ASSIST_WORKER_ENABLED: ${AGENTFLOW_ASSIST_WORKER_ENABLED:-true}
+      AGENTFLOW_ASSIST_ENDPOINT: ${AGENTFLOW_ASSIST_ENDPOINT:?Set the trusted chat completions endpoint}
+      AGENTFLOW_ASSIST_PROVIDER: ${AGENTFLOW_ASSIST_PROVIDER:-openai-compatible}
+      AGENTFLOW_ASSIST_MODEL: ${AGENTFLOW_ASSIST_MODEL:?Set the verified model identifier}
+      AGENTFLOW_ASSIST_TIMEOUT_SECONDS: ${AGENTFLOW_ASSIST_TIMEOUT_SECONDS:-45}
+      AGENTFLOW_ASSIST_API_KEY_FILE: /run/secrets/assist_api_key
+    secrets:
+      - assist_api_key
+
+secrets:
+  assist_api_key:
+    file: ${AGENTFLOW_ASSIST_API_KEY_FILE:?Set the model API key file}

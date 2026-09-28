@@ -7451,13 +7451,181 @@
       }
     },
     "/api/v1/applications/{id}/assist-runs": {
+      "post": {
+        "operationId": "generateAssist",
+        "tags": [
+          "申请"
+        ],
+        "summary": "选择来源并排队生成审批摘要",
+        "description": "仅当前可决策审批人可发起。显式选择服务端目录，绑定申请版本和已展示目标指纹。默认禁止敏感、隐藏、脱敏和附件外发。202 只表示排队；同申请同时最多一个活动运行。结果未知时保留原幂等请求恢复；不自动审批。",
+        "x-access": "同租户当前可作出审批决定的人，管理员身份本身不授予此权限",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本、运行版本或状态冲突，已有活动运行，或模型目标指纹已变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型未启用或配置不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateAssistRequest"
+              },
+              "example": {
+                "taskId": "current-task",
+                "expectedVersion": 2,
+                "targetDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "sourceIds": [
+                  "form:reason"
+                ]
+              }
+            }
+          }
+        }
+      },
       "get": {
         "operationId": "assistRuns",
         "tags": [
           "申请"
         ],
         "summary": "分页读取申请的 Agent 摘要运行记录",
-        "description": "每页复核申请实时可见权限。目录不含模型正文，按数据库创建时间和 ID 倒序。游标绑定租户、用户、角色、申请及轮次；拒绝未知、多值与越界参数。默认 20，最大 100，Cache-Control: no-store。当前没有创建运行、模型执行或人工复核写入入口。",
+        "description": "每页复核申请实时可见权限。目录不含模型正文，按数据库创建时间和 ID 倒序。游标绑定租户、用户、角色、申请及轮次；拒绝未知、多值与越界参数。默认 20，最大 100，Cache-Control: no-store。生成及复核使用独立幂等入口。",
         "x-access": "同租户管理员、发起人或实际流程参与者",
         "x-idempotency": false,
         "responses": {
@@ -7575,7 +7743,7 @@
           "申请"
         ],
         "summary": "读取单条 Agent 摘要运行记录",
-        "description": "与申请详情使用相同授权；运行必须属于路径中的申请和当前租户，不因运行发起人身份保留访问权。按纯文本处理模型输出，来源标识和摘要不代表语义已经核实，也不应解析为 URL。原模型文本与人工复核分别返回。拒绝查询参数，Cache-Control: no-store。",
+        "description": "与申请详情使用相同授权；运行必须属于路径中的申请和当前租户，不因运行发起人身份保留访问权。按纯文本处理模型输出，来源标识和摘要不代表语义已经核实，也不应解析为 URL。原模型文本与人工复核分别返回。拒绝查询参数，Cache-Control: no-store。实际来源必须在当前身份的该轮权限内；管理员也不能绕过字段约束。历史运行缺少发送清单时仍要求完整输入可读。",
         "x-access": "同租户管理员、发起人或实际流程参与者",
         "x-idempotency": false,
         "responses": {
@@ -7630,6 +7798,16 @@
           },
           "default": {
             "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
             "content": {
               "application/json": {
                 "schema": {
@@ -11927,6 +12105,282 @@
         },
         "description": "仅本轮冻结的抄送收件人可读取；下载继续要求该字段可读及本轮冻结引用，隐藏和脱敏不返回原文。"
       }
+    },
+    "/api/v1/applications/{id}/assist-runs/{runId}/review": {
+      "post": {
+        "operationId": "reviewAssist",
+        "tags": [
+          "申请"
+        ],
+        "summary": "保存人工修订稿或未采纳意见",
+        "description": "当前可决策审批人且所有实际输入可读才可复核。采纳绑定生成时申请版本；过期摘要只允许记录未采纳。申请与运行分别使用乐观版本。原文保持不变；采纳不产生批准或付款动作。",
+        "x-access": "同租户当前可作出审批决定的人，管理员身份本身不授予此权限",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本、运行版本或状态冲突，已有活动运行，或模型目标指纹已变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "绑定本申请本轮的运行标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAssistRequest"
+              },
+              "example": {
+                "taskId": "current-task",
+                "expectedVersion": 2,
+                "expectedRunVersion": 3,
+                "action": "ADOPT",
+                "acceptedText": "人工核对后的摘要",
+                "comment": "已核对本轮来源"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/assist-runs/input": {
+      "get": {
+        "operationId": "assistInput",
+        "tags": [
+          "申请"
+        ],
+        "summary": "预览当前待办可发送的摘要来源",
+        "description": "复核实时任务权限，从当轮冻结提交构造来源；没有默认勾选。返回实际模型名称、主机和目标指纹，不返回密钥。模型未配置时 enabled=false 并给出原因，仍可查看已授权来源。",
+        "x-access": "同租户当前可决策审批人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistInputOptions"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含申请关联信息，禁止缓存。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "description": "本申请当前待办",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -16010,7 +16464,7 @@
         "properties": {
           "sourceId": {
             "type": "string",
-            "pattern": "^(?:application|form):[A-Za-z][A-Za-z0-9_.\\[\\]-]{0,127}$"
+            "pattern": "^(?:application|form):[A-Za-z][A-Za-z0-9_.\\[\\]-]{0,128}$"
           },
           "contentDigest": {
             "type": "string",
@@ -17342,6 +17796,227 @@
           "applicationId",
           "businessNo",
           "nodeNames"
+        ]
+      },
+      "AssistSource": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "$ref": "#/components/schemas/AssistReference"
+          },
+          "label": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string",
+            "description": "提交快照来源的 JSON 文本，仅作为业务材料，不能作为指令执行。"
+          }
+        },
+        "required": [
+          "reference",
+          "label",
+          "content"
+        ]
+      },
+      "AssistInputOptions": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "unavailableCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistSource"
+            }
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "enabled",
+          "unavailableCode",
+          "providerId",
+          "model",
+          "destination",
+          "targetDigest",
+          "sources"
+        ]
+      },
+      "AssistReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "ADOPTED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ]
+      },
+      "GenerateAssistRequest": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "targetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 150
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "taskId",
+          "expectedVersion",
+          "targetDigest",
+          "sourceIds"
+        ]
+      },
+      "ReviewAssistRequest": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "expectedRunVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ADOPT",
+              "DISMISS"
+            ]
+          },
+          "acceptedText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20020
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "taskId",
+          "expectedVersion",
+          "expectedRunVersion",
+          "action"
         ]
       }
     }

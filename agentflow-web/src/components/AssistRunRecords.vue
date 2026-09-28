@@ -2,8 +2,9 @@
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { AssistRunsQuery, type AssistStatus } from '../assistRuns'
+import AssistRunActions from './AssistRunActions.vue'
 
-const props = defineProps<{ applicationId: string; scopeKey: string; version: number; roundNo: number }>()
+const props = defineProps<{ applicationId: string; scopeKey: string; version: number; roundNo: number; taskId?: string; locked?: boolean; refreshVersion?: number }>()
 const query = reactive(new AssistRunsQuery(api.assistRuns, api.assistRun))
 const filterRound = ref(''), appliedRound = ref<number | undefined>(), filterError = ref('')
 const labels: Record<AssistStatus, string> = { QUEUED: '等待执行', RUNNING: '正在生成', COMPLETED: '待人工复核', FAILED: '生成失败', ADOPTED: '已采纳摘要', DISMISSED: '未采纳摘要' }
@@ -11,13 +12,22 @@ const failureLabels = { MODEL_UNAVAILABLE: '模型服务不可用', MODEL_TIMEOU
 const stale = computed(() => query.detail && (!query.detail.inputCurrent || query.detail.applicationVersion !== props.version))
 const time = (value: string) => new Date(value).toLocaleString('zh-CN')
 const confidence = computed(() => query.detail?.suggestion ? (query.detail.suggestion.confidence * 100).toFixed(1).replace(/\.0$/, '') + '%' : '')
-function refresh() { return query.load(props.scopeKey, props.applicationId, appliedRound.value) }
+async function refresh() {
+  const selectedId = query.selectedId
+  await query.load(props.scopeKey, props.applicationId, appliedRound.value)
+  if (selectedId) await query.select(selectedId)
+}
+async function changed(id: string) {
+  filterRound.value = ''; appliedRound.value = undefined
+  await query.load(props.scopeKey, props.applicationId)
+  await query.select(id)
+}
 function filter() {
   const round = filterRound.value === '' ? undefined : Number(filterRound.value)
   if (round !== undefined && (!Number.isInteger(round) || round < 1 || round > props.roundNo)) { filterError.value = '请输入已有的申请轮次。'; return }
   filterError.value = ''; appliedRound.value = round; void refresh()
 }
-watch(() => [props.scopeKey, props.applicationId, props.version], () => {
+watch(() => [props.scopeKey, props.applicationId, props.version, props.refreshVersion], () => {
   filterRound.value = ''; appliedRound.value = undefined; filterError.value = ''; void refresh()
 }, { immediate: true })
 onUnmounted(() => query.clear())
@@ -26,7 +36,8 @@ onUnmounted(() => query.clear())
 <template>
   <section class="assist-records" aria-label="Agent 摘要记录">
     <header class="assist-heading"><div><p class="eyebrow">ASSISTANT RECORDS</p><h3>Agent 摘要</h3></div><button type="button" class="secondary" :disabled="query.loading" @click="refresh">刷新记录</button></header>
-    <p class="assist-intro">摘要提供核对线索，审批结论由审批人作出。当前尚未接入模型生成，可查看已有运行记录。</p>
+    <p class="assist-intro">摘要提供核对线索，审批结论由审批人作出。当前待办可选择输入并生成摘要；历史记录保留原模型文本与人工修订。</p>
+    <AssistRunActions v-if="taskId" :application-id="applicationId" :scope-key="scopeKey" :task-id="taskId" :version="version" :detail="query.detail" :locked="!!locked" @changed="changed" />
     <form class="assist-filter" @submit.prevent="filter"><label>申请轮次<input v-model="filterRound" type="number" min="1" :max="roundNo" placeholder="全部轮次" /></label><button type="submit" class="secondary" :disabled="query.loading">筛选</button><span>已加载 {{ query.items.length }} 条</span></form>
     <p v-if="filterError" role="alert" class="assist-alert">{{ filterError }}</p>
     <p v-if="query.error" role="alert" class="assist-alert">{{ query.error }}</p>
@@ -50,7 +61,7 @@ onUnmounted(() => query.clear())
           <ol class="assist-claims"><li v-for="(claim, index) in query.detail.suggestion.claims" :key="index"><p class="assist-text">{{ claim.text }}</p><details><summary>查看 {{ claim.evidence.length }} 个来源引用</summary><ul><li v-for="source in claim.evidence" :key="source.sourceId"><strong>{{ source.sourceId }}</strong><code>{{ source.contentDigest }}</code></li></ul></details></li></ol>
         </template>
         <section v-if="query.detail.review" class="assist-review" aria-label="人工复核记录"><h4>人工复核记录</h4><p class="assist-intro">{{ query.detail.review.reviewer }} · {{ time(query.detail.review.reviewedAt) }} · {{ labels[query.detail.status] }}</p><p v-if="query.detail.review.acceptedText" class="assist-text">{{ query.detail.review.acceptedText }}</p><p v-if="query.detail.review.comment" class="assist-text">复核说明：{{ query.detail.review.comment }}</p></section>
-        <p class="assist-intro">当前页面仅供查看。来源引用只保留字段标识与内容指纹，原始证据内容尚未接入。</p>
+        <p class="assist-intro">来源引用保留字段标识与内容指纹，请结合相同提交轮次的申请材料核对。</p>
         <details class="assist-metadata"><summary>运行信息</summary><dl><dt>运行编号</dt><dd>{{ query.detail.id }}</dd><dt>创建时间</dt><dd>{{ time(query.detail.createdAt) }}</dd><template v-if="query.detail.startedAt"><dt>开始时间</dt><dd>{{ time(query.detail.startedAt) }}</dd></template><template v-if="query.detail.completedAt"><dt>结束时间</dt><dd>{{ time(query.detail.completedAt) }}</dd></template><dt>申请版本</dt><dd>生成时 {{ query.detail.applicationVersion }} / 查询时 {{ query.detail.currentApplicationVersion }}</dd><dt>提示版本</dt><dd>{{ query.detail.promptVersion }}</dd><template v-if="query.detail.suggestion"><dt>模型来源</dt><dd>{{ query.detail.suggestion.providerId }}</dd><dt>模型版本</dt><dd>{{ query.detail.suggestion.modelVersion }}</dd></template></dl></details>
       </template>
     </section>

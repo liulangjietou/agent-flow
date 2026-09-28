@@ -72,7 +72,11 @@ public class FlowableTaskFacade {
 
     /** 按标识重新取得可操作任务，打开列表或旧消息时不依赖全量队列。 */
     public TaskView get(String taskId) {
-        Actor actor = currentActor.actor();
+        return get(taskId, currentActor.actor());
+    }
+
+    /** 后台摘要复核已认证的发起主体，继续使用当前任务与组织事实，不修改线程认证上下文。 */
+    public TaskView get(String taskId, Actor actor) {
         actor.requireRole("APPROVER");
         Task task = authorizedTask(taskId, actor);
         if (task.isSuspended() || applicationFor(actor, task).status() != ApplicationStatus.IN_APPROVAL) {

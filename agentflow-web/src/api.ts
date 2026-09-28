@@ -1,7 +1,7 @@
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
 import type { NotificationTexts } from './notificationTexts'
-import type { AssistRunDetail, AssistRunFilter, AssistRunPage } from './assistRuns'
+import type { AssistRunDetail, AssistRunFilter, AssistRunPage, AssistInputOptions, AssistReceipt, AssistGenerateRequest, AssistReviewRequest } from './assistRuns'
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
 import type { RoundDiagram } from './roundDiagram'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
@@ -340,6 +340,9 @@ export const api = {
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
   assistRuns: (id: string, query: AssistRunFilter, signal: AbortSignal) => request<AssistRunPage>('/applications/' + encodeURIComponent(id) + '/assist-runs' + historyQuery(query), { signal }),
   assistRun: (id: string, runId: string, signal: AbortSignal) => request<AssistRunDetail>('/applications/' + encodeURIComponent(id) + '/assist-runs/' + encodeURIComponent(runId), { signal }),
+  assistInput: (id: string, taskId: string, signal: AbortSignal) => request<AssistInputOptions>('/applications/' + encodeURIComponent(id) + '/assist-runs/input?taskId=' + encodeURIComponent(taskId), { signal }),
+  generateAssist: (id: string, body: AssistGenerateRequest) => write<AssistReceipt>('/applications/' + encodeURIComponent(id) + '/assist-runs', 'POST', '生成 Agent 摘要', body),
+  reviewAssist: (id: string, runId: string, body: AssistReviewRequest) => write<AssistReceipt>('/applications/' + encodeURIComponent(id) + '/assist-runs/' + encodeURIComponent(runId) + '/review', 'POST', '复核 Agent 摘要', body),
   applicationComments: (id: string, query: CommentQuery, signal: AbortSignal) => request<CommentPage>('/applications/' + encodeURIComponent(id) + '/comments' + historyQuery(query), { signal }),
   addApplicationComment: (id: string, body: CommentDraft) => write<ApplicationComment>('/applications/' + encodeURIComponent(id) + '/comments', 'POST', '追加申请评论', body),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),

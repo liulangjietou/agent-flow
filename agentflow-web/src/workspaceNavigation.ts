@@ -1,5 +1,5 @@
 /** 工作空间已有页面标识；导航展示不授予业务权限。@author owlzhangfq@gmail.com */
-export type WorkspacePage = 'organization' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'expense' | 'system'
+export type WorkspacePage = 'organization' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'assist' | 'expense' | 'system'
 
 /** 同一份菜单供桌面侧栏与窄屏抽屉使用。@author owlzhangfq@gmail.com */
 export interface WorkspaceMenuItem { label: string; icon: string; page?: WorkspacePage; access?: 'manage' | 'inspect' }
@@ -17,7 +17,7 @@ export const workspaceMenu: { label: string; items: WorkspaceMenuItem[] }[] = [
   { label: '流程与业务', items: [
     { page: 'designer', label: '流程管理', icon: '⌘' },
     { page: 'templates', label: '模板中心', icon: '▤', access: 'manage' },
-    { label: 'Agent 助理', icon: '✦' },
+    { page: 'assist', label: 'Agent 助理', icon: '✦' },
     { page: 'expense', label: '费用报销', icon: '▣' }
   ] },
   { label: '管理与集成', items: [

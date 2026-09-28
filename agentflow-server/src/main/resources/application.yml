@@ -24,6 +24,14 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  assist:
+    enabled: ${AGENTFLOW_ASSIST_ENABLED:false}
+    worker-enabled: ${AGENTFLOW_ASSIST_WORKER_ENABLED:true}
+    endpoint: ${AGENTFLOW_ASSIST_ENDPOINT:}
+    provider-id: ${AGENTFLOW_ASSIST_PROVIDER:openai-compatible}
+    model: ${AGENTFLOW_ASSIST_MODEL:}
+    api-key: ${AGENTFLOW_ASSIST_API_KEY:}
+    timeout-seconds: ${AGENTFLOW_ASSIST_TIMEOUT_SECONDS:45}
   attachments:
     directory: ${AGENTFLOW_ATTACHMENT_DIRECTORY:}
     max-file-bytes: ${AGENTFLOW_ATTACHMENT_MAX_FILE_BYTES:20971520}

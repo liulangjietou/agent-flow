@@ -119,6 +119,7 @@ const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
 const detailLoading = ref(false)
 const taskDetailPanel = ref<HTMLElement | null>(null)
+const assistRefresh = ref(0)
 const taskTab = ref<'detail' | 'compare' | 'timeline' | 'audit' | 'comments' | 'assist'>('detail')
 const commentRefresh = ref(0)
 const restoredDefinition = new DefinitionSelection(api.searchDefinitions, api.getDefinition)
@@ -913,6 +914,9 @@ async function recoverOperation(id: string) {
         if (request.body) calendarDrafts.acknowledge(actorScope.value, request.path, request.body, result as BusinessCalendar)
         templateRefresh.value++
         notice.value = '已确认原日历保存结果，旧版本保持不变。'
+      } else if (/^\/applications\/[^/]+\/assist-runs(?:\/[^/]+\/review)?$/.test(request.path)) {
+        assistRefresh.value++
+        notice.value = '原摘要操作已确认，请刷新记录核对执行或复核结果。'
       } else if (request.path.startsWith('/applications')) {
         templateRefresh.value++
         const value = result as Application
@@ -1036,7 +1040,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
     </section>
     <template v-else>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'assist' ? 'Agent 助理' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
         <div v-if="notice && !sessionExpired" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
@@ -1054,12 +1058,12 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
                   <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
                   <p v-else class="unavailable">正在加载申请详情…</p>
-                  <div class="agent-note"><span>✦</span><div><strong>Agent 摘要</strong><p>模型生成尚未接入，已有记录可在「Agent 摘要」中查看。审批请以申请内容及核实结果为依据。</p></div></div>
+                  <div class="agent-note"><span>✦</span><div><strong>Agent 摘要</strong><p>在「Agent 摘要」中选择本轮可读字段，生成后核对来源并保存人工修订。审批以申请内容及核实结果为依据。</p></div></div>
                 </div>
                 <div v-else-if="taskTab === 'compare'" class="timeline-full"><RoundComparison v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><ApplicationHistory :application-id="activeTask.applicationId" mode="timeline" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <div v-else-if="taskTab === 'audit'" class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
-                <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
+                <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" :task-id="activeTask.taskId" :locked="busy || writesBlocked" :refresh-version="assistRefresh" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
                 <TaskDeadlineStatus :due-at="activeTask.dueAt" />
                 <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
@@ -1067,6 +1071,10 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
               <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
             </div>
           </div>
+        </section>
+        <section v-else-if="page === 'assist'" class="content">
+          <div class="page-heading"><div><p class="eyebrow">APPROVAL ASSISTANT</p><h2>Agent 助理</h2><p class="subhead">从当前待办选择材料，生成摘要后逐条核对来源。</p></div><button class="primary" @click="page = 'workbench'; taskTab = 'assist'">打开待办摘要</button></div>
+          <div class="panel queue-empty"><strong>由你决定发送哪些内容</strong><p>在待办的“Agent 摘要”中勾选可读字段，确认模型目的地后生成。敏感字段和附件不发送。服务未配置时，输入面板会显示具体原因。</p><p>生成结果可修改后采纳，也可记录未采纳意见。复核记录与原文分别保留，审批仍需单独办理。</p><button class="secondary" @click="page = 'applications'">查看申请中的历史摘要</button></div>
         </section>
         <WebhookDeliveries v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
