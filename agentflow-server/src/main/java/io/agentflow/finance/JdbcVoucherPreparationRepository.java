@@ -54,7 +54,11 @@ public class JdbcVoucherPreparationRepository {
     public Optional<VoucherPreparation> find(String tenant, UUID id) { return jdbc.query("SELECT * FROM voucher_preparation WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst(); }
     /** 固定业务来源决定类型，取本轮最后一次已持久尝试。 */
     public Optional<VoucherPreparation> latest(VoucherPreparation.Source source) {
-        return jdbc.query("SELECT * FROM voucher_preparation WHERE tenant_id=? AND application_id=? AND round_no=? AND kind=? ORDER BY attempt_no DESC LIMIT 1", row(), source.tenantId(), source.applicationId().toString(), source.roundNo(), source.kind().name()).stream().findFirst();
+        return latest(source.tenantId(), source.applicationId(), source.roundNo(), source.kind());
+    }
+    /** 历史读取沿用指定轮次，不要求用当前财务版本伪造旧来源。 */
+    public Optional<VoucherPreparation> latest(String tenant, UUID applicationId, int round, VoucherCommand.Kind kind) {
+        return jdbc.query("SELECT * FROM voucher_preparation WHERE tenant_id=? AND application_id=? AND round_no=? AND kind=? ORDER BY attempt_no DESC LIMIT 1", row(), tenant, applicationId.toString(), round, kind.name()).stream().findFirst();
     }
     /** 有界扫描只读取身份，领取事务重新获取原输入。 */
     public List<Candidate> due(Instant now) {

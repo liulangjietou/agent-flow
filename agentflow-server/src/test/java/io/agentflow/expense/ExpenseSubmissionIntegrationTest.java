@@ -75,6 +75,8 @@ class ExpenseSubmissionIntegrationTest {
     private BudgetObservation.Rejection budgetRejection = BudgetObservation.Rejection.BUDGET_INSUFFICIENT;
     private int writes;
     private int queries;
+    private String voucherMode = "POSTED";
+    private final Map<UUID, VoucherCommand> voucherCommands = new ConcurrentHashMap<>();
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
@@ -91,6 +93,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired CurrentActor actors;
     @Autowired JdbcTemplate jdbc;
     @Autowired OrganizationService organization;
+    @Autowired io.agentflow.organization.OrganizationRepository organizationRepository;
     @Autowired DefinitionApplicationService definitions;
     @Autowired ApplicationRepository applications;
     @Autowired ExpenseReportRepository reports;
@@ -131,6 +134,12 @@ class ExpenseSubmissionIntegrationTest {
     }
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
+        for (UUID report : created) {
+            jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
+            jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", report.toString());
+            jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?)", report.toString());
+            jdbc.update("DELETE FROM voucher_operation WHERE tenant_id='demo' AND business_id=?", report.toString());
+        }
         for (UUID report : created) for (int index = 0; index < 4; index++) {
             var occupation = occupations.find("demo", report).orElse(null);
             if (occupation == null || occupation.pendingOperationId() == null) break;
@@ -385,6 +394,72 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void voucherApiKeepsFieldPermissionsAndFinanceSeparationAcrossIdempotentPreparationAndQueries() throws Exception {
+        var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200); String path = voucherPath(report);
+        var owned = ok(read(path, "alice"), 200);
+        assertThat(owned.path("applicationId").asText()).isEqualTo(report.applicationId().toString());
+        assertThat(owned.has("operation")).isTrue(); assertThat(owned.get("operation").isNull()).isTrue();
+        assertThat(owned.path("preparation").has("completedAt")).isTrue(); assertThat(owned.path("preparation").has("issue")).isTrue();
+        assertThat(owned.at("/preparation/status").asText()).isEqualTo("QUEUED"); assertThat(owned.at("/actions/prepare").asBoolean()).isFalse();
+        assertThat(read(path, "bob").getStatus()).isEqualTo(404); assertThat(read(path, "admin").getStatus()).isEqualTo(403);
+        assertThat(read(path + "?roundNo=0", "finance").getStatus()).isEqualTo(400);
+        assertThat(read(path + "?employeeId=alice", "finance").getStatus()).isEqualTo(400);
+        assertThat(read(path + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
+        configuration.setEnabled(false); voucherPreparationWorker.poll(); configuration.setEnabled(true);
+        var blocked = ok(read(path, "finance"), 200); assertThat(blocked.at("/preparation/issue").asText()).isEqualTo("NOT_CONFIGURED");
+        assertThat(blocked.at("/actions/prepare").asBoolean()).isTrue();
+        var input = voucherInput(report, "PREPARE", null); String key = UUID.randomUUID().toString();
+        for (String user : List.of("alice", "manager", "admin")) assertThat(send(path + "/actions", user, input).getStatus()).isEqualTo(403);
+        var forged = new HashMap<>(input); forged.put("amount", "999.99"); assertThat(send(path + "/actions", "finance", forged).getStatus()).isEqualTo(400);
+        var stale = new HashMap<>(input); stale.put("businessVersion", current(report).version() - 1);
+        assertCode(send(path + "/actions", "finance", stale), "CONCURRENCY_CONFLICT");
+        var prepared = send(path + "/actions", "finance", key, input); ok(prepared, 202);
+        var preparationReceipt = ok(prepared, 202);
+        assertThat(preparationReceipt.has("operationId")).isTrue(); assertThat(preparationReceipt.get("operationId").isNull()).isTrue();
+        assertThat(preparationReceipt.has("operationVersion")).isTrue(); assertThat(preparationReceipt.get("operationVersion").isNull()).isTrue();
+        assertThat(prepared.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(path + "/actions", "finance", key, input).getContentAsString()).isEqualTo(prepared.getContentAsString());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_PREPARE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        voucherPreparationWorker.poll(); var queued = ok(read(path, "finance"), 200);
+        for (String field : List.of("observedStatus", "voucherReference", "postedAt", "issue")) assertThat(queued.path("operation").has(field)).isTrue();
+        assertThat(queued.at("/operation/status").asText()).isEqualTo("QUEUED"); assertThat(queued.at("/actions/query").asBoolean()).isFalse();
+        voucherWorker.poll(); var posted = ok(read(path, "finance"), 200); assertThat(posted.at("/operation/status").asText()).isEqualTo("POSTED");
+        assertThat(posted.at("/operation/voucherReference").asText()).isEqualTo("synthetic-voucher"); assertThat(posted.at("/actions/query").asBoolean()).isTrue();
+        assertThat(posted.toString()).doesNotContain("targetDigest", "accountDigest", "accountReference", "mapping", "commandDigest", "synthetic-private-account");
+        assertThat(ok(read(path, "alice"), 200).at("/actions/query").asBoolean()).isFalse();
+        var queryInput = voucherInput(report, "QUERY", posted.path("operation")); String queryKey = UUID.randomUUID().toString();
+        var query = send(path + "/actions", "finance", queryKey, queryInput); ok(query, 202);
+        assertThat(ok(query, 202).has("preparationId")).isTrue();
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(path + "/actions", "finance", queryKey, queryInput).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(send(path + "/actions", "finance", queryKey, queryInput).getContentAsString()).isEqualTo(query.getContentAsString());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_QUERY'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        assertCode(send(path + "/actions", "finance", queryInput), "CONCURRENCY_CONFLICT");
+    }
+
+    @Test
+    void financeCanResendOnlyTheSameAuthoritativelyMissingCommandWithFreshVersions() throws Exception {
+        var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200); String path = voucherPath(report);
+        voucherPreparationWorker.poll(); voucherMode = "INVALID"; voucherWorker.poll();
+        var unknown = ok(read(path, "finance"), 200); assertThat(unknown.at("/operation/status").asText()).isEqualTo("UNKNOWN");
+        assertThat(unknown.at("/actions/resendOriginal").asBoolean()).isFalse();
+        assertThat(send(path + "/actions", "finance", voucherInput(report, "RESEND_ORIGINAL", unknown.path("operation"))).getStatus()).isBetween(400, 499);
+        voucherMode = "NOT_FOUND"; ok(send(path + "/actions", "finance", voucherInput(report, "QUERY", unknown.path("operation"))), 202); voucherWorker.poll();
+        var missing = ok(read(path, "finance"), 200); assertThat(missing.at("/operation/status").asText()).isEqualTo("NOT_FOUND");
+        assertThat(missing.at("/actions/resendOriginal").asBoolean()).isTrue(); UUID operationId = UUID.fromString(missing.at("/operation/id").asText());
+        var original = voucherOperations.find("demo", operationId).orElseThrow().input();
+        String key = UUID.randomUUID().toString(); var input = voucherInput(report, "RESEND_ORIGINAL", missing.path("operation"));
+        var receipt = send(path + "/actions", "finance", key, input); ok(receipt, 202);
+        assertThat(send(path + "/actions", "finance", key, input).getContentAsString()).isEqualTo(receipt.getContentAsString());
+        assertThat(voucherOperations.find("demo", operationId).orElseThrow().input()).isEqualTo(original);
+        voucherMode = "POSTED"; voucherWorker.poll(); assertThat(ok(read(path, "finance"), 200).at("/operation/status").asText()).isEqualTo("POSTED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_operation WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_RESEND_ORIGINAL'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+    }
+
+    @Test
     void reductionRequiresActualFinancialTaskAuthorityStrictFieldsAndCurrentDoubleVersions() throws Exception {
         var report = fixture(false).report(); submit(report); budgetWorker.poll();
         assertCode(send(reductionPath(report), "manager", reductionInput(report, "50", "3")), "EXPENSE_FINANCE_TASK_REQUIRED");
@@ -633,6 +708,13 @@ class ExpenseSubmissionIntegrationTest {
     private Application app(ExpenseReport report) { return applications.findById("demo", report.applicationId()).orElseThrow(); }
     private ExpenseReport current(ExpenseReport report) { return reports.find("demo", report.id()).orElseThrow(); }
     private String path(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id(); }
+    private String voucherPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/vouchers"; }
+    private Map<String, Object> voucherInput(ExpenseReport report, String action, JsonNode operation) {
+        var input = new HashMap<String, Object>(); input.put("action", action); input.put("roundNo", app(report).roundNo());
+        input.put("applicationVersion", app(report).version()); input.put("businessVersion", current(report).version()); input.put("comment", "合成财务对账操作");
+        if (operation != null) { input.put("operationId", operation.path("id").asText()); input.put("operationVersion", operation.path("version").asLong()); }
+        return input;
+    }
     private String target() { return configuration.destination("demo").orElseThrow().digest("demo"); }
     private MockHttpServletResponse send(String path, String user, Object input) throws Exception { return send(path, user, UUID.randomUUID().toString(), input); }
     private MockHttpServletResponse send(String path, String user, String key, Object input) throws Exception {
@@ -671,8 +753,12 @@ class ExpenseSubmissionIntegrationTest {
                 var request = json.read(data.toString(), AccountMappingPort.Request.class); var at = Instant.now();
                 yield new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
             }
-            case "voucher-command" -> {
-                var command = json.read(data.path("command").toString(), VoucherCommand.class);
+            case "voucher-command", "voucher-query" -> {
+                VoucherCommand command;
+                if (operation.equals("voucher-command")) { command = json.read(data.path("command").toString(), VoucherCommand.class); voucherCommands.put(command.id(), command); }
+                else command = voucherCommands.get(UUID.fromString(data.path("operationId").asText()));
+                if (voucherMode.equals("INVALID")) yield Map.of("invalidFixture", true);
+                if (voucherMode.equals("NOT_FOUND")) yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null, null, null);
                 yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, Instant.now(), "synthetic-posting", "synthetic-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
             }
             case "budget-command", "budget-query" -> {

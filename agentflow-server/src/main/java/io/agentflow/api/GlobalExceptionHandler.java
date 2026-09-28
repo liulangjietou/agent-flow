@@ -76,7 +76,7 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
-            case "INVALID_ATTACHMENT_QUERY", "INVALID_EXPENSE_QUERY", "INVALID_FINANCE_QUERY", "INVALID_INVOICE_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "INVALID_ATTACHMENT_QUERY", "INVALID_EXPENSE_QUERY", "INVALID_FINANCE_QUERY", "INVALID_INVOICE_QUERY", "INVALID_VOUCHER_QUERY" -> HttpStatus.BAD_REQUEST;
             case "ATTACHMENT_TOO_LARGE", "FILE_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
             case "ATTACHMENT_QUOTA_EXCEEDED", "AGENT_RUN_ACTIVE", "AGENT_INPUT_CHANGED", "AGENT_TARGET_CHANGED", "AGENT_RUN_STATE_CONFLICT",
                     "FINANCIAL_RESOURCE_EXISTS", "INVOICE_OCCUPIED", "INVOICE_OCCUPATION_CHANGED", "INVOICE_WALLET_QUOTA_EXCEEDED",

@@ -72,6 +72,25 @@ public class VoucherOperationService {
         complete(current, current.unavailable(failure, time(now)));
     }
 
+    /** 已获业务权限的财务入口显式复查原操作，不修改原命令或既有事实。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public VoucherOperation query(String tenant, UUID id, long expectedVersion, Instant now) {
+        var current = currentVersion(tenant, id, expectedVersion); var next = current.requestQuery(time(now));
+        complete(current, next); return next;
+    }
+    /** 权威查无后仍复核实际批准与发送时效；只重发相同编号和内容。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public VoucherOperation resend(String tenant, UUID id, long expectedVersion, Instant now) {
+        var current = currentVersion(tenant, id, expectedVersion); requireSource(current.input().command());
+        var next = current.retryNotFound(time(now)); complete(current, next); return next;
+    }
+    private VoucherOperation currentVersion(String tenant, UUID id, long expectedVersion) {
+        var initial = operations.find(tenant, id).orElseThrow(VoucherOperationService::notFound); lock(initial.input().command());
+        var current = operations.find(tenant, id).orElseThrow(VoucherOperationService::notFound);
+        if (current.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Voucher operation version changed");
+        return current;
+    }
+
     private VoucherOperation currentClaim(VoucherOperation claimed) {
         var command = claimed.input().command(); lock(command);
         var current = operations.find(command.tenantId(), command.id()).orElseThrow(VoucherOperationService::notFound);

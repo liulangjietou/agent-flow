@@ -66,6 +66,10 @@
     {
       "name": "事前申请",
       "description": "计划申请、预检、轮次冻结和实际审批后的额度生成。"
+    },
+    {
+      "name": "凭证与结算",
+      "description": "授权轮次的会计准备、过账事实及财务恢复操作。"
     }
   ],
   "paths": {
@@ -18536,6 +18540,252 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/vouchers": {
+      "get": {
+        "operationId": "getApplicationVouchers",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取授权轮次的凭证状态",
+        "description": "沿用业务明细和敏感字段权限；当前轮次或明确 roundNo。仅展示准备、原操作和凭证引用，不返回账户、目标或科目。READY 不是已过账，POSTED 不是已付款。",
+        "x-access": "有权读取完整本轮费用或借款明细的本人或参与者；管理员仍受敏感字段约束",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "省略取当前轮次；其他查询参数拒绝。"
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/vouchers/actions": {
+      "post": {
+        "operationId": "actOnApplicationVoucher",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "登记凭证准备或原操作查询",
+        "description": "FINANCE 角色且可读取该轮完整财务明细，申请人不得操作自身副作用。版本和原因必填；未知结果先查询。仅权威查无、从未见过外部版本且原发送依据有效时允许重发原编号。幂等回放前也复核实时字段权限。",
+        "x-access": "FINANCE + 该轮完整明细权限 + 非申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "请求已登记；实际 ERP 处理由后台进行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherActionInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28236,6 +28486,424 @@
           "approvedAt"
         ],
         "additionalProperties": false
+      },
+      "VoucherPreparationSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "attempt",
+          "createdAt",
+          "completedAt",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "BLOCKED",
+              "UNAVAILABLE",
+              "VOIDED",
+              "NOT_REQUIRED"
+            ]
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherOperationSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "kind",
+          "status",
+          "attempts",
+          "accountingDate",
+          "updatedAt",
+          "sendExpiresAt",
+          "observedStatus",
+          "voucherReference",
+          "postedAt",
+          "disputed",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_ACCRUAL",
+              "PAYMENT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sendExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "POSTED",
+                  "FAILED",
+                  "REVERSED",
+                  "NOT_FOUND"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voucherReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disputed": {
+            "type": "boolean"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherActionOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "prepare",
+          "query",
+          "resendOriginal"
+        ],
+        "properties": {
+          "prepare": {
+            "type": "boolean"
+          },
+          "query": {
+            "type": "boolean"
+          },
+          "resendOriginal": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VoucherWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "businessType",
+          "businessId",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "preparation",
+          "operation",
+          "actions"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessType": {
+            "type": "string",
+            "enum": [
+              "ADVANCE_REQUEST",
+              "EXPENSE"
+            ]
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "preparation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherPreparationSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherOperationSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actions": {
+            "$ref": "#/components/schemas/VoucherActionOptions"
+          }
+        }
+      },
+      "VoucherActionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "comment"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "PREPARE",
+              "QUERY",
+              "RESEND_ORIGINAL"
+            ]
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "description": "PREPARE 不携带 operationId/operationVersion；QUERY 和 RESEND_ORIGINAL 必须携带两者。comment 不能全为空白。无金额、账户或外部目标字段。",
+        "examples": [
+          {
+            "action": "PREPARE",
+            "roundNo": 1,
+            "applicationVersion": 7,
+            "businessVersion": 2,
+            "comment": "会计期间已开放，重新查询依据。"
+          },
+          {
+            "action": "QUERY",
+            "roundNo": 1,
+            "applicationVersion": 7,
+            "businessVersion": 2,
+            "operationId": "a1b2c3d4-1234-4234-8234-123456789abc",
+            "operationVersion": 3,
+            "comment": "核对原凭证的外部处理结果。"
+          }
+        ]
+      },
+      "VoucherActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "businessId",
+          "roundNo",
+          "action",
+          "preparationId",
+          "operationId",
+          "operationVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "PREPARE",
+              "QUERY",
+              "RESEND_ORIGINAL"
+            ]
+          },
+          "preparationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       }
     }
   }
