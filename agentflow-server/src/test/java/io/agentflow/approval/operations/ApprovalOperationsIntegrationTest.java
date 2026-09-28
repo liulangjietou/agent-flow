@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.password=${AGENTFLOW_OPERATIONS_TEST_PASSWORD:}",
         "spring.datasource.driver-class-name=${AGENTFLOW_OPERATIONS_TEST_DRIVER:org.h2.Driver}",
         "agentflow.auth.demo-enabled=true"})
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 class ApprovalOperationsIntegrationTest {
     @Autowired MockMvc mvc;
     @MockitoSpyBean AuthService auth;
@@ -56,6 +56,41 @@ class ApprovalOperationsIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired TaskService tasks;
     @Autowired RuntimeService runtime;
+
+    @Test
+    void organizationMetricsFollowEachHistoricalRoundAndKeepUnknownHistoryExplicit() throws Exception {
+        String key = "round-organization-" + UUID.randomUUID(), app = UUID.randomUUID().toString();
+        seedApplication("demo", app, key, 2);
+        seedRound("demo", app, 1, "RETURNED", "2020-01-01T12:00:00Z", "2020-01-01T13:00:00Z");
+        seedRound("demo", app, 2, "APPROVED", "2020-01-02T12:00:00Z", "2020-01-02T13:00:00Z");
+        organization("demo", app, 1, "研发%_!部");
+        organization("demo", app, 2, "财务部");
+        String other = seed("demo", key, "APPROVED", "2020-01-02T14:00:00Z", "2020-01-02T15:00:00Z");
+        organization("demo", other, 1, "研发%_!部");
+        seed("demo", key, "APPROVED", "2020-01-03T12:00:00Z", "2020-01-03T13:00:00Z");
+        seedApplication("demo", UUID.randomUUID().toString(), key, 2);
+        String foreign = seed("foreign", key, "RETURNED", "2020-01-01T12:00:00Z", "2020-01-01T13:00:00Z");
+        organization("foreign", foreign, 1, "研发%_!部");
+        var before = jdbc.queryForList("SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY round_no", app);
+        var report = report(key, "%_!");
+        var metrics = report.path("metrics");
+        assertThat(report.path("organization").asText()).isEqualTo("%_!");
+        assertThat(metrics.path("submittedRounds").asLong()).isEqualTo(2);
+        assertThat(metrics.path("applications").asLong()).isEqualTo(2);
+        assertThat(metrics.path("returned").asLong()).isEqualTo(1);
+        assertThat(metrics.path("returnRatePercent").decimalValue()).isEqualByComparingTo("50.0");
+        assertThat(report.path("daily").findValuesAsText("submittedRounds")).containsExactly("1", "1", "0");
+        assertThat(report.path("processes").get(0).path("metrics").path("submittedRounds").asLong()).isEqualTo(2);
+        assertThat(report.path("unrecordedHistoricalRounds").asLong()).isEqualTo(2);
+        assertThat(report.toString()).doesNotContain("secret-value", "payload", "appointmentId");
+        assertThat(report(key, "财务").path("metrics").path("submittedRounds").asLong()).isEqualTo(1);
+        assertThat(report(key, "reviewer").path("metrics").path("submittedRounds").asLong()).isEqualTo(3);
+        assertThat(report(key, "验收法人").path("metrics").path("submittedRounds").asLong()).isEqualTo(3);
+        var empty = report(key, "不存在的组织");
+        assertThat(empty.path("metrics").path("submittedRounds").asLong()).isZero();
+        assertThat(empty.path("unrecordedHistoricalRounds").asLong()).isEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY round_no", app)).isEqualTo(before);
+    }
 
     @Test
     void countsRoundsInsteadOfCurrentApplicationStateAndDoesNotMutateFacts() throws Exception {
@@ -157,8 +192,20 @@ class ApprovalOperationsIntegrationTest {
         assertThat(report.waitingNodes()).hasSize(1);
         assertThat(report.waitingNodes().get(0).tasks()).isEqualTo(2);
         assertThat(report.oldestTasks()).extracting(ApprovalOperationsReadPort.WaitingTask::assignee).containsExactlyInAnyOrder("admin", "finance");
+        organization("demo", app, 1, "实际在审部门");
+        var liveTasks = tasks.createTaskQuery().processInstanceId(task.getProcessInstanceId()).list();
+        tasks.setDueDate(liveTasks.get(0).getId(), java.util.Date.from(Instant.parse("2000-01-01T00:00:00Z")));
+        tasks.setDueDate(liveTasks.get(1).getId(), java.util.Date.from(Instant.parse("2100-01-01T00:00:00Z")));
+        var filtered = report(key, "实际在审");
+        assertThat(filtered.path("metrics").path("submittedRounds").asLong()).isZero();
+        assertThat(filtered.path("pendingTasks").asLong()).isEqualTo(2);
+        assertThat(filtered.path("overdueTasks").asLong()).isEqualTo(1);
+        assertThat(filtered.path("waitingNodes").get(0).path("tasks").asLong()).isEqualTo(2);
+        assertThat(filtered.path("oldestTasks")).hasSize(2);
+        assertThat(report(key, "其他部门").path("pendingTasks").asLong()).isZero();
         runtime.setVariable(task.getProcessInstanceId(), "roundNo", 9);
         assertThat(reader.read("demo", query(key), Instant.now()).pendingTasks()).isZero();
+        assertThat(report(key, "实际在审").path("pendingTasks").asLong()).isZero();
         runtime.setVariable(task.getProcessInstanceId(), "roundNo", 1);
         runtime.setVariable(task.getProcessInstanceId(), "tenantId", "other");
         assertThat(reader.read("demo", query(key), Instant.now()).pendingTasks()).isZero();
@@ -228,8 +275,11 @@ class ApprovalOperationsIntegrationTest {
     }
 
     private JsonNode report(String key) throws Exception {
+        return report(key, "");
+    }
+    private JsonNode report(String key, String organization) throws Exception {
         return json.read(mvc.perform(get("/api/v1/operations/approvals").param("from", "2020-01-01").param("to", "2020-01-03")
-                .param("processKey", key).header("Authorization", token("admin"))).andExpect(status().isOk())
+                .param("processKey", key).param("organization", organization).header("Authorization", token("admin"))).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store")).andReturn().getResponse().getContentAsString(), JsonNode.class);
     }
     private ApprovalOperationsReadPort.Query query(String key) {
@@ -253,4 +303,13 @@ class ApprovalOperationsIntegrationTest {
                 completed == null ? null : "finance", completed == null ? null : OffsetDateTime.parse(completed));
     }
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
+
+    private void organization(String tenant, String app, int round, String department) {
+        var snapshot = new io.agentflow.organization.InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1,
+                UUID.randomUUID(), "验收法人", UUID.randomUUID(), department, UUID.randomUUID(), "Reviewer");
+        jdbc.update("""
+                UPDATE approval_submission_round SET initiator_context_json=?,initiator_legal_entity_name=?,initiator_department_name=?,initiator_position_name=?
+                WHERE tenant_id=? AND application_id=? AND round_no=?
+                """, json.write(snapshot), snapshot.legalEntityName(), snapshot.departmentName(), snapshot.positionName(), tenant, app, round);
+    }
 }

@@ -4,16 +4,25 @@ const { ApprovalOperationsQuery, defaultOperationsFilter, operationsFilter, oper
 const now = new Date('2024-03-01T01:00:00Z')
 
 test('UTC 日期包含闰日和边界，拒绝无效范围与脱离流程的版本', () => {
-  assert.deepEqual(defaultOperationsFilter(new Date('2024-02-29T20:00:00-05:00')), { from: '2024-02-01', to: '2024-03-01', processKey: '' })
-  assert.equal(operationsFilter('2023-03-02', '2024-03-01', ' flow ', '2', now).definitionVersion, 2)
+  assert.deepEqual(defaultOperationsFilter(new Date('2024-02-29T20:00:00-05:00')), { from: '2024-02-01', to: '2024-03-01', processKey: '', organization: '' })
+  assert.equal(operationsFilter('2023-03-02', '2024-03-01', ' flow ', '2', '', now).definitionVersion, 2)
   for (const [from, to, key, version] of [
     ['2023-02-29', '2024-03-01', '', ''], ['2023-03-01', '2024-03-01', '', ''],
     ['2024-03-02', '2024-03-01', '', ''], ['2024-03-01', '2024-03-02', '', ''],
     ['2024-02-29', '2024-03-01', '', '1'], ['2024-02-29', '2024-03-01', 'flow', '0'],
     ['2024-02-29', '2024-03-01', 'flow', '2147483648']
-  ]) assert.throws(() => operationsFilter(from, to, key, version, now))
+  ]) assert.throws(() => operationsFilter(from, to, key, version, '', now))
   assert.equal(operationsDuration(undefined), '—'); assert.equal(operationsDuration(0), '0 秒')
   assert.equal(operationsDuration(3661), '1 小时 1 分'); assert.equal(operationsDuration(90000), '1 天 1 小时')
+})
+
+test('组织名称保留字面量，限制长度且不会沿用旧筛选', () => {
+  const result = operationsFilter('2024-02-01', '2024-03-01', '', '', '  R&D%_!室  ', now)
+  assert.equal(result.organization, 'R&D%_!室')
+  for (const organization of ['x'.repeat(129), 'x\ny']) {
+    assert.throws(() => operationsFilter('2024-02-01', '2024-03-01', '', '', organization, now), /组织名称/)
+  }
+  assert.equal(defaultOperationsFilter(now).organization, '')
 })
 
 test('账号和筛选切换取消旧查询，迟到结果与错误均不能回填', async () => {
@@ -21,8 +30,9 @@ test('账号和筛选切换取消旧查询，迟到结果与错误均不能回�
   const query = new ApprovalOperationsQuery((filter, signal) => new Promise((resolve, reject) => requests.push({ filter, signal, resolve, reject })))
   const filter = defaultOperationsFilter(now)
   const first = query.load('demo:admin', filter)
-  filter.processKey = 'changed'
+  filter.processKey = 'changed'; filter.organization = '另一个组织'
   assert.equal(requests[0].filter.processKey, '')
+  assert.equal(requests[0].filter.organization, '')
   const second = query.load('other:admin', filter)
   assert.equal(requests[0].signal.aborted, true)
   requests[1].resolve({ pendingTasks: 2 }); await second
@@ -60,10 +70,11 @@ test('运营 API 是可取消的认证只读请求，编码流程键且没有写
   let request
   globalThis.fetch = async (url, init) => { request = { url, ...init }; return Response.json({}) }
   const controller = new AbortController()
-  await api.approvalOperations({ from: '2024-02-01', to: '2024-03-01', processKey: '流程/x & y', definitionVersion: 2 }, controller.signal)
+  await api.approvalOperations({ from: '2024-02-01', to: '2024-03-01', processKey: '流程/x & y', definitionVersion: 2, organization: 'R&D%_!室' }, controller.signal)
   const url = new URL(request.url, 'http://localhost')
   assert.equal(url.pathname, '/api/v1/operations/approvals'); assert.equal(url.searchParams.get('processKey'), '流程/x & y')
   assert.equal(url.searchParams.get('definitionVersion'), '2'); assert.equal(request.signal, controller.signal)
+  assert.equal(url.searchParams.get('organization'), 'R&D%_!室')
   assert.equal(request.headers.get('Authorization'), 'Bearer operations-token')
   assert.equal(request.headers.has('Idempotency-Key'), false); assert.equal(request.body, undefined)
 })

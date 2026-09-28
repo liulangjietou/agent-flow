@@ -28,9 +28,17 @@ class OperationsQueryParametersTest {
                 .isEqualTo("2023-03-02");
         for (var raw : java.util.List.of(Map.of("from", "2023-03-01"), Map.of("from", "2023-02-29"),
                 Map.of("from", "0000-03-01"), Map.of("processKey", "x\ny"), Map.of("processKey", "x".repeat(129)),
-                Map.of("processKey", "x", "definitionVersion", "2147483648"))) {
+                Map.of("processKey", "x", "definitionVersion", "2147483648"),
+                Map.of("organization", "x".repeat(129)), Map.of("organization", "x\ny"))) {
             assertThatThrownBy(() -> OperationsQueryParameters.parse(raw, today)).isInstanceOf(DomainException.class)
-                    .hasMessage("Invalid UTC date range or process filter");
+                    .hasMessage("Invalid UTC date range, process or organization filter");
         }
+    }
+
+    @Test
+    void acceptsLiteralOrganizationNamesAndTrimsOnlyOuterWhitespace() {
+        var query = OperationsQueryParameters.parse(Map.of("organization", "  R&D%_!室  "), LocalDate.parse("2024-03-01"));
+        assertThat(query.organization()).isEqualTo("R&D%_!室");
+        assertThat(OperationsQueryParameters.parse(Map.of(), LocalDate.parse("2024-03-01")).organization()).isEmpty();
     }
 }

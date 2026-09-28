@@ -100,11 +100,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
             sql.append(" AND (LOWER(a.title) LIKE ? ESCAPE '!' OR LOWER(a.business_no) LIKE ? ESCAPE '!' OR LOWER(t.NAME_) LIKE ? ESCAPE '!')");
             parameters.addAll(List.of(pattern, pattern, pattern));
         }
-        if (!query.organization().isEmpty()) {
-            String pattern = literalPattern(query.organization());
-            sql.append(" AND (LOWER(r.initiator_legal_entity_name) LIKE ? ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE ? ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE ? ESCAPE '!')");
-            parameters.addAll(List.of(pattern, pattern, pattern));
-        }
+        io.agentflow.approval.RoundOrganizationSearchSql.append(sql, parameters, query.organization());
         if (!query.processKey().isEmpty()) { sql.append(" AND a.process_key=?"); parameters.add(query.processKey()); }
         if (!query.applicant().isEmpty()) { sql.append(" AND a.created_by=?"); parameters.add(query.applicant()); }
         if (query.minAmount() != null) { sql.append(" AND a.search_amount>=?"); parameters.add(query.minAmount()); }

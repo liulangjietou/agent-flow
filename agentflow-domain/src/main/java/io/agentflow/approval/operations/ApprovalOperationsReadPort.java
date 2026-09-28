@@ -15,10 +15,14 @@ public interface ApprovalOperationsReadPort {
     Report read(String tenantId, Query query, Instant generatedAt);
 
     /**
-     * 已校验的 UTC 提交日期范围与精确流程筛选。
+     * 已校验的 UTC 提交日期、精确流程和提交时组织名称筛选。
      * @author owlzhangfq@gmail.com
      */
-    record Query(LocalDate from, LocalDate to, String processKey, Long definitionVersion) {
+    record Query(LocalDate from, LocalDate to, String processKey, Long definitionVersion, String organization) {
+        /** 保留未设置组织条件的既有内部调用。 */
+        public Query(LocalDate from, LocalDate to, String processKey, Long definitionVersion) {
+            this(from, to, processKey, definitionVersion, "");
+        }
         /** 起始日包含，结束日次日零点不包含。 */
         public Instant fromInclusive() { return from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant(); }
         /** 将用户看到的结束日期转换为半开区间上界。 */
@@ -67,11 +71,11 @@ public interface ApprovalOperationsReadPort {
                        String processKey, long definitionVersion, int roundNo, String assignee,
                        Instant createdAt, long waitingSeconds, Instant dueAt) { }
     /**
-     * 日期窗口按提交时间划定；当前待办和缺失历史轮次只受流程筛选影响。
+     * 历史指标按各自轮次的组织筛选，当前待办按在审轮次；缺失历史仍仅披露流程范围。
      * @author owlzhangfq@gmail.com
      */
     record Report(Instant generatedAt, LocalDate from, LocalDate to, String timeZone, String processKey,
-                  Long definitionVersion, Metrics metrics, List<Daily> daily, List<ProcessSummary> processes,
+                  Long definitionVersion, String organization, Metrics metrics, List<Daily> daily, List<ProcessSummary> processes,
                   boolean moreProcesses, long pendingTasks, long overdueTasks, List<WaitingNode> waitingNodes, boolean moreWaitingNodes,
                   List<WaitingTask> oldestTasks, boolean moreOldestTasks, long unrecordedHistoricalRounds) { }
 }

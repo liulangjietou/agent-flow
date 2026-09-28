@@ -71,7 +71,8 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
                 (row, index) -> new ProcessSummary(row.getString("process_key"), row.getLong("definition_version"), metrics(row)), roundParameters.toArray());
 
         var taskParameters = new ArrayList<Object>(List.of(tenantId));
-        StringBuilder tasks = new StringBuilder(FlowableActiveTaskSql.fromCurrentApplications());
+        StringBuilder tasks = new StringBuilder(query.organization().isEmpty()
+                ? FlowableActiveTaskSql.fromCurrentApplications() : FlowableActiveTaskSql.fromCurrentApplicationsWithRound());
         filters(tasks, taskParameters, query, "a.definition_version");
         var nodeParameters = new ArrayList<Object>(List.of(java.sql.Timestamp.from(generatedAt), java.sql.Timestamp.from(generatedAt)));
         nodeParameters.addAll(taskParameters);
@@ -102,7 +103,7 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
                     row.getString("ASSIGNEE_"), created, elapsed(created, generatedAt),
                     row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant());
         }, taskParameters.toArray());
-        return new Report(generatedAt, query.from(), query.to(), "UTC", query.processKey(), query.definitionVersion(), metrics, daily,
+        return new Report(generatedAt, query.from(), query.to(), "UTC", query.processKey(), query.definitionVersion(), query.organization(), metrics, daily,
                 head(processes, PROCESS_LIMIT), processes.size() > PROCESS_LIMIT, pending, overdue, head(nodes, WAITING_LIMIT),
                 nodes.size() > WAITING_LIMIT, head(oldestTasks, WAITING_LIMIT), oldestTasks.size() > WAITING_LIMIT,
                 historyGaps.count(tenantId, query.processKey(), query.definitionVersion()));
@@ -118,6 +119,7 @@ public class JdbcApprovalOperationsReadAdapter implements ApprovalOperationsRead
     private static void filters(StringBuilder sql, List<Object> parameters, Query query, String versionColumn) {
         if (!query.processKey().isEmpty()) { sql.append(" AND a.process_key=?"); parameters.add(query.processKey()); }
         if (query.definitionVersion() != null) { sql.append(" AND ").append(versionColumn).append("=?"); parameters.add(query.definitionVersion()); }
+        io.agentflow.approval.RoundOrganizationSearchSql.append(sql, parameters, query.organization());
     }
 
     private static long elapsed(Instant start, Instant end) { return Math.max(0, Duration.between(start, end).getSeconds()); }
