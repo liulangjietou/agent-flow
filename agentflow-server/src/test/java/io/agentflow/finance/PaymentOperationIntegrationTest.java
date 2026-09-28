@@ -50,6 +50,7 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.payments.worker-enabled=false", "agentflow.payments.lease-seconds=15",
+        "agentflow.payments.request-worker-enabled=false", "agentflow.payments.request-lease-seconds=15",
         "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false"})
 @Import(PaymentOperationIntegrationTest.ListenerConfiguration.class)
@@ -78,6 +79,9 @@ class PaymentOperationIntegrationTest {
     @Autowired JdbcPaymentOperationRepository operations;
     @Autowired PaymentOperationService execution;
     @Autowired PaymentOperationWorker worker;
+    @Autowired JdbcPaymentExecutionRequestRepository executionRequests;
+    @Autowired PaymentExecutionRequestService requestService;
+    @Autowired PaymentExecutionRequestWorker requestWorker;
     @Autowired FinanceGatewayConfiguration configuration;
     @Autowired FailureListener listener;
 
@@ -96,6 +100,8 @@ class PaymentOperationIntegrationTest {
     }
     @AfterEach void removeOnlyPaymentFixtures() {
         for (var id : fixtures) {
+            jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id=?)", id.toString());
+            jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id=?", id.toString());
             jdbc.update("DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=?", id.toString());
             jdbc.update("DELETE FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString());
             jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id=?", id.toString());
@@ -190,6 +196,73 @@ class PaymentOperationIntegrationTest {
         tx().executeWithoutResult(status -> execution.resend("demo", job.input().command().id(), reload(job).version(), now())); RESPONDER.set(PaymentOperationIntegrationTest::response); worker.poll();
         assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isEqualTo(2); assertThat(ACCOUNT_READS.get()).isEqualTo(4);
         assertThat(reload(job).input()).isEqualTo(job.input()); assertThat(LAST_KEY.get()).isEqualTo(job.input().command().id().toString());
+    }
+
+    @Test void cashierChoiceIsCommittedBeforeAnyAccountCallAndReadyOnlyRegistersOriginalPayment() {
+        var authorization = authorized(); var request = request(authorization, "v1");
+        assertThat(ACCOUNT_READS.get()).isZero(); assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization);
+        assertThat(executionRequests.find("foreign", request.input().id())).isEmpty(); requestWorker.poll();
+        assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.READY);
+        var registered = authorizations.find("demo", authorization.terms().id()).orElseThrow(); var queued = operations.find("demo", authorization.terms().id()).orElseThrow();
+        COMMANDS.put(authorization.terms().id(), queued.input().command());
+        assertThat(registered.status()).isEqualTo(PaymentAuthorization.Status.EXECUTION_REGISTERED); assertThat(queued.status()).isEqualTo(PaymentOperation.Status.QUEUED);
+        assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isEqualTo(2);
+        worker.poll(); assertThat(reload(queued).settleable()).isTrue(); assertThat(WRITES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isEqualTo(4);
+    }
+    @Test void duplicateCashierSelectionAndChangedDisplayedAccountVersionCannotRegisterPayment() {
+        var authorization = authorized(); var request = request(authorization, "outdated");
+        assertThatThrownBy(() -> request(authorization, "v1")).isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("PAYMENT_EXECUTION_ALREADY_REQUESTED"));
+        requestWorker.poll(); assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.BLOCKED);
+        assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization); assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
+    }
+    @Test void requestLeaseRecoveryKeepsChoiceAndLateWorkerCannotRegisterAgain() {
+        var authorization = authorized(); var request = request(authorization, "v1");
+        var stale = requestService.claim("demo", request.input().id(), now().minusSeconds(20));
+        requestWorker.poll(); assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.QUEUED);
+        requestWorker.poll(); var ready = executionRequests.find("demo", request.input().id()).orElseThrow(); assertThat(ready.status()).isEqualTo(PaymentExecutionRequest.Status.READY);
+        requestService.finish(stale, directory(now()), account(now()), now()); assertThat(executionRequests.find("demo", request.input().id())).contains(ready);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_operation WHERE tenant_id='demo' AND id=?", Long.class, authorization.terms().id().toString())).isEqualTo(1);
+        assertThat(WRITES.get()).isZero();
+    }
+    @Test void requestHistoryFailureRollsBackAuthorizationAndPaymentQueueTogether() {
+        var authorization = authorized(); var request = request(authorization, "v1"); var work = requestService.claim("demo", request.input().id(), now());
+        jdbc.update("INSERT INTO payment_execution_request_revision(tenant_id,request_id,version,state_json) VALUES('demo',?,3,'{}')", request.input().id().toString());
+        assertThatThrownBy(() -> requestService.finish(work, directory(now()), account(now()), now())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization); assertThat(operations.find("demo", authorization.terms().id())).isEmpty();
+        assertThat(executionRequests.find("demo", request.input().id())).contains(work.request()); assertThat(WRITES.get()).isZero();
+    }
+    @Test void financeVoidingAuthorizationDuringRequestReadsPreventsAnyPaymentQueue() throws Exception {
+        var authorization = authorized(); var request = request(authorization, "v1"); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        RESPONDER.set((path, data) -> { if (path.endsWith("debit-accounts")) { entered.countDown(); await(release); } return response(path, data); });
+        var thread = Executors.newSingleThreadExecutor();
+        try {
+            var running = thread.submit(requestWorker::poll); assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            tx().executeWithoutResult(status -> { sources.lock(authorization); authorizations.update(authorization.voidBeforeExecution("finance", "取消尚未完成的执行检查", now())); });
+            release.countDown(); running.get(4, TimeUnit.SECONDS);
+            assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.VOIDED);
+            assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
+        } finally { release.countDown(); thread.shutdownNow(); }
+    }
+    @Test void authorizationExpiryDuringRequestReadClosesBothUnexecutedRecords() {
+        var authorization = authorized(); var request = request(authorization, "v1"); var until = authorization.decision().expiresAt();
+        var work = requestService.claim("demo", request.input().id(), until.minusSeconds(1));
+        requestService.finish(work, directory(until), account(until), until);
+        assertThat(authorizations.find("demo", authorization.terms().id()).orElseThrow().status()).isEqualTo(PaymentAuthorization.Status.EXPIRED);
+        assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.EXPIRED);
+        assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
+    }
+
+    @Test void storedCashierChoiceCannotBeRewrittenAndRelationalIdentityTamperingFailsClosed() {
+        var authorization = authorized(); var request = request(authorization, "v1"); var input = request.input(); var claimed = request.claim(now(), Duration.ofSeconds(15));
+        var changedInput = new PaymentExecutionRequest.Input(input.id(), input.tenantId(), input.authorizationId(), input.authorizationVersion(), input.cashier(), "another-debit", input.debitVersion());
+        var changed = new PaymentExecutionRequest(changedInput, claimed.version(), claimed.status(), claimed.attempts(), claimed.createdAt(), claimed.updatedAt(), claimed.nextAttemptAt(), claimed.leaseUntil(), claimed.failure());
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> executionRequests.update(changed))).isInstanceOf(DomainException.class);
+        jdbc.update("UPDATE payment_execution_request SET cashier_id='another-person' WHERE tenant_id='demo' AND id=?", input.id().toString());
+        assertThatThrownBy(() -> executionRequests.find("demo", input.id())).isInstanceOf(IllegalStateException.class);
+    }
+
+    private PaymentExecutionRequest request(PaymentAuthorization authorization, String accountVersion) {
+        return tx().execute(status -> requestService.register(authorization, "cashier", "debit-1", accountVersion, now().minusSeconds(30)));
     }
 
     private PaymentOperation job() { return register(authorized()); }
