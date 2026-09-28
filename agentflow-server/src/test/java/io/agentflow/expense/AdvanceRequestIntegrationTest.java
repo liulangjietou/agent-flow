@@ -15,6 +15,9 @@ import io.agentflow.finance.EmployeeAccountPort;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.Money;
+import io.agentflow.finance.ApprovedVoucherSources;
+import io.agentflow.finance.JdbcVoucherPreparationRepository;
+import io.agentflow.finance.VoucherPreparation;
 import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.OrganizationService;
@@ -58,6 +61,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
+        "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.expense-plans.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -97,6 +101,8 @@ class AdvanceRequestIntegrationTest {
     @Autowired AdvanceRequestCheckWorker worker;
     @Autowired JdbcAdvanceRequestCheckRepository checks;
     @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired ApprovedVoucherSources voucherSources;
+    @Autowired JdbcVoucherPreparationRepository voucherPreparations;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -145,6 +151,7 @@ class AdvanceRequestIntegrationTest {
         assertThat(app(id).payload().get("amount")).isEqualTo("100.00"); assertThat(current(id).approval()).isNull();
         var firstApproval = ok(act(id, "APPROVE"), 200); assertThat(firstApproval.path("applicationStatus").asText()).isEqualTo("IN_APPROVAL");
         assertThat(current(id).approval()).isNull(); assertThat(paidAdvances.find("demo", id)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", Integer.class, id.toString())).isZero();
         String lastPath = actionPath(id); String approvalKey = UUID.randomUUID().toString(); var decision = decision(id, "APPROVE");
         var approved = send(lastPath, "manager", approvalKey, decision); ok(approved, 200);
         assertThat(send(lastPath, "manager", approvalKey, decision).getContentAsString()).isEqualTo(approved.getContentAsString());
@@ -152,6 +159,13 @@ class AdvanceRequestIntegrationTest {
         assertThat(current(id).approval().roundNo()).isEqualTo(1); assertThat(current(id).approval().approvedBy()).isEqualTo("manager");
         assertThat(current(id).version()).isEqualTo(3); assertThat(paidAdvances.find("demo", id)).isEmpty();
         assertThat(app(id).status()).isEqualTo(ApplicationStatus.APPROVED);
+        var preparation = voucherPreparations.latest(voucherSources.reference(app(id))).orElseThrow();
+        assertThat(preparation.status()).isEqualTo(VoucherPreparation.Status.QUEUED);
+        assertThat(preparation.input().source().businessVersion()).isEqualTo(current(id).version());
+        assertThat(preparation.input().source().applicationVersion()).isEqualTo(app(id).version());
+        assertThat(preparation.input().attempt()).isEqualTo(1); assertThat(preparation.input().requestedBy()).isEqualTo("manager");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", Integer.class, id.toString())).isEqualTo(1);
+        assertThat(calls.keySet()).containsExactlyInAnyOrder("catalog", "employee-account");
         for (String user : List.of("alice", "manager")) {
             var view = ok(read(path(id), user), 200);
             assertThat(view.at("/financialRound/maskedAccount").asText()).isEqualTo("****1234");
@@ -176,6 +190,9 @@ class AdvanceRequestIntegrationTest {
         assertThat(paidAdvances.find("demo", id)).isEmpty();
         assertThat(ok(read(path(id) + "?roundNo=1", "manager"), 200).has("approval")).isFalse();
         assertThat(app(id).roundNo()).isEqualTo(2);
+        var preparation = voucherPreparations.latest(voucherSources.reference(app(id))).orElseThrow();
+        assertThat(preparation.input().source().roundNo()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND business_id=? AND round_no=1", Integer.class, id.toString())).isZero();
     }
 
     @Test void ownListAndEveryWriteOrPrecheckRejectAnotherIdentityAndUnknownFilters() throws Exception {
@@ -353,6 +370,19 @@ class AdvanceRequestIntegrationTest {
         } finally { jdbc.execute("ALTER TABLE advance_request_revision DROP CONSTRAINT ck_advance_approval_fixture"); }
         ok(act(id, "APPROVE"), 200); assertThat(current(id).approval()).isNotNull();
         assertThat(paidAdvances.find("demo", id)).isEmpty();
+    }
+
+    @Test void failedVoucherQueueWriteRollsBackFinalTaskRoundAndAdvanceApprovalTogether() throws Exception {
+        UUID id = create(); submit(id); ok(act(id, "APPROVE"), 200); long before = app(id).version(); String task = actionPath(id);
+        jdbc.execute("ALTER TABLE voucher_preparation ADD CONSTRAINT ck_voucher_approval_fixture CHECK (business_id <> '" + id + "')");
+        try {
+            assertThatThrownBy(() -> act(id, "APPROVE")).isInstanceOf(jakarta.servlet.ServletException.class).hasRootCauseInstanceOf(java.sql.SQLException.class);
+            assertThat(app(id).status()).isEqualTo(ApplicationStatus.IN_APPROVAL); assertThat(app(id).version()).isEqualTo(before);
+            assertThat(actionPath(id)).isEqualTo(task); assertThat(current(id).version()).isEqualTo(2); assertThat(current(id).approval()).isNull();
+            assertThat(jdbc.queryForObject("SELECT status FROM approval_submission_round WHERE tenant_id='demo' AND application_id=? AND round_no=1", String.class, app(id).id().toString())).isEqualTo("IN_APPROVAL");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", Integer.class, id.toString())).isZero();
+        } finally { jdbc.execute("ALTER TABLE voucher_preparation DROP CONSTRAINT ck_voucher_approval_fixture"); }
+        ok(act(id, "APPROVE"), 200); assertThat(voucherPreparations.latest(voucherSources.reference(app(id)))).isPresent();
     }
 
     private UUID create() throws Exception { return id(ok(send("/api/v1/advance-requests", "alice", createBody(published(false, false), content("100"))), 201)); }

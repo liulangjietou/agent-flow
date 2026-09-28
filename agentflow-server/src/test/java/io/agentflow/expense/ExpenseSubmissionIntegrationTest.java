@@ -48,6 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
+        "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.budgets.worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -93,6 +94,13 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired ApplicationRepository applications;
     @Autowired ExpenseReportRepository reports;
+    @Autowired ApprovedVoucherSources voucherSources;
+    @Autowired JdbcVoucherPreparationRepository voucherPreparations;
+    @Autowired VoucherPreparationWorker voucherPreparationWorker;
+    @Autowired JdbcVoucherOperationRepository voucherOperations;
+    @Autowired VoucherOperationWorker voucherWorker;
+    @Autowired VoucherPreparationService voucherPreparationService;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired InvoiceRepository invoices;
     @Autowired ExpenseRequestRepository requests;
     @Autowired EmployeeAdvanceRepository advances;
@@ -159,6 +167,15 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.FROZEN);
         assertThat(frozen.rounds()).hasSize(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+        var preparation = voucherPreparations.latest(voucherSources.reference(app(report))).orElseThrow();
+        assertThat(preparation.input().source().businessVersion()).isEqualTo(current(report).version());
+        assertThat(preparation.input().source().applicationVersion()).isEqualTo(app(report).version());
+        voucherPreparationWorker.poll(); assertThat(voucherPreparations.find("demo", preparation.input().id()).orElseThrow().status()).isEqualTo(VoucherPreparation.Status.READY);
+        var voucher = voucherOperations.find("demo", preparation.input().id()).orElseThrow();
+        assertThat(voucher.input().command().totals()).isEqualTo(new VoucherCommand.Totals(money("100"), money("6"), money("50")));
+        assertThat(voucher.input().command().binding().applicationId()).isEqualTo(report.applicationId());
+        voucherWorker.poll(); assertThat(voucherOperations.find("demo", preparation.input().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.POSTED);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.FROZEN);
     }
 
     @Test
@@ -333,6 +350,10 @@ class ExpenseSubmissionIntegrationTest {
         budgetWorker.poll(); ok(act(report, "finance", "APPROVE"), 200);
         // 原金额 100 会进入额外审批；实际执行直接结束，证明引擎条件读取了 25。
         assertThat(app(report).status()).isEqualTo(ApplicationStatus.APPROVED); assertThat(tasks(report)).isEmpty();
+        var preparation = voucherPreparations.latest(voucherSources.reference(app(report))).orElseThrow();
+        assertThat(preparation.input().source().businessVersion()).isEqualTo(reduced.version());
+        var source = voucherSources.derive(preparation.input().source());
+        assertThat(source.totals()).isEqualTo(new VoucherCommand.Totals(money("25"), money("1"), money("25")));
     }
 
     @Test
@@ -345,6 +366,22 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(current(report).currentRound().approvedGross()).isEqualTo(money("0"));
         assertCode(act(report, "finance", "APPROVE"), "EXPENSE_BUDGET_NOT_CONFIRMED");
         budgetWorker.poll(); ok(act(report, "finance", "APPROVE"), 200);
+        var preparation = voucherPreparations.latest(voucherSources.reference(app(report))).orElseThrow(); voucherPreparationWorker.poll();
+        assertThat(voucherPreparations.find("demo", preparation.input().id()).orElseThrow().status()).isEqualTo(VoucherPreparation.Status.NOT_REQUIRED);
+        assertThat(voucherOperations.find("demo", preparation.input().id())).isEmpty();
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.FROZEN);
+    }
+
+    @Test
+    void approvedExpenseCannotPrepareVoucherWhileBudgetFinalizationIsUnconfirmed() throws Exception {
+        var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        var preparation = voucherPreparations.latest(voucherSources.reference(app(report))).orElseThrow();
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(transaction ->
+                budgetExecution.finalizeOccupation("demo", report.id(), BudgetCommand.Action.CONSUME, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS)));
+        assertThat(voucherPreparationService.claim("demo", preparation.input().id(), Instant.now())).isNull();
+        var blocked = voucherPreparations.find("demo", preparation.input().id()).orElseThrow();
+        assertThat(blocked.status()).isEqualTo(VoucherPreparation.Status.BLOCKED); assertThat(blocked.result().code()).isEqualTo("VOUCHER_BUDGET_NOT_FROZEN");
+        assertThat(voucherOperations.find("demo", preparation.input().id())).isEmpty();
     }
 
     @Test
@@ -626,6 +663,18 @@ class ExpenseSubmissionIntegrationTest {
             case "invoice-verification" -> new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-verification", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(json.read(data.toString(), BudgetPrecheckPort.Request.class), "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
+            case "accounting-period" -> {
+                var request = json.read(data.toString(), AccountingPeriodPort.Request.class); var date = request.accountingDate(); var at = Instant.now();
+                yield new AccountingPeriodPort.OpenPeriod(request, "synthetic-period", "v1", date.minusDays(30), date.plusDays(30), at, at.plusSeconds(300));
+            }
+            case "account-mapping" -> {
+                var request = json.read(data.toString(), AccountMappingPort.Request.class); var at = Instant.now();
+                yield new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+            }
+            case "voucher-command" -> {
+                var command = json.read(data.path("command").toString(), VoucherCommand.class);
+                yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, Instant.now(), "synthetic-posting", "synthetic-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
+            }
             case "budget-command", "budget-query" -> {
                 BudgetCommand command;
                 if (operation.equals("budget-command")) { writes++; command = json.read(data.path("command").toString(), BudgetCommand.class); commands.put(command.id(), command); }

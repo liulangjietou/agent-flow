@@ -1,0 +1,47 @@
+{
+  "recordedAt": "2026-09-28T22:05:14.757752+00:00",
+  "status": "LOCAL_APPROVAL_INTEGRATION_ACCEPTANCE_PASSED",
+  "syntheticErp": true,
+  "enterpriseAcceptance": false,
+  "databaseMigration": "V44__voucher_preparation.sql",
+  "tests": {
+    "h2Scope": 79,
+    "domain": 19,
+    "server": 60,
+    "postgresql": 55,
+    "postgresqlVersion": "17.11",
+    "scopesOverlap": true,
+    "javaAuthors": {
+      "files": 588,
+      "namedTypes": 1034,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "fixtureCorrection": "Newly prepared commands exposed synthetic future postedAt; corrected fixture while strict production validation remained unchanged"
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "voucher-preparation-first-tests.log",
+    "voucher-preparation-flow-tests.log",
+    "voucher-preparation-scope.log",
+    "voucher-preparation-postgres.log"
+  ],
+  "implemented": [
+    "Real final approvals queue immutable sources in same transaction",
+    "Reads original period and complete mapping outside transactions",
+    "Revalidates current financial facts, paper control and confirmed budget",
+    "Voucher registration and preparation completion are atomic",
+    "Retry read-only attempts keeps failures and immutable original target",
+    "Any registered voucher prevents replacement by new preparation",
+    "Zero approved amount explicitly needs no voucher without declaring settlement complete",
+    "Preparation failure rolls back engine task, round and loan approval",
+    "V43 to V44 preserves original vouchers and revisions"
+  ],
+  "remaining": [
+    "Authorized financial status and operation API and UI",
+    "Persistent payment authorization and execution",
+    "Resource consumption and archive closure",
+    "Explicit voucher retirement or conflict resolution",
+    "Enterprise integration"
+  ]
+}

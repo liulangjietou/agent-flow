@@ -1,11 +1,6 @@
 package io.agentflow.finance;
 
-import io.agentflow.approval.model.BusinessReference;
-import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
-import io.agentflow.expense.AdvanceRequestRepository;
-import io.agentflow.expense.ExpenseReportRepository;
-import io.agentflow.expense.JdbcExpenseSubmissionControlRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -22,21 +17,16 @@ import java.util.UUID;
  */
 @Service
 public class VoucherOperationService {
-    private final ApplicationRepository applications;
-    private final AdvanceRequestRepository advances;
-    private final ExpenseReportRepository expenses;
-    private final JdbcExpenseSubmissionControlRepository controls;
-    private final JdbcBudgetOccupationRepository budgets;
+    private final ApprovedVoucherSources sources;
     private final JdbcVoucherOperationRepository operations;
     private final ApplicationEventPublisher events;
     private final Duration lease;
 
     /** 领取租约有界，网络调用不进入本服务的事务。 */
-    public VoucherOperationService(ApplicationRepository applications, AdvanceRequestRepository advances, ExpenseReportRepository expenses,
-            JdbcExpenseSubmissionControlRepository controls, JdbcBudgetOccupationRepository budgets, JdbcVoucherOperationRepository operations,
+    public VoucherOperationService(ApprovedVoucherSources sources, JdbcVoucherOperationRepository operations,
             ApplicationEventPublisher events, @Value("${agentflow.vouchers.lease-seconds:90}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Voucher lease must be between 15 and 300 seconds");
-        this.applications = applications; this.advances = advances; this.expenses = expenses; this.controls = controls; this.budgets = budgets;
+        this.sources = sources;
         this.operations = operations; this.events = events; this.lease = Duration.ofSeconds(leaseSeconds);
     }
 
@@ -90,26 +80,11 @@ public class VoucherOperationService {
     private void complete(VoucherOperation previous, VoucherOperation value) {
         operations.update(value); events.publishEvent(new VoucherOperationChanged(previous, value));
     }
-    private void lock(VoucherCommand command) {
-        if (JdbcVoucherOperationRepository.businessType(command) == BusinessReference.Type.ADVANCE_REQUEST) advances.lock(command.tenantId(), command.binding().businessId());
-        else expenses.lock(command.tenantId(), command.binding().businessId());
-    }
+    private void lock(VoucherCommand command) { sources.lock(sources.reference(command)); }
     private void requireSource(VoucherCommand command) {
-        var application = applications.findById(command.tenantId(), command.binding().applicationId()).orElseThrow(VoucherOperationService::notFound);
-        VoucherSource.Plan source;
-        if (command.kind() == VoucherCommand.Kind.EMPLOYEE_ADVANCE) {
-            source = VoucherSource.advance(application, advances.find(command.tenantId(), command.binding().businessId()).orElseThrow(VoucherOperationService::notFound));
-        } else if (command.kind() == VoucherCommand.Kind.EXPENSE_ACCRUAL) {
-            var report = expenses.find(command.tenantId(), command.binding().businessId()).orElseThrow(VoucherOperationService::notFound);
-            var control = controls.find(command.tenantId(), report.id(), command.binding().roundNo()).orElseThrow(VoucherOperationService::notFound);
-            source = VoucherSource.expense(application, report, control);
-            var budget = budgets.find(command.tenantId(), report.id()).orElseThrow(VoucherOperationService::notFound);
-            if (!budget.frozenFor(BudgetPrecheckPort.Request.fromCurrent(report, control.input().accountingDate()))) throw new DomainException("VOUCHER_BUDGET_NOT_FROZEN", "Current expense amount must retain its confirmed budget reservation");
-        } else {
-            // 付款凭证须由后续持久支付结果创建，不能仅凭调用方提供的一份回单声明登记。
-            throw new DomainException("VOUCHER_PAYMENT_SOURCE_REQUIRED", "A persisted successful payment is required before registering its voucher");
+        if (!sources.derive(sources.reference(command)).matches(command)) {
+            throw new DomainException("VOUCHER_SOURCE_MISMATCH", "Voucher command no longer matches the approved financial source");
         }
-        if (!source.matches(command)) throw new DomainException("VOUCHER_SOURCE_MISMATCH", "Voucher command no longer matches the approved financial source");
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher financial source or operation not found"); }
