@@ -112,6 +112,8 @@ class GatewayBudgetSystemTest {
         TransactionSynchronizationManager.setActualTransactionActive(false);
         assertThatThrownBy(() -> client.read("tenant-a", FinanceGatewayClient.Operation.BUDGET_COMMAND, command, BudgetObservation.class, value -> true))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.read("tenant-a", FinanceGatewayClient.Operation.BUDGET_QUERY, command, BudgetObservation.class, value -> true))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThat(requests.get()).isZero();
     }
 

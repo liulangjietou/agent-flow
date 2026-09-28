@@ -1,0 +1,32 @@
+{
+  "recordedAt": "2026-09-28T20:19:23.793655+00:00",
+  "status": "LOCAL_PORT_ACCEPTANCE_PASSED",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "1965e13",
+  "scope": "Payment domain contracts and loopback HTTP adapter, no exposed execution API",
+  "synthetic": true,
+  "tests": {
+    "paymentDomain": 5,
+    "paymentHttp": 7,
+    "totalScoped": 53,
+    "scopesOverlap": true,
+    "budgetQueryRed": 1,
+    "budgetQueryRedFailures": 1
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "payment-port-first-tests.log",
+    "payment-port-budget-query-red.log",
+    "payment-port-regression.log",
+    "payment-port-authors.log"
+  ],
+  "migration": null,
+  "actualBankPayment": false,
+  "remaining": [
+    "Employee advance origination",
+    "Voucher and authorization",
+    "Persistent execution and signed callbacks",
+    "Settlement consumption and archive",
+    "Enterprise integration"
+  ]
+}

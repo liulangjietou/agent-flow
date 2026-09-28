@@ -52,7 +52,10 @@ public class FinanceGatewayClient {
 
     /** 业务适配器核对结果与请求一致性，基础传输只认固定操作及封闭结果类型。 */
     public <T> FinanceResult<T> read(String tenantId, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
-        if (operation == Operation.BUDGET_COMMAND) throw new IllegalArgumentException("A budget command requires its persistent operation identity");
+        if (operation == Operation.BUDGET_COMMAND || operation == Operation.BUDGET_QUERY
+                || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY) {
+            throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
+        }
         return exchange(tenantId, null, operation, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
@@ -69,6 +72,19 @@ public class FinanceGatewayClient {
         return exchange(tenantId, targetDigest, Operation.BUDGET_COMMAND, operationId, data, resultType, matchesRequest);
     }
 
+    /** 付款查询始终使用原租户、原目标和原授权，不能改查当前新配置的资金系统。 */
+    public <T> FinanceResult<T> queryPayment(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.PAYMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 授权号兼作传输编号与外部幂等号，适配器不会创建替代授权或重试任务。 */
+    public <T> FinanceResult<T> executePayment(String tenantId, String targetDigest, UUID authorizationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (authorizationId == null) throw new IllegalArgumentException("A payment authorization identity is required");
+        return exchange(tenantId, targetDigest, Operation.PAYMENT_COMMAND, authorizationId, data, resultType, matchesRequest);
+    }
+
     private <T> FinanceResult<T> exchange(String tenantId, String targetDigest, Operation operation, UUID requestId,
                                         Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Finance gateway must run outside a transaction");
@@ -79,7 +95,7 @@ public class FinanceGatewayClient {
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(operation.path)).timeout(destination.timeout())
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
-        if (operation == Operation.BUDGET_COMMAND) request.header("Idempotency-Key", requestId.toString());
+        if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -137,7 +153,9 @@ public class FinanceGatewayClient {
                 FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED, FinanceResult.Reason.COST_OBJECT_UNAVAILABLE,
                 FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         BUDGET_COMMAND("budget-command", Set.of()),
-        BUDGET_QUERY("budget-query", Set.of());
+        BUDGET_QUERY("budget-query", Set.of()),
+        PAYMENT_COMMAND("payment-command", Set.of()),
+        PAYMENT_QUERY("payment-query", Set.of());
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
         Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }
