@@ -1,0 +1,95 @@
+{
+  "recordedAt": "2026-09-28T02:31:03.383534+00:00",
+  "baseline": "47c510a62ba5ac640bdf09d33c17539e9639a019",
+  "branch": "codex/governance-identifier-integration",
+  "change": "organization system diagnostics reflect tenant initialization; align UI, acceptance script and documentation",
+  "redTest": {
+    "tests": 1,
+    "failures": 1,
+    "expected": "UP",
+    "actual": "NOT_IMPLEMENTED"
+  },
+  "backendRegression": {
+    "tests": 30,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "database": "isolated H2"
+  },
+  "frontendRegression": {
+    "tests": 9,
+    "failures": 0
+  },
+  "openapi": {
+    "operations": 82,
+    "schemas": 132,
+    "requestExamples": 28,
+    "result": "PASS"
+  },
+  "build": "PASS; existing large-chunk warning retained",
+  "authors": {
+    "files": 340,
+    "namedTypes": 529,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "realHttp": {
+    "port": 18188,
+    "uninitialized": "WARNING / LOCAL_ORGANIZATION_NOT_INITIALIZED",
+    "initialized": "UP / LOCAL_ORGANIZATION_ENABLED",
+    "unauthorized": 401,
+    "forbidden": 403,
+    "businessStateUnchanged": true,
+    "serviceStopped": true
+  },
+  "gitnexus": "current repository is not indexed; source callers reviewed directly",
+  "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+  "mainDeploymentChanged": false,
+  "fullGoalComplete": false,
+  "fullProjectSuiteRun": false,
+  "postgresRun": false,
+  "browserRun": false,
+  "remoteConfigured": false,
+  "files": [
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/red.log",
+      "sha256": "0f26d9745b95d90f0128c45ea241f8a75094c8a37812397c260c5965487b0487"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/regression.log",
+      "sha256": "00b51c9da2c75088f3ed5fa706ea27f815185c1be70ebd0e251eed69c9732958"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/legacy-script-red.log",
+      "sha256": "2a3360299e9d9f91e6f13a38d0d613cf9413f2b6321a4da960087fbfafcc7870"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/web-focused.log",
+      "sha256": "d859fe7b1338a076cb3e2a8313432035c7a00182f1ece5cc68526715bfe0967e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/openapi.log",
+      "sha256": "7fc8618073353703c07760c9b5183db45bf3d31fbb68bc4d57c388fe125fb016"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/web-build.log",
+      "sha256": "b6cae24d32165bb388195d150712858b1f12931f19c02b0502ca801b04e7005c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/authors.log",
+      "sha256": "c1d9c1ae169aefbc75c870a1f99c1d3f1696b9e77a677f90b749bc106d2d8a63"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/http-uninitialized.json",
+      "sha256": "6e5227eb42c974ccbfff1813d9e3bfaf8a1af4a53cc63daa426b71e50635c71a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/http-initialized.json",
+      "sha256": "c560535c40836ac4d4a877379ed47b4f096981129ae8d9deb78cc8874b682ac7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/docs-links.json",
+      "sha256": "38a2f7c1bdf07051b311f697c5014f32481cc7ca52682c45c2f9c42d669aee26"
+    }
+  ]
+}

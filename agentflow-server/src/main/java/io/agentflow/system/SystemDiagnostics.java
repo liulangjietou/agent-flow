@@ -78,6 +78,18 @@ public class SystemDiagnostics {
         }
     }
 
+    /** 只读取当前租户的目录启用事实；不初始化目录，也不读取人员资料或推断审批资格。 */
+    public boolean organization(String tenantId) {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("SELECT revision FROM organization_directory WHERE tenant_id=?")) {
+            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setString(1, tenantId);
+            try (var result = statement.executeQuery()) { return result.next(); }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Organization storage probe failed", exception);
+        }
+    }
+
     /** 只验证会话表可查询，不读取标识、身份或令牌内容，也不创建测试会话。 */
     public void sessions() {
         try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {

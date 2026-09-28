@@ -39,7 +39,7 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
       <div><p class="eyebrow">GETTING STARTED / FIRST WORKFLOW</p><h2>让第一条审批真正跑起来。</h2><p class="subhead">从模板到真实申请，每一步都有可以核对的记录。</p></div>
       <button class="secondary" @click="emit('workbench')">进入工作台 →</button>
     </div>
-    <div class="guide-scope"><strong>{{ enterpriseAuth ? '已启用企业登录' : '当前为开发与演示环境' }}</strong><span>租户、法人和组织初始化尚未完成。下方引导帮助验证已有的流程能力，正式使用前需完成企业接入。</span></div>
+    <div class="guide-scope"><strong>{{ enterpriseAuth ? '已启用企业登录' : '当前为开发与演示环境' }}</strong><span>管理员可在“组织与人员”启用本地目录并维护法人、部门、岗位和任职。下方进度只记录流程验证结果，正式使用前仍需完成企业接入验收。</span></div>
     <div class="guide-paths">
       <article class="panel guide-path featured"><span class="guide-number">01 / RECOMMENDED</span><h3>从模板开始</h3><p>请假、用印、合同审批已有字段与路由样例，复制后按实际制度调整。</p><button class="primary" :disabled="locked" @click="emit('templates')">选择并复制模板 ↗</button><button class="quiet" :disabled="locked" @click="emit('import')">从文件导入模板 →</button></article>
       <article class="panel guide-path"><span class="guide-number">02 / DESIGN</span><h3>创建自己的流程</h3><p>打开可视化设计器，配置字段、审批人和条件，校验并模拟后发布。</p><button class="secondary" :disabled="locked" @click="emit('new')">新建审批流程</button></article>
@@ -74,10 +74,10 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
         <p class="eyebrow">ENVIRONMENT</p><h3 id="guide-environment-title">运行前，检查环境</h3><p>确认数据库、迁移、流程引擎和模板可用，再开始配置。</p>
         <p v-if="diagnostics.loading" role="status">正在执行实际依赖检查…</p>
         <div v-else-if="diagnostics.error" role="alert"><strong>未取得环境结果</strong><p>{{ diagnostics.error }}</p></div>
-        <template v-else-if="diagnostics.report"><strong :class="coreReady ? 'guide-ready' : 'guide-caution'">{{ coreReady ? '四项运行基础检查通过' : '运行基础尚未全部确认' }}</strong><p>检查于 {{ time(diagnostics.report.checkedAt) }}。企业认证、组织、对象存储和模型仍有待接入项。</p></template>
+        <template v-else-if="diagnostics.report"><strong :class="coreReady ? 'guide-ready' : 'guide-caution'">{{ coreReady ? '四项运行基础检查通过' : '运行基础尚未全部确认' }}</strong><p>检查于 {{ time(diagnostics.report.checkedAt) }}。认证与本地目录状态请查看系统自检；对象存储和模型尚待接入。</p></template>
         <p v-else class="guide-footnote">尚未执行检查，不能据此判断服务就绪。</p>
         <button class="secondary" :disabled="diagnostics.loading" @click="diagnostics.load(scopeKey)">{{ diagnostics.loading ? '正在检查…' : '检查运行环境' }}</button><button class="quiet" @click="emit('checks')">查看完整系统自检 →</button>
-        <div class="guide-account-note"><strong>切换账号验证</strong><p v-if="enterpriseAuth">请使用身份服务已分配权限的账号。组织目录尚未接入，登录成功不代表审批人配置已经就绪；仅退出平台会保留企业账号登录；身份服务支持时，可在退出窗口选择同时退出企业账号。</p><template v-else><p>演示环境可用申请人 alice、审批人 manager / finance，以及 admin；具体处理人由你配置的节点规则决定。</p><p>使用导航中的“退出登录”，再以对应账号登录。引导不代办审批，也不更改角色。</p></template></div>
+        <div class="guide-account-note"><strong>切换账号验证</strong><p v-if="enterpriseAuth">请使用身份服务已分配权限的账号，并在本地目录维护对应人员、任职与审批资格。登录成功后仍需核对审批人配置；仅退出平台会保留企业账号登录；身份服务支持时，可在退出窗口选择同时退出企业账号。</p><template v-else><p>演示环境可用申请人 alice、审批人 manager / finance，以及 admin；具体处理人由你配置的节点规则决定。</p><p>使用导航中的“退出登录”，再以对应账号登录。引导不代办审批，也不更改角色。</p></template></div>
       </aside>
     </div>
     <label class="guide-preference"><input v-model="hidden" type="checkbox" @change="updatePreference" />以后登录直接进入工作台<span>随时可以从侧栏“开始使用”返回。</span></label>

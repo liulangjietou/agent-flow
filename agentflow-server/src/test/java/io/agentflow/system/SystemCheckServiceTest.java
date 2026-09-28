@@ -34,7 +34,7 @@ class SystemCheckServiceTest {
     }
 
     @Test
-    void configuredOidcDoesNotClaimProviderHealthOrOrganizationIntegration() {
+    void configuredOidcDoesNotImplyThatTheLocalOrganizationIsInitialized() {
         when(catalog.list()).thenReturn(List.of());
         var service = new SystemCheckService(diagnostics, catalog, false, true);
         try {
@@ -42,13 +42,18 @@ class SystemCheckServiceTest {
             assertThat(report.checks().get(4).code()).isEqualTo("OIDC_CONFIGURED");
             assertThat(report.checks().get(4).status()).isEqualTo(SystemCheckService.Status.WARNING);
             assertThat(report.checks()).filteredOn(check -> check.id().equals("organization"))
-                    .allSatisfy(check -> assertThat(check.status()).isEqualTo(SystemCheckService.Status.NOT_IMPLEMENTED));
+                    .singleElement().satisfies(check -> {
+                        assertThat(check.status()).isEqualTo(SystemCheckService.Status.WARNING);
+                        assertThat(check.code()).isEqualTo("LOCAL_ORGANIZATION_NOT_INITIALIZED");
+                    });
+            verify(diagnostics).organization(admin.tenantId());
         } finally { service.close(); }
     }
 
     @Test
     void redactsFailureAndContinuesOtherChecksInTheActorsTenant() {
         doThrow(new IllegalStateException("jdbc:secret-host password=secret-value")).when(diagnostics).database();
+        doThrow(new IllegalStateException("organization secret-value")).when(diagnostics).organization(admin.tenantId());
         when(diagnostics.migrations()).thenReturn("8");
         when(catalog.list()).thenReturn(List.of());
         var service = new SystemCheckService(diagnostics, catalog, false);
@@ -59,6 +64,11 @@ class SystemCheckServiceTest {
             assertThat(report.checks().get(2).status()).isEqualTo(SystemCheckService.Status.UP);
             assertThat(report.toString()).doesNotContain("secret-host", "secret-value");
             assertThat(report.checks().get(4).code()).isEqualTo("AUTH_PROVIDER_NOT_CONFIGURED");
+            assertThat(report.checks()).filteredOn(check -> check.id().equals("organization"))
+                    .singleElement().satisfies(check -> {
+                        assertThat(check.status()).isEqualTo(SystemCheckService.Status.DOWN);
+                        assertThat(check.code()).isEqualTo("CHECK_FAILED");
+                    });
             verify(diagnostics).flowable(admin.tenantId());
         } finally { service.close(); }
     }

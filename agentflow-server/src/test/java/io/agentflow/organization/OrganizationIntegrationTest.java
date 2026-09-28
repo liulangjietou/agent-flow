@@ -69,6 +69,35 @@ class OrganizationIntegrationTest {
     }
 
     @Test
+    void systemChecksReportInitializedLocalDirectoryWithoutChangingItsRecords() throws Exception {
+        initialize();
+        var person = person("private-organization-subject");
+        var directoryBefore = jdbc.queryForList("SELECT * FROM organization_directory WHERE tenant_id=?", tenant);
+        var peopleBefore = jdbc.queryForList("SELECT * FROM organization_person WHERE tenant_id=?", tenant);
+        var changesBefore = jdbc.queryForList("SELECT * FROM organization_change WHERE tenant_id=?", tenant);
+
+        var response = mvc.perform(get("/api/v1/system/checks").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("checks[?(@.id == 'organization')].status").value("UP"))
+                .andExpect(jsonPath("checks[?(@.id == 'organization')].code").value("LOCAL_ORGANIZATION_ENABLED"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(response).doesNotContain(person.path("subject").asText(), person.path("id").asText());
+        assertThat(jdbc.queryForList("SELECT * FROM organization_directory WHERE tenant_id=?", tenant)).isEqualTo(directoryBefore);
+        assertThat(jdbc.queryForList("SELECT * FROM organization_person WHERE tenant_id=?", tenant)).isEqualTo(peopleBefore);
+        assertThat(jdbc.queryForList("SELECT * FROM organization_change WHERE tenant_id=?", tenant)).isEqualTo(changesBefore);
+
+        String otherTenant = "other-" + UUID.randomUUID();
+        String otherToken = UUID.randomUUID().toString();
+        doReturn(new Actor(otherTenant, "admin", Set.of("ADMIN"))).when(auth).authenticate(otherToken);
+        mvc.perform(get("/api/v1/system/checks").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("checks[?(@.id == 'organization')].status").value("WARNING"))
+                .andExpect(jsonPath("checks[?(@.id == 'organization')].code").value("LOCAL_ORGANIZATION_NOT_INITIALIZED"));
+        assertThat(repository.initialized(otherTenant)).isFalse();
+    }
+
+    @Test
     void peopleUseStableSubjectsAndMultipleAppointmentsRetainHistory() throws Exception {
         initialize();
         var legal = unit("LEGAL_ENTITY", "公司", null, null);

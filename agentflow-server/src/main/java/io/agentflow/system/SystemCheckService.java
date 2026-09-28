@@ -85,11 +85,11 @@ public class SystemCheckService {
         checks.add(up("templates", "已加载 " + templates.size() + " 个模板，启动时验证 " + scenarios + " 个路由场景。"));
         checks.add(new Check("authentication", Status.WARNING,
                 oidcEnabled ? "OIDC_CONFIGURED" : demoEnabled ? "DEMO_AUTH_ONLY" : "AUTH_PROVIDER_NOT_CONFIGURED",
-                oidcEnabled ? "已配置企业 OIDC 登录；本次未探测身份服务可用性，组织目录尚未接入。"
+                oidcEnabled ? "已配置企业 OIDC 登录；本次未探测身份服务可用性，组织状态见本地目录检查。"
                         : demoEnabled ? "使用演示账号，企业身份认证尚未接入。" : "演示登录已关闭，企业身份认证尚未接入。"));
         checks.add(inspect("notifications", () -> {
             diagnostics.notifications(actor.tenantId());
-            return new Check("notifications", Status.WARNING, "IN_APP_ONLY", "站内消息存储查询成功；邮件、IM 和 SLA 尚未接入。");
+            return new Check("notifications", Status.WARNING, "IN_APP_ONLY", "站内消息存储查询成功；邮件和 IM 尚未接入。本项不验证超时提醒调度是否运行。");
         }));
         checks.add(jdbcSessions ? inspect("sessionStorage", () -> {
             diagnostics.sessions();
@@ -97,7 +97,12 @@ public class SystemCheckService {
         }) : new Check("sessionStorage", Status.WARNING, "JDBC_SESSIONS_DISABLED", oidcEnabled
                 ? "当前使用单实例内存会话；多实例部署需显式启用共享会话。"
                 : "共享会话未启用；此能力适用于企业 OIDC 登录。"));
-        for (String id : List.of("objectStorage", "organization", "model")) {
+        checks.add(inspect("organization", () -> diagnostics.organization(actor.tenantId())
+                ? new Check("organization", Status.UP, "LOCAL_ORGANIZATION_ENABLED",
+                        "本租户已启用本地组织目录，存储查询成功；人员、任职与审批资格需在组织管理中核对。")
+                : new Check("organization", Status.WARNING, "LOCAL_ORGANIZATION_NOT_INITIALIZED",
+                        "本租户尚未启用本地组织目录；管理员可在“组织与人员”中启用并配置。")));
+        for (String id : List.of("objectStorage", "model")) {
             checks.add(new Check(id, Status.NOT_IMPLEMENTED, "ADAPTER_NOT_IMPLEMENTED", "当前版本尚未实现此服务接入，未执行连接检查。"));
         }
         return new Report(Instant.now(), List.copyOf(checks));
