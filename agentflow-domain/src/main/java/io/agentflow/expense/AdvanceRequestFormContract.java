@@ -7,18 +7,18 @@ import io.agentflow.form.HumanReviewContract;
 import java.util.Map;
 
 /**
- * 事前申请的敏感明细组和审批边界；路由值只能从冻结计划派生。
+ * 借款申请的敏感明细组和审批边界；路由值只能从冻结借款申请派生。
  * @author owlzhangfq@gmail.com
  */
-public final class ExpensePlanFormContract {
-    public static final String DETAILS = "expensePlanDetails";
-    private static final String DETAILS_LINK = "计划明细见事前申请";
+public final class AdvanceRequestFormContract {
+    public static final String DETAILS = "advanceRequestDetails";
+    private static final String DETAILS_LINK = "借款明细见借款申请";
     private static final Map<String, FormSchema.FieldType> TYPES = Map.of(DETAILS, FormSchema.FieldType.TEXT,
             "amount", FormSchema.FieldType.NUMBER, "currency", FormSchema.FieldType.TEXT);
 
-    private ExpensePlanFormContract() { }
+    private AdvanceRequestFormContract() { }
 
-    /** 独立保留字段防止普通表单冒充可产生额度的事前申请。 */
+    /** 独立保留字段防止普通表单冒充借款申请。 */
     public static boolean structured(FormSchema schema) {
         return schema != null && schema.fieldTypes().containsKey(DETAILS);
     }
@@ -28,7 +28,7 @@ public final class ExpensePlanFormContract {
         if (schema == null || !schema.fieldTypes().keySet().equals(TYPES.keySet())
                 || schema.fields().stream().anyMatch(field -> field.type() != TYPES.get(field.key()) || !field.required()
                     || DETAILS.equals(field.key()) && !Boolean.TRUE.equals(field.sensitive()))) {
-            throw new DomainException("EXPENSE_PLAN_FORM_REQUIRED", "An expense plan requires sensitive details and derived amount and currency fields");
+            throw new DomainException("ADVANCE_REQUEST_FORM_REQUIRED", "An advance request requires sensitive details and derived amount and currency fields");
         }
     }
 
@@ -36,15 +36,15 @@ public final class ExpensePlanFormContract {
     public static void requireReview(Graph graph, FormSchema schema) {
         requireSchema(schema);
         var details = schema.fields().stream().filter(field -> DETAILS.equals(field.key())).findFirst().orElseThrow();
-        HumanReviewContract.require(graph, details, "EXPENSE_PLAN_REVIEW_FIELDS_REQUIRED", "EXPENSE_PLAN_REVIEW_REQUIRED");
+        HumanReviewContract.require(graph, details, "ADVANCE_REQUEST_REVIEW_FIELDS_REQUIRED", "ADVANCE_REQUEST_REVIEW_REQUIRED");
     }
 
-    /** 草稿还没有汇率依据，不填虚构总额。 */
+    /** 草稿不提供可绕过专用提交入口的路由金额。 */
     public static Map<String, Object> draftPayload() { return Map.of(DETAILS, DETAILS_LINK); }
 
-    /** 审批路由与最终产生的额度逐行使用同一份本位币金额。 */
-    public static Map<String, Object> submittedPayload(ExpensePlanRound round) {
-        return Map.of(DETAILS, DETAILS_LINK, "amount", round.total().value().toPlainString(), "currency", round.total().currency());
+    /** 审批路由使用与冻结约定一致的本位币金额。 */
+    public static Map<String, Object> submittedPayload(AdvanceRequestRound round) {
+        return Map.of(DETAILS, DETAILS_LINK, "amount", round.content().amount().value().toPlainString(), "currency", round.content().amount().currency());
     }
 
     /** 只有完整保留敏感组的投影可以进一步读取业务明细。 */

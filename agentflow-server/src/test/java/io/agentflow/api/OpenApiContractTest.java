@@ -73,6 +73,18 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("AdvanceRequestView", io.agentflow.expense.AdvanceRequestService.View.class),
+                java.util.Map.entry("AdvanceRequestReceipt", io.agentflow.expense.AdvanceRequestService.Receipt.class),
+                java.util.Map.entry("AdvanceRequestContent", io.agentflow.expense.AdvanceRequestContent.class),
+                java.util.Map.entry("AdvanceRequestRound", io.agentflow.expense.AdvanceRequestRoundView.class),
+                java.util.Map.entry("AdvanceRequestApproval", io.agentflow.expense.AdvanceRequest.Approval.class),
+                java.util.Map.entry("AdvanceRequestItem", io.agentflow.expense.AdvanceRequestQuery.Item.class),
+                java.util.Map.entry("AdvanceRequestPage", io.agentflow.expense.AdvanceRequestQuery.Page.class),
+                java.util.Map.entry("AdvanceRequestCheckOptions", io.agentflow.expense.AdvanceRequestCheckService.Options.class),
+                java.util.Map.entry("AdvanceRequestCheckSummary", io.agentflow.expense.AdvanceRequestCheckService.Summary.class),
+                java.util.Map.entry("AdvanceRequestCheckReceipt", io.agentflow.expense.AdvanceRequestCheckService.Receipt.class),
+                java.util.Map.entry("AdvanceRequestCheckPage", io.agentflow.expense.AdvanceRequestCheckService.Page.class),
+                java.util.Map.entry("AdvanceRequestCheckView", io.agentflow.expense.AdvanceRequestCheckService.View.class),
                 java.util.Map.entry("ExpensePlanView", io.agentflow.expense.ExpensePlanService.View.class),
                 java.util.Map.entry("ExpensePlanReceipt", io.agentflow.expense.ExpensePlanService.Receipt.class),
                 java.util.Map.entry("ExpensePlanContent", io.agentflow.expense.ExpensePlanContent.class),

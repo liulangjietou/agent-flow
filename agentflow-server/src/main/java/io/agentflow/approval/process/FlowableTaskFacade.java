@@ -19,6 +19,7 @@ import io.agentflow.notification.ApprovalNotificationService;
 import io.agentflow.expense.ExpenseApprovalService;
 import io.agentflow.expense.ExpenseReleaseService;
 import io.agentflow.expense.ExpensePlanApprovalService;
+import io.agentflow.expense.AdvanceRequestApprovalService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
@@ -46,13 +47,15 @@ public class FlowableTaskFacade {
     private final ExpenseApprovalService expenses;
     private final ExpenseReleaseService expenseReleases;
     private final ExpensePlanApprovalService expensePlans;
+    private final AdvanceRequestApprovalService advanceRequests;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
                               ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
                               TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients,
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
-                              ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases, ExpensePlanApprovalService expensePlans) {
+                              ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases, ExpensePlanApprovalService expensePlans,
+                              AdvanceRequestApprovalService advanceRequests) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -63,6 +66,7 @@ public class FlowableTaskFacade {
         this.notifications = notifications;
         this.authorization = authorization; this.expenses = expenses; this.expenseReleases = expenseReleases;
         this.expensePlans = expensePlans;
+        this.advanceRequests = advanceRequests;
     }
 
     /** 只返回当前主体可领取或已指派给自己的待办。 */
@@ -124,6 +128,7 @@ public class FlowableTaskFacade {
         Application application = authorization.application(actor, task);
         expenses.lock(application);
         expensePlans.lock(application);
+        advanceRequests.lock(application);
         task = authorization.require(taskId, actor);
         application = authorization.application(actor, task);
         ApplicationStatus previousStatus = application.status();
@@ -202,6 +207,7 @@ public class FlowableTaskFacade {
                 }
                 applicationRepository.update(application, expectedVersion);
                 expensePlans.approved(application, actor.userId());
+                advanceRequests.approved(application, actor.userId());
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
