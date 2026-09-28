@@ -49,6 +49,7 @@ public interface BudgetPrecheckPort {
 
         /** 真实冻结或核减绑定变更后的当前财务版本，不能复用提交前的预检版本。 */
         public static Request fromCurrent(ExpenseReport report, LocalDate accountingDate) {
+            report.requireFrozenRound();
             return from(report, accountingDate, report.version());
         }
 

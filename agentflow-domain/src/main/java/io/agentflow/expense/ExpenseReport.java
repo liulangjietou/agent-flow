@@ -84,7 +84,7 @@ public final class ExpenseReport {
     public ExpenseAdjustment reduce(long expectedVersion, List<Reduction> reductions, String adjustedBy,
                                      String reasonCode, String comment, Instant at) {
         requireVersion(expectedVersion);
-        var round = currentRound();
+        var round = requireFrozenRound();
         String actor = actor(adjustedBy, 128);
         requireTime(at, latestEvent(round));
         if (reasonCode == null || !reasonCode.matches("[A-Z][A-Z0-9_]{0,63}") || StringUtils.isBlank(comment) || comment.length() > 2000
@@ -183,6 +183,17 @@ public final class ExpenseReport {
     public ExpenseRound currentRound() {
         if (rounds.isEmpty()) throw new DomainException("EXPENSE_NOT_SUBMITTED", "Expense report has no submitted financial round");
         return rounds.get(rounds.size() - 1);
+    }
+
+    /** 当前版本必须已经冻结或核减，补正中的旧轮次不能冒充新版本财务事实。 */
+    public ExpenseRound requireFrozenRound() {
+        var round = currentRound();
+        long frozenVersion = round.adjustments().isEmpty() ? round.submittedFinancialVersion() + 1
+                : round.adjustments().get(round.adjustments().size() - 1).previousFinancialVersion() + 1;
+        if (version != frozenVersion || !content.equals(round.content())) {
+            throw new DomainException("EXPENSE_NOT_FROZEN", "Current financial version has not been frozen");
+        }
+        return round;
     }
 
     /** 完整持久状态，版本更新由仓储以乐观锁完成。 */

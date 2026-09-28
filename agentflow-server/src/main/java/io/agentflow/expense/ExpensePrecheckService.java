@@ -64,7 +64,7 @@ public class ExpensePrecheckService {
     /** 只登记明确选择的任职和输入版本，排队事务不访问外部系统。 */
     @Transactional
     public Receipt queue(UUID reportId, QueueInput request) {
-        var actor = actors.actor(); jobs.lockReport(actor.tenantId(), reportId);
+        var actor = actors.actor(); reports.lock(actor.tenantId(), reportId);
         var report = owned(reportId); var application = applications.requireApplicant(report.applicationId());
         application.requireEditable(request.applicationVersion());
         if (report.version() != request.financialVersion() || report.rounds().size() + 1 != application.nextSubmissionRound()) throw changed();
@@ -114,7 +114,7 @@ public class ExpensePrecheckService {
     @Transactional
     public ExpensePrecheckJob claim(String tenant, UUID id, Instant at) {
         var found = jobs.find(tenant, id).orElse(null); if (found == null) return null;
-        jobs.lockReport(tenant, found.input().reportId());
+        reports.lock(tenant, found.input().reportId());
         var job = jobs.find(tenant, id).orElseThrow(); Instant now = time(at);
         if (job.expired(now)) { jobs.update(job.finish(Result.unavailable(Stage.SYSTEM, "TIMEOUT"), now)); return null; }
         if (job.status() != Status.QUEUED) return null;
@@ -127,7 +127,7 @@ public class ExpensePrecheckService {
     /** 落库前复核申请、任职、目标和资源；网络等待期间的任何修改都不能混入成功。 */
     @Transactional
     public void finish(ExpensePrecheckJob claimed, Result result, Instant at) {
-        jobs.lockReport(claimed.input().tenantId(), claimed.input().reportId());
+        reports.lock(claimed.input().tenantId(), claimed.input().reportId());
         var job = jobs.find(claimed.input().tenantId(), claimed.input().id()).orElseThrow();
         if (job.status() != Status.RUNNING || job.version() != claimed.version() || !job.input().equals(claimed.input())) return;
         Instant now = time(at); String failure = contextFailure(job);

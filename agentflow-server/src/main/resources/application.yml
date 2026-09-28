@@ -24,6 +24,9 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  budgets:
+    worker-enabled: ${AGENTFLOW_BUDGET_WORKER_ENABLED:true}
+    lease-seconds: ${AGENTFLOW_BUDGET_LEASE_SECONDS:90}
   expenses:
     precheck-worker-enabled: ${AGENTFLOW_EXPENSE_PRECHECK_WORKER_ENABLED:true}
     precheck-timeout-seconds: ${AGENTFLOW_EXPENSE_PRECHECK_TIMEOUT_SECONDS:300}

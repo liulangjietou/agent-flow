@@ -43,6 +43,14 @@ class BudgetPrecheckPortTest {
         var actual = BudgetPrecheckPort.Request.fromCurrent(report, DATE);
         assertThat(actual.financialVersion()).isEqualTo(2); assertThat(actual.allocations()).isEqualTo(request.allocations());
         assertThat(request.employeeId()).isEqualTo("alice"); assertThat(request.legalEntityId()).isEqualTo(ENTITY);
+        report.reduce(2, List.of(new ExpenseReport.Reduction(2, money("0.04", "CNY"), money("0.01", "CNY"))), "finance", "INELIGIBLE", "合成核减", NOW.plusSeconds(1));
+        assertThat(BudgetPrecheckPort.Request.fromCurrent(report, DATE).financialVersion()).isEqualTo(3);
+        assertThat(BudgetPrecheckPort.Request.fromCurrent(report, DATE).total()).isEqualTo(money("0.04", "CNY"));
+        report.revise(3, report.content());
+        assertThatThrownBy(() -> BudgetPrecheckPort.Request.fromCurrent(report, DATE)).isInstanceOf(DomainException.class).hasMessageContaining("not been frozen");
+        // 旧测试只从已冻结轮次核减，未覆盖补正后借核减把旧快照标记为当前版本。
+        assertThatThrownBy(() -> report.reduce(4, List.of(new ExpenseReport.Reduction(2, money("0.03", "CNY"), money("0.01", "CNY"))),
+                "finance", "INELIGIBLE", "不应作用于补正草稿", NOW.plusSeconds(2))).isInstanceOf(DomainException.class).hasMessageContaining("not been frozen");
     }
 
     @Test

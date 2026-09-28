@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.agent.AssistScheduling;
 import io.agentflow.config.DatabaseConfig;
+import io.agentflow.finance.BudgetOperationScheduling;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -17,10 +18,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InvoiceVerificationSchedulingTest {
     @Test
     void financeAndModelRetainSeparateSchedulersAndIndependentDefault() {
-        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class, InvoiceVerificationScheduling.class, ExpensePrecheckScheduling.class)
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class, InvoiceVerificationScheduling.class, ExpensePrecheckScheduling.class, BudgetOperationScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
                 .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.worker-enabled=false",
-                        "agentflow.finance-gateway.enabled=true", "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false")
+                        "agentflow.finance-gateway.enabled=true", "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false")
                 .run(context -> {
                     assertThat(context).hasBean("taskScheduler").hasBean("assistTaskScheduler").hasBean("invoiceVerificationTaskScheduler");
                     assertThat(context.getBean("invoiceVerificationTaskScheduler", TaskScheduler.class))
@@ -28,6 +29,9 @@ class InvoiceVerificationSchedulingTest {
                     assertThat(context).doesNotHaveBean("invoiceVerificationPoller").doesNotHaveBean("expensePrecheckPoller");
                     assertThat(context.getBean("expensePrecheckTaskScheduler", TaskScheduler.class))
                             .isNotSameAs(context.getBean("taskScheduler", TaskScheduler.class)).isNotSameAs(context.getBean("invoiceVerificationTaskScheduler", TaskScheduler.class));
+                    assertThat(context).hasBean("budgetOperationTaskScheduler").doesNotHaveBean("budgetOperationPoller");
+                    assertThat(context.getBean("budgetOperationTaskScheduler", TaskScheduler.class))
+                            .isNotSameAs(context.getBean("taskScheduler", TaskScheduler.class)).isNotSameAs(context.getBean("expensePrecheckTaskScheduler", TaskScheduler.class));
                 });
     }
 }

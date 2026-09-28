@@ -8,6 +8,8 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public interface ExpenseReportRepository {
+    /** 短事务按申请、报销顺序锁定，协调补正、提交、预检和外部预算结果。 */
+    void lock(String tenantId, UUID id);
     /** 只创建初始草稿，业务绑定必须已经存在。 */
     void create(ExpenseReport report, String actor);
     /** 根据财务版本更新，审批申请版本由上层同一事务核对。 */

@@ -1,0 +1,95 @@
+{
+  "recordedAt": "2026-09-28T15:41:17.404809+00:00",
+  "result": "PASS",
+  "scope": "Persistent budget commands and occupation with transaction-outside HTTP dispatch and query-before-retry; expense submission endpoint and finance guards remain pending",
+  "migration": "V37 to V38 preserves existing report/application/revisions with owner/version/active/state constraints; H2 and PostgreSQL verified",
+  "tests": {
+    "domainScope": 36,
+    "serverScope": 34,
+    "budgetIntegrationIncluded": 8,
+    "budgetMigrationIncluded": 1,
+    "postgresBudgetAndMigration": 9,
+    "scopesOverlap": true,
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-outbox-regression.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-postgres.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-restart.log"
+    ]
+  },
+  "regression": {
+    "gap": "Existing reduction tests never attempted reduction after revising a previously frozen report",
+    "red": "/fyoung/tmp/agentflow-remaining-20260928/budget-stale-reduction-red.log",
+    "redResult": "1 test, 1 failure",
+    "fix": "ExpenseReport.requireFrozenRound owns current financial version validation; reduction and budget current position both require it"
+  },
+  "actualProcessRecovery": {
+    "scope": "Synthetic valid database fixtures with real packaged worker and PostgreSQL; not formal submission endpoint acceptance",
+    "database": "budget_restart_1c578a33f9",
+    "jarSha256": "dc0232a762ae5a350e163c1a6b402be4943186f61fbb7349ecf38d0f4266a5df",
+    "result": "PASS",
+    "operations": [
+      {
+        "id": "464af16d-79ef-415e-986c-018230144500",
+        "reportId": "0e4b2007-2724-4c56-b033-8080bd636e50",
+        "mode": "NORMAL",
+        "writes": 1,
+        "queries": 0,
+        "effects": 1,
+        "localState": "APPLIED",
+        "revisions": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "id": "89adf8b0-d9df-45ab-bb93-2e857d72280b",
+        "reportId": "11bdc9f8-64e5-4f3f-a80b-0f0cabaa0e18",
+        "mode": "HOLD_APPLIED",
+        "writes": 1,
+        "queries": 1,
+        "effects": 1,
+        "localState": "APPLIED",
+        "revisions": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      {
+        "id": "b85ef3e6-061d-4e54-973b-30b0d1336425",
+        "reportId": "1658e8db-b067-440b-bb9e-9d9920ccc410",
+        "mode": "DROP_FIRST",
+        "writes": 2,
+        "queries": 1,
+        "effects": 1,
+        "localState": "APPLIED",
+        "revisions": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      }
+    ],
+    "ownedBackendStopped": true,
+    "fixtureStopped": true
+  },
+  "staticCheck": {
+    "javaFiles": 490,
+    "namedTypes": 817,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "limits": [
+    "Process test seeds valid synthetic database fixtures; not formal expense submission API acceptance",
+    "No real enterprise budget service",
+    "Finance node guards and automatic return pending",
+    "No remote CI"
+  ]
+}

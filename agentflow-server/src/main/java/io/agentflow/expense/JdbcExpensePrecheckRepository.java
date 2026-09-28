@@ -55,15 +55,6 @@ public class JdbcExpensePrecheckRepository {
         append(job);
     }
 
-    /** 与费用补正保持申请在前、报销在后的锁顺序，锁直到短事务完成。 */
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void lockReport(String tenant, UUID reportId) {
-        var application = jdbc.queryForList("SELECT application_id FROM expense_report WHERE tenant_id=? AND id=?", String.class, tenant, reportId.toString());
-        if (application.isEmpty()) throw new DomainException("NOT_FOUND", "Expense report not found");
-        jdbc.queryForList("SELECT id FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE", String.class, tenant, application.get(0));
-        jdbc.queryForList("SELECT id FROM expense_report WHERE tenant_id=? AND id=? FOR UPDATE", String.class, tenant, reportId.toString());
-    }
-
     /** 租户列和输入/状态 JSON 的身份必须一致。 */
     public Optional<ExpensePrecheckJob> find(String tenant, UUID id) {
         return jdbc.query("SELECT * FROM expense_precheck_job WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst();

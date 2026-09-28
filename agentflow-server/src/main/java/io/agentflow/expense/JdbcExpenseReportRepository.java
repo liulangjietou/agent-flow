@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
@@ -22,6 +23,16 @@ public class JdbcExpenseReportRepository implements ExpenseReportRepository {
 
     /** 共用平台事务管理器，跨聚合编排可以一并回滚。 */
     public JdbcExpenseReportRepository(JdbcTemplate jdbc, JsonUtil json) { this.jdbc = jdbc; this.json = json; }
+
+    /** 所有跨聚合财务编排共用相同锁顺序，不能把锁留在某一种后台任务仓储。 */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lock(String tenant, UUID reportId) {
+        var application = jdbc.queryForList("SELECT application_id FROM expense_report WHERE tenant_id=? AND id=?", String.class, tenant, reportId.toString());
+        if (application.isEmpty()) throw new DomainException("NOT_FOUND", "Expense report not found");
+        jdbc.queryForList("SELECT id FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE", String.class, tenant, application.get(0));
+        jdbc.queryForList("SELECT id FROM expense_report WHERE tenant_id=? AND id=? FOR UPDATE", String.class, tenant, reportId.toString());
+    }
 
     @Override
     @Transactional
