@@ -3,17 +3,18 @@ import assert from 'node:assert/strict'
 const { PendingTaskQueueQuery } = await import(process.env.AGENTFLOW_TEST_TASK_QUEUE)
 const item = taskId => ({ taskId })
 
-test('查询保存已提交筛选，编辑中的金额和账号不能污染分页', async () => {
+test('查询保存已提交筛选，编辑中的金额、账号和期限不能污染分页', async () => {
   const calls = []
   const query = new PendingTaskQueueQuery(async params => {
     calls.push(params)
     return params.cursor ? { items: [item('second')], total: 2 } : { items: [item('first')], total: 2, nextCursor: 'cursor' }
   })
-  const filters = { q: '发票', applicant: 'alice', minAmount: '999.123456789012345678' }
+  const filters = { q: '发票', applicant: 'alice', minAmount: '999.123456789012345678', deadline: 'overdue' }
   await query.load('demo:finance', filters)
-  filters.applicant = 'bob'; filters.minAmount = '0'
+  filters.applicant = 'bob'; filters.minAmount = '0'; filters.deadline = 'pending'
   await query.more()
   assert.equal(calls[1].applicant, 'alice'); assert.equal(calls[1].minAmount, '999.123456789012345678')
+  assert.equal(calls[1].deadline, 'overdue')
   assert.equal(query.total, 2); assert.deepEqual(query.items, [item('first'), item('second')])
 })
 
@@ -55,11 +56,12 @@ test('分页和单项任务查询只读、可取消并保留精确数值与特�
   const requests = []
   globalThis.fetch = async (url, init) => { requests.push({ url, ...init }); return Response.json({ items: [], total: 0 }) }
   const controller = new AbortController()
-  await api.taskPage({ q: '%_ !', processKey: '流程/x', assignment: 'delegated', minAmount: '999.123456789012345678', cursor: 'a+/=' }, controller.signal)
+  await api.taskPage({ q: '%_ !', processKey: '流程/x', assignment: 'delegated', deadline: 'unrecorded', minAmount: '999.123456789012345678', cursor: 'a+/=' }, controller.signal)
   await api.task('task/id', controller.signal)
   const params = new URL(requests[0].url, 'http://localhost').searchParams
   assert.equal(params.get('q'), '%_ !'); assert.equal(params.get('processKey'), '流程/x')
   assert.equal(params.get('minAmount'), '999.123456789012345678'); assert.equal(params.get('cursor'), 'a+/=')
+  assert.equal(params.get('deadline'), 'unrecorded')
   assert.ok(requests[1].url.endsWith('/tasks/task%2Fid'))
   for (const request of requests) {
     assert.equal(request.signal, controller.signal); assert.equal(request.headers.get('Authorization'), 'Bearer task-token')

@@ -102,6 +102,7 @@ export interface PendingTaskItem {
 /** 服务端筛选与分页参数。@author owlzhangfq@gmail.com */
 export interface PendingTaskQuery {
   q?: string; processKey?: string; applicant?: string; assignment?: 'all' | 'assigned' | 'unclaimed' | 'delegated'
+  deadline?: 'all' | 'overdue' | 'pending' | 'unrecorded'
   minAmount?: string; maxAmount?: string; limit?: number; cursor?: string
 }
 /** 当前筛选计数不会被已加载条数替代。@author owlzhangfq@gmail.com */

@@ -7,7 +7,7 @@ import PendingTaskCard from './PendingTaskCard.vue'
 const props = defineProps<{ view: 'list' | 'board'; scopeKey: string; refreshVersion: number; locked: boolean; selectedId?: string }>()
 const emit = defineEmits<{ select: [item: PendingTaskItem]; clearSelection: []; 'update:view': [view: 'list' | 'board'] }>()
 const query = reactive(new PendingTaskQueueQuery(api.taskPage))
-const filters = reactive({ q: '', processKey: '', applicant: '', assignment: 'all', minAmount: '', maxAmount: '' })
+const filters = reactive({ q: '', processKey: '', applicant: '', assignment: 'all', deadline: 'all', minAmount: '', maxAmount: '' })
 const applied = ref<PendingTaskQuery>({})
 const expanded = ref(false)
 const panel = ref<HTMLElement | null>(null)
@@ -27,11 +27,11 @@ const filterDirty = ref(false)
 watch(filters, () => { filterDirty.value = true }, { flush: 'sync' })
 function refresh() { void query.load(props.scopeKey, applied.value) }
 function search() {
-  applied.value = { ...filters, q: filters.q.trim(), applicant: filters.applicant.trim(), assignment: filters.assignment as PendingTaskQuery['assignment'] }
+  applied.value = { ...filters, q: filters.q.trim(), applicant: filters.applicant.trim(), assignment: filters.assignment as PendingTaskQuery['assignment'], deadline: filters.deadline as PendingTaskQuery['deadline'] }
   filterDirty.value = false; emit('clearSelection'); refresh()
 }
 function reset() {
-  Object.assign(filters, { q: '', processKey: '', applicant: '', assignment: 'all', minAmount: '', maxAmount: '' })
+  Object.assign(filters, { q: '', processKey: '', applicant: '', assignment: 'all', deadline: 'all', minAmount: '', maxAmount: '' })
   search()
 }
 watch([() => props.scopeKey, () => props.refreshVersion], refresh, { immediate: true, flush: 'sync' })
@@ -50,8 +50,10 @@ onUnmounted(() => query.clear())
           <label>流程标识<input v-model="filters.processKey" maxlength="128" placeholder="全部流程，可输入准确标识" /></label>
           <DefinitionPicker :scope-key="scopeKey" label="待办流程" published-only :selected-label="filters.processKey || '全部流程'" :locked="locked" @select="filters.processKey = $event.key" />
           <label>申请人账号<input v-model="filters.applicant" maxlength="128" placeholder="输入完整账号" /></label>
+          <label>处理期限<select v-model="filters.deadline"><option value="all">全部期限状态</option><option value="overdue">已超时</option><option value="pending">未到期</option><option value="unrecorded">未记录期限</option></select></label>
           <div class="amount-range"><label>最低金额<input v-model="filters.minAmount" inputmode="decimal" maxlength="80" placeholder="不限" /></label><span aria-hidden="true">—</span><label>最高金额<input v-model="filters.maxAmount" inputmode="decimal" maxlength="80" placeholder="不限" /></label></div>
           <p>金额范围仅匹配可识别的数值金额；未提供金额的申请不会计入。</p>
+          <p v-if="applied.deadline && applied.deadline !== 'all'">期限按查询时刻筛选；跨过截止时间后请刷新队列。</p>
         </div>
         <div class="filter-footer"><span v-if="filterDirty">筛选已修改，点击查询生效</span><span v-else>显示已应用的筛选结果</span><button type="button" class="quiet" @click="reset">清空筛选</button></div>
       </fieldset>

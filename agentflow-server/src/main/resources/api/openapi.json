@@ -3521,7 +3521,7 @@
           "工作台"
         ],
         "summary": "待办检索与分页",
-        "description": "较早任务优先；数据库按当前租户、实际候选/指派、活跃任务及当前轮次过滤。无 APPROVER 返回空列表。总数与分页不是冻结快照。",
+        "description": "较早任务优先；数据库按当前租户、实际候选/指派、活跃任务及当前轮次过滤。无 APPROVER 返回空列表。总数与分页不是冻结快照。 期限按每次请求取得的服务端时刻判断，列表与总数共用该时刻；改变期限筛选必须从首页重新查询。",
         "x-access": "当前已登录账号",
         "x-idempotency": false,
         "responses": {
@@ -3610,6 +3610,22 @@
                 "unclaimed",
                 "delegated"
               ]
+            }
+          },
+          {
+            "name": "deadline",
+            "in": "query",
+            "required": false,
+            "description": "all 不限制；overdue 截止时间小于等于本次查询时刻；pending 截止时间晚于查询时刻；unrecorded 无已记录截止时间，不能推断为未到期。只影响查询，不改变任务状态。",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "overdue",
+                "pending",
+                "unrecorded"
+              ],
+              "default": "all"
             }
           },
           {

@@ -1,0 +1,267 @@
+{
+  "feature": "待办 SLA 期限筛选",
+  "verifiedAt": "2026-09-28",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "4997ca7c6bc2570b19e292521c3ee06d68a4c774",
+  "scope": [
+    "deadline 参数与服务端单次查询时刻",
+    "真实 Flowable DUE_DATE_",
+    "列表/总数/空后续页共用原授权",
+    "游标绑定期限条件并兼容原 all 游标",
+    "列表及看板筛选和清空"
+  ],
+  "red": {
+    "testsFailed": 2,
+    "reason": "deadline 参数原先返回 400，缺少请求解析和查询谓词",
+    "log": "/fyoung/tmp/agentflow-sla-filter-20260928/red.log"
+  },
+  "verification": {
+    "h2Backend": {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        "PendingTaskQueueIntegrationTest",
+        "TaskDeadlineIntegrationTest",
+        "FieldPermissionsIntegrationTest",
+        "OpenApiContractTest"
+      ]
+    },
+    "postgres": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "overlapsH2": true,
+      "database": "sla_queue_9f4028871b4d",
+      "version": "PostgreSQL 17.11",
+      "runtimeFacts": "/fyoung/tmp/agentflow-sla-filter-20260928/postgres-runtime-facts.txt"
+    },
+    "frontend": {
+      "tests": 31,
+      "failed": 0,
+      "scope": [
+        "task-queue.test.mjs",
+        "task-deadline.test.mjs",
+        "requests.test.mjs"
+      ]
+    },
+    "build": {
+      "mavenVerify": "PASS",
+      "vueTypecheckAndVite": "PASS",
+      "existingChunkWarning": true
+    },
+    "openapi": {
+      "operations": 86,
+      "schemas": 138,
+      "requestExamples": 31,
+      "result": "PASS"
+    },
+    "authors": {
+      "javaFiles": 346,
+      "namedTypes": 538,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "runtimeHttp": {
+    "result": "PASS",
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 400
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 400
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "anonymous",
+        "status": 401
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 200
+      }
+    ],
+    "marker": "SLA-d186e7f3",
+    "assertions": [
+      "32 overdue tasks: 30 plus 2, total stable, no duplicates",
+      "one future task and one unrecorded deadline",
+      "combined amount predicate",
+      "cursor binds deadline filter",
+      "invalid filter 400",
+      "anonymous 401 and unrelated applicant empty",
+      "all 34 applications remain IN_APPROVAL"
+    ],
+    "deadlineSource": "real task creation plus configured one-minute working calendar; no timestamp editing",
+    "seedRequests": 79,
+    "seedRequestsAreSeparate": true
+  },
+  "browser": {
+    "result": "PASS",
+    "baseUrl": "http://127.0.0.1:15191/",
+    "identity": "synthetic manager",
+    "cases": [
+      "超时 30＋2 末页匹配 32",
+      "编辑未提交条件保留旧结果",
+      "未到期 1 条",
+      "未记录期限 1 条及看板共用条件",
+      "清空返回 34 条且期限恢复 all"
+    ],
+    "consoleErrors": 0,
+    "screenshot": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-deadline-board-result.png"
+  },
+  "cleanup": {
+    "18191": "stopped",
+    "15191": "stopped",
+    "testPostgres": "stopped; databases and volume retained",
+    "dockerDesktop": "original stopped state restored",
+    "otherContainersUnmodified": true
+  },
+  "delivery": {
+    "localOnly": true,
+    "migrationAdded": false,
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "remoteCI": "not run",
+    "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "fullProductComplete": false
+  },
+  "files": {
+    "red.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/red.log",
+      "sha256": "ca595d6598004b57d745626355f7abf5d12aa04c70c4c7f45f733533c20ab972"
+    },
+    "backend.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/backend.log",
+      "sha256": "22697a1b7b1a1faa2ed3941a8b4fdaa1b58ae1b85c627fe8dd1cfffdc9d56b5e"
+    },
+    "frontend.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/frontend.log",
+      "sha256": "990c69e60dc96acdc61fdd978a2c29a27cf2751b3f217ab94c5c5339fcb8cbb0"
+    },
+    "frontend-build.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/frontend-build.log",
+      "sha256": "684d65225d54e6b19ce6cca4275287737c25bf4ee86685d82168574844c92cd1"
+    },
+    "openapi.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/openapi.log",
+      "sha256": "baef1bb73ee5937f3e8305e9a8b0f7a419f87fe32f7942177f855c4b6fe2be80"
+    },
+    "authors.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/authors.log",
+      "sha256": "e64eea689b4b80a01d3a50c329d53142eee4f4e65766d3030445439686606544"
+    },
+    "postgres.log": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/postgres.log",
+      "sha256": "3ed230a3fcd623b9ec7fdc51ff9725dc24d00a36be25f94218b79f45b093a551"
+    },
+    "http-evidence.json": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/http-evidence.json",
+      "sha256": "47ab56aadead2fa5299c25beb407ca2213c3236e38a8bf1e5e4be893a0508b5c"
+    },
+    "browser-overdue-first.txt": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-overdue-first.txt",
+      "sha256": "16dc3bd77e332a23aee26ad69bc7dba38f2027e8816f597a3a97f27e70029f77"
+    },
+    "browser-overdue-more.txt": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-overdue-more.txt",
+      "sha256": "cfd8d027be0493ea62b828870b97aeb1517037e914f7df451de441852f83a9eb"
+    },
+    "browser-dirty.txt": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-dirty.txt",
+      "sha256": "03262823a3add00ef8953005d15bff5e444f8a39e640fff6169bcefa46edb711"
+    },
+    "browser-pending.txt": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-pending.txt",
+      "sha256": "83cba7382f6940cc5ecb8acd82312c4448f2e47ef33e814e9d1448192682a50e"
+    },
+    "browser-unrecorded-board.txt": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-unrecorded-board.txt",
+      "sha256": "99715587018c8eed3367d5b3f98a83fe9c586ac7015fc3f0d78edc6f8ab72137"
+    },
+    "browser-reset.txt": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-reset.txt",
+      "sha256": "0981460b597541027fee3ec36e3d8dc37bcdf893c788873f0c1712b5d30defb6"
+    },
+    "browser-deadline-board-result.png": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/browser-deadline-board-result.png",
+      "sha256": "c07efaafd4c5866e870d82c59a3bc0040f07c3e23388838fbc107121e6e25cd0"
+    },
+    "cleanup.json": {
+      "path": "/fyoung/tmp/agentflow-sla-filter-20260928/cleanup.json",
+      "sha256": "786d977193daaf8c5bcaa15adf5303cde1b06f18b604da128723af300f6b91b0"
+    }
+  }
+}

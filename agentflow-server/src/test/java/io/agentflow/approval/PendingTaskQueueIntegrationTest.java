@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.password=${AGENTFLOW_QUEUE_TEST_PASSWORD:}",
         "spring.datasource.driver-class-name=${AGENTFLOW_QUEUE_TEST_DRIVER:org.h2.Driver}",
         "agentflow.auth.demo-enabled=true", "agentflow.auth.demo-tenant=demo"})
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 class PendingTaskQueueIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired AuthService auth;
@@ -57,6 +57,75 @@ class PendingTaskQueueIntegrationTest {
     @Autowired RuntimeService runtime;
     @Autowired JdbcTemplate jdbc;
     @Autowired PendingTaskReadPort reader;
+
+    @Test
+    void deadlineFilterUsesRealDueDatesAndTheSameAuthorizedSetForRowsAndTotal() throws Exception {
+        String key = definition("user:manager");
+        String overdue = task(submit(key, "alice", "已超期待办", "10").path("id").asText());
+        String pending = task(submit(key, "alice", "未到期待办", "20").path("id").asText());
+        String unrecorded = task(submit(key, "alice", "无期限待办", "30").path("id").asText());
+        String unrelated = task(submit(key, "alice", "其他人的超期待办", "40").path("id").asText());
+        tasks.setDueDate(overdue, java.util.Date.from(java.time.Instant.parse("2000-01-01T00:00:00Z")));
+        tasks.setDueDate(pending, java.util.Date.from(java.time.Instant.parse("2100-01-01T00:00:00Z")));
+        tasks.setDueDate(unrelated, java.util.Date.from(java.time.Instant.parse("2000-01-01T00:00:00Z")));
+        tasks.setAssignee(unrelated, "finance");
+        for (var expected : Map.of("overdue", overdue, "pending", pending, "unrecorded", unrecorded).entrySet()) {
+            var page = query("manager", Map.of("processKey", key, "deadline", expected.getKey()));
+            assertThat(page.path("total").asLong()).isEqualTo(1);
+            assertThat(page.path("items").findValuesAsText("taskId")).containsExactly(expected.getValue());
+            assertThat(page.toString()).doesNotContain("payload", "private-body");
+        }
+        assertThat(query("manager", Map.of("processKey", key, "deadline", "all")).path("total").asLong()).isEqualTo(3);
+        assertThat(query("manager", Map.of("processKey", key, "deadline", "overdue", "minAmount", "11")).path("total").asLong()).isZero();
+        assertThat(query("alice", Map.of("processKey", key, "deadline", "overdue")).path("total").asLong()).isZero();
+    }
+
+    @Test
+    void deadlineFilteredCursorBindsTheFilterAndKeepsTotalBeforePagination() throws Exception {
+        String key = definition("user:manager");
+        for (int index = 0; index < 3; index++) {
+            String task = task(submit(key, "alice", "超期分页 " + index, "10").path("id").asText());
+            tasks.setDueDate(task, java.util.Date.from(java.time.Instant.parse("2000-01-01T00:00:00Z")));
+        }
+        var first = query("manager", Map.of("processKey", key, "deadline", "overdue", "limit", "2"));
+        assertThat(first.path("items")).hasSize(2);
+        assertThat(first.path("total").asLong()).isEqualTo(3);
+        String cursor = first.path("nextCursor").asText();
+        request("manager", Map.of("processKey", key, "deadline", "pending", "cursor", cursor)).andExpect(status().isBadRequest());
+        request("manager", Map.of("processKey", key, "cursor", cursor)).andExpect(status().isBadRequest());
+        var second = query("manager", Map.of("processKey", key, "deadline", "overdue", "cursor", cursor, "limit", "2"));
+        assertThat(second.path("items")).hasSize(1);
+        assertThat(second.path("total").asLong()).isEqualTo(3);
+        assertThat(second.path("items").get(0).path("taskId").asText()).isNotIn(first.path("items").findValuesAsText("taskId"));
+        act(second.path("items").get(0).path("taskId").asText(), "manager", "APPROVE", null, 2);
+        var empty = query("manager", Map.of("processKey", key, "deadline", "overdue", "cursor", cursor, "limit", "2"));
+        assertThat(empty.path("items")).isEmpty();
+        assertThat(empty.path("total").asLong()).isEqualTo(2);
+        for (var filters : List.of(Map.of("deadline", "due-soon"), Map.of("deadline", "overdue", "deadlineAt", "2000-01-01T00:00:00Z"))) {
+            request("manager", filters).andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void deadlineBoundaryUsesOneServerInstantAndStillChecksTenantAndCurrentEligibility() throws Exception {
+        String key = definition("user:manager");
+        String exact = task(submit(key, "alice", "恰好到期", "10").path("id").asText());
+        String later = task(submit(key, "alice", "下一毫秒到期", "20").path("id").asText());
+        var now = java.time.Instant.parse("2026-09-28T12:00:00Z");
+        tasks.setDueDate(exact, java.util.Date.from(now));
+        tasks.setDueDate(later, java.util.Date.from(now.plusMillis(1)));
+        var actor = new Actor("demo", "manager", Set.of("APPROVER", "MANAGER"));
+        var parameters = TaskQueryParameters.parse(actor, Map.of("processKey", key, "deadline", "overdue"), json, now);
+        assertThat(reader.read(actor, parameters.query()).items()).extracting(PendingTaskReadPort.Item::taskId).containsExactly(exact);
+        var pending = TaskQueryParameters.parse(actor, Map.of("processKey", key, "deadline", "pending"), json, now);
+        assertThat(reader.read(actor, pending.query()).items()).extracting(PendingTaskReadPort.Item::taskId).containsExactly(later);
+        var next = TaskQueryParameters.parse(actor, Map.of("processKey", key, "deadline", "overdue"), json, now.plusMillis(1));
+        assertThat(reader.read(actor, next.query()).total()).isEqualTo(2);
+        assertThat(reader.read(new Actor("foreign", "manager", actor.roles()), parameters.query()).total()).isZero();
+        assertThat(reader.read(new Actor("demo", "manager", Set.of("ADMIN")), parameters.query()).total()).isZero();
+        act(exact, "manager", "APPROVE", null, 2);
+        assertThat(reader.read(actor, parameters.query()).total()).isZero();
+    }
 
     @Test
     void filtersActualTaskAndApplicationSummariesWithoutReturningPayload() throws Exception {
@@ -129,7 +198,7 @@ class PendingTaskQueueIntegrationTest {
         assertThat(last.path("nextCursor").isTextual()).isFalse();
         assertThat(seen).isEqualTo(ids);
         var other = new Actor("other", "manager", Set.of("APPROVER", "MANAGER", "ADMIN"));
-        var filter = TaskQueryParameters.parse(other, Map.of("processKey", key), json).query();
+        var filter = TaskQueryParameters.parse(other, Map.of("processKey", key), json, java.time.Instant.now()).query();
         var otherPage = reader.read(other, filter);
         assertThat(otherPage.items()).isEmpty(); assertThat(otherPage.total()).isZero();
         var nonApprover = reader.read(new Actor("demo", "manager", Set.of("ADMIN")), filter);

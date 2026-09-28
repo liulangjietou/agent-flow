@@ -86,6 +86,13 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
             case "delegated" -> sql.append(" AND t.DELEGATION_='PENDING'");
             default -> { }
         }
+        // 列表、窗口计数和空后续页补计数共用同一个服务端时刻。
+        switch (query.deadline()) {
+            case OVERDUE -> { sql.append(" AND t.DUE_DATE_<=?"); parameters.add(Timestamp.from(query.deadlineAt())); }
+            case PENDING -> { sql.append(" AND t.DUE_DATE_>?"); parameters.add(Timestamp.from(query.deadlineAt())); }
+            case UNRECORDED -> sql.append(" AND t.DUE_DATE_ IS NULL");
+            case ALL -> { }
+        }
         if (!query.text().isEmpty()) {
             String pattern = "%" + query.text().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
             sql.append(" AND (LOWER(a.title) LIKE ? ESCAPE '!' OR LOWER(a.business_no) LIKE ? ESCAPE '!' OR LOWER(t.NAME_) LIKE ? ESCAPE '!')");
