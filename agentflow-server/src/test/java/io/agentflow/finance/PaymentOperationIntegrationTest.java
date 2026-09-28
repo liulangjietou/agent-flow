@@ -1,0 +1,296 @@
+package io.agentflow.finance;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.sun.net.httpserver.HttpServer;
+import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.ApplicationStatus;
+import io.agentflow.approval.model.BusinessReference;
+import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.expense.*;
+import io.agentflow.notification.NotificationTexts;
+import io.agentflow.organization.*;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import static org.assertj.core.api.Assertions.*;
+
+/**
+ * 实际批准聚合、组织、事务与回环资金 HTTP 验证原付款执行，不将合成回执当作真实银行到账。
+ * @author owlzhangfq@gmail.com
+ */
+@SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.payments.worker-enabled=false", "agentflow.payments.lease-seconds=15",
+        "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
+        "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false"})
+@Import(PaymentOperationIntegrationTest.ListenerConfiguration.class)
+class PaymentOperationIntegrationTest {
+    private static final UUID ENTITY = UUID.randomUUID();
+    private static final ExecutorService HTTP_THREADS = Executors.newCachedThreadPool();
+    private static final HttpServer SERVER = server();
+    private static final String ENDPOINT = "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/finance";
+    private static final AtomicReference<BiFunction<String, JsonNode, Object>> RESPONDER = new AtomicReference<>();
+    private static final AtomicInteger WRITES = new AtomicInteger(), QUERIES = new AtomicInteger(), ACCOUNT_READS = new AtomicInteger();
+    private static final AtomicReference<String> LAST_KEY = new AtomicReference<>();
+    private static final Map<UUID, PaymentCommand> COMMANDS = new ConcurrentHashMap<>();
+    private static JsonUtil wire;
+    private final List<UUID> fixtures = new ArrayList<>();
+    @Autowired JsonUtil json;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired PlatformTransactionManager transactions;
+    @Autowired ApplicationRepository applications;
+    @Autowired AdvanceRequestRepository advances;
+    @Autowired OrganizationRepository organization;
+    @Autowired PaymentPersonnel personnel;
+    @Autowired JdbcVoucherOperationRepository vouchers;
+    @Autowired VoucherOperationService voucherExecution;
+    @Autowired ApprovedPaymentSources sources;
+    @Autowired JdbcPaymentAuthorizationRepository authorizations;
+    @Autowired JdbcPaymentOperationRepository operations;
+    @Autowired PaymentOperationService execution;
+    @Autowired PaymentOperationWorker worker;
+    @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired FailureListener listener;
+
+    @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
+        values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
+        values.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> "true");
+        values.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_PAYMENT_OPERATION_TEST_URL", "jdbc:h2:mem:payment-operations;DB_CLOSE_DELAY=-1"));
+        values.add("spring.datasource.driver-class-name", () -> System.getenv().getOrDefault("AGENTFLOW_PAYMENT_OPERATION_TEST_DRIVER", "org.h2.Driver"));
+        values.add("spring.datasource.username", () -> System.getenv().getOrDefault("AGENTFLOW_PAYMENT_OPERATION_TEST_USER", "sa"));
+        values.add("spring.datasource.password", () -> System.getenv().getOrDefault("AGENTFLOW_PAYMENT_OPERATION_TEST_PASSWORD", ""));
+    }
+    @BeforeEach void setup() {
+        wire = json; WRITES.set(0); QUERIES.set(0); ACCOUNT_READS.set(0); listener.reject.set(false); configuration.setEnabled(true);
+        configuration.getTenants().get("demo").setEndpoint(ENDPOINT); configuration.getTenants().get("demo").setTimeoutSeconds(2);
+        RESPONDER.set(PaymentOperationIntegrationTest::response); setupOrganization();
+    }
+    @AfterEach void removeOnlyPaymentFixtures() {
+        for (var id : fixtures) {
+            jdbc.update("DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=?", id.toString());
+            jdbc.update("DELETE FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString());
+            jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id=?", id.toString());
+            jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND id=?", id.toString()); COMMANDS.remove(id);
+        }
+        jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN ('finance','cashier')");
+    }
+    @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test void workerRechecksBothAccountsAndOnlySendsTheCommittedOriginalCommand() {
+        var job = job(); assertThat(WRITES.get()).isZero(); worker.poll(); var done = reload(job);
+        assertThat(done.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(done.settleable()).isTrue();
+        assertThat(done.version()).isEqualTo(4); assertThat(done.dispatches()).isEqualTo(1); assertThat(WRITES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isEqualTo(2);
+        assertThat(LAST_KEY.get()).isEqualTo(job.input().command().id().toString()); assertThat(QUERIES.get()).isZero();
+        assertThat(new JdbcPaymentOperationRepository(jdbc, json, authorizations).find("demo", job.input().command().id())).contains(done);
+        assertThat(jdbc.queryForList("SELECT version FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=? ORDER BY version", Long.class, job.input().command().id().toString())).containsExactly(1L, 2L, 3L, 4L);
+        assertThat(operations.find("foreign", job.input().command().id())).isEmpty();
+    }
+    @Test void rollbackAndTransactionGuardPreventAnyExternalRequest() {
+        var authorization = authorized();
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> { register(authorization); throw new IllegalStateException("Synthetic rollback"); })).isInstanceOf(IllegalStateException.class);
+        assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization);
+        worker.poll(); assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero();
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> worker.poll())).hasMessageContaining("outside a database transaction");
+    }
+    @Test void changedApprovalOrDisabledOriginalCashierStopsBeforeAnyNetworkCall() {
+        var job = job(); revoke(job); worker.poll(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.VOIDED);
+        var second = job(); jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'"); worker.poll();
+        assertThat(reload(second).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero();
+        assertThat(personnel.eligible("foreign", "finance", ENTITY)).isFalse(); assertThat(personnel.eligible("demo", "finance", UUID.randomUUID())).isFalse();
+    }
+    @Test void actualApprovedAmountsAndFrozenPayeeCannotBeReplacedByCallerTerms() {
+        var authorization = authorized(); var terms = authorization.terms();
+        var changed = new PaymentAuthorization.Terms(terms.id(), terms.tenantId(), terms.purpose(), terms.binding(), terms.amount(),
+                new EmployeeAccountSnapshot(ENTITY, "alice", "different-account", "****5678", "b".repeat(64), "v2"), terms.voucherOperationId(), terms.voucherCommandDigest(), terms.voucherRevision(), terms.voucherReference(), terms.targetDigest());
+        var forged = new PaymentAuthorization(changed, authorization.decision(), 1, PaymentAuthorization.Status.AUTHORIZED, authorization.updatedAt(), null, null);
+        assertThatThrownBy(() -> sources.requireCurrent(forged, now())).isInstanceOf(DomainException.class);
+        jdbc.update("UPDATE approval_application SET version=version+1 WHERE tenant_id='demo' AND id=?", terms.binding().applicationId().toString());
+        assertThatThrownBy(() -> sources.requireCurrent(authorization, now())).isInstanceOf(DomainException.class); assertThat(WRITES.get()).isZero();
+    }
+    @Test void anotherWorkerCannotSendAndAccountWaitingDoesNotHoldTheApplicationLock() throws Exception {
+        var job = job(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        RESPONDER.set((path, request) -> { if (path.endsWith("debit-accounts")) { entered.countDown(); await(release); } return response(path, request); });
+        var threads = Executors.newFixedThreadPool(2);
+        try {
+            var first = threads.submit(worker::poll); assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            threads.submit(() -> tx().executeWithoutResult(status -> advances.lock("demo", job.input().command().binding().businessId()))).get(1, TimeUnit.SECONDS);
+            threads.submit(worker::poll).get(1, TimeUnit.SECONDS); assertThat(WRITES.get()).isZero();
+            release.countDown(); first.get(4, TimeUnit.SECONDS); assertThat(WRITES.get()).isEqualTo(1); assertThat(reload(job).settleable()).isTrue();
+        } finally { release.countDown(); threads.shutdownNow(); }
+    }
+    @Test void approvalChangingDuringAccountReadIsCaughtBeforeMarkingPossibleSend() throws Exception {
+        var job = job(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        RESPONDER.set((path, request) -> { if (path.endsWith("debit-accounts")) { entered.countDown(); await(release); } return response(path, request); });
+        var thread = Executors.newSingleThreadExecutor();
+        try {
+            var running = thread.submit(worker::poll); assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            tx().executeWithoutResult(status -> { advances.lock("demo", job.input().command().binding().businessId()); revoke(job); });
+            release.countDown(); running.get(4, TimeUnit.SECONDS);
+            assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(reload(job).dispatches()).isZero(); assertThat(WRITES.get()).isZero();
+        } finally { release.countDown(); thread.shutdownNow(); }
+    }
+    @Test void currentPayeeChangeAndAccountBusinessRejectionStopWithoutPayment() {
+        var changed = job(); RESPONDER.set((path, request) -> path.endsWith("employee-account") ? new EmployeeAccountPort.Account(
+                new EmployeeAccountSnapshot(ENTITY, "alice", "changed-account", "****5678", "b".repeat(64), "v2"), now().plusSeconds(60)) : response(path, request));
+        worker.poll(); assertThat(reload(changed).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(reload(changed).failure()).isEqualTo(PaymentOperation.Failure.ACCOUNT_CHANGED);
+        var blocked = job(); RESPONDER.set((path, request) -> new FinanceResult.Rejected<>(FinanceResult.Reason.CASHIER_UNAVAILABLE));
+        worker.poll(); assertThat(reload(blocked).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(WRITES.get()).isZero();
+    }
+    @Test void changedTargetRemainsUnsentAndAccountReadFailureDoesNotQueryBank() {
+        var job = job(); configuration.getTenants().get("demo").setEndpoint(ENDPOINT + "/changed"); worker.poll();
+        var current = reload(job); assertThat(current.status()).isEqualTo(PaymentOperation.Status.QUEUED); assertThat(current.failure()).isEqualTo(PaymentOperation.Failure.TARGET_CHANGED);
+        assertThat(current.dispatches()).isZero(); assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero(); assertThat(QUERIES.get()).isZero();
+    }
+    @Test void lostSendingLeaseQueriesOriginalEvenWhenSourceWasRevokedAndStaleCompletionCannotOverwrite() {
+        var job = job(); var at = now().minusSeconds(20); var checking = execution.claim("demo", job.input().command().id(), at);
+        var sending = execution.readyToSend(checking, directory(at), account(at), at); assertThat(sending).isNotNull(); revoke(job);
+        worker.poll(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.UNKNOWN); worker.poll();
+        var done = reload(job); assertThat(done.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isZero();
+        execution.finish(sending, new FinanceResult.Success<>(paid(job.input().command(), 1)), now()); assertThat(reload(job)).isEqualTo(done);
+    }
+    @Test void localSettlementFailureRollsBackThenOnlyQueriesOriginalPayment() {
+        var job = job(); listener.reject.set(true); worker.poll(); var unknown = reload(job);
+        assertThat(unknown.status()).isEqualTo(PaymentOperation.Status.UNKNOWN); assertThat(unknown.observation()).isNull(); assertThat(WRITES.get()).isEqualTo(1);
+        recheck(job); worker.poll(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1);
+    }
+    @Test void missingAfterUncertainSendRequiresExplicitOriginalResendAndFreshAccountReads() {
+        var job = job(); RESPONDER.set((path, request) -> path.endsWith("payment-command") ? Map.of("invalid", true) : response(path, request)); worker.poll();
+        assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.UNKNOWN); assertThat(WRITES.get()).isEqualTo(1);
+        RESPONDER.set((path, request) -> path.endsWith("payment-query") ? missing(job.input().command()) : response(path, request)); recheck(job); worker.poll();
+        assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.NOT_FOUND); worker.poll(); assertThat(WRITES.get()).isEqualTo(1);
+        tx().executeWithoutResult(status -> execution.resend("demo", job.input().command().id(), reload(job).version(), now())); RESPONDER.set(PaymentOperationIntegrationTest::response); worker.poll();
+        assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isEqualTo(2); assertThat(ACCOUNT_READS.get()).isEqualTo(4);
+        assertThat(reload(job).input()).isEqualTo(job.input()); assertThat(LAST_KEY.get()).isEqualTo(job.input().command().id().toString());
+    }
+
+    private PaymentOperation job() { return register(authorized()); }
+    private PaymentOperation register(PaymentAuthorization authorization) {
+        return tx().execute(status -> {
+            var at = now().minusSeconds(30); var executed = authorization.registerExecution("cashier", directory(at), "debit-1", account(at), sources.requireCurrent(authorization, at), at);
+            authorizations.update(executed); var operation = execution.register(executed, at); COMMANDS.put(executed.terms().id(), executed.execution().command()); return operation;
+        });
+    }
+    private PaymentAuthorization authorized() {
+        var request = advance(); var plan = VoucherSource.advance(applications.findById("demo", request.applicationId()).orElseThrow(), request); var at = now().minusSeconds(60); var date = plan.accountingDate();
+        var period = new AccountingPeriodPort.OpenPeriod(plan.periodRequest(), "synthetic-period", "v1", date.minusDays(30), date.plusDays(30), at, at.plusSeconds(600));
+        var mapping = new AccountMappingPort.Mapping(plan.mappingRequest(), "v1", at, at.plusSeconds(600), plan.mappingRequest().keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+        var command = plan.prepare(UUID.randomUUID(), period, mapping, at);
+        var queued = tx().execute(status -> voucherExecution.register(command, configuration.destination("demo").orElseThrow().digest("demo"), at));
+        var claimed = queued.claim(at, Duration.ofSeconds(15)); var observed = at.plusSeconds(1);
+        var posted = claimed.complete(new FinanceResult.Success<>(new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, observed,
+                "posting-1", "voucher-1", period.periodReference(), date, command.totals().gross(), command.totals().gross(), observed, null)), observed);
+        tx().executeWithoutResult(status -> { vouchers.update(claimed); vouchers.update(posted); });
+        var authorization = PaymentAuthorization.issue(UUID.randomUUID(), posted, sources.payee(posted, observed), "finance", at.plusSeconds(10), at.plusSeconds(600));
+        fixtures.add(authorization.terms().id()); tx().executeWithoutResult(status -> authorizations.create(authorization)); return authorization;
+    }
+    private AdvanceRequest advance() {
+        var at = now().minusSeconds(120); var id = UUID.randomUUID();
+        var app = Application.draftBusiness(UUID.randomUUID(), "demo", "SYNTHETIC-PAYMENT-" + id, "fixture", 1, "alice", "合成付款", Map.of(), null, null, null, new BusinessReference(BusinessReference.Type.ADVANCE_REQUEST, id));
+        var request = AdvanceRequest.draft(id, "demo", app.id(), "alice", new AdvanceRequestContent(ENTITY, "合成借款", "合成用途", new Money(new BigDecimal("100.00"), "CNY"), at.atZone(ZoneOffset.UTC).toLocalDate().plusDays(10)));
+        tx().executeWithoutResult(status -> {
+            applications.save(app); advances.create(request, "alice");
+            var catalog = new FinanceCatalog("alice", "v1", at.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(ENTITY, "法人", "CNY", false, "v1", "UTC")), List.of(), List.of(), List.of(), List.of());
+            request.freeze(1, 1, catalog, account(at), new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, ENTITY, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位"), at);
+            advances.update(request, 1, "alice", "SYNTHETIC_SUBMIT"); request.approve(2, 1, 5, "manager", at); advances.update(request, 2, "manager", "SYNTHETIC_APPROVE");
+            applications.update(Application.restore(app.id(), "demo", app.businessNo(), app.processKey(), 1, "alice", app.title(), AdvanceRequestFormContract.submittedPayload(request.currentRound()),
+                    ApplicationStatus.APPROVED, 1, 5, null, null, NotificationTexts.EMPTY, app.businessReference()), 1);
+        }); return request;
+    }
+    private void setupOrganization() {
+        if (organization.unit("demo", ENTITY).isPresent()) return;
+        tx().executeWithoutResult(status -> {
+            if (!organization.initialized("demo")) organization.initialize("demo", "admin", now());
+            organization.save("demo", new OrganizationUnit(ENTITY, OrganizationUnit.Kind.LEGAL_ENTITY, "付款法人", null, null, true, 1), 0);
+            var department = new OrganizationUnit(UUID.randomUUID(), OrganizationUnit.Kind.DEPARTMENT, "财务部", ENTITY, null, true, 1);
+            var position = new OrganizationUnit(UUID.randomUUID(), OrganizationUnit.Kind.POSITION, "财务执行岗位", ENTITY, null, true, 1);
+            organization.save("demo", department, 0); organization.save("demo", position, 0);
+            for (String user : List.of("finance", "cashier")) {
+                var person = new OrganizationPerson(UUID.randomUUID(), user, user, true, true, 1); organization.save("demo", person, 0);
+                organization.save("demo", new OrganizationAppointment(UUID.randomUUID(), person.id(), department.id(), position.id(), true, 1), 0);
+            }
+        });
+    }
+    private void revoke(PaymentOperation job) { jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", job.input().command().binding().applicationId().toString()); }
+    private PaymentOperation reload(PaymentOperation value) { return operations.find("demo", value.input().command().id()).orElseThrow(); }
+    private void recheck(PaymentOperation value) { tx().executeWithoutResult(status -> execution.query("demo", value.input().command().id(), reload(value).version(), now())); }
+    private TransactionTemplate tx() { return new TransactionTemplate(transactions); }
+    private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
+    private static PaymentAccountsPort.Directory directory(Instant at) {
+        return new PaymentAccountsPort.Directory(new PaymentAccountsPort.Request(ENTITY, "CNY", "cashier"), "v1", at, at.plusSeconds(600),
+                List.of(new PaymentAccountsPort.DebitAccount("debit-1", "业务账户", "****5678", "CNY", "v1")));
+    }
+    private static EmployeeAccountPort.Account account(Instant at) { return new EmployeeAccountPort.Account(new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1"), at.plusSeconds(600)); }
+    private static PaymentObservation paid(PaymentCommand command, long revision) { return new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, revision, now(), "bank-1", command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "receipt-1", null); }
+    private static PaymentObservation missing(PaymentCommand command) { return new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.NOT_FOUND, 0L, now(), null, null, null, null, null, null); }
+    private static Object response(String path, JsonNode request) {
+        if (path.endsWith("debit-accounts")) return directory(now());
+        if (path.endsWith("employee-account")) return account(now());
+        var command = path.endsWith("payment-command") ? wire.read(request.at("/data/command").toString(), PaymentCommand.class) : COMMANDS.get(UUID.fromString(request.at("/data/authorizationId").asText()));
+        return paid(command, 1);
+    }
+    private static void await(CountDownLatch latch) {
+        try { if (!latch.await(8, TimeUnit.SECONDS)) throw new IllegalStateException("Synthetic payment wait expired"); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException("Synthetic payment interrupted"); }
+    }
+    private static HttpServer server() {
+        try {
+            var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); server.setExecutor(HTTP_THREADS);
+            server.createContext("/finance/", exchange -> {
+                var path = exchange.getRequestURI().getPath();
+                if (path.endsWith("payment-command")) WRITES.incrementAndGet(); else if (path.endsWith("payment-query")) QUERIES.incrementAndGet(); else ACCOUNT_READS.incrementAndGet();
+                LAST_KEY.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+                var request = wire.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class); var value = RESPONDER.get().apply(path, request);
+                var envelope = value instanceof FinanceResult.Rejected<?> rejected
+                        ? Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "REJECTED", "reason", rejected.reason().name())
+                        : Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", value);
+                byte[] body = wire.write(envelope).getBytes(StandardCharsets.UTF_8); exchange.getResponseHeaders().set("Content-Type", "application/json"); exchange.sendResponseHeaders(200, 0);
+                try { exchange.getResponseBody().write(body); } finally { exchange.close(); }
+            }); server.start(); return server;
+        } catch (Exception failed) { throw new IllegalStateException(failed); }
+    }
+    /**
+     * 模拟资金已到账后本地消费者失败，验证持久确认和结算的共同回滚。
+     * @author owlzhangfq@gmail.com
+     */
+    static class FailureListener {
+        private final AtomicBoolean reject = new AtomicBoolean();
+        @EventListener public void changed(PaymentOperationChanged event) {
+            if (event.current().status() == PaymentOperation.Status.SUCCEEDED && reject.compareAndSet(true, false)) throw new IllegalStateException("Synthetic settlement failure");
+        }
+    }
+    /**
+     * 故障消费者仅在此测试中启用。
+     * @author owlzhangfq@gmail.com
+     */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class ListenerConfiguration { @Bean FailureListener paymentFailureListener() { return new FailureListener(); } }
+}

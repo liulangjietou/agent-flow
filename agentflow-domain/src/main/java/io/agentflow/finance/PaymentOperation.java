@@ -66,6 +66,7 @@ public record PaymentOperation(Input input, long version, Status status, int att
     /** 账户复查完成后才持久标记可能发送；调用方须在此事务中复核原批准、凭证和实际执行权限。 */
     public PaymentOperation readyToSend(PaymentAccountsPort.Directory directory, EmployeeAccountPort.Account payee, Instant now) {
         requireTime(now); if (status != Status.CHECKING) throw conflict(); if (expired(now)) return expire(now);
+        if (!now.isBefore(input.command().authorization().expiresAt())) return changed(Status.EXPIRED, now, null, null, null, observation, conflictingObservation, highestRevision, Failure.AUTHORIZATION_EXPIRED);
         input.command().requireSendAt(now);
         var evidence = AccountEvidence.checked(input, directory, payee, now);
         return new PaymentOperation(input, Math.incrementExact(version), Status.SENDING, attempts, Math.incrementExact(dispatches), createdAt, now,

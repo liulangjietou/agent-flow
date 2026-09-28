@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-28",
+  "scope": "Approved financial sources, legal-entity personnel, original-payment worker and scheduling",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "newHttpIntegrationTests": 11,
+  "operationDomainTests": 12,
+  "h2ScopeTests": 87,
+  "postgresqlScopeTests": 17,
+  "overlappingScopes": true,
+  "logs": {
+    "accountReadExpiryRed": "/fyoung/tmp/agentflow-remaining-20260928/payment-check-expiry-red.log",
+    "h2Scope": "/fyoung/tmp/agentflow-remaining-20260928/payment-worker-scope.log",
+    "postgresqlScope": "/fyoung/tmp/agentflow-remaining-20260928/payment-worker-postgres.log",
+    "postgresqlDatabases": "/fyoung/tmp/agentflow-remaining-20260928/payment-worker-postgres-databases.json",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/payment-worker-authors.log"
+  },
+  "confirmed": [
+    "Actual approved advance aggregates and frozen payee are reloaded before sending",
+    "Cashier and authorizer remain active in the original legal entity",
+    "Account HTTP waits do not hold approval locks and concurrent workers send only once",
+    "Approval changes during account reads stop sending",
+    "Changed payee and cashier business rejection remain unsent",
+    "Changed financial target triggers no external request and never redirects the command",
+    "Expired possible-send lease only queries original transaction even after approval revocation",
+    "Late completion cannot overwrite current query result",
+    "Local settlement consumer failure rolls back and recovers by original query",
+    "Authoritative absence requires explicit original resend and fresh account evidence",
+    "Authorization expiring during account reads remains unsent and explicitly expired"
+  ],
+  "notClaimed": ["Authenticated finance or cashier payment API", "Cashier UI", "Real bank transfer", "Loan balance creation", "Expense settlement", "Enterprise identity role revocation verification", "Enterprise acceptance", "Remote PR or CI"]
+}

@@ -133,6 +133,13 @@ class PaymentOperationTest {
         assertThat(sending().complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.SUCCEEDED, 1, NOW.plusSeconds(20))), NOW.plusSeconds(20)).status()).isEqualTo(PaymentOperation.Status.UNKNOWN);
     }
 
+    @Test void authorizationExpiringDuringAccountReadStopsBeforeSendingWithoutBankUncertainty() {
+        var until = command.authorization().expiresAt(); var checking = queue().claim(until.minusSeconds(1), LEASE);
+        var result = checking.readyToSend(directory(until), account(until), until);
+        assertThat(result.status()).isEqualTo(PaymentOperation.Status.EXPIRED); assertThat(result.dispatches()).isZero();
+        assertThat(result.failure()).isEqualTo(PaymentOperation.Failure.AUTHORIZATION_EXPIRED); assertThat(result.observation()).isNull();
+    }
+
     @Test void restoredSendingAndRequeuedSnapshotsNeedOriginalAccountCheckAndAuthoritativeAbsence() {
         var sending = sending();
         assertThatThrownBy(() -> new PaymentOperation(sending.input(), sending.version(), sending.status(), sending.attempts(), 1, NOW, NOW, null, sending.leaseUntil(), null, null, null, 0, null)).isInstanceOf(DomainException.class);
