@@ -1,0 +1,85 @@
+package io.agentflow.finance;
+
+import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * 原授权唯一付款执行及其恢复版本，固定命令摘要、财务目标和出款账户。
+ * @author owlzhangfq@gmail.com
+ */
+@Repository
+public class JdbcPaymentOperationRepository {
+    private final JdbcTemplate jdbc;
+    private final JsonUtil json;
+    private final JdbcPaymentAuthorizationRepository authorizations;
+    /** 授权与执行同事务核验，不在仓储内访问资金系统。 */
+    public JdbcPaymentOperationRepository(JdbcTemplate jdbc, JsonUtil json, JdbcPaymentAuthorizationRepository authorizations) { this.jdbc = jdbc; this.json = json; this.authorizations = authorizations; }
+
+    /** 同一事务中必须已经保存出纳执行登记，执行命令与该登记完全相同。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void create(PaymentOperation value) {
+        if (value.version() != 1 || value.status() != PaymentOperation.Status.QUEUED || value.attempts() != 0 || value.dispatches() != 0) throw conflict();
+        var command = value.input().command(); var authorization = authorizations.find(command.tenantId(), command.id()).orElseThrow(JdbcPaymentOperationRepository::conflict);
+        if (!PaymentOperation.queue(authorization, value.createdAt()).equals(value)) throw conflict();
+        jdbc.update("""
+                INSERT INTO payment_operation(tenant_id,id,input_json,command_digest,state_json,version,status,attempts,dispatches,highest_revision,created_at,updated_at,next_attempt_at)
+                VALUES(?,?,?,?,?,1,'QUEUED',0,0,0,?,?,?)
+                """, command.tenantId(), command.id().toString(), json.write(value.input()), command.digest(), json.write(value),
+                timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()));
+        append(value);
+    }
+
+    /** 租约结果按原版本比较更新，迟到执行者不能覆盖新领取和到账结果。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void update(PaymentOperation value) {
+        var command = value.input().command();
+        int changed = jdbc.update("""
+                UPDATE payment_operation SET version=?,status=?,attempts=?,dispatches=?,highest_revision=?,state_json=?,updated_at=?,next_attempt_at=?,lease_until=?
+                WHERE tenant_id=? AND id=? AND version=? AND input_json=? AND command_digest=?
+                """, value.version(), value.status().name(), value.attempts(), value.dispatches(), value.highestRevision(), json.write(value), timestamp(value.updatedAt()),
+                timestamp(value.nextAttemptAt()), timestamp(value.leaseUntil()), command.tenantId(), command.id().toString(), value.version() - 1, json.write(value.input()), command.digest());
+        if (changed != 1) throw conflict(); append(value);
+    }
+    /** 按原授权读取，领域构造及关系列共同校验持久状态。 */
+    public Optional<PaymentOperation> find(String tenant, UUID id) { return jdbc.query("SELECT * FROM payment_operation WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst(); }
+    /** 扫描只取十个标识，不加载或输出账户及金额。 */
+    public List<Candidate> due(Instant now) {
+        return jdbc.query("""
+                SELECT tenant_id,id FROM payment_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
+                OR (status IN ('CHECKING','SENDING','QUERYING') AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+    }
+    private RowMapper<PaymentOperation> row() {
+        return (row, index) -> {
+            var value = json.read(row.getString("state_json"), PaymentOperation.class); var command = value.input().command();
+            if (!value.input().equals(json.read(row.getString("input_json"), PaymentOperation.Input.class)) || !command.digest().equals(row.getString("command_digest"))
+                    || !command.tenantId().equals(row.getString("tenant_id")) || !command.id().toString().equals(row.getString("id"))
+                    || value.version() != row.getLong("version") || !value.status().name().equals(row.getString("status")) || value.attempts() != row.getInt("attempts")
+                    || value.dispatches() != row.getInt("dispatches") || value.highestRevision() != row.getLong("highest_revision")
+                    || !value.createdAt().equals(instant(row.getTimestamp("created_at"))) || !value.updatedAt().equals(instant(row.getTimestamp("updated_at")))
+                    || !Objects.equals(value.nextAttemptAt(), instant(row.getTimestamp("next_attempt_at"))) || !Objects.equals(value.leaseUntil(), instant(row.getTimestamp("lease_until")))) throw new IllegalStateException("Persisted payment operation identity is inconsistent");
+            return value;
+        };
+    }
+    private void append(PaymentOperation value) { jdbc.update("INSERT INTO payment_operation_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,?,?)", value.input().command().tenantId(), value.input().command().id().toString(), value.version(), json.write(value)); }
+    private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(value); }
+    private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
+    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payment operation input or version changed"); }
+
+    /**
+     * 调度候选不包含任何付款明细。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Candidate(String tenantId, UUID id) { }
+}

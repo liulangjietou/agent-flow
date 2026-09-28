@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-28",
+  "scope": "Payment authorization and operation domain models, V45 migration and JDBC persistence; application entry points and payment settlement remain unfinished",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "domainAuthorizationTests": 8,
+  "domainOperationTests": 11,
+  "persistenceTests": 5,
+  "migrationTests": 1,
+  "h2ScopeTests": 75,
+  "postgresqlScopeTests": 6,
+  "overlappingScopes": true,
+  "logs": {
+    "authorizationRed": "/fyoung/tmp/agentflow-remaining-20260928/payment-authorization-domain-red.log",
+    "h2Scope": "/fyoung/tmp/agentflow-remaining-20260928/payment-persistence-scope.log",
+    "postgresqlScope": "/fyoung/tmp/agentflow-remaining-20260928/payment-persistence-postgres.log",
+    "postgresqlDatabases": "/fyoung/tmp/agentflow-remaining-20260928/payment-persistence-postgres-databases.json",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/payment-persistence-authors.log"
+  },
+  "confirmed": [
+    "Authorizations derive positive payable from the posted voucher and recheck original financial bindings",
+    "Original applicant, finance authorizer and cashier are distinct",
+    "Checking crashes recheck accounts; possible-send crashes only query the original payment",
+    "Missing payments never resend automatically and explicit resend keeps original command identity",
+    "Stale or contradictory observations retain accepted payment evidence",
+    "Reversal preserves its own receipt and never becomes a second successful settlement",
+    "Authorization execution and queue creation roll back together",
+    "Original terms, command, target and version cannot be overwritten by a stale writer",
+    "V44 to V45 retains existing accounting and application rows; repeated migration validates cleanly"
+  ],
+  "notClaimed": ["Public payment API", "Cashier UI", "Automatic worker wiring", "Actual funds transfer", "Loan balance creation", "Expense resource consumption", "Enterprise acceptance", "Remote PR or CI"]
+}
