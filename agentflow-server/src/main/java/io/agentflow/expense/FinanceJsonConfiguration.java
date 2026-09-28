@@ -48,7 +48,8 @@ public class FinanceJsonConfiguration {
     private static final class MoneyDeserializer extends JsonDeserializer<Money> {
         /** 在 JSON 边界拒绝可能已经丢失精度的数值输入。 */
         @Override public Money deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            var value = parser.getCodec().readTree(parser);
+            // 在当前字段上下文读取子树；重新进入根读取会把后续正常字段误判成多余 JSON。
+            var value = context.readTree(parser);
             if (!value.isObject() || value.size() != 2 || value.get("value") == null || !value.get("value").isValueNode()
                     || value.get("currency") == null || !value.get("currency").isValueNode()) throw invalid();
             var node = (com.fasterxml.jackson.databind.JsonNode) value;

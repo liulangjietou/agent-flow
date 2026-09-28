@@ -24,6 +24,9 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  finance-gateway:
+    enabled: ${AGENTFLOW_FINANCE_GATEWAY_ENABLED:false}
+    tenants: {}
   assist:
     enabled: ${AGENTFLOW_ASSIST_ENABLED:false}
     worker-enabled: ${AGENTFLOW_ASSIST_WORKER_ENABLED:true}

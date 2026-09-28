@@ -12784,6 +12784,100 @@
           }
         }
       }
+    },
+    "/api/v1/finance/catalog": {
+      "get": {
+        "operationId": "getFinanceCatalog",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取当前员工的财务目录",
+        "description": "按已认证员工与租户取得授权法人、费用类别、成本中心、项目和城市；不接受查询参数。未配置或外部服务不可用返回 503，不使用示例企业数据。",
+        "x-access": "已认证员工本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceCatalog"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "个人授权目录不得缓存"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "企业主数据业务拒绝：FINANCE_RULE_REJECTED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "服务未配置、超时或协议错误：FINANCE_GATEWAY_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
     }
   },
   "components": {
@@ -19136,6 +19230,212 @@
           "applicationVersion",
           "financialVersion",
           "content"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceLegalEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "baseCurrency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "paperReceiptRequired": {
+            "type": "boolean"
+          },
+          "sourceVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "baseCurrency",
+          "paperReceiptRequired",
+          "sourceVersion"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceCategory": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ITEM",
+                "DAY",
+                "NIGHT",
+                "KILOMETER",
+                "PERSON"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "units"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceCostCenter": {
+        "type": "object",
+        "properties": {
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "legalEntityId",
+          "code",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceProject": {
+        "type": "object",
+        "properties": {
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "legalEntityId",
+          "code",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceCity": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceCatalog": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sourceVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "legalEntities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceLegalEntity"
+            },
+            "maxItems": 200
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCategory"
+            },
+            "maxItems": 2000
+          },
+          "costCenters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCostCenter"
+            },
+            "maxItems": 2000
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceProject"
+            },
+            "maxItems": 2000
+          },
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCity"
+            },
+            "maxItems": 2000
+          }
+        },
+        "required": [
+          "employeeId",
+          "sourceVersion",
+          "validUntil",
+          "legalEntities",
+          "categories",
+          "costCenters",
+          "projects",
+          "cities"
         ],
         "additionalProperties": false
       }

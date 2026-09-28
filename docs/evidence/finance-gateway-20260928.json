@@ -1,0 +1,83 @@
+{
+  "recordedAt": "2026-09-28T12:40:40.512966+00:00",
+  "scope": "Tenant-bound read-only finance gateway and current-employee catalog API",
+  "previousCommit": "bc46f749148bb7119f99a9c856be127d64483d65",
+  "tests": [
+    {
+      "class": "FinanceContractsTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "ExpenseReportTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "FinanceGatewayConfigurationTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "FinanceGatewayClientTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "FinanceCatalogControllerTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "OpenApiContractTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "ExpenseDraftIntegrationTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "liveHttp": "Loopback HttpServer synthetic financial fixture; all five adapters exercised",
+  "uiChanged": false,
+  "databaseMigrationAdded": false,
+  "enterpriseFinanceAcceptance": "NOT_RUN_NO_REAL_CONFIGURATION",
+  "openapi": {
+    "operations": 102,
+    "schemas": 172,
+    "requestExamples": 36,
+    "result": "PASS"
+  },
+  "regressions": [
+    {
+      "test": "FinanceContractsTest.rejectsCompleteAccountNumbersDisguisedAsDisplayMasks",
+      "before": "FAIL - complete account number accepted",
+      "after": "PASS - aggregate enforces mask and digit limits"
+    },
+    {
+      "test": "FinanceGatewayClientTest expense policy and invoice successful real HTTP cases",
+      "before": "FAIL - nested Money re-entered root reader under strict trailing-token mode",
+      "after": "PASS - current deserialization context reads Money subtree"
+    }
+  ],
+  "logs": [
+    "finance-account-mask-red.log",
+    "finance-gateway-first.log",
+    "finance-gateway-green.log"
+  ],
+  "temporaryEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "remaining": [
+    "invoice original wallet and verification jobs",
+    "version-bound persistent precheck and atomic submit",
+    "budget voucher payment and settlement",
+    "finance editor and browser acceptance"
+  ]
+}
