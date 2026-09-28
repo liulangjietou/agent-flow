@@ -101,6 +101,8 @@ HTTP 记录、数据库、脚本及截图保留在 `/fyoung/tmp/agentflow-contex
 
 ## 交付状态与限制
 
+2026-09-28 补齐待办“本轮组织”筛选和摘要展示：按被冻结的法人、部门或岗位名称匹配，改名不影响旧轮次，重提只匹配当前轮次。V29 增加可重建的名称查询列，H2/PostgreSQL 升级保留验证、HTTP 和浏览器通过；详情与证据见[本轮组织筛选](pending-task-queue.md#本轮组织筛选与-v29-升级)。这项查询不需要开放组织管理目录权限。
+
 本轮完成两项已确认规则的本地开发。工作树为 `/fyoung/tmp/agentflow-governance-identifier-integration`，分支 `codex/governance-identifier-integration`；主线 `60bafa0` 和主演示保持原状。用户要求先完成本地开发，且仓库尚未配置远端，本轮没有 GitHub PR 或远程 CI，开发工作树继续保留。
 
 首次交付时 Docker daemon 不可连接，V27–V28 的 PostgreSQL 缺口已由上述补充验收完成。真实企业数据库、身份及生产安装验收仍需目标环境。AgentFlow 未建立 GitNexus 索引，调用方和读写出口按源代码逐项复核。

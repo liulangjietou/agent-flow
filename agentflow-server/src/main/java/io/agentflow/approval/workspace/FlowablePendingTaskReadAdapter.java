@@ -36,6 +36,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                 SELECT p.* FROM (
                     SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.OWNER_,t.DELEGATION_,t.CREATE_TIME_,t.DUE_DATE_,
                            a.id,a.business_no,a.title,a.process_key,a.definition_version,a.created_by,a.search_amount,a.round_no,
+                           r.initiator_legal_entity_name,r.initiator_department_name,r.initiator_position_name,
                            COUNT(*) OVER () AS matching_total
                 """).append(where(actor, query, parameters)).append(") p");
         if (query.afterTime() != null) {
@@ -68,11 +69,12 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                 amount == null ? null : amount.stripTrailingZeros().toPlainString(), row.getInt("round_no"),
                 row.getString("ASSIGNEE_"), row.getString("OWNER_"), delegation == null ? "NONE" : delegation,
                 row.getTimestamp("CREATE_TIME_").toInstant(),
-                row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant());
+                row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant(),
+                row.getString("initiator_legal_entity_name"), row.getString("initiator_department_name"), row.getString("initiator_position_name"));
     }
 
     private StringBuilder where(Actor actor, Query query, List<Object> parameters) {
-        var sql = new StringBuilder(io.agentflow.approval.process.FlowableActiveTaskSql.fromCurrentApplications()); parameters.add(actor.tenantId());
+        var sql = new StringBuilder(io.agentflow.approval.process.FlowableActiveTaskSql.fromCurrentApplicationsWithRound()); parameters.add(actor.tenantId());
         sql.append(" AND (t.ASSIGNEE_=? OR (t.ASSIGNEE_ IS NULL AND EXISTS (SELECT 1 FROM ACT_RU_IDENTITYLINK i WHERE i.TASK_ID_=t.ID_ AND i.TYPE_='candidate' AND (i.USER_ID_=?");
         parameters.add(actor.userId()); parameters.add(actor.userId());
         if (!actor.roles().isEmpty()) {
@@ -94,8 +96,13 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
             case ALL -> { }
         }
         if (!query.text().isEmpty()) {
-            String pattern = "%" + query.text().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+            String pattern = literalPattern(query.text());
             sql.append(" AND (LOWER(a.title) LIKE ? ESCAPE '!' OR LOWER(a.business_no) LIKE ? ESCAPE '!' OR LOWER(t.NAME_) LIKE ? ESCAPE '!')");
+            parameters.addAll(List.of(pattern, pattern, pattern));
+        }
+        if (!query.organization().isEmpty()) {
+            String pattern = literalPattern(query.organization());
+            sql.append(" AND (LOWER(r.initiator_legal_entity_name) LIKE ? ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE ? ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE ? ESCAPE '!')");
             parameters.addAll(List.of(pattern, pattern, pattern));
         }
         if (!query.processKey().isEmpty()) { sql.append(" AND a.process_key=?"); parameters.add(query.processKey()); }
@@ -103,5 +110,9 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
         if (query.minAmount() != null) { sql.append(" AND a.search_amount>=?"); parameters.add(query.minAmount()); }
         if (query.maxAmount() != null) { sql.append(" AND a.search_amount<=?"); parameters.add(query.maxAmount()); }
         return sql;
+    }
+
+    private static String literalPattern(String value) {
+        return "%" + value.toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 }

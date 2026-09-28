@@ -21,7 +21,7 @@ import java.util.Set;
  * @author owlzhangfq@gmail.com
  */
 public record TaskQueryParameters(PendingTaskReadPort.Query query, String context) {
-    private static final Set<String> KEYS = Set.of("q", "processKey", "applicant", "assignment", "deadline", "minAmount", "maxAmount", "limit", "cursor");
+    private static final Set<String> KEYS = Set.of("q", "processKey", "applicant", "organization", "assignment", "deadline", "minAmount", "maxAmount", "limit", "cursor");
     private static final Set<String> ASSIGNMENTS = Set.of("all", "assigned", "unclaimed", "delegated");
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 100;
@@ -31,6 +31,7 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
         if (!KEYS.containsAll(raw.keySet())) throw invalid();
         try {
             String text = text(raw, "q", 100), process = text(raw, "processKey", 128), applicant = text(raw, "applicant", 128);
+            String organization = text(raw, "organization", 128);
             String assignment = raw.getOrDefault("assignment", "all");
             var deadline = switch (raw.getOrDefault("deadline", "all")) {
                 case "all" -> PendingTaskReadPort.DeadlineFilter.ALL;
@@ -46,6 +47,8 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
                     text, process, applicant, assignment, min == null ? "" : min.toPlainString(), max == null ? "" : max.toPlainString())));
             // 不限制期限时保留原游标上下文；新增筛选不能复用其他期限条件的游标。
             if (deadline != PendingTaskReadPort.DeadlineFilter.ALL) context = digest(json.write(List.of("deadline-v1", context, deadline.name())));
+            // 未设置组织条件时兼容已有游标；历史名称匹配不读取当前组织目录。
+            if (!organization.isEmpty()) context = digest(json.write(List.of("organization-v1", context, organization)));
             Instant time = null; String id = null;
             if (raw.containsKey("cursor")) {
                 String cursor = raw.get("cursor");
@@ -55,7 +58,7 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
                 time = Instant.parse(parts[1]); id = parts[2];
                 if (time.isBefore(Instant.parse("0001-01-01T00:00:00Z")) || time.isAfter(Instant.parse("9999-12-31T23:59:59Z"))) throw invalid();
             }
-            return new TaskQueryParameters(new PendingTaskReadPort.Query(text, process, applicant, assignment, deadline, now, min, max, limit, time, id), context);
+            return new TaskQueryParameters(new PendingTaskReadPort.Query(text, process, applicant, organization, assignment, deadline, now, min, max, limit, time, id), context);
         } catch (IllegalArgumentException | DateTimeParseException exception) { throw invalid(); }
     }
 

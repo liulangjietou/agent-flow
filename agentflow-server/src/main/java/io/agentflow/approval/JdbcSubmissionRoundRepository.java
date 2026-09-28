@@ -36,16 +36,19 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
 
     @Override
     public void append(SubmissionRound round) {
+        var initiator = round.initiatorContext();
         try {
             jdbc.update("""
                     INSERT INTO approval_submission_round
                     (tenant_id, application_id, round_no, process_instance_id, definition_version,
-                     title, payload_json, submitted_by, submitted_at, form_schema_json, initiator_context_json, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL')
+                     title, payload_json, submitted_by, submitted_at, form_schema_json, initiator_context_json,
+                     initiator_legal_entity_name, initiator_department_name, initiator_position_name, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL')
                     """, round.tenantId(), round.applicationId().toString(), round.roundNo(), round.processInstanceId(),
                     round.definitionVersion(), round.title(), jsonUtil.write(round.payload()), round.submittedBy(),
                     round.submittedAt().atOffset(ZoneOffset.UTC), round.formSchema() == null ? null : jsonUtil.write(round.formSchema()),
-                    round.initiatorContext() == null ? null : jsonUtil.write(round.initiatorContext()));
+                    initiator == null ? null : jsonUtil.write(initiator), initiator == null ? null : initiator.legalEntityName(),
+                    initiator == null ? null : initiator.departmentName(), initiator == null ? null : initiator.positionName());
         } catch (DuplicateKeyException exception) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Submission round already exists");
         }

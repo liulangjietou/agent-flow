@@ -98,10 +98,11 @@ export interface PendingTaskItem {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
   definitionVersion: number; applicant: string; amount: string | null; roundNo: number; assignee?: string
   owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; createdAt: string; dueAt?: string | null
+  legalEntityName?: string | null; departmentName?: string | null; positionName?: string | null
 }
 /** 服务端筛选与分页参数。@author owlzhangfq@gmail.com */
 export interface PendingTaskQuery {
-  q?: string; processKey?: string; applicant?: string; assignment?: 'all' | 'assigned' | 'unclaimed' | 'delegated'
+  q?: string; processKey?: string; applicant?: string; organization?: string; assignment?: 'all' | 'assigned' | 'unclaimed' | 'delegated'
   deadline?: 'all' | 'overdue' | 'pending' | 'unrecorded'
   minAmount?: string; maxAmount?: string; limit?: number; cursor?: string
 }

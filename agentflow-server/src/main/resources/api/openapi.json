@@ -3598,6 +3598,16 @@
             }
           },
           {
+            "name": "organization",
+            "in": "query",
+            "required": false,
+            "description": "本轮冻结的法人、部门或岗位名称包含匹配，忽略大小写；最多128字符，%/_/!均按字面量。无任职快照不匹配，不读取当前组织或扩展办理权限。",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
             "name": "assignment",
             "in": "query",
             "required": false,
@@ -12333,6 +12343,18 @@
             "type": "string",
             "format": "date-time",
             "description": "真实任务的到期时刻；旧任务或未配置期限时缺失，不补造历史期限。"
+          },
+          "legalEntityName": {
+            "type": "string",
+            "description": "本轮提交时冻结的法人名称；未记录任职时省略。"
+          },
+          "departmentName": {
+            "type": "string",
+            "description": "本轮提交时冻结的部门名称；未记录任职时省略。"
+          },
+          "positionName": {
+            "type": "string",
+            "description": "本轮提交时冻结的岗位名称；未记录任职时省略。"
           }
         },
         "required": [

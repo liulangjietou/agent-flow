@@ -39,10 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OrganizationApprovalIntegrationTest {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> System.getProperty("agentflow.organization-test.jdbc-url", "jdbc:h2:mem:organization-approval;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000"));
-        registry.add("spring.datasource.driver-class-name", () -> System.getProperty("agentflow.organization-test.jdbc-driver", "org.h2.Driver"));
-        registry.add("spring.datasource.username", () -> System.getProperty("agentflow.organization-test.jdbc-user", "sa"));
-        registry.add("spring.datasource.password", () -> System.getProperty("agentflow.organization-test.jdbc-password", ""));
+        registry.add("spring.datasource.url", () -> System.getProperty("agentflow.organization-test.jdbc-url", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_TEST_URL", "jdbc:h2:mem:organization-approval;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000")));
+        registry.add("spring.datasource.driver-class-name", () -> System.getProperty("agentflow.organization-test.jdbc-driver", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_TEST_DRIVER", "org.h2.Driver")));
+        registry.add("spring.datasource.username", () -> System.getProperty("agentflow.organization-test.jdbc-user", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_TEST_USER", "sa")));
+        registry.add("spring.datasource.password", () -> System.getProperty("agentflow.organization-test.jdbc-password", System.getenv().getOrDefault("AGENTFLOW_ORGANIZATION_TEST_PASSWORD", "")));
     }
 
     @Autowired MockMvc mvc;
@@ -64,6 +64,65 @@ class OrganizationApprovalIntegrationTest {
     private String applicantToken;
     private String firstToken;
     private String secondToken;
+
+    @Test
+    void pendingQueueSearchesFrozenOrganizationNamesAndOnlyTheCurrentAuthorizedRound() throws Exception {
+        var applicant = organization.createPerson(admin, "applicant", "申请员工", true, false);
+        var selected = organization.createAppointment(admin, applicant.id(), department.id(), position.id(), true);
+        String key = publish("role:" + LocalOrganizationDirectory.PERSON_ROLE + first.id(), "SINGLE");
+        var applications = new java.util.ArrayList<String>();
+        for (int index = 0; index < 3; index++) applications.add(submit(key, selected.id()).path("id").asText());
+        submit(key); // 未选择任职的旧式静态申请，不能借用申请人的当前组织。
+        String queue = "/workspace/tasks?processKey=" + key;
+        var page = read(queue + "&organization=审核&limit=2", firstToken, 200);
+        assertThat(page.path("items")).hasSize(2);
+        assertThat(page.path("total").asLong()).isEqualTo(3);
+        assertThat(page.path("items").get(0).path("departmentName").asText()).isEqualTo("审核部");
+        assertThat(page.path("items").get(0).path("legalEntityName").asText()).isEqualTo("法人");
+        assertThat(page.path("items").get(0).path("positionName").asText()).isEqualTo("审核岗");
+        assertThat(page.toString()).doesNotContain("payload", "appointmentId", "personId");
+        String cursor = page.path("nextCursor").asText();
+        var tail = read(queue + "&organization=审核&cursor=" + cursor, firstToken, 200);
+        assertThat(tail.path("items")).hasSize(1);
+        assertThat(tail.path("total").asLong()).isEqualTo(3);
+        read(queue + "&organization=法人&cursor=" + cursor, firstToken, 400);
+        read(queue + "&cursor=" + cursor, firstToken, 400);
+        for (String name : List.of("法人", "审核岗")) {
+            assertThat(read(queue + "&organization=" + name, firstToken, 200).path("total").asLong()).isEqualTo(3);
+        }
+        assertThat(read(queue, firstToken, 200).path("total").asLong()).isEqualTo(4);
+        for (String token : List.of(applicantToken, secondToken)) {
+            assertThat(read(queue + "&organization=审核", token, 200).path("total").asLong()).isZero();
+        }
+        String foreignToken = UUID.randomUUID().toString();
+        doReturn(new Actor("foreign-" + UUID.randomUUID(), first.subject(), Set.of("APPROVER"))).when(auth).authenticate(foreignToken);
+        assertThat(read(queue + "&organization=审核", foreignToken, 200).path("total").asLong()).isZero();
+        assertThat(read(queue + "&organization=审核&deadline=overdue", firstToken, 200).path("total").asLong()).isZero();
+        assertThat(read(queue + "&organization=审核&deadline=unrecorded", firstToken, 200).path("total").asLong()).isEqualTo(3);
+        organization.updateUnit(admin, department.id(), "改名后的部门", null, true, department.revision());
+        assertThat(read(queue + "&organization=审核部", firstToken, 200).path("total").asLong()).isEqualTo(3);
+        assertThat(read(queue + "&organization=改名后的部门", firstToken, 200).path("total").asLong()).isZero();
+
+        var nextDepartment = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "R&D%_!室",
+                department.legalEntityId(), null, true);
+        var nextJob = organization.createAppointment(admin, applicant.id(), nextDepartment.id(), position.id(), true);
+        String id = applications.get(0);
+        write(post("/api/v1/applications/" + id + "/withdraw"), applicantToken, Map.of("expectedVersion", 2), 200);
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 3, "initiatorAppointmentId", nextJob.id()), 200);
+        assertThat(read(queue + "&organization=审核部", firstToken, 200).path("total").asLong()).isEqualTo(2);
+        for (String name : List.of("r&d", "%_!")) {
+            var current = json.read(mvc.perform(get("/api/v1/workspace/tasks").param("processKey", key).param("organization", name)
+                    .header("Authorization", "Bearer " + firstToken)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString(), JsonNode.class);
+            assertThat(current.path("items").findValuesAsText("applicationId")).containsExactly(id);
+            assertThat(current.path("items").get(0).path("roundNo").asInt()).isEqualTo(2);
+            assertThat(current.path("items").get(0).path("departmentName").asText()).isEqualTo("R&D%_!室");
+        }
+        assertThat(read("/applications/" + id + "/rounds", applicantToken, 200).get(0)
+                .path("initiatorContext").path("departmentName").asText()).isEqualTo("审核部");
+        read(queue + "&organization=" + "x".repeat(129), firstToken, 400);
+    }
 
     @Test
     void applicantSelectsOwnAppointmentAndEachRoundKeepsItsOriginalContext() throws Exception {
@@ -363,8 +422,12 @@ class OrganizationApprovalIntegrationTest {
         return definitions.publish(admin, draft.id(), draft.revision(), "本地组织实际审批验证").key();
     }
     private JsonNode submit(String key) throws Exception {
+        return submit(key, null);
+    }
+    private JsonNode submit(String key, UUID appointmentId) throws Exception {
         var app = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(), "title", "组织流程申请", "processKey", key, "definitionVersion", 1, "payload", Map.of()), 201);
-        return write(post("/api/v1/applications/" + app.path("id").asText() + "/submit"), applicantToken, Map.of("expectedVersion", 1), 200);
+        return write(post("/api/v1/applications/" + app.path("id").asText() + "/submit"), applicantToken,
+                appointmentId == null ? Map.of("expectedVersion", 1) : Map.of("expectedVersion", 1, "initiatorAppointmentId", appointmentId), 200);
     }
     private JsonNode read(String path, String token, int expected) throws Exception {
         return json.read(mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token)).andExpect(status().is(expected)).andReturn().getResponse().getContentAsString(), JsonNode.class);
