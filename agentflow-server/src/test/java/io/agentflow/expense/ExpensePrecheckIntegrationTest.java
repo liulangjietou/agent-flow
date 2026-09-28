@@ -142,6 +142,28 @@ class ExpensePrecheckIntegrationTest {
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
     @Test
+    void optionsLocateLatestAttemptInsteadOfFirstUuidHistoryItem() throws Exception {
+        var report = fixture(false).report();
+        assertThat(tree(read(report, "/precheck-options", "alice")).path("latestPrecheckId").isMissingNode()).isTrue();
+        UUID original = enqueue(report); worker.poll(); var source = job(original).input();
+        UUID older = new UUID(-1, -1), latest = new UUID(0, 1);
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        new TransactionTemplate(transactions).executeWithoutResult(transaction -> {
+            var oldInput = new Input(older, source.tenantId(), source.reportId(), source.applicationId(), source.employeeId(),
+                    source.applicationVersion(), source.financialVersion(), source.roundNo(), 2, source.initiator(), source.accountingDate(), source.targetDigest());
+            var old = ExpensePrecheckJob.queue(oldInput, now); jobs.create(old);
+            old = old.start(now, now.plusSeconds(60)); jobs.update(old);
+            jobs.update(old.finish(Result.unavailable(Stage.SYSTEM, "TIMEOUT"), now));
+            var newestInput = new Input(latest, source.tenantId(), source.reportId(), source.applicationId(), source.employeeId(),
+                    source.applicationVersion(), source.financialVersion(), source.roundNo(), 3, source.initiator(), source.accountingDate(), source.targetDigest());
+            jobs.create(ExpensePrecheckJob.queue(newestInput, now));
+        });
+        assertThat(tree(read(report, "/prechecks?limit=1", "alice")).path("items").get(0).path("id").asText()).isEqualTo(older.toString());
+        assertThat(tree(read(report, "/precheck-options", "alice")).path("latestPrecheckId").asText()).isEqualTo(latest.toString());
+        assertThat(read(report, "/precheck-options", "bob").getStatus()).isEqualTo(404);
+    }
+
+    @Test
     void submissionControlPersistsActualPrecheckEvidenceAndCannotReuseReceiptAcrossRounds() throws Exception {
         var report = fixture(false).report(); UUID checked = enqueue(report); worker.poll(); var evidence = job(checked).result().evidence();
         var preview = evidence.preview(); Instant submittedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);

@@ -58,7 +58,8 @@ public class ExpensePrecheckService {
         String unavailable = !application.editable() ? "APPLICATION_NOT_EDITABLE" : report.content().lines().isEmpty()
                 ? "EXPENSE_LINES_REQUIRED" : destination == null ? "FINANCE_GATEWAY_UNAVAILABLE" : null;
         return new Options(application.version(), report.version(), unavailable == null, unavailable,
-                destination == null ? null : destination.baseUri().getAuthority(), destination == null ? null : destination.digest(report.tenantId()));
+                destination == null ? null : destination.baseUri().getAuthority(), destination == null ? null : destination.digest(report.tenantId()),
+                jobs.latestId(report.tenantId(), reportId).orElse(null));
     }
 
     /** 只登记明确选择的任职和输入版本，排队事务不访问外部系统。 */
@@ -188,7 +189,7 @@ public class ExpensePrecheckService {
      * 排队入口可用性和真实目标。
      * @author owlzhangfq@gmail.com
      */
-    public record Options(long applicationVersion, long financialVersion, boolean enabled, String unavailableCode, String destination, String targetDigest) { }
+    public record Options(long applicationVersion, long financialVersion, boolean enabled, String unavailableCode, String destination, String targetDigest, UUID latestPrecheckId) { }
     /**
      * 有界历史的轻量状态。
      * @author owlzhangfq@gmail.com

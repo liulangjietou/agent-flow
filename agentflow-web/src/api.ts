@@ -19,6 +19,7 @@ import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
+import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
@@ -283,6 +284,14 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),
+  createExpense: (input: ExpenseCreate) => write<ExpenseDetail>('/expense-reports', 'POST', '保存报销草稿', input),
+  reviseExpense: (id: string, input: ExpenseRevise) => write<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}/revise`, 'POST', '保存报销修改', input),
+  expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
+  queueExpensePrecheck: (id: string, input: PrecheckInput) => write<{ id: string }>(`/expense-reports/${encodeURIComponent(id)}/precheck`, 'POST', '发起费用预检', input),
+  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  submitExpense: (id: string, input: { applicationVersion: number; financialVersion: number; precheckId: string }) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/submit`, 'POST', '正式提交报销', input),
+  invoices: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceItem>>('/invoices' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReports: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ExpenseItem>>('/expense-reports' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PriorRequestItem>>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),

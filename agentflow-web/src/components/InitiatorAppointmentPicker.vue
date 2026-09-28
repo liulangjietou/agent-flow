@@ -3,7 +3,7 @@ import { onUnmounted, ref, watch } from 'vue'
 import { api, type ApiError } from '../api'
 import { initiatorContextLabel, type InitiatorContext } from '../initiatorContext'
 
-const props = defineProps<{ modelValue: string; scopeKey: string; disabled: boolean }>()
+const props = defineProps<{ modelValue: string; scopeKey: string; disabled: boolean; required?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const choices = ref<InitiatorContext[]>([]), next = ref<string | null>(), loading = ref(false), error = ref('')
 const READ_TIMEOUT_MS = 12_000
@@ -32,8 +32,8 @@ onUnmounted(() => { generation++; controller?.abort() })
 <template>
   <div class="initiator-appointment">
     <label>本次发起任职
-      <select :value="modelValue" :disabled="disabled || loading" @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)">
-        <option value="">请选择本次任职；静态选人流程可不选</option>
+      <select :value="modelValue" :disabled="disabled || loading" :required="required" @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)">
+        <option value="">{{ required ? '请选择本次任职' : '请选择本次任职；静态选人流程可不选' }}</option>
         <option v-if="modelValue && !choices.some(value => value.appointmentId === modelValue)" :value="modelValue">原选择尚未载入，请刷新核对</option>
         <option v-for="choice in choices" :key="choice.appointmentId" :value="choice.appointmentId">{{ initiatorContextLabel(choice) }}</option>
       </select>

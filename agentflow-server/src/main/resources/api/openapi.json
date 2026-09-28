@@ -22974,6 +22974,17 @@
                 "type": "null"
               }
             ]
+          },
+          "latestPrecheckId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

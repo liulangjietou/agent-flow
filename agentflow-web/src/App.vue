@@ -13,6 +13,8 @@ import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
 import ExpenseDetail from './components/ExpenseDetail.vue'
+import { expenseDrafts } from './expenseDraft'
+import type { ExpenseDetail as ExpenseDetailData } from './expenses'
 import TaskDeadlineStatus from './components/TaskDeadlineStatus.vue'
 import PendingTaskQueue from './components/PendingTaskQueue.vue'
 import NotificationInbox from './components/NotificationInbox.vue'
@@ -937,6 +939,14 @@ async function recoverOperation(id: string) {
       } else if (/^\/applications\/[^/]+\/assist-runs(?:\/[^/]+\/review)?$/.test(request.path)) {
         assistRefresh.value++
         notice.value = '原摘要操作已确认，请刷新记录核对执行或复核结果。'
+      } else if (request.path.startsWith('/expense-reports')) {
+        if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
+          const value = result as ExpenseDetailData
+          const restored = expenseDrafts.acknowledge(actorScope.value, request.path, request.body, value)
+          if (!restored && value.applicationId) recordApplicationId.value = value.applicationId
+          notice.value = '原费用保存结果已确认，请核对原单据后继续预检。'
+        } else notice.value = '原费用操作已确认，请刷新费用详情或预检结果核对当前状态。'
+        templateRefresh.value++
       } else if (request.path.startsWith('/applications')) {
         templateRefresh.value++
         const value = result as Application
@@ -977,7 +987,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || expenseDrafts.hasDrafts() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */

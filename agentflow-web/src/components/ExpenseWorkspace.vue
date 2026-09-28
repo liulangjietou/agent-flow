@@ -2,9 +2,11 @@
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { ExpensePageQuery, expenseStatuses, moneyLabel } from '../expenses'
+import ExpenseEditor from './ExpenseEditor.vue'
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean }>()
 const emit = defineEmits<{ open: [applicationId: string] }>()
 const tab = ref<'reports' | 'requests' | 'advances'>('reports'), status = ref('')
+const editing = ref(false)
 const reports = reactive(new ExpensePageQuery(api.expenseReports)), requests = reactive(new ExpensePageQuery(api.expenseRequests)), advances = reactive(new ExpensePageQuery(api.employeeAdvances))
 const current = computed(() => tab.value === 'reports' ? reports : tab.value === 'requests' ? requests : advances)
 const tabs = [{ id: 'reports' as const, label: '我的报销' }, { id: 'requests' as const, label: '事前批准额度' }, { id: 'advances' as const, label: '已放款借款' }]
@@ -18,7 +20,9 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { y
 
 <template>
   <section class="content expense-workspace">
-    <div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">查看报销进度，核对本人可用额度与借款余额。</p></div><button class="secondary" :disabled="current.loading" @click="load()">刷新记录</button></div>
+    <ExpenseEditor v-if="editing" :scope-key="scopeKey" :locked="locked" @close="editing = false; load()" @submitted="editing = false; load(); emit('open', $event)" />
+    <template v-else>
+    <div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">查看报销进度，核对本人可用额度与借款余额。</p></div><div class="workspace-actions"><button class="secondary" :disabled="current.loading" @click="load()">刷新记录</button><button class="primary" :disabled="locked" @click="editing = true">＋ 填写报销</button></div></div>
     <div class="expense-navigation" role="group" aria-label="费用工作区视图"><button v-for="item in tabs" :key="item.id" :aria-pressed="tab === item.id" @click="tab = item.id">{{ item.label }}</button></div>
     <div class="ledger-toolbar"><label v-if="tab === 'reports'">报销状态<select v-model="status"><option value="">全部状态</option><option v-for="(label, value) in expenseStatuses" :key="value" :value="value">{{ label }}</option></select></label><p v-else>{{ tab === 'requests' ? '批准额度包含当前预留；已关闭的额度不能增加占用。' : '只显示实际放款的借款，预留金额仍未完成冲销。' }}</p><span>已加载 {{ current.items.length }} 条</span></div>
     <p v-if="current.error" class="expense-error" role="alert">{{ current.error }}<button :disabled="current.loading" @click="load(!!current.nextBeforeId)">重新读取</button></p>
@@ -31,9 +35,11 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { y
     <p v-if="current.loading" class="ledger-empty" role="status">正在读取本人费用记录…</p>
     <div v-else-if="!current.error && !current.items.length" class="ledger-empty"><strong>{{ tab === 'reports' ? '暂无符合条件的报销单' : tab === 'requests' ? '暂无本人事前批准额度' : '暂无本人已放款借款' }}</strong><p>{{ tab === 'reports' ? '已保存的费用单会显示在这里，可切换状态筛选。' : '此处根据实际批准或放款结果显示余额。' }}</p></div>
     <button v-if="current.nextBeforeId" class="secondary more-records" :disabled="current.loading" @click="load(true)">加载更多</button>
+    </template>
   </section>
 </template>
 
 <style scoped>
+.workspace-actions{display:flex;gap:10px;flex-wrap:wrap}
 .expense-workspace{min-width:0}.expense-navigation{display:flex;gap:8px;border-bottom:1px solid var(--line);margin:24px 0 18px;overflow-x:auto}.expense-navigation button{white-space:nowrap;padding:13px 17px;font-size:13px;border-bottom:2px solid transparent;color:var(--muted)}.expense-navigation button[aria-pressed="true"]{color:var(--deep);border-color:var(--teal);font-weight:700}.ledger-toolbar{display:flex;gap:18px;align-items:center;margin-bottom:18px}.ledger-toolbar label{display:flex;align-items:center;gap:12px;margin:0;font-size:12px;white-space:nowrap}.ledger-toolbar select{min-width:135px;padding:9px 12px}.ledger-toolbar>span{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}.ledger-toolbar p{font-size:12px;line-height:1.8;color:var(--muted);margin:0}.report-ledger{background:white;border:1px solid var(--line);border-radius:14px;overflow:hidden}.ledger-head,.ledger-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(130px,1fr) 155px 70px;gap:18px;align-items:center;padding:16px 22px}.ledger-head{font-size:10px;color:var(--muted);background:var(--paper)}.ledger-row{border-top:1px solid var(--line)}.ledger-row strong{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.ledger-row small{display:block;font-size:10px;color:var(--muted);margin-top:7px;overflow-wrap:anywhere}.ledger-row time{font:10px 'DM Mono',monospace;color:var(--muted)}.ledger-row button{font-size:11px}.funds-ledger{display:grid;gap:14px}.fund-entry{background:white;border:1px solid var(--line);border-radius:14px;padding:22px}.fund-heading{display:flex;align-items:center;gap:12px}.fund-heading strong{font-size:14px}.fund-heading button{margin-left:auto;font-size:12px}.reference{font:10px 'DM Mono',monospace;color:var(--muted);overflow-wrap:anywhere;line-height:1.8}.fund-entry dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}.fund-entry dt{font-size:11px;color:var(--muted);margin-bottom:8px}.fund-entry dd{margin:0;font:12px 'DM Mono',monospace;line-height:1.8;overflow-wrap:anywhere}.available{color:var(--deep)}.balance-row{padding-top:15px;border-top:1px solid var(--line);margin-top:16px}.balance-row>strong{font-size:12px}.advance-dates{font-size:11px;color:var(--muted)}.ledger-empty{text-align:center;border:1px dashed var(--line);border-radius:12px;padding:44px 20px;color:var(--muted);font-size:12px;line-height:1.8}.ledger-empty strong{color:var(--ink);font-size:14px}.expense-error{font-size:12px;line-height:1.8;background:#fff0ed;color:var(--red);padding:14px;border-radius:10px}.expense-error button{margin-left:12px;text-decoration:underline}.more-records{margin-top:18px}@media(max-width:900px){.ledger-head{display:none}.ledger-row{grid-template-columns:minmax(0,1fr) auto}.ledger-row time{grid-column:1}.ledger-row button{grid-column:2}.fund-entry dl{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:550px){.ledger-toolbar{flex-wrap:wrap;gap:10px}.ledger-toolbar>span{margin-left:0}.expense-navigation button{padding:12px;font-size:12px}.fund-entry{padding:15px}.fund-heading{flex-wrap:wrap}.fund-entry dl{gap:12px}.ledger-row{padding:16px;gap:14px}}
 </style>

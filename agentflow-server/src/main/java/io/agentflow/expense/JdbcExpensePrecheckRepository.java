@@ -69,6 +69,12 @@ public class JdbcExpensePrecheckRepository {
         return jdbc.queryForObject("SELECT COALESCE(MAX(attempt_no),0) FROM expense_precheck_job WHERE tenant_id=? AND report_id=?", Long.class, tenant, reportId.toString());
     }
 
+    /** 最新任务按业务检查序号定位；历史 UUID 游标不能用于判断新旧。 */
+    public Optional<UUID> latestId(String tenant, UUID reportId) {
+        return jdbc.queryForList("SELECT id FROM expense_precheck_job WHERE tenant_id=? AND report_id=? ORDER BY attempt_no DESC LIMIT 1",
+                String.class, tenant, reportId.toString()).stream().findFirst().map(UUID::fromString);
+    }
+
     /** 排队前在单据锁下检查，唯一约束继续兜底并发。 */
     public boolean active(String tenant, UUID reportId) {
         return !jdbc.queryForList("SELECT id FROM expense_precheck_job WHERE tenant_id=? AND active_report_id=?", String.class, tenant, reportId.toString()).isEmpty();
