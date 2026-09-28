@@ -151,14 +151,9 @@ public final class Application {
     /** 提交草稿并进入审批。 */
     public void submit(long expectedVersion) {
         checkVersion(expectedVersion);
-        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
-                && status != ApplicationStatus.WITHDRAWN) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be submitted");
-        }
+        int submittingRound = nextSubmissionRound();
         if (formSchema != null) formSchema.validateSubmission(payload);
-        if (status != ApplicationStatus.DRAFT) {
-            roundNo++;
-        }
+        roundNo = submittingRound;
         status = ApplicationStatus.IN_APPROVAL;
         version++;
     }
@@ -184,6 +179,12 @@ public final class Application {
 
     /** 是否仍允许申请人修改本次内容；历史轮次始终不可变。 */
     public boolean editable() { return status == ApplicationStatus.DRAFT || status == ApplicationStatus.RETURNED || status == ApplicationStatus.WITHDRAWN; }
+
+    /** 草稿已经预编号为第一轮；退回或撤回后才在下次提交时增加轮次。 */
+    public int nextSubmissionRound() {
+        if (!editable()) throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be submitted");
+        return status == ApplicationStatus.DRAFT ? roundNo : roundNo + 1;
+    }
 
     public BusinessReference businessReference() { return businessReference; }
 

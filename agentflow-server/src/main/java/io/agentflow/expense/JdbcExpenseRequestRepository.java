@@ -42,10 +42,18 @@ public class JdbcExpenseRequestRepository implements ExpenseRequestRepository {
 
     @Override
     public Optional<ExpenseRequest> find(String tenantId, UUID id) {
-        return store.find(KIND, tenantId, id).map(row -> {
-            var request = ExpenseRequest.restore(json.read(row.state(), ExpenseRequest.State.class));
-            row.requireConsistent(stored(request)); return request;
-        });
+        return store.find(KIND, tenantId, id).map(this::decode);
+    }
+
+    @Override
+    public java.util.Map<UUID, ExpenseRequest> findAll(String tenantId, java.util.Collection<UUID> ids) {
+        return store.findAll(KIND, tenantId, ids).stream().map(this::decode)
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(ExpenseRequest::id, value -> value));
+    }
+
+    private ExpenseRequest decode(FinancialResourceStore.Stored row) {
+        var value = ExpenseRequest.restore(json.read(row.state(), ExpenseRequest.State.class));
+        row.requireConsistent(stored(value)); return value;
     }
 
     private FinancialResourceStore.Stored stored(ExpenseRequest request) {

@@ -72,6 +72,19 @@ public class JdbcInvoiceVerificationRepository {
                 String.class, tenant, invoiceId.toString()).isEmpty();
     }
 
+    /** 当前版本必须恰由成功任务产生，且其后没有任何同版本的新尝试；不以时间戳猜最新结论。 */
+    public java.util.Map<UUID, InvoiceVerificationJob> currentReceipts(String tenant, java.util.Collection<UUID> invoiceIds) {
+        if (invoiceIds.isEmpty()) return java.util.Map.of();
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+                SELECT j.* FROM invoice_verification_job j JOIN finance_resource r
+                ON r.tenant_id=j.tenant_id AND r.resource_type='INVOICE' AND r.id=j.invoice_id
+                WHERE j.tenant_id=:tenant AND j.invoice_id IN (:ids) AND j.status='SUCCEEDED' AND j.invoice_version=r.version-1
+                AND NOT EXISTS (SELECT 1 FROM invoice_verification_job later WHERE later.tenant_id=j.tenant_id
+                    AND later.invoice_id=j.invoice_id AND later.invoice_version=r.version)
+                """, java.util.Map.of("tenant", tenant, "ids", invoiceIds.stream().map(UUID::toString).toList()), row()).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(value -> value.input().invoiceId(), value -> value));
+    }
+
     /** 每次只扫描十项，过期运行用于结算超时而非再次发送。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""

@@ -1,6 +1,6 @@
 # 财务只读网关
 
-当前实现六项真实 HTTP 只读端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验和预算预检。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API 与[持久验票任务](invoice-verification.md) 已调用对应端口，其他端口由后续预检用例调用；尚未完成真实企业联调、预算冻结、凭证或支付集成。
+当前实现六项真实 HTTP 只读端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验和预算预检。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API、[持久验票任务](invoice-verification.md) 和[费用提交预检](expense-precheck.md) 已调用对应端口；尚未完成真实企业联调、预算冻结、凭证或支付集成。
 
 ## 部署配置
 
@@ -61,7 +61,7 @@ agentflow:
 | `invoice-verification` | `InvoiceVerificationPort.Request` | `Invoice.VerifiedFacts` | 法人、原件摘要相同；已到查验时刻且尚未过期 |
 | `budget-precheck` | `BudgetPrecheckPort.Request` | `BudgetPrecheckPort.Assessment` | 完整请求逐项相同，查验时间已到且有效期未结束；不能只匹配总金额 |
 
-`FinanceCatalog` 的完整公开结构见 OpenAPI `FinanceCatalog`。类别计量单位使用 `ITEM`、`DAY`、`NIGHT`、`KILOMETER`、`PERSON`。城市、类别和成本对象代码均是企业稳定标识，展示名称不能替代标识。法人包含本位币、纸质签收要求及来源版本。平台支持两位精度币种，不能向目录返回当前核算模型不支持的币种。
+`FinanceCatalog` 的完整公开结构见 OpenAPI `FinanceCatalog`。类别计量单位使用 `ITEM`、`DAY`、`NIGHT`、`KILOMETER`、`PERSON`。城市、类别和成本对象代码均是企业稳定标识，展示名称不能替代标识。法人包含本位币、纸质签收要求、来源版本和明确的 `timeZone`。时区须是有效 ZoneId，如 `Asia/Shanghai`；目录适配器须提供该字段，缺失时不使用服务器时区补齐。平台支持两位精度币种，不能向目录返回当前核算模型不支持的币种。
 
 账户结果包含 `snapshot` 和 `validUntil`。快照字段为 `legalEntityId`、`employeeId`、`accountReference`、`maskedAccount`、`accountDigest`、`sourceVersion`。`accountDigest` 必须为 64 位小写 SHA-256 十六进制；完整账号只保留在资金主数据。掩码仅允许数字、`*`、`•`、`x/X`、空格及连字符，须有至少两个连续掩码字符，最多显示 8 位数字，单段最多 4 位，例如 `6222 **** **** 1234`。账户引用和摘要不通过报销详情返回页面。
 

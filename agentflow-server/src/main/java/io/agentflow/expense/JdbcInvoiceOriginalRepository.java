@@ -56,6 +56,15 @@ public class JdbcInvoiceOriginalRepository {
         return jdbc.query("SELECT * FROM invoice_original WHERE tenant_id=? AND invoice_id=?", ROW, tenant, invoiceId.toString()).stream().findFirst();
     }
 
+    /** 预检一次取得所选原件的元数据，原件内容仍在事务外逐个校验。 */
+    public java.util.Map<UUID, InvoiceOriginal> findAll(String tenant, java.util.Collection<UUID> ids) {
+        if (ids.isEmpty()) return java.util.Map.of();
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query(
+                "SELECT * FROM invoice_original WHERE tenant_id=:tenant AND invoice_id IN (:ids)",
+                java.util.Map.of("tenant", tenant, "ids", ids.stream().map(UUID::toString).toList()), ROW).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(InvoiceOriginal::invoiceId, value -> value));
+    }
+
     /** 发布和状态更新前以发票标识串行化同一原件。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public InvoiceOriginal lock(String tenant, UUID invoiceId) {

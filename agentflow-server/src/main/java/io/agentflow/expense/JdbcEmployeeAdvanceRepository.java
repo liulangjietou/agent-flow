@@ -37,10 +37,18 @@ public class JdbcEmployeeAdvanceRepository implements EmployeeAdvanceRepository 
 
     @Override
     public Optional<EmployeeAdvance> find(String tenantId, UUID id) {
-        return store.find(KIND, tenantId, id).map(row -> {
-            var advance = EmployeeAdvance.restore(json.read(row.state(), EmployeeAdvance.State.class));
-            row.requireConsistent(stored(advance)); return advance;
-        });
+        return store.find(KIND, tenantId, id).map(this::decode);
+    }
+
+    @Override
+    public java.util.Map<UUID, EmployeeAdvance> findAll(String tenantId, java.util.Collection<UUID> ids) {
+        return store.findAll(KIND, tenantId, ids).stream().map(this::decode)
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(EmployeeAdvance::id, value -> value));
+    }
+
+    private EmployeeAdvance decode(FinancialResourceStore.Stored row) {
+        var value = EmployeeAdvance.restore(json.read(row.state(), EmployeeAdvance.State.class));
+        row.requireConsistent(stored(value)); return value;
     }
 
     private FinancialResourceStore.Stored stored(EmployeeAdvance advance) {

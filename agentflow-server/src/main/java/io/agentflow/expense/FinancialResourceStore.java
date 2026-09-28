@@ -59,6 +59,16 @@ public class FinancialResourceStore {
                 tenantId, kind.name(), id.toString()).stream().findFirst();
     }
 
+    /** 输入由费用单的有界引用集合提供；空集合不构造无效 IN 条件。 */
+    public java.util.List<Stored> findAll(Kind kind, String tenant, java.util.Collection<UUID> ids) {
+        if (ids.isEmpty()) return java.util.List.of();
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query(
+                "SELECT * FROM finance_resource WHERE tenant_id=:tenant AND resource_type=:kind AND id IN (:ids) ORDER BY id",
+                Map.of("tenant", tenant, "kind", kind.name(), "ids", ids.stream().map(UUID::toString).toList()),
+                (row, index) -> new Stored(UUID.fromString(row.getString("id")), row.getString("tenant_id"), row.getString("owner_id"),
+                        row.getString("source_reference"), row.getLong("version"), row.getString("context_json"), row.getString("state_json")));
+    }
+
     /** 账本的预留和核销归属规范化落库，用外键阻止跨租户报销占用。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void replaceAmountUses(Kind kind, Stored value, Map<Integer, ReservedAmount> balances) {

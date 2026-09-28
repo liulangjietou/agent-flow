@@ -50,9 +50,12 @@ public record FinanceCatalog(String employeeId, String sourceVersion, Instant va
      * 法人本位币和纸质签收制度来自真实主数据。
      * @author owlzhangfq@gmail.com
      */
-    public record LegalEntity(UUID id, String name, String baseCurrency, boolean paperReceiptRequired, String sourceVersion) {
-        /** 法人必须有可追溯版本及明确本位币。 */
-        public LegalEntity { if (id == null) throw invalid(); text(name, 256); text(sourceVersion, 128); Money.zero(baseCurrency); }
+    public record LegalEntity(UUID id, String name, String baseCurrency, boolean paperReceiptRequired, String sourceVersion, String timeZone) {
+        /** 法人必须明确本位币和业务日时区，不能使用服务器默认时区猜测提交日。 */
+        public LegalEntity {
+            if (id == null) throw invalid(); text(name, 256); text(sourceVersion, 128); Money.zero(baseCurrency); text(timeZone, 64);
+            try { java.time.ZoneId.of(timeZone); } catch (java.time.DateTimeException malformed) { throw invalid(); }
+        }
     }
     /**
      * 可用费用类别；具体标准额度仍由版本化制度判定。

@@ -17,15 +17,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InvoiceVerificationSchedulingTest {
     @Test
     void financeAndModelRetainSeparateSchedulersAndIndependentDefault() {
-        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class, InvoiceVerificationScheduling.class)
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class, InvoiceVerificationScheduling.class, ExpensePrecheckScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
                 .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.worker-enabled=false",
-                        "agentflow.finance-gateway.enabled=true", "agentflow.invoices.verification-worker-enabled=false")
+                        "agentflow.finance-gateway.enabled=true", "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false")
                 .run(context -> {
                     assertThat(context).hasBean("taskScheduler").hasBean("assistTaskScheduler").hasBean("invoiceVerificationTaskScheduler");
                     assertThat(context.getBean("invoiceVerificationTaskScheduler", TaskScheduler.class))
                             .isNotSameAs(context.getBean("taskScheduler", TaskScheduler.class)).isNotSameAs(context.getBean("assistTaskScheduler", TaskScheduler.class));
-                    assertThat(context).doesNotHaveBean("invoiceVerificationPoller");
+                    assertThat(context).doesNotHaveBean("invoiceVerificationPoller").doesNotHaveBean("expensePrecheckPoller");
+                    assertThat(context.getBean("expensePrecheckTaskScheduler", TaskScheduler.class))
+                            .isNotSameAs(context.getBean("taskScheduler", TaskScheduler.class)).isNotSameAs(context.getBean("invoiceVerificationTaskScheduler", TaskScheduler.class));
                 });
     }
 }

@@ -1,0 +1,95 @@
+{
+  "recordedAt": "2026-09-28T15:00:24.410994+00:00",
+  "result": "PASS",
+  "scope": "Persistent owner-only expense precheck through real finance HTTP adapters, current invoice receipts and readonly resource plan; formal submission and budget freezing still pending",
+  "binding": [
+    "application and financial versions",
+    "selected appointment with directory revision",
+    "legal-entity timezone and local submission date",
+    "explicit accounting date",
+    "target fingerprint",
+    "resource versions including previous round references",
+    "latest verification receipts",
+    "canonical invoice active claims",
+    "latest monotonically ordered precheck attempt"
+  ],
+  "migrations": "V36 to V37; H2 and PostgreSQL preserved old application and financial rows, exact owner/application/version FKs and active/attempt unique constraints verified",
+  "tests": {
+    "domainPrecheck": 3,
+    "domainApprovalRegression": 22,
+    "serverRegressionScope": 70,
+    "serverRegressionScopeIncludesPrecheck": 13,
+    "finalPrecheckIntegration": 14,
+    "finalMigration": 1,
+    "finalScheduling": 1,
+    "finalOpenApi": 5,
+    "postgresPrecheckAndMigration": 15,
+    "finalPackageGatewaySchedulingAndContract": 20,
+    "scopesOverlap": true,
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-regression.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-final-green.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/precheck-postgres.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-package.log"
+    ]
+  },
+  "regressions": [
+    {
+      "problem": "Initial application round is 1 while no financial round exists; newly added precheck incorrectly rejected initial requests",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-integration-context.log",
+      "fix": "Application owns nextSubmissionRound and both initial and returned consumers are verified"
+    },
+    {
+      "problem": "Throwing missing appointment through transactional proxy marked result transaction rollback-only",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-integration-round-fix.log",
+      "fix": "Current optional appointment lookup records expected unavailability without poisoning the result transaction"
+    },
+    {
+      "problem": "Another original claiming same canonical invoice did not change any selected resource version; old READY appeared usable",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-canonical-red.log",
+      "red": "1 test, 1 failure",
+      "fix": "Result/current checks rerun shared reservation plan and canonical active claims"
+    }
+  ],
+  "actualProcessRecovery": {
+    "httpRequestsIncludingPolling": 141,
+    "gatewayCalls": {
+      "invoice-verification": 1,
+      "catalog": 3,
+      "employee-account": 3,
+      "exchange-rate": 3,
+      "expense-policy": 3,
+      "budget-precheck": 3
+    },
+    "terminalJobs": [
+      "READY:2",
+      "UNAVAILABLE:1"
+    ],
+    "jobRevisionRows": 9,
+    "reportVersionsUnchanged": true,
+    "invoiceClaims": 0,
+    "amountReservations": 0,
+    "queuedRestart": "PASS",
+    "claimedCrashThenLeaseExpiryWithoutResend": "PASS",
+    "explicitNewAttemptAndOriginalIdempotencyReplay": "PASS",
+    "adminIsolationAndUnknownRequestField": "PASS",
+    "rawEvidence": "/fyoung/tmp/agentflow-remaining-20260928/expense-precheck-restart-evidence.json",
+    "jarSha256": "6937a2dc8127c84f0577861eafa18103b9e45248a05ad8374f198b4859b3d839",
+    "database": "expense_precheck_http_5e4989c590",
+    "ownedBackendStopped": true,
+    "fixtureStopped": true
+  },
+  "contract": {
+    "operations": 116,
+    "schemas": 193,
+    "requestExamples": 39,
+    "legalEntityTimezone": "required explicit valid ZoneId"
+  },
+  "limits": {
+    "financeUI": "not yet implemented",
+    "formalSubmission": "in progress next",
+    "budgetFreeze": "not yet implemented",
+    "actualEnterpriseAcceptance": "not run",
+    "remoteCI": "not run"
+  }
+}

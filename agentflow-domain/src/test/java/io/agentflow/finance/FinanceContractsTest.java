@@ -32,7 +32,7 @@ class FinanceContractsTest {
 
     @Test
     void catalogRejectsDuplicateAndOrphanCostObjectsAndCopiesInputCollections() {
-        var entity = new FinanceCatalog.LegalEntity(ENTITY, "测试法人", "CNY", true, "v1");
+        var entity = new FinanceCatalog.LegalEntity(ENTITY, "测试法人", "CNY", true, "v1", "Asia/Shanghai");
         var center = new FinanceCatalog.CostCenter(ENTITY, "IT", "研发中心");
         var catalog = catalog(List.of(entity), List.of(center));
         assertThat(catalog.legalEntity(ENTITY)).isEqualTo(entity);

@@ -37,9 +37,18 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
 
     @Override
     public Optional<Invoice> find(String tenantId, UUID id) {
-        return store.find(KIND, tenantId, id).map(row -> {
-            var invoice = Invoice.restore(json.read(row.state(), Invoice.State.class)); row.requireConsistent(stored(invoice)); return invoice;
-        });
+        return store.find(KIND, tenantId, id).map(this::decode);
+    }
+
+    @Override
+    public java.util.Map<UUID, Invoice> findAll(String tenantId, java.util.Collection<UUID> ids) {
+        return store.findAll(KIND, tenantId, ids).stream().map(this::decode)
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(Invoice::id, value -> value));
+    }
+
+    private Invoice decode(FinancialResourceStore.Stored row) {
+        var value = Invoice.restore(json.read(row.state(), Invoice.State.class));
+        row.requireConsistent(stored(value)); return value;
     }
 
     private void syncClaim(Invoice invoice) {

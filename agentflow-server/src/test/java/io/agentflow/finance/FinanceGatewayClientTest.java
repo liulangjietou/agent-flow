@@ -173,6 +173,8 @@ class FinanceGatewayClientTest {
                 body -> ((ObjectNode) body.path("data")).put("fullBankNumber", "6222021234567890123"),
                 body -> ((ObjectNode) body.at("/data/legalEntities/0")).put("paperReceiptRequired", "true"),
                 body -> ((ObjectNode) body.at("/data/legalEntities/0")).remove("paperReceiptRequired"),
+                body -> ((ObjectNode) body.at("/data/legalEntities/0")).remove("timeZone"),
+                body -> ((ObjectNode) body.at("/data/legalEntities/0")).put("timeZone", "system-default"),
                 body -> ((ObjectNode) body.path("data")).put("employeeId", 123));
         for (var corrupt : corruptions) {
             responder.set(request -> { var body = success(request, catalog("alice", Instant.now().plusSeconds(60))); corrupt.accept(body); return json.write(body); });
@@ -322,7 +324,7 @@ class FinanceGatewayClientTest {
     }
     private FinanceCatalog catalog(String employee, Instant validity) {
         return new FinanceCatalog(employee, "synthetic-catalog-v1", validity,
-                List.of(new FinanceCatalog.LegalEntity(ENTITY, "合成测试法人", "CNY", false, "v1")),
+                List.of(new FinanceCatalog.LegalEntity(ENTITY, "合成测试法人", "CNY", false, "v1", "Asia/Shanghai")),
                 List.of(new FinanceCatalog.Category("TRAINING", "培训", List.of(ExpenseLine.Unit.ITEM))),
                 List.of(new FinanceCatalog.CostCenter(ENTITY, "IT", "研发中心")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
     }
