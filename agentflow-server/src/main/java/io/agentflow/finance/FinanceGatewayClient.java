@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentflow.common.JsonUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.ByteArrayOutputStream;
@@ -27,7 +28,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 /**
- * 财务只读端口的固定协议传输；在事务外调用，不重定向、不自动重试、不透传远端错误正文。
+ * 财务端口的固定协议传输；在事务外调用，不重定向、不自动重试、不透传远端错误正文。
  * @author owlzhangfq@gmail.com
  */
 @Component
@@ -51,14 +52,34 @@ public class FinanceGatewayClient {
 
     /** 业务适配器核对结果与请求一致性，基础传输只认固定操作及封闭结果类型。 */
     public <T> FinanceResult<T> read(String tenantId, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        if (operation == Operation.BUDGET_COMMAND) throw new IllegalArgumentException("A budget command requires its persistent operation identity");
+        return exchange(tenantId, null, operation, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 排队后的查询继续绑定原目的地；凭据可以轮换，但不能查询另一个预算系统。 */
+    public <T> FinanceResult<T> queryBudget(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.BUDGET_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 预算写操作使用持久化编号作为请求编号和幂等头，绝不生成新的重试编号。 */
+    public <T> FinanceResult<T> executeBudget(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A budget operation identity is required");
+        return exchange(tenantId, targetDigest, Operation.BUDGET_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    private <T> FinanceResult<T> exchange(String tenantId, String targetDigest, Operation operation, UUID requestId,
+                                        Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Finance gateway must run outside a transaction");
         var selected = configuration.destination(tenantId);
         if (selected.isEmpty()) return unavailable(FinanceResult.Failure.NOT_CONFIGURED);
         var destination = selected.get();
-        UUID requestId = UUID.randomUUID();
+        if (targetDigest != null && !targetDigest.equals(destination.digest(tenantId))) return unavailable(FinanceResult.Failure.TARGET_CHANGED);
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(operation.path)).timeout(destination.timeout())
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
+        if (operation == Operation.BUDGET_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -96,9 +117,12 @@ public class FinanceGatewayClient {
 
     private static <T> FinanceResult<T> unavailable(FinanceResult.Failure failure) { return new FinanceResult.Unavailable<>(failure); }
     private static <T> FinanceResult<T> invalid() { return unavailable(FinanceResult.Failure.INVALID_RESPONSE); }
+    private static void requireTarget(String targetDigest) {
+        if (StringUtils.isBlank(targetDigest) || !targetDigest.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("A persisted finance gateway target is required");
+    }
 
     /**
-     * 已实现只读接口的固定路径与业务拒绝集合，禁止任意 URL 或未知远端指令。
+     * 已实现接口的固定路径；预算操作的拒绝必须放在绑定原命令的事实中，不能只返回通用拒绝。
      * @author owlzhangfq@gmail.com
      */
     public enum Operation {
@@ -111,7 +135,9 @@ public class FinanceGatewayClient {
                 FinanceResult.Reason.INVOICE_BUYER_MISMATCH, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         BUDGET_PRECHECK("budget-precheck", Set.of(FinanceResult.Reason.BUDGET_INSUFFICIENT, FinanceResult.Reason.BUDGET_POLICY_UNAVAILABLE,
                 FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED, FinanceResult.Reason.COST_OBJECT_UNAVAILABLE,
-                FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE));
+                FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
+        BUDGET_COMMAND("budget-command", Set.of()),
+        BUDGET_QUERY("budget-query", Set.of());
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
         Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }

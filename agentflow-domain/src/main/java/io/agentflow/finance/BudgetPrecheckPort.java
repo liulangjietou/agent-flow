@@ -44,6 +44,15 @@ public interface BudgetPrecheckPort {
 
         /** 从通过领域核算的预提交快照派生，不使用客户端自行填写的预算分摊。 */
         public static Request from(ExpenseReport prepared, LocalDate accountingDate) {
+            return from(prepared, accountingDate, prepared.currentRound().submittedFinancialVersion());
+        }
+
+        /** 真实冻结或核减绑定变更后的当前财务版本，不能复用提交前的预检版本。 */
+        public static Request fromCurrent(ExpenseReport report, LocalDate accountingDate) {
+            return from(report, accountingDate, report.version());
+        }
+
+        private static Request from(ExpenseReport prepared, LocalDate accountingDate, long financialVersion) {
             var round = prepared.currentRound(); var allocations = new ArrayList<Allocation>();
             for (int index = 0; index < round.approvedLines().size(); index++) {
                 var approved = round.approvedLines().get(index); var original = round.originalLines().get(index).original();
@@ -51,7 +60,7 @@ public interface BudgetPrecheckPort {
                     allocations.add(new Allocation(approved.lineNo(), allocationNo + 1, original.categoryCode(), approved.allocations().get(allocationNo)));
                 }
             }
-            return new Request(prepared.id(), round.roundNo(), round.submittedFinancialVersion(), prepared.employeeId(),
+            return new Request(prepared.id(), round.roundNo(), financialVersion, prepared.employeeId(),
                     round.content().legalEntityId(), round.baseCurrency(), accountingDate, allocations);
         }
 

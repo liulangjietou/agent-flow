@@ -40,6 +40,8 @@ class BudgetPrecheckPortTest {
                 new BudgetPrecheckPort.Allocation(2, 1, "TRAVEL", new CostAllocation("IT", "P1", money("0.02", "CNY"))),
                 new BudgetPrecheckPort.Allocation(2, 2, "TRAVEL", new CostAllocation("RESEARCH", null, money("0.03", "CNY"))));
         assertThat(request.financialVersion()).isEqualTo(1); assertThat(request.reportId()).isEqualTo(report.id());
+        var actual = BudgetPrecheckPort.Request.fromCurrent(report, DATE);
+        assertThat(actual.financialVersion()).isEqualTo(2); assertThat(actual.allocations()).isEqualTo(request.allocations());
         assertThat(request.employeeId()).isEqualTo("alice"); assertThat(request.legalEntityId()).isEqualTo(ENTITY);
     }
 

@@ -187,6 +187,7 @@ public class InvoiceVerificationService {
     private static Failure gatewayFailure(FinanceResult.Failure failure) {
         return switch (failure) {
             case NOT_CONFIGURED -> Failure.NOT_CONFIGURED;
+            case TARGET_CHANGED -> Failure.TARGET_CHANGED;
             case TIMEOUT -> Failure.TIMEOUT;
             case CONNECTION -> Failure.CONNECTION;
             case AUTHENTICATION -> Failure.AUTHENTICATION;

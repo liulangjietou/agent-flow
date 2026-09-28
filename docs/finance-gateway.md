@@ -1,6 +1,6 @@
-# 财务只读网关
+# 财务网关
 
-当前实现六项真实 HTTP 只读端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验和预算预检。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API、[持久验票任务](invoice-verification.md) 和[费用提交预检](expense-precheck.md) 已调用对应端口；尚未完成真实企业联调、预算冻结、凭证或支付集成。
+当前实现六项真实 HTTP 只读端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验和预算预检。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API、[持久验票任务](invoice-verification.md) 和[费用提交预检](expense-precheck.md) 已调用对应端口；另已实现[预算变更与查询契约](budget-operations.md)及适配器；持久冻结、真实企业联调、凭证或支付集成继续实施。
 
 ## 部署配置
 
@@ -17,7 +17,7 @@ agentflow:
         timeout-seconds: 15
 ```
 
-`endpoint` 是六个相对路径的共同父路径。只允许 HTTPS，或字面回环地址 `127.0.0.1` / `[::1]` 的 HTTP。禁止用户名、查询参数、片段和编码路径；路径仅接受字母、数字、`/`、`_`、`-`。不跟随重定向。超时范围 1–60 秒，覆盖响应体接收完成；连接超时另有 3 秒上限。
+`endpoint` 是财务端口相对路径的共同父路径。只允许 HTTPS，或字面回环地址 `127.0.0.1` / `[::1]` 的 HTTP。禁止用户名、查询参数、片段和编码路径；路径仅接受字母、数字、`/`、`_`、`-`。不跟随重定向。超时范围 1–60 秒，覆盖响应体接收完成；连接超时另有 3 秒上限。
 
 企业目标必须配置 Bearer 凭据。仅本机合成夹具可以显式设置 `allow-unauthenticated-loopback: true` 后省略凭据。该开关对 HTTPS 或非回环目标无效。配置错误在启用时阻止启动，缺少某租户配置在调用时返回 `NOT_CONFIGURED`。原始响应正文、令牌和原件均不写日志。
 
@@ -88,7 +88,7 @@ agentflow:
 | 验票 | `INVOICE_INVALID`, `INVOICE_CANCELLED`, `INVOICE_BUYER_MISMATCH`, `LEGAL_ENTITY_UNAVAILABLE` |
 | 预算预检 | `BUDGET_INSUFFICIENT`, `BUDGET_POLICY_UNAVAILABLE`, `ACCOUNTING_PERIOD_CLOSED`, `COST_OBJECT_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE`, `EMPLOYEE_UNAVAILABLE` |
 
-依赖失败分类为 `NOT_CONFIGURED`、`TIMEOUT`、`CONNECTION`、`AUTHENTICATION`、`REMOTE_FAILURE`、`INVALID_RESPONSE`、`RESPONSE_TOO_LARGE`。只读 API 映射为 HTTP 503；业务拒绝映射为 HTTP 422。预检工作流应分别收集两类结果，不得将外部不可用持久化成“发票无效”或“已查验”。
+依赖失败分类为 `NOT_CONFIGURED`、`TARGET_CHANGED`（排队后的原目标已变化）、`TIMEOUT`、`CONNECTION`、`AUTHENTICATION`、`REMOTE_FAILURE`、`INVALID_RESPONSE`、`RESPONSE_TOO_LARGE`。只读 API 映射为 HTTP 503；业务拒绝映射为 HTTP 422。预检工作流应分别收集两类结果，不得将外部不可用持久化成“发票无效”或“已查验”。
 
 客户端拒绝在真实数据库事务中调用。当前 `IdempotencyExecutor` 会把写入操作包在事务中，因此后续预检用例须使用独立的事务外执行阶段，返回与单据版本绑定的结果；提交在本地短事务中复核版本和有效期。不能在幂等成功回放前强制重新调用外部依赖。
 
@@ -99,3 +99,5 @@ agentflow:
 `FinanceCatalogControllerTest` 验证当前主体、防查询参数覆盖、无缓存和错误码；`OpenApiContractTest` 对照实际路由和公开记录字段。原有报销草稿回归继续验证精确金额 JSON、敏感字段授权和幂等。详见 `evidence/finance-gateway-20260928.json`。
 
 预算只读端口另通过领域/核算/契约 23 项、实际 HTTP 网关/验票/目录 28 项；此范围包括原有回归。没有新增预算写入 API、冻结状态或凭证/支付行为。证据见 `evidence/budget-precheck-port-20260928.json`。
+
+预算变更端口的固定幂等号、原操作查询、完整金额摘要和原子调整契约另见 [预算操作](budget-operations.md)。该扩展不改变上述六项只读操作的无副作用要求。

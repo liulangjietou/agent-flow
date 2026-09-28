@@ -51,5 +51,5 @@ public sealed interface FinanceResult<T> permits FinanceResult.Success, FinanceR
      * 对外稳定的依赖失败分类。
      * @author owlzhangfq@gmail.com
      */
-    enum Failure { NOT_CONFIGURED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE, RESPONSE_TOO_LARGE }
+    enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE, RESPONSE_TOO_LARGE }
 }
