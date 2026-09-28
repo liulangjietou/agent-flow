@@ -1,0 +1,49 @@
+{
+  "date": "2026-09-28",
+  "baseCommit": "121b29177af5e49c60a95bf36ba75d1b128205d6",
+  "scope": "Invoice identity, tenant-scoped claims, advance and prior-request reservations with retained consumption identity",
+  "migration": "V34",
+  "result": "PASS",
+  "resourceDomainTests": 14,
+  "repositoryTests": 10,
+  "draftRegressionTests": 10,
+  "h2MigrationTests": 1,
+  "postgresRepositoryTests": 10,
+  "postgresMigrationTests": 1,
+  "scopesOverlap": true,
+  "redRegressions": [
+    "expense-reservation-reuse-red.log",
+    "expense-resources-repository-first.log"
+  ],
+  "logs": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-reservation-reuse-green.log",
+      "sha256": "1372276248154dc15fbfcc54c6fc8932cad22d78175d77331d3bc7357d77e0e5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-resources-repository-green.log",
+      "sha256": "6839b6fe8fdda131e8362ed4a61bc550f6aa2fa0581d6ecdcc33cb4d61b65598"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/resource-migration.log",
+      "sha256": "94a8b7b05c24940c61b8da07edee032a51c15fc0294c379588b137813b5285a5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/resource-postgres.log",
+      "sha256": "5d691e4659a9c4b7eb793b54089ad68fc69e12331212763af1eee9a570618d56"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/resource-postgres-migration.log",
+      "sha256": "f2235b67e003c76fbc67bbdd7c9cdd691f21684f8cb73a8a72fc8efeadd0fab9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/resource-authors.log",
+      "sha256": "a02976207e973f7032b3b995fd65927c545ac1a5c87bc5ce3991e0e301ff763b"
+    }
+  ],
+  "notYetIntegrated": [
+    "Real invoice originals and verification gateway",
+    "Approved prior-request workflow and actual loan disbursement confirmation",
+    "Expense submission, budgets, settlement and financial UI"
+  ]
+}
