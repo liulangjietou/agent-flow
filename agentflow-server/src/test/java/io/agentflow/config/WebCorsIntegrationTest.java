@@ -29,6 +29,15 @@ class WebCorsIntegrationTest {
     }
 
     @Test
+    void browserCanPreflightBinaryUploadWithApplicationVersion() throws Exception {
+        mvc.perform(options("/api/v1/applications/any/attachments/any/content").header("Origin", ORIGIN)
+                        .header("Access-Control-Request-Method", "PUT")
+                        .header("Access-Control-Request-Headers", "content-type,authorization,x-application-version"))
+                .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", ORIGIN))
+                .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsString("x-application-version")));
+    }
+
+    @Test
     void actualMissingOrInvalidTokensStillReturnReadable401ToAllowedOrigin() throws Exception {
         mvc.perform(get("/api/v1/applications").header("Origin", ORIGIN))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("UNAUTHENTICATED"))

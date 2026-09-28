@@ -89,6 +89,24 @@ class SystemCheckServiceTest {
     }
 
     @Test
+    void localAttachmentsReportConfigurationAvailabilityAndFailureWithoutExposingPaths() {
+        when(catalog.list()).thenReturn(List.of());
+        var service = new SystemCheckService(diagnostics, catalog, true);
+        try {
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("objectStorage"))
+                    .singleElement().satisfies(check -> assertThat(check.code()).isEqualTo("ATTACHMENT_STORAGE_NOT_CONFIGURED"));
+            when(diagnostics.attachments(admin.tenantId())).thenReturn(true);
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("objectStorage"))
+                    .singleElement().satisfies(check -> assertThat(check.code()).isEqualTo("LOCAL_ATTACHMENT_STORAGE"));
+            when(diagnostics.attachments(admin.tenantId())).thenThrow(new IllegalStateException("/private/storage"));
+            var report = service.check(admin);
+            assertThat(report.checks()).filteredOn(check -> check.id().equals("objectStorage"))
+                    .singleElement().satisfies(check -> assertThat(check.status()).isEqualTo(SystemCheckService.Status.DOWN));
+            assertThat(report.toString()).doesNotContain("/private/storage");
+        } finally { service.close(); }
+    }
+
+    @Test
     void uninterruptibleDependencyTimesOutWithoutLaunchingMoreQueries() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch completed = new CountDownLatch(1);

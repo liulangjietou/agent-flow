@@ -34,12 +34,23 @@ public class ApplicationFieldViews {
 
     /** 当前申请只在审批中使用当前节点权限，补正内容不沿用上一轮的节点权限。 */
     public ApplicationResponse application(Application application) {
-        String process = application.status() == ApplicationStatus.IN_APPROVAL
-                ? rounds.findByRound(application.tenantId(), application.id(), application.roundNo()).map(SubmissionRound::processInstanceId).orElse(null) : null;
-        var view = project(application, application.formSchema(), application.payload(), process);
+        var view = attachmentView(application, null);
         return new ApplicationResponse(application.id(), application.tenantId(), application.businessNo(), application.processKey(),
                 application.definitionVersion(), application.createdBy(), application.title(), view.payload(), application.status(),
                 application.roundNo(), application.version(), view.schema());
+    }
+
+    /** 文件元数据和下载必须使用与页面相同的当轮字段投影，不能沿用前端显示结果授权。 */
+    public FormFieldProjection attachmentView(Application application, Integer roundNo) {
+        if (roundNo != null) {
+            if (roundNo < 1) throw new DomainException("INVALID_ATTACHMENT_QUERY", "Round number must be positive");
+            var round = rounds.findByRound(application.tenantId(), application.id(), roundNo)
+                    .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+            return project(application, round.formSchema(), round.payload(), round.processInstanceId());
+        }
+        String process = application.status() == ApplicationStatus.IN_APPROVAL
+                ? rounds.findByRound(application.tenantId(), application.id(), application.roundNo()).map(SubmissionRound::processInstanceId).orElse(null) : null;
+        return project(application, application.formSchema(), application.payload(), process);
     }
 
     /** 每轮只使用该轮的节点参与事实；不能从其他轮次继承更宽的权限。 */

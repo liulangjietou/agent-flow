@@ -40,6 +40,14 @@ export function curlExample(entry: ApiEntry): string {
   const lines = [`curl --request ${entry.method} "$BASE_URL${entry.path}${query ? '?' + query : ''}"`]
   if (operation.security?.length !== 0) lines.push('  --header "Authorization: Bearer $TOKEN"')
   if (operation['x-idempotency']) lines.push('  --header "Idempotency-Key: $REQUEST_KEY"')
+  if (operation.parameters?.some(parameter => parameter.in === 'header' && parameter.name === 'X-Application-Version')) {
+    lines.push('  --header "X-Application-Version: $APPLICATION_VERSION"')
+  }
+  if (operation.requestBody?.content['application/octet-stream']) {
+    lines.push('  --header "Content-Type: application/octet-stream"')
+    lines.push('  --data-binary "@$FILE_PATH"')
+  }
+  if (operation.responses['200']?.content?.['application/octet-stream']) lines.push('  --output "$OUTPUT_FILE"')
   const body = operation.requestBody?.content['application/json']
   if (body?.example !== undefined) {
     lines.push('  --header "Content-Type: application/json"')

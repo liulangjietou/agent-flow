@@ -2,7 +2,7 @@
 
 AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。领域层表达审批、流程定义与工作日历规则，Flowable 作为基础设施防腐层运行 BPMN，Web 层提供租户隔离后的 REST API，Vue 设计器负责流程图编辑。
 
-当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)。附件、财务业务闭环、模型执行和企业生产验收仍未完成；这些分支成果尚未合入主线或部署到主演示。
+当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。财务业务闭环、模型执行和企业生产验收仍未完成；这些分支成果尚未合入主线或部署到主演示。
 
 截至 2026-09-27，以上组织与治理成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收，详细进度见[本分支交付核对](docs/system-diagnostics-alignment.md)。
 
@@ -12,7 +12,7 @@ AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。�
 
 待办办理支持[批准意见填写与确认](docs/approval-comments.md)：意见选填，确认后提交；支持取消、原请求恢复和会签分别留痕，可在已办记录与操作审计追溯。
 
-[Agent 审批摘要核心](docs/agent-summary-core.md)正在开发：已建立领域状态、证据绑定与事务存储；真实模型、应用 API、执行器和 UI 尚未接入，不计为可用 Agent 功能。
+[Agent 审批摘要核心](docs/agent-summary-core.md)正在开发：已建立领域状态、证据绑定与事务存储，并接入有申请授权的只读 API 和记录详情；真实模型、执行器及生成/复核操作尚未接入，不计为可用 Agent 生成功能。
 - [Agent 摘要运行记录](docs/agent-summary-records.md)：有申请授权的分页目录与详情展示；模型生成和人工复核写入尚未启用。
 
 管理员“操作审计”支持按操作人、动作、来源、申请及 UTC 时间跨申请检索追加事件，保留缺失元数据的旧记录，并可下钻原申请详情。详见[管理员操作审计](docs/audit-search.md)。
@@ -46,6 +46,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 [多实例部署与故障接续](docs/multi-instance-deployment.md)说明同版本副本配置、统一 HTTPS 入口、请求重放边界和升级停写要求；已有流程的幂等及租约竞争通过双实例测试，不代表组织接入或完整生产高可用已完成。
 
 [生产数据库备份与隔离恢复](docs/production-backup-recovery.md)提供外部 PostgreSQL 17 的完整逻辑备份、离线校验和随机新库恢复，强制 TLS 主机名校验并保留失败现场。原待办已通过隔离恢复后的办理验证；对象存储、生产切流、异地副本和 RTO/RPO 仍需独立验收。
+
+已启用附件的部署使用[数据库与文件配套备份恢复](docs/field-attachments.md#数据库与文件配套恢复)：停写后备份数据库和全部已发布原文件，逐文件核对摘要，恢复到全新数据库及目录；不自动删除历史原文或切换生产入口。
 
 ## 本地启动
 

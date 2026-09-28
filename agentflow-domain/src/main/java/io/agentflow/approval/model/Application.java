@@ -136,11 +136,7 @@ public final class Application {
 
     /** 补正可编辑申请；提交时才递增轮次，原业务标识和定义版本保持不变。 */
     public void revise(long expectedVersion, String title, Map<String, Object> payload) {
-        checkVersion(expectedVersion);
-        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
-                && status != ApplicationStatus.WITHDRAWN) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
-        }
+        requireEditable(expectedVersion);
         String revisedTitle = require(title, "title");
         if (formSchema != null) formSchema.validateDraft(payload);
         Map<String, Object> revisedPayload = copyPayload(payload);
@@ -148,6 +144,17 @@ public final class Application {
         this.payload = revisedPayload;
         version++;
     }
+
+    /** 正文与附件共用可编辑状态，上传不能借草稿入口修改审批中的证据。 */
+    public void requireEditable(long expectedVersion) {
+        checkVersion(expectedVersion);
+        if (!editable()) {
+            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
+        }
+    }
+
+    /** 是否仍允许申请人修改本次内容；历史轮次始终不可变。 */
+    public boolean editable() { return status == ApplicationStatus.DRAFT || status == ApplicationStatus.RETURNED || status == ApplicationStatus.WITHDRAWN; }
 
     /** 退回申请人并保留原轮次审计。 */
     public void returnToApplicant(long expectedVersion) {

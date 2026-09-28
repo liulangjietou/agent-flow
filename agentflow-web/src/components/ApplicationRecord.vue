@@ -28,6 +28,7 @@ const payload = ref<Record<string, unknown>>({})
 const fieldErrors = ref<FieldErrors>({})
 const loading = ref(true)
 const saving = ref(false)
+const uploading = ref(false)
 const error = ref('')
 const notice = ref('')
 const initialFields = ref('')
@@ -113,7 +114,7 @@ async function saveChanges() {
   emit('changed')
 }
 async function save(submit = false) {
-  if (!canEdit.value || saving.value || loading.value || writesBlocked.value || cancellationOpen.value) return
+  if (!canEdit.value || uploading.value || saving.value || loading.value || writesBlocked.value || cancellationOpen.value) return
   error.value = ''; notice.value = ''
   if (!validate(submit)) return
   saving.value = true
@@ -157,7 +158,7 @@ async function withdraw() {
   }
 }
 function close() {
-  if (!saving.value && !dirty.value) emit('close')
+  if (!uploading.value && !saving.value && !dirty.value) emit('close')
 }
 async function openCancellation() {
   if (!canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
@@ -204,7 +205,7 @@ onUnmounted(() => returnFocus?.focus())
     <section ref="dialog" class="modal application-record" role="dialog" aria-modal="true" aria-labelledby="record-title" tabindex="-1" @keydown="trapFocus">
       <div class="modal-heading">
         <div><p class="eyebrow">APPLICATION RECORD</p><h2 id="record-title">申请详情与轮次</h2></div>
-        <button aria-label="关闭申请详情" :disabled="saving || dirty" @click="close">×</button>
+        <button aria-label="关闭申请详情" :disabled="uploading || saving || dirty" @click="close">×</button>
       </div>
       <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
@@ -222,33 +223,33 @@ onUnmounted(() => returnFocus?.focus())
           <fieldset :disabled="saving || writesBlocked || cancellationOpen">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
             <label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label>
-            <FormFields v-if="application.formSchema" v-model="payload" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
+            <FormFields v-if="application.formSchema" v-model="payload" :attachment-context="{ applicationId: application.id, expectedVersion: application.version, scopeKey }" @uploading="uploading = $event" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
             <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
           <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="scopeKey" :disabled="saving || writesBlocked || cancellationOpen" />
           <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
-          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="saving || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
+          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="uploading || saving || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="uploading || saving || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
-        <template v-else><h3 class="record-section-title">{{ application.title }}</h3><FormFields :schema="application.formSchema" :model-value="application.payload" readonly /><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
+        <template v-else><h3 class="record-section-title">{{ application.title }}</h3><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
         <section v-if="canEdit" class="withdrawal-panel" aria-label="作废申请">
           <template v-if="!cancellationOpen">
             <p>不再需要这份申请时可以作废。作废后不能修改或重新提交，原内容与历史记录会保留。</p>
             <p v-if="dirty">请先保存修改，或重新加载已保存的内容，再作废申请。</p>
-            <button ref="cancellationTrigger" type="button" class="return" :disabled="saving || loading || writesBlocked || dirty" @click="openCancellation">作废申请</button>
+            <button ref="cancellationTrigger" type="button" class="return" :disabled="uploading || saving || loading || writesBlocked || dirty" @click="openCancellation">作废申请</button>
           </template>
           <form v-else @submit.prevent="cancelApplication">
             <h3>确认作废这份申请</h3><p>作废后将结束这份申请，不能恢复编辑或重新提交。历史审批意见和轮次不会删除。</p>
             <label>作废说明（选填）<textarea ref="cancellationInput" v-model="cancellationComment" rows="3" maxlength="2000" :disabled="saving || writesBlocked" placeholder="例如：申请计划已取消" /></label>
-            <div class="form-actions"><button type="button" class="secondary" :disabled="saving || writesBlocked" @click="dismissCancellation">暂不作废</button><button class="return" :disabled="saving || writesBlocked || dirty">{{ saving ? '正在作废…' : '确认作废申请' }}</button></div>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="uploading || saving || writesBlocked" @click="dismissCancellation">暂不作废</button><button class="return" :disabled="uploading || saving || writesBlocked || dirty">{{ saving ? '正在作废…' : '确认作废申请' }}</button></div>
           </form>
         </section>
         <p v-if="application.status === 'CANCELLED'" class="return-context">此申请已作废，不能再修改或提交。作废人、说明和时间可在操作审计中查看。</p>
         <section v-if="canWithdraw" class="withdrawal-panel" aria-label="撤回审批">
-          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="saving || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
+          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="uploading || saving || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
           <form v-else @submit.prevent="withdraw">
             <h3>撤回当前审批</h3><p>撤回后，当前待办将停止，已经产生的审批意见会保留。再次提交会开始新一轮审批。</p>
             <label>撤回说明（选填）<textarea ref="withdrawalInput" v-model="withdrawalComment" rows="3" maxlength="2000" :disabled="saving || writesBlocked" placeholder="例如：需要补充申请材料" /></label>
-            <div class="form-actions"><button type="button" class="secondary" :disabled="saving || writesBlocked" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="saving || writesBlocked">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="uploading || saving || writesBlocked" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="uploading || saving || writesBlocked">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
           </form>
         </section>
         <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button></div>
@@ -257,7 +258,7 @@ onUnmounted(() => returnFocus?.focus())
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
-            <div class="round-content"><h4>{{ round.title }}</h4><p class="field-help">发起任职：{{ round.initiatorContext ? initiatorContextLabel(round.initiatorContext) : '本轮未记录任职上下文' }}</p><FormFields :schema="round.formSchema" :model-value="round.payload" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
+            <div class="round-content"><h4>{{ round.title }}</h4><p class="field-help">发起任职：{{ round.initiatorContext ? initiatorContextLabel(round.initiatorContext) : '本轮未记录任职上下文' }}</p><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
         <RoundComparison v-else-if="historyTab === 'compare'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" />
@@ -266,7 +267,7 @@ onUnmounted(() => returnFocus?.focus())
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />
       </template>
-      <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="saving || dirty" @click="close">关闭</button></div>
+      <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="uploading || saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="uploading || saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="uploading || saving || dirty" @click="close">关闭</button></div>
     </section>
   </div>
 </template>

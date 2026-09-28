@@ -12,7 +12,7 @@ export const conditionOperators = [
 ]
 /** 文本、选项和布尔仅开放其真实支持的运算。 */
 export function operatorsFor(field?: FormField, version = 1) {
-  const result = conditionOperators.filter(operator => field?.type === 'TABLE' ? ['EXISTS', 'NOT_EXISTS'].includes(operator.value) : ['NUMBER', 'DATE'].includes(field?.type ?? '') || ['==', '!=', 'EXISTS', 'NOT_EXISTS'].includes(operator.value))
+  const result = conditionOperators.filter(operator => (field?.type === 'TABLE' || field?.type === 'ATTACHMENT') ? ['EXISTS', 'NOT_EXISTS'].includes(operator.value) : ['NUMBER', 'DATE'].includes(field?.type ?? '') || ['==', '!=', 'EXISTS', 'NOT_EXISTS'].includes(operator.value))
   return version === 2 && field?.type === 'SELECT' ? [...result, { value: 'IN', label: '属于（多选）' }] : result
 }
 /** 仅识别可无歧义回显的平面语法；不能识别时绝不重写原条件。 */
@@ -66,7 +66,7 @@ export function serializeConditionRows(value: ConditionRows, fields: FormField[]
   return value.rows.map(row => {
     if (!safeConditionLiteral(row.value, version)) throw new Error('此值包含条件语法不支持的字符，已保留原条件。')
     const field = fields.find(field => field.key === row.field)
-    if (field?.type === 'TABLE' && !['EXISTS', 'NOT_EXISTS'].includes(row.operator)) throw new Error('明细仅支持已填写或未填写判断。')
+    if ((field?.type === 'TABLE' || field?.type === 'ATTACHMENT') && !['EXISTS', 'NOT_EXISTS'].includes(row.operator)) throw new Error('明细和附件仅支持已填写或未填写判断。')
     const prefix = row.field + ' ' + row.operator
     if (['EXISTS', 'NOT_EXISTS'].includes(row.operator)) return prefix
     if (row.operator === 'IN') {

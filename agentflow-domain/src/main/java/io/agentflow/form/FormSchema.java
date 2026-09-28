@@ -26,6 +26,7 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
     public static final int DEFAULT_TABLE_ROWS = 50;
     public static final int MAX_TABLE_CELLS = 2000;
     public static final int MAX_TEXT_LENGTH = 10000;
+    public static final int MAX_ATTACHMENTS = 10;
     private static final int MAX_OPTIONS = 50;
     private static final int MAX_LABEL_LENGTH = 128;
     private static final int MAX_HELP_LENGTH = 1000;
@@ -82,8 +83,8 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
         Field field = fields.stream().filter(candidate -> candidate.key().equals(comparison.field())).findFirst()
                 .orElseThrow(() -> new DomainException("INVALID_CONDITION", "Condition field is not declared in the form schema"));
         if (comparison.operator() == DefinitionModels.Operator.EXISTS || comparison.operator() == DefinitionModels.Operator.NOT_EXISTS) return;
-        if (field.type() == FieldType.TABLE) {
-            throw new DomainException("INVALID_CONDITION", "Detail tables only support presence conditions");
+        if (field.type() == FieldType.TABLE || field.type() == FieldType.ATTACHMENT) {
+            throw new DomainException("INVALID_CONDITION", "Structured fields only support presence conditions");
         }
         if (field.type() != FieldType.NUMBER && field.type() != FieldType.DATE
                 && comparison.operator() != DefinitionModels.Operator.EQ && comparison.operator() != DefinitionModels.Operator.NE) {
@@ -142,7 +143,7 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
 
     /** 未填写和显式清空等价；false 与十进制字符串 0 都不是空值。 */
     public static boolean empty(Object value, FieldType type) {
-        if (type == FieldType.TABLE) return value == null || value instanceof List<?> rows && rows.isEmpty();
+        if (type == FieldType.TABLE || type == FieldType.ATTACHMENT) return value == null || value instanceof List<?> rows && rows.isEmpty();
         return value == null || value instanceof String text && (text.isEmpty()
                 || (type == FieldType.TEXT || type == FieldType.TEXTAREA) && text.isBlank());
     }
@@ -171,7 +172,7 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
      * 六种基础输入与一层重复明细；明细列使用基础类型。
      * @author owlzhangfq@gmail.com
      */
-    public enum FieldType { TEXT, TEXTAREA, NUMBER, DATE, SELECT, BOOLEAN, TABLE }
+    public enum FieldType { TEXT, TEXTAREA, NUMBER, DATE, SELECT, BOOLEAN, TABLE, ATTACHMENT }
 
     /**
      * 不可变字段定义，不包含客户端脚本或动态表达式。
@@ -252,6 +253,12 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
         public int rowLimit() { return maxRows == null ? DEFAULT_TABLE_ROWS : maxRows; }
 
         private String valueError(Object value, boolean checkBounds) {
+            if (type == FieldType.ATTACHMENT) {
+                if (!(value instanceof List<?> ids) || ids.stream().anyMatch(id -> !(id instanceof String text)
+                        || !text.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))) return "INVALID_ATTACHMENT";
+                if (ids.size() > MAX_ATTACHMENTS) return "TOO_MANY_ATTACHMENTS";
+                return ids.stream().distinct().count() == ids.size() ? null : "DUPLICATE_ATTACHMENT";
+            }
             if (type == FieldType.BOOLEAN) return value instanceof Boolean ? null : "INVALID_TYPE";
             if (!(value instanceof String text)) return "INVALID_TYPE";
             return switch (type) {
@@ -259,7 +266,7 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
                 case DATE -> validDate(text) ? null : "INVALID_DATE";
                 case SELECT -> options.stream().anyMatch(option -> option.value().equals(text)) ? null : "INVALID_OPTION";
                 case NUMBER -> numberError(text, checkBounds);
-                case BOOLEAN, TABLE -> throw new IllegalStateException("Structured values handled before text fields");
+                case BOOLEAN, TABLE, ATTACHMENT -> throw new IllegalStateException("Structured values handled before text fields");
             };
         }
 

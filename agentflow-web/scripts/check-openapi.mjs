@@ -38,18 +38,18 @@ async function exercise(base) {
   const completed = new Set(), tokens = {}, statuses = new Set()
   async function call(method, template, options = {}) {
     const operation = spec.paths[template][method.toLowerCase()]
-    const { user = 'admin', status = 200, body, path = template, key = randomUUID() } = options
-    const headers = { 'Content-Type': 'application/json' }
+    const { user = 'admin', status = 200, body, raw, extraHeaders = {}, path = template, key = randomUUID() } = options
+    const headers = { 'Content-Type': raw === undefined ? 'application/json' : 'application/octet-stream', ...extraHeaders }
     if (tokens[user]) headers.Authorization = `Bearer ${tokens[user]}`
     if (operation['x-idempotency']) headers['Idempotency-Key'] = key
     if (body !== undefined) validate(operation.requestBody.content['application/json'].schema, body)
-    const response = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) })
-    const binary = response.ok && operation.responses[String(status)]?.content?.['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    const response = await fetch(base + path, { method, headers, body: raw ?? (body === undefined ? undefined : JSON.stringify(body)), signal: AbortSignal.timeout(15000) })
+    const binary = response.ok && Object.keys(operation.responses[String(status)]?.content ?? {}).find(type => type !== 'application/json')
     const text = binary ? '' : await response.text(), value = binary ? new Uint8Array(await response.arrayBuffer()) : text ? JSON.parse(text) : undefined
     assert.equal(response.status, status, `${method} ${template}: ${value?.code ?? 'unexpected status'}`)
     const declared = operation.responses[String(status)]
     assert.ok(declared, `undocumented status ${status}`)
-    if (binary) { assert.equal(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); assert.deepEqual([...value.slice(0, 2)], [80, 75]); assert.equal(response.headers.get('cache-control'), 'no-store') }
+    if (binary) { assert.equal(response.headers.get('content-type'), binary); if (binary.includes('spreadsheetml')) assert.deepEqual([...value.slice(0, 2)], [80, 75]); assert.equal(response.headers.get('cache-control'), 'no-store') }
     else if (declared.content) validate(declared.content['application/json'].schema, value)
     else assert.equal(value, undefined)
     if (status < 300 && operation['x-idempotency']) assert.ok(['true', 'false'].includes(response.headers.get('Idempotency-Replayed')))
@@ -276,6 +276,33 @@ async function exercise(base) {
     assert.ok(!JSON.stringify(item).includes('payload_json'))
   }
   // 最后启用独立测试租户的本地组织，避免改变前面的演示目录验收前提。
+  const fileOptions = await call('GET', '/api/v1/attachments/options', { user: 'alice' })
+  const fileTemplate = apps + '/{applicationId}/attachments', fileContent = fileTemplate + '/{id}/content'
+  if (fileOptions.enabled) {
+    const fileCreate = example(defs); fileCreate.key = `attachment-contract-${suffix}`
+    fileCreate.formSchema = { schemaVersion: 1, fields: [{ key: 'proof', label: '证明附件', type: 'ATTACHMENT', required: false, sensitive: true }] }
+    let fileDefinition = await call('POST', defs, { body: fileCreate })
+    fileDefinition = await call('POST', defs + '/{id}/publish', { path: defs + '/' + fileDefinition.id + '/publish?expectedRevision=' + fileDefinition.revision, body: example(defs + '/{id}/publish') })
+    let fileApp = await call('POST', apps, { user: 'alice', status: 201, body: { businessNo: `FILE-${suffix}`, processKey: fileDefinition.key, definitionVersion: fileDefinition.version, title: '附件契约验收', payload: {} } })
+    const filePath = apps + '/' + fileApp.id + '/attachments', input = example(fileTemplate), fileKey = randomUUID()
+    input.expectedVersion = fileApp.version
+    const attachment = await call('POST', fileTemplate, { user: 'alice', path: filePath, status: 201, body: input, key: fileKey })
+    assert.deepEqual(await call('POST', fileTemplate, { user: 'alice', path: filePath, status: 201, body: input, key: fileKey }), attachment)
+    const itemPath = filePath + '/' + attachment.id
+    assert.equal((await call('PUT', fileContent, { user: 'alice', path: itemPath + '/content', raw: Buffer.from('abc'), extraHeaders: { 'X-Application-Version': String(fileApp.version) } })).status, 'READY')
+    assert.equal((await call('GET', fileTemplate + '/{id}', { user: 'alice', path: itemPath })).sha256, input.sha256)
+    assert.equal(Buffer.from(await call('GET', fileContent, { user: 'alice', path: itemPath + '/content' })).toString(), 'abc')
+    await call('GET', fileContent, { user: 'admin', path: itemPath + '/content', status: 403 })
+    fileApp = await call('PUT', apps + '/{id}', { user: 'alice', path: apps + '/' + fileApp.id, body: { expectedVersion: fileApp.version, title: fileApp.title, payload: { proof: [attachment.id] } } })
+    await call('POST', apps + '/{id}/submit', { user: 'alice', path: apps + '/' + fileApp.id + '/submit', body: { expectedVersion: fileApp.version } })
+    assert.equal(Buffer.from(await call('GET', fileContent, { user: 'alice', path: itemPath + '/content?roundNo=1' })).toString(), 'abc')
+  } else {
+    const unavailable = apps + '/' + randomUUID() + '/attachments', itemPath = unavailable + '/' + randomUUID()
+    await call('POST', fileTemplate, { user: 'alice', path: unavailable, status: 503, body: example(fileTemplate) })
+    await call('PUT', fileContent, { user: 'alice', path: itemPath + '/content', status: 404, raw: Buffer.from('abc'), extraHeaders: { 'X-Application-Version': '1' } })
+    await call('GET', fileTemplate + '/{id}', { user: 'alice', path: itemPath, status: 404 })
+    await call('GET', fileContent, { user: 'alice', path: itemPath + '/content', status: 404 })
+  }
   const org = '/api/v1/organization'
   await call('GET', org + '/my-appointments', { user: 'alice' })
   await call('GET', org)

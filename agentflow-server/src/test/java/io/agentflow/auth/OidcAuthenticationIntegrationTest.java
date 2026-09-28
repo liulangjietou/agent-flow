@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
@@ -113,6 +114,26 @@ class OidcAuthenticationIntegrationTest {
                 .andExpect(status().isNoContent()).andExpect(cookie().maxAge("AGENTFLOW_SESSION", 0));
         assertThat(session.isInvalid()).isTrue();
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void binaryAttachmentUploadStillRequiresCsrfAndTheOriginalSessionActor() throws Exception {
+        MockHttpSession session = complete(authorize());
+        String path = "/api/v1/applications/" + java.util.UUID.randomUUID() + "/attachments/" + java.util.UUID.randomUUID() + "/content";
+        mvc.perform(put(path).session(session).header("X-Application-Version", "1")
+                        .contentType("application/octet-stream").content(new byte[]{1, 2}))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("code").value("CSRF_INVALID"));
+        JsonNode options = options(session);
+        String identity = java.net.URLEncoder.encode("[\"tenant-a\",\"other-user\"]", java.nio.charset.StandardCharsets.UTF_8);
+        mvc.perform(put(path).session(session).header("X-Application-Version", "1")
+                        .header("X-CSRF-TOKEN", options.path("csrfToken").asText()).header("X-AgentFlow-Actor", identity)
+                        .contentType("application/octet-stream").content(new byte[]{1, 2}))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("UNAUTHENTICATED"));
+        identity = java.net.URLEncoder.encode("[\"tenant-a\",\"employee-42\"]", java.nio.charset.StandardCharsets.UTF_8);
+        mvc.perform(put(path).session(session).header("X-Application-Version", "1")
+                        .header("X-CSRF-TOKEN", options.path("csrfToken").asText()).header("X-AgentFlow-Actor", identity)
+                        .contentType("application/octet-stream").content(new byte[]{1, 2}))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("code").value("NOT_FOUND"));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package io.agentflow.system;
 
+import io.agentflow.attachment.LocalAttachmentStore;
 import org.flywaydb.core.Flyway;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
@@ -23,16 +24,18 @@ public class SystemDiagnostics {
     private final RuntimeService runtime;
     private final TaskService tasks;
     private final HistoryService history;
+    private final LocalAttachmentStore attachments;
 
     /** 复用运行时依赖，避免诊断独立连接与真实应用配置不一致。 */
     public SystemDiagnostics(DataSource dataSource, Flyway flyway, RepositoryService repository,
-                             RuntimeService runtime, TaskService tasks, HistoryService history) {
+                             RuntimeService runtime, TaskService tasks, HistoryService history, LocalAttachmentStore attachments) {
         this.dataSource = dataSource;
         this.flyway = flyway;
         this.repository = repository;
         this.runtime = runtime;
         this.tasks = tasks;
         this.history = history;
+        this.attachments = attachments;
     }
 
     /** 在真实连接上执行轻量查询，连接和语句均在本次检查后释放。 */
@@ -87,6 +90,25 @@ public class SystemDiagnostics {
             try (var result = statement.executeQuery()) { return result.next(); }
         } catch (SQLException exception) {
             throw new IllegalStateException("Organization storage probe failed", exception);
+        }
+    }
+
+    /** 查询附件元数据表和已配置目录的访问权限，不读取内容、写探针文件或声称完成扫描。 */
+    public boolean attachments(String tenantId) {
+        if (!attachments.enabled()) return false;
+        if (!attachments.available()) throw new IllegalStateException("Attachment directory probe failed");
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                     SELECT a.id FROM approval_attachment a LEFT JOIN approval_attachment_round r
+                     ON a.tenant_id=r.tenant_id AND a.application_id=r.application_id AND a.id=r.attachment_id
+                     WHERE a.tenant_id=? LIMIT 1
+                     """)) {
+            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setString(1, tenantId);
+            try (var result = statement.executeQuery()) { result.next(); }
+            return true;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Attachment metadata probe failed", exception);
         }
     }
 

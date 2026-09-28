@@ -17,6 +17,7 @@ import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import type { FieldErrors, FormSchema } from './formSchema'
+import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
@@ -156,9 +157,9 @@ function historyQuery(query: object) {
   return params.size ? '?' + params.toString() : ''
 }
 
-async function request<T>(path: string, init: RequestInit = {}, format: 'json' | 'xlsx' = 'json'): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, format: 'json' | 'xlsx' | 'binary' = 'json'): Promise<T> {
   const headers = new Headers(init.headers)
-  headers.set('Content-Type', 'application/json')
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const token = localStorage.getItem('agentflow.token')
   if (token && authentication?.mode !== 'OIDC') headers.set('Authorization', `Bearer ${token}`)
   if (authentication?.mode === 'OIDC' && !['GET', 'HEAD', 'OPTIONS'].includes((init.method ?? 'GET').toUpperCase())) {
@@ -180,6 +181,13 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
     let details: ApiError['details']
     try { const body = await response.json() as { message?: string; code?: string; details?: ApiError['details'] }; message = body.message ?? message; code = body.code ?? code; details = body.details } catch { /* 已收到明确状态码，保留错误分类。 */ }
     const messages: Record<string, string> = {
+      ATTACHMENT_NOT_READY: '附件尚未上传完成，请恢复上传后再提交。',
+      ATTACHMENT_TOO_LARGE: '文件超过当前部署的大小上限，请选择其他文件。',
+      ATTACHMENT_QUOTA_EXCEEDED: '本申请累计上传已达到限制，请联系管理员核对存储配置。移除引用不会释放历史文件占用。',
+      ATTACHMENT_CONTENT_MISMATCH: '文件内容与登记时不一致，请使用原文件重试，或另行添加新文件。',
+      ATTACHMENT_STORAGE_UNAVAILABLE: '附件存储未配置或暂时不可用，请联系管理员。',
+      ATTACHMENT_INTEGRITY_FAILED: '文件缺失或完整性校验失败，未提供下载。请联系管理员核对备份和存储。',
+      INVALID_ATTACHMENT_REFERENCE: '附件不属于本申请的这个字段，请重新上传。',
       CSRF_INVALID: '会话验证信息已失效，请刷新登录状态后恢复原操作。',
       AUDIT_EXPORT_LIMIT_EXCEEDED: '匹配操作超过 10,000 条，请按操作日期、账号或关联申请缩小筛选后再导出。未生成截断文件。',
       AUDIT_EXPORT_BUSY: '服务正在生成另一份审计导出，请稍后重试。',
@@ -246,6 +254,10 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
     throw { status: response.status, code, message: messages[code] ?? message, details } satisfies ApiError
   }
   try {
+    if (format === 'binary') {
+      if (response.headers.get('Content-Type')?.split(';')[0] !== 'application/octet-stream') throw new Error('Unexpected attachment content type')
+      return await response.blob() as T
+    }
     if (format === 'xlsx') {
       if (response.headers.get('Content-Type')?.split(';')[0] !== workbookType) throw new Error('Unexpected workbook content type')
       const blob = await response.blob()
@@ -267,6 +279,11 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  attachmentOptions: (signal?: AbortSignal) => request<AttachmentOptions>('/attachments/options', { signal }),
+  reserveAttachment: (applicationId: string, input: AttachmentInput, key: string, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments`, { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key }, signal }),
+  uploadAttachment: (applicationId: string, id: string, expectedVersion: number, file: Blob, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments/${id}/content`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-Application-Version': String(expectedVersion) }, signal }),
+  attachment: (applicationId: string, id: string, roundNo?: number, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments/${id}${historyQuery({ roundNo })}`, { signal }),
+  downloadAttachment: (applicationId: string, id: string, roundNo?: number, signal?: AbortSignal) => request<Blob>(`/applications/${applicationId}/attachments/${id}/content${historyQuery({ roundNo })}`, { signal }, 'binary'),
   authOptions: async () => {
     const options = await request<AuthOptions>('/auth/options', { cache: 'no-store', signal: AbortSignal.timeout(AUTH_OPTIONS_TIMEOUT_MS) })
     if (!['DEMO', 'OIDC', 'UNCONFIGURED'].includes(options.mode)

@@ -1,5 +1,5 @@
 export type FieldVisibility = 'READ_ONLY' | 'MASKED' | 'HIDDEN'
-export type FieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'BOOLEAN' | 'TABLE'
+export type FieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'BOOLEAN' | 'TABLE' | 'ATTACHMENT'
 export interface FormOption { value: string; label: string }
 export interface FormField {
   key: string; label: string; type: FieldType; required: boolean; helpText?: string
@@ -11,9 +11,10 @@ export interface SchemaErrors { schema: string[]; fields: Array<Record<string, s
 export const fieldTypes: Array<{ value: FieldType; label: string }> = [
   { value: 'TEXT', label: '单行文本' }, { value: 'TEXTAREA', label: '多行文本' },
   { value: 'NUMBER', label: '数字' }, { value: 'DATE', label: '日期' },
-  { value: 'SELECT', label: '单选' }, { value: 'BOOLEAN', label: '是 / 否' }, { value: 'TABLE', label: '重复明细' }
+  { value: 'SELECT', label: '单选' }, { value: 'BOOLEAN', label: '是 / 否' }, { value: 'TABLE', label: '重复明细' }, { value: 'ATTACHMENT', label: '附件' }
 ]
 const errorMessages: Record<string, string> = {
+  INVALID_ATTACHMENT: '附件引用无效，请移除后重新上传。', TOO_MANY_ATTACHMENTS: '每个附件字段最多保留 10 份文件。', DUPLICATE_ATTACHMENT: '同一字段不能重复引用同一份文件。',
   TOO_MANY_ROWS: '明细行数超过此表单的上限。', TOO_MANY_CELLS: '明细总单元格数超过 2000，请减少行数。',
   REQUIRED: '请填写此项。', INVALID_TYPE: '保存的值类型不匹配，请重新填写。',
   INVALID_NUMBER: '请输入十进制数字，最多 38 位有效数字、18 位小数，不含空格或指数。',
@@ -119,6 +120,13 @@ export function validatePayload(schema: FormSchema | null, payload: Record<strin
   let tableCells = 0
   for (const field of schema.fields) {
     const value = ownValue(payload, field.key)
+    if (field.type === 'ATTACHMENT') {
+      if (value == null || Array.isArray(value) && !value.length) { if (submit && field.required) errors[field.key] = 'REQUIRED' }
+      else if (!Array.isArray(value) || value.some(id => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id))) errors[field.key] = 'INVALID_ATTACHMENT'
+      else if (value.length > 10) errors[field.key] = 'TOO_MANY_ATTACHMENTS'
+      else if (new Set(value).size !== value.length) errors[field.key] = 'DUPLICATE_ATTACHMENT'
+      continue
+    }
     if (field.type === 'TABLE') {
       if (Array.isArray(value)) tableCells += value.length * (field.columns?.length ?? 0)
       if (Array.isArray(value) && tableCells > 2000) errors[field.key] = 'TOO_MANY_CELLS'
@@ -166,7 +174,7 @@ export function displayFields(schema: FormSchema | null | undefined, payload: Re
   const known = new Set(schema?.fields.map(field => field.key) ?? [])
   const configured = (schema?.fields ?? []).map(field => {
     const value = ownValue(payload, field.key)
-    const label = field.type === 'TABLE' ? detailValueLabel(field, value) : field.type === 'BOOLEAN' && typeof value === 'boolean' ? value ? '是' : '否'
+    const label = field.type === 'ATTACHMENT' && Array.isArray(value) ? value.length ? `${value.length} 份附件` : '未上传' : field.type === 'TABLE' ? detailValueLabel(field, value) : field.type === 'BOOLEAN' && typeof value === 'boolean' ? value ? '是' : '否'
       : field.type === 'SELECT' ? field.options?.find(option => option.value === value)?.label ?? rawValueLabel(value) : rawValueLabel(value)
     return { key: field.key, label: field.label, value: label, extra: false }
   })

@@ -1,0 +1,532 @@
+{
+  "recordedAt": "2026-09-28T09:26:11.025974+00:00",
+  "scope": "单机表单附件、服务端字段授权、提交轮次留存及配套恢复",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "efb07e61d8c3b1899a49d9ec1a9be0c33b9f838f",
+  "confirmedPolicy": {
+    "storage": "single-host persistent directory",
+    "readAccess": "same field projection as application and submission round; hidden/masked deny original download, including administrators",
+    "removeCurrentReference": "applicant only in DRAFT/RETURNED/WITHDRAWN",
+    "history": "freeze references on submission; retain original files; no automatic physical deletion"
+  },
+  "defaults": {
+    "maxFileBytes": 20971520,
+    "maxApplicationBytes": 268435456,
+    "maxApplicationUploads": 100,
+    "maxAttachmentsPerField": 10,
+    "maxSupportedFileBytes": 104857600,
+    "contentScanAvailable": false
+  },
+  "migration": "V30__field_attachments.sql",
+  "backend": {
+    "scopeCountsOverlap": true,
+    "schemaStorageAndFieldPermissions": {
+      "log": "/fyoung/tmp/agentflow-attachments-20260928/backend-scope.log",
+      "result": "PASS",
+      "executions": 50,
+      "classes": [
+        {
+          "class": "io.agentflow.form.FormSchemaTest",
+          "tests": 33,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.form.AttachmentFormSchemaTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.attachment.AttachmentMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.attachment.LocalAttachmentStoreTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.attachment.AttachmentIntegrationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.approval.FieldPermissionsIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "authenticationCorsAndContract": {
+      "log": "/fyoung/tmp/agentflow-attachments-20260928/package.log",
+      "result": "PASS",
+      "executions": 24,
+      "classes": [
+        {
+          "class": "io.agentflow.config.WebCorsIntegrationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.auth.OidcAuthenticationIntegrationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "diagnosticsAndContract": {
+      "log": "/fyoung/tmp/agentflow-attachments-20260928/backend-contract.log",
+      "result": "PASS",
+      "executions": 31,
+      "classes": [
+        {
+          "class": "io.agentflow.form.AttachmentFormSchemaTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.config.WebCorsIntegrationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.attachment.AttachmentIntegrationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.system.SystemCheckServiceTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.system.SystemChecksIntegrationTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "conditionAndExistingApplicationContracts": {
+      "log": "/fyoung/tmp/agentflow-attachments-20260928/backend-adjacent.log",
+      "result": "PASS",
+      "executions": 67,
+      "classes": [
+        {
+          "class": "io.agentflow.definition.ConditionLanguageTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.definition.ConditionGroupContractTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.definition.ConditionParserQuotedLiteralTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.definition.ConditionPresentationContractTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.approval.VersionedFormsIntegrationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.approval.IdempotencyIntegrationTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "finalSubmissionAndExistingApplicationContracts": {
+      "log": "/fyoung/tmp/agentflow-attachments-20260928/submit-race-green.log",
+      "result": "PASS",
+      "executions": 54,
+      "classes": [
+        {
+          "class": "io.agentflow.attachment.AttachmentIntegrationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.approval.VersionedFormsIntegrationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.approval.IdempotencyIntegrationTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "finalPostgresAndExecutablePackage": {
+      "log": "/fyoung/tmp/agentflow-attachments-20260928/postgres-clean-final-package.log",
+      "result": "PASS",
+      "executions": 10,
+      "classes": [
+        {
+          "class": "io.agentflow.attachment.AttachmentMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.attachment.AttachmentIntegrationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "javaAuthorCheck": {
+      "files": 360,
+      "namedTypes": 558,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "regressions": [
+    {
+      "issue": "CORS did not allow X-Application-Version",
+      "whyMissed": "The earlier preflight test asserted HTTP 200 but did not assert the requested header was actually allowed.",
+      "redLog": "/fyoung/tmp/agentflow-attachments-20260928/cors-red.log",
+      "fix": "Include the version header in the existing trusted-origin CORS policy."
+    },
+    {
+      "issue": "Pending file requests could leave UI busy or apply a late result after timeout",
+      "whyMissed": "The previous component tests did not drive timeout with a request that ignores cancellation.",
+      "redLog": "/fyoung/tmp/agentflow-attachments-20260928/frontend-red.log",
+      "redTests": 6,
+      "redFailures": 3,
+      "greenTests": 6,
+      "fix": "Deadline releases waiting state; aborted or older generations cannot advance to the next phase or replace current data."
+    },
+    {
+      "issue": "Attachment validation and submission could observe different application revisions",
+      "whyMissed": "Upload/edit concurrency was tested; the separate validation-read and submission-read interleaving was not.",
+      "redLog": "/fyoung/tmp/agentflow-attachments-20260928/submit-race-red.log",
+      "redTests": 1,
+      "redFailures": 1,
+      "observed": "Expected version-conflict HTTP 409, received HTTP 200 with a newly saved unfinished reference.",
+      "fix": "Validate the exact aggregate returned by submission inside the same transaction; failure rolls back application, engine and round records.",
+      "greenLog": "/fyoung/tmp/agentflow-attachments-20260928/submit-race-green.log",
+      "postgresLog": "/fyoung/tmp/agentflow-attachments-20260928/postgres-clean-final-package.log"
+    },
+    {
+      "issue": "Escape could close the application dialog while attachment registration was pending",
+      "whyMissed": "The previous checks exercised disabled close buttons and attachment request cancellation, not the dialog keyboard handler.",
+      "redLog": "/fyoung/tmp/agentflow-attachments-20260928/keyboard-close-red.log",
+      "redTests": 7,
+      "redFailures": 1,
+      "observed": "The actual Vue dialog emitted close while uploading was true.",
+      "fix": "The shared close action checks upload state, covering Escape and close buttons.",
+      "greenLog": "/fyoung/tmp/agentflow-attachments-20260928/frontend-final-scope.log"
+    }
+  ],
+  "frontend": {
+    "scopedTests": 41,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-attachments-20260928/frontend-final-scope.log",
+    "attachmentComponentTestsIncluded": 7,
+    "build": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-attachments-20260928/frontend-build-final.log",
+    "buildNote": "Vite reports its existing large-chunk advisory; type checking and build passed."
+  },
+  "recoveryTools": {
+    "tests": 24,
+    "attachmentTestsIncluded": 5,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-attachments-20260928/production-tool-final.log"
+  },
+  "openapi": {
+    "static": {
+      "result": "PASS",
+      "operations": 91,
+      "schemas": 141,
+      "requestExamples": 32
+    },
+    "actualHttp": {
+      "result": "PASS",
+      "base": "http://127.0.0.1:18202",
+      "operations": 91,
+      "statuses": [
+        200,
+        201,
+        400,
+        401,
+        403,
+        404,
+        409,
+        422
+      ],
+      "processKey": "api-contract-6d60b04a",
+      "approved": "93426964-ca0e-490b-ad31-69a366bf939a",
+      "withdrawn": "fcb01703-b4de-42ab-a9c4-2446cd0047e9"
+    },
+    "log": "/fyoung/tmp/agentflow-attachments-20260928/http-contract-final.log"
+  },
+  "browser": {
+    "result": "PASS",
+    "processKey": "attachment-browser-90827ff7",
+    "applicationId": "66f33768-6fec-4cd9-a445-9d1432da9304",
+    "actions": [
+      "save draft then upload top-level and detail-table files",
+      "manager sees one permitted download and no hidden receipt column",
+      "administrator sees no download or original sensitive filenames",
+      "withdraw, remove current proof reference and save",
+      "download retained round 1 original after current reference removal"
+    ],
+    "downloadBytes": 68,
+    "downloadSha256": "131a849d99f8de4257d6a9465d4e72fac0980d15dc5c4e9a355a94a9756cb3d3",
+    "screenshots": [
+      "/fyoung/tmp/agentflow-attachments-20260928/browser-manager.png",
+      "/fyoung/tmp/agentflow-attachments-20260928/browser-admin.png",
+      "/fyoung/tmp/agentflow-attachments-20260928/browser-history.png"
+    ],
+    "downloadEvidence": "/fyoung/tmp/agentflow-attachments-20260928/browser-downloads.json",
+    "tabClosed": true
+  },
+  "proxy": {
+    "result": "PASS",
+    "binaryBytes": 2097152,
+    "sha256": "5b766f6d76a999636fd93b4e039d5a32187f84a19c0950449f0c721da0223914",
+    "applicationId": "8a048f2e-8085-428b-af21-3f0d22a46d4c",
+    "attachmentId": "ccbc14ac-49b9-40c8-b285-cd3d35449b23",
+    "ordinaryJsonLimit": 413
+  },
+  "pairedRecovery": {
+    "transport": "PostgreSQL 17 client pinned by image digest; sslmode=verify-full with matching local test CA/hostname",
+    "sourceApplicationStoppedBeforeBackup": true,
+    "backup": {
+      "status": "DATABASE_AND_ATTACHMENTS_BACKED_UP",
+      "bundle": "/fyoung/tmp/agentflow-attachments-20260928/paired-backup",
+      "files": 4,
+      "databaseSha256": "914cb1c0eb070b3291c5778ebfa84b641b3c6d18ab4608c8c5318144989f5e56"
+    },
+    "offlineCheck": "PAIRED_BUNDLE_VALID",
+    "finalPackageSha256": "43f5269ed12004430a099d9f5a13b961a264547294adc63608c5a4d87f0b6412",
+    "finalRestoredApplication": {
+      "status": "PASS",
+      "targetDatabase": "agentflow_restore_211825a1095747acbe31218e795bc27c",
+      "attachmentDirectory": "/fyoung/tmp/agentflow-attachments-20260928/paired-restore-final/attachments",
+      "files": 4,
+      "tablesEqualBeforeBusinessActions": {
+        "approval_application": 6,
+        "approval_submission_round": 4,
+        "approval_attachment": 4,
+        "approval_attachment_round": 3
+      },
+      "applicationId": "66f33768-6fec-4cd9-a445-9d1432da9304",
+      "historicalContentSha256": "131a849d99f8de4257d6a9465d4e72fac0980d15dc5c4e9a355a94a9756cb3d3",
+      "historyUnchanged": true,
+      "restoredApplicationStatus": "APPROVED",
+      "restoredApplicationRoundNo": 2,
+      "requests": [
+        {
+          "method": "POST",
+          "path": "/auth/login",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/auth/login",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/rounds",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=1",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=1",
+          "status": 404
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/5bcddb1a-3ff1-4714-9faa-b44a8ecf00d7/content?roundNo=1",
+          "status": 404
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=1",
+          "status": 403
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/5bcddb1a-3ff1-4714-9faa-b44a8ecf00d7/content?roundNo=1",
+          "status": 403
+        },
+        {
+          "method": "PUT",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/submit",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=2",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/5bcddb1a-3ff1-4714-9faa-b44a8ecf00d7/content?roundNo=2",
+          "status": 403
+        },
+        {
+          "method": "GET",
+          "path": "/tasks",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/tasks/2da8dc30-bb1e-11f1-a272-2ea561d14965/actions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/rounds",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=1",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=2",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/applications/66f33768-6fec-4cd9-a445-9d1432da9304/attachments/01ff97d7-256c-4446-9de0-402d764ec244/content?roundNo=2",
+          "status": 403
+        }
+      ],
+      "originalDatabasePreserved": true
+    },
+    "log": "/fyoung/tmp/agentflow-attachments-20260928/paired-application-final.log",
+    "scope": "Local isolated PostgreSQL and directories; not a production failover or RTO/RPO measurement"
+  },
+  "verificationSetupCorrections": [
+    "A migration rerun initially reused a V30 fixture database and hit its existing OLD-1 business key. Final V29-to-V30 validation used a fresh dedicated database; old data were preserved rather than cleaned.",
+    "A withdrawn application has no current manager task and no completed manager participation in this fixture, so manager reads correctly return 404 before resubmission. After resubmission, the readable proof succeeds and hidden receipt returns 403.",
+    "Docker address pools were exhausted. The two task-owned containers temporarily used an existing network verified to have zero active endpoints; both were disconnected after acceptance and the network was preserved.",
+    "Browser download-event waiting timed out, but native downloads were present. Bytes and SHA-256 were checked, and only the newly created test downloads were moved into the QA directory."
+  ],
+  "finalChecks": {
+    "diffCheck": "PASS",
+    "pythonSyntax": "PASS",
+    "productionComposeWithAttachments": "PASS",
+    "productionNginxSyntax": "PASS",
+    "documentationLinks": "PASS",
+    "author": "liulangjietou <owlzhangfq@gmail.com>",
+    "committer": "liulangjietou <owlzhangfq@gmail.com>",
+    "workflowYamlAndBash": "PASS"
+  },
+  "environment": {
+    "qaDirectory": "/fyoung/tmp/agentflow-attachments-20260928",
+    "applicationAndPreviewListenersClosed": true,
+    "taskContainersStopped": true,
+    "reusedNetworkHasZeroActiveEndpoints": true,
+    "dockerDesktopRestoredToStopped": true,
+    "filesAndDatabasesRetained": true,
+    "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "remoteConfigured": false,
+    "remoteCi": "NOT_RUN",
+    "pullRequest": null
+  },
+  "remainingScope": "财务 D1–D6 及真实接口、Agent 模型与字段发送/复核规则、高级流程/外部通知业务输入、真实企业生产环境和远端交付仍未完成；本附件方案完成不代表完整平台完成。"
+}

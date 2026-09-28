@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, onUnmounted, ref, useId } from 'vue'
+import AttachmentField from './AttachmentField.vue'
+import type { AttachmentContext } from '../attachments'
 import DetailTableValue from './DetailTableValue.vue'
 import type { FieldErrors, FormField, FormSchema } from '../formSchema'
 import { displayFields, fieldErrorMessage, rawValueLabel, updatePayloadField, ownValue, isDetailRow } from '../formSchema'
 
-const props = withDefaults(defineProps<{ schema?: FormSchema | null; modelValue: Record<string, unknown>; readonly?: boolean; disabled?: boolean; errors?: FieldErrors }>(), { schema: null, readonly: false, disabled: false, errors: () => ({}) })
-const emit = defineEmits<{ 'update:modelValue': [value: Record<string, unknown>] }>()
+const props = withDefaults(defineProps<{ schema?: FormSchema | null; modelValue: Record<string, unknown>; readonly?: boolean; disabled?: boolean; errors?: FieldErrors; attachmentContext?: AttachmentContext; fieldPrefix?: string }>(), { schema: null, readonly: false, disabled: false, errors: () => ({}), fieldPrefix: '' })
+const emit = defineEmits<{ 'update:modelValue': [value: Record<string, unknown>]; uploading: [busy: boolean] }>()
 const prefix = useId()
+const activeUploads = ref(new Set<string>())
+function uploadState(key: string, busy: boolean) { if (busy) activeUploads.value.add(key); else activeUploads.value.delete(key); emit('uploading', activeUploads.value.size > 0) }
+onUnmounted(() => emit('uploading', false))
+const attachmentField = (key: string) => props.schema?.fields.find(field => field.key === key && field.type === 'ATTACHMENT')
 const entries = computed(() => displayFields(props.schema, props.modelValue))
 const extras = computed(() => entries.value.filter(field => field.extra))
 const errorCode = (key: string) => ownValue(props.errors, key)
@@ -33,7 +39,7 @@ function moveRow(field: FormField, index: number, offset: number) {
 <template>
   <div class="form-fields">
     <template v-if="readonly">
-      <dl v-if="entries.length" class="payload-list"><template v-for="entry in entries" :key="entry.key"><dt>{{ entry.label }}<small v-if="entry.extra">其他已保存字段</small></dt><dd :class="{ 'detail-value-cell': tableField(entry.key) }"><DetailTableValue v-if="tableField(entry.key)" :field="tableField(entry.key)!" :value="ownValue(modelValue, entry.key)" /><template v-else>{{ entry.value }}</template></dd></template></dl>
+      <dl v-if="entries.length" class="payload-list"><template v-for="entry in entries" :key="entry.key"><dt>{{ entry.label }}<small v-if="entry.extra">其他已保存字段</small></dt><dd :class="{ 'detail-value-cell': tableField(entry.key) }"><DetailTableValue v-if="tableField(entry.key)" :field="tableField(entry.key)!" :value="ownValue(modelValue, entry.key)" :attachment-context="attachmentContext" /><AttachmentField v-else-if="attachmentField(entry.key)" :model-value="ownValue(modelValue, entry.key)" :field-path="fieldPrefix + entry.key" :context="attachmentContext" readonly /><template v-else>{{ entry.value }}</template></dd></template></dl>
       <p v-else class="unavailable">此表单没有业务字段。</p>
     </template>
     <template v-else-if="schema">
@@ -44,12 +50,13 @@ function moveRow(field: FormField, index: number, offset: number) {
           <p class="detail-caption">{{ detailRows(field).length }} / {{ field.maxRows ?? 50 }} 行 · 每行单独填写一项</p>
           <p v-if="ownValue(modelValue, field.key) != null && !Array.isArray(ownValue(modelValue, field.key))" class="field-error">原明细格式不匹配：{{ rawValueLabel(ownValue(modelValue, field.key)) }} <button type="button" :disabled="disabled" @click="changeRows(field, [])">清空无效明细</button></p>
           <section v-for="(row, rowIndex) in detailRows(field)" :key="rowIndex" class="detail-row" :aria-label="`${field.label} 第 ${rowIndex + 1} 行`">
-            <div class="detail-row-heading"><strong>第 {{ rowIndex + 1 }} 行</strong><div><button type="button" :disabled="disabled || rowIndex === 0" :aria-label="`上移${field.label}第 ${rowIndex + 1} 行`" @click="moveRow(field, rowIndex, -1)">↑</button><button type="button" :disabled="disabled || rowIndex === detailRows(field).length - 1" :aria-label="`下移${field.label}第 ${rowIndex + 1} 行`" @click="moveRow(field, rowIndex, 1)">↓</button><button type="button" :disabled="disabled" :aria-label="`删除${field.label}第 ${rowIndex + 1} 行`" @click="changeRows(field, detailRows(field).filter((_, current) => current !== rowIndex))">删除</button></div></div>
-            <FormFields v-if="isDetailRow(row)" :schema="columnSchema(field)" :model-value="row" :errors="rowErrors(field, rowIndex)" :disabled="disabled" @update:model-value="value => changeRows(field, detailRows(field).map((saved, current) => current === rowIndex ? value : saved))" />
+            <div class="detail-row-heading"><strong>第 {{ rowIndex + 1 }} 行</strong><div><button type="button" :disabled="disabled || activeUploads.size > 0 || rowIndex === 0" :aria-label="`上移${field.label}第 ${rowIndex + 1} 行`" @click="moveRow(field, rowIndex, -1)">↑</button><button type="button" :disabled="disabled || activeUploads.size > 0 || rowIndex === detailRows(field).length - 1" :aria-label="`下移${field.label}第 ${rowIndex + 1} 行`" @click="moveRow(field, rowIndex, 1)">↓</button><button type="button" :disabled="disabled || activeUploads.size > 0" :aria-label="`删除${field.label}第 ${rowIndex + 1} 行`" @click="changeRows(field, detailRows(field).filter((_, current) => current !== rowIndex))">删除</button></div></div>
+            <FormFields v-if="isDetailRow(row)" :attachment-context="attachmentContext" :field-prefix="field.key + '.'" @uploading="uploadState(field.key + ':' + rowIndex, $event)" :schema="columnSchema(field)" :model-value="row" :errors="rowErrors(field, rowIndex)" :disabled="disabled" @update:model-value="value => changeRows(field, detailRows(field).map((saved, current) => current === rowIndex ? value : saved))" />
             <p v-else class="field-error">此行格式不匹配：{{ rawValueLabel(row) }}。请删除后重新添加。</p>
           </section>
-          <button type="button" class="secondary" :disabled="disabled || detailRows(field).length >= (field.maxRows ?? 50) || (ownValue(modelValue, field.key) != null && !Array.isArray(ownValue(modelValue, field.key)))" @click="changeRows(field, [...detailRows(field), {}])">＋ 添加{{ field.label }}行</button>
+          <button type="button" class="secondary" :disabled="disabled || activeUploads.size > 0 || detailRows(field).length >= (field.maxRows ?? 50) || (ownValue(modelValue, field.key) != null && !Array.isArray(ownValue(modelValue, field.key)))" @click="changeRows(field, [...detailRows(field), {}])">＋ 添加{{ field.label }}行</button>
         </div>
+        <AttachmentField v-else-if="field.type === 'ATTACHMENT'" :model-value="ownValue(modelValue, field.key)" :field-path="fieldPrefix + field.key" :context="attachmentContext" :disabled="disabled" @update:model-value="emit('update:modelValue', updatePayloadField(modelValue, field.key, $event))" @uploading="uploadState(field.key, $event)" />
         <textarea v-else-if="field.type === 'TEXTAREA'" :id="`${prefix}-${index}`" :value="inputValue(field.key)" :disabled="disabled" rows="3" :aria-required="field.required" :aria-invalid="!!errorCode(field.key)" :aria-describedby="`${prefix}-${index}-help`" @input="update(field, $event)" />
         <select v-else-if="field.type === 'SELECT'" :id="`${prefix}-${index}`" :value="inputValue(field.key)" :disabled="disabled" :aria-required="field.required" :aria-invalid="!!errorCode(field.key)" :aria-describedby="`${prefix}-${index}-help`" @change="update(field, $event)">
           <option value="">请选择</option><option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option>

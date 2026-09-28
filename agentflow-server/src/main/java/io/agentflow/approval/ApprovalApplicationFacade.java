@@ -16,6 +16,7 @@ import io.agentflow.definition.DefinitionModels;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.ApprovalNotificationService;
 import io.agentflow.organization.OrganizationInitiatorDirectory;
+import io.agentflow.attachment.AttachmentReferenceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,12 +41,13 @@ public class ApprovalApplicationFacade {
     private final ProcessRuntimePort processRuntime;
     private final ApprovalNotificationService notifications;
     private final OrganizationInitiatorDirectory initiators;
+    private final AttachmentReferenceService attachments;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, List<ApplicationParticipantPort> participantPorts,
                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions,
-                                     ApprovalNotificationService notifications, OrganizationInitiatorDirectory initiators) {
+                                     ApprovalNotificationService notifications, OrganizationInitiatorDirectory initiators, AttachmentReferenceService attachments) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
@@ -55,6 +57,7 @@ public class ApprovalApplicationFacade {
         this.processRuntime = processRuntime;
         this.notifications = notifications;
         this.initiators = initiators;
+        this.attachments = attachments;
     }
 
     /** 创建申请草稿。 */
@@ -70,8 +73,10 @@ public class ApprovalApplicationFacade {
         if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
-        return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
+        var application = service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
                 formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts());
+        attachments.validate(application, false);
+        return application;
     }
 
     /** 提交申请并启动流程。 */
@@ -87,6 +92,9 @@ public class ApprovalApplicationFacade {
         requireApplicant(actor, id);
         var context = initiators.snapshot(actor, initiatorAppointmentId);
         Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId(), context);
+        // 校验实际提交的聚合，避免二次读取跨版本；失败时申请、引擎及轮次一并回滚。
+        attachments.validate(application, true);
+        attachments.freeze(application);
         notifications.submitted(application, actor.userId());
         return application;
     }
@@ -96,7 +104,9 @@ public class ApprovalApplicationFacade {
     public Application revise(UUID id, long expectedVersion, String title, Map<String, Object> payload) {
         Actor actor = currentActor.actor();
         requireApplicant(actor, id);
-        return service.revise(actor.tenantId(), id, expectedVersion, title, payload, actor.userId());
+        var application = service.revise(actor.tenantId(), id, expectedVersion, title, payload, actor.userId());
+        attachments.validate(application, false);
+        return application;
     }
 
     /** 仅发起人可以撤回审批中的申请，全部写入与引擎终止共用事务。 */
@@ -147,10 +157,16 @@ public class ApprovalApplicationFacade {
         return participantPorts.stream().anyMatch(port -> port.isParticipant(actor.tenantId(), application.id(), actor));
     }
 
-    private void requireApplicant(Actor actor, UUID id) {
+    private Application requireApplicant(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!application.createdBy().equals(actor.userId())) {
             throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit, withdraw or cancel this application");
         }
+        return application;
+    }
+
+    /** 附件写入复用申请人的资源授权，状态与版本由申请聚合继续判断。 */
+    public Application requireApplicant(UUID id) {
+        return requireApplicant(currentActor.actor(), id);
     }
 }

@@ -102,9 +102,12 @@ public class SystemCheckService {
                         "本租户已启用本地组织目录，存储查询成功；人员、任职与审批资格需在组织管理中核对。")
                 : new Check("organization", Status.WARNING, "LOCAL_ORGANIZATION_NOT_INITIALIZED",
                         "本租户尚未启用本地组织目录；管理员可在“组织与人员”中启用并配置。")));
-        for (String id : List.of("objectStorage", "model")) {
-            checks.add(new Check(id, Status.NOT_IMPLEMENTED, "ADAPTER_NOT_IMPLEMENTED", "当前版本尚未实现此服务接入，未执行连接检查。"));
-        }
+        checks.add(inspect("objectStorage", () -> diagnostics.attachments(actor.tenantId())
+                ? new Check("objectStorage", Status.UP, "LOCAL_ATTACHMENT_STORAGE",
+                        "附件元数据可查询，持久目录访问权限正常；本项未写入文件或校验全部存量内容。当前未接入内容扫描。")
+                : new Check("objectStorage", Status.WARNING, "ATTACHMENT_STORAGE_NOT_CONFIGURED",
+                        "附件持久目录尚未配置；管理员配置后可在申请表单中上传。")));
+        checks.add(new Check("model", Status.NOT_IMPLEMENTED, "ADAPTER_NOT_IMPLEMENTED", "当前版本尚未实现模型服务接入，未执行连接检查。"));
         return new Report(Instant.now(), List.copyOf(checks));
     }
 

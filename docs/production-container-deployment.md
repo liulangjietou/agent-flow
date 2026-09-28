@@ -2,7 +2,7 @@
 
 `compose.production.yml` 将现有服务器和 Web 镜像组成独立部署，连接企业提供的 PostgreSQL 与 OIDC。它启用 `prod`、JDBC 会话及 HTTPS，关闭演示账号；数据库迁移由显式维护命令执行。此文件不会启动或修改 `compose.demo.yml` 的数据库和数据卷。
 
-本阶段是部署工程能力。组织目录、企业初始化、真实 IdP 联调、财务和 Agent 等仍待完成，健康探针与协议夹具验收不代表完整平台已经上线。
+本阶段是部署工程能力。本地组织及初始化已在开发分支实现；真实企业 IdP 联调、财务和 Agent 等仍待完成，健康探针与协议夹具验收不代表完整平台已经上线。
 
 ## 部署前准备
 
@@ -29,6 +29,8 @@ docker build -f deploy/Dockerfile.web -t registry.example/agentflow-web:release 
 密码和 OIDC 客户端密钥分别写入独立文件；文件内容是一行原始值，可有结尾换行，不加 shell 引号、不做变量替换。容器入口只读文件，值不会出现在 Compose 环境清单或 Java 启动参数中。容器进程环境仍包含运行所需的值，Docker 管理权限需要按企业制度控制。
 
 服务器镜像以 UID/GID `10001` 运行。Linux 上应配置密钥文件所有者/组和权限，使该 UID 可读，其他无关账号不可读，例如所有者 `10001`、权限 `0400`；父目录保留受控访问。Compose 本地文件 secrets 使用绑定挂载，不依赖 `uid/gid/mode` 字段替你修改宿主机权限。TLS 私钥由 Nginx 主进程读取。缺失、空文件和同时配置文件/环境值的歧义会阻止启动。
+
+启用[表单附件](field-attachments.md#启用持久目录)时，先准备 UID/GID `10001` 所有、权限 `0700` 的持久目录，并设置 `AGENTFLOW_ATTACHMENT_HOST_DIRECTORY`。在本页 Compose 命令中一并使用 `-f compose.attachments.yml`，包括后续重建；目录必须支持 POSIX 权限和硬链接。未配置时附件保持关闭，不会保存到容器临时层。已有附件的备份和恢复必须同时包含数据库和原文件。
 
 租户与角色映射只授予明确声明所对应的平台身份，不会自动创建组织或审批人。请按 [OIDC 接入说明](enterprise-oidc.md)完成映射。`AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT` 默认 false，身份源正确注册通知地址并完成联调后再启用。
 

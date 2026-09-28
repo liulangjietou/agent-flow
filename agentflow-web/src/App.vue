@@ -829,7 +829,7 @@ async function createAndSubmitApplication(submit = true) {
     if (!createdApplication.value) createdApplication.value = await api.createApplication({ businessNo: applicationBusinessNo.value.trim(), processKey: definition!.key, definitionVersion: definition!.version, title: applicationTitle.value.trim(), payload })
     if (!submit) {
       const saved = createdApplication.value
-      newApplicationOpen.value = false; createdApplication.value = null; page.value = 'drafts'; templateRefresh.value++; await refreshWorkspace(); notice.value = `草稿 ${saved.businessNo} 已保存，可在我的草稿中继续填写。`; return
+      newApplicationOpen.value = false; createdApplication.value = null; page.value = 'drafts'; templateRefresh.value++; await refreshWorkspace(); notice.value = `草稿 ${saved.businessNo} 已保存，可在我的草稿中继续填写。`; if (saved.formSchema?.fields.some(field => field.type === 'ATTACHMENT' || field.columns?.some(column => column.type === 'ATTACHMENT'))) recordApplicationId.value = saved.id; return
     }
     const submitted = await api.submitApplication(createdApplication.value.id, createdApplication.value.version, initiatorAppointmentId.value)
     newApplicationOpen.value = false; createdApplication.value = null; page.value = 'started'; templateRefresh.value++; await refreshWorkspace(); notice.value = `申请 ${submitted.businessNo} 已提交，状态：${statusLabel(submitted.status)}`
@@ -1045,7 +1045,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }, { key: 'assist', label: 'Agent 摘要' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
                 <div v-if="taskTab === 'detail'" class="detail-content">
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
-                  <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" readonly /></template>
+                  <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
                   <p v-else class="unavailable">正在加载申请详情…</p>
                   <div class="agent-note"><span>✦</span><div><strong>Agent 摘要</strong><p>模型生成尚未接入，已有记录可在「Agent 摘要」中查看。审批请以申请内容及核实结果为依据。</p></div></div>
                 </div>

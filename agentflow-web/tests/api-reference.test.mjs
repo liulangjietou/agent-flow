@@ -48,3 +48,11 @@ test('契约加载是认证 GET，不携带写入键或业务参数', async () =
   assert.equal(sent.signal, controller.signal)
   assert.equal(sent.body, undefined)
 })
+
+test('附件 curl 明确二进制正文、申请版本和下载目的文件', () => {
+  const catalog = entries(document), find = id => catalog.find(e => e.operation.operationId === id)
+  assert.match(curlExample(find('uploadAttachment')), /Content-Type: application\/octet-stream/)
+  assert.match(curlExample(find('uploadAttachment')), /--data-binary "@\$FILE_PATH"/)
+  assert.match(curlExample(find('uploadAttachment')), /X-Application-Version: \$APPLICATION_VERSION/)
+  assert.match(curlExample(find('downloadAttachment')), /--output "\$OUTPUT_FILE"/)
+})

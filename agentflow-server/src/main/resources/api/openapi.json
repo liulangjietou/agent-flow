@@ -3,7 +3,7 @@
   "info": {
     "title": "AgentFlow API",
     "version": "0.1.0",
-    "description": "与当前工程同步的已实现 API。支持演示 Bearer 认证，或显式配置的企业 OIDC 会话认证；组织目录、真实模型和财务支付尚未接入。企业浏览器经同源入口使用 HttpOnly 会话 Cookie，写请求须携带 auth/options 返回的 X-CSRF-TOKEN，以及 URL 编码的 JSON 数组 [tenantId,userId] 作为 X-AgentFlow-Actor，后者仅用于核对页面身份，不授予权限。所有资源继续限定认证主体租户。",
+    "description": "与当前工程同步的已实现 API。支持演示 Bearer 认证，或显式配置的企业 OIDC 会话认证；支持本地组织目录和显式配置的单机附件目录；真实模型和财务支付尚未接入。企业浏览器经同源入口使用 HttpOnly 会话 Cookie，写请求须携带 auth/options 返回的 X-CSRF-TOKEN，以及 URL 编码的 JSON 数组 [tenantId,userId] 作为 X-AgentFlow-Actor，后者仅用于核对页面身份，不授予权限。所有资源继续限定认证主体租户。",
     "contact": {
       "email": "owlzhangfq@gmail.com"
     }
@@ -49,7 +49,7 @@
     },
     {
       "name": "工作日历",
-      "description": "管理员维护工作时间规则、不可变修订及只读到期试算。尚未关联任务 SLA。"
+      "description": "管理员维护工作时间规则、不可变修订及只读到期试算。可用于人工任务 SLA。"
     },
     {
       "name": "集成投递",
@@ -58,6 +58,10 @@
     {
       "name": "本地组织",
       "description": "租户本地组织与审批资格维护，保留可信 OIDC 认证。"
+    },
+    {
+      "name": "附件",
+      "description": "申请字段附件，单机持久存储和不可变轮次引用。"
     }
   ],
   "paths": {
@@ -10587,6 +10591,864 @@
           }
         }
       }
+    },
+    "/api/v1/attachments/options": {
+      "get": {
+        "operationId": "attachmentOptions",
+        "tags": [
+          "附件"
+        ],
+        "summary": "读取附件存储可用性和上传限额",
+        "x-access": "已登录用户",
+        "x-idempotency": false,
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOptions"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "description": "不暴露目录路径。enabled 检查目录配置和访问权限；每次文件传输另行验证 I/O。contentScanAvailable 当前为 false。"
+      }
+    },
+    "/api/v1/applications/{applicationId}/attachments": {
+      "post": {
+        "operationId": "reserveAttachment",
+        "tags": [
+          "附件"
+        ],
+        "summary": "登记可恢复上传",
+        "x-access": "申请人，且状态为 DRAFT / RETURNED / WITHDRAWN",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentMetadata"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "description": "登记内容身份和 SHA-256，不接收路径或外部 URL。同一幂等键重试返回原附件标识。累计配额包含历史、已移除引用和未完成上传。登记不改变申请版本或表单引用，后续需上传内容并保存申请。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentUploadInput"
+              },
+              "example": {
+                "expectedVersion": 1,
+                "fieldPath": "proof",
+                "filename": "凭证.txt",
+                "size": 3,
+                "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{applicationId}/attachments/{id}": {
+      "get": {
+        "operationId": "getAttachment",
+        "tags": [
+          "附件"
+        ],
+        "summary": "读取可见附件元数据",
+        "x-access": "当前申请人，或具有本申请及所属字段读取权限的用户",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "历史提交轮次；省略时按当前表单权限和引用读取",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentMetadata"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "description": "与原文件下载执行相同字段权限校验。隐藏或脱敏时不返回文件名、大小或摘要。历史须具备冻结的当轮引用；草稿申请人可读取尚未保存引用的本申请上传以恢复操作。"
+      }
+    },
+    "/api/v1/applications/{applicationId}/attachments/{id}/content": {
+      "put": {
+        "operationId": "uploadAttachment",
+        "tags": [
+          "附件"
+        ],
+        "summary": "上传并校验原文件",
+        "x-access": "申请人，且状态为 DRAFT / RETURNED / WITHDRAWN",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Application-Version",
+            "in": "header",
+            "required": true,
+            "description": "本次已核对的申请版本，传输前后均检查",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentMetadata"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "description": "二进制流受实际字节数和 SHA-256 校验；原附件标识与固定指纹保证重复传输不覆盖内容。未取得明确成功时以同标识、同内容重试。提交或版本变更后拒绝发布。禁止 multipart。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "downloadAttachment",
+        "tags": [
+          "附件"
+        ],
+        "summary": "下载可见原文件",
+        "x-access": "当前申请人，或具有本申请及所属字段读取权限的用户",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "历史提交轮次；省略时按当前表单权限和引用读取",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; 原文件名以 UTF-8 编码"
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "const": "nosniff"
+                }
+              }
+            }
+          }
+        },
+        "description": "每次读取重新检查租户、申请及所属字段权限。隐藏或脱敏不可下载。仅提供 attachment 下载，nosniff，内容指纹校验失败不发送原文件。"
+      }
     }
   },
   "components": {
@@ -10759,7 +11621,8 @@
               "DATE",
               "SELECT",
               "BOOLEAN",
-              "TABLE"
+              "TABLE",
+              "ATTACHMENT"
             ]
           },
           "required": {
@@ -10876,7 +11739,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "类型和约束须匹配。NUMBER 最多 38 位有效数字、18 位小数；SELECT 需 1—50 个不重复选项；文本长度按 Unicode 码点计。 TABLE 仅限格式版本 2；列为 1—20 个基础字段，行数默认 50、最多 100；整份填写最多 2000 个明细单元格。明细仅支持 EXISTS/NOT_EXISTS 条件。",
+        "description": "类型和约束须匹配。NUMBER 最多 38 位有效数字、18 位小数；SELECT 需 1—50 个不重复选项；文本长度按 Unicode 码点计。 TABLE 仅限格式版本 2；列为 1—20 个基础字段，行数默认 50、最多 100；整份填写最多 2000 个明细单元格。明细仅支持 EXISTS/NOT_EXISTS 条件。 ATTACHMENT 保存最多 10 个不重复的规范 UUID 字符串；提交须全部完成上传。只支持 EXISTS / NOT_EXISTS 路由条件。",
         "required": [
           "key",
           "label",
@@ -14458,7 +15321,8 @@
               "NUMBER",
               "DATE",
               "SELECT",
-              "BOOLEAN"
+              "BOOLEAN",
+              "ATTACHMENT"
             ]
           },
           "required": {
@@ -14525,7 +15389,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "明细中的基础列，不允许嵌套明细。",
+        "description": "明细中的基础列，不允许嵌套明细。 ATTACHMENT 保存最多 10 个不重复的规范 UUID 字符串；提交须全部完成上传。只支持 EXISTS / NOT_EXISTS 路由条件。",
         "required": [
           "key",
           "label",
@@ -15814,6 +16678,119 @@
           "payload",
           "restricted"
         ]
+      },
+      "AttachmentUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "fieldPath",
+          "filename",
+          "size",
+          "sha256"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fieldPath": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}(\\.[A-Za-z][A-Za-z0-9_]{0,63})?$",
+            "description": "顶层字段或 明细字段.列字段，不含行号"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\x00-\\x1f\\x7f/\\\\]+$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 104857600
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "AttachmentMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "fieldPath",
+          "filename",
+          "size",
+          "sha256",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldPath": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UPLOADING",
+              "READY",
+              "FAILED"
+            ]
+          }
+        }
+      },
+      "AttachmentOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "maxFileBytes",
+          "maxApplicationBytes",
+          "maxApplicationUploads",
+          "maxAttachmentsPerField",
+          "contentScanAvailable"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxFileBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxApplicationBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxApplicationUploads": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxAttachmentsPerField": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "contentScanAvailable": {
+            "type": "boolean"
+          }
+        }
       }
     }
   }

@@ -81,3 +81,22 @@ test('企业退出拒绝身份切换、未支持能力及外部表单地址', as
     await assert.rejects(api.prepareProviderLogout(), error => error.code === 'AUTH_CONFIGURATION_INVALID')
   }
 })
+
+test('二进制附件复用企业身份与 CSRF，保留原 File 正文和版本头', async () => {
+  globalThis.fetch = async () => Response.json(enterprise)
+  await api.authOptions()
+  bindAuthenticationActor({ tenantId: 'tenant-a', userId: 'file-user', roles: ['EMPLOYEE'] })
+  const file = new File(['abc'], 'proof.bin'), sent = []
+  globalThis.fetch = async (url, init) => { sent.push({ url, ...init }); return Response.json({ status: 'READY' }) }
+  await api.uploadAttachment('app', 'file', 7, file)
+  assert.equal(sent[0].body, file)
+  assert.equal(sent[0].headers.get('Content-Type'), 'application/octet-stream')
+  assert.equal(sent[0].headers.get('X-Application-Version'), '7')
+  assert.equal(sent[0].headers.get('X-CSRF-TOKEN'), enterprise.csrfToken)
+  assert.equal(sent[0].headers.has('Authorization'), false)
+  assert.deepEqual(JSON.parse(decodeURIComponent(sent[0].headers.get('X-AgentFlow-Actor'))), ['tenant-a', 'file-user'])
+  globalThis.fetch = async () => new Response('abc', { headers: { 'Content-Type': 'application/octet-stream' } })
+  assert.equal(await (await api.downloadAttachment('app', 'file', 2)).text(), 'abc')
+  globalThis.fetch = async () => new Response('<html>login</html>', { headers: { 'Content-Type': 'text/html' } })
+  await assert.rejects(api.downloadAttachment('app', 'file', 2))
+})

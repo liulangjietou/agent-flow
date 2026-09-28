@@ -72,7 +72,8 @@ class SystemChecksIntegrationTest {
                 .andExpect(jsonPath("checks[?(@.id == 'notifications')].code").value("IN_APP_ONLY"))
                 .andExpect(jsonPath("checks[?(@.id == 'sessionStorage')].code").value("JDBC_SESSIONS_DISABLED"))
                 .andExpect(jsonPath("checks[?(@.id == 'organization')].code").value("LOCAL_ORGANIZATION_NOT_INITIALIZED"))
-                .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.hasSize(2)));
+                .andExpect(jsonPath("checks[?(@.id == 'objectStorage')].code").value("ATTACHMENT_STORAGE_NOT_CONFIGURED"))
+                .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.hasSize(1)));
     }
 
     private String token(String username) {

@@ -24,6 +24,11 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  attachments:
+    directory: ${AGENTFLOW_ATTACHMENT_DIRECTORY:}
+    max-file-bytes: ${AGENTFLOW_ATTACHMENT_MAX_FILE_BYTES:20971520}
+    max-application-bytes: ${AGENTFLOW_ATTACHMENT_MAX_APPLICATION_BYTES:268435456}
+    max-application-uploads: ${AGENTFLOW_ATTACHMENT_MAX_APPLICATION_UPLOADS:100}
   monitoring:
     enabled: ${AGENTFLOW_METRICS_ENABLED:false}
     expected-instances: ${AGENTFLOW_EXPECTED_INSTANCES:1}

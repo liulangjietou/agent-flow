@@ -16,7 +16,8 @@ async function openSchema(name: string) {
 const catalog = computed(() => query.document ? entries(query.document) : [])
 const filtered = computed(() => filterEntries(catalog.value, search.value, group.value))
 const selected = computed(() => filtered.value.find(item => item.operation.operationId === selectedId.value) ?? filtered.value[0])
-const request = computed(() => selected.value?.operation.requestBody?.content['application/json'])
+const requestType = computed(() => Object.keys(selected.value?.operation.requestBody?.content ?? {})[0])
+const request = computed(() => requestType.value ? selected.value?.operation.requestBody?.content[requestType.value] : undefined)
 const schema = computed(() => query.document?.components.schemas[selectedSchema.value])
 function fields(input?: ApiSchema) { return input && query.document ? resolveSchema(query.document, input) : null }
 function releaseDownload() { if (downloadUrl.value) URL.revokeObjectURL(downloadUrl.value); downloadUrl.value = '' }

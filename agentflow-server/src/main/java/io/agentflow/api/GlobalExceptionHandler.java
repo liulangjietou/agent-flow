@@ -76,6 +76,10 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "INVALID_ATTACHMENT_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "ATTACHMENT_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case "ATTACHMENT_QUOTA_EXCEEDED" -> HttpStatus.CONFLICT;
+            case "ATTACHMENT_STORAGE_UNAVAILABLE", "ATTACHMENT_INTEGRITY_FAILED" -> HttpStatus.SERVICE_UNAVAILABLE;
             case "INVALID_ORGANIZATION_QUERY", "INVALID_AVAILABILITY_QUERY", "INVALID_AGENT_QUERY", "INVALID_DEFINITION_QUERY", "INVALID_WEBHOOK_QUERY", "INVALID_DIAGRAM_QUERY", "INVALID_AUDIT_QUERY", "INVALID_APPLICATION_QUERY", "INVALID_CALENDAR_QUERY", "INVALID_CALENDAR_CALCULATION", "INVALID_COMMENT_QUERY", "INVALID_FIRST_WORKFLOW_QUERY", "INVALID_OPERATIONS_QUERY", "INVALID_TASK_QUERY", "INVALID_INBOX_QUERY", "INVALID_WORKSPACE_QUERY", "INVALID_HISTORY_QUERY", "IDEMPOTENCY_KEY_REQUIRED", "INVALID_IDEMPOTENCY_KEY",
                     "INVALID_IDEMPOTENCY_REQUEST", "INVALID_TEMPLATE_COPY_REQUEST" -> HttpStatus.BAD_REQUEST;
             case "UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
