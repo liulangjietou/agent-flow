@@ -13,6 +13,8 @@ import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
 import ExpenseDetail from './components/ExpenseDetail.vue'
+import ExpensePlanDetail from './components/ExpensePlanDetail.vue'
+import { planDrafts, type PlanDetail as PlanDetailData } from './expensePlan'
 import { expenseDrafts } from './expenseDraft'
 import { invoiceUploads } from './invoiceWallet'
 import type { ExpenseDetail as ExpenseDetailData } from './expenses'
@@ -943,6 +945,14 @@ async function recoverOperation(id: string) {
       } else if (/^\/invoices\/[^/]+\/verifications$/.test(request.path)) {
         templateRefresh.value++
         notice.value = '原验票任务已确认受理，请打开原票据并刷新查验状态。'
+      } else if (request.path.startsWith('/expense-plans')) {
+        if (request.body && (request.path === '/expense-plans' || request.path.endsWith('/revise'))) {
+          const value = result as PlanDetailData
+          const restored = planDrafts.acknowledge(actorScope.value, request.path, request.body, value)
+          if (!restored && value.applicationId) recordApplicationId.value = value.applicationId
+          notice.value = '原计划保存结果已确认，请核对原单据后继续预检。'
+        } else notice.value = '原计划操作已确认，请刷新计划详情或预检结果核对当前状态。'
+        templateRefresh.value++
       } else if (request.path.startsWith('/expense-reports')) {
         if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
           const value = result as ExpenseDetailData
@@ -991,7 +1001,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || expenseDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */
@@ -1090,7 +1100,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }, { key: 'assist', label: 'Agent 摘要' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
                 <div v-if="taskTab === 'detail'" class="detail-content">
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
-                  <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><ExpenseDetail v-if="activeApplication.businessReference?.type === 'EXPENSE'" :report-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :task-id="activeTask.taskId" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ExpenseDetail><FormFields v-else :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
+                  <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><ExpenseDetail v-if="activeApplication.businessReference?.type === 'EXPENSE'" :report-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :task-id="activeTask.taskId" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ExpenseDetail><ExpensePlanDetail v-else-if="activeApplication.businessReference?.type === 'EXPENSE_PLAN'" :plan-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ExpensePlanDetail><FormFields v-else :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
                   <p v-else class="unavailable">正在加载申请详情…</p>
                   <div class="agent-note"><span>✦</span><div><strong>Agent 摘要</strong><p>在「Agent 摘要」中选择本轮可读字段，生成后核对来源并保存人工修订。审批以申请内容及核实结果为依据。</p></div></div>
                 </div>

@@ -21,6 +21,7 @@ import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './a
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
+import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
@@ -286,6 +287,16 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 
 export const api = {
   financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),
+  expensePlans: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PlanItem>>('/expense-plans' + historyQuery(filter), { signal, cache: 'no-store' }),
+  expensePlan: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<PlanDetail>(`/expense-plans/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  createExpensePlan: (input: PlanCreate) => write<PlanDetail>('/expense-plans', 'POST', '保存事前申请', input),
+  reviseExpensePlan: (id: string, input: PlanRevise) => write<PlanDetail>(`/expense-plans/${encodeURIComponent(id)}/revise`, 'POST', '保存事前计划修改', input),
+  planCheckOptions: (id: string, signal: AbortSignal) => request<PlanCheckOptions>(`/expense-plans/${encodeURIComponent(id)}/prechecks/options`, { signal, cache: 'no-store' }),
+  queuePlanCheck: (id: string, input: PlanCheckInput) => write<{ id: string }>(`/expense-plans/${encodeURIComponent(id)}/prechecks`, 'POST', '查询事前计划财务依据', input),
+  planCheck: (id: string, jobId: string, signal: AbortSignal) => request<PlanCheckView>(`/expense-plans/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  submitExpensePlan: (id: string, input: PlanVersions & { precheckId: string }) => write<PlanReceipt>(`/expense-plans/${encodeURIComponent(id)}/submit`, 'POST', '正式提交事前申请', input),
+  withdrawExpensePlan: (id: string, input: PlanVersions & { comment: string }) => write<PlanReceipt>(`/expense-plans/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回事前申请', input),
+  cancelExpensePlan: (id: string, input: PlanVersions & { comment: string }) => write<PlanReceipt>(`/expense-plans/${encodeURIComponent(id)}/cancel`, 'POST', '作废事前申请', input),
   createExpense: (input: ExpenseCreate) => write<ExpenseDetail>('/expense-reports', 'POST', '保存报销草稿', input),
   reviseExpense: (id: string, input: ExpenseRevise) => write<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}/revise`, 'POST', '保存报销修改', input),
   expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
