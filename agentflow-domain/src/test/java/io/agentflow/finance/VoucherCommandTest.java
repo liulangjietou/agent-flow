@@ -136,6 +136,7 @@ class VoucherCommandTest {
                 .map(key -> new AccountMappingPort.Entry(key, key.role() == AccountMappingPort.Role.EMPLOYEE_RECEIVABLE ? "1122-员工" : "2241-员工")).toList());
         return new VoucherCommand(ID, "tenant-a", kind, BINDING, ENTITY, "alice", DATE, totals, period, mapping, lines, proof, NOW, NOW.plusSeconds(60));
     }
+    static VoucherCommand advanceCommand() { return command(VoucherCommand.Kind.EMPLOYEE_ADVANCE, totals("0", "0"), advanceLines(), null); }
     private static VoucherCommand copy(VoucherCommand command, VoucherCommand.Binding binding, AccountingPeriodPort.OpenPeriod period, AccountMappingPort.Mapping mapping, List<VoucherCommand.Line> lines, Instant expiresAt) {
         return new VoucherCommand(command.id(), command.tenantId(), command.kind(), binding, command.legalEntityId(), command.employeeId(), command.accountingDate(), command.totals(), period, mapping, lines, command.payment(), NOW, expiresAt);
     }
