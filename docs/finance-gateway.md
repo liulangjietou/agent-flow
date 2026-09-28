@@ -1,6 +1,6 @@
 # 财务只读网关
 
-当前实现五项真实 HTTP 端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API 与[持久验票任务](invoice-verification.md) 已调用对应端口，其他端口由后续预检用例调用；尚未完成真实企业联调、预算、凭证或支付集成。
+当前实现六项真实 HTTP 只读端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验和预算预检。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API 与[持久验票任务](invoice-verification.md) 已调用对应端口，其他端口由后续预检用例调用；尚未完成真实企业联调、预算冻结、凭证或支付集成。
 
 ## 部署配置
 
@@ -17,13 +17,13 @@ agentflow:
         timeout-seconds: 15
 ```
 
-`endpoint` 是五个相对路径的共同父路径。只允许 HTTPS，或字面回环地址 `127.0.0.1` / `[::1]` 的 HTTP。禁止用户名、查询参数、片段和编码路径；路径仅接受字母、数字、`/`、`_`、`-`。不跟随重定向。超时范围 1–60 秒，覆盖响应体接收完成；连接超时另有 3 秒上限。
+`endpoint` 是六个相对路径的共同父路径。只允许 HTTPS，或字面回环地址 `127.0.0.1` / `[::1]` 的 HTTP。禁止用户名、查询参数、片段和编码路径；路径仅接受字母、数字、`/`、`_`、`-`。不跟随重定向。超时范围 1–60 秒，覆盖响应体接收完成；连接超时另有 3 秒上限。
 
 企业目标必须配置 Bearer 凭据。仅本机合成夹具可以显式设置 `allow-unauthenticated-loopback: true` 后省略凭据。该开关对 HTTPS 或非回环目标无效。配置错误在启用时阻止启动，缺少某租户配置在调用时返回 `NOT_CONFIGURED`。原始响应正文、令牌和原件均不写日志。
 
 ## 固定协议
 
-五个端口均使用 `POST` 和 `application/json`。POST 只承载只读查询；企业实现不得据此冻结预算、扣款、记账或修改票据归属。平台每次读取生成新的 `requestId`，不自动重试。请求统一为：
+六个端口均使用 `POST` 和 `application/json`。POST 只承载只读查询；企业实现不得据此冻结预算、扣款、记账或修改票据归属。平台每次读取生成新的 `requestId`，不自动重试。请求统一为：
 
 ```json
 {
@@ -59,6 +59,7 @@ agentflow:
 | `exchange-rate` | `legalEntityId`, `fromCurrency`, `toCurrency`, `rateDate` | `ExpenseExchangeRate` | 同一币种对、同一日期，显式来源；同币种汇率只能为 1 |
 | `expense-policy` | `ExpensePolicyPort.Request` | `ExpensePolicyPort.Assessment` | 制度核算额等于该行按传入汇率折算值；可抵扣税额不超过折算申报税额；有效期未结束 |
 | `invoice-verification` | `InvoiceVerificationPort.Request` | `Invoice.VerifiedFacts` | 法人、原件摘要相同；已到查验时刻且尚未过期 |
+| `budget-precheck` | `BudgetPrecheckPort.Request` | `BudgetPrecheckPort.Assessment` | 完整请求逐项相同，查验时间已到且有效期未结束；不能只匹配总金额 |
 
 `FinanceCatalog` 的完整公开结构见 OpenAPI `FinanceCatalog`。类别计量单位使用 `ITEM`、`DAY`、`NIGHT`、`KILOMETER`、`PERSON`。城市、类别和成本对象代码均是企业稳定标识，展示名称不能替代标识。法人包含本位币、纸质签收要求及来源版本。平台支持两位精度币种，不能向目录返回当前核算模型不支持的币种。
 
@@ -67,6 +68,12 @@ agentflow:
 制度请求含员工、法人、报销种类、完整 `ExpenseLine`、已选 `ExpenseExchangeRate` 及逐张 `InvoiceEvidence(invoiceId, facts)`；票据必须完整对应本行的本地发票标识，不得多出、漏掉或跨法人。制度结果含 `policy`、本位币 `deductibleTax`、`priorRequestRequired`、`validUntil`。`policy` 保留制度 ID/版本、核算额、制度允许额、`WITHIN_LIMIT` / `REQUIRES_EXCEPTION` / `DENIED`、税务规则引用及证据引用。超标不是已获特批，后续审批仍然必需。
 
 验票请求含 `employeeId`、`legalEntityId`、`originalFileId`、`originalDigest`、`mediaType` 和 Base64 编码的 `original`。实际字节必须从服务器原件存储读取，并与 SHA-256 摘要相符；最大 20 MiB，支持 PDF、OFD、PNG、JPEG。接口不接受文件下载 URL。成功结果保留规范票号、法人、含税金额、税额、开票日期、相同原件摘要、查验引用、查验时刻及有效期。数电票使用 `DIGITAL` 和二十位 `number`，`code` 为 null 或省略；传统票使用 `TRADITIONAL`、`code` 和 `number`。真实票种、真实性及买方校验责任在企业查验服务。
+
+预算预检请求含 `reportId`、`roundNo`、`financialVersion`（待提交财务版本）、`employeeId`、`legalEntityId`、`baseCurrency`、`accountingDate` 和 `allocations`。每项分摊为 `expenseLineNo`、`allocationNo`（均从 1 开始）、`categoryCode` 及 `cost: {costCenter, projectCode, amount}`。费用类别到真实预算科目的映射由企业预算服务提供，本地不编造科目或额度。上限为 200 行费用、每行 50 个分摊，同一位置不能重复，所有金额必须为法人本位币。
+
+预算基数采用本位币核定含税分摊，不减可抵扣税额或借款冲销额。分摊已经过按行汇兑和整分平衡，不再汇兑。第 N 轮重提时，企业预检可把同租户、同报销单的第 N−1 轮现存冻结作为可替换额度；不能增加其他单据或已消耗预算的可用量。预检本身不得释放、替换或冻结额度。
+
+预算成功返回 `request`（完整回传已核对的请求）、`reference`、`checkedAt`、`validUntil`，表示该份请求在检查时具有可用预算。总额相同但员工、法人、轮次、财务版本、期间、费用类别、成本中心或项目不同，均判为响应无效。此证据不是冻结凭证；后续提交必须另行幂等冻结，外部并发消耗仍可能导致冻结不足。
 
 ## 结果分类和事务边界
 
@@ -79,6 +86,7 @@ agentflow:
 | 汇率 | `RATE_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE` |
 | 制度 | `POLICY_NOT_FOUND`, `EXPENSE_PROHIBITED`, `PRIOR_REQUEST_REQUIRED`, `COST_OBJECT_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE`, `EMPLOYEE_UNAVAILABLE` |
 | 验票 | `INVOICE_INVALID`, `INVOICE_CANCELLED`, `INVOICE_BUYER_MISMATCH`, `LEGAL_ENTITY_UNAVAILABLE` |
+| 预算预检 | `BUDGET_INSUFFICIENT`, `BUDGET_POLICY_UNAVAILABLE`, `ACCOUNTING_PERIOD_CLOSED`, `COST_OBJECT_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE`, `EMPLOYEE_UNAVAILABLE` |
 
 依赖失败分类为 `NOT_CONFIGURED`、`TIMEOUT`、`CONNECTION`、`AUTHENTICATION`、`REMOTE_FAILURE`、`INVALID_RESPONSE`、`RESPONSE_TOO_LARGE`。只读 API 映射为 HTTP 503；业务拒绝映射为 HTTP 422。预检工作流应分别收集两类结果，不得将外部不可用持久化成“发票无效”或“已查验”。
 
@@ -89,3 +97,5 @@ agentflow:
 `FinanceGatewayClientTest` 使用真实回环 HTTP 和合成财务事实，验证成功、租户与编号错配、员工/法人错配、账户掩码、有效期、金额/税额错配、原件字节摘要、业务拒绝、重定向、分块超限、响应体超时及事务禁止。测试包含真实请求头和正文检查，不代表企业服务已经接入。
 
 `FinanceCatalogControllerTest` 验证当前主体、防查询参数覆盖、无缓存和错误码；`OpenApiContractTest` 对照实际路由和公开记录字段。原有报销草稿回归继续验证精确金额 JSON、敏感字段授权和幂等。详见 `evidence/finance-gateway-20260928.json`。
+
+预算只读端口另通过领域/核算/契约 23 项、实际 HTTP 网关/验票/目录 28 项；此范围包括原有回归。没有新增预算写入 API、冻结状态或凭证/支付行为。证据见 `evidence/budget-precheck-port-20260928.json`。

@@ -59,6 +59,7 @@ class FinanceGatewayClientTest {
     private GatewayExchangeRates rates;
     private GatewayExpensePolicies policies;
     private GatewayInvoiceVerification invoices;
+    private GatewayBudgetPrecheck budgets;
 
     @BeforeEach
     void start() throws IOException {
@@ -69,6 +70,7 @@ class FinanceGatewayClientTest {
         config.validate(); client = new FinanceGatewayClient(config, mapper);
         master = new GatewayFinanceMasterData(client); rates = new GatewayExchangeRates(client);
         policies = new GatewayExpensePolicies(client); invoices = new GatewayInvoiceVerification(client);
+        budgets = new GatewayBudgetPrecheck(client);
         answer(catalog("alice", Instant.now().plusSeconds(60)));
     }
 
@@ -214,6 +216,47 @@ class FinanceGatewayClientTest {
         assertThat(policies.assess("tenant-a", request)).isEqualTo(invalid());
         responder.set(in -> { var body = success(in, good); ((ObjectNode) body.at("/data/policy/assessedGross")).put("value", 100); return json.write(body); });
         assertThat(policies.assess("tenant-a", request)).isEqualTo(invalid());
+    }
+
+    @Test
+    void budgetPrecheckBindsWholeRequestAndDoesNotAcceptEqualTotalsForDifferentCostObjects() {
+        var request = new BudgetPrecheckPort.Request(UUID.randomUUID(), 2, 4, "alice", ENTITY, "CNY", DATE,
+                List.of(new BudgetPrecheckPort.Allocation(1, 1, "TRAVEL", new CostAllocation("IT", "P1", cny("100")))));
+        var evidence = new BudgetPrecheckPort.Assessment(request, "synthetic-budget", Instant.now().minusSeconds(1), Instant.now().plusSeconds(60));
+        answer(evidence); assertThat(budgets.precheck("tenant-a", request).requireValue()).isEqualTo(evidence);
+        assertThat(path.get()).isEqualTo("/finance/budget-precheck");
+        assertThat(received.get().at("/data/allocations/0/cost/amount/value").asText()).isEqualTo("100.00");
+        List<Consumer<ObjectNode>> corruptions = List.of(
+                body -> ((ObjectNode) body.at("/data/request")).put("reportId", UUID.randomUUID().toString()),
+                body -> ((ObjectNode) body.at("/data/request")).put("roundNo", 3),
+                body -> ((ObjectNode) body.at("/data/request")).put("financialVersion", 5),
+                body -> ((ObjectNode) body.at("/data/request")).put("employeeId", "bob"),
+                body -> ((ObjectNode) body.at("/data/request")).put("legalEntityId", UUID.randomUUID().toString()),
+                body -> ((ObjectNode) body.at("/data/request")).put("accountingDate", DATE.plusDays(1).toString()),
+                body -> ((ObjectNode) body.at("/data/request/allocations/0")).put("categoryCode", "OTHER"),
+                body -> ((ObjectNode) body.at("/data/request/allocations/0/cost")).put("costCenter", "OTHER"),
+                body -> ((ObjectNode) body.at("/data/request/allocations/0/cost")).put("projectCode", "P2"),
+                body -> ((ObjectNode) body.at("/data/request/allocations/0/cost/amount")).put("value", "99.99"),
+                body -> ((ObjectNode) body.path("data")).put("validUntil", Instant.now().minusSeconds(1).toString()),
+                body -> ((ObjectNode) body.path("data")).put("checkedAt", Instant.now().plusSeconds(1).toString()));
+        for (var corrupt : corruptions) {
+            responder.set(in -> { var body = success(in, evidence); corrupt.accept(body); return json.write(body); });
+            assertThat(budgets.precheck("tenant-a", request)).isEqualTo(invalid());
+        }
+    }
+
+    @Test
+    void budgetFailuresKeepBusinessShortfallDistinctFromAnUnavailableService() {
+        var request = new BudgetPrecheckPort.Request(UUID.randomUUID(), 1, 1, "alice", ENTITY, "CNY", DATE,
+                List.of(new BudgetPrecheckPort.Allocation(1, 1, "TRAVEL", new CostAllocation("IT", null, cny("100")))));
+        for (var reason : List.of(FinanceResult.Reason.BUDGET_INSUFFICIENT, FinanceResult.Reason.BUDGET_POLICY_UNAVAILABLE, FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED)) {
+            reject(reason.name()); assertThat(budgets.precheck("tenant-a", request)).isEqualTo(new FinanceResult.Rejected<>(reason));
+        }
+        reject("INVOICE_INVALID"); assertThat(budgets.precheck("tenant-a", request)).isEqualTo(invalid());
+        status.set(503); assertThat(budgets.precheck("tenant-a", request)).isEqualTo(unavailable(FinanceResult.Failure.REMOTE_FAILURE));
+        int before = requests.get(); config.setEnabled(false);
+        assertThat(budgets.precheck("tenant-a", request)).isEqualTo(unavailable(FinanceResult.Failure.NOT_CONFIGURED));
+        assertThat(requests.get()).isEqualTo(before);
     }
 
     @Test

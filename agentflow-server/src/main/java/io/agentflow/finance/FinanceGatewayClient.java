@@ -108,7 +108,10 @@ public class FinanceGatewayClient {
         EXPENSE_POLICY("expense-policy", Set.of(FinanceResult.Reason.POLICY_NOT_FOUND, FinanceResult.Reason.EXPENSE_PROHIBITED,
                 FinanceResult.Reason.PRIOR_REQUEST_REQUIRED, FinanceResult.Reason.COST_OBJECT_UNAVAILABLE, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         INVOICE_VERIFICATION("invoice-verification", Set.of(FinanceResult.Reason.INVOICE_INVALID, FinanceResult.Reason.INVOICE_CANCELLED,
-                FinanceResult.Reason.INVOICE_BUYER_MISMATCH, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE));
+                FinanceResult.Reason.INVOICE_BUYER_MISMATCH, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
+        BUDGET_PRECHECK("budget-precheck", Set.of(FinanceResult.Reason.BUDGET_INSUFFICIENT, FinanceResult.Reason.BUDGET_POLICY_UNAVAILABLE,
+                FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED, FinanceResult.Reason.COST_OBJECT_UNAVAILABLE,
+                FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE));
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
         Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }
