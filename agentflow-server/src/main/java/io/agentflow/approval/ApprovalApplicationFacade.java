@@ -148,8 +148,18 @@ public class ApprovalApplicationFacade {
     /** 仅发起人可以撤回审批中的申请，全部写入与引擎终止共用事务。 */
     @Transactional
     public Application withdraw(UUID id, long expectedVersion, String comment) {
+        return withdrawBound(id, expectedVersion, comment, null);
+    }
+
+    /** 业务申请撤回由业务服务核对财务版本，保留本轮资源供补正重提。 */
+    @Transactional
+    public Application withdrawBusiness(UUID id, long expectedVersion, String comment, BusinessReference reference) {
+        return withdrawBound(id, expectedVersion, comment, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application withdrawBound(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireWriteBinding(requireApplicant(actor, id), null);
+        requireWriteBinding(requireApplicant(actor, id), reference);
         var previous = notifications.beforeWithdrawal(service.get(actor.tenantId(), id));
         Application application = service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
         notifications.withdrawn(application, actor.userId(), previous);
@@ -159,9 +169,27 @@ public class ApprovalApplicationFacade {
     /** 仅申请人可作废未在审批中的单据；申请版本与审计在同一事务内提交。 */
     @Transactional
     public Application cancel(UUID id, long expectedVersion, String comment) {
+        return cancelBound(id, expectedVersion, comment, null);
+    }
+
+    /** 业务作废需要同事务释放资源，此入口只执行申请自身状态与审计。 */
+    @Transactional
+    public Application cancelBusiness(UUID id, long expectedVersion, String comment, BusinessReference reference) {
+        return cancelBound(id, expectedVersion, comment, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application cancelBound(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireWriteBinding(requireApplicant(actor, id), null);
+        requireWriteBinding(requireApplicant(actor, id), reference);
         return service.cancel(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+    }
+
+    /** 内部财务结果使用明确系统身份退回，不冒用申请人或某个人工审批任务。 */
+    @Transactional
+    public Application returnBusiness(String tenant, UUID id, long expectedVersion, BusinessReference reference, String actor, String comment) {
+        requireWriteBinding(service.get(tenant, id), java.util.Objects.requireNonNull(reference));
+        var application = service.returnToApplicant(tenant, id, expectedVersion, actor, comment);
+        notifications.returned(application, actor); return application;
     }
 
     /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */

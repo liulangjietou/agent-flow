@@ -16,6 +16,8 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.notification.ApprovalNotificationService;
+import io.agentflow.expense.ExpenseApprovalService;
+import io.agentflow.expense.ExpenseReleaseService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
@@ -24,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 /**
  * 任务应用服务，集中执行租户、候选关系和乐观版本校验，再调用流程防腐层。
@@ -40,12 +41,16 @@ public class FlowableTaskFacade {
     private final TaskAuditPort auditPort;
     private final SubmissionRoundRepository rounds;
     private final ApprovalNotificationService notifications;
+    private final FlowableTaskAuthorization authorization;
+    private final ExpenseApprovalService expenses;
+    private final ExpenseReleaseService expenseReleases;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
                               ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
                               TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients,
-                              ApprovalNotificationService notifications) {
+                              ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
+                              ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -54,6 +59,7 @@ public class FlowableTaskFacade {
         this.auditPort = auditPort;
         this.rounds = rounds;
         this.notifications = notifications;
+        this.authorization = authorization; this.expenses = expenses; this.expenseReleases = expenseReleases;
     }
 
     /** 只返回当前主体可领取或已指派给自己的待办。 */
@@ -67,7 +73,7 @@ public class FlowableTaskFacade {
         }
         query.active();
         if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return List.of();
-        return query.list().stream().filter(task -> canAct(actor, task)).map(task -> view(actor, task)).toList();
+        return query.list().stream().filter(task -> authorization.canAct(actor, task)).map(task -> view(actor, task)).toList();
     }
 
     /** 按标识重新取得可操作任务，打开列表或旧消息时不依赖全量队列。 */
@@ -78,15 +84,15 @@ public class FlowableTaskFacade {
     /** 后台摘要复核已认证的发起主体，继续使用当前任务与组织事实，不修改线程认证上下文。 */
     public TaskView get(String taskId, Actor actor) {
         actor.requireRole("APPROVER");
-        Task task = authorizedTask(taskId, actor);
-        if (task.isSuspended() || applicationFor(actor, task).status() != ApplicationStatus.IN_APPROVAL) {
+        Task task = authorization.require(taskId, actor);
+        if (task.isSuspended() || authorization.application(actor, task).status() != ApplicationStatus.IN_APPROVAL) {
             throw new DomainException("NOT_FOUND", "Active task not found");
         }
         return view(actor, task);
     }
 
     private TaskView view(Actor actor, Task task) {
-        Application application = applicationFor(actor, task);
+        Application application = authorization.application(actor, task);
         CountersignProgress countersign = countersign(task);
         return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
                 application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
@@ -111,8 +117,11 @@ public class FlowableTaskFacade {
         if (expectedVersion == null) {
             throw new DomainException("INVALID_REQUEST", "expectedVersion is required");
         }
-        Task task = authorizedTask(taskId, actor);
-        Application application = applicationFor(actor, task);
+        Task task = authorization.require(taskId, actor);
+        Application application = authorization.application(actor, task);
+        expenses.lock(application);
+        task = authorization.require(taskId, actor);
+        application = authorization.application(actor, task);
         ApplicationStatus previousStatus = application.status();
         TaskAction normalized = TaskAction.parse(action);
         delegation(task).requireAction(normalized);
@@ -178,6 +187,7 @@ public class FlowableTaskFacade {
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
             }
             case APPROVE -> {
+                expenses.requireApproval(application, task);
                 application.recordTaskAction(expectedVersion);
                 recordDecisionAssignee(task, actor);
                 ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
@@ -191,6 +201,7 @@ public class FlowableTaskFacade {
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }
+        if (normalized == TaskAction.REJECT) expenseReleases.release(application, actor.userId(), Instant.now());
         notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds);
         return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }
@@ -199,21 +210,9 @@ public class FlowableTaskFacade {
     public List<String> recipients(String taskId) {
         Actor actor = currentActor.actor();
         actor.requireRole("APPROVER");
-        Task task = authorizedTask(taskId, actor);
+        Task task = authorization.require(taskId, actor);
         delegation(task).requireAction(TaskAction.TRANSFER);
         return recipients.approvers(actor.tenantId()).stream().filter(user -> !actor.userId().equals(user)).toList();
-    }
-
-    private Task authorizedTask(String taskId, Actor actor) {
-        if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException("FORBIDDEN", "Current organization approval eligibility is missing");
-        Task task = taskService.createTaskQuery().taskId(taskId).includeProcessVariables().includeIdentityLinks().singleResult();
-        if (task == null || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
-            throw new DomainException("NOT_FOUND", "Task not found");
-        }
-        if (!canAct(actor, task)) {
-            throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
-        }
-        return task;
     }
 
     private TaskDelegation delegation(Task task) {
@@ -230,31 +229,6 @@ public class FlowableTaskFacade {
     private void completeRound(Task task, Application application, Actor actor, String reason) {
         rounds.complete(actor.tenantId(), application.id(), application.roundNo(), task.getProcessInstanceId(),
                 SubmissionRound.Status.valueOf(application.status().name()), reason, actor.userId(), Instant.now());
-    }
-
-    private Application applicationFor(Actor actor, Task task) {
-        Object value = task.getProcessVariables().get("applicationId");
-        try {
-            return applicationRepository.findById(actor.tenantId(), UUID.fromString(String.valueOf(value)))
-                    .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
-        } catch (IllegalArgumentException exception) {
-            throw new DomainException("NOT_FOUND", "Application not found");
-        }
-    }
-
-    private boolean canAct(Actor actor, Task task) {
-        if (!actor.hasRole("APPROVER") || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
-            return false;
-        }
-        if (actor.userId().equals(task.getAssignee())) {
-            return true;
-        }
-        if (task.getAssignee() != null) {
-            return false;
-        }
-        return task.getIdentityLinks().stream().anyMatch(link ->
-                actor.userId().equals(link.getUserId()) ||
-                        (link.getGroupId() != null && actor.hasRole(link.getGroupId())));
     }
 
     private void requireAssignee(Task task, Actor actor) {

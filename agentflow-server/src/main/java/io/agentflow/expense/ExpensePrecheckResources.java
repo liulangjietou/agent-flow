@@ -4,6 +4,8 @@ import io.agentflow.common.DomainException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -34,11 +36,34 @@ public class ExpensePrecheckResources {
         this.jdbc = new NamedParameterJdbcTemplate(jdbc);
     }
 
+    /** 正式提交在同一短事务固定资源引用，阻止新验票任务在复核凭据后插入。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockReferences(String tenant, List<ResourceVersion> references) {
+        for (var kind : ResourceKind.values()) {
+            var ids = references.stream().filter(value -> value.kind() == kind).map(value -> value.id().toString()).sorted().toList();
+            if (!ids.isEmpty()) jdbc.queryForList("""
+                    SELECT id FROM finance_resource WHERE tenant_id=:tenant AND resource_type=:kind AND id IN (:ids)
+                    ORDER BY id FOR UPDATE
+                    """, Map.of("tenant", tenant, "kind", kind.name(), "ids", ids), String.class);
+        }
+    }
+
     /** 当前输入与上一轮占用都参与重提，不能漏掉本次被删除的引用。 */
     public ExpenseSubmissionResources.Resources load(ExpenseReport report) {
+        return load(report, true);
+    }
+
+    /** 取消补正单时只读取已提交引用，新草稿可能已经删除或替换了原占用。 */
+    public ExpenseSubmissionResources.Resources loadReserved(ExpenseReport report) {
+        return load(report, false);
+    }
+
+    private ExpenseSubmissionResources.Resources load(ExpenseReport report, boolean includeDraft) {
         var invoiceIds = new HashSet<UUID>(); var requestIds = new HashSet<UUID>(); var advanceIds = new HashSet<UUID>();
-        collect(report.content(), invoiceIds, requestIds);
-        report.content().advanceOffsets().forEach(value -> advanceIds.add(value.advanceId()));
+        if (includeDraft) {
+            collect(report.content(), invoiceIds, requestIds);
+            report.content().advanceOffsets().forEach(value -> advanceIds.add(value.advanceId()));
+        }
         if (!report.rounds().isEmpty()) {
             collect(report.currentRound().content(), invoiceIds, requestIds);
             report.currentRound().advanceOffsets().forEach(value -> advanceIds.add(value.advanceId()));

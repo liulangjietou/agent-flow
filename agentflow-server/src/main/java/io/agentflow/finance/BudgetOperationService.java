@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseReportRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
@@ -22,12 +23,14 @@ public class BudgetOperationService {
     private final JdbcBudgetOccupationRepository occupations;
     private final JdbcBudgetOperationRepository operations;
     private final Duration lease;
+    private final ApplicationEventPublisher events;
 
     /** 领取租约有界；恢复不依赖当前进程保存状态。 */
     public BudgetOperationService(ExpenseReportRepository reports, JdbcBudgetOccupationRepository occupations,
-            JdbcBudgetOperationRepository operations, @Value("${agentflow.budgets.lease-seconds:90}") int leaseSeconds) {
+            JdbcBudgetOperationRepository operations, @Value("${agentflow.budgets.lease-seconds:90}") int leaseSeconds, ApplicationEventPublisher events) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Budget lease must be between 15 and 300 seconds");
         this.reports = reports; this.occupations = occupations; this.operations = operations; this.lease = Duration.ofSeconds(leaseSeconds);
+        this.events = events;
     }
 
     /** 必须加入正式提交或核减事务，金额从刚保存的实际轮次派生，不能传客户端预算命令。 */
@@ -96,6 +99,7 @@ public class BudgetOperationService {
             var command = completed.input().command();
             var occupation = occupations.find(command.tenantId(), command.position().reportId()).orElseThrow(BudgetOperationService::notFound);
             occupations.update(occupation.complete(completed));
+            events.publishEvent(new BudgetOperationCompleted(completed));
         }
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }

@@ -38,8 +38,8 @@ public record BudgetOccupation(String tenantId, UUID reportId, String employeeId
         if (status == Status.RELEASED || status == Status.CONSUMED) throw new DomainException("BUDGET_FINALIZED", "Budget ledger has been finalized");
         if (command.action() == BudgetCommand.Action.ADJUST) {
             var previous = confirmed.position(); var next = command.position();
-            if (next.financialVersion() <= previous.financialVersion() || next.roundNo() < previous.roundNo()
-                    || next.roundNo() > previous.roundNo() + 1) throw conflict();
+            // 拒绝的重提不改变最后确认的预算轮次，后续合法轮次可能跨过不止一轮。
+            if (next.financialVersion() <= previous.financialVersion() || next.roundNo() < previous.roundNo()) throw conflict();
         } else if (command.action() != BudgetCommand.Action.FREEZE && !command.position().equals(confirmed.position())) throw conflict();
         return new BudgetOccupation(tenantId, reportId, employeeId, targetDigest, Math.incrementExact(version), status, confirmed, command.id());
     }

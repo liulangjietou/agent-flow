@@ -31,6 +31,7 @@ public class ApprovalWebhookEvents {
             case SUBMIT -> "ApplicationSubmitted";
             case WITHDRAW -> "ApplicationWithdrawn";
             case CANCEL -> "ApplicationCancelled";
+            case RETURN -> "ApplicationReturned";
             default -> null;
         };
         if (type == null) return;

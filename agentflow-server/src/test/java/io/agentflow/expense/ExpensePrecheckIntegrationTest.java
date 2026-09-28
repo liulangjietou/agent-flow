@@ -116,6 +116,7 @@ class ExpensePrecheckIntegrationTest {
     @Autowired JdbcInvoiceVerificationRepository verificationJobs;
     @Autowired ExpensePrecheckResources resourceSnapshots;
     @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired JdbcExpenseSubmissionControlRepository controls;
 
     @BeforeEach void setup() {
         wire = json; CALLS.clear(); LAST_BUDGET.set(null);
@@ -139,6 +140,34 @@ class ExpensePrecheckIntegrationTest {
         actors.clear();
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @Test
+    void submissionControlPersistsActualPrecheckEvidenceAndCannotReuseReceiptAcrossRounds() throws Exception {
+        var report = fixture(false).report(); UUID checked = enqueue(report); worker.poll(); var evidence = job(checked).result().evidence();
+        var preview = evidence.preview(); Instant submittedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var input = new ExpenseSubmissionControl.Input("demo", report.id(), report.applicationId(), "alice", 1, 2, checked,
+                job(checked).input().accountingDate(), true, Map.of("receipt", ExpenseProcessPolicy.Stage.RECEIPT, "finance", ExpenseProcessPolicy.Stage.FINANCE_REVIEW));
+        var value = ExpenseSubmissionControl.submitted(input, submittedAt);
+        new TransactionTemplate(transactions).executeWithoutResult(transaction -> {
+            report.freeze(1, 1, preview.baseCurrency(), preview.account(), Map.of(1, preview.originalLines().get(0).assessment()), "alice", submittedAt);
+            reports.update(report, 1, "alice", "SYNTHETIC_FREEZE");
+            // 此测试验证存储边界，审批轮次为明确的合成夹具；实际 Flowable 提交由专门消费者测试验收。
+            jdbc.update("""
+                    INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,
+                    title,payload_json,submitted_by,submitted_at,status)
+                    VALUES('demo',?,1,?,1,'合成财务控制','{}','alice',?,'IN_APPROVAL')
+                    """, report.applicationId().toString(), "synthetic-control-" + UUID.randomUUID(), java.sql.Timestamp.from(submittedAt));
+            controls.create(value);
+        });
+        assertThat(controls.find("demo", report.id(), 1)).contains(value);
+        assertThat(controls.find("foreign", report.id(), 1)).isEmpty(); assertThat(controls.find("demo", report.id(), 2)).isEmpty();
+        var signed = value.receive("synthetic-task", "receipt", "manager", "合成纸件已核对", submittedAt.plusSeconds(1));
+        new TransactionTemplate(transactions).executeWithoutResult(transaction -> controls.update(signed));
+        assertThat(new JdbcExpenseSubmissionControlRepository(jdbc, json).find("demo", report.id(), 1)).contains(signed);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_control_revision WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(2);
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(transaction -> controls.update(signed))).isInstanceOf(DomainException.class);
+        assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(2);
+    }
 
     @Test
     void completeReadonlyPrecheckUsesActualPortsAndKeepsEveryFinancialResourceUnchanged() throws Exception {

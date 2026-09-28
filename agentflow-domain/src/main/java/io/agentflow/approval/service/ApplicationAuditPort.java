@@ -25,5 +25,5 @@ public interface ApplicationAuditPort {
      * 由申请应用服务执行的生命周期动作。
      * @author owlzhangfq@gmail.com
      */
-    enum Action { CREATE, REVISE, SUBMIT, WITHDRAW, CANCEL }
+    enum Action { CREATE, REVISE, SUBMIT, WITHDRAW, CANCEL, RETURN }
 }

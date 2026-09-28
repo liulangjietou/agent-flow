@@ -27,9 +27,15 @@ import java.util.UUID;
 public class ExpenseController {
     private final ExpenseDraftService drafts;
     private final IdempotencyExecutor idempotency;
+    private final ExpenseSubmissionService submissions;
+    private final ExpenseApprovalService approvals;
+    private final ExpenseLifecycleService lifecycle;
 
     /** 财务写入继续使用平台请求幂等及实际认证主体。 */
-    public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency) { this.drafts = drafts; this.idempotency = idempotency; }
+    public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency, ExpenseSubmissionService submissions,
+            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle) {
+        this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle;
+    }
 
     /** 创建草稿，只绑定可用的已发布费用流程。 */
     @PostMapping
@@ -47,6 +53,31 @@ public class ExpenseController {
     public ResponseEntity<String> revise(@PathVariable UUID id, @Valid @RequestBody ReviseRequest request, HttpServletRequest http) {
         return idempotency.execute(http, HttpStatus.OK,
                 () -> drafts.revise(id, request.applicationVersion(), request.financialVersion(), request.content()));
+    }
+
+    /** 正式提交与重提共用实际预检、双版本和当前审批轮次。 */
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<String> submit(@PathVariable UUID id, @Valid @RequestBody ExpenseSubmissionService.Input request, HttpServletRequest http) {
+        return idempotency.execute(http, HttpStatus.OK, () -> submissions.submit(id, request));
+    }
+
+    /** 签收是明确操作，不隐含在通用审批同意中。 */
+    @PostMapping("/{id}/tasks/{taskId}/receive")
+    public ResponseEntity<String> receive(@PathVariable UUID id, @PathVariable String taskId,
+            @Valid @RequestBody ExpenseApprovalService.ReceiveInput request, HttpServletRequest http) {
+        return idempotency.execute(http, HttpStatus.OK, () -> approvals.receive(id, taskId, request));
+    }
+
+    /** 撤回保留本轮预留供补正。 */
+    @PostMapping("/{id}/withdraw")
+    public ResponseEntity<String> withdraw(@PathVariable UUID id, @Valid @RequestBody ExpenseLifecycleService.Input request, HttpServletRequest http) {
+        return idempotency.execute(http, HttpStatus.OK, () -> lifecycle.change(id, request, false));
+    }
+
+    /** 作废同时安排释放本地预留和已确认的外部预算。 */
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<String> cancel(@PathVariable UUID id, @Valid @RequestBody ExpenseLifecycleService.Input request, HttpServletRequest http) {
+        return idempotency.execute(http, HttpStatus.OK, () -> lifecycle.change(id, request, true));
     }
 
     /**

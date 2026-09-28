@@ -90,6 +90,22 @@ class BudgetOperationTest {
     }
 
     @Test
+    void rejectedResubmissionDoesNotPreventAThirdRoundUsingTheLastConfirmedLedger() {
+        var frozen = freeze(queue()); var second = position(3, "120");
+        second = new BudgetPrecheckPort.Request(report, 2, second.financialVersion(), second.employeeId(), entity,
+                second.baseCurrency(), second.accountingDate(), second.allocations());
+        var input = input(BudgetCommand.Action.ADJUST, second, frozen.confirmed().expected());
+        var running = BudgetOperation.queue(input, NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE);
+        var rejected = frozen.enqueue(input).complete(running.complete(observed(running,
+                BudgetObservation.Status.REJECTED, BudgetObservation.Rejection.BUDGET_INSUFFICIENT), NOW.plusSeconds(3)));
+        var third = new BudgetPrecheckPort.Request(report, 3, 5, second.employeeId(), entity,
+                second.baseCurrency(), second.accountingDate(), position(5, "80").allocations());
+        var next = input(BudgetCommand.Action.ADJUST, third, rejected.confirmed().expected());
+        assertThat(rejected.enqueue(next).pendingOperationId()).isEqualTo(next.command().id());
+        assertThat(rejected.confirmed()).isEqualTo(frozen.confirmed());
+    }
+
+    @Test
     void releaseAndConsumeRequireExactLastPositionAndPreventLaterChanges() {
         for (var action : List.of(BudgetCommand.Action.RELEASE, BudgetCommand.Action.CONSUME)) {
             var frozen = freeze(queue());

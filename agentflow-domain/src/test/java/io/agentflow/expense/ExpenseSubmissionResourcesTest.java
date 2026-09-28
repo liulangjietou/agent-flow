@@ -41,6 +41,21 @@ class ExpenseSubmissionResourcesTest {
     }
 
     @Test
+    void cancellationReleasesOnlyFrozenRoundEvenWhenDraftReferencesAreNoLongerAvailable() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var request = request("100"); var advance = advance("80");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), request.id())), List.of(new AdvanceOffset(advance.id(), money("80"))));
+        var inputs = resources(List.of(invoice), List.of(request), List.of(advance));
+        var retained = applied(inputs, planner.plan(report, inputs, NOW));
+        report.revise(report.version(), new ExpenseContent(ENTITY, ExpenseContent.Type.DAILY, "未提交补正",
+                List.of(line(1, "100", List.of(UUID.randomUUID()), UUID.randomUUID())), List.of(new AdvanceOffset(UUID.randomUUID(), money("80")))));
+        var released = applied(retained, planner.release(report, retained, NOW.plusSeconds(20)));
+        assertThat(released.invoices().get(invoice.id()).occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
+        assertThat(released.requests().get(request.id()).balances().get(1).available()).isEqualTo(money("100"));
+        assertThat(released.advances().get(advance.id()).balance().available()).isEqualTo(money("80"));
+        assertThat(planner.release(report, released, NOW.plusSeconds(30))).isEqualTo(new ExpenseSubmissionResources.Plan(List.of(), List.of(), List.of()));
+    }
+
+    @Test
     void resubmissionReleasesRemovedResourcesAndMovesOnlyRetainedPreviousRoundUses() {
         var first = invoice(UUID.randomUUID(), "12345678901234567890"); var removed = invoice(UUID.randomUUID(), "22345678901234567890");
         var request = request("200"); var advance = advance("100"); var removedAdvance = advance("100");

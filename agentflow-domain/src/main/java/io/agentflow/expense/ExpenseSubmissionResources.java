@@ -41,6 +41,14 @@ public final class ExpenseSubmissionResources {
         return new Plan(invoices, requests, advances);
     }
 
+    /** 驳回或作废只释放上一轮实际预留，不读取补正后尚未提交的资源引用。 */
+    public Plan release(ExpenseReport report, Resources resources, Instant at) {
+        if (report.rounds().isEmpty()) return new Plan(List.of(), List.of(), List.of());
+        var previous = report.currentRound();
+        return new Plan(invoiceChanges(report, previous, Map.of(), resources, at),
+                priorChanges(report, previous, Map.of(), resources), advanceChanges(report, previous, Map.of(), resources));
+    }
+
     private List<InvoiceChange> invoiceChanges(ExpenseReport report, ExpenseRound previous, Map<UUID, ExpenseUse> desired, Resources resources, Instant at) {
         var old = new HashMap<UUID, ExpenseUse>();
         if (previous != null) for (var line : previous.content().lines()) for (UUID id : line.invoiceIds()) {
@@ -114,6 +122,10 @@ public final class ExpenseSubmissionResources {
     private List<AdvanceChange> advanceChanges(ExpenseReport report, ExpenseRound previous, Resources resources) {
         var desired = new HashMap<UUID, Money>();
         for (var offset : report.currentRound().advanceOffsets()) if (offset.amount().value().signum() > 0) desired.put(offset.advanceId(), offset.amount());
+        return advanceChanges(report, previous, desired, resources);
+    }
+
+    private List<AdvanceChange> advanceChanges(ExpenseReport report, ExpenseRound previous, Map<UUID, Money> desired, Resources resources) {
         var old = new HashMap<UUID, Money>();
         if (previous != null) for (var offset : previous.advanceOffsets()) if (offset.amount().value().signum() > 0) old.put(offset.advanceId(), offset.amount());
         var changes = new ArrayList<AdvanceChange>(); var target = new ExpenseUse(report.id(), report.currentRound().roundNo(), 0);

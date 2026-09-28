@@ -14497,6 +14497,643 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/submit": {
+      "post": {
+        "operationId": "submitExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "正式提交或重提报销",
+        "description": "复核本人最新有效预检、双版本、任职和已发布流程；在一个本地事务内冻结财务轮次、占用资源、启动审批并登记预算命令。回执不表示外部预算已冻结。财务同意必须等待实际冻结并满足本轮纸件要求。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseSubmissionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseSubmissionInput"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "precheckId": "11111111-1111-4111-8111-111111111111"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/tasks/{taskId}/receive": {
+      "post": {
+        "operationId": "receiveExpensePaper",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "确认本轮纸质原件",
+        "description": "明确确认纸件，不能由普通同意隐式替代。只允许当前轮次 RECEIPT 节点，每轮一次；需匹配双版本。待归还委派不能代签，重提需要重新签收。",
+        "x-access": "当前签收节点的可决策审批人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePaperReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "当前签收任务标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseReceiveInput"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "comment": "确认当前操作原因"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/withdraw": {
+      "post": {
+        "operationId": "withdrawExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "撤回报销申请",
+        "description": "终止当前审批轮次，保留发票、事前额度、借款及已确认预算冻结供补正重提。不得使用通用申请写入入口绕过财务版本。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseLifecycleReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseLifecycleInput"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "comment": "确认当前操作原因"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/cancel": {
+      "post": {
+        "operationId": "cancelExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "作废报销申请",
+        "description": "仅草稿、退回或撤回状态可作废。释放上一轮实际本地预留；已确认预算登记释放，未知预算先对账确认原操作，再决定释放。释放排队不表示外部已经完成。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseLifecycleReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseLifecycleInput"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "comment": "确认当前操作原因"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -21986,6 +22623,202 @@
         },
         "required": [
           "items"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSubmissionInput": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "precheckId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "financialVersion",
+          "precheckId"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseReceiveInput": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "financialVersion",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseLifecycleInput": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "financialVersion",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSubmissionReceipt": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budgetOperationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "roundNo",
+          "budgetOperationId"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePaperReceipt": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "controlVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "roundNo",
+          "controlVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseLifecycleReceipt": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WITHDRAWN",
+              "CANCELLED"
+            ]
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "status"
         ],
         "additionalProperties": false
       }

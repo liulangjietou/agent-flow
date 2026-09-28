@@ -2,6 +2,8 @@ package io.agentflow.definition;
 
 import java.util.*;
 import io.agentflow.form.FormSchema;
+import io.agentflow.expense.ExpenseFormContract;
+import io.agentflow.expense.ExpenseProcessPolicy;
 import java.util.regex.Pattern;
 
 import static io.agentflow.definition.DefinitionModels.*;
@@ -29,6 +31,11 @@ public final class DefinitionValidator {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (n.properties().containsKey(ExpenseProcessPolicy.PROPERTY)) {
+                try { ExpenseProcessPolicy.stage(n); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                if (!ExpenseFormContract.structured(formSchema)) errors.add("EXPENSE_STAGE_REQUIRES_EXPENSE_FORM:" + n.id());
+            }
             if (n.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + n.id());
             if (TaskDeadlinePolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
                 if (n.type() != NodeType.USER_TASK) errors.add("DEADLINE_REQUIRES_USER_TASK:" + n.id());

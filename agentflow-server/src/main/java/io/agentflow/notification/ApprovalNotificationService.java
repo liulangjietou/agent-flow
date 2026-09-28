@@ -56,6 +56,11 @@ public class ApprovalNotificationService {
         }
     }
 
+    /** 系统退回没有人工任务编号，通知沿用真实申请轮次及系统身份。 */
+    public void returned(Application application, String actor) {
+        send(application, actor, application.createdBy(), Kind.APPLICATION_RETURNED, null, null);
+    }
+
     /** 通知内容取已成功执行后的事实；领取不重复提醒，释放提醒恢复的候选人。 */
     public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName,
                           Set<String> previousTaskIds) {

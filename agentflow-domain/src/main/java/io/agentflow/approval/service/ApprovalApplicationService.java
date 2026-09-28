@@ -142,6 +142,23 @@ public class ApprovalApplicationService {
         return application;
     }
 
+    /** 系统业务结论退回当前轮次，仍需精确终止对应实例并保存真实系统操作者。 */
+    public Application returnToApplicant(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
+        Application application = get(tenantId, id); ApplicationStatus previousStatus = application.status();
+        application.returnToApplicant(expectedVersion);
+        var round = rounds.findByRound(tenantId, id, application.roundNo()).orElseThrow(
+                () -> new DomainException("CONCURRENCY_CONFLICT", "Active submission round not found"));
+        if (round.status() != SubmissionRound.Status.IN_APPROVAL || round.definitionVersion() != application.definitionVersion()) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+        }
+        String instanceId = processRuntime.withdraw(new ProcessRuntimePort.WithdrawProcessCommand(tenantId, id, application.roundNo(),
+                round.processInstanceId(), "RETURN by " + actor));
+        repository.update(application, expectedVersion);
+        rounds.complete(tenantId, id, application.roundNo(), instanceId, SubmissionRound.Status.RETURNED, comment, actor, Instant.now());
+        recordApplicationOperation(application, actor, ApplicationAuditPort.Action.RETURN, previousStatus, instanceId, comment);
+        return application;
+    }
+
     private void recordApplicationOperation(Application application, String actor, ApplicationAuditPort.Action action,
                                             ApplicationStatus previousStatus, String instanceId, String comment) {
         audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(),

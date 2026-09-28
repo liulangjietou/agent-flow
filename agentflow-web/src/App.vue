@@ -47,6 +47,7 @@ import DefinitionPicker from './components/DefinitionPicker.vue'
 import { DefinitionSelection } from './definitionSelection'
 import DefinitionAssignee from './components/DefinitionAssignee.vue'
 import DefinitionDeadline from './components/DefinitionDeadline.vue'
+import DefinitionExpenseStage from './components/DefinitionExpenseStage.vue'
 import { assigneeLabel } from './definitionAssignees'
 import { simulationIssue } from './definitionSimulation'
 import DefinitionPublication from './components/DefinitionPublication.vue'
@@ -717,7 +718,17 @@ function patchQuickNode(id: string, patch: Partial<GraphNode>) {
     node.approvalMode = patch.properties.approvalMode ?? node.approvalMode
   }
 }
-/** 快速模式与画布共用同一个节点编辑模型，清除期限时不影响审批人及其他属性。 */
+/** 财务职责写入已有节点属性，清除后恢复普通业务审批，撤销保留完整配置。 */
+function patchExpenseStage(id: string, value: string | undefined) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type !== 'USER_TASK') return
+  const properties = { ...node.originalProperties }
+  if (value === undefined) delete properties.expenseStage
+  else properties.expenseStage = value
+  node.originalProperties = properties
+}
+/** 两种设计视图共用期限输入，清除时保留节点其他配置。 */
 function patchQuickDeadline(id: string, deadline: DesignerDeadline | undefined) {
   if (editorLocked.value || !canManageDefinitions.value) return
   const node = nodes.value.find(node => node.id === id)
@@ -1107,7 +1118,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
-          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @deadline="patchQuickDeadline" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
@@ -1138,6 +1149,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" v-model:approval-mode="selectedNode.approvalMode" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionCopyRecipient v-if="selectedNode.type === 'COPY'" :key="selectedNode.id" :model-value="selectedNode.recipientRule ?? ''" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="selectedNode.recipientRule = $event" />
+                <DefinitionExpenseStage v-if="selectedNode.type === 'USER_TASK'" :model-value="selectedNode.originalProperties?.expenseStage" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseStage(selectedNode.id, $event)" />
                 <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><p v-if="isExclusiveMerge(selectedNode.id)" class="field-help">条件汇合：选中的路径到达后直接继续，不等待未选中的路径。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedNode.id)" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>

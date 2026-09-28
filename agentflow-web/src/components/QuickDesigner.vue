@@ -7,11 +7,12 @@ import QuickSequence from './QuickSequence.vue'
 import DefinitionAssignee from './DefinitionAssignee.vue'
 import DefinitionCopyRecipient from './DefinitionCopyRecipient.vue'
 import DefinitionDeadline from './DefinitionDeadline.vue'
+import DefinitionExpenseStage from './DefinitionExpenseStage.vue'
 import { readDesignerDeadline, type DesignerDeadline } from '../designerGraph'
 import ConditionEditor from './ConditionEditor.vue'
 import { describeBranch, branchTooltip } from '../conditionPresentation'
 const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
-const emit = defineEmits<{ command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
+const emit = defineEmits<{ expenseStage: [id: string, value: string | undefined]; command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
 const projection = computed(() => projectQuickGraph(props.graph))
 const selected = computed(() => props.graph.nodes.find(node => node.id === props.selectedNode))
 const selectedDeadline = computed(() => selected.value ? readDesignerDeadline(selected.value.properties) : undefined)
@@ -60,6 +61,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
           <template v-if="['USER_TASK', 'COPY'].includes(selected.type)">
             <DefinitionCopyRecipient v-if="selected.type === 'COPY'" :key="selected.id" :model-value="selected.properties.recipientRule ?? ''" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('recipientRule', $event)" />
             <DefinitionAssignee v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selected.properties.assigneeRule ?? ''" :approval-mode="selected.properties.approvalMode ?? 'SINGLE'" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('assigneeRule', $event)" @update:approval-mode="properties('approvalMode', $event)" />
+            <DefinitionExpenseStage v-if="selected.type === 'USER_TASK'" :model-value="selected.properties.expenseStage" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('expenseStage', selected.id, $event)" />
             <DefinitionDeadline v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selectedDeadline" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="changeDeadline" />
             <div class="quick-move"><button type="button" class="secondary" :disabled="!adjacent.before" @click="emit('command', { kind: 'swapTasks', firstId: adjacent.before!, secondId: selected.id })">上移一步</button><button type="button" class="secondary" :disabled="!adjacent.after" @click="emit('command', { kind: 'swapTasks', firstId: selected.id, secondId: adjacent.after! })">下移一步</button></div>
             <button type="button" class="quick-delete" @click="emit('command', { kind: 'removeTask', nodeId: selected.id })">删除此步骤并接续流程</button>
