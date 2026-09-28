@@ -22,6 +22,7 @@ class PairedAttachmentRecoveryTest(unittest.TestCase):
         (self.source / (self.record['id'] + '.bin')).write_bytes(b'abc')
         self.client = Mock(config={'schema': 'public'})
         self.client.sql.return_value = json.dumps([self.record])
+        self.client.sql.side_effect = lambda query, database=None: 'approval_attachment' if query.startswith('SELECT CASE') else self.client.sql.return_value
 
     def tearDown(self):
         self.temp.cleanup()
@@ -64,7 +65,7 @@ class PairedAttachmentRecoveryTest(unittest.TestCase):
                     source.unlink()
                 else:
                     source.write_bytes(b'abc')
-                    self.client.sql.side_effect = [json.dumps([self.record]), '[]']
+                    self.client.sql.side_effect = ['approval_attachment', json.dumps([self.record]), 'approval_attachment', '[]']
                 with patch.object(db, 'backup', side_effect=self.database_backup):
                     with self.assertRaises((OSError, db.RecoveryError)):
                         attachments.backup(self.client, self.source, output, True)
@@ -104,6 +105,22 @@ class PairedAttachmentRecoveryTest(unittest.TestCase):
             with self.assertRaises(ValueError): attachments.restore(self.client, bundle, output)
         self.assertFalse((output / 'receipt.json').exists())
         self.assertTrue((output / 'database').exists())
+
+    def test_invoice_originals_join_the_paired_backup_inventory(self):
+        invoice = dict(self.record, id=str(uuid.uuid4()))
+        (self.source / (invoice['id'] + '.bin')).write_bytes(b'abc')
+        def sql(query, database=None):
+            if query.startswith('SELECT CASE'):
+                return 'stored_document_inventory'
+            return json.dumps([self.record, invoice] if '.stored_document_inventory' in query else [self.record])
+        self.client.sql.side_effect = sql
+        bundle = self.bundle()
+        self.assertEqual(len(attachments.check_bundle(bundle)[0]['files']), 2)
+        output = db.private_directory(self.root / 'invoice-recovery')
+        with patch.object(db, 'restore', return_value={'targetDatabase': 'invoice_restore_new'}):
+            result = attachments.restore(self.client, bundle, output)
+        self.assertEqual(result['files'], 2)
+        self.assertEqual((output / 'attachments' / (invoice['id'] + '.bin')).read_bytes(), b'abc')
 
 
 if __name__ == '__main__':

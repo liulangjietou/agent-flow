@@ -2,11 +2,11 @@
 
 当前已实现 API 的唯一机器可读契约位于 `agentflow-server/src/main/resources/api/openapi.json`，采用 [OpenAPI 3.1.1](https://spec.openapis.org/oas/v3.1.1.html)。它随服务打包，并由已认证的 `GET /api/v1/openapi.json` 返回。接口文档页直接读取此资源，提供搜索、分组、参数、模型、curl 示例和 JSON 下载；没有另建业务状态或修改 DDD 聚合。
 
-契约当前包含 86 个操作，覆盖认证、定义草稿/发布/校验/模拟/比较/字段权限预览、模板、申请、轮次/轨迹/审计/协作评论、Agent 摘要记录查询、任务、工作台、站内消息、工作日历和系统自检。未来新增端点时同步更新契约，Java 路由对照测试会阻止遗漏或虚构端点。
+契约覆盖认证、流程设计与模板、申请、审批与抄送轮次、协作、Agent 执行及复核、工作台、消息、日历、系统自检，以及已实现的费用草稿、财务目录和个人发票原件。操作与模型数量以当前机器可读契约及验证输出为准。未来新增端点时同步更新契约，Java 路由对照测试会阻止遗漏或虚构端点。
 
 ## 最小集成顺序
 
-1. 演示环境调用 `/api/v1/auth/login`，正文 tenantId、username、password，返回 `{token,user}`。默认演示租户 demo、密码 demo；可用账号见登录页。企业 IdP/OIDC 和服务账号认证尚未接入。令牌是不透明会话值，服务重启或注销后失效；不要按 JWT 解析。
+1. 演示环境调用 `/api/v1/auth/login`，正文 tenantId、username、password，返回 `{token,user}`。默认演示租户 demo、密码 demo；可用账号见登录页。企业模式使用已配置的 OIDC 入口，真实企业联调状态另见对应验收证据。演示令牌是不透明会话值，服务重启或注销后失效；不要按 JWT 解析。
 2. 所有后续接口带 `Authorization: Bearer <token>`。租户、用户与权限取自认证上下文；`/auth/me` 返回 `{actor}`，不会再次返回 token。
 3. 管理账号复制模板或创建流程草稿，校验、模拟后发布。发布请求的 expectedRevision 在查询参数，changeNote 在正文；其他草稿更新在正文传 expectedRevision。
 4. 申请人创建草稿（HTTP 201），保留服务端 version，再提交（HTTP 200）。NUMBER 表单字段传精确十进制字符串；BOOLEAN 传 JSON 布尔值。表单与流程版本绑定，不使用另一个版本的字段。

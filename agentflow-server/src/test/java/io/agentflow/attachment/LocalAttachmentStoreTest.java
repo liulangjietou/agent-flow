@@ -18,17 +18,17 @@ import static org.assertj.core.api.Assertions.*;
 class LocalAttachmentStoreTest {
     @Test
     void disabledStorageNeverFallsBackToAnEphemeralDirectory() {
-        var store = new LocalAttachmentStore("", 1024, 2048, 3);
+        var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore("", 1024), 2048, 3);
         assertThat(store.available()).isFalse();
-        assertThatThrownBy(() -> new LocalAttachmentStore("relative", 1024, 2048, 3)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new LocalAttachmentStore("", LocalAttachmentStore.MAX_SUPPORTED_BYTES + 1, Long.MAX_VALUE, 3))
+        assertThatThrownBy(() -> new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore("relative", 1024), 2048, 3)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore("", LocalAttachmentStore.MAX_SUPPORTED_BYTES + 1), Long.MAX_VALUE, 3))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void immutablePublishSurvivesRetryAndMissingTamperedOrLinkedFilesFailClosed() throws Exception {
         Path root = Files.createTempDirectory(Path.of("/fyoung/tmp"), "agentflow-attachment-store-");
-        var store = new LocalAttachmentStore(root.toString(), 1024, 2048, 3);
+        var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore(root.toString(), 1024), 2048, 3);
         byte[] bytes = {1, 2, 3};
         var file = file(bytes);
         Path path = root.resolve(file.id() + ".bin");
@@ -54,7 +54,7 @@ class LocalAttachmentStoreTest {
     @Test
     void interruptedAndMismatchedBodiesLeaveNoStagingFiles() throws Exception {
         Path root = Files.createTempDirectory(Path.of("/fyoung/tmp"), "agentflow-attachment-failure-");
-        var store = new LocalAttachmentStore(root.toString(), 1024, 2048, 3);
+        var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore(root.toString(), 1024), 2048, 3);
         var file = file(new byte[]{1, 2});
         assertThatThrownBy(() -> store.stage(file, new ByteArrayInputStream(new byte[]{1}))).isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> store.stage(file, new ByteArrayInputStream(new byte[]{1, 3}))).isInstanceOf(DomainException.class);

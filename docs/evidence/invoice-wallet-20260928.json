@@ -1,0 +1,83 @@
+{
+  "recordedAt": "2026-09-28T13:18:39.688667+00:00",
+  "scope": "Personal invoice original wallet and paired recovery",
+  "previousCommit": "d36f17d1b30554fc27187b3a1fc48c7dd8a0b95a",
+  "tests": {
+    "h2Wallet": 8,
+    "attachmentRegression": 12,
+    "h2MigrationAndOpenApi": 6,
+    "postgresWalletAndMigration": 9,
+    "recoveryTools": 6,
+    "crossDatabaseScopesOverlap": true
+  },
+  "packagedHttp": {
+    "result": "PASS",
+    "checks": 19,
+    "invoiceId": "3840a833-0194-4e9a-bf36-9e8ff4e3b1ee",
+    "originalBytes": 2097152,
+    "sha256": "1dc76c8035589a17183643b4f46565859eed230d85b6f5785e666892ee0d0d50",
+    "verification": "PENDING",
+    "throughProxy": "http://127.0.0.1:53212"
+  },
+  "pairedRecovery": {
+    "restoredFiles": 1,
+    "tablesIdentical": {
+      "finance_resource": 2,
+      "finance_resource_revision": 2,
+      "invoice_original": 2,
+      "invoice_wallet": 1
+    },
+    "sourceDatabase": "invoice_wallet_http_2394919d",
+    "restoredDatabase": "agentflow_restore_17f4846f50714f7aa61d0b9c1e8b6080",
+    "databaseSha256": "9e397306a71f8d2ba06df689853cf822bd5634831e9a3cc86f3b2c917e8e7450",
+    "applicationStarted": true,
+    "restoredHttpChecks": 6,
+    "restoredOriginalBytes": 2097152,
+    "restoredOriginalSha256": "1dc76c8035589a17183643b4f46565859eed230d85b6f5785e666892ee0d0d50",
+    "restoredPermissionCheck": "PASS"
+  },
+  "nginxProductionSyntax": "PASS",
+  "openapi": {
+    "operations": 108,
+    "schemas": 181,
+    "requestExamples": 37,
+    "result": "PASS"
+  },
+  "jarSha256": "603b2dc7359a67862286dbf90ff280d1eb3eb0c3a064bec9540f9a009b2994d5",
+  "regressions": [
+    {
+      "name": "paired original inventory",
+      "red": "backup omitted invoice original; expected2 got1",
+      "green": "both approval attachment and invoice original preserved"
+    },
+    {
+      "name": "invoice binary proxy",
+      "red": "2MiB invoice PUT returned413 from generic1MiB JSON limit",
+      "green": "invoice content has dedicated20MiB route; ordinary JSON still limited"
+    }
+  ],
+  "logs": [
+    "shared-document-store.log",
+    "invoice-wallet-first.log",
+    "invoice-wallet-contract-migration.log",
+    "invoice-postgres.log",
+    "invoice-backup-red.log",
+    "invoice-backup-green.log",
+    "invoice-proxy-red.log",
+    "invoice-proxy-green.log",
+    "invoice-paired-backup-complete.log",
+    "invoice-paired-restore.log",
+    "invoice-production-nginx.log"
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "frontendChanged": false,
+  "browserAcceptance": "NOT_RUN_NO_UI_IN_THIS_SLICE",
+  "taxVerificationAcceptance": "NOT_RUN_NO_REAL_ENTERPRISE_CONNECTION",
+  "remaining": [
+    "persistent verification jobs",
+    "precheck and atomic submit",
+    "approval-scoped original reading",
+    "invoice and expense UI",
+    "budget voucher payment and settlement"
+  ]
+}

@@ -17,8 +17,13 @@ MAX_BYTES = 100 * 1024 * 1024
 def inventory(client, database=None, schema=None):
     """只导出文件身份与指纹，不读取文件名和业务正文；schema 已由连接配置校验。"""
     schema = schema or client.config["schema"]
+    # V35 起原件包含个人发票；旧恢复点没有统一视图时仍按原附件表读取。
+    source = client.sql("SELECT CASE WHEN to_regclass('\"" + schema + "\".stored_document_inventory') IS NULL "
+                        "THEN 'approval_attachment' ELSE 'stored_document_inventory' END", database).strip()
+    if source not in {"approval_attachment", "stored_document_inventory"}:
+        raise ValueError("Invalid document inventory source")
     query = ('SELECT COALESCE(json_agg(row_to_json(a)),\'[]\'::json)::text FROM '
-             '(SELECT id,byte_size AS size,sha256,status FROM "' + schema + '".approval_attachment ORDER BY id) a')
+             '(SELECT id,byte_size AS size,sha256,status FROM "' + schema + '".' + source + ' ORDER BY id) a')
     rows = json.loads(client.sql(query, database))
     validate_records(rows, include_status=True)
     return rows
