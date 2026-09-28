@@ -10,6 +10,9 @@ public interface DefinitionAssigneeDirectory {
     /** 返回具有有效审批账号的指定用户和角色；不可用身份源不得生成假名单。 */
     List<Option> options(String tenantId);
 
+    /** 抄送目录允许无审批资格的有效人员；未实现的身份源不能复用审批角色推断收件权。 */
+    default List<Option> copyOptions(String tenantId) { return List.of(); }
+
     /**
      * 可保存的字面量规则及当前有效成员数；成员变化后发布仍需重新读取。
      * @author owlzhangfq@gmail.com

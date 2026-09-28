@@ -70,6 +70,14 @@ public class DefinitionController {
                 .body(service.assigneeOptions(currentActor.actor().tenantId()));
     }
 
+    /** 设计器的抄送名单只向流程管理员开放，不要求收件人具备审批资格。 */
+    @GetMapping("/copy-options")
+    public ResponseEntity<List<DefinitionAssigneeDirectory.Option>> copyOptions() {
+        requireProcessAdmin();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(service.copyOptions(currentActor.actor().tenantId()));
+    }
+
     /** 仅对设计者提供的测试内容计算权限展示，不读取申请或授予所选节点的实际权限。 */
     @PostMapping("/field-preview")
     public ResponseEntity<FormFieldProjection> fieldPreview(@Valid @RequestBody FieldPreviewRequest request) {

@@ -4,6 +4,16 @@ const { loadDesignerNodes, serializeDesignerNodes, readDesignerDeadline } = awai
 const loaded = () => ({ id: 'approve', name: '审批', type: 'USER_TASK', x: 220, y: 180, assigneeRule: 'role:MANAGER',
   originalProperties: { assigneeRule: 'role:MANAGER', businessTag: '保留原属性' }, loadedPosition: { x: 220, y: 180 } })
 
+test('抄送名单在加载、修改及清空时原样保存，不附加审批方式', () => {
+  const graph = [{ id: 'copy', name: '抄送', type: 'COPY', properties: { recipientRule: 'user:bob' } }]
+  const nodes = loadDesignerNodes(graph)
+  assert.deepEqual(serializeDesignerNodes(nodes), graph)
+  nodes[0].recipientRule = 'role:ORG_DEPARTMENT_HEAD'
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, { recipientRule: 'role:ORG_DEPARTMENT_HEAD' })
+  nodes[0].recipientRule = ''
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, {})
+})
+
 test('快速模式读取的期限副本与画布一致，编辑或清除不污染原属性及审批人', () => {
   const properties = { ...loaded().originalProperties, deadlineCalendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688',
     deadlineCalendarRevision: '1', deadlineWorkingMinutes: '480' }

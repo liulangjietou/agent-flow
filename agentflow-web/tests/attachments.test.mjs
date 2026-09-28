@@ -4,7 +4,7 @@ import { createRenderer, reactive } from 'vue'
 const { default: Panel } = await import(process.env.AGENTFLOW_TEST_ATTACHMENT_FIELD)
 const { api } = await import(process.env.AGENTFLOW_TEST_API)
 const { attachmentIds, fileDigest } = await import(process.env.AGENTFLOW_TEST_ATTACHMENTS)
-const original = Object.fromEntries(['attachmentOptions', 'reserveAttachment', 'uploadAttachment', 'attachment', 'downloadAttachment'].map(key => [key, api[key]]))
+const original = Object.fromEntries(['attachmentOptions', 'reserveAttachment', 'uploadAttachment', 'attachment', 'downloadAttachment', 'copyAttachment', 'downloadCopyAttachment'].map(key => [key, api[key]]))
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 const id = '6d3c98ca-b9d3-4ca5-948c-d8975f94e333'
 const sha256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
@@ -13,6 +13,22 @@ const pendingFile = { id, fieldPath: 'proof', filename: file.name, size: 3, sha2
 const readyFile = { ...pendingFile, status: 'READY' }
 const limits = { enabled: true, maxFileBytes: 1024, maxApplicationBytes: 10240, maxApplicationUploads: 100, maxAttachmentsPerField: 10, contentScanAvailable: false }
 const settle = () => new Promise(resolve => setImmediate(resolve))
+
+test('抄送附件只走专用轮次接口，切回普通上下文不复用旧元数据', async () => {
+  defaults(); const called = []
+  api.copyAttachment = async (app, file, round) => { called.push([app, file, round]); return readyFile }
+  api.attachment = async () => { throw { message: '普通申请不可见' } }
+  const p = panel({ modelValue: [id], readonly: true, context: { applicationId: 'copied', roundNo: 3, scopeKey: 'demo/bob', copy: true } })
+  try {
+    await settle()
+    assert.deepEqual(called, [['copied', id, 3]])
+    assert.equal(p.state.metadata[id].filename, file.name)
+    p.props.context.copy = false
+    await settle()
+    assert.deepEqual(p.state.metadata, {})
+    assert.equal(p.state.error, '普通申请不可见')
+  } finally { p.close() }
+})
 function defaults() {
   api.attachmentOptions = async () => limits
   api.reserveAttachment = async () => pendingFile

@@ -59,6 +59,8 @@ jobs:
             'AGENTFLOW_ROUND_ORGANIZATION_MIGRATION:round_organization'
             'AGENTFLOW_ATTACHMENT_TEST:attachments'
             'AGENTFLOW_ATTACHMENT_MIGRATION:attachment_migration'
+            'AGENTFLOW_COPY_TEST:copies'
+            'AGENTFLOW_COPY_MIGRATION:copy_migration'
           )
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
@@ -69,7 +71,7 @@ jobs:
             export "${test_config_prefix}_PASSWORD=${AGENTFLOW_SCHEMA_TEST_PASSWORD}"
             export "${test_config_prefix}_DRIVER=org.postgresql.Driver"
           done
-          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest,ApplicationCopyIntegrationTest,CopyMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
             test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"

@@ -14,6 +14,8 @@ import TaskActions from './components/TaskActions.vue'
 import TaskDeadlineStatus from './components/TaskDeadlineStatus.vue'
 import PendingTaskQueue from './components/PendingTaskQueue.vue'
 import NotificationInbox from './components/NotificationInbox.vue'
+import CopyRecord from './components/CopyRecord.vue'
+import DefinitionCopyRecipient from './components/DefinitionCopyRecipient.vue'
 import { isTaskNotification } from './notificationInbox'
 import { taskActionLabels } from './taskActions'
 import WorkspaceRecords from './components/WorkspaceRecords.vue'
@@ -66,7 +68,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type NodeType = 'START' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
+type NodeType = 'START' | 'COPY' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }))
@@ -170,6 +172,8 @@ const validationMessage = computed(() => validation.loading ? '正在检查最�
     : validationOpened.value ? '内容已修改，正在等待重新校验。' : '尚未校验，发布前将运行服务端校验。'))
 const newApplicationOpen = ref(false)
 const recordApplicationId = ref('')
+const selectedCopy = ref<{ applicationId: string; roundNo: number } | null>(null)
+watch(actorScope, () => { selectedCopy.value = null }, { flush: 'sync' })
 const applicationDefinitionId = computed(() => applicationSelection.definition?.id ?? '')
 const applicationTitle = ref('')
 const initiatorAppointmentId = ref('')
@@ -206,6 +210,7 @@ const stageSize = computed(() => ({ width: Math.max(canvasSize.value.width / can
 let stopNodeDrag: (() => void) | null = null
 const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'USER_TASK', label: '人工审批', icon: '人' },
+  { type: 'COPY', label: '抄送', icon: '抄' },
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
   { type: 'PARALLEL_GATEWAY', label: '并行网关', icon: '＋' },
   { type: 'END', label: '结束节点', icon: '●' }
@@ -497,6 +502,7 @@ async function readNotification(message: InboxMessage) {
 /** 旧消息按单项任务实时复核；已结束或转交的任务回到申请权限查询。 */
 async function openNotification(message: InboxMessage) {
   if (busy.value || writesBlocked.value) return
+  if (message.kind === 'APPLICATION_COPIED') { selectedCopy.value = { applicationId: message.applicationId, roundNo: message.roundNo }; return }
   if (!isTaskNotification(message)) { recordApplicationId.value = message.applicationId; return }
   const scope = actorScope.value, controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 12_000)
@@ -706,6 +712,7 @@ function patchQuickNode(id: string, patch: Partial<GraphNode>) {
   if (patch.properties) {
     node.originalProperties = { ...node.originalProperties, ...patch.properties }
     node.assigneeRule = patch.properties.assigneeRule ?? node.assigneeRule
+    node.recipientRule = patch.properties.recipientRule ?? node.recipientRule
     node.approvalMode = patch.properties.approvalMode ?? node.approvalMode
   }
 }
@@ -1114,7 +1121,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
@@ -1122,6 +1129,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" v-model:approval-mode="selectedNode.approvalMode" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+                <DefinitionCopyRecipient v-if="selectedNode.type === 'COPY'" :key="selectedNode.id" :model-value="selectedNode.recipientRule ?? ''" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="selectedNode.recipientRule = $event" />
                 <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><p v-if="isExclusiveMerge(selectedNode.id)" class="field-help">条件汇合：选中的路径到达后直接继续，不等待未选中的路径。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedNode.id)" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>
@@ -1135,7 +1143,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <DefinitionNotificationTexts v-model="definitionNotificationTexts" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <DefinitionAvailability v-if="definitionStatus === 'PUBLISHED' && definitionId && canManageDefinitions" :definition-id="definitionId" :revision="definitionRevision" :start-enabled="definitionStartEnabled" :scope-key="actorScope" :locked="busy || writesBlocked || confirmationOpen" :error="availabilityError" :refresh-version="templateRefresh" @change="changeDefinitionAvailability" @refresh="refreshDefinitionAvailability" />
-          <FormSchemaEditor v-model="definitionFormSchema" :scope-key="canManageDefinitions ? actorScope + ':' + definitionId + ':' + definitionKey : ''" :approval-nodes="nodes.filter(node => node.type === 'USER_TASK')" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+          <FormSchemaEditor v-model="definitionFormSchema" :scope-key="canManageDefinitions ? actorScope + ':' + definitionId + ':' + definitionKey : ''" :approval-nodes="nodes.filter(node => ['USER_TASK', 'COPY'].includes(node.type))" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
             <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>
             <template v-if="validationOpened"><p class="validation-live-help">修改后自动重新检查。提醒不阻止发布，分支执行顺序保持不变。</p><ul v-if="validationOtherErrors.length"><li v-for="error in validationOtherErrors" :key="error">{{ simulationIssue(error).label }}<button v-if="simulationIssue(error).target" type="button" class="secondary" @click="locateDesignTarget(simulationIssue(error).target)">定位 {{ simulationIssue(error).target }}</button></li></ul>
@@ -1145,6 +1153,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         </section>
         <section v-else class="content expense-page"><div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">报销领域正在接入，当前可使用通用表单验证审批流程。</p></div><button class="primary" @click="openApplicationForm">＋ 发起表单审批</button></div><div class="expense-cards"><article v-for="item in [{ title: '报销填报', detail: '发票、费用明细和借款冲销尚未接入。' }, { title: '财务审核', detail: '费用标准、预算校验和核减尚未接入。' }, { title: '出纳付款', detail: '付款授权、银行回执和对账尚未接入。' }]" :key="item.title"><span class="card-kicker">{{ item.title }}</span><strong>待接入</strong><p>{{ item.detail }}</p></article></div><div class="panel queue-empty"><strong>暂无报销领域数据</strong><p>通用审批申请可在“申请记录”中查看；此处不展示演示单据或虚构金额。</p></div></section>
       </main>
+      <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />
       <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="refreshPage()" />
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">

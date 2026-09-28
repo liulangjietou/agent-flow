@@ -101,6 +101,9 @@ public class DefinitionApplicationService {
         return assignees.options(tenantId);
     }
 
+    /** 抄送名单不要求审批资格；发布时仍使用同一目录再次校验。 */
+    public List<DefinitionAssigneeDirectory.Option> copyOptions(String tenantId) { return assignees.copyOptions(tenantId); }
+
     /** 新建流程草稿。 */
     @Transactional
     public DefinitionDraft create(String tenantId, String key, String name, Graph graph) {
@@ -219,6 +222,14 @@ public class DefinitionApplicationService {
         var errors = new java.util.ArrayList<>(graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
                 .filter(node -> !available.contains(node.properties().get("assigneeRule")))
                 .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList());
+        if (graph.nodes().stream().anyMatch(node -> node.type() == DefinitionModels.NodeType.COPY)) {
+            var copyRules = assignees.copyOptions(tenantId).stream().filter(option -> option.contextual()
+                    || option.memberCount() > 0 && option.memberCount() <= io.agentflow.approval.copy.CopyRecipient.MAX_RECIPIENTS)
+                    .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
+            graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.COPY)
+                    .filter(node -> !copyRules.contains(node.properties().get("recipientRule")))
+                    .forEach(node -> errors.add("COPY_RECIPIENT_UNAVAILABLE:" + node.id()));
+        }
         for (var node : graph.nodes()) {
             TaskDeadlinePolicy.fromProperties(node.properties()).ifPresent(policy -> {
                 if (calendars.findVersion(tenantId, policy.calendarId(), policy.calendarRevision()).isEmpty()) {

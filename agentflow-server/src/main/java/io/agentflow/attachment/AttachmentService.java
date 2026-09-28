@@ -32,12 +32,15 @@ public class AttachmentService {
     private final JdbcAttachmentRepository files;
     private final LocalAttachmentStore store;
     private final TransactionTemplate transaction;
+    private final io.agentflow.approval.copy.CopyReadService copies;
 
     /** 元数据、申请授权和本地文件由组合协作，不把 I/O 放入申请实体。 */
     public AttachmentService(ApprovalApplicationFacade applications, ApplicationFieldViews fields, CurrentActor actors,
-            JdbcAttachmentRepository files, LocalAttachmentStore store, PlatformTransactionManager transactions) {
+            JdbcAttachmentRepository files, LocalAttachmentStore store, PlatformTransactionManager transactions,
+            io.agentflow.approval.copy.CopyReadService copies) {
         this.applications = applications; this.fields = fields; this.actors = actors; this.files = files; this.store = store;
         this.transaction = new TransactionTemplate(transactions);
+        this.copies = copies;
     }
 
     /** 返回实际部署限制，不公开主机路径；文件不自动执行、预览或送往扫描服务。 */
@@ -94,6 +97,27 @@ public class AttachmentService {
         var file = readable(application, id, round);
         file.requireReady();
         return new Download(file.filename(), store.read(file));
+    }
+
+    /** 抄送文件只依据专用快照权限与已冻结的轮次引用，不开放普通申请详情。 */
+    public Metadata copyMetadata(UUID application, UUID id, int round) { return Metadata.from(readableCopy(application, id, round)); }
+
+    /** 抄送下载与审批下载共用存储校验，隐藏及脱敏字段不能取回原文件。 */
+    public Download copyDownload(UUID application, UUID id, int round) {
+        var file = readableCopy(application, id, round);
+        file.requireReady();
+        return new Download(file.filename(), store.read(file));
+    }
+
+    private Attachment readableCopy(UUID application, UUID id, int round) {
+        var view = copies.get(application, round);
+        var file = files.get(actors.actor().tenantId(), application, id);
+        if (!AttachmentReferences.containsField(view.formSchema(), file.fieldPath())) {
+            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading this attachment");
+        }
+        if (!AttachmentReferences.collect(view.formSchema(), view.payload()).contains(new AttachmentReferences.Reference(file.fieldPath(), id))
+                || !files.frozen(file, round)) throw new DomainException("NOT_FOUND", "Attachment is not referenced in this copied round");
+        return file;
     }
 
     private Attachment readable(UUID applicationId, UUID id, Integer round) {

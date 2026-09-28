@@ -23,7 +23,7 @@ public final class DefinitionModels {
      * 节点类型。
      * @author owlzhangfq@gmail.com
      */
-    public enum NodeType { START, END, USER_TASK, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
+    public enum NodeType { START, END, USER_TASK, COPY, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
 
     /**
      * 单人办理或全员会签；未配置的历史节点保持单人办理。

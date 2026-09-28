@@ -32,13 +32,25 @@ public class OrganizationAssigneeResolver {
     public Selection resolve(String tenantId, String rule, InitiatorContext context) {
         long revision = repository.lock(tenantId);
         List<String> members = LocalOrganizationDirectory.isContextualRule(rule)
-                ? contextualMembers(tenantId, rule, context)
+                ? contextualMembers(tenantId, rule, context, true)
                 : directory.roleMembers(tenantId, rule.substring("role:".length()));
         if (members.isEmpty()) throw new DomainException("ORGANIZATION_NO_APPROVERS", "No active approvers match the organization rule");
         return new Selection(revision, rule, members);
     }
 
-    private List<String> contextualMembers(String tenant, String rule, InitiatorContext context) {
+    /** 抄送与审批共用组织关系检查，但不要求收件人具有审批资格。 */
+    @Transactional
+    public Selection resolveCopy(String tenantId, String rule, InitiatorContext context) {
+        long revision = repository.initialized(tenantId) ? repository.lock(tenantId) : 0;
+        var members = LocalOrganizationDirectory.isContextualRule(rule)
+                ? contextualMembers(tenantId, rule, context, false) : directory.copyMembers(tenantId, rule);
+        if (members.isEmpty() || members.size() > io.agentflow.approval.copy.CopyRecipient.MAX_RECIPIENTS) {
+            throw new DomainException("COPY_RECIPIENT_UNAVAILABLE", "Copy rule must match between one and 100 active recipients");
+        }
+        return new Selection(revision, rule, members);
+    }
+
+    private List<String> contextualMembers(String tenant, String rule, InitiatorContext context, boolean approvalRequired) {
         if (context == null) throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
         var origin = appointment(tenant, context.appointmentId());
         if (!origin.personId().equals(context.personId()) || !origin.departmentId().equals(context.departmentId())) throw unavailable();
@@ -66,7 +78,7 @@ public class OrganizationAssigneeResolver {
             }
         }
         requireActive(tenant, target);
-        return repository.person(tenant, target.personId()).filter(OrganizationPerson::canApprove)
+        return repository.person(tenant, target.personId()).filter(person -> person.active() && (!approvalRequired || person.approvalEligible()))
                 .map(person -> List.of(person.subject())).orElseThrow(OrganizationAssigneeResolver::unavailable);
     }
 

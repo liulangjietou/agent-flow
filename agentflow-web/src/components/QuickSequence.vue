@@ -8,7 +8,7 @@ const props = defineProps<{ sequence: QuickSequence; graph: Graph; formSchema: F
 const emit = defineEmits<{ selectNode: [id: string]; selectEdge: [id: string]; command: [value: QuickCommand] }>()
 const node = (id: string) => props.graph.nodes.find(node => node.id === id)!
 const edge = (id: string) => props.graph.edges.find(edge => edge.id === id)!
-function insert(event: Event, edgeId: string | null, beforeNodeId: string | undefined, type: 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY') {
+function insert(event: Event, edgeId: string | null, beforeNodeId: string | undefined, type: 'USER_TASK' | 'COPY' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY') {
   // 插入后原节点会复用，需主动收起菜单，避免重复添加。
   const menu = (event.currentTarget as HTMLElement).closest('details')
   if (menu) menu.open = false
@@ -19,7 +19,7 @@ function kind(id: string, branches: boolean) {
   const type = node(id).type
   if (type === 'PARALLEL_GATEWAY') return branches ? joins(id) ? '汇合后并行' : '并行分支' : '全部汇合'
   if (type === 'EXCLUSIVE_GATEWAY') return branches ? '条件分支' : '条件汇合'
-  return type === 'START' ? '开始' : type === 'END' ? '结束' : '审批步骤'
+  return type === 'START' ? '开始' : type === 'END' ? '结束' : type === 'COPY' ? '抄送' : '审批步骤'
 }
 const rule = (node: GraphNode) => node.properties.approvalMode === 'ALL' ? `全员会签 · ${assigneeLabel(node.properties.assigneeRule ?? '')}` : assigneeLabel(node.properties.assigneeRule ?? '')
 </script>
@@ -27,11 +27,11 @@ const rule = (node: GraphNode) => node.properties.approvalMode === 'ALL' ? `全�
   <div class="quick-sequence">
     <template v-for="step in sequence.steps" :key="step.nodeId">
       <div v-if="node(step.nodeId).type !== 'START'" class="quick-connector" :class="{ simulated: step.beforeEdge && simulatedEdges.includes(step.beforeEdge) }">
-        <details v-if="!locked && !joins(step.nodeId)" class="quick-insert"><summary :aria-label="`在${node(step.nodeId).name}前添加步骤`">＋</summary><div><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'USER_TASK')">添加审批</button><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'EXCLUSIVE_GATEWAY')">添加条件分支</button><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'PARALLEL_GATEWAY')">添加并行分支</button></div></details>
+        <details v-if="!locked && !joins(step.nodeId)" class="quick-insert"><summary :aria-label="`在${node(step.nodeId).name}前添加步骤`">＋</summary><div><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'USER_TASK')">添加审批</button><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'COPY')">添加抄送</button><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'EXCLUSIVE_GATEWAY')">添加条件分支</button><button type="button" @click="insert($event, step.beforeEdge, step.nodeId, 'PARALLEL_GATEWAY')">添加并行分支</button></div></details>
       </div>
       <button type="button" class="quick-card" :data-quick-node="step.nodeId" :class="[node(step.nodeId).type.toLowerCase(), { selected: selectedNode === step.nodeId, invalid: invalidNodes.includes(step.nodeId), simulated: simulatedNodes.includes(step.nodeId) }]" @click="emit('selectNode', step.nodeId)">
         <span class="quick-type">{{ kind(step.nodeId, !!step.branches) }}</span>
-        <strong>{{ node(step.nodeId).name }}</strong><small v-if="node(step.nodeId).type === 'USER_TASK'">{{ rule(node(step.nodeId)) }}</small><small v-else-if="node(step.nodeId).type === 'PARALLEL_GATEWAY'">{{ step.branches ? '所有分支同时执行' : '等待本组全部分支完成' }}</small>
+        <strong>{{ node(step.nodeId).name }}</strong><small v-if="node(step.nodeId).type === 'USER_TASK'">{{ rule(node(step.nodeId)) }}</small><small v-else-if="node(step.nodeId).type === 'COPY'">{{ assigneeLabel(node(step.nodeId).properties.recipientRule ?? '') }}</small><small v-else-if="node(step.nodeId).type === 'PARALLEL_GATEWAY'">{{ step.branches ? '所有分支同时执行' : '等待本组全部分支完成' }}</small>
       </button>
       <div v-if="step.branches" class="quick-branches" :class="{ parallel: node(step.nodeId).type === 'PARALLEL_GATEWAY' }">
         <section v-for="(branch, index) in step.branches" :key="branch.edgeId" class="quick-branch" :aria-label="node(step.nodeId).type === 'PARALLEL_GATEWAY' ? `并行分支 ${index + 1}` : edge(branch.edgeId).defaultBranch ? '其他情况' : `条件分支 ${index + 1}`">
@@ -40,7 +40,7 @@ const rule = (node: GraphNode) => node.properties.approvalMode === 'ALL' ? `全�
         </section>
       </div>
     </template>
-    <div v-if="sequence.tailEdge" class="quick-connector quick-tail" :class="{ simulated: simulatedEdges.includes(sequence.tailEdge) }"><details v-if="!locked" class="quick-insert"><summary aria-label="在分支末尾添加步骤">＋</summary><div><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'USER_TASK')">添加审批</button><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'EXCLUSIVE_GATEWAY')">添加条件分支</button><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'PARALLEL_GATEWAY')">添加并行分支</button></div></details></div>
+    <div v-if="sequence.tailEdge" class="quick-connector quick-tail" :class="{ simulated: simulatedEdges.includes(sequence.tailEdge) }"><details v-if="!locked" class="quick-insert"><summary aria-label="在分支末尾添加步骤">＋</summary><div><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'USER_TASK')">添加审批</button><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'COPY')">添加抄送</button><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'EXCLUSIVE_GATEWAY')">添加条件分支</button><button type="button" @click="insert($event, sequence.tailEdge, undefined, 'PARALLEL_GATEWAY')">添加并行分支</button></div></details></div>
   </div>
 </template>
 <style scoped>

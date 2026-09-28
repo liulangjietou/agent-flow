@@ -5,6 +5,7 @@ import type { FormSchema } from '../formSchema'
 import { projectQuickGraph, quickNodeIds, quickStep, type QuickCommand } from '../quickDesigner'
 import QuickSequence from './QuickSequence.vue'
 import DefinitionAssignee from './DefinitionAssignee.vue'
+import DefinitionCopyRecipient from './DefinitionCopyRecipient.vue'
 import DefinitionDeadline from './DefinitionDeadline.vue'
 import { readDesignerDeadline, type DesignerDeadline } from '../designerGraph'
 import ConditionEditor from './ConditionEditor.vue'
@@ -32,11 +33,11 @@ const branchCount = computed(() => {
   return branch ? quickNodeIds(branch.sequence).length : 0
 })
 const adjacent = computed(() => {
-  if (selected.value?.type !== 'USER_TASK') return {}
+  if (!selected.value || !['USER_TASK', 'COPY'].includes(selected.value.type)) return {}
   const incoming = props.graph.edges.filter(edge => edge.target === selected.value!.id)
-  const before = incoming.length === 1 ? props.graph.nodes.find(node => node.id === incoming[0]!.source && node.type === 'USER_TASK') : null
+  const before = incoming.length === 1 ? props.graph.nodes.find(node => node.id === incoming[0]!.source && ['USER_TASK', 'COPY'].includes(node.type)) : null
   const target = props.graph.edges.find(edge => edge.source === selected.value!.id)?.target
-  const after = props.graph.nodes.find(node => node.id === target && node.type === 'USER_TASK')
+  const after = props.graph.nodes.find(node => node.id === target && ['USER_TASK', 'COPY'].includes(node.type))
   return { before: before?.id, after: after && props.graph.edges.filter(edge => edge.target === after.id).length === 1 ? after.id : undefined }
 })
 function properties(key: string, value: string) { if (selected.value) emit('node', selected.value.id, { properties: { ...selected.value.properties, [key]: value } }) }
@@ -49,18 +50,19 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
   <div class="quick-designer">
     <template v-if="projection.sequence">
       <section class="quick-stage" aria-label="快速流程步骤">
-        <div class="quick-stage-heading"><strong>从上到下，安排每一步</strong><span>点击 ＋ 添加审批、条件或并行分支</span></div>
+        <div class="quick-stage-heading"><strong>从上到下，安排每一步</strong><span>点击 ＋ 添加审批、抄送、条件或并行分支</span></div>
         <div class="quick-scroll" tabindex="0" aria-label="可滚动的快速流程图"><QuickSequence :sequence="projection.sequence" :graph="graph" :form-schema="formSchema" :selected-node="selectedNode" :selected-edge="selectedEdge" :locked="locked" :invalid-nodes="invalidNodes" :simulated-nodes="simulatedNodes" :simulated-edges="simulatedEdges" @select-node="emit('selectNode', $event)" @select-edge="emit('selectEdge', $event)" @command="emit('command', $event)" /></div>
       </section>
       <aside class="quick-inspector" aria-label="快速步骤配置"><fieldset :disabled="locked">
         <template v-if="selected">
           <p class="eyebrow">{{ isGateway(selected) ? 'BRANCH' : 'STEP' }}</p><h3>{{ selected.name }}</h3>
           <label>步骤名称<input :value="selected.name" @focus="emit('beforeChange')" @input="emit('node', selected.id, { name: ($event.target as HTMLInputElement).value })" /></label>
-          <template v-if="selected.type === 'USER_TASK'">
-            <DefinitionAssignee :key="selected.id" :model-value="selected.properties.assigneeRule ?? ''" :approval-mode="selected.properties.approvalMode ?? 'SINGLE'" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('assigneeRule', $event)" @update:approval-mode="properties('approvalMode', $event)" />
-            <DefinitionDeadline :key="selected.id" :model-value="selectedDeadline" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="changeDeadline" />
+          <template v-if="['USER_TASK', 'COPY'].includes(selected.type)">
+            <DefinitionCopyRecipient v-if="selected.type === 'COPY'" :key="selected.id" :model-value="selected.properties.recipientRule ?? ''" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('recipientRule', $event)" />
+            <DefinitionAssignee v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selected.properties.assigneeRule ?? ''" :approval-mode="selected.properties.approvalMode ?? 'SINGLE'" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('assigneeRule', $event)" @update:approval-mode="properties('approvalMode', $event)" />
+            <DefinitionDeadline v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selectedDeadline" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="changeDeadline" />
             <div class="quick-move"><button type="button" class="secondary" :disabled="!adjacent.before" @click="emit('command', { kind: 'swapTasks', firstId: adjacent.before!, secondId: selected.id })">上移一步</button><button type="button" class="secondary" :disabled="!adjacent.after" @click="emit('command', { kind: 'swapTasks', firstId: selected.id, secondId: adjacent.after! })">下移一步</button></div>
-            <button type="button" class="quick-delete" @click="emit('command', { kind: 'removeTask', nodeId: selected.id })">删除此审批步骤并接续流程</button>
+            <button type="button" class="quick-delete" @click="emit('command', { kind: 'removeTask', nodeId: selected.id })">删除此步骤并接续流程</button>
           </template>
           <template v-else-if="gateway && step?.branches">
             <p v-if="parallel" class="quick-help">所有分支同时执行，全部完成后才继续；显示顺序不代表审批先后。</p>
@@ -71,7 +73,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
             <button type="button" class="quick-delete" @click="emit('command', { kind: 'removeGateway', nodeId: selected.id })">删除{{ parallel ? '并行' : '条件' }}块及全部分支</button>
           </template>
           <p v-else-if="isGateway(selected)" class="quick-help">{{ selected.type === 'PARALLEL_GATEWAY' ? '等待本组全部并行分支到达后继续。' : '选中的条件路径到达后直接继续，不等待未选中的路径。' }}可在汇合之后添加步骤；需要删除分支时，请选择对应的分支块。</p>
-          <p v-else class="quick-help">通过相邻的 ＋ 添加审批、条件或并行分支。开始、结束节点在快速模式中保留。</p>
+          <p v-else class="quick-help">通过相邻的 ＋ 添加审批、抄送、条件或并行分支。开始、结束节点在快速模式中保留。</p>
         </template>
         <template v-else-if="selectedLine && gateway">
           <p class="eyebrow">{{ parallel ? 'PARALLEL BRANCH' : 'BRANCH CONDITION' }}</p><h3>{{ parallel ? '并行分支' : selectedLine.defaultBranch ? '其他情况' : '分支条件' }}</h3>

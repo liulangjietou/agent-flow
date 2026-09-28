@@ -71,6 +71,13 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                     case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
                             .append(escape(node.name())).append("\"/>");
                     case USER_TASK -> appendUserTask(xml, node);
+                    case COPY -> {
+                        String encodedRule = Base64.getEncoder().encodeToString(node.properties().get("recipientRule")
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        xml.append("<serviceTask id=\"").append(escape(node.id())).append("\" name=\"")
+                                .append(escape(node.name())).append("\" flowable:expression=\"${flowableCopyRecipients.deliver(execution, '")
+                                .append(encodedRule).append("')}\"/>");
+                    }
                     case EXCLUSIVE_GATEWAY -> appendGateway(xml, node, graph);
                     case PARALLEL_GATEWAY -> xml.append("<parallelGateway id=\"").append(escape(node.id()))
                             .append("\" name=\"").append(escape(node.name())).append("\"/>");

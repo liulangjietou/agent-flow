@@ -11449,6 +11449,484 @@
         },
         "description": "每次读取重新检查租户、申请及所属字段权限。隐藏或脱敏不可下载。仅提供 attachment 下载，nosniff，内容指纹校验失败不发送原文件。"
       }
+    },
+    "/api/v1/process-definitions/copy-options": {
+      "get": {
+        "operationId": "definitionCopyOptions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取可配置抄送收件人",
+        "description": "返回同租户有效人员及组织规则，不要求审批资格；成员在节点激活时冻结。每节点最多 100 人。响应禁止缓存。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssigneeOption"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/copies/{applicationId}/rounds/{roundNo}": {
+      "get": {
+        "operationId": "copySnapshot",
+        "tags": [
+          "申请"
+        ],
+        "summary": "读取本轮抄送快照",
+        "description": "只返回当前有效收件人收到的轮次，按该轮抄送节点投影字段。没有管理员绕过，不授予普通申请、草稿或其他轮次权限。响应禁止缓存。",
+        "x-access": "同租户、当前有效且在本轮冻结的抄送收件人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopySnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/copies/{applicationId}/rounds/{roundNo}/attachments/{id}": {
+      "get": {
+        "operationId": "copyAttachmentMetadata",
+        "tags": [
+          "附件"
+        ],
+        "summary": "读取抄送附件元数据",
+        "x-access": "本轮有效抄送收件人，且所属字段允许读取",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentMetadata"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "description": "仅本轮冻结的抄送收件人可读取；下载继续要求该字段可读及本轮冻结引用，隐藏和脱敏不返回原文。"
+      }
+    },
+    "/api/v1/copies/{applicationId}/rounds/{roundNo}/attachments/{id}/content": {
+      "get": {
+        "operationId": "copyAttachmentDownload",
+        "tags": [
+          "附件"
+        ],
+        "summary": "下载抄送附件",
+        "x-access": "本轮有效抄送收件人，且所属字段允许读取",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "申请版本冲突、累计上传容量超限或幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "附件实际内容或登记大小超过限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "文件内容必须使用 application/octet-stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; 原文件名以 UTF-8 编码"
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "const": "nosniff"
+                }
+              }
+            }
+          }
+        },
+        "description": "仅本轮冻结的抄送收件人可读取；下载继续要求该字段可读及本轮冻结引用，隐藏和脱敏不返回原文。"
+      }
     }
   },
   "components": {
@@ -11846,7 +12324,8 @@
               "END",
               "USER_TASK",
               "EXCLUSIVE_GATEWAY",
-              "PARALLEL_GATEWAY"
+              "PARALLEL_GATEWAY",
+              "COPY"
             ]
           },
           "properties": {
@@ -11857,7 +12336,7 @@
             "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）和 ALL（全员会签）。ALL 在节点激活时固定有效成员，全部同意才通过，空名单回滚本次操作。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。"
           }
         },
-        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。其他引擎节点尚未支持发布。",
+        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。其他引擎节点尚未支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。",
         "required": [
           "id",
           "name",
@@ -13592,7 +14071,8 @@
               "TASK_TRANSFERRED",
               "TASK_DELEGATED",
               "TASK_RESOLVED",
-              "TASK_OVERDUE"
+              "TASK_OVERDUE",
+              "APPLICATION_COPIED"
             ]
           },
           "actor": {
@@ -16791,6 +17271,78 @@
             "type": "boolean"
           }
         }
+      },
+      "CopySnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "formSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "nodeNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "roundNo",
+          "definitionVersion",
+          "title",
+          "status",
+          "submittedAt",
+          "formSchema",
+          "payload",
+          "applicationId",
+          "businessNo",
+          "nodeNames"
+        ]
       }
     }
   }

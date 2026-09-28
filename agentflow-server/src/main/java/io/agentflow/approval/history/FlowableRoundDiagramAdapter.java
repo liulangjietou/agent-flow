@@ -132,6 +132,8 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
         if (node instanceof StartEvent) return "START";
         if (node instanceof EndEvent) return "END";
         if (node instanceof UserTask) return "USER_TASK";
+        if (node instanceof org.flowable.bpmn.model.ServiceTask service && service.getImplementation() != null
+                && service.getImplementation().startsWith("${flowableCopyRecipients.deliver(")) return "COPY";
         if (node instanceof ExclusiveGateway) return "EXCLUSIVE_GATEWAY";
         if (node instanceof ParallelGateway) return "PARALLEL_GATEWAY";
         return "OTHER";

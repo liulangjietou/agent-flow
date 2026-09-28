@@ -28,7 +28,7 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     public static final int MAX_SUPERVISOR_LEVEL = 10;
     private static final String ACTIVE_APPOINTMENTS = """
             FROM organization_appointment a
-            JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE AND p.approval_eligible=TRUE
+            JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE
             JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE
             JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE
             JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE
@@ -78,13 +78,18 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
 
     /** 只解析本地命名空间；身份源系统角色不会被本地人员编辑变成组织组。 */
     public List<String> roleMembers(String tenantId, String role) {
+        return roleMembers(tenantId, role, true);
+    }
+
+    private List<String> roleMembers(String tenantId, String role, boolean approvalRequired) {
         if (role.startsWith(PERSON_ROLE)) {
             var id = localId(role, PERSON_ROLE);
-            return repository.person(tenantId, id).filter(OrganizationPerson::canApprove).map(person -> List.of(person.subject())).orElseGet(List::of);
+            return repository.person(tenantId, id).filter(person -> person.active() && (!approvalRequired || person.approvalEligible()))
+                    .map(person -> List.of(person.subject())).orElseGet(List::of);
         }
         if (role.startsWith(UNIT_ROLE)) {
             String id = localId(role, UNIT_ROLE).toString();
-            return jdbc.queryForList("SELECT DISTINCT p.subject " + ACTIVE_APPOINTMENTS + " AND (a.department_id=? OR a.position_id=?) ORDER BY p.subject", String.class, tenantId, id, id);
+            return jdbc.queryForList("SELECT DISTINCT p.subject " + appointments(approvalRequired) + " AND (a.department_id=? OR a.position_id=?) ORDER BY p.subject", String.class, tenantId, id, id);
         }
         return List.of();
     }
@@ -92,18 +97,42 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     @Override
     @Transactional(readOnly = true)
     public List<Option> options(String tenantId) {
+        return options(tenantId, true);
+    }
+
+    /** 抄送只要求同租户人员有效，不复用审批资格作为读取许可。 */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Option> copyOptions(String tenantId) { return options(tenantId, false); }
+
+    /** 每次读取抄送快照重新核对当前人员启停状态，已冻结记录不受组织改组影响。 */
+    public boolean activeRecipient(String tenantId, String subject) {
+        return repository.initialized(tenantId) ? repository.personBySubject(tenantId, subject).filter(OrganizationPerson::active).isPresent()
+                : demo.approvers(tenantId).contains(subject);
+    }
+
+    /** 静态抄送规则只在当前租户目录内展开，动态任职规则由关系解析服务处理。 */
+    public List<String> copyMembers(String tenantId, String rule) {
+        if (!repository.initialized(tenantId)) {
+            return rule.startsWith("user:") ? demo.members(tenantId, Set.of(rule.substring(5)), Set.of())
+                    : demo.members(tenantId, Set.of(), Set.of(rule.substring(5)));
+        }
+        return rule.startsWith("role:") ? roleMembers(tenantId, rule.substring(5), false) : List.of();
+    }
+
+    private List<Option> options(String tenantId, boolean approvalRequired) {
         if (!repository.initialized(tenantId)) return demo.options(tenantId);
         var result = new ArrayList<Option>();
         result.add(new Option(DEPARTMENT_HEAD_RULE, "本次任职部门负责人", 0, true));
         for (int level = 1; level <= MAX_SUPERVISOR_LEVEL; level++) {
             result.add(new Option(SUPERVISOR_RULE + level, "本次任职 · 第 " + level + " 级主管", 0, true));
         }
-        jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE AND approval_eligible=TRUE ORDER BY display_name,id",
+        jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE" + (approvalRequired ? " AND approval_eligible=TRUE" : "") + " ORDER BY display_name,id",
                 (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new Option("role:" + PERSON_ROLE + row.getString("id"), "人员 · " + row.getString("display_name"), 1)), tenantId);
         var counts = new HashMap<String, Integer>();
         for (String column : List.of("department_id", "position_id")) {
             // 列名是服务端固定白名单，不来自 URL 或客户端输入。
-            jdbc.query("SELECT a." + column + " AS id,COUNT(DISTINCT p.subject) AS members " + ACTIVE_APPOINTMENTS + " GROUP BY a." + column,
+            jdbc.query("SELECT a." + column + " AS id,COUNT(DISTINCT p.subject) AS members " + appointments(approvalRequired) + " GROUP BY a." + column,
                     (org.springframework.jdbc.core.RowCallbackHandler) row -> counts.put(row.getString("id"), row.getInt("members")), tenantId);
         }
         jdbc.query("SELECT id,name,kind FROM organization_unit WHERE tenant_id=? AND kind IN ('DEPARTMENT','POSITION') AND active=TRUE ORDER BY kind,name,id",
@@ -113,6 +142,10 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
                             ("DEPARTMENT".equals(row.getString("kind")) ? "部门 · " : "岗位 · ") + row.getString("name"), count));
                 }, tenantId);
         return List.copyOf(result);
+    }
+
+    private static String appointments(boolean approvalRequired) {
+        return ACTIVE_APPOINTMENTS + (approvalRequired ? " AND p.approval_eligible=TRUE" : "");
     }
 
     private static UUID localId(String role, String prefix) {

@@ -10,6 +10,23 @@ const parallel = () => ({nodes:[node('start','START'),node('fork','PARALLEL_GATE
 let counter=0
 const edit = (graph, command) => editQuickGraph(graph,command,()=>String(++counter))
 
+test('抄送可在直线和并行分支插入、移动、删除且保留收件规则', () => {
+  for (const [graph, edgeId] of [[line(), 'two'], [parallel(), 'aj']]) {
+    const inserted = edit(graph, { kind: 'insert', edgeId, type: 'COPY' })
+    const copy = inserted.nodes.find(node => node.type === 'COPY')
+    copy.properties.recipientRule = 'user:bob'
+    assert.equal(projectQuickGraph(inserted).reason, '')
+    assert.equal(quickNodeIds(projectQuickGraph(inserted).sequence).filter(id => id === copy.id).length, 1)
+    assert.deepEqual(edit(inserted, { kind: 'removeTask', nodeId: copy.id }), graph)
+  }
+  const inserted = edit(line(), { kind: 'insert', edgeId: 'two', type: 'COPY' })
+  const copy = inserted.nodes.find(node => node.type === 'COPY')
+  copy.properties.recipientRule = 'user:bob'
+  const moved = edit(inserted, { kind: 'swapTasks', firstId: 'a', secondId: copy.id })
+  assert.deepEqual(quickNodeIds(projectQuickGraph(moved).sequence), ['start', copy.id, 'a', 'b', 'end'])
+  assert.equal(moved.nodes.find(node => node.id === copy.id).properties.recipientRule, 'user:bob')
+})
+
 test('并行投影完整保留原图，拆分与汇合各出现一次', () => {
   const graph=parallel(), before=structuredClone(graph), view=projectQuickGraph(graph)
   assert.equal(view.reason,'')

@@ -1,5 +1,5 @@
 /** 附件使用申请和可选轮次的授权上下文，账号身份用于清理迟到响应。@author owlzhangfq@gmail.com */
-export interface AttachmentContext { applicationId: string; expectedVersion?: number; roundNo?: number; scopeKey: string }
+export interface AttachmentContext { applicationId: string; expectedVersion?: number; roundNo?: number; scopeKey: string; copy?: boolean }
 export interface AttachmentMetadata { id: string; fieldPath: string; filename: string; size: number; sha256: string; status: 'UPLOADING' | 'READY' | 'FAILED' }
 export interface AttachmentOptions { enabled: boolean; maxFileBytes: number; maxApplicationBytes: number; maxApplicationUploads: number; maxAttachmentsPerField: number; contentScanAvailable: boolean }
 export interface AttachmentInput { expectedVersion: number; fieldPath: string; filename: string; size: number; sha256: string }

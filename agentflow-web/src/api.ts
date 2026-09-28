@@ -141,10 +141,11 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE'
+  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
+export interface CopySnapshot { applicationId: string; businessNo: string; roundNo: number; definitionVersion: number; title: string; status: string; submittedAt: string; nodeNames: string[]; formSchema: FormSchema | null; payload: Record<string, unknown> }
 export interface InboxPage { items: InboxMessage[]; nextCursor?: string | null; unreadCount: number }
 /** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
 export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
@@ -244,6 +245,8 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
   INVALID_ORGANIZATION_APPOINTMENT: '请选择人员、部门和岗位。',
   DEFINITION_DISABLED: '此流程版本已停用，无法新建申请或提交（包括重提）。请联系流程管理员恢复原版本后重试。',
       DEFINITION_AVAILABILITY_UNCHANGED: '版本状态已与本次操作相同，请刷新版本状态后核对记录。',
+      COPY_RECIPIENT_UNAVAILABLE: '抄送名单已失效或超过 100 人，请检查组织目录后重试。',
+      INVALID_COPY_QUERY: '抄送轮次无效，请重新打开消息。',
       INVALID_TEMPLATE_COPY_REQUEST: '复制信息无效，请检查流程标识、名称和模板版本。',
       TEMPLATE_VERSION_CONFLICT: '模板版本已变化，请重新加载目录，核对后再复制。',
       DEFINITION_BINDING_AMBIGUOUS: '这份旧申请未保存原流程来源，当前存在同名版本。请保留原记录，核对流程后重新发起申请。'
@@ -279,6 +282,10 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  definitionCopyRecipients: (signal?: AbortSignal) => request<AssigneeOption[]>('/process-definitions/copy-options', { signal }),
+  copySnapshot: (applicationId: string, round: number, signal?: AbortSignal) => request<CopySnapshot>(`/copies/${applicationId}/rounds/${round}`, { signal }),
+  copyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<AttachmentMetadata>(`/copies/${applicationId}/rounds/${round}/attachments/${id}`, { signal }),
+  downloadCopyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<Blob>(`/copies/${applicationId}/rounds/${round}/attachments/${id}/content`, { signal }, 'binary'),
   attachmentOptions: (signal?: AbortSignal) => request<AttachmentOptions>('/attachments/options', { signal }),
   reserveAttachment: (applicationId: string, input: AttachmentInput, key: string, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments`, { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key }, signal }),
   uploadAttachment: (applicationId: string, id: string, expectedVersion: number, file: Blob, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments/${id}/content`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-Application-Version': String(expectedVersion) }, signal }),

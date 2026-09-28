@@ -45,15 +45,18 @@ public final class DefinitionValidator {
                 }
             }
             if (nodes.put(n.id(), n) != null) errors.add("DUPLICATE_NODE:" + n.id());
+            if (n.type() == NodeType.COPY && (n.id().length() > 128 || n.name().length() > 200)) {
+                errors.add("COPY_NODE_LIMIT_EXCEEDED:" + n.id());
+            }
             if (n.type() == NodeType.SERVICE_TASK) {
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
             }
-            if (n.type() == NodeType.USER_TASK) {
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
                     errors.add("TASK_NAME_EXPRESSION_FORBIDDEN:" + n.id());
                 }
-                String assigneeRule = n.properties().get("assigneeRule");
+                String assigneeRule = n.properties().get(n.type() == NodeType.COPY ? "recipientRule" : "assigneeRule");
                 if (assigneeRule == null || assigneeRule.isBlank()) {
                     errors.add("ASSIGNEE_RULE_REQUIRED:" + n.id());
                 } else if (!LITERAL_ASSIGNEE_RULE.matcher(assigneeRule).matches()) {
@@ -118,7 +121,7 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.START && incoming.contains(n.id())) errors.add("START_MUST_HAVE_NO_INCOMING:" + n.id());
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
             // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
-            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK) && outgoingCount > 1) {
+            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
@@ -129,6 +132,17 @@ public final class DefinitionValidator {
             }
         }
         Node start = graph.nodes().stream().filter(n -> n.type() == NodeType.START).findFirst().orElse(null);
+        if (start != null && graph.nodes().stream().anyMatch(node -> node.type() == NodeType.COPY)) {
+            // 抄送不是审批：含抄送的申请不能沿没有任何人工审批的路径直接结束。
+            Set<String> visited = new HashSet<>();
+            Deque<String> pending = new ArrayDeque<>(); pending.add(start.id());
+            while (!pending.isEmpty()) {
+                var node = nodes.get(pending.removeFirst());
+                if (node == null || !visited.add(node.id()) || node.type() == NodeType.USER_TASK) continue;
+                if (node.type() == NodeType.END) { errors.add("COPY_REQUIRES_APPROVAL_PATH:" + node.id()); break; }
+                outgoingEdges.getOrDefault(node.id(), List.of()).stream().map(Edge::target).forEach(pending::addLast);
+            }
+        }
         if (start != null) {
             Set<String> reachable = new HashSet<>();
             Deque<String> queue = new ArrayDeque<>();
@@ -178,7 +192,7 @@ public final class DefinitionValidator {
         for (var field : fields) {
             if (field.nodeAccess() != null) for (String nodeId : field.nodeAccess().keySet()) {
                 var node = nodes.get(nodeId);
-                if (node == null || node.type() != NodeType.USER_TASK) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
+                if (node == null || node.type() != NodeType.USER_TASK && node.type() != NodeType.COPY) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
             }
             if (field.columns() != null) validateFieldNodes(field.columns(), nodes, errors);
         }

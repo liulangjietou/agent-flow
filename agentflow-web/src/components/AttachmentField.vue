@@ -16,7 +16,7 @@ const downloading = ref('')
 const picker = ref<HTMLInputElement | null>(null)
 const retryTarget = ref<string | null>(null)
 const attempt = shallowRef<{ file: File; key: string; id?: string; input?: AttachmentInput } | null>(null)
-const contextKey = computed(() => JSON.stringify([props.context?.scopeKey, props.context?.applicationId, props.context?.roundNo, props.fieldPath, !!props.readonly]))
+const contextKey = computed(() => JSON.stringify([props.context?.scopeKey, props.context?.applicationId, props.context?.roundNo, !!props.context?.copy, props.fieldPath, !!props.readonly]))
 let generation = 0, readGeneration = 0
 let readController: AbortController | null = null, uploadController: AbortController | null = null, downloadController: AbortController | null = null
 const urls = new Set<string>()
@@ -40,7 +40,7 @@ async function refresh() {
   try {
     const [limits, values] = await Promise.all([
       props.readonly ? Promise.resolve(null) : api.attachmentOptions(controller.signal),
-      Promise.all(ids.value.map(id => api.attachment(context.applicationId, id, context.roundNo, controller.signal)))
+      Promise.all(ids.value.map(id => (context.copy ? api.copyAttachment(context.applicationId, id, context.roundNo!, controller.signal) : api.attachment(context.applicationId, id, context.roundNo, controller.signal))))
     ])
     if (current()) { options.value = limits; metadata.value = Object.fromEntries(values.map(file => [file.id, file])) }
   } catch (cause) { if (current()) error.value = controller.signal.aborted ? '附件信息加载超时，请重试。' : message(cause) }
@@ -118,9 +118,9 @@ async function download(id: string) {
   }, 120_000)
   downloading.value = id; error.value = ''
   try {
-    const file = await api.attachment(context.applicationId, id, context.roundNo, controller.signal)
+    const file = await (context.copy ? api.copyAttachment(context.applicationId, id, context.roundNo!, controller.signal) : api.attachment(context.applicationId, id, context.roundNo, controller.signal))
     if (!current()) return
-    const content = await api.downloadAttachment(context.applicationId, id, context.roundNo, controller.signal)
+    const content = await (context.copy ? api.downloadCopyAttachment(context.applicationId, id, context.roundNo!, controller.signal) : api.downloadAttachment(context.applicationId, id, context.roundNo, controller.signal))
     if (!current()) return
     if (content.size !== file.size) throw { message: '下载内容未完整接收，请重试。' }
     const url = URL.createObjectURL(content); urls.add(url)

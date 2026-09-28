@@ -67,7 +67,8 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                         published.requireStartEnabled();
                         // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
                         if (command.initiatorContext() == null && published.graph().nodes().stream().anyMatch(node ->
-                                LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule")))) {
+                                LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule"))
+                                || LocalOrganizationDirectory.isContextualRule(node.properties().get("recipientRule")))) {
                             throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
                         }
                     });

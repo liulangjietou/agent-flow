@@ -20,6 +20,7 @@ export function readDesignerDeadline(properties: Record<string, string>): Design
  */
 export interface DesignerNode {
   id: string; name: string; type: string; x: number; y: number; assigneeRule: string
+  recipientRule?: string
   approvalMode?: string
   deadline?: DesignerDeadline
   originalProperties?: Record<string, string>
@@ -37,7 +38,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
     const rawY = Number(node.properties.y ?? DEFAULT_NODE_Y)
     const x = Number.isFinite(rawX) && rawX >= 0 ? rawX : DEFAULT_NODE_X + index * DEFAULT_NODE_SPACING
     const y = Number.isFinite(rawY) && rawY >= 0 ? rawY : DEFAULT_NODE_Y
-    return { id: node.id, name: node.name, type: node.type, x, y, assigneeRule: node.properties.assigneeRule ?? '',
+    return { id: node.id, name: node.name, type: node.type, x, y, assigneeRule: node.properties.assigneeRule ?? '', recipientRule: node.properties.recipientRule ?? '',
       deadline: readDesignerDeadline(node.properties),
       approvalMode: node.properties.approvalMode ?? 'SINGLE', originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
@@ -47,6 +48,10 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
 export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
   return nodes.map(node => {
     const properties = { ...node.originalProperties }
+    if (node.type === 'COPY') {
+      if (node.recipientRule) properties.recipientRule = node.recipientRule
+      else delete properties.recipientRule
+    }
     if (node.type === 'USER_TASK') {
       for (const field of Object.keys(deadlineProperties) as Array<keyof DesignerDeadline>) {
         const value = node.deadline?.[field]
