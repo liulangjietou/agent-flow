@@ -11,6 +11,8 @@ import ApplicationSearch from './components/ApplicationSearch.vue'
 import WebhookDeliveries from './components/WebhookDeliveries.vue'
 import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
+import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
+import ExpenseDetail from './components/ExpenseDetail.vue'
 import TaskDeadlineStatus from './components/TaskDeadlineStatus.vue'
 import PendingTaskQueue from './components/PendingTaskQueue.vue'
 import NotificationInbox from './components/NotificationInbox.vue'
@@ -483,6 +485,13 @@ async function selectTask(item: { taskId: string }) {
   } finally { clearTimeout(timeout); if (taskDetailRequest === controller) detailLoading.value = false }
 }
 function clearTaskSelection() { taskDetailRequest?.abort(); taskDetailRequest = null; detailLoading.value = false; activeTask.value = null; activeApplication.value = null }
+/** 财务变更同时影响详情、待办摘要金额及领取状态，必须刷新同一工作区。 */
+function expenseTaskChanged() {
+  const task = activeTask.value
+  if (!task) return
+  void refreshWorkspace()
+  void selectTask(task)
+}
 async function performAction(input: TaskActionInput) {
   if (!activeTask.value || busy.value || writesBlocked.value) return
   busy.value = true
@@ -1067,7 +1076,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }, { key: 'assist', label: 'Agent 摘要' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
                 <div v-if="taskTab === 'detail'" class="detail-content">
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
-                  <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
+                  <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><ExpenseDetail v-if="activeApplication.businessReference?.type === 'EXPENSE'" :report-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :task-id="activeTask.taskId" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ExpenseDetail><FormFields v-else :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
                   <p v-else class="unavailable">正在加载申请详情…</p>
                   <div class="agent-note"><span>✦</span><div><strong>Agent 摘要</strong><p>在「Agent 摘要」中选择本轮可读字段，生成后核对来源并保存人工修订。审批以申请内容及核实结果为依据。</p></div></div>
                 </div>
@@ -1171,7 +1180,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </template>
           </section>
         </section>
-        <section v-else class="content expense-page"><div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">报销领域正在接入，当前可使用通用表单验证审批流程。</p></div><button class="primary" @click="openApplicationForm">＋ 发起表单审批</button></div><div class="expense-cards"><article v-for="item in [{ title: '报销填报', detail: '发票、费用明细和借款冲销尚未接入。' }, { title: '财务审核', detail: '费用标准、预算校验和核减尚未接入。' }, { title: '出纳付款', detail: '付款授权、银行回执和对账尚未接入。' }]" :key="item.title"><span class="card-kicker">{{ item.title }}</span><strong>待接入</strong><p>{{ item.detail }}</p></article></div><div class="panel queue-empty"><strong>暂无报销领域数据</strong><p>通用审批申请可在“申请记录”中查看；此处不展示演示单据或虚构金额。</p></div></section>
+        <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>
       <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />
       <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="refreshPage()" />

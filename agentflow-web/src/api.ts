@@ -18,6 +18,7 @@ import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
+import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
@@ -111,7 +112,7 @@ export interface PendingTaskQuery {
 export interface PendingTaskPage { items: PendingTaskItem[]; nextCursor?: string | null; total: number }
 /** 提交时保留任务快照版本，不在冲突后自动更新版本。@author owlzhangfq@gmail.com */
 export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number }
-export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
+export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number; businessReference?: { type: string; id: string } | null }
 export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null; initiatorContext?: InitiatorContext | null }
 export interface HistoryEvent {
   id: string; sequence: number; occurredAt: string; source: string; action: string
@@ -282,6 +283,15 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  expenseReports: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ExpenseItem>>('/expense-reports' + historyQuery(filter), { signal, cache: 'no-store' }),
+  expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PriorRequestItem>>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
+  employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),
+  expenseReport: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expenseWorkflow: (id: string, taskId: string | undefined, signal: AbortSignal) => request<ExpenseWorkflow>(`/expense-reports/${encodeURIComponent(id)}/workflow` + historyQuery({ taskId }), { signal, cache: 'no-store' }),
+  receiveExpense: (id: string, taskId: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/receive`, 'POST', '确认费用原件签收', input),
+  reduceExpense: (id: string, taskId: string, input: ExpenseReduction) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/reduce`, 'POST', '确认财务核减', input),
+  withdrawExpense: (id: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回费用审批', input),
+  cancelExpense: (id: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/cancel`, 'POST', '作废费用单', input),
   definitionCopyRecipients: (signal?: AbortSignal) => request<AssigneeOption[]>('/process-definitions/copy-options', { signal }),
   copySnapshot: (applicationId: string, round: number, signal?: AbortSignal) => request<CopySnapshot>(`/copies/${applicationId}/rounds/${round}`, { signal }),
   copyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<AttachmentMetadata>(`/copies/${applicationId}/rounds/${round}/attachments/${id}`, { signal }),

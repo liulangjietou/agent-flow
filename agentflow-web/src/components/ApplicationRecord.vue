@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import RoundDiagram from './RoundDiagram.vue'
+import ExpenseDetail from './ExpenseDetail.vue'
 import RoundComparison from './RoundComparison.vue'
 import ApplicationHistory from './ApplicationHistory.vue'
 import ApplicationComments from './ApplicationComments.vue'
@@ -27,6 +28,9 @@ const description = ref('')
 const payload = ref<Record<string, unknown>>({})
 const fieldErrors = ref<FieldErrors>({})
 const loading = ref(true)
+const expenseBusy = ref(false)
+const selectedExpenseRound = ref<number | null>(null)
+const expenseId = computed(() => application.value?.businessReference?.type === 'EXPENSE' ? application.value.businessReference.id : null)
 const saving = ref(false)
 const uploading = ref(false)
 const error = ref('')
@@ -42,8 +46,8 @@ const cancellationInput = ref<HTMLTextAreaElement | null>(null)
 const cancellationTrigger = ref<HTMLButtonElement | null>(null)
 let returnFocus: HTMLElement | null = null
 const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
-const canEdit = computed(() => application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
-const canWithdraw = computed(() => application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL')
+const canEdit = computed(() => !expenseId.value && application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
+const canWithdraw = computed(() => !expenseId.value && application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL')
 const conclusionLabel = computed(() => application.value?.status === 'WITHDRAWN' ? '撤回说明' : '退回原因')
 const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
 const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
@@ -158,7 +162,7 @@ async function withdraw() {
   }
 }
 function close() {
-  if (!uploading.value && !saving.value && !dirty.value) emit('close')
+  if (!expenseBusy.value && !uploading.value && !saving.value && !dirty.value) emit('close')
 }
 async function openCancellation() {
   if (!canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
@@ -205,7 +209,7 @@ onUnmounted(() => returnFocus?.focus())
     <section ref="dialog" class="modal application-record" role="dialog" aria-modal="true" aria-labelledby="record-title" tabindex="-1" @keydown="trapFocus">
       <div class="modal-heading">
         <div><p class="eyebrow">APPLICATION RECORD</p><h2 id="record-title">申请详情与轮次</h2></div>
-        <button aria-label="关闭申请详情" :disabled="uploading || saving || dirty" @click="close">×</button>
+        <button aria-label="关闭申请详情" :disabled="expenseBusy || uploading || saving || dirty" @click="close">×</button>
       </div>
       <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
@@ -219,7 +223,8 @@ onUnmounted(() => returnFocus?.focus())
           <small v-if="currentRound?.completedBy">{{ currentRound.completedBy }}<template v-if="currentRound.completedAt"> · {{ timeLabel(currentRound.completedAt) }}</template></small>
           <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
         </div>
-        <form v-if="canEdit" novalidate @submit.prevent="save(true)">
+        <ExpenseDetail v-if="expenseId" :report-id="expenseId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :locked="saving || writesBlocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ExpenseDetail>
+        <form v-else-if="canEdit" novalidate @submit.prevent="save(true)">
           <fieldset :disabled="saving || writesBlocked || cancellationOpen">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
             <label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label>
@@ -258,7 +263,7 @@ onUnmounted(() => returnFocus?.focus())
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
-            <div class="round-content"><h4>{{ round.title }}</h4><p class="field-help">发起任职：{{ round.initiatorContext ? initiatorContextLabel(round.initiatorContext) : '本轮未记录任职上下文' }}</p><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
+            <div class="round-content"><h4>{{ round.title }}</h4><p class="field-help">发起任职：{{ round.initiatorContext ? initiatorContextLabel(round.initiatorContext) : '本轮未记录任职上下文' }}</p><template v-if="expenseId"><button type="button" class="secondary" @click="selectedExpenseRound = selectedExpenseRound === round.roundNo ? null : round.roundNo">{{ selectedExpenseRound === round.roundNo ? '收起本轮费用' : '查看本轮费用与核减记录' }}</button><ExpenseDetail v-if="selectedExpenseRound === round.roundNo" :report-id="expenseId" :application-id="application.id" :scope-key="scopeKey" :version="application.version"  :round-no="round.roundNo"><template #restricted><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /></template></ExpenseDetail></template><FormFields v-else :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
         <RoundComparison v-else-if="historyTab === 'compare'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" />
@@ -267,7 +272,7 @@ onUnmounted(() => returnFocus?.focus())
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />
       </template>
-      <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="uploading || saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="uploading || saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="uploading || saving || dirty" @click="close">关闭</button></div>
+      <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="uploading || saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="expenseBusy || uploading || saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="expenseBusy || uploading || saving || dirty" @click="close">关闭</button></div>
     </section>
   </div>
 </template>

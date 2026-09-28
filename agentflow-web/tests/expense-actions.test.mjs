@@ -1,0 +1,139 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createRenderer, reactive } from 'vue'
+const { default: Actions } = await import(process.env.AGENTFLOW_TEST_EXPENSEACTIONS)
+const { default: Detail } = await import(process.env.AGENTFLOW_TEST_EXPENSEDETAIL)
+const { default: Workspace } = await import(process.env.AGENTFLOW_TEST_EXPENSEWORKSPACE)
+const { api } = await import(process.env.AGENTFLOW_TEST_API)
+const originals = { receiveExpense: api.receiveExpense, reduceExpense: api.reduceExpense, withdrawExpense: api.withdrawExpense, cancelExpense: api.cancelExpense,
+  expenseReport: api.expenseReport, expenseWorkflow: api.expenseWorkflow, expenseReports: api.expenseReports, expenseRequests: api.expenseRequests, employeeAdvances: api.employeeAdvances }
+const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
+const money = value => ({ value, currency: 'CNY' })
+const detail = () => ({ id: 'report', applicationId: 'app', applicationVersion: 2, financialVersion: 5, roundNo: 1,
+  financialRound: { approvedLines: [{ lineNo: 1, gross: money('100.00'), tax: money('5.00') }] } })
+const workflow = () => ({ reportId: 'report', applicationId: 'app', applicationVersion: 2, financialVersion: 5, roundNo: 1,
+  canWithdraw: true, canCancel: true, task: { taskId: 'task', stage: 'FINANCE_REVIEW', canReceive: true, canReduce: true }, budget: { confirmedCurrent: true } })
+const receipt = () => ({ reportId: 'report', applicationId: 'app', applicationVersion: 3, financialVersion: 6 })
+const settle = () => new Promise(resolve => setImmediate(resolve))
+function panel(Component = Actions, initial = { scopeKey: 'demo/alice', detail: detail(), workflow: workflow(), locked: false }) {
+  const props = reactive(initial), events = []
+  const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onChanged: () => events.push('changed') })
+  const mounted = app.mount({})
+  return { state: mounted.$.setupState, props, events, close: () => { app.unmount(); Object.assign(api, originals) } }
+}
+
+test('收单、撤回、作废先确认且说明必填，只发送当前双版本', async () => {
+  for (const [action, method] of [['RECEIVE', 'receiveExpense'], ['WITHDRAW', 'withdrawExpense'], ['CANCEL', 'cancelExpense']]) {
+    const calls = []; api[method] = async (...args) => { calls.push(args); return receipt() }; const p = panel()
+    try {
+      p.state.prepare(action); assert.equal(calls.length, 0); p.state.cancel(); assert.equal(p.state.pending, null)
+      p.state.prepare(action); await p.state.execute(); assert.equal(calls.length, 0); assert.match(p.state.error, /说明/)
+      p.state.comment = ' 已核对原件或本次意图 '; await p.state.execute()
+      const input = { applicationVersion: 2, financialVersion: 5, comment: '已核对原件或本次意图' }
+      assert.deepEqual(calls, [action === 'RECEIVE' ? ['report', 'task', input] : ['report', input]])
+      assert.deepEqual(p.events, ['changed']); assert.equal(p.state.requiresRefresh, true); p.state.prepare(action); assert.equal(p.state.pending, null)
+    } finally { p.close() }
+  }
+})
+
+test('打开确认表单后键盘焦点进入首个输入，取消后不执行迟到焦点跳转', async () => {
+  const p = panel(); let focused = 0
+  try {
+    p.state.formElement = { querySelector: () => ({ focus: () => focused++ }) }
+    p.state.prepare('RECEIVE'); await settle(); assert.equal(focused, 1)
+    p.state.cancel(); p.state.prepare('REDUCE'); p.state.cancel(); await settle(); assert.equal(focused, 1)
+  } finally { p.close() }
+})
+
+test('核减默认保留原金额，填写原因和变化后才发送精确字符串，不修改原始正文', async () => {
+  const calls = []; api.reduceExpense = async (...args) => { calls.push(args); return receipt() }; const p = panel()
+  try {
+    p.state.prepare('REDUCE'); p.state.comment = '部分无效'; await p.state.execute(); assert.match(p.state.error, /原因/)
+    p.state.reason = 'INVALID_INVOICE'; await p.state.execute(); assert.match(p.state.error, /至少减少/); assert.equal(calls.length, 0)
+    p.state.inputs[0].approvedGross = '25.00'; p.state.inputs[0].approvedTax = '1.25'; await p.state.execute()
+    assert.deepEqual(calls, [['report', 'task', { applicationVersion: 2, financialVersion: 5, comment: '部分无效', reasonCode: 'INVALID_INVOICE', lines: [{ lineNo: 1, approvedGross: '25.00', approvedTax: '1.25' }] }]])
+    assert.equal(p.props.detail.financialRound.approvedLines[0].gross.value, '100.00')
+  } finally { p.close() }
+})
+
+test('委派或预算未确认时不能开启核减；提交锁与并发点击只发送一次', async () => {
+  let resolve; const calls = []; api.reduceExpense = (...args) => { calls.push(args); return new Promise(done => { resolve = done }) }; const p = panel()
+  try {
+    p.props.workflow.task.canReduce = false; p.state.prepare('REDUCE'); assert.equal(p.state.pending, null)
+    p.props.workflow.task.canReduce = true; p.props.locked = true; p.state.prepare('REDUCE'); assert.equal(p.state.pending, null)
+    p.props.locked = false; p.state.prepare('REDUCE'); p.state.inputs[0].approvedGross = '80'; p.state.comment = '核对'; p.state.reason = 'OTHER'
+    const first = p.state.execute(); await p.state.execute(); p.state.cancel(); assert.equal(p.state.pending, 'REDUCE'); assert.equal(calls.length, 1)
+    resolve(receipt()); await first
+  } finally { p.close() }
+})
+
+test('身份、任务或任一版本变化都会取消原意图；旧写入结果不刷新新账号', async () => {
+  let resolve; api.receiveExpense = () => new Promise(done => { resolve = done }); const p = panel()
+  try {
+    for (const change of [() => p.props.detail.applicationVersion++, () => p.props.detail.financialVersion++, () => p.props.workflow.task.taskId = 'new-task']) {
+      p.state.prepare('RECEIVE'); p.state.comment = '旧说明'; change(); assert.equal(p.state.pending, null); assert.equal(p.state.comment, '')
+    }
+    p.state.prepare('RECEIVE'); p.state.comment = '原账号'; const waiting = p.state.execute(); p.props.scopeKey = 'demo/bob'
+    resolve(receipt()); await waiting; assert.deepEqual(p.events, []); assert.equal(p.state.saving, false); assert.equal(p.state.pending, null)
+  } finally { p.close() }
+})
+
+test('冲突不自动更新版本重试；未知结果只提示恢复，不伪造成功', async () => {
+  for (const failure of [{ code: 'CONCURRENCY_CONFLICT', status: 409 }, { code: 'REQUEST_TIMEOUT', status: 0 }]) {
+    let calls = 0; api.reduceExpense = async () => { calls++; throw failure }; const p = panel()
+    try {
+      p.state.prepare('REDUCE'); p.state.reason = 'OTHER'; p.state.comment = '核减'; p.state.inputs[0].approvedGross = '50'
+      await p.state.execute(); await p.state.execute(); assert.equal(calls, 1); assert.deepEqual(p.events, []); assert.equal(p.state.requiresRefresh, true)
+      assert.match(p.state.error, failure.status ? /刷新/ : /恢复/); assert.equal(p.props.detail.applicationVersion, 2); assert.equal(p.props.detail.financialVersion, 5)
+    } finally { p.close() }
+  }
+})
+
+test('关闭组件后迟到回执不更新界面', async () => {
+  let resolve; api.cancelExpense = () => new Promise(done => { resolve = done }); const p = panel()
+  p.state.prepare('CANCEL'); p.state.comment = '取消计划'; const waiting = p.state.execute(); p.close(); resolve(receipt()); await waiting; assert.deepEqual(p.events, [])
+})
+
+test('实际费用详情组件区分旧冻结与本版本确认，账号切换清空旧内容', async () => {
+  const calls = []; api.expenseReport = (_id, _round, signal) => new Promise(resolve => calls.push({ signal, resolve })); api.expenseWorkflow = async () => ({ ...workflow(), budget: { confirmedCurrent: false, ledgerStatus: 'FROZEN', operationStatus: 'QUEUED' } })
+  const p = panel(Detail, { reportId: 'report', applicationId: 'app', scopeKey: 'alice', version: 2 })
+  try {
+    calls[0].resolve(detail()); await settle(); assert.match(p.state.budgetLabel, /等待/)
+    p.props.scopeKey = 'bob'; assert.equal(p.state.query.detail, null); assert.equal(calls.length, 2)
+    calls[1].resolve(detail()); await settle(); assert.ok(p.state.query.detail)
+    p.state.query.workflow.budget.confirmedCurrent = true; assert.match(p.state.budgetLabel, /当前金额预算已确认/)
+    p.props.roundNo = 1; assert.equal(p.state.query.workflow, null); calls[2].resolve(detail()); await settle()
+  } finally { p.close() }
+})
+
+test('实际工作区切换视图和账号立即清空余额，分页按当前视图读取', async () => {
+  const calls = []; api.expenseReports = async () => ({ items: [{ id: 'one' }], nextBeforeId: 'next' })
+  api.expenseRequests = (filter, signal) => new Promise(resolve => calls.push({ filter, signal, resolve }))
+  api.employeeAdvances = async () => ({ items: [{ id: 'advance' }], nextBeforeId: null })
+  const p = panel(Workspace, { scopeKey: 'alice', refreshVersion: 0 })
+  try {
+    await settle(); assert.equal(p.state.reports.items.length, 1)
+    p.state.tab = 'requests'; assert.deepEqual(p.state.reports.items, []); assert.equal(calls.length, 1)
+    p.props.scopeKey = 'bob'; assert.equal(calls[0].signal.aborted, true)
+    calls[0].resolve({ items: [{ id: 'leaked' }], nextBeforeId: null }); calls[1].resolve({ items: [], nextBeforeId: null }); await settle(); assert.deepEqual(p.state.requests.items, [])
+    p.state.tab = 'advances'; await settle(); assert.equal(p.state.advances.items[0].id, 'advance'); p.props.refreshVersion++; assert.deepEqual(p.state.advances.items, [])
+  } finally { p.close() }
+})
+
+test('申请弹窗按业务绑定关闭通用修改撤回入口，财务请求中 Escape 不关闭弹窗', async () => {
+  const { default: Record } = await import(process.env.AGENTFLOW_TEST_APPLICATION_RECORD)
+  const document = globalThis.document, originalApplication = api.application, originalRounds = api.applicationRounds
+  globalThis.document = { activeElement: null }
+  api.application = async () => ({ id: 'app', createdBy: 'alice', status: 'DRAFT', title: '费用草稿', payload: {}, version: 1, roundNo: 0, businessReference: { type: 'EXPENSE', id: 'report' } })
+  api.applicationRounds = async () => []
+  let closed = 0
+  const app = renderer.createApp({ ...Record, render: () => null }, { applicationId: 'app', userId: 'alice', scopeKey: 'demo/alice', commentRefreshVersion: 0, pendingWrites: [], recoveryError: '', onClose: () => closed++ })
+  const state = app.mount({}).$.setupState
+  try {
+    await settle(); assert.equal(state.expenseId, 'report'); assert.equal(state.canEdit, false)
+    state.setApplication({ ...state.application, status: 'IN_APPROVAL' }); assert.equal(state.canWithdraw, false)
+    state.expenseBusy = true; state.trapFocus({ key: 'Escape', preventDefault() {} }); assert.equal(closed, 0)
+    state.expenseBusy = false; state.trapFocus({ key: 'Escape', preventDefault() {} }); assert.equal(closed, 1)
+    state.setApplication({ ...state.application, status: 'DRAFT', businessReference: null }); assert.equal(state.canEdit, true)
+  } finally { app.unmount(); globalThis.document = document; api.application = originalApplication; api.applicationRounds = originalRounds }
+})

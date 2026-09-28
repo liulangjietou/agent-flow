@@ -1,0 +1,163 @@
+{
+  "date": "2026-09-28",
+  "scope": "expense workspace and financial review UI",
+  "backendCommit": "7967c1ab3054e50d55a68a35e1ff0b923ba69f6b",
+  "frontendTests": 34,
+  "frontendBuild": "PASS",
+  "openapi": {
+    "operations": 125,
+    "schemas": 213,
+    "requestExamples": 44
+  },
+  "http": {
+    "initialHttpChecks": 24,
+    "finalHttpChecks": 16,
+    "checks": [
+      {
+        "path": "/expense-reports/4578ee38-3fac-42b4-83bb-2559f5b92b3d",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports/4578ee38-3fac-42b4-83bb-2559f5b92b3d/workflow",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/applications/7f423651-2ce6-4b69-853f-1ae3c5bd4318",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/applications/7f423651-2ce6-4b69-853f-1ae3c5bd4318/rounds",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports/4578ee38-3fac-42b4-83bb-2559f5b92b3d?roundNo=1",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/tasks",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports?status=DRAFT",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports/4578ee38-3fac-42b4-83bb-2559f5b92b3d/workflow",
+        "actor": "admin",
+        "status": 403
+      },
+      {
+        "path": "/expense-reports",
+        "actor": "bob",
+        "status": 200
+      },
+      {
+        "path": "/expense-reports/4578ee38-3fac-42b4-83bb-2559f5b92b3d/workflow",
+        "actor": "bob",
+        "status": 404
+      },
+      {
+        "path": "/expense-requests",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/employee-advances",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/applications/7f423651-2ce6-4b69-853f-1ae3c5bd4318/audit?action=EXPENSE_REDUCE",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "path": "/notifications?limit=50",
+        "actor": "alice",
+        "status": 200
+      }
+    ],
+    "reportId": "4578ee38-3fac-42b4-83bb-2559f5b92b3d",
+    "applicationStatus": "APPROVED",
+    "originalGross": "100.00",
+    "approvedGross": "20.00",
+    "approvedTax": "1.20",
+    "adjustments": 2,
+    "budgetConfirmedCurrent": true,
+    "originalSubmissionPayloadPreserved": true,
+    "domainMoneyDisplayedAsStrings": true,
+    "synthetic": true
+  },
+  "browser": {
+    "result": "PASS",
+    "report": "UI-EXPENSE-001",
+    "actions": [
+      "paper receive",
+      "approve receipt task",
+      "reduce 100.00 to 25.00",
+      "reduce 25.00 to 20.00",
+      "approve finance task",
+      "inspect current and original round",
+      "restricted manager allowed projected summary"
+    ],
+    "redGreen": [
+      {
+        "issue": "task queue stale gross after reduction",
+        "red": "detail 25.00, queue 100.00; real DOM assertion failed",
+        "green": "detail and queue 20.00 after next reduction"
+      },
+      {
+        "issue": "confirmation form keyboard focus lost",
+        "red": "component test expected one focus, actual zero",
+        "green": "34 scoped tests pass and browser focus in first gross input"
+      },
+      {
+        "issue": "restricted financial detail obscured permitted summary",
+        "red": "real manager detail lacked readable amount",
+        "green": "projected amount and currency visible, masked account and expense details absent"
+      }
+    ],
+    "responsive": {
+      "cssWidth": 500,
+      "scrollWidth": 500,
+      "dialogWidth": 476
+    },
+    "consoleErrors": []
+  },
+  "localArtifacts": [
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-final-tests.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-final-build.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-openapi.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-focus-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-stale-queue-red.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-finance-green.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-mobile.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-restricted-green.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-http-evidence.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-final-http.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-restricted.json"
+  ],
+  "limitations": [
+    "local synthetic finance gateway is not enterprise integration",
+    "source balances use actual API but fixture contains no funded source rows",
+    "origination and settlement UI remain in progress",
+    "remote CI not run"
+  ]
+}
