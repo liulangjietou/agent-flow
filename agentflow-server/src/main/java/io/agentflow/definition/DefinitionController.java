@@ -5,12 +5,14 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.form.FormSchema;
+import io.agentflow.form.FormFieldProjection;
 import io.agentflow.notification.NotificationTexts;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -67,6 +69,23 @@ public class DefinitionController {
         return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
                 .body(service.assigneeOptions(currentActor.actor().tenantId()));
     }
+
+    /** 仅对设计者提供的测试内容计算权限展示，不读取申请或授予所选节点的实际权限。 */
+    @PostMapping("/field-preview")
+    public ResponseEntity<FormFieldProjection> fieldPreview(@Valid @RequestBody FieldPreviewRequest request) {
+        requireProcessAdmin();
+        request.formSchema().validateDraft(request.values());
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(FormFieldProjection.forNodes(request.formSchema(), request.values(), request.nodeIds()));
+    }
+
+    /**
+     * 预览只接受显式测试数据；空节点集合表示没有节点参与事实的管理视角。
+     * @author owlzhangfq@gmail.com
+     */
+    public record FieldPreviewRequest(@NotNull FormSchema formSchema, @NotNull java.util.Map<String, Object> values,
+                                      @NotNull @Size(max = FormSchema.MAX_PERMISSION_NODES)
+                                      java.util.Set<@NotBlank @Size(max = FormSchema.MAX_NODE_ID_LENGTH) String> nodeIds) { }
 
     /** 创建流程草稿。 */
     @PostMapping

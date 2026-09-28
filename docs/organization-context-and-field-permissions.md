@@ -82,6 +82,23 @@ HTTP 记录、数据库、脚本及截图保留在 `/fyoung/tmp/agentflow-contex
 
 测试服务、容器及合成数据在 `/fyoung/tmp/agentflow-context-fields-postgres-20260927` 单独记录，测试服务和容器已停止，数据保留。证据与日志摘要见 [PostgreSQL 验收索引](evidence/organization-context-postgres-20260927.json)。
 
+## 设计器权限预览补齐（2026-09-28）
+
+设计器在申请人测试填写下方新增权限展示预览，支持没有节点身份的管理员、单个人工审批节点和多个节点；多节点仍按更严格的规则合并。已发布版本允许用测试内容预览，字段配置继续只读。预览不保存填写内容、不创建申请，也不授予所选节点的实际资源权限。
+
+调用链为 `FormSchemaEditor` → `FieldPermissionPreview` → `POST /api/v1/process-definitions/field-preview` → `FormFieldProjection`。该入口要求 ADMIN 或 PROCESS_ADMIN，只接收设计者提供的 schema、测试值和有界节点集合，没有真实申请标识。新增第二个投影消费者后，将原 `ApplicationFieldViews` 内的纯字段投影提取到领域类型，正式查询继续负责原申请授权与真实节点事实，避免前端另写一套脱敏规则。
+
+切换账号或流程清空测试填写；修改字段、测试值、身份或节点使旧结果失效并取消请求。12 秒超时解除等待，超时、失效及卸载后的迟到响应不能重新显示旧内容；普通账号无法调用预览接口。结果响应标记 `Cache-Control: no-store`。
+
+验收记录见 [权限预览证据](evidence/field-permission-preview-20260928.json)：
+
+- 实现前新增接口用例先失败 2 项（预期成功或权限拒绝，实际路由返回 405）。接入后相关后端 36 项通过；补充节点数量/长度边界和契约后，设计预览 12 项及契约 5 项通过。两次范围有重叠，不相加。
+- 前端相关 56 项通过，包括实际 Vue 组件的身份/输入失效、取消、超时、迟到响应、节点删除与等值重绘。首次测试替身直接复制响应式对象触发 `DataCloneError`，改为与实际 API 相同的 JSON 序列化后通过。
+- 当前 OpenAPI 86 个操作、138 个 schema、31 个请求样例通过；Java 与 Vue 构建通过。Java 作者检查 346 个文件、537 个命名类型，无缺失或解析错误。
+- 独立 H2 与当前构建完成 11 次真实 HTTP 请求，验证管理员、主管、多节点和明细列结果，以及 401/403/400、no-store、流程定义未变。浏览器实际确认管理员脱敏、主管读取金额、多节点从严、测试值改变清除旧结果；退出后切换 alice，原填写为空且预览按钮不可用。
+
+本次没有数据库变更，PostgreSQL 迁移沿用上一节独立验收。测试端口 18190/15190 和本轮浏览器标签已关闭；脚本、数据库、日志及截图保留在 `/fyoung/tmp/agentflow-field-preview-20260927`（目录在前一天建立，最终验收日期为 2026-09-28）。
+
 ## 交付状态与限制
 
 本轮完成两项已确认规则的本地开发。工作树为 `/fyoung/tmp/agentflow-governance-identifier-integration`，分支 `codex/governance-identifier-integration`；主线 `60bafa0` 和主演示保持原状。用户要求先完成本地开发，且仓库尚未配置远端，本轮没有 GitHub PR 或远程 CI，开发工作树继续保留。

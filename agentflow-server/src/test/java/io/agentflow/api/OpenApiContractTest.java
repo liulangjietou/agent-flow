@@ -141,6 +141,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("LoginResponse", io.agentflow.auth.AuthController.LoginResponse.class),
                 java.util.Map.entry("CurrentIdentity", io.agentflow.auth.AuthService.LoginResult.class),
                 java.util.Map.entry("SimulationResult", io.agentflow.definition.DefinitionSimulator.Result.class),
+                java.util.Map.entry("FieldPreviewResult", io.agentflow.form.FormFieldProjection.class),
                 java.util.Map.entry("SimulationDecision", io.agentflow.definition.DefinitionSimulator.Decision.class),
                 java.util.Map.entry("SimulationBranch", io.agentflow.definition.DefinitionSimulator.Branch.class),
                 java.util.Map.entry("ComparisonChange", io.agentflow.definition.DefinitionDiffService.Change.class),

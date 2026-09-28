@@ -1068,6 +1068,140 @@
         ]
       }
     },
+    "/api/v1/process-definitions/field-preview": {
+      "post": {
+        "operationId": "previewFieldPermissions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "预览字段权限展示",
+        "description": "只读。仅投影设计器提供的表单和测试内容，不读取真实申请、不保存内容。nodeIds 为空模拟没有节点身份的管理员；多节点按更严格权限合并。该模拟身份只对本次测试输入生效，不授予任何资源访问权限。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldPreviewResult"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "测试内容不得缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldPreviewInput"
+              },
+              "example": {
+                "formSchema": {
+                  "schemaVersion": 1,
+                  "fields": [
+                    {
+                      "key": "amount",
+                      "label": "金额",
+                      "type": "NUMBER",
+                      "required": false,
+                      "sensitive": true,
+                      "nodeAccess": {
+                        "review": "READ_ONLY"
+                      }
+                    }
+                  ]
+                },
+                "values": {
+                  "amount": "125.50"
+                },
+                "nodeIds": []
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/process-definitions/{id}/simulate": {
       "post": {
         "operationId": "simulateSavedDefinition",
@@ -15574,6 +15708,60 @@
           "expectedRevision"
         ],
         "additionalProperties": false
+      },
+      "FieldPreviewInput": {
+        "type": "object",
+        "properties": {
+          "formSchema": {
+            "$ref": "#/components/schemas/FormSchema"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          },
+          "nodeIds": {
+            "type": "array",
+            "maxItems": 200,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "\\S"
+            },
+            "description": "设计器选中的人工审批节点标识；空集合模拟没有节点身份的管理员。"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formSchema",
+          "values",
+          "nodeIds"
+        ]
+      },
+      "FieldPreviewResult": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "$ref": "#/components/schemas/FormSchema"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "根据所选身份投影后的测试内容；隐藏字段无键，脱敏值固定为已脱敏。"
+          },
+          "restricted": {
+            "type": "boolean",
+            "description": "是否存在字段或明细列被隐藏或脱敏。"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "payload",
+          "restricted"
+        ]
       }
     }
   }

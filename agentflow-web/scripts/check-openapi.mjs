@@ -92,6 +92,9 @@ async function exercise(base) {
   collidingGraph.edges[0].id = conflictingId
   assert.ok((await call('POST', defs + '/validate', { body: { graph: collidingGraph } })).errors.includes('NODE_EDGE_ID_CONFLICT:' + conflictingId))
   await call('POST', defs + '/simulate', { body: { graph: create.graph, values: {} } })
+  const fieldPreview = example(defs + '/field-preview')
+  assert.equal((await call('POST', defs + '/field-preview', { body: fieldPreview })).payload.amount, '已脱敏')
+  await call('POST', defs + '/field-preview', { body: fieldPreview, user: 'alice', status: 403 })
   await call('POST', defs + '/{id}/simulate', { path: defPath + '/simulate', body: { values: {} } })
   definition = await call('PUT', defs + '/{id}', { path: defPath, body: { name: '接口契约验收流程', graph: create.graph, expectedRevision: definition.revision } })
   definition = await call('POST', defs + '/{id}/publish', { path: defPath + `/publish?expectedRevision=${definition.revision}`, body: example(defs + '/{id}/publish') })

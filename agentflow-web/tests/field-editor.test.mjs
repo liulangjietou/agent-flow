@@ -32,3 +32,13 @@ test('权限配置保持原表单不可变、可清除失效节点且锁定时�
     assert.equal(p.events.length, count)
   } finally { p.close() }
 })
+test('切换账号或定义时清除测试填写，避免相同表单复用旧预览内容', () => {
+  const p = panel()
+  try {
+    p.state.preview = { secret: '旧账号测试内容' }
+    p.state.previewChecked = true
+    p.props.scopeKey = 'another/designer/definition'
+    assert.deepEqual(p.state.preview, {}); assert.equal(p.state.previewChecked, false)
+    assert.equal(p.events.length, 0)
+  } finally { p.close() }
+})

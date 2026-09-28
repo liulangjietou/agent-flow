@@ -1,0 +1,251 @@
+{
+  "recordedAt": "2026-09-28T04:09:12.244545+00:00",
+  "timezone": "America/New_York",
+  "result": "PASS",
+  "sourceBaseCommit": "909ac155111ad7c9dc8e6cce5b6fa718c07ba41c",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "Designer test-data field permission preview and shared projection; no new database migration",
+  "rules": {
+    "roles": [
+      "ADMIN",
+      "PROCESS_ADMIN"
+    ],
+    "nodeCountLimit": 200,
+    "nodeIdLengthLimit": 128,
+    "emptyNodeIds": "administrator without node participation",
+    "multipleNodeIds": "strictest visibility",
+    "readsRealApplications": false,
+    "writesBusinessData": false,
+    "cacheControl": "no-store"
+  },
+  "tests": {
+    "red": {
+      "tests": 2,
+      "failure": "missing route returned 405 instead of successful or forbidden field preview"
+    },
+    "backendProjectionScope": {
+      "passed": 36,
+      "classes": [
+        "AssistRunQueryIntegrationTest",
+        "DefinitionPreviewIntegrationTest",
+        "FieldPermissionsIntegrationTest"
+      ]
+    },
+    "backendFinalContractScope": {
+      "passed": 17,
+      "classes": [
+        "DefinitionPreviewIntegrationTest",
+        "OpenApiContractTest"
+      ],
+      "overlapsEarlierScope": true
+    },
+    "frontend": {
+      "passed": 56,
+      "files": [
+        "field-preview.test.mjs",
+        "field-editor.test.mjs",
+        "forms.test.mjs",
+        "requests.test.mjs",
+        "simulation.test.mjs"
+      ]
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 86,
+      "schemas": 138,
+      "requestExamples": 31
+    },
+    "javaBuild": "PASS",
+    "vueBuild": "PASS; existing chunk-size warning retained",
+    "authors": {
+      "files": 346,
+      "namedTypes": 537,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "runtime": {
+    "result": "PASS",
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/21958574-76a6-4ed8-92dc-3e0b61136c08/publish",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/field-preview",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/field-preview",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/field-preview",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/field-preview",
+        "actor": "alice",
+        "status": 403
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/field-preview",
+        "actor": "anonymous",
+        "status": 401
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/field-preview",
+        "actor": "admin",
+        "status": 400
+      },
+      {
+        "method": "GET",
+        "path": "/process-definitions/21958574-76a6-4ed8-92dc-3e0b61136c08",
+        "actor": "admin",
+        "status": 200
+      }
+    ],
+    "assertions": [
+      "admin masked",
+      "manager raw amount and hidden note",
+      "parallel nodes strictest",
+      "table cell masked",
+      "employee forbidden",
+      "anonymous unauthorized",
+      "node length bounded",
+      "no-store response",
+      "definition unchanged"
+    ],
+    "fixture": {
+      "definitionId": "21958574-76a6-4ed8-92dc-3e0b61136c08",
+      "processKey": "field-preview-7d9b38a3",
+      "definitionRevision": 1,
+      "name": "字段权限预览验收"
+    }
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:15190",
+    "database": "isolated H2 synthetic fixtures only",
+    "checks": [
+      "published schema stays read-only while test entry is editable",
+      "administrator sees masked amount and table account; note hidden",
+      "single manager node reads amount; note hidden and table account masked",
+      "manager and finance selected together mask amount",
+      "test input change clears old result",
+      "logout and login as alice clear test entries and disable preview"
+    ],
+    "requestRaceAndTimeoutCoverage": "Vue component regression; not network fault injection in browser",
+    "temporaryTabClosed": true
+  },
+  "cleanup": {
+    "recordedAt": "2026-09-28T04:08:20.431040+00:00",
+    "temporaryServicesStopped": true,
+    "temporaryTabClosed": true,
+    "dataRetained": true,
+    "ports": [
+      18190,
+      15190
+    ]
+  },
+  "artifacts": [
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/red.log",
+      "bytes": 29674,
+      "sha256": "cd185e05f03c90bdc2775e446815700469ee69edae90b6eb627101d342990bf5"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/backend-regression.log",
+      "bytes": 51560,
+      "sha256": "30aa22421b9e3b1fa6e39be486b243d68fb42eeaa0c938e370a88fb9f9737af4"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/contract-build.log",
+      "bytes": 38055,
+      "sha256": "894f03e49118139e96aed2bb38af6d22a91203d5b9ddefc85996ac62db6049de"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/web-regression-final.log",
+      "bytes": 5252,
+      "sha256": "366f6b552c5c7f49e4f378fd485616456b6a74c1f14b524c43ac4772687c459f"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/web-build.log",
+      "bytes": 775,
+      "sha256": "74171902e1e38955998cdbe47a983a78e0d11e27ccd4862aea69568990fffc2c"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/openapi.log",
+      "bytes": 69,
+      "sha256": "baef1bb73ee5937f3e8305e9a8b0f7a419f87fe32f7942177f855c4b6fe2be80"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/http-evidence.json",
+      "bytes": 1971,
+      "sha256": "cdf0923cff4d96cead31518acf66f7a3ee89a6aab35fa85fe48067c4eebe6843"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/authors.log",
+      "bytes": 71,
+      "sha256": "858d1560112e9d4098e4585ce6c13e2e3660ddf3eaf46d52b7542e0a8af40454"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/cleanup.json",
+      "bytes": 183,
+      "sha256": "6a9f253fa688664d0b9fc3b3a63067ff6c5771a91c5c41663072c9e6ed9efada"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/browser-admin.png",
+      "bytes": 97870,
+      "sha256": "592053af491ea6649062a99f6c33e35b2c9a433e4c509aec8b15aa1965af4be3"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/browser-manager.png",
+      "bytes": 98752,
+      "sha256": "caf850eb7fdb847914005f82c606cb76ba64d4a3a6c0aa78f1cf83388d387f3c"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/browser-multiple-nodes.png",
+      "bytes": 97260,
+      "sha256": "f3da9a6f781be9484353e740f9fda7280add53ba27e2777483fcadffb6bcb480"
+    },
+    {
+      "file": "/fyoung/tmp/agentflow-field-preview-20260927/browser-alice-state.txt",
+      "bytes": 13093,
+      "sha256": "fd27f79550f7a8cd84f38c4864337d43775523b7de7ee571bfd801b6e102c065"
+    }
+  ],
+  "limitations": [
+    "Only local development delivery; no configured Git remote, PR or remote CI",
+    "PostgreSQL migration/runtime evidence was completed separately before this schema-free projection extraction",
+    "Attachment decisions and other full-platform scope remain pending"
+  ]
+}

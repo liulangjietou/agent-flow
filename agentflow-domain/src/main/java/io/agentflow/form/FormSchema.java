@@ -19,8 +19,8 @@ import java.util.regex.Pattern;
 public record FormSchema(int schemaVersion, List<Field> fields) {
     public static final int CURRENT_VERSION = 2;
     public static final int MAX_FIELDS = 50;
-    private static final int MAX_PERMISSION_NODES = 200;
-    private static final int MAX_NODE_ID_LENGTH = 128;
+    public static final int MAX_PERMISSION_NODES = 200;
+    public static final int MAX_NODE_ID_LENGTH = 128;
     public static final int MAX_TABLE_COLUMNS = 20;
     public static final int MAX_TABLE_ROWS = 100;
     public static final int DEFAULT_TABLE_ROWS = 50;

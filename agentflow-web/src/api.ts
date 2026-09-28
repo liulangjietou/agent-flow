@@ -34,6 +34,10 @@ export function bindAuthenticationActor(actor: Actor | null) {
 export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
 /** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
 export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown> }
+/** 仅使用设计器测试填写内容的字段权限预览。@author owlzhangfq@gmail.com */
+export interface FieldPreviewInput { formSchema: FormSchema; values: Record<string, unknown>; nodeIds: string[] }
+/** 正式读取与设计预览共用的服务端投影。@author owlzhangfq@gmail.com */
+export interface FieldPreviewResult { schema: FormSchema; payload: Record<string, unknown>; restricted: boolean }
 /** 与发布基线比较的完整当前配置。@author owlzhangfq@gmail.com */
 export interface ComparisonInput { key: string; name: string; graph: Graph; formSchema: FormSchema | null; notificationTexts?: NotificationTexts }
 /** 一个稳定对象的配置变化；缺少前后值表示该侧未配置。@author owlzhangfq@gmail.com */
@@ -303,6 +307,7 @@ export const api = {
   changeDefinitionAvailability: (id: string, body: DefinitionAvailabilityInput) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}/availability`, 'POST', body.startEnabled ? '恢复流程版本' : '停用流程版本', body),
   compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
+  previewFields: (body: FieldPreviewInput, signal: AbortSignal) => request<FieldPreviewResult>('/process-definitions/field-preview', { method: 'POST', body: JSON.stringify(body), signal }),
   approvalOperations: (filter: OperationsFilter, signal: AbortSignal) => request<OperationsReport>('/operations/approvals' + historyQuery(filter), { signal }),
   firstWorkflow: (id: string, signal: AbortSignal) => request<FirstWorkflowReport>('/system/first-workflow' + (id ? '?definitionId=' + encodeURIComponent(id) : ''), { signal }),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),

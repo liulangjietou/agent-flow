@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch, useId } from 'vue'
 import FormFields from './FormFields.vue'
+import FieldPermissionPreview from './FieldPermissionPreview.vue'
 import { defaultFormSchema, fieldTypes, validatePayload, validateFormSchema, ownValue, type FieldErrors, type FieldVisibility, type FieldType, type FormField, type FormSchema } from '../formSchema'
 
-const props = defineProps<{ modelValue: FormSchema | null; disabled: boolean; columnsOnly?: boolean; approvalNodes?: Array<{ id: string; name: string }> }>()
+const props = defineProps<{ modelValue: FormSchema | null; disabled: boolean; columnsOnly?: boolean; approvalNodes?: Array<{ id: string; name: string }>; scopeKey?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: FormSchema]; beforeChange: [] }>()
 const headingId = useId()
 const fieldLimit = computed(() => props.columnsOnly ? 20 : 50)
@@ -12,6 +13,7 @@ const rows = ref<Array<{ id: string; field: FormField }>>([])
 const preview = ref<Record<string, unknown>>({})
 const previewErrors = ref<FieldErrors>({})
 const previewChecked = ref(false)
+watch(() => props.scopeKey, () => { preview.value = {}; previewErrors.value = {}; previewChecked.value = false }, { flush: 'sync' })
 const configErrors = computed(() => validateFormSchema(props.modelValue, props.columnsOnly))
 const configErrorCount = computed(() => configErrors.value.schema.length + configErrors.value.fields.reduce((count, fields) => count + Object.keys(fields).length, 0))
 const configError = (index: number, property: string) => ownValue(configErrors.value.fields[index] ?? {}, property)
@@ -145,7 +147,14 @@ function checkPreview() { previewErrors.value = validatePayload(props.modelValue
         </fieldset>
         <p class="config-footnote">字段标识以字母开头，只使用字母、数字与下划线。字段顺序决定填写顺序。</p>
       </div>
-      <aside v-if="!columnsOnly" class="form-preview" aria-label="申请表单预览"><div class="preview-title"><span class="preview-dot"></span><strong>填写预览</strong><small>预览内容不会保存</small></div><FormFields v-model="preview" :schema="modelValue" :errors="previewErrors" @update:model-value="previewChecked = false; previewErrors = {}" /><p v-if="configErrorCount" class="config-error">请先修正字段配置，再检查预览填写。</p><button type="button" class="secondary" :disabled="configErrorCount > 0" @click="checkPreview">检查预览填写</button><p v-if="previewChecked && !Object.keys(previewErrors).length" class="preview-success" role="status">预览填写符合当前字段要求。</p></aside>
+      <aside v-if="!columnsOnly" class="form-preview" aria-label="申请表单预览">
+        <div class="preview-title"><span class="preview-dot"></span><strong>申请人填写预览</strong><small>预览内容不会保存</small></div>
+        <FormFields v-model="preview" :schema="modelValue" :errors="previewErrors" @update:model-value="previewChecked = false; previewErrors = {}" />
+        <p v-if="configErrorCount" class="config-error">请先修正字段配置，再检查预览填写。</p>
+        <button type="button" class="secondary" :disabled="configErrorCount > 0" @click="checkPreview">检查预览填写</button>
+        <p v-if="previewChecked && !Object.keys(previewErrors).length" class="preview-success" role="status">预览填写符合当前字段要求。</p>
+        <FieldPermissionPreview :schema="modelValue" :values="preview" :approval-nodes="approvalNodes ?? []" :scope-key="scopeKey ?? ''" :invalid="configErrorCount > 0" />
+      </aside>
     </div>
   </section>
 </template>

@@ -25,7 +25,7 @@ import static io.agentflow.definition.DefinitionModels.*;
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:definition-preview;DB_CLOSE_DELAY=-1", "agentflow.auth.demo-enabled=true"})
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 class DefinitionPreviewIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
@@ -36,6 +36,54 @@ class DefinitionPreviewIntegrationTest {
     @Autowired TaskService tasks;
     @Autowired JdbcTemplate jdbc;
     @Autowired org.flowable.engine.RepositoryService engineRepository;
+
+    @Test
+    void fieldPreviewUsesNodeRestrictionsAndDoesNotWriteBusinessOrEngineState() throws Exception {
+        var schema = Map.of("schemaVersion", 2, "fields", List.of(
+                Map.of("key", "amount", "label", "金额", "type", "NUMBER", "required", false, "sensitive", true,
+                        "nodeAccess", Map.of("manager", "READ_ONLY", "finance", "HIDDEN")),
+                Map.of("key", "items", "label", "明细", "type", "TABLE", "required", false, "columns", List.of(
+                        Map.of("key", "account", "label", "账号", "type", "TEXT", "required", false, "sensitive", true)))));
+        var values = Map.of("amount", "125.50", "items", List.of(Map.of("account", "private-account")));
+        var before = snapshot();
+        mvc.perform(post("/api/v1/process-definitions/field-preview").header("Authorization", token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("formSchema", schema, "values", values, "nodeIds", List.of("manager")))))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("payload.amount").value("125.50"))
+                .andExpect(jsonPath("payload.items[0].account").value("已脱敏"))
+                .andExpect(jsonPath("restricted").value(true));
+        for (var nodes : List.of(List.of(), List.of("manager", "finance"))) {
+            var response = mvc.perform(post("/api/v1/process-definitions/field-preview").header("Authorization", token("admin"))
+                            .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("formSchema", schema, "values", values, "nodeIds", nodes))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("payload.amount").doesNotExist())
+                    .andExpect(jsonPath("schema.fields[0].key").value("items")).andReturn().getResponse().getContentAsString();
+            assertThat(response).doesNotContain("125.50", "private-account");
+        }
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    void fieldPreviewRequiresDesignerAndBoundedValidTestInput() throws Exception {
+        var body = Map.of("formSchema", Map.of("schemaVersion", 1, "fields", List.of()), "values", Map.of(), "nodeIds", List.of());
+        var before = snapshot();
+        mvc.perform(post("/api/v1/process-definitions/field-preview").contentType(MediaType.APPLICATION_JSON).content(json.write(body)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/process-definitions/field-preview").header("Authorization", token("employee"))
+                        .contentType(MediaType.APPLICATION_JSON).content(json.write(body))).andExpect(status().isForbidden());
+        var invalid = new java.util.LinkedHashMap<String, Object>(body);
+        for (var nodes : List.of(List.of(" "), List.of("n".repeat(129)),
+                java.util.stream.IntStream.range(0, 201).mapToObj(index -> "node" + index).toList())) {
+            invalid.put("nodeIds", nodes);
+            mvc.perform(post("/api/v1/process-definitions/field-preview").header("Authorization", token("admin"))
+                            .contentType(MediaType.APPLICATION_JSON).content(json.write(invalid))).andExpect(status().isBadRequest());
+        }
+        invalid.put("nodeIds", List.of()); invalid.put("values", Map.of("undeclared", "must-not-be-echoed"));
+        var response = mvc.perform(post("/api/v1/process-definitions/field-preview").header("Authorization", token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON).content(json.write(invalid))).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("details.fieldErrors.undeclared").value("UNKNOWN_FIELD")).andReturn().getResponse().getContentAsString();
+        assertThat(response).doesNotContain("must-not-be-echoed");
+        assertThat(snapshot()).isEqualTo(before);
+    }
 
     @Test
     void previewIsReadOnlyAndReturnsTypedDecisionTrace() throws Exception {
