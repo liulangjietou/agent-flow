@@ -1,0 +1,157 @@
+{
+  "recordedAt": "2026-09-28T20:59:58.432744+00:00",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "backendCommit": "b2bc4dfec923492ff3084400a5221ed042b4985f",
+  "syntheticFinance": true,
+  "enterpriseAcceptance": false,
+  "database": "expense_ui_b8e8e035f6",
+  "migration": "V41 to V42 by packaged application",
+  "tests": {
+    "advanceUi": 23,
+    "frontendScope": 118,
+    "scopesOverlap": true,
+    "build": "PASS",
+    "initialRegression": {
+      "tests": 23,
+      "passed": 22,
+      "failed": 1,
+      "cause": "overlapping catalog read and saved receipt reload cancelled catalog and retained loading state"
+    }
+  },
+  "approval": {
+    "phase": "APPROVED",
+    "requestId": "2b728aa9-8743-404a-a342-2ca698b7fc76",
+    "applicationId": "cfc5497e-419e-4028-8291-79262a3feed5",
+    "current": {
+      "id": "2b728aa9-8743-404a-a342-2ca698b7fc76",
+      "applicationId": "cfc5497e-419e-4028-8291-79262a3feed5",
+      "businessNo": "UI-ADVANCE-001",
+      "status": "APPROVED",
+      "applicationVersion": 9,
+      "requestVersion": 5,
+      "roundNo": 2,
+      "editable": false,
+      "content": {
+        "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+        "title": "客户现场交流借款 · 本地验收",
+        "purpose": "客户现场交流期间的交通与住宿备用金。本单为本地合成验收，不触发真实付款。",
+        "amount": {
+          "value": "450.00",
+          "currency": "CNY"
+        },
+        "dueOn": "2026-10-12"
+      },
+      "financialRound": {
+        "roundNo": 2,
+        "submittedRequestVersion": 3,
+        "submittedBy": "alice",
+        "submittedAt": "2026-09-28T20:56:37.974402Z",
+        "content": {
+          "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+          "title": "客户现场交流借款 · 本地验收",
+          "purpose": "客户现场交流期间的交通与住宿备用金。本单为本地合成验收，不触发真实付款。",
+          "amount": {
+            "value": "450.00",
+            "currency": "CNY"
+          },
+          "dueOn": "2026-10-12"
+        },
+        "legalEntity": {
+          "id": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+          "name": "本地验收法人",
+          "baseCurrency": "CNY",
+          "paperReceiptRequired": true,
+          "sourceVersion": "v1",
+          "timeZone": "UTC"
+        },
+        "catalogVersion": "synthetic-ui-v1",
+        "maskedAccount": "****1234"
+      },
+      "approval": {
+        "roundNo": 2,
+        "applicationVersion": 9,
+        "approvedBy": "manager",
+        "approvedAt": "2026-09-28T20:58:03.976163Z"
+      }
+    },
+    "history": {
+      "id": "2b728aa9-8743-404a-a342-2ca698b7fc76",
+      "applicationId": "cfc5497e-419e-4028-8291-79262a3feed5",
+      "businessNo": "UI-ADVANCE-001",
+      "status": "APPROVED",
+      "applicationVersion": 9,
+      "requestVersion": 5,
+      "roundNo": 1,
+      "editable": false,
+      "content": {
+        "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+        "title": "客户现场交流借款 · 本地验收",
+        "purpose": "客户现场交流期间的交通与住宿备用金。本单为本地合成验收，不触发真实付款。",
+        "amount": {
+          "value": "500.00",
+          "currency": "CNY"
+        },
+        "dueOn": "2026-10-10"
+      },
+      "financialRound": {
+        "roundNo": 1,
+        "submittedRequestVersion": 1,
+        "submittedBy": "alice",
+        "submittedAt": "2026-09-28T20:52:26.339594Z",
+        "content": {
+          "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+          "title": "客户现场交流借款 · 本地验收",
+          "purpose": "客户现场交流期间的交通与住宿备用金。本单为本地合成验收，不触发真实付款。",
+          "amount": {
+            "value": "500.00",
+            "currency": "CNY"
+          },
+          "dueOn": "2026-10-10"
+        },
+        "legalEntity": {
+          "id": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+          "name": "本地验收法人",
+          "baseCurrency": "CNY",
+          "paperReceiptRequired": true,
+          "sourceVersion": "v1",
+          "timeZone": "UTC"
+        },
+        "catalogVersion": "synthetic-ui-v1",
+        "maskedAccount": "****1234"
+      }
+    },
+    "actualPaidBalances": [],
+    "unrelatedUserStatus": 404,
+    "sensitiveAdminStatus": 403,
+    "synthetic": true
+  },
+  "browserScenarios": [
+    "create and save minimal receipt followed by actual detail read",
+    "explicit appointment and masked account precheck",
+    "submit first round",
+    "withdraw and correct amount and due date",
+    "round one remains 500 and 2026-10-10; round two 450 and 2026-10-12",
+    "actual manager approval",
+    "approval retains zero actual paid balances"
+  ],
+  "responsive": {
+    "requestedWidth": 375,
+    "actualCssViewportWidth": 500,
+    "documentScrollWidth": 500,
+    "dialogClientWidth": 456,
+    "dialogScrollWidth": 456,
+    "overflow": false
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "screenshots": [
+    "advance-request-ui-precheck.png",
+    "advance-request-ui-round-history.png",
+    "advance-request-ui-approved.png",
+    "advance-request-ui-mobile.png"
+  ],
+  "limitations": [
+    "Synthetic finance is not enterprise integration",
+    "Payment, vouchers and settlement still under development",
+    "Git remote and PR are not configured"
+  ]
+}

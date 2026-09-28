@@ -21,6 +21,7 @@ import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './a
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
+import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
@@ -287,6 +288,16 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 
 export const api = {
   financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),
+  advanceRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceRequestItem>>('/advance-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
+  advanceRequest: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<AdvanceDetail>(`/advance-requests/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  createAdvanceRequest: (input: AdvanceCreate) => write<AdvanceReceipt>('/advance-requests', 'POST', '保存借款申请', input),
+  reviseAdvanceRequest: (id: string, input: AdvanceRevise) => write<AdvanceReceipt>(`/advance-requests/${encodeURIComponent(id)}/revise`, 'POST', '保存借款申请修改', input),
+  advanceCheckOptions: (id: string, signal: AbortSignal) => request<AdvanceCheckOptions>(`/advance-requests/${encodeURIComponent(id)}/prechecks/options`, { signal, cache: 'no-store' }),
+  queueAdvanceCheck: (id: string, input: AdvanceCheckInput) => write<{ id: string }>(`/advance-requests/${encodeURIComponent(id)}/prechecks`, 'POST', '查询借款申请财务依据', input),
+  advanceCheck: (id: string, jobId: string, signal: AbortSignal) => request<AdvanceCheckView>(`/advance-requests/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  submitAdvanceRequest: (id: string, input: AdvanceVersions & { precheckId: string }) => write<AdvanceReceipt>(`/advance-requests/${encodeURIComponent(id)}/submit`, 'POST', '正式提交借款申请', input),
+  withdrawAdvanceRequest: (id: string, input: AdvanceVersions & { comment: string }) => write<AdvanceReceipt>(`/advance-requests/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回借款申请', input),
+  cancelAdvanceRequest: (id: string, input: AdvanceVersions & { comment: string }) => write<AdvanceReceipt>(`/advance-requests/${encodeURIComponent(id)}/cancel`, 'POST', '作废借款申请', input),
   expensePlans: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PlanItem>>('/expense-plans' + historyQuery(filter), { signal, cache: 'no-store' }),
   expensePlan: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<PlanDetail>(`/expense-plans/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   createExpensePlan: (input: PlanCreate) => write<PlanDetail>('/expense-plans', 'POST', '保存事前申请', input),
