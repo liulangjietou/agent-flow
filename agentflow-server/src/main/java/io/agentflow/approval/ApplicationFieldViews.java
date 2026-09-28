@@ -37,7 +37,7 @@ public class ApplicationFieldViews {
         var view = attachmentView(application, null);
         return new ApplicationResponse(application.id(), application.tenantId(), application.businessNo(), application.processKey(),
                 application.definitionVersion(), application.createdBy(), application.title(), view.payload(), application.status(),
-                application.roundNo(), application.version(), view.schema());
+                application.roundNo(), application.version(), view.schema(), application.businessReference());
     }
 
     /** 文件元数据和下载必须使用与页面相同的当轮字段投影，不能沿用前端显示结果授权。 */

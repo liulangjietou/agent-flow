@@ -22,6 +22,7 @@ public final class Application {
     private final String runtimeDefinitionId;
     private final NotificationTexts notificationTexts;
     private final String createdBy;
+    private final BusinessReference businessReference;
     private String title;
     private Map<String, Object> payload;
     private ApplicationStatus status;
@@ -59,6 +60,16 @@ public final class Application {
                 title, payload, ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId, notificationTexts);
     }
 
+    /** 业务应用服务创建不可变结构化绑定；普通表单入口不能传入该引用。 */
+    public static Application draftBusiness(UUID id, String tenantId, String businessNo, String processKey,
+                                            long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                            FormSchema formSchema, String runtimeDefinitionId, NotificationTexts notificationTexts,
+                                            BusinessReference businessReference) {
+        if (formSchema != null) formSchema.validateDraft(payload);
+        return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload,
+                ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId, notificationTexts, Objects.requireNonNull(businessReference));
+    }
+
     /** 从仓储恢复聚合。 */
     public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
                                       long definitionVersion, String createdBy, String title,
@@ -93,6 +104,15 @@ public final class Application {
                 title, payload, status, roundNo, version, formSchema, runtimeDefinitionId, notificationTexts);
     }
 
+    /** 结构化绑定从独立数据库列恢复，不由表单内容推断。 */
+    public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
+                                      long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                      ApplicationStatus status, int roundNo, long version, FormSchema formSchema,
+                                      String runtimeDefinitionId, NotificationTexts notificationTexts, BusinessReference businessReference) {
+        return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload,
+                status, roundNo, version, formSchema, runtimeDefinitionId, notificationTexts, businessReference);
+    }
+
     private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
                         String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
                         int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId) {
@@ -103,6 +123,14 @@ public final class Application {
     private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
                         String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
                         int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId, NotificationTexts notificationTexts) {
+        this(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, status, roundNo, version,
+                formSchema, runtimeDefinitionId, notificationTexts, null);
+    }
+
+    private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
+                        String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
+                        int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId,
+                        NotificationTexts notificationTexts, BusinessReference businessReference) {
         this.id = Objects.requireNonNull(id);
         this.tenantId = Objects.requireNonNull(tenantId);
         this.businessNo = require(businessNo, "businessNo");
@@ -112,6 +140,7 @@ public final class Application {
         this.runtimeDefinitionId = runtimeDefinitionId;
         this.notificationTexts = notificationTexts == null ? NotificationTexts.EMPTY : notificationTexts;
         this.createdBy = require(createdBy, "createdBy");
+        this.businessReference = businessReference;
         this.title = require(title, "title");
         this.payload = copyPayload(payload);
         this.status = Objects.requireNonNull(status);
@@ -155,6 +184,8 @@ public final class Application {
 
     /** 是否仍允许申请人修改本次内容；历史轮次始终不可变。 */
     public boolean editable() { return status == ApplicationStatus.DRAFT || status == ApplicationStatus.RETURNED || status == ApplicationStatus.WITHDRAWN; }
+
+    public BusinessReference businessReference() { return businessReference; }
 
     /** 退回申请人并保留原轮次审计。 */
     public void returnToApplicant(long expectedVersion) {

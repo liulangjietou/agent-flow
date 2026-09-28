@@ -2097,7 +2097,7 @@
           "申请"
         ],
         "summary": "创建申请草稿",
-        "description": "绑定指定已发布版本和表单快照。唯一内置 legacy 流程为 expense-reimbursement v1。创建不启动流程。",
+        "description": "绑定指定已发布版本和表单快照。唯一内置 legacy 流程为 expense-reimbursement v1。创建不启动流程。 结构化费用申请返回 USE_BUSINESS_ENDPOINT，须通过费用业务入口写入。",
         "x-access": "当前已登录账号",
         "x-idempotency": true,
         "responses": {
@@ -2313,7 +2313,7 @@
           "申请"
         ],
         "summary": "编辑或补正申请",
-        "description": "仅 DRAFT、RETURNED、WITHDRAWN 可修改，保持业务号和绑定版本；原轮次不可覆盖。",
+        "description": "仅 DRAFT、RETURNED、WITHDRAWN 可修改，保持业务号和绑定版本；原轮次不可覆盖。 结构化费用申请返回 USE_BUSINESS_ENDPOINT，须通过费用业务入口写入。",
         "x-access": "申请发起人",
         "x-idempotency": true,
         "responses": {
@@ -2472,7 +2472,7 @@
           "申请"
         ],
         "summary": "提交或重新提交",
-        "description": "要求表单必填完整。启动真实流程、记录新轮次并产生站内消息，成功 HTTP 200，不是 202。",
+        "description": "要求表单必填完整。启动真实流程、记录新轮次并产生站内消息，成功 HTTP 200，不是 202。 结构化费用申请返回 USE_BUSINESS_ENDPOINT，须通过费用业务入口写入。",
         "x-access": "申请发起人",
         "x-idempotency": true,
         "responses": {
@@ -2627,7 +2627,7 @@
           "申请"
         ],
         "summary": "撤回审批中申请",
-        "description": "仅发起人且 IN_APPROVAL；终止当前流程，记录 WITHDRAWN 轮次，保留历史并可补正重提。",
+        "description": "仅发起人且 IN_APPROVAL；终止当前流程，记录 WITHDRAWN 轮次，保留历史并可补正重提。 结构化费用申请返回 USE_BUSINESS_ENDPOINT，须通过费用业务入口写入。",
         "x-access": "申请发起人",
         "x-idempotency": true,
         "responses": {
@@ -5753,7 +5753,7 @@
           "申请"
         ],
         "summary": "申请人作废申请",
-        "description": "仅申请人可作废 DRAFT、RETURNED、WITHDRAWN 申请，进入 CANCELLED 终态后不能编辑或提交。保留正文和历史轮次，不改变已发生的审批结论。作废与审计、幂等响应共用事务。",
+        "description": "仅申请人可作废 DRAFT、RETURNED、WITHDRAWN 申请，进入 CANCELLED 终态后不能编辑或提交。保留正文和历史轮次，不改变已发生的审批结论。作废与审计、幂等响应共用事务。 结构化费用申请返回 USE_BUSINESS_ENDPOINT，须通过费用业务入口写入。",
         "x-access": "申请发起人",
         "x-idempotency": true,
         "responses": {
@@ -12381,6 +12381,409 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports": {
+      "post": {
+        "operationId": "createExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "创建结构化费用草稿",
+        "description": "绑定已发布的结构化费用定义与敏感明细权限；金额使用十进制字符串，不接受申请人或预检结果覆盖。",
+        "x-access": "认证申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpenseRequest"
+              },
+              "example": {
+                "businessNo": "EXPENSE-001",
+                "processKey": "structured-expense",
+                "definitionVersion": 1,
+                "content": {
+                  "legalEntityId": "11111111-1111-1111-1111-111111111111",
+                  "type": "DAILY",
+                  "title": "费用草稿",
+                  "lines": [],
+                  "advanceOffsets": []
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}": {
+      "get": {
+        "operationId": "getExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取费用草稿或单轮明细",
+        "description": "申请人可读取自己的草稿；其他参与者须通过所选轮次 expenseDetails 敏感组权限。隐藏和脱敏均不返回完整明细，管理员没有额外豁免。",
+        "x-access": "申请人或本轮明细可读的实际审批参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expense-reports/{id}/revise": {
+      "post": {
+        "operationId": "reviseExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "保存结构化费用草稿",
+        "description": "仅申请人在草稿、退回或撤回状态可修改。申请版本和财务版本须同时匹配，失败整体回滚，历史轮次保持原样。",
+        "x-access": "申请发起人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseExpenseRequest"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "content": {
+                  "legalEntityId": "11111111-1111-1111-1111-111111111111",
+                  "type": "DAILY",
+                  "title": "费用草稿",
+                  "lines": [],
+                  "advanceOffsets": []
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13696,6 +14099,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/FormSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessReference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessReference"
               },
               {
                 "type": "null"
@@ -18018,6 +18431,713 @@
           "expectedRunVersion",
           "action"
         ]
+      },
+      "BusinessReference": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "EXPENSE"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "Money": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?$",
+            "description": "非负、至多两位小数，响应固定两位。禁止 JSON 浮点数和科学计数法。"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 币种，当前费用设计只支持两位最小单位。"
+          }
+        },
+        "required": [
+          "value",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "CostAllocation": {
+        "type": "object",
+        "properties": {
+          "costCenter": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "projectCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "costCenter",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "AdvanceOffset": {
+        "type": "object",
+        "properties": {
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "advanceId",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "PriorRequestLine": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "requestId",
+          "lineNo"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "categoryCode": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "incurredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "endedOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cityCode": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000,
+            "multipleOf": 0.001
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "ITEM",
+              "DAY",
+              "NIGHT",
+              "KILOMETER",
+              "PERSON"
+            ]
+          },
+          "claimedGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "claimedTax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "invoiceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "priorRequest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriorRequestLine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CostAllocation"
+            },
+            "maxItems": 50,
+            "minItems": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "exceptionReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "lineNo",
+          "categoryCode",
+          "incurredOn",
+          "cityCode",
+          "quantity",
+          "unit",
+          "claimedGross",
+          "claimedTax",
+          "invoiceIds",
+          "allocations",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseContent": {
+        "type": "object",
+        "properties": {
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TRAVEL",
+              "DAILY",
+              "ENTERTAINMENT",
+              "TRAINING",
+              "OTHER"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseLine"
+            },
+            "maxItems": 200
+          },
+          "advanceOffsets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdvanceOffset"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "legalEntityId",
+          "type",
+          "title",
+          "lines",
+          "advanceOffsets"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseExchangeRate": {
+        "type": "object",
+        "properties": {
+          "fromCurrency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "toCurrency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "rate": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "rateDate": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "fromCurrency",
+          "toCurrency",
+          "rate",
+          "source",
+          "rateDate"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicySnapshot": {
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "assessedGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "allowedGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "WITHIN_LIMIT",
+              "REQUIRES_EXCEPTION",
+              "DENIED"
+            ]
+          },
+          "taxRuleReference": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "evidenceReference": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "policyId",
+          "version",
+          "assessedGross",
+          "allowedGross",
+          "decision",
+          "taxRuleReference",
+          "evidenceReference"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseAssessment": {
+        "type": "object",
+        "properties": {
+          "exchangeRate": {
+            "$ref": "#/components/schemas/ExpenseExchangeRate"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ExpensePolicySnapshot"
+          },
+          "deductibleTax": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "exchangeRate",
+          "policy",
+          "deductibleTax"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFrozenLine": {
+        "type": "object",
+        "properties": {
+          "original": {
+            "$ref": "#/components/schemas/ExpenseLine"
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/ExpenseAssessment"
+          },
+          "claimedBase": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "deductibleTaxBase": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "original",
+          "assessment",
+          "claimedBase",
+          "deductibleTaxBase"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseApprovedLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CostAllocation"
+            }
+          }
+        },
+        "required": [
+          "lineNo",
+          "gross",
+          "tax",
+          "allocations"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseLineChange": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "previousGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "approvedGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "previousTax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "approvedTax": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "lineNo",
+          "previousGross",
+          "approvedGross",
+          "previousTax",
+          "approvedTax"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseOffsetChange": {
+        "type": "object",
+        "properties": {
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "advanceId",
+          "previousAmount",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseAdjustment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousFinancialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustedBy": {
+            "type": "string"
+          },
+          "adjustedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reasonCode": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "lineChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseLineChange"
+            }
+          },
+          "offsetChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseOffsetChange"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "previousFinancialVersion",
+          "adjustedBy",
+          "adjustedAt",
+          "reasonCode",
+          "comment",
+          "lineChanges",
+          "offsetChanges"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialRound": {
+        "type": "object",
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "submittedFinancialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "submittedBy": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "baseCurrency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "maskedAccount": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "originalLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseFrozenLine"
+            }
+          },
+          "approvedLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseApprovedLine"
+            }
+          },
+          "advanceOffsets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdvanceOffset"
+            }
+          },
+          "adjustments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseAdjustment"
+            }
+          },
+          "approvedGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "approvedTax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "offsetTotal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "payable": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "roundNo",
+          "submittedFinancialVersion",
+          "submittedBy",
+          "submittedAt",
+          "baseCurrency",
+          "maskedAccount",
+          "originalLines",
+          "approvedLines",
+          "advanceOffsets",
+          "adjustments",
+          "approvedGross",
+          "approvedTax",
+          "offsetTotal",
+          "payable"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "applicationStatus": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "APPROVED",
+              "REJECTED",
+              "RETURNED",
+              "WITHDRAWN",
+              "CANCELLED"
+            ]
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ExpenseContent"
+          },
+          "financialRound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseFinancialRound"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "applicationId",
+          "businessNo",
+          "applicationStatus",
+          "applicationVersion",
+          "financialVersion",
+          "roundNo",
+          "editable",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "CreateExpenseRequest": {
+        "type": "object",
+        "properties": {
+          "businessNo": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "processKey": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "$ref": "#/components/schemas/ExpenseContent"
+          }
+        },
+        "required": [
+          "businessNo",
+          "processKey",
+          "definitionVersion",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "ReviseExpenseRequest": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "$ref": "#/components/schemas/ExpenseContent"
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "financialVersion",
+          "content"
+        ],
+        "additionalProperties": false
       }
     }
   }

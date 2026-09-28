@@ -1,6 +1,7 @@
 package io.agentflow.approval.service;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -56,11 +57,22 @@ public class ApprovalApplicationService {
     public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
                               String userId, String title, Map<String, Object> payload, FormSchema formSchema,
                               String runtimeDefinitionId, NotificationTexts notificationTexts) {
+        return create(tenantId, businessNo, processKey, definitionVersion, userId, title, payload, formSchema,
+                runtimeDefinitionId, notificationTexts, null);
+    }
+
+    /** 结构化业务绑定由相应应用服务产生，与创建审计在同一事务保存。 */
+    public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
+                              String userId, String title, Map<String, Object> payload, FormSchema formSchema,
+                              String runtimeDefinitionId, NotificationTexts notificationTexts, BusinessReference businessReference) {
         if (repository.findByBusinessNo(tenantId, businessNo).isPresent()) {
             throw new DomainException("BUSINESS_NO_EXISTS", "Business number already exists");
         }
-        Application application = Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey,
-                definitionVersion, userId, title, payload, formSchema, runtimeDefinitionId, notificationTexts);
+        Application application = businessReference == null
+                ? Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey, definitionVersion, userId, title, payload,
+                    formSchema, runtimeDefinitionId, notificationTexts)
+                : Application.draftBusiness(UUID.randomUUID(), tenantId, businessNo, processKey, definitionVersion, userId, title, payload,
+                    formSchema, runtimeDefinitionId, notificationTexts, businessReference);
         repository.save(application);
         recordApplicationOperation(application, userId, ApplicationAuditPort.Action.CREATE, null, null, null);
         return application;

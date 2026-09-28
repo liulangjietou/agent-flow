@@ -1,6 +1,8 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.BusinessReference;
+import io.agentflow.expense.ExpenseFormContract;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -64,6 +66,18 @@ public class ApprovalApplicationFacade {
     @Transactional
     public Application create(String businessNo, String processKey, long definitionVersion, String title,
                               Map<String, Object> payload) {
+        return createBound(businessNo, processKey, definitionVersion, title, payload, null);
+    }
+
+    /** 业务应用服务创建绑定申请，此入口不直接暴露为 HTTP 请求。 */
+    @Transactional
+    public Application createBusiness(String businessNo, String processKey, long definitionVersion, String title,
+                                      Map<String, Object> payload, BusinessReference reference) {
+        return createBound(businessNo, processKey, definitionVersion, title, payload, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application createBound(String businessNo, String processKey, long definitionVersion, String title,
+                                     Map<String, Object> payload, BusinessReference reference) {
         Actor actor = currentActor.actor();
         DefinitionModels.DefinitionDraft definition = definitions.lockPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
         // classpath 内置报销 v1 是唯一没有平台定义行的公开 legacy 模板。
@@ -72,9 +86,11 @@ public class ApprovalApplicationFacade {
         }
         if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
+        if (reference == null && ExpenseFormContract.structured(formSchema)) throw businessEndpointRequired();
+        if (reference != null) ExpenseFormContract.requireSchema(formSchema);
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
         var application = service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
-                formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts());
+                formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts(), reference);
         attachments.validate(application, false);
         return application;
     }
@@ -88,8 +104,18 @@ public class ApprovalApplicationFacade {
     /** 选择任职只允许当前申请人，内容在当前提交轮次内冻结。 */
     @Transactional
     public Application submit(UUID id, long expectedVersion, UUID initiatorAppointmentId) {
+        return submitBound(id, expectedVersion, initiatorAppointmentId, null);
+    }
+
+    /** 结构化提交前由业务服务完成占用、预检和路由投影。 */
+    @Transactional
+    public Application submitBusiness(UUID id, long expectedVersion, UUID initiatorAppointmentId, BusinessReference reference) {
+        return submitBound(id, expectedVersion, initiatorAppointmentId, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application submitBound(UUID id, long expectedVersion, UUID initiatorAppointmentId, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
+        requireWriteBinding(requireApplicant(actor, id), reference);
         var context = initiators.snapshot(actor, initiatorAppointmentId);
         Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId(), context);
         // 校验实际提交的聚合，避免二次读取跨版本；失败时申请、引擎及轮次一并回滚。
@@ -102,8 +128,18 @@ public class ApprovalApplicationFacade {
     /** 只有发起人可以补正内容，补正及版本更新处于同一事务。 */
     @Transactional
     public Application revise(UUID id, long expectedVersion, String title, Map<String, Object> payload) {
+        return reviseBound(id, expectedVersion, title, payload, null);
+    }
+
+    /** 结构化草稿与服务端路由字段通过同一申请版本更新。 */
+    @Transactional
+    public Application reviseBusiness(UUID id, long expectedVersion, String title, Map<String, Object> payload, BusinessReference reference) {
+        return reviseBound(id, expectedVersion, title, payload, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application reviseBound(UUID id, long expectedVersion, String title, Map<String, Object> payload, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
+        requireWriteBinding(requireApplicant(actor, id), reference);
         var application = service.revise(actor.tenantId(), id, expectedVersion, title, payload, actor.userId());
         attachments.validate(application, false);
         return application;
@@ -113,7 +149,7 @@ public class ApprovalApplicationFacade {
     @Transactional
     public Application withdraw(UUID id, long expectedVersion, String comment) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
+        requireWriteBinding(requireApplicant(actor, id), null);
         var previous = notifications.beforeWithdrawal(service.get(actor.tenantId(), id));
         Application application = service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
         notifications.withdrawn(application, actor.userId(), previous);
@@ -124,7 +160,7 @@ public class ApprovalApplicationFacade {
     @Transactional
     public Application cancel(UUID id, long expectedVersion, String comment) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
+        requireWriteBinding(requireApplicant(actor, id), null);
         return service.cancel(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
     }
 
@@ -168,5 +204,13 @@ public class ApprovalApplicationFacade {
     /** 附件写入复用申请人的资源授权，状态与版本由申请聚合继续判断。 */
     public Application requireApplicant(UUID id) {
         return requireApplicant(currentActor.actor(), id);
+    }
+
+    private static void requireWriteBinding(Application application, BusinessReference reference) {
+        if (!java.util.Objects.equals(application.businessReference(), reference)) throw businessEndpointRequired();
+    }
+
+    private static DomainException businessEndpointRequired() {
+        return new DomainException("USE_BUSINESS_ENDPOINT", "Structured business applications must use their own write endpoint");
     }
 }
