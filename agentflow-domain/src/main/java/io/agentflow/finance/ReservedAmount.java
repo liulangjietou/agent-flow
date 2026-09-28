@@ -38,11 +38,14 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         return reservations.stream().filter(item -> item.use().equals(use)).map(Reservation::amount).findFirst().orElse(Money.zero(limit.currency()));
     }
 
+    /** 已结算的完整轮次归属不能被后续重提伪装成未预留资源。 */
+    public boolean consumedFor(ExpenseUse use) { return consumptions.stream().anyMatch(item -> item.use().equals(use)); }
+
     /** 设置该归属的精确预留额；为零时释放，其余归属不受影响。 */
     public ReservedAmount reserve(ExpenseUse use, Money amount) {
         limit.sameCurrency(amount);
         if (use == null) throw invalid();
-        if (consumptions.stream().anyMatch(item -> item.use().equals(use))) {
+        if (consumedFor(use)) {
             throw new DomainException("RESERVATION_ALREADY_CONSUMED", "A consumed expense round cannot reserve the same resource again");
         }
         var updated = new ArrayList<>(reservations.stream().filter(item -> !item.use().equals(use)).toList());

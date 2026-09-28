@@ -1,0 +1,37 @@
+{
+  "recordedAt": "2026-09-28T14:21:01.058324+00:00",
+  "result": "PASS",
+  "scope": "Pure resource plan shared by upcoming precheck/submission and repository consumer validation",
+  "behavior": [
+    "release replaced canonical invoice before claiming new original",
+    "decrease existing prior-use amounts before increases on same approved line",
+    "closed request carries only same non-increased reservations",
+    "settled previous round cannot reserve again",
+    "every intermediate resource version persisted",
+    "late conflict rolls back all earlier resource and report changes"
+  ],
+  "regression": {
+    "gap": "Aggregate tests did not exercise consumed previous uses across a complete resubmission plan",
+    "red": "8 tests; 1 failure before guarding consumed previous uses",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-resource-plan-first.log"
+  },
+  "tests": {
+    "domainPlan": 8,
+    "domainRegression": 30,
+    "resourceRepositoryRegression": 10,
+    "h2PlanRepository": 2,
+    "postgresPlanRepository": 2,
+    "scopesOverlap": true,
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-resource-plan-green.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-resource-plan-integration.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/resource-plan-postgres.log"
+    ]
+  },
+  "limits": {
+    "completePrecheck": "not yet connected",
+    "actualSubmission": "not yet connected",
+    "httpAcceptance": "not claimed",
+    "databaseMigration": "none"
+  }
+}
