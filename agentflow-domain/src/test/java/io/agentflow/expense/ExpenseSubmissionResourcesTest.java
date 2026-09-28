@@ -172,6 +172,40 @@ class ExpenseSubmissionResourcesTest {
         fails("RESERVATION_ALREADY_CONSUMED", () -> planner.plan(removedInvoice, resources(List.of(consumedInvoice), List.of(), List.of()), NOW.plusSeconds(20)));
     }
 
+    @Test
+    void sameRoundReductionPreservesIntermediateVersionsAndOnlyTouchesItsOwnReservations() {
+        var first = invoice(UUID.randomUUID(), "12345678901234567890"); var second = invoice(UUID.randomUUID(), "22345678901234567890");
+        var request = request("200"); var advance = advance("180");
+        var before = frozen(List.of(line(1, "100", List.of(first.id()), request.id()), line(2, "100", List.of(second.id()), request.id())), List.of(new AdvanceOffset(advance.id(), money("180"))));
+        var input = resources(List.of(first, second), List.of(request), List.of(advance)); var reserved = applied(input, planner.plan(before, input, NOW));
+        var after = ExpenseReport.restore(before.state());
+        after.reduce(after.version(), List.of(new ExpenseReport.Reduction(1, money("0"), money("0")), new ExpenseReport.Reduction(2, money("40"), money("0"))), "finance", "INELIGIBLE_COST", "合成核减", NOW.plusSeconds(1));
+        var changes = new ExpenseReductionResources().plan(before, after, reserved); var adjusted = applied(reserved, changes);
+        assertThat(changes.requests().stream().map(value -> value.after().version())).containsExactly(4L, 5L);
+        assertThat(adjusted.requests().get(request.id()).balances().get(1).available()).isEqualTo(money("160"));
+        assertThat(adjusted.advances().get(advance.id()).balance().available()).isEqualTo(money("140"));
+        assertThat(adjusted.invoices().get(first.id()).occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
+        assertThat(adjusted.invoices().get(second.id()).occupation()).isEqualTo(Invoice.Occupation.OCCUPIED);
+        var reused = Invoice.restore(adjusted.invoices().get(first.id())); reused.occupy(reused.version(), new ExpenseUse(UUID.randomUUID(), 1, 1), "alice", ENTITY, NOW.plusSeconds(2));
+        var values = new HashMap<>(adjusted.invoices()); values.put(first.id(), reused.state());
+        var next = ExpenseReport.restore(after.state()); next.reduce(next.version(), List.of(new ExpenseReport.Reduction(2, money("30"), money("0"))), "finance", "INELIGIBLE_COST", "继续核减", NOW.plusSeconds(3));
+        var nextPlan = new ExpenseReductionResources().plan(after, next, new ExpenseSubmissionResources.Resources(values, adjusted.requests(), adjusted.advances()));
+        assertThat(nextPlan.invoices()).isEmpty();
+        assertThat(reserved.requests().get(request.id()).balances().get(1).available()).isEqualTo(money("0"));
+    }
+
+    @Test
+    void reductionCannotRecreateMissingOrConsumedReservations() {
+        var request = request("100"); var before = frozen(List.of(line(1, "100", List.of(), request.id())), List.of());
+        var after = ExpenseReport.restore(before.state());
+        after.reduce(after.version(), List.of(new ExpenseReport.Reduction(1, money("50"), money("0"))), "finance", "INELIGIBLE_COST", "合成核减", NOW.plusSeconds(1));
+        var input = resources(List.of(), List.of(request), List.of());
+        fails("EXPENSE_RESERVATION_CHANGED", () -> new ExpenseReductionResources().plan(before, after, input));
+        var reserved = applied(input, planner.plan(before, input, NOW)); var consumed = ExpenseRequest.restore(reserved.requests().get(request.id()));
+        consumed.consume(consumed.version(), 1, new ExpenseUse(before.id(), 1, 1));
+        fails("EXPENSE_RESERVATION_CHANGED", () -> new ExpenseReductionResources().plan(before, after, resources(List.of(), List.of(consumed), List.of())));
+    }
+
     private ExpenseReport frozen(List<ExpenseLine> lines, List<AdvanceOffset> offsets) {
         var report = ExpenseReport.draft(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", content(lines, offsets)); freeze(report, NOW); return report;
     }

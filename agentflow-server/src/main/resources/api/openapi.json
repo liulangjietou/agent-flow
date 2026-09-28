@@ -3090,7 +3090,8 @@
                 "RETURN",
                 "REJECT",
                 "APPROVE",
-                "CANCEL"
+                "CANCEL",
+                "EXPENSE_REDUCE"
               ]
             }
           },
@@ -6458,7 +6459,8 @@
                 "RESOLVE",
                 "RETURN",
                 "REJECT",
-                "APPROVE"
+                "APPROVE",
+                "EXPENSE_REDUCE"
               ]
             }
           },
@@ -7976,7 +7978,8 @@
                 "RESOLVE",
                 "RETURN",
                 "REJECT",
-                "APPROVE"
+                "APPROVE",
+                "EXPENSE_REDUCE"
               ]
             }
           },
@@ -15134,6 +15137,180 @@
           }
         }
       }
+    },
+    "/api/v1/expense-reports/{id}/tasks/{taskId}/reduce": {
+      "post": {
+        "operationId": "reduceExpense",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "在当前财务任务核减报销",
+        "description": "仅当前财务审核或复核处理人可核减；预算须已确认且纸件要求已满足。只减不增，不变更发票、币种、成本对象或收款人，不创建审批轮次，不完成任务。预留、路由、追加审计、预算调整命令与申请人通知在同一事务。调整预算确认前财务同意被阻止。",
+        "x-access": "当前财务审核或复核节点的可决策审批人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseReductionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "当前财务任务标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseReductionInput"
+              },
+              "example": {
+                "applicationVersion": 6,
+                "financialVersion": 2,
+                "lines": [
+                  {
+                    "lineNo": 1,
+                    "approvedGross": "50.00",
+                    "approvedTax": "3.00"
+                  }
+                ],
+                "reasonCode": "INELIGIBLE_COST",
+                "comment": "此行部分费用不符合规定"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -17289,7 +17466,8 @@
               "TASK_DELEGATED",
               "TASK_RESOLVED",
               "TASK_OVERDUE",
-              "APPLICATION_COPIED"
+              "APPLICATION_COPIED",
+              "EXPENSE_ADJUSTED"
             ]
           },
           "actor": {
@@ -22819,6 +22997,123 @@
           "applicationVersion",
           "financialVersion",
           "status"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseReductionInput": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/ExpenseReductionLine"
+            }
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "INELIGIBLE_COST",
+              "OVER_STANDARD_NOT_ACCEPTED",
+              "INVALID_INVOICE",
+              "TAX_CORRECTION",
+              "OTHER"
+            ]
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "financialVersion",
+          "comment",
+          "lines",
+          "reasonCode"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseReductionLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "approvedGross": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?$",
+            "description": "非负、至多两位小数，响应固定两位。禁止 JSON 浮点数和科学计数法。"
+          },
+          "approvedTax": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?$",
+            "description": "非负、至多两位小数，响应固定两位。禁止 JSON 浮点数和科学计数法。"
+          }
+        },
+        "required": [
+          "lineNo",
+          "approvedGross",
+          "approvedTax"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseReductionReceipt": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budgetOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "roundNo",
+          "budgetOperationId",
+          "adjustmentId"
         ],
         "additionalProperties": false
       }

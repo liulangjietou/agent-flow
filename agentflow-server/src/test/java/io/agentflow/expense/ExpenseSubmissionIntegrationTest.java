@@ -67,6 +67,7 @@ class ExpenseSubmissionIntegrationTest {
     private boolean paperRequired = true;
     private boolean financeStage = true;
     private boolean afterFinanceTask;
+    private boolean reductionRoute;
     private BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
     private BudgetObservation.Rejection budgetRejection = BudgetObservation.Rejection.BUDGET_INSUFFICIENT;
     private int writes;
@@ -94,6 +95,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseRequestRepository requests;
     @Autowired EmployeeAdvanceRepository advances;
     @Autowired TaskService tasks;
+    @Autowired org.flowable.engine.RuntimeService runtime;
+    @Autowired io.agentflow.approval.repository.SubmissionRoundRepository rounds;
     @Autowired InvoiceWalletService wallet;
     @Autowired InvoiceVerificationService verification;
     @Autowired InvoiceVerificationWorker invoiceWorker;
@@ -298,6 +301,135 @@ class ExpenseSubmissionIntegrationTest {
         budgetWorker.poll(); assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.RELEASED);
     }
 
+    @Test
+    void financialReductionAdjustsReservationsRoutesAndBudgetWithoutReplacingTheSubmission() throws Exception {
+        reductionRoute = true; var fixture = fixture(true); var report = fixture.report(); enterFinance(report);
+        var before = current(report); var original = rounds.findByRound("demo", report.applicationId(), 1).orElseThrow();
+        long applicationVersion = app(report).version(); String taskId = task(report).getId();
+        String key = UUID.randomUUID().toString(); var input = reductionInput(report, "25", "1");
+        var receipt = ok(send(reductionPath(report), "finance", key, input), 200);
+        assertThat(ok(send(reductionPath(report), "finance", key, input), 200)).isEqualTo(receipt);
+        var reduced = current(report);
+        assertThat(reduced.version()).isEqualTo(before.version() + 1); assertThat(app(report).version()).isEqualTo(applicationVersion + 1);
+        assertThat(reduced.rounds()).hasSize(1); assertThat(reduced.currentRound().originalLines()).isEqualTo(before.currentRound().originalLines());
+        assertThat(rounds.findByRound("demo", report.applicationId(), 1).orElseThrow()).isEqualTo(original);
+        assertThat(reduced.currentRound().adjustments()).hasSize(1);
+        assertThat(reduced.currentRound().approvedGross()).isEqualTo(money("25")); assertThat(reduced.currentRound().offsetTotal()).isEqualTo(money("25"));
+        assertThat(reduced.currentRound().payable()).isEqualTo(money("0"));
+        assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.OCCUPIED);
+        assertThat(requests.find("demo", fixture.prior()).orElseThrow().balance(1).reservedFor(new ExpenseUse(report.id(), 1, 1))).isEqualTo(money("25"));
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().reservedFor(new ExpenseUse(report.id(), 1, 0))).isEqualTo(money("25"));
+        assertThat(task(report).getId()).isEqualTo(taskId); assertThat(app(report).payload().get("amount")).isEqualTo("25.00");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND aggregate_type='Task' AND aggregate_id=? AND action='EXPENSE_REDUCE' AND actor_id='finance' AND aggregate_version=?", Integer.class,
+                report.applicationId().toString(), taskId, app(report).version())).isEqualTo(1);
+        assertThat(((Map<?, ?>) runtime.getVariable(task(report).getProcessInstanceId(), "formData")).get("amount")).isEqualTo("25.00");
+        var operation = operations.find("demo", UUID.fromString(receipt.path("budgetOperationId").asText())).orElseThrow();
+        assertThat(operation.input().command().action()).isEqualTo(BudgetCommand.Action.ADJUST);
+        assertThat(operation.input().command().position().total()).isEqualTo(money("25"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='EXPENSE_ADJUSTED'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        assertCode(act(report, "finance", "APPROVE"), "EXPENSE_BUDGET_NOT_CONFIRMED");
+        budgetWorker.poll(); ok(act(report, "finance", "APPROVE"), 200);
+        // 原金额 100 会进入额外审批；实际执行直接结束，证明引擎条件读取了 25。
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.APPROVED); assertThat(tasks(report)).isEmpty();
+    }
+
+    @Test
+    void zeroReductionReleasesLocalUsesButStillRequiresConfirmedBudgetAdjustment() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report);
+        var input = reductionInput(report, "0", "0"); ok(send(reductionPath(report), "finance", input), 200);
+        assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
+        assertThat(requests.find("demo", fixture.prior()).orElseThrow().balance(1).available()).isEqualTo(money("200"));
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().available()).isEqualTo(money("200"));
+        assertThat(current(report).currentRound().approvedGross()).isEqualTo(money("0"));
+        assertCode(act(report, "finance", "APPROVE"), "EXPENSE_BUDGET_NOT_CONFIRMED");
+        budgetWorker.poll(); ok(act(report, "finance", "APPROVE"), 200);
+    }
+
+    @Test
+    void reductionRequiresActualFinancialTaskAuthorityStrictFieldsAndCurrentDoubleVersions() throws Exception {
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        assertCode(send(reductionPath(report), "manager", reductionInput(report, "50", "3")), "EXPENSE_FINANCE_TASK_REQUIRED");
+        ok(act(report, "manager", "APPROVE"), 200); ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200); var original = current(report).state(); long version = app(report).version();
+        for (String user : List.of("alice", "admin", "manager")) assertThat(send(reductionPath(report), user, reductionInput(report, "50", "3")).getStatus()).isBetween(400, 499);
+        var foreign = fixture(false).report();
+        assertThat(send(path(foreign) + "/tasks/" + task(report).getId() + "/reduce", "finance", reductionInput(report, "50", "3")).getStatus()).isEqualTo(404);
+        var forged = new HashMap<String, Object>(reductionInput(report, "50", "3")); forged.put("actor", "alice");
+        assertThat(send(reductionPath(report), "finance", forged).getStatus()).isEqualTo(400);
+        forged = new HashMap<>(reductionInput(report, "50", "3")); forged.put("lines", List.of(Map.of("lineNo", 1, "approvedGross", "50", "approvedTax", "3", "currency", "USD")));
+        assertThat(send(reductionPath(report), "finance", forged).getStatus()).isEqualTo(400);
+        for (String field : List.of("applicationVersion", "financialVersion")) {
+            forged = new HashMap<>(reductionInput(report, "50", "3")); forged.put(field, 999);
+            assertCode(send(reductionPath(report), "finance", forged), "CONCURRENCY_CONFLICT");
+        }
+        assertCode(send(reductionPath(report), "finance", reductionInput(report, "101", "6")), "INVALID_EXPENSE_REDUCTION");
+        assertCode(send(reductionPath(report), "finance", reductionInput(report, "100", "6")), "INVALID_EXPENSE_REDUCTION");
+        assertThat(current(report).state()).isEqualTo(original); assertThat(app(report).version()).isEqualTo(version);
+        String taskId = task(report).getId();
+        ok(send("/api/v1/tasks/" + taskId + "/actions", "finance", Map.of("action", "DELEGATE", "targetUser", "manager", "expectedVersion", version)), 200);
+        assertCode(send(reductionPath(report), "manager", reductionInput(report, "50", "3")), "TASK_DELEGATION_PENDING");
+    }
+
+    @Test
+    void concurrentReductionsOnlyAppendOneAdjustmentAndPendingBudgetBlocksAnother() throws Exception {
+        var report = fixture(false).report(); enterFinance(report); var input = reductionInput(report, "40", "2"); String path = reductionPath(report);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var results = executor.invokeAll(List.<java.util.concurrent.Callable<MockHttpServletResponse>>of(
+                    () -> send(path, "finance", input), () -> send(path, "finance", input)));
+            assertThat(results.stream().map(value -> { try { return value.get().getStatus(); } catch (Exception failure) { throw new IllegalStateException(failure); } }).toList())
+                    .containsExactlyInAnyOrder(200, 409);
+        } finally { executor.shutdownNow(); }
+        assertThat(current(report).currentRound().adjustments()).hasSize(1);
+        assertCode(send(path, "finance", reductionInput(report, "20", "1")), "EXPENSE_BUDGET_NOT_CONFIRMED");
+        budgetWorker.poll(); ok(send(path, "finance", reductionInput(report, "20", "1")), 200);
+        assertThat(current(report).currentRound().adjustments()).hasSize(2);
+    }
+
+    @Test
+    void lateInstanceBindingFailureRollsBackReductionResourcesAuditAndNotification() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report);
+        var before = current(report).state(); var application = app(report); var task = task(report);
+        var invoice = invoices.find("demo", fixture.invoice()).orElseThrow().state();
+        var request = requests.find("demo", fixture.prior()).orElseThrow().state();
+        var advance = advances.find("demo", fixture.advance()).orElseThrow().state();
+        var duplicate = runtime.createProcessInstanceBuilder().processDefinitionId(task.getProcessDefinitionId()).tenantId("demo")
+                .businessKey("synthetic-duplicate").variables(Map.of("tenantId", "demo", "applicationId", application.id().toString(), "roundNo", 1, "formData", application.payload())).start();
+        try {
+            assertCode(send(path(report) + "/tasks/" + task.getId() + "/reduce", "finance", reductionInput(report, "0", "0")), "CONCURRENCY_CONFLICT");
+            assertThat(current(report).state()).isEqualTo(before); assertThat(app(report).version()).isEqualTo(application.version());
+            assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().state()).isEqualTo(invoice);
+            assertThat(requests.find("demo", fixture.prior()).orElseThrow().state()).isEqualTo(request);
+            assertThat(advances.find("demo", fixture.advance()).orElseThrow().state()).isEqualTo(advance);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_report_revision WHERE report_id=? AND operation='REDUCE'", Integer.class, report.id().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='EXPENSE_ADJUSTED'", Integer.class, application.id().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+            assertThat(((Map<?, ?>) runtime.getVariable(task.getProcessInstanceId(), "formData")).get("amount")).isEqualTo("100.00");
+        } finally { runtime.deleteProcessInstance(duplicate.getId(), "synthetic cleanup"); }
+    }
+
+    @Test
+    void reductionRejectsJsonNumbersAndExponentStringsBeforeChangingFinancialFacts() throws Exception {
+        var report = fixture(false).report(); enterFinance(report); var before = current(report).state();
+        for (Object gross : List.of(50, 49.99, "5e1", "50.001")) {
+            var input = new HashMap<>(reductionInput(report, "50", "3"));
+            input.put("lines", List.of(Map.of("lineNo", 1, "approvedGross", gross, "approvedTax", "3")));
+            assertThat(send(reductionPath(report), "finance", input).getStatus()).isBetween(400, 499);
+            assertThat(current(report).state()).isEqualTo(before);
+        }
+    }
+
+    private void enterFinance(ExpenseReport report) throws Exception {
+        submit(report); budgetWorker.poll(); ok(act(report, "manager", "APPROVE"), 200);
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200);
+    }
+    private String reductionPath(ExpenseReport report) { return path(report) + "/tasks/" + task(report).getId() + "/reduce"; }
+    private Map<String, Object> reductionInput(ExpenseReport report, String gross, String tax) {
+        return Map.of("applicationVersion", app(report).version(), "financialVersion", current(report).version(),
+                "lines", List.of(Map.of("lineNo", 1, "approvedGross", gross, "approvedTax", tax)), "reasonCode", "INELIGIBLE_COST", "comment", "合成核减原因");
+    }
+
     private Fixture fixture(boolean withResources) throws Exception {
         UUID invoice = withResources ? original() : null; UUID priorId = null; UUID advanceId = null;
         if (withResources) {
@@ -322,10 +454,15 @@ class ExpenseSubmissionIntegrationTest {
                 new Node("finance", "财务审核", NodeType.USER_TASK, financeStage ? Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "FINANCE_REVIEW") : Map.of("assigneeRule", "role:ORG_PERSON_" + finance)),
                 new Node("end", "结束", NodeType.END, Map.of())));
         var edges = new ArrayList<>(List.of(new Edge("a", "start", "business", "", false), new Edge("b", "business", "receipt", "", false),
-                new Edge("c", "receipt", "finance", "", false), new Edge("d", "finance", afterFinanceTask ? "afterFinance" : "end", "", false)));
-        if (afterFinanceTask) {
+                new Edge("c", "receipt", "finance", "", false), new Edge("d", "finance", reductionRoute ? "amountGate" : afterFinanceTask ? "afterFinance" : "end", "", false)));
+        if (afterFinanceTask || reductionRoute) {
             nodes.add(new Node("afterFinance", "财务后续业务", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)));
             edges.add(new Edge("e", "afterFinance", "end", "", false));
+        }
+        if (reductionRoute) {
+            nodes.add(new Node("amountGate", "核定金额判断", NodeType.EXCLUSIVE_GATEWAY, Map.of()));
+            edges.add(new Edge("low", "amountGate", "end", "amount <= 50", false));
+            edges.add(new Edge("high", "amountGate", "afterFinance", "amount > 50", false));
         }
         var graph = new Graph(nodes, edges);
         var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,

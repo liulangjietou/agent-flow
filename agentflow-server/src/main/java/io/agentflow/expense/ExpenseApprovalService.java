@@ -59,34 +59,70 @@ public class ExpenseApprovalService {
         if (!structured(application)) return;
         var context = context(application, task);
         var stage = context.control().stage(task.getTaskDefinitionKey());
-        if (stage != ExpenseProcessPolicy.Stage.BUSINESS && !context.control().paperReady()) {
-            throw new DomainException("EXPENSE_PAPER_RECEIPT_REQUIRED", "Paper originals must be explicitly received for this round");
-        }
-        if (stage.finance()) {
-            var position = BudgetPrecheckPort.Request.fromCurrent(context.report(), context.control().input().accountingDate());
-            if (budgets.find(application.tenantId(), context.report().id()).filter(value -> value.frozenFor(position)).isEmpty()) {
-                throw new DomainException("EXPENSE_BUDGET_NOT_CONFIRMED", "The current expense amount has no confirmed budget reservation");
-            }
-        }
+        if (stage != ExpenseProcessPolicy.Stage.BUSINESS) requirePaper(context);
+        if (stage.finance()) requireBudget(context);
     }
 
     /** 只有当前签收节点的实际可决策人可以确认纸件；受托待归还状态不能代签。 */
     @Transactional
     public Receipt receive(UUID reportId, String taskId, ReceiveInput input) {
         var actor = actors.actor();
-        var task = authorization.require(taskId, actor); var application = authorization.application(actor, task);
-        if (!structured(application) || !application.businessReference().id().equals(reportId)) throw notFound();
-        reports.lock(actor.tenantId(), reportId);
-        task = authorization.require(taskId, actor); application = authorization.application(actor, task);
-        var context = context(application, task);
-        if (context.report().version() != input.financialVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Financial version changed");
-        new TaskDelegation(task.getOwner(), task.getDelegationState() == DelegationState.PENDING).requireAction(TaskAction.APPROVE);
+        var authorized = authorize(reportId, taskId, input.applicationVersion(), input.financialVersion());
+        var task = authorized.task(); var application = authorized.application(); var context = authorized.context();
         application.recordTaskAction(input.applicationVersion());
         var received = context.control().receive(taskId, task.getTaskDefinitionKey(), actor.userId(), input.comment(), Instant.now().truncatedTo(ChronoUnit.MICROS));
         if (task.getAssignee() == null) tasks.claim(taskId, actor.userId());
         controls.update(received); applications.update(application, input.applicationVersion());
         return new Receipt(reportId, application.id(), application.version(), context.report().version(), application.roundNo(), received.version());
     }
+
+    /** 核减入口按当前任务重新授权；只有本轮实际财务节点且预算已确认才能改变核定金额。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public FinanceTask requireReduction(UUID reportId, String taskId, long applicationVersion, long financialVersion) {
+        var authorized = authorize(reportId, taskId, applicationVersion, financialVersion);
+        var application = authorized.application(); var task = authorized.task(); var context = authorized.context();
+        if (!context.control().stage(task.getTaskDefinitionKey()).finance()) {
+            throw new DomainException("EXPENSE_FINANCE_TASK_REQUIRED", "Only a current financial review task may reduce expense amounts");
+        }
+        requirePaper(context); var budget = requireBudget(context);
+        return new FinanceTask(application, context.report(), context.control(), budget.targetDigest(), task.getId(), task.getTaskDefinitionKey(), task.getName(), task.getProcessInstanceId());
+    }
+
+    /**
+     * 已在同一事务内完成任务与双版本校验的财务上下文，不允许客户端构造路由或预算目标。
+     * @author owlzhangfq@gmail.com
+     */
+    public record FinanceTask(Application application, ExpenseReport report, ExpenseSubmissionControl control, String targetDigest,
+                              String taskId, String nodeId, String nodeName, String processInstanceId) { }
+
+    private AuthorizedTask authorize(UUID reportId, String taskId, long applicationVersion, long financialVersion) {
+        var actor = actors.actor();
+        var task = authorization.require(taskId, actor); var application = authorization.application(actor, task);
+        if (!structured(application) || !application.businessReference().id().equals(reportId)) throw notFound();
+        reports.lock(actor.tenantId(), reportId);
+        task = authorization.require(taskId, actor); application = authorization.application(actor, task);
+        var context = context(application, task);
+        if (application.version() != applicationVersion || context.report().version() != financialVersion) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Application or financial version changed");
+        }
+        new TaskDelegation(task.getOwner(), task.getDelegationState() == DelegationState.PENDING).requireAction(TaskAction.APPROVE);
+        return new AuthorizedTask(application, task, context);
+    }
+
+    private void requirePaper(Context context) {
+        if (!context.control().paperReady()) throw new DomainException("EXPENSE_PAPER_RECEIPT_REQUIRED", "Paper originals must be explicitly received for this round");
+    }
+    private io.agentflow.finance.BudgetOccupation requireBudget(Context context) {
+        var position = BudgetPrecheckPort.Request.fromCurrent(context.report(), context.control().input().accountingDate());
+        return budgets.find(context.report().tenantId(), context.report().id()).filter(value -> value.frozenFor(position)).orElseThrow(
+                () -> new DomainException("EXPENSE_BUDGET_NOT_CONFIRMED", "The current expense amount has no confirmed budget reservation"));
+    }
+
+    /**
+     * 签收与核减共享加锁后复核的身份、任务、双版本和委派规则。
+     * @author owlzhangfq@gmail.com
+     */
+    private record AuthorizedTask(Application application, Task task, Context context) { }
 
     private Context context(Application application, Task task) {
         var report = reports.find(application.tenantId(), application.businessReference().id()).orElseThrow(ExpenseApprovalService::notFound);

@@ -53,11 +53,29 @@ public class FinanceJsonConfiguration {
             if (!value.isObject() || value.size() != 2 || value.get("value") == null || !value.get("value").isValueNode()
                     || value.get("currency") == null || !value.get("currency").isValueNode()) throw invalid();
             var node = (com.fasterxml.jackson.databind.JsonNode) value;
-            if (!node.get("value").isTextual() || !node.get("currency").isTextual()
-                    || !node.get("value").textValue().matches("(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?")) throw invalid();
-            return new Money(new BigDecimal(node.get("value").textValue()), node.get("currency").textValue());
+            if (!node.get("currency").isTextual()) throw invalid();
+            return new Money(decimal(node.get("value")), node.get("currency").textValue());
         }
 
         private static DomainException invalid() { return new DomainException("INVALID_MONEY", "Money requires a decimal string and currency"); }
     }
+
+    /**
+     * 核减金额不由客户端指定币种，但仍必须使用与 Money 相同的精确十进制字符串。
+     * @author owlzhangfq@gmail.com
+     */
+    public static final class DecimalAmountDeserializer extends JsonDeserializer<BigDecimal> {
+        /** 只作用于明确标注的财务输入，不改变其他表单或引擎数值。 */
+        @Override public BigDecimal deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+            return decimal(context.readTree(parser));
+        }
+    }
+
+    private static BigDecimal decimal(com.fasterxml.jackson.databind.JsonNode value) {
+        if (!value.isTextual() || !value.textValue().matches("(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?")) {
+            throw new DomainException("INVALID_MONEY", "A non-negative decimal string with at most two fractional digits is required");
+        }
+        return new BigDecimal(value.textValue());
+    }
+
 }

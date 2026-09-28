@@ -92,6 +92,21 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId());
     }
 
+    /** 路由更新复查唯一活跃实例和实际轮次，保留原任务与历史提交快照。 */
+    @Override
+    @Transactional
+    public void updateBusinessPayload(UpdateBusinessPayload command) {
+        var instances = runtimeService.createProcessInstanceQuery().active()
+                .variableValueEquals("tenantId", command.tenantId())
+                .variableValueEquals("applicationId", command.applicationId().toString())
+                .variableValueEquals("roundNo", command.roundNo()).listPage(0, 2);
+        if (instances.size() != 1 || !instances.get(0).getId().equals(command.processInstanceId())) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Business adjustment requires the exact active submission instance");
+        }
+        requireTenantBinding(instances.get(0), command.tenantId());
+        runtimeService.setVariable(command.processInstanceId(), "formData", Collections.unmodifiableMap(new HashMap<>(command.payload())));
+    }
+
     private ProcessDefinition boundDefinition(StartProcessCommand command) {
         String definitionId = command.runtimeDefinitionId();
         if (definitionId == null && command.previousProcessInstanceId() != null) {

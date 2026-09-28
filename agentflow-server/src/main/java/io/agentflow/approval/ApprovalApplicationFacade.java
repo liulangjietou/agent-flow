@@ -192,6 +192,13 @@ public class ApprovalApplicationFacade {
         notifications.returned(application, actor); return application;
     }
 
+    /** 仅供已经完成业务任务授权的核定服务调用，不向普通修改申请接口开放。 */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Application adjustBusiness(UUID id, long expectedVersion, BusinessReference reference, Map<String, Object> payload) {
+        var actor = currentActor.actor();
+        return service.adjustBusiness(actor.tenantId(), id, expectedVersion, reference, payload);
+    }
+
     /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */
     public List<SubmissionRound> rounds(UUID id) {
         Application application = get(id);

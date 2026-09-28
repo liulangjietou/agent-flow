@@ -203,7 +203,7 @@ public final class ExpenseSubmissionResources {
      * 提交只允许预留、迁移或释放，不在此核销资金。
      * @author owlzhangfq@gmail.com
      */
-    public enum Operation { RESERVE, MOVE, RELEASE }
+    public enum Operation { RESERVE, MOVE, RELEASE, REDUCE }
     /**
      * 事前批准行及报销行的配对，迁移不得串到另一行的额度。
      * @author owlzhangfq@gmail.com

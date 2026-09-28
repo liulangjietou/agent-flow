@@ -30,11 +30,12 @@ public class ExpenseController {
     private final ExpenseSubmissionService submissions;
     private final ExpenseApprovalService approvals;
     private final ExpenseLifecycleService lifecycle;
+    private final ExpenseReductionService reductions;
 
     /** 财务写入继续使用平台请求幂等及实际认证主体。 */
     public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency, ExpenseSubmissionService submissions,
-            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle) {
-        this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle;
+            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions) {
+        this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle; this.reductions = reductions;
     }
 
     /** 创建草稿，只绑定可用的已发布费用流程。 */
@@ -66,6 +67,13 @@ public class ExpenseController {
     public ResponseEntity<String> receive(@PathVariable UUID id, @PathVariable String taskId,
             @Valid @RequestBody ExpenseApprovalService.ReceiveInput request, HttpServletRequest http) {
         return idempotency.execute(http, HttpStatus.OK, () -> approvals.receive(id, taskId, request));
+    }
+
+    /** 财务独立核减不能复用申请人修改接口，也不会完成当前任务。 */
+    @PostMapping("/{id}/tasks/{taskId}/reduce")
+    public ResponseEntity<String> reduce(@PathVariable UUID id, @PathVariable String taskId,
+            @Valid @RequestBody ExpenseReductionService.Input request, HttpServletRequest http) {
+        return idempotency.execute(http, HttpStatus.OK, () -> reductions.reduce(id, taskId, request));
     }
 
     /** 撤回保留本轮预留供补正。 */

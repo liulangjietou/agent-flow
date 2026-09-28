@@ -169,6 +169,16 @@ public final class Application {
         version++;
     }
 
+    /** 结构化业务在审批中更新派生路由；业务实体负责证明变化合法，原提交轮次不被覆盖。 */
+    public void adjustBusinessPayload(long expectedVersion, BusinessReference reference, Map<String, Object> payload) {
+        checkVersion(expectedVersion); requireInApproval();
+        if (businessReference == null || !businessReference.equals(reference)) {
+            throw new DomainException("USE_BUSINESS_ENDPOINT", "A matching structured business reference is required");
+        }
+        if (formSchema != null) formSchema.validateSubmission(payload);
+        this.payload = copyPayload(payload); version++;
+    }
+
     /** 正文与附件共用可编辑状态，上传不能借草稿入口修改审批中的证据。 */
     public void requireEditable(long expectedVersion) {
         checkVersion(expectedVersion);

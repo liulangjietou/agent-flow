@@ -16,6 +16,16 @@ public interface ProcessRuntimePort {
     /** 启动与申请版本绑定的流程实例。 */
     StartedProcess start(StartProcessCommand command);
 
+    /** 核定业务金额变化仅更新当前唯一实例的派生路由，不启动或结束任务。 */
+    void updateBusinessPayload(UpdateBusinessPayload command);
+
+    /**
+     * 精确绑定实际审批轮次，不能把核减写到另一个或已结束的实例。
+     * @author owlzhangfq@gmail.com
+     */
+    record UpdateBusinessPayload(String tenantId, UUID applicationId, int roundNo, String processInstanceId,
+                                 Map<String, Object> payload) { }
+
     /** 完成当前人工任务。 */
     CompletedTask complete(CompleteTaskCommand command);
 

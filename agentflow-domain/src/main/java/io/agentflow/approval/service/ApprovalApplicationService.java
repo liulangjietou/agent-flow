@@ -159,6 +159,21 @@ public class ApprovalApplicationService {
         return application;
     }
 
+    /** 已授权的业务核定只更新当前路由，不改写提交快照；具体任务证据由业务用例追加。 */
+    public Application adjustBusiness(String tenantId, UUID id, long expectedVersion, BusinessReference reference,
+            Map<String, Object> payload) {
+        var application = get(tenantId, id);
+        application.adjustBusinessPayload(expectedVersion, reference, payload);
+        var round = rounds.findByRound(tenantId, id, application.roundNo()).orElseThrow(
+                () -> new DomainException("CONCURRENCY_CONFLICT", "Active submission round not found"));
+        if (round.status() != SubmissionRound.Status.IN_APPROVAL || round.definitionVersion() != application.definitionVersion()) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+        }
+        processRuntime.updateBusinessPayload(new ProcessRuntimePort.UpdateBusinessPayload(tenantId, id, application.roundNo(), round.processInstanceId(), application.payload()));
+        repository.update(application, expectedVersion);
+        return application;
+    }
+
     private void recordApplicationOperation(Application application, String actor, ApplicationAuditPort.Action action,
                                             ApplicationStatus previousStatus, String instanceId, String comment) {
         audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(),
