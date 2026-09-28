@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-28",
+  "scope": "Owner expense and funding queries, authorized workflow controls, V40 indexes",
+  "h2Regression": {"passed": 35, "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-workspace-regression.log"},
+  "postgres": {"version": "17.11", "submissionAndQueries": 19, "migration": 1, "log": "/fyoung/tmp/agentflow-remaining-20260928/workspace-postgres.log", "databases": "/fyoung/tmp/agentflow-remaining-20260928/workspace-postgres-databases.json"},
+  "adjacentH2ResourceRepository": 10,
+  "scopesOverlap": true,
+  "openapi": {"operations": 125, "schemas": 213, "requestExamples": 44, "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-workspace-openapi.log"},
+  "frontend": "not implemented in this slice",
+  "packagedHttpAndBrowser": "not run for this slice",
+  "remoteCi": "not run",
+  "externalEnterpriseAcceptance": "not performed"
+}

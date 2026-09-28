@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
  * 发布定义、认证 HTTP、实际引擎、资源台账与合成财务 HTTP 联合验证正式提交及审批控制。
@@ -68,6 +69,7 @@ class ExpenseSubmissionIntegrationTest {
     private boolean financeStage = true;
     private boolean afterFinanceTask;
     private boolean reductionRoute;
+    private boolean hideBusinessDetails;
     private BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
     private BudgetObservation.Rejection budgetRejection = BudgetObservation.Rejection.BUDGET_INSUFFICIENT;
     private int writes;
@@ -419,6 +421,88 @@ class ExpenseSubmissionIntegrationTest {
         }
     }
 
+    @Test
+    void expenseWorkspacePaginatesOnlyOwnedReportsAndDoesNotExposeFinancialSourceSecrets() throws Exception {
+        fixture(true); var first = fixture(true); var second = fixture(false); var third = fixture(false);
+        var page = ok(read("/api/v1/expense-reports?limit=1&status=DRAFT", "alice"), 200);
+        assertThat(page.path("items")).hasSize(1); assertThat(page.path("items").get(0).path("id").asText()).isEqualTo(third.report().id().toString());
+        var next = ok(read("/api/v1/expense-reports?limit=1&status=DRAFT&beforeId=" + page.path("nextBeforeId").asText(), "alice"), 200);
+        assertThat(next.path("items").get(0).path("id").asText()).isEqualTo(second.report().id().toString());
+        assertThat(ok(read("/api/v1/expense-reports", "admin"), 200).path("items")).isEmpty();
+        assertThat(ok(read("/api/v1/expense-reports", "bob"), 200).path("items")).isEmpty();
+        for (String path : List.of("/api/v1/expense-reports", "/api/v1/expense-requests", "/api/v1/employee-advances")) {
+            assertThat(read(path + "?employeeId=alice", "bob").getStatus()).isEqualTo(400);
+            assertThat(read(path + "?limit=0", "alice").getStatus()).isEqualTo(400);
+            assertThat(read(path + "?limit=101", "alice").getStatus()).isEqualTo(400);
+        }
+        for (String path : List.of("/api/v1/expense-requests", "/api/v1/employee-advances")) {
+            var firstPage = ok(read(path + "?limit=1", "alice"), 200);
+            var secondPage = ok(read(path + "?limit=1&beforeId=" + firstPage.path("nextBeforeId").asText(), "alice"), 200);
+            assertThat(secondPage.path("items")).hasSize(1);
+            assertThat(secondPage.path("items").get(0).path("id").asText()).isNotEqualTo(firstPage.path("items").get(0).path("id").asText());
+        }
+        var prior = ok(read("/api/v1/expense-requests?limit=100", "alice"), 200).path("items");
+        var found = java.util.stream.StreamSupport.stream(prior.spliterator(), false).filter(item -> item.path("id").asText().equals(first.prior().toString())).findFirst().orElseThrow();
+        assertThat(found.path("lines").get(0).path("available").path("value").asText()).isEqualTo("200.00");
+        var loansResponse = read("/api/v1/employee-advances?limit=100", "alice");
+        assertThat(loansResponse.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(loansResponse.getContentAsString()).doesNotContain("synthetic-payment", "paymentReference", "account", "reservations");
+        assertThat(ok(read("/api/v1/employee-advances", "bob"), 200).path("items")).isEmpty();
+        assertThat(read("/api/v1/expense-reports?beforeId=" + first.report().id(), "bob").getStatus()).isEqualTo(400);
+        assertThat(read("/api/v1/employee-advances?beforeId=" + first.advance(), "bob").getStatus()).isEqualTo(400);
+        assertThat(read("/api/v1/expense-requests?beforeId=" + first.advance(), "alice").getStatus()).isEqualTo(400);
+    }
+
+    @Test
+    void expenseWorkflowShowsRealControlsAcrossSubmissionReceiptReductionAndBudgetConfirmation() throws Exception {
+        var report = fixture(false).report(); String path = path(report) + "/workflow";
+        var draft = ok(read(path, "alice"), 200); assertThat(draft.path("canCancel").asBoolean()).isTrue(); assertThat(draft.path("canWithdraw").asBoolean()).isFalse();
+        assertThat(draft.path("budget").path("confirmedCurrent").asBoolean()).isFalse();
+        submit(report); var business = ok(read(path + "?taskId=" + task(report).getId(), "manager"), 200);
+        assertThat(business.path("task").path("stage").asText()).isEqualTo("BUSINESS");
+        assertThat(business.path("budget").path("operationStatus").asText()).isEqualTo("QUEUED");
+        assertThat(ok(read(path, "alice"), 200).path("canWithdraw").asBoolean()).isTrue();
+        ok(act(report, "manager", "APPROVE"), 200);
+        var receipt = ok(read(path + "?taskId=" + task(report).getId(), "finance"), 200);
+        assertThat(receipt.path("task").path("canReceive").asBoolean()).isTrue();
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(ok(read(path, "alice"), 200).path("canWithdraw").asBoolean()).isFalse();
+        var financial = ok(read(path + "?taskId=" + task(report).getId(), "finance"), 200);
+        assertThat(financial.path("paper").path("received").asBoolean()).isTrue();
+        assertThat(financial.path("task").path("canReduce").asBoolean()).isFalse();
+        budgetWorker.poll();
+        assertThat(ok(read(path + "?taskId=" + task(report).getId(), "finance"), 200).path("task").path("canReduce").asBoolean()).isTrue();
+        ok(send(reductionPath(report), "finance", reductionInput(report, "50", "3")), 200);
+        financial = ok(read(path + "?taskId=" + task(report).getId(), "finance"), 200);
+        assertThat(financial.path("budget").path("ledgerStatus").asText()).isEqualTo("FROZEN");
+        assertThat(financial.path("budget").path("confirmedCurrent").asBoolean()).isFalse();
+        assertThat(financial.path("task").path("canReduce").asBoolean()).isFalse();
+        assertThat(financial.toString()).doesNotContain("targetDigest", "synthetic-budget", "allocations", "account");
+        budgetWorker.poll();
+        assertThat(ok(read(path + "?taskId=" + task(report).getId(), "finance"), 200).path("budget").path("confirmedCurrent").asBoolean()).isTrue();
+    }
+
+    @Test
+    void expenseWorkflowRetainsSensitiveFieldAndCurrentTaskBoundaries() throws Exception {
+        hideBusinessDetails = true; var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        String path = path(report) + "/workflow";
+        assertThat(read(path, "admin").getStatus()).isEqualTo(403);
+        assertThat(read(path, "bob").getStatus()).isEqualTo(404);
+        assertThat(read(path + "?taskId=" + task(report).getId(), "manager").getStatus()).isEqualTo(403);
+        assertThat(read(path + "?tenantId=other", "alice").getStatus()).isEqualTo(400);
+        ok(act(report, "manager", "APPROVE"), 200); String receiptTask = task(report).getId();
+        ok(send("/api/v1/tasks/" + receiptTask + "/actions", "finance", Map.of("action", "DELEGATE", "targetUser", "manager", "expectedVersion", app(report).version())), 200);
+        var delegated = ok(read(path + "?taskId=" + receiptTask, "manager"), 200);
+        assertThat(delegated.path("task").path("canReceive").asBoolean()).isFalse();
+        assertThat(delegated.path("task").path("canReduce").asBoolean()).isFalse();
+        assertThat(read(path + "?taskId=" + receiptTask, "finance").getStatus()).isEqualTo(403);
+    }
+
+    private MockHttpServletResponse read(String path, String user) throws Exception {
+        return mvc.perform(get(path).header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn().getResponse();
+    }
+
     private void enterFinance(ExpenseReport report) throws Exception {
         submit(report); budgetWorker.poll(); ok(act(report, "manager", "APPROVE"), 200);
         ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
@@ -466,7 +550,7 @@ class ExpenseSubmissionIntegrationTest {
         }
         var graph = new Graph(nodes, edges);
         var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,
-                null, null, null, null, null, null, true, Map.of("business", FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY)),
+                null, null, null, null, null, null, true, Map.of("business", hideBusinessDetails ? FieldVisibility.HIDDEN : FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY)),
                 new FormSchema.Field("amount", "本币金额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
                 new FormSchema.Field("currency", "本位币", FormSchema.FieldType.TEXT, true, null, null, null, null, null),
                 new FormSchema.Field("overPolicy", "超标", FormSchema.FieldType.BOOLEAN, true, null, null, null, null, null)));

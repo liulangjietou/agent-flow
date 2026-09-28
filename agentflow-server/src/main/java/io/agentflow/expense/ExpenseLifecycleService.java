@@ -44,7 +44,9 @@ public class ExpenseLifecycleService {
         var report = reports.find(actor.tenantId(), reportId).orElseThrow();
         var application = applications.requireApplicant(report.applicationId());
         if (report.version() != input.financialVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Financial version changed");
-        if (!cancel) requireWithdrawalAllowed(application);
+        if (!cancel && application.status() == ApplicationStatus.IN_APPROVAL && !withdrawalAllowed(application)) {
+            throw new DomainException("EXPENSE_WITHDRAWAL_NOT_ALLOWED", "Expense withdrawal is not allowed after financial review has started");
+        }
         application = cancel
                 ? applications.cancelBusiness(application.id(), input.applicationVersion(), input.comment(), application.businessReference())
                 : applications.withdrawBusiness(application.id(), input.applicationVersion(), input.comment(), application.businessReference());
@@ -52,8 +54,9 @@ public class ExpenseLifecycleService {
         return new Receipt(reportId, application.id(), application.version(), report.version(), application.status().name());
     }
 
-    private void requireWithdrawalAllowed(Application application) {
-        if (application.status() != ApplicationStatus.IN_APPROVAL) return;
+    /** 写入与已授权详情共用本轮撤回规则；调用方另行核对本人身份。 */
+    public boolean withdrawalAllowed(Application application) {
+        if (application.status() != ApplicationStatus.IN_APPROVAL) return false;
         var control = controls.find(application.tenantId(), application.businessReference().id(), application.roundNo()).orElseThrow(
                 () -> new DomainException("EXPENSE_TASK_CONTEXT_CHANGED", "Expense submission control not found"));
         var round = rounds.findByRound(application.tenantId(), application.id(), application.roundNo()).orElseThrow(
@@ -61,7 +64,7 @@ public class ExpenseLifecycleService {
         // 只看当前待办会在财务已完成、流转到后续节点时重新放开撤回，因此核对本轮实际进入历史。
         boolean entered = history.createHistoricTaskInstanceQuery().processInstanceId(round.processInstanceId()).list().stream()
                 .anyMatch(task -> control.stage(task.getTaskDefinitionKey()).finance());
-        if (entered) throw new DomainException("EXPENSE_WITHDRAWAL_NOT_ALLOWED", "Expense withdrawal is not allowed after financial review has started");
+        return !entered;
     }
 
     /**

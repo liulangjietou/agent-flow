@@ -59,6 +59,12 @@ public class JdbcBudgetOperationRepository {
         return jdbc.query("SELECT * FROM budget_operation WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst();
     }
 
+    /** 费用详情只展示同单最近操作，完整输入与外部凭据不返回到页面。 */
+    public Optional<BudgetOperation> latest(String tenant, UUID reportId) {
+        return jdbc.query("SELECT * FROM budget_operation WHERE tenant_id=? AND report_id=? ORDER BY financial_version DESC,created_at DESC,id DESC LIMIT 1",
+                row(), tenant, reportId.toString()).stream().findFirst();
+    }
+
     /** 到期恢复最多十条，重试退避在持久状态中，不随进程重启重置。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""

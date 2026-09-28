@@ -27,10 +27,12 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
     /** 核销总额由不可变的逐笔归属派生，不能丢掉已核销轮次的防重依据。 */
     public Money consumed() { return consumptions.stream().map(Reservation::amount).reduce(Money.zero(limit.currency()), Money::plus); }
 
+    /** 汇总实际预留，不向资金选择器暴露其他使用单据的身份。 */
+    public Money reserved() { return reservations.stream().map(Reservation::amount).reduce(Money.zero(limit.currency()), Money::plus); }
+
     /** 当前可用额严格扣除所有仍然有效的预留。 */
     public Money available() {
-        Money reserved = reservations.stream().map(Reservation::amount).reduce(Money.zero(limit.currency()), Money::plus);
-        return limit.minus(consumed()).minus(reserved);
+        return limit.minus(consumed()).minus(reserved());
     }
 
     /** 查询某一完整轮次归属已经预留的金额。 */
