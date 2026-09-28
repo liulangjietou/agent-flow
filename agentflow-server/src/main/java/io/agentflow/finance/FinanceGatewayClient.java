@@ -55,7 +55,7 @@ public class FinanceGatewayClient {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.BUDGET_QUERY
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
-                || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING) {
+                || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
         return exchange(tenantId, null, operation, UUID.randomUUID(), data, resultType, matchesRequest);
@@ -85,6 +85,13 @@ public class FinanceGatewayClient {
         requireTarget(targetDigest);
         if (authorizationId == null) throw new IllegalArgumentException("A payment authorization identity is required");
         return exchange(tenantId, targetDigest, Operation.PAYMENT_COMMAND, authorizationId, data, resultType, matchesRequest);
+    }
+
+    /** 付款前账户复查绑定原目标，只允许员工账户及出纳出款目录两个只读操作。 */
+    public <T> FinanceResult<T> readPaymentAccounts(String tenantId, String targetDigest, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operation != Operation.EMPLOYEE_ACCOUNT && operation != Operation.DEBIT_ACCOUNTS) throw new IllegalArgumentException("A payment account read operation is required");
+        return exchange(tenantId, targetDigest, operation, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 结算准备中的只读事实仍绑定原财务系统，期间和映射不能来自不同目标。 */
@@ -178,6 +185,7 @@ public class FinanceGatewayClient {
         BUDGET_QUERY("budget-query", Set.of()),
         PAYMENT_COMMAND("payment-command", Set.of()),
         PAYMENT_QUERY("payment-query", Set.of()),
+        DEBIT_ACCOUNTS("debit-accounts", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.CASHIER_UNAVAILABLE, FinanceResult.Reason.DEBIT_ACCOUNT_UNAVAILABLE)),
         ACCOUNTING_PERIOD("accounting-period", Set.of(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         ACCOUNT_MAPPING("account-mapping", Set.of(FinanceResult.Reason.ACCOUNT_MAPPING_UNAVAILABLE, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         VOUCHER_COMMAND("voucher-command", Set.of()),
