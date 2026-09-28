@@ -68,8 +68,13 @@ public class JdbcInvoiceVerificationRepository {
 
     /** 由活动唯一键查询，调用方应先锁发票串行化排队与完成。 */
     public boolean active(String tenant, UUID invoiceId) {
-        return !jdbc.queryForList("SELECT id FROM invoice_verification_job WHERE tenant_id=? AND active_invoice_id=?",
-                String.class, tenant, invoiceId.toString()).isEmpty();
+        return activeId(tenant, invoiceId).isPresent();
+    }
+
+    /** 页面恢复直接读取活动唯一键，不把历史 UUID 分页当作执行顺序。 */
+    public Optional<UUID> activeId(String tenant, UUID invoiceId) {
+        return jdbc.queryForList("SELECT id FROM invoice_verification_job WHERE tenant_id=? AND active_invoice_id=?",
+                String.class, tenant, invoiceId.toString()).stream().findFirst().map(UUID::fromString);
     }
 
     /** 当前版本必须恰由成功任务产生，且其后没有任何同版本的新尝试；不以时间戳猜最新结论。 */

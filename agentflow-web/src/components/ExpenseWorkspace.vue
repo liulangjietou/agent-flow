@@ -3,16 +3,17 @@ import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { ExpensePageQuery, expenseStatuses, moneyLabel } from '../expenses'
 import ExpenseEditor from './ExpenseEditor.vue'
+import InvoiceWallet from './InvoiceWallet.vue'
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean }>()
 const emit = defineEmits<{ open: [applicationId: string] }>()
-const tab = ref<'reports' | 'requests' | 'advances'>('reports'), status = ref('')
+const tab = ref<'reports' | 'requests' | 'advances' | 'invoices'>('reports'), status = ref('')
 const editing = ref(false)
 const reports = reactive(new ExpensePageQuery(api.expenseReports)), requests = reactive(new ExpensePageQuery(api.expenseRequests)), advances = reactive(new ExpensePageQuery(api.employeeAdvances))
 const current = computed(() => tab.value === 'reports' ? reports : tab.value === 'requests' ? requests : advances)
-const tabs = [{ id: 'reports' as const, label: '我的报销' }, { id: 'requests' as const, label: '事前批准额度' }, { id: 'advances' as const, label: '已放款借款' }]
+const tabs = [{ id: 'reports' as const, label: '我的报销' }, { id: 'invoices' as const, label: '个人票夹' }, { id: 'requests' as const, label: '事前批准额度' }, { id: 'advances' as const, label: '已放款借款' }]
 const advanceStatus: Record<string, string> = { PAID_OUT: '已放款', PARTIALLY_SETTLED: '部分冲销', SETTLED: '已结清' }
 function clear() { reports.clear(); requests.clear(); advances.clear() }
-function load(more = false) { return current.value.load(props.scopeKey, tab.value === 'reports' ? status.value || undefined : undefined, more) }
+function load(more = false) { if (tab.value !== 'invoices') return current.value.load(props.scopeKey, tab.value === 'reports' ? status.value || undefined : undefined, more) }
 watch(() => [props.scopeKey, props.refreshVersion, tab.value, status.value], () => { clear(); void load() }, { immediate: true, flush: 'sync' })
 onUnmounted(clear)
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -24,6 +25,8 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { y
     <template v-else>
     <div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">查看报销进度，核对本人可用额度与借款余额。</p></div><div class="workspace-actions"><button class="secondary" :disabled="current.loading" @click="load()">刷新记录</button><button class="primary" :disabled="locked" @click="editing = true">＋ 填写报销</button></div></div>
     <div class="expense-navigation" role="group" aria-label="费用工作区视图"><button v-for="item in tabs" :key="item.id" :aria-pressed="tab === item.id" @click="tab = item.id">{{ item.label }}</button></div>
+    <InvoiceWallet v-if="tab === 'invoices'" :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
+    <template v-else>
     <div class="ledger-toolbar"><label v-if="tab === 'reports'">报销状态<select v-model="status"><option value="">全部状态</option><option v-for="(label, value) in expenseStatuses" :key="value" :value="value">{{ label }}</option></select></label><p v-else>{{ tab === 'requests' ? '批准额度包含当前预留；已关闭的额度不能增加占用。' : '只显示实际放款的借款，预留金额仍未完成冲销。' }}</p><span>已加载 {{ current.items.length }} 条</span></div>
     <p v-if="current.error" class="expense-error" role="alert">{{ current.error }}<button :disabled="current.loading" @click="load(!!current.nextBeforeId)">重新读取</button></p>
     <div v-if="tab === 'reports' && reports.items.length" class="report-ledger">
@@ -35,6 +38,7 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { y
     <p v-if="current.loading" class="ledger-empty" role="status">正在读取本人费用记录…</p>
     <div v-else-if="!current.error && !current.items.length" class="ledger-empty"><strong>{{ tab === 'reports' ? '暂无符合条件的报销单' : tab === 'requests' ? '暂无本人事前批准额度' : '暂无本人已放款借款' }}</strong><p>{{ tab === 'reports' ? '已保存的费用单会显示在这里，可切换状态筛选。' : '此处根据实际批准或放款结果显示余额。' }}</p></div>
     <button v-if="current.nextBeforeId" class="secondary more-records" :disabled="current.loading" @click="load(true)">加载更多</button>
+    </template>
     </template>
   </section>
 </template>

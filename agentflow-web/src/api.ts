@@ -20,6 +20,7 @@ import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
+import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
 /** 登录方式由部署配置决定，防伪令牌只保留在内存。@author owlzhangfq@gmail.com */
@@ -292,6 +293,15 @@ export const api = {
   expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
   submitExpense: (id: string, input: { applicationVersion: number; financialVersion: number; precheckId: string }) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/submit`, 'POST', '正式提交报销', input),
   invoices: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceItem>>('/invoices' + historyQuery(filter), { signal, cache: 'no-store' }),
+  invoice: (id: string, signal: AbortSignal) => request<InvoiceItem>(`/invoices/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
+  invoiceWalletOptions: (signal: AbortSignal) => request<InvoiceWalletOptions>('/invoices/options', { signal, cache: 'no-store' }),
+  reserveInvoice: (input: InvoiceUploadInput, key: string, signal: AbortSignal) => request<{ id: string }>('/invoices', { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key }, signal }),
+  uploadInvoice: (id: string, file: Blob, signal: AbortSignal) => request<InvoiceOriginal>(`/invoices/${encodeURIComponent(id)}/content`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream' }, signal }),
+  downloadInvoice: (id: string, signal: AbortSignal) => request<Blob>(`/invoices/${encodeURIComponent(id)}/content`, { signal, cache: 'no-store' }, 'binary'),
+  invoiceVerificationOptions: (id: string, signal: AbortSignal) => request<InvoiceVerificationOptions>(`/invoices/${encodeURIComponent(id)}/verification-options`, { signal, cache: 'no-store' }),
+  queueInvoiceVerification: (id: string, input: InvoiceVerificationInput) => write<{ id: string }>(`/invoices/${encodeURIComponent(id)}/verifications`, 'POST', '发起发票查验', input),
+  invoiceVerification: (id: string, jobId: string, signal: AbortSignal) => request<InvoiceVerificationJob>(`/invoices/${encodeURIComponent(id)}/verifications/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  invoiceVerifications: (id: string, filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceVerificationJob>>(`/invoices/${encodeURIComponent(id)}/verifications` + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReports: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ExpenseItem>>('/expense-reports' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PriorRequestItem>>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),

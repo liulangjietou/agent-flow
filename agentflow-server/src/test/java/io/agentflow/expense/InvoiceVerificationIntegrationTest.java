@@ -110,6 +110,17 @@ class InvoiceVerificationIntegrationTest {
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
     @Test
+    void optionsLocateActiveJobWithoutDependingOnUuidHistoryOrder() throws Exception {
+        UUID invoice = original(true);
+        assertThat(tree(read(invoice, "/verification-options", "alice")).path("activeVerificationId").isMissingNode()).isTrue();
+        UUID id = id(queue(invoice, "alice", UUID.randomUUID().toString(), input(invoice), 202));
+        assertThat(tree(read(invoice, "/verification-options", "alice")).path("activeVerificationId").asText()).isEqualTo(id.toString());
+        assertThat(read(invoice, "/verification-options", "admin").getStatus()).isEqualTo(404);
+        worker.poll();
+        assertThat(tree(read(invoice, "/verification-options", "alice")).path("activeVerificationId").isMissingNode()).isTrue();
+    }
+
+    @Test
     void persistedQueueUsesActualOriginalOutsideTransactionAndReplaysWithoutAnotherExternalCall() throws Exception {
         UUID invoice = original(true); String key = UUID.randomUUID().toString(); var input = input(invoice);
         var first = queue(invoice, "alice", key, input, 202); UUID id = id(first);

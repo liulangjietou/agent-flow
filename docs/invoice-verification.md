@@ -8,7 +8,7 @@
 
 | 方法及路径 | 行为 |
 | --- | --- |
-| `GET /api/v1/invoices/{id}/verification-options` | 当前发票版本、可用性、实际目标及其指纹、已确认法人 |
+| `GET /api/v1/invoices/{id}/verification-options` | 当前发票版本、可用性、实际目标及其指纹、已确认法人及活动任务标识 |
 | `POST /api/v1/invoices/{id}/verifications` | 幂等保存一次任务；请求含 `expectedInvoiceVersion`、`legalEntityId`、`targetDigest` |
 | `GET /api/v1/invoices/{id}/verifications/{jobId}` | 当前任务状态、输入/结果版本、时间和稳定失败分类 |
 | `GET /api/v1/invoices/{id}/verifications` | 本张发票历史；`limit` 1–100，默认 25；`beforeId` 接上一页游标 |
@@ -53,4 +53,4 @@ V36 增加任务与版本历史，不重写 V35 原件和已有财务版本。�
 
 新增请求未知字段测试先失败于返回 202。原因是平台既有 JSON 默认忽略额外字段，旧网关严格解码测试只覆盖外部响应。修复在新写入 DTO 边界明确拒绝额外属性，保持其他接口既有兼容策略。
 
-打包服务的 PostgreSQL/实际 HTTP 重启证据见 `evidence/invoice-verification-20260928.json`。全部票据、法人、账户和网关都属于合成本机验收；尚未完成真实企业税务查验或票夹页面验收。
+打包服务的 PostgreSQL/实际 HTTP 重启证据见 `evidence/invoice-verification-20260928.json`。全部票据、法人、账户和网关都属于合成本机验收；真实企业税务查验尚未验收；后续已完成 [票夹页面和报销引用验收](invoice-wallet-ui.md)。

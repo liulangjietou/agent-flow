@@ -47,7 +47,7 @@ public class InvoiceVerificationService {
                 : destination == null ? "FINANCE_GATEWAY_UNAVAILABLE" : null;
         return new Options(invoice.version(), unavailable == null, unavailable,
                 destination == null ? null : destination.baseUri().getAuthority(), destination == null ? null : destination.digest(invoice.tenantId()),
-                invoice.facts() == null ? null : invoice.facts().legalEntityId());
+                invoice.facts() == null ? null : invoice.facts().legalEntityId(), jobs.activeId(invoice.tenantId(), invoiceId).orElse(null));
     }
 
     /** 幂等响应只保存任务编号，不把票面或原件复制进响应缓存。 */
@@ -220,7 +220,7 @@ public class InvoiceVerificationService {
      * 实际验票目的地和当前输入版本供发起人核对。
      * @author owlzhangfq@gmail.com
      */
-    public record Options(long invoiceVersion, boolean enabled, String unavailableCode, String destination, String targetDigest, UUID confirmedLegalEntityId) { }
+    public record Options(long invoiceVersion, boolean enabled, String unavailableCode, String destination, String targetDigest, UUID confirmedLegalEntityId, UUID activeVerificationId) { }
     /**
      * 只返回明确状态与稳定分类，不包含远端响应正文、原件字节或目标凭据。
      * @author owlzhangfq@gmail.com

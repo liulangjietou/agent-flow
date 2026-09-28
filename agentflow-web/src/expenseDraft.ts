@@ -1,5 +1,7 @@
 import type { Definition } from './api'
 import type { InitiatorContext } from './initiatorContext'
+import type { InvoiceItem } from './invoiceWallet'
+export type { InvoiceItem } from './invoiceWallet'
 import { amountMinor, type ExpenseContent, type ExpenseDetail, type ExpenseLine, type ExpenseVersions, type FinancialRound, type Money } from './expenses.js'
 
 export interface FinanceCatalog {
@@ -19,12 +21,6 @@ export interface PrecheckView {
   job: PrecheckSummary; usable: boolean; unavailableCode: string | null; initiator: InitiatorContext; accountingDate: string
   rateDate: string | null; validUntil: string | null; preview: FinancialRound | null
   findings: Array<{ stage: string; lineNo: number | null; nature: 'REJECTED' | 'UNAVAILABLE'; code: string }>
-}
-export interface InvoiceItem {
-  id: string; version: number; original: { id: string; filename: string; size: number; sha256: string; format: 'PDF' | 'OFD' | 'PNG' | 'JPEG'; status: 'UPLOADING' | 'READY' | 'FAILED'; createdAt: string }
-  verification: 'PENDING' | 'VERIFIED' | 'FAILED'; occupation: 'AVAILABLE' | 'OCCUPIED' | 'CONSUMED'
-  facts: null | { legalEntityId: string; gross: Money; tax: Money; issueDate: string; validUntil: string }
-  use: null | { reportId: string; roundNo: number; lineNo: number }; failureCode: string | null; checkedAt: string | null
 }
 
 export const expenseUnits: Record<ExpenseLine['unit'], string> = { ITEM: '项', DAY: '天', NIGHT: '晚', KILOMETER: '公里', PERSON: '人' }

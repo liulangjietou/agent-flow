@@ -22732,6 +22732,17 @@
                 "type": "null"
               }
             ]
+          },
+          "activeVerificationId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

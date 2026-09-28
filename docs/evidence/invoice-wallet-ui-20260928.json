@@ -1,0 +1,213 @@
+{
+  "date": "2026-09-28",
+  "scope": "invoice wallet UI and actual expense reference",
+  "backendH2Tests": 25,
+  "backendPostgresTests": 12,
+  "backendScopesOverlap": true,
+  "frontendTests": 88,
+  "invoiceTestsIncluded": 14,
+  "build": "PASS",
+  "openapi": {
+    "operations": 125,
+    "schemas": 213,
+    "requestExamples": 44
+  },
+  "javaAuthorCheck": {
+    "files": 510,
+    "types": 868,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "http": {
+    "result": "PASS",
+    "syntheticFinance": true,
+    "database": "expense_ui_b8e8e035f6",
+    "invoiceId": "f3197673-96bd-4207-8b8b-a9c58f759f0d",
+    "originalId": "d35ba5ef-52ed-48f0-b146-da1424c591cb",
+    "bytes": 647,
+    "sha256": "8d095f5e917a72b3a35397b62fd997dd016b10133024af8f7d83ea65dbd132e8",
+    "originalCount": 1,
+    "verificationAttempts": 4,
+    "verificationOutcomes": [
+      "REJECTED",
+      "SUCCEEDED",
+      "SUCCEEDED",
+      "UNAVAILABLE"
+    ],
+    "originalVerified": true,
+    "browserDownloadCompleted": true,
+    "reportId": "e249e7b9-b7d3-406a-a54a-940f71384b40",
+    "applicationId": "56db5727-00fb-460a-bf11-beb2809a7c62",
+    "businessNo": "UI-INVOICE-004",
+    "reportStatus": "IN_APPROVAL",
+    "invoiceOccupation": "OCCUPIED",
+    "use": {
+      "reportId": "e249e7b9-b7d3-406a-a54a-940f71384b40",
+      "roundNo": 1,
+      "lineNo": 1
+    },
+    "actualManagerTasks": 1,
+    "budgetConfirmed": true,
+    "httpChecks": 20,
+    "checks": [
+      {
+        "actor": "alice",
+        "path": "/invoices?limit=25",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/content",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/verification-options",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/verifications?limit=25",
+        "status": 200
+      },
+      {
+        "actor": "admin",
+        "path": "/invoices?limit=25",
+        "status": 200
+      },
+      {
+        "actor": "admin",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d",
+        "status": 404
+      },
+      {
+        "actor": "admin",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/content",
+        "status": 404
+      },
+      {
+        "actor": "admin",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/verification-options",
+        "status": 404
+      },
+      {
+        "actor": "admin",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/verifications/7123792a-336e-4484-967e-c31a730806a1",
+        "status": 404
+      },
+      {
+        "actor": "bob",
+        "path": "/invoices?limit=25",
+        "status": 200
+      },
+      {
+        "actor": "bob",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d",
+        "status": 404
+      },
+      {
+        "actor": "bob",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/content",
+        "status": 404
+      },
+      {
+        "actor": "bob",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/verification-options",
+        "status": 404
+      },
+      {
+        "actor": "bob",
+        "path": "/invoices/f3197673-96bd-4207-8b8b-a9c58f759f0d/verifications/7123792a-336e-4484-967e-c31a730806a1",
+        "status": 404
+      },
+      {
+        "actor": "alice",
+        "path": "/invoices?ownerId=alice",
+        "status": 400
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports?limit=25",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/e249e7b9-b7d3-406a-a54a-940f71384b40",
+        "status": 200
+      },
+      {
+        "actor": "manager",
+        "path": "/workspace/tasks?q=UI-INVOICE-004&limit=25",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/e249e7b9-b7d3-406a-a54a-940f71384b40/workflow",
+        "status": 200
+      }
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "actions": [
+      "select synthetic original",
+      "restore selection after navigation",
+      "upload original once",
+      "confirm then cancel verification",
+      "successful verification",
+      "dependency unavailable without rewriting facts",
+      "business rejection preserving previous facts",
+      "explicit successful retry",
+      "actual original download",
+      "reference invoice in expense line",
+      "precheck and formal submission",
+      "verify occupied invoice"
+    ],
+    "responsive": {
+      "cssWidth": 500,
+      "documentWidth": 480,
+      "detailWidth": 451,
+      "detailScrollWidth": 451
+    },
+    "download": {
+      "browserCompleted": true,
+      "receivedBytes": 647,
+      "highLevelDownloadPath": "not returned; confirmed with browser Page.downloadProgress and actual HTTP byte comparison"
+    },
+    "consoleErrors": []
+  },
+  "redGreen": [
+    "active verification pointer",
+    "late terminal options response after identity switch",
+    "download alongside detail refresh",
+    "same invoice object refresh retains terminal result"
+  ],
+  "limitations": [
+    "synthetic finance is not enterprise integration",
+    "fund source origination and settlement still in development",
+    "remote CI not run"
+  ],
+  "localArtifacts": [
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-active-options-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-backend.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-postgres-databases.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-refresh-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-refresh-green.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-final-tests.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-final-build.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-openapi.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-http.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-download-events.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-verified.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-unavailable.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-rejected.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/invoice-wallet-ui-mobile.png"
+  ]
+}
