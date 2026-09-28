@@ -8,6 +8,7 @@ import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.organization.InitiatorContext;
 
 import java.time.Instant;
 import java.util.Map;
@@ -67,6 +68,11 @@ public class ApprovalApplicationService {
 
     /** 提交申请；流程启动失败时由上层事务回滚本地状态。 */
     public Application submit(String tenantId, UUID id, long expectedVersion, String submittedBy) {
+        return submit(tenantId, id, expectedVersion, submittedBy, null);
+    }
+
+    /** 把服务端确认的任职同时交给运行端口和轮次仓储，不把它混入用户表单。 */
+    public Application submit(String tenantId, UUID id, long expectedVersion, String submittedBy, InitiatorContext initiatorContext) {
         Application application = repository.findById(tenantId, id)
                 .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
         ApplicationStatus previousStatus = application.status();
@@ -75,9 +81,9 @@ public class ApprovalApplicationService {
         application.submit(expectedVersion);
         ProcessRuntimePort.StartedProcess started = processRuntime.start(new ProcessRuntimePort.StartProcessCommand(tenantId, id, application.processKey(),
                 application.definitionVersion(), application.roundNo(), application.businessNo(), application.payload(), application.formSchema(),
-                application.runtimeDefinitionId(), previousRound == null ? null : previousRound.processInstanceId()));
+                application.runtimeDefinitionId(), previousRound == null ? null : previousRound.processInstanceId(), initiatorContext));
         repository.update(application, expectedVersion);
-        rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now()));
+        rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now(), initiatorContext));
         recordApplicationOperation(application, submittedBy, ApplicationAuditPort.Action.SUBMIT, previousStatus,
                 started.processInstanceId(), null);
         return application;

@@ -103,6 +103,8 @@ public final class DefinitionDiffService {
             modified(changes, Area.FIELD, key, label, "options", oldField.options(), newField.options());
             modified(changes, Area.FIELD, key, label, "columns", oldField.columns(), newField.columns());
             modified(changes, Area.FIELD, key, label, "maxRows", oldField.maxRows(), newField.maxRows());
+            modified(changes, Area.FIELD, key, label, "sensitive", oldField.sensitive(), newField.sensitive());
+            modified(changes, Area.FIELD, key, label, "nodeAccess", oldField.nodeAccess(), newField.nodeAccess());
         }
     }
 

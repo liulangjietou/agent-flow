@@ -117,6 +117,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("AssistRunDetail", io.agentflow.agent.AssistRunQueryService.Detail.class),
                 java.util.Map.entry("Application", io.agentflow.approval.ApplicationResponse.class),
                 java.util.Map.entry("SubmissionRound", io.agentflow.approval.SubmissionRoundResponse.class),
+                java.util.Map.entry("InitiatorContext", io.agentflow.organization.InitiatorContext.class),
                 java.util.Map.entry("Definition", io.agentflow.definition.DefinitionController.DefinitionResponse.class),
                 java.util.Map.entry("DefinitionAvailabilityChange", io.agentflow.definition.DefinitionAvailabilityChange.class),
                 java.util.Map.entry("DefinitionAvailabilityHistory", io.agentflow.definition.DefinitionAvailabilityController.HistoryPage.class),

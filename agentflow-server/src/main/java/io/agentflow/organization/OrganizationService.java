@@ -90,6 +90,50 @@ public class OrganizationService {
         return value;
     }
 
+    /** 同法人内为任职设置主管，检查整条主管链，不以人员主任职推断路径。 */
+    @Transactional
+    public OrganizationAppointment setSupervisor(Actor actor, UUID id, UUID supervisorId, long expectedRevision) {
+        long revision = repository.lock(actor.tenantId());
+        var value = appointment(actor.tenantId(), id).withSupervisor(supervisorId, expectedRevision);
+        var legalId = unit(actor.tenantId(), value.departmentId()).legalEntityId();
+        var seen = new HashSet<UUID>();
+        var people = new HashSet<UUID>();
+        seen.add(id); people.add(value.personId());
+        UUID current = supervisorId;
+        while (current != null) {
+            if (!seen.add(current)) throw supervisorCycle();
+            var supervisor = appointment(actor.tenantId(), current);
+            if (!people.add(supervisor.personId())) throw supervisorCycle();
+            if (!legalId.equals(unit(actor.tenantId(), supervisor.departmentId()).legalEntityId())) throw relation();
+            requireEffectiveAppointment(actor.tenantId(), supervisor);
+            current = supervisor.supervisorAppointmentId();
+        }
+        repository.save(actor.tenantId(), value, expectedRevision);
+        record(actor, revision, APPOINTMENT, id, value);
+        return value;
+    }
+
+    /** 部门负责人必须在该部门有效任职，清空配置不删除历史记录。 */
+    @Transactional
+    public OrganizationUnit setDepartmentHead(Actor actor, UUID id, UUID appointmentId, long expectedRevision) {
+        long revision = repository.lock(actor.tenantId());
+        var value = requireKind(actor.tenantId(), id, OrganizationUnit.Kind.DEPARTMENT).withHead(appointmentId, expectedRevision);
+        if (appointmentId != null) {
+            var head = appointment(actor.tenantId(), appointmentId);
+            if (!id.equals(head.departmentId())) throw relation();
+            requireEffectiveAppointment(actor.tenantId(), head);
+        }
+        repository.save(actor.tenantId(), value, expectedRevision);
+        record(actor, revision, value.kind().name(), id, value);
+        return value;
+    }
+
+    private void requireEffectiveAppointment(String tenant, OrganizationAppointment value) {
+        if (!value.active() || !person(tenant, value.personId()).canApprove()) throw inactive();
+        checkAppointment(tenant, value);
+    }
+    private static DomainException supervisorCycle() { return new DomainException("ORGANIZATION_SUPERVISOR_CYCLE", "Supervisor chain cannot repeat an appointment or person"); }
+
     private void checkUnit(String tenant, OrganizationUnit value) {
         if (value.kind() == OrganizationUnit.Kind.LEGAL_ENTITY) return;
         var legal = requireKind(tenant, value.legalEntityId(), OrganizationUnit.Kind.LEGAL_ENTITY);

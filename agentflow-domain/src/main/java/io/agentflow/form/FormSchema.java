@@ -19,6 +19,8 @@ import java.util.regex.Pattern;
 public record FormSchema(int schemaVersion, List<Field> fields) {
     public static final int CURRENT_VERSION = 2;
     public static final int MAX_FIELDS = 50;
+    private static final int MAX_PERMISSION_NODES = 200;
+    private static final int MAX_NODE_ID_LENGTH = 128;
     public static final int MAX_TABLE_COLUMNS = 20;
     public static final int MAX_TABLE_ROWS = 100;
     public static final int DEFAULT_TABLE_ROWS = 50;
@@ -177,7 +179,12 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
      */
     public record Field(String key, String label, FieldType type, boolean required, String helpText,
                         Integer maxLength, String minimum, String maximum, List<Option> options,
-                        List<Field> columns, Integer maxRows) {
+                        List<Field> columns, Integer maxRows, Boolean sensitive, Map<String, FieldVisibility> nodeAccess) {
+        /** 兼容未配置字段权限的既有表单与历史快照。 */
+        public Field(String key, String label, FieldType type, boolean required, String helpText,
+                     Integer maxLength, String minimum, String maximum, List<Option> options, List<Field> columns, Integer maxRows) {
+            this(key, label, type, required, helpText, maxLength, minimum, maximum, options, columns, maxRows, null, null);
+        }
         /** 兼容原六类字段的构造契约，不为旧快照添加明细配置。 */
         public Field(String key, String label, FieldType type, boolean required, String helpText,
                      Integer maxLength, String minimum, String maximum, List<Option> options) {
@@ -217,6 +224,28 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
                 throw invalid("Only detail tables can declare columns or row limits");
             }
             columns = columns == null ? null : List.copyOf(columns);
+            if (nodeAccess != null) {
+                if (nodeAccess.size() > MAX_PERMISSION_NODES || nodeAccess.entrySet().stream().anyMatch(entry -> entry.getKey() == null
+                        || entry.getKey().isBlank() || entry.getKey().length() > MAX_NODE_ID_LENGTH || entry.getValue() == null)) {
+                    throw invalid("Field permissions must reference bounded node identifiers and visibility values");
+                }
+                nodeAccess = Map.copyOf(nodeAccess);
+            }
+        }
+
+        /** 多个节点取更严格的可见性；无节点身份不能凭管理员角色绕过限制。 */
+        public FieldVisibility visibility(Set<String> nodes) {
+            FieldVisibility fallback = Boolean.TRUE.equals(sensitive) ? FieldVisibility.MASKED : FieldVisibility.READ_ONLY;
+            if (nodeAccess == null || nodeAccess.isEmpty()) return fallback;
+            if (nodes.isEmpty()) return nodeAccess.values().stream().reduce(fallback, FieldVisibility::stricter);
+            return nodes.stream().map(node -> nodeAccess.getOrDefault(node, fallback))
+                    .reduce(FieldVisibility.READ_ONLY, FieldVisibility::stricter);
+        }
+
+        /** 公共摘要和索引不能间接暴露任一节点受限的字段。 */
+        public boolean restricted() {
+            return Boolean.TRUE.equals(sensitive) || nodeAccess != null && nodeAccess.values().stream().anyMatch(value -> value != FieldVisibility.READ_ONLY)
+                    || columns != null && columns.stream().anyMatch(Field::restricted);
         }
 
         /** 缺省上限仅在使用时解释，读取旧快照不补写默认配置。 */

@@ -214,7 +214,7 @@ public class DefinitionApplicationService {
     }
 
     private List<String> unavailableAssigneesAndCalendars(String tenantId, Graph graph) {
-        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0)
+        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0 || option.contextual())
                 .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
         var errors = new java.util.ArrayList<>(graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
                 .filter(node -> !available.contains(node.properties().get("assigneeRule")))

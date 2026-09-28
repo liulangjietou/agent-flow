@@ -61,6 +61,7 @@ public final class DefinitionValidator {
                 }
             }
         }
+        if (formSchema != null) validateFieldNodes(formSchema.fields(), nodes, errors);
         long starts = graph.nodes().stream().filter(n -> n.type() == NodeType.START).count();
         long ends = graph.nodes().stream().filter(n -> n.type() == NodeType.END).count();
         if (starts != 1) errors.add("START_COUNT_MUST_BE_ONE");
@@ -173,4 +174,14 @@ public final class DefinitionValidator {
         }
         return visited != nodeIds.size();
     }
+    private static void validateFieldNodes(List<FormSchema.Field> fields, Map<String, Node> nodes, List<String> errors) {
+        for (var field : fields) {
+            if (field.nodeAccess() != null) for (String nodeId : field.nodeAccess().keySet()) {
+                var node = nodes.get(nodeId);
+                if (node == null || node.type() != NodeType.USER_TASK) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
+            }
+            if (field.columns() != null) validateFieldNodes(field.columns(), nodes, errors);
+        }
+    }
+
 }

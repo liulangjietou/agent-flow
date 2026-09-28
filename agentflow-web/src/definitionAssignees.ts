@@ -2,7 +2,7 @@
  * 当前租户身份源中实际可选择的审批规则。
  * @author owlzhangfq@gmail.com
  */
-export interface AssigneeOption { rule: string; label: string; memberCount: number }
+export interface AssigneeOption { rule: string; label: string; memberCount: number; contextual?: boolean }
 
 const roleLabels: Record<string, string> = {
   MANAGER: '部门审批组', FINANCE: '财务审批组', ADMIN: '管理员组',
@@ -11,6 +11,8 @@ const roleLabels: Record<string, string> = {
 
 /** 已保存规则始终可读，不因目录暂时不可用而变为空白。 */
 export function assigneeLabel(rule: string, directoryLabel?: string): string {
+  if (rule === 'role:ORG_DEPARTMENT_HEAD') return directoryLabel || '本次任职部门负责人'
+  if (rule.startsWith('role:ORG_SUPERVISOR_')) return directoryLabel || `本次任职 · 第 ${rule.slice('role:ORG_SUPERVISOR_'.length)} 级主管`
   if (rule.startsWith('role:ORG_PERSON_')) return directoryLabel || '本地指定人员'
   if (rule.startsWith('role:ORG_UNIT_')) return directoryLabel || '本地组织成员'
   if (rule.startsWith('user:')) return `指定账号 · ${rule.slice(5)}`

@@ -9,6 +9,7 @@ async function panel() {
   api.organizationStatus = async () => ({ initialized: true })
   api.organizationUnits = async () => ({ items: [] })
   api.organizationPeople = async () => ({ items: [] })
+  api.organizationAppointments = async () => ({ items: [] })
   const props = reactive({ scopeKey: 'panel/' + Math.random(), refreshVersion: 0, locked: false })
   const app = renderer.createApp({ ...Panel, setup: (_, context) => Panel.setup(props, context), render: () => null }, props)
   const instance = app.mount({}); await flush()

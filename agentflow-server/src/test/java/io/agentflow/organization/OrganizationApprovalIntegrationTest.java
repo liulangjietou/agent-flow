@@ -53,15 +53,78 @@ class OrganizationApprovalIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired TaskService tasks;
     @Autowired RuntimeService runtime;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     private Actor admin;
     private OrganizationUnit department;
     private OrganizationUnit position;
     private OrganizationPerson first;
     private OrganizationPerson second;
     private OrganizationAppointment firstJob;
+    private OrganizationAppointment secondJob;
     private String applicantToken;
     private String firstToken;
     private String secondToken;
+
+    @Test
+    void applicantSelectsOwnAppointmentAndEachRoundKeepsItsOriginalContext() throws Exception {
+        var applicant = organization.createPerson(admin, "applicant", "申请员工", true, false);
+        var selected = organization.createAppointment(admin, applicant.id(), department.id(), position.id(), true);
+        var anotherDepartment = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "兼任部门",
+                department.legalEntityId(), null, true);
+        var another = organization.createAppointment(admin, applicant.id(), anotherDepartment.id(), position.id(), true);
+        var options = read("/organization/my-appointments?limit=1", applicantToken, 200);
+        assertThat(options.path("items")).hasSize(1);
+        assertThat(options.path("items").get(0).path("subject").asText()).isEqualTo("applicant");
+        assertThat(options.path("nextAfterId").asText()).isNotBlank();
+        assertThat(read("/organization/my-appointments?limit=1&afterId=" + options.path("nextAfterId").asText(),
+                applicantToken, 200).path("items")).hasSize(1);
+        read("/organization/my-appointments?subject=" + first.subject(), applicantToken, 400);
+
+        String key = publish("role:" + LocalOrganizationDirectory.PERSON_ROLE + first.id(), "SINGLE");
+        var draft = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "任职上下文", "processKey", key, "definitionVersion", 1, "payload", Map.of()), 201);
+        String id = draft.path("id").asText();
+        var unavailable = write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 1, "initiatorAppointmentId", firstJob.id()), 422);
+        assertThat(unavailable.path("code").asText()).isEqualTo("INITIATOR_APPOINTMENT_UNAVAILABLE");
+        assertThat(read("/applications/" + id, applicantToken, 200).path("version").asLong()).isEqualTo(1);
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 1, "initiatorAppointmentId", selected.id()), 200);
+        var firstContext = read("/applications/" + id + "/rounds", applicantToken, 200).get(0).path("initiatorContext");
+        assertThat(firstContext.path("appointmentId").asText()).isEqualTo(selected.id().toString());
+        assertThat(firstContext.path("departmentName").asText()).isEqualTo("审核部");
+        var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+        assertThat(json.read((String) runtime.getVariable(task.getExecutionId(),
+                io.agentflow.approval.process.FlowableProcessRuntimeAdapter.INITIATOR_CONTEXT), JsonNode.class)).isEqualTo(firstContext);
+
+        organization.updateUnit(admin, department.id(), "修改后的部门", null, true, department.revision());
+        write(post("/api/v1/applications/" + id + "/withdraw"), applicantToken, Map.of("expectedVersion", 2), 200);
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 3, "initiatorAppointmentId", another.id()), 200);
+        var rounds = read("/applications/" + id + "/rounds", applicantToken, 200);
+        assertThat(rounds.get(0).path("initiatorContext")).isEqualTo(firstContext);
+        assertThat(rounds.get(1).path("initiatorContext").path("appointmentId").asText()).isEqualTo(another.id().toString());
+        assertThat(rounds.get(1).path("initiatorContext").path("departmentName").asText()).isEqualTo("兼任部门");
+    }
+
+    @Test
+    void stoppedOrOtherTenantAppointmentsAreUnavailableAndLegacyRoundsHaveNoInventedContext() throws Exception {
+        var applicant = organization.createPerson(admin, "applicant", "申请员工", true, false);
+        var selected = organization.createAppointment(admin, applicant.id(), department.id(), position.id(), true);
+        organization.updateAppointment(admin, selected.id(), false, selected.revision());
+        assertThat(read("/organization/my-appointments", applicantToken, 200).path("items")).isEmpty();
+        String key = publish("role:" + LocalOrganizationDirectory.PERSON_ROLE + first.id(), "SINGLE");
+        var draft = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "无任职旧流程", "processKey", key, "definitionVersion", 1, "payload", Map.of()), 201);
+        String id = draft.path("id").asText();
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 1, "initiatorAppointmentId", selected.id()), 422);
+        String otherToken = UUID.randomUUID().toString();
+        doReturn(new Actor("other-" + UUID.randomUUID(), "applicant", Set.of("EMPLOYEE"))).when(auth).authenticate(otherToken);
+        assertThat(read("/organization/my-appointments", otherToken, 200).path("items")).isEmpty();
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken, Map.of("expectedVersion", 1), 200);
+        assertThat(read("/applications/" + id + "/rounds", applicantToken, 200).get(0).path("initiatorContext").isNull()).isTrue();
+    }
 
     @BeforeEach
     void setup() {
@@ -74,7 +137,7 @@ class OrganizationApprovalIntegrationTest {
         first = organization.createPerson(admin, "issuer:first/审批人", "甲", true, true);
         second = organization.createPerson(admin, "issuer:second/审批人", "乙", true, true);
         firstJob = organization.createAppointment(admin, first.id(), department.id(), position.id(), true);
-        organization.createAppointment(admin, second.id(), department.id(), position.id(), true);
+        secondJob = organization.createAppointment(admin, second.id(), department.id(), position.id(), true);
         applicantToken = identity("applicant", Set.of("EMPLOYEE"));
         firstToken = identity(first.subject(), Set.of("EMPLOYEE", "APPROVER"));
         secondToken = identity(second.subject(), Set.of("EMPLOYEE", "APPROVER"));
@@ -187,14 +250,116 @@ class OrganizationApprovalIntegrationTest {
         assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app.path("id").asText()).count()).isZero();
     }
 
+    @Test
+    void laterDynamicTenantDefinitionCannotImposeContextOnBoundOrHistoricalBundledApplications() throws Exception {
+        var bound = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "已绑定内置定义", "processKey", "expense-reimbursement", "definitionVersion", 1, "payload", Map.of("amount", 6000)), 201);
+        var legacy = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "历史内置定义", "processKey", "expense-reimbursement", "definitionVersion", 1, "payload", Map.of("amount", 6000)), 201);
+        String boundId = bound.path("id").asText(), legacyId = legacy.path("id").asText();
+        // 模拟尚未保存引擎定义 ID 的旧申请，重提必须从原轮次恢复来源。
+        jdbc.update("UPDATE approval_application SET runtime_definition_id=NULL WHERE id=?", legacyId);
+        write(post("/api/v1/applications/" + legacyId + "/submit"), applicantToken, Map.of("expectedVersion", 1), 200);
+        String originalDefinition = tasks.createTaskQuery().processVariableValueEquals("applicationId", legacyId).singleResult().getProcessDefinitionId();
+        write(post("/api/v1/applications/" + legacyId + "/withdraw"), applicantToken, Map.of("expectedVersion", 2), 200);
+        publish("expense-reimbursement", LocalOrganizationDirectory.SUPERVISOR_RULE + "1", "SINGLE");
+
+        write(post("/api/v1/applications/" + boundId + "/submit"), applicantToken, Map.of("expectedVersion", 1), 200);
+        write(post("/api/v1/applications/" + legacyId + "/submit"), applicantToken, Map.of("expectedVersion", 3), 200);
+        for (String id : List.of(boundId, legacyId)) {
+            var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+            assertThat(task.getProcessDefinitionId()).isEqualTo(originalDefinition);
+            assertThat(task.getTaskDefinitionKey()).isEqualTo("finance-approval");
+        }
+        assertThat(read("/applications/" + legacyId + "/rounds", applicantToken, 200)).hasSize(2);
+        var current = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "新建租户动态流程", "processKey", "expense-reimbursement", "definitionVersion", 1, "payload", Map.of()), 201);
+        String currentId = current.path("id").asText();
+        assertThat(write(post("/api/v1/applications/" + currentId + "/submit"), applicantToken, Map.of("expectedVersion", 1), 422)
+                .path("code").asText()).isEqualTo("INITIATOR_APPOINTMENT_REQUIRED");
+        assertThat(read("/applications/" + currentId, applicantToken, 200).path("status").asText()).isEqualTo("DRAFT");
+        assertThat(read("/applications/" + currentId + "/rounds", applicantToken, 200)).isEmpty();
+    }
+
+    @Test
+    void dynamicSupervisorsUseSelectedAppointmentFreezeCandidatesAndRequireContext() throws Exception {
+        var applicant = organization.createPerson(admin, "applicant", "多任职申请人", true, false);
+        var job = organization.createAppointment(admin, applicant.id(), department.id(), position.id(), true);
+        organization.setSupervisor(admin, job.id(), firstJob.id(), 1);
+        organization.setSupervisor(admin, firstJob.id(), secondJob.id(), 1);
+        String key = publish(LocalOrganizationDirectory.SUPERVISOR_RULE + "2", "ALL");
+        var draft = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "二级主管", "processKey", key, "definitionVersion", 1, "payload", Map.of()), 201);
+        String id = draft.path("id").asText();
+        assertThat(write(post("/api/v1/applications/" + id + "/submit"), applicantToken, Map.of("expectedVersion", 1), 422)
+                .path("code").asText()).isEqualTo("INITIATOR_APPOINTMENT_REQUIRED");
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 1, "initiatorAppointmentId", job.id()), 200);
+        var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+        assertThat(task.getAssignee()).isEqualTo(second.subject());
+        organization.setSupervisor(admin, firstJob.id(), null, 2);
+        assertThat(tasks.createTaskQuery().taskId(task.getId()).singleResult().getAssignee()).isEqualTo(second.subject());
+        write(post("/api/v1/tasks/" + task.getId() + "/actions"), secondToken, Map.of("action", "APPROVE", "expectedVersion", 2), 200);
+        assertThat(read("/applications/" + id, applicantToken, 200).path("status").asText()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void departmentHeadMustExistAndRelationshipWritesRespectOwnershipRevisionAndCycles() throws Exception {
+        var applicant = organization.createPerson(admin, "applicant", "申请人", true, false);
+        var job = organization.createAppointment(admin, applicant.id(), department.id(), position.id(), true);
+        var token = identity(admin.userId(), Set.of("ADMIN", "PROCESS_ADMIN"));
+        write(put("/api/v1/organization/appointments/" + job.id() + "/supervisor"), applicantToken,
+                Map.of("appointmentId", firstJob.id(), "expectedRevision", 1), 403);
+        write(put("/api/v1/organization/appointments/" + job.id() + "/supervisor"), token,
+                Map.of("appointmentId", firstJob.id(), "expectedRevision", 1), 200);
+        write(put("/api/v1/organization/appointments/" + job.id() + "/supervisor"), token,
+                Map.of("appointmentId", secondJob.id(), "expectedRevision", 1), 409);
+        assertThatThrownBy(() -> organization.setSupervisor(admin, firstJob.id(), job.id(), 1))
+                .isInstanceOf(io.agentflow.common.DomainException.class);
+        organization.setSupervisor(admin, firstJob.id(), secondJob.id(), 1);
+        assertThatThrownBy(() -> organization.setSupervisor(admin, secondJob.id(), firstJob.id(), 1))
+                .isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                        error -> assertThat(error.code()).isEqualTo("ORGANIZATION_SUPERVISOR_CYCLE"));
+        var foreign = new Actor("foreign-" + UUID.randomUUID(), "other", Set.of("ADMIN"));
+        organization.initialize(foreign);
+        assertThatThrownBy(() -> organization.setSupervisor(foreign, job.id(), firstJob.id(), 1))
+                .isInstanceOf(io.agentflow.common.DomainException.class);
+        var anotherDepartment = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "其他部门", department.legalEntityId(), null, true);
+        assertThatThrownBy(() -> organization.setDepartmentHead(admin, anotherDepartment.id(), firstJob.id(), 1))
+                .isInstanceOf(io.agentflow.common.DomainException.class);
+        String key = publish(LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE, "SINGLE");
+        var draft = write(post("/api/v1/applications"), applicantToken, Map.of("businessNo", UUID.randomUUID().toString(),
+                "title", "部门负责人", "processKey", key, "definitionVersion", 1, "payload", Map.of()), 201);
+        String id = draft.path("id").asText();
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 1, "initiatorAppointmentId", job.id()), 422);
+        assertThat(read("/applications/" + id, applicantToken, 200).path("version").asLong()).isEqualTo(1);
+        write(put("/api/v1/organization/units/" + department.id() + "/head"), token,
+                Map.of("appointmentId", firstJob.id(), "expectedRevision", 1), 200);
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 1, "initiatorAppointmentId", job.id()), 200);
+        var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+        assertThat(tasks.getIdentityLinksForTask(task.getId())).extracting(org.flowable.identitylink.api.IdentityLink::getUserId).contains(first.subject());
+        organization.updateAppointment(admin, firstJob.id(), false, 2);
+        // 已经冻结的责任不随任职停用移走；下一次激活会重新检查任职有效性。
+        read("/tasks/" + task.getId(), firstToken, 200);
+        write(post("/api/v1/applications/" + id + "/withdraw"), applicantToken, Map.of("expectedVersion", 2), 200);
+        write(post("/api/v1/applications/" + id + "/submit"), applicantToken,
+                Map.of("expectedVersion", 3, "initiatorAppointmentId", job.id()), 422);
+        assertThat(read("/applications/" + id + "/rounds", applicantToken, 200)).hasSize(1);
+    }
+
     private String identity(String subject, Set<String> roles) {
         String token = UUID.randomUUID().toString();
         doReturn(new Actor(admin.tenantId(), subject, roles)).when(auth).authenticate(token); return token;
     }
     private String publish(String rule, String mode) {
+        return publish("org-" + UUID.randomUUID(), rule, mode);
+    }
+    private String publish(String key, String rule, String mode) {
         var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()), new Node("review", "组织审核", NodeType.USER_TASK, Map.of("assigneeRule", rule, "approvalMode", mode)), new Node("end", "结束", NodeType.END, Map.of())),
                 List.of(new Edge("e1", "start", "review", ""), new Edge("e2", "review", "end", "")));
-        var draft = definitions.create(admin.tenantId(), "org-" + UUID.randomUUID(), "组织流程", graph, null, null);
+        var draft = definitions.create(admin.tenantId(), key, "组织流程", graph, null, null);
         return definitions.publish(admin, draft.id(), draft.revision(), "本地组织实际审批验证").key();
     }
     private JsonNode submit(String key) throws Exception {

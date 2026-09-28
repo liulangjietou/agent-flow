@@ -9,7 +9,11 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record OrganizationUnit(UUID id, Kind kind, String name, UUID legalEntityId,
-                               UUID parentDepartmentId, boolean active, long revision) {
+                               UUID parentDepartmentId, boolean active, long revision, UUID headAppointmentId) {
+    /** 兼容未维护部门负责人的历史单元。 */
+    public OrganizationUnit(UUID id, Kind kind, String name, UUID legalEntityId, UUID parentDepartmentId, boolean active, long revision) {
+        this(id, kind, name, legalEntityId, parentDepartmentId, active, revision, null);
+    }
     /** 仅保留各类组织单元适用的结构，拒绝无意义字段。 */
     public OrganizationUnit {
         if (id == null || kind == null || StringUtils.isBlank(name) || name.length() > 128 || revision < 1
@@ -17,14 +21,21 @@ public record OrganizationUnit(UUID id, Kind kind, String name, UUID legalEntity
         name = name.strip();
         if (kind == Kind.LEGAL_ENTITY && (legalEntityId != null || parentDepartmentId != null)
                 || kind != Kind.LEGAL_ENTITY && legalEntityId == null
-                || kind != Kind.DEPARTMENT && parentDepartmentId != null
+                || kind != Kind.DEPARTMENT && (parentDepartmentId != null || headAppointmentId != null)
                 || id.equals(legalEntityId) || id.equals(parentDepartmentId)) throw invalid();
     }
 
     /** 修改名称、启停及同法人内部门层级；不能通过编辑把既有实体变成另一类组织。 */
     public OrganizationUnit revise(String name, UUID parentDepartmentId, boolean active, long expectedRevision) {
         OrganizationRevision.require(revision, expectedRevision);
-        return new OrganizationUnit(id, kind, name, legalEntityId, parentDepartmentId, active, revision + 1);
+        return new OrganizationUnit(id, kind, name, legalEntityId, parentDepartmentId, active, revision + 1, headAppointmentId);
+    }
+
+    /** 负责人属于部门自身配置，其他组织类型不能配置。 */
+    public OrganizationUnit withHead(UUID appointmentId, long expectedRevision) {
+        OrganizationRevision.require(revision, expectedRevision);
+        if (kind != Kind.DEPARTMENT) throw invalid();
+        return new OrganizationUnit(id, kind, name, legalEntityId, parentDepartmentId, active, revision + 1, appointmentId);
     }
 
     private static DomainException invalid() { return new DomainException("INVALID_ORGANIZATION_UNIT", "Organization unit fields are invalid"); }

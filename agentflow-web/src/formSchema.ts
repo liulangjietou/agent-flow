@@ -1,8 +1,9 @@
+export type FieldVisibility = 'READ_ONLY' | 'MASKED' | 'HIDDEN'
 export type FieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'BOOLEAN' | 'TABLE'
 export interface FormOption { value: string; label: string }
 export interface FormField {
   key: string; label: string; type: FieldType; required: boolean; helpText?: string
-  maxLength?: number; minimum?: string; maximum?: string; options?: FormOption[]; columns?: FormField[]; maxRows?: number
+  maxLength?: number; minimum?: string; maximum?: string; options?: FormOption[]; columns?: FormField[]; maxRows?: number; sensitive?: boolean | null; nodeAccess?: Record<string, FieldVisibility> | null
 }
 export interface FormSchema { schemaVersion: 1 | 2; fields: FormField[] }
 export type FieldErrors = Record<string, string>
@@ -47,6 +48,9 @@ export function validateFormSchema(schema: FormSchema | null, columnsOnly = fals
   for (const field of schema.fields) keyCounts.set(field.key, (keyCounts.get(field.key) ?? 0) + 1)
   result.fields = schema.fields.map(field => {
     const errors: Record<string, string> = {}
+    if (field.sensitive != null && typeof field.sensitive !== 'boolean') errors.sensitive = '敏感字段配置必须是布尔值。'
+    if (field.nodeAccess != null && (typeof field.nodeAccess !== 'object' || Array.isArray(field.nodeAccess) || Object.keys(field.nodeAccess).length > 200 || Object.entries(field.nodeAccess).some(([key, value]) => !key.trim() || key.length > 128 || !['READ_ONLY','MASKED','HIDDEN'].includes(value)))) errors.nodeAccess = '节点字段权限只支持只读、脱敏和隐藏。'
+
     if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(field.key)) errors.key = '以字母开头，仅用字母、数字和下划线，最多 64 字符。'
     else if (reserved.has(field.key)) errors.key = '这是系统保留标识，请更换。'
     else if ((keyCounts.get(field.key) ?? 0) > 1) errors.key = '字段标识重复，请为每个字段使用不同标识。'

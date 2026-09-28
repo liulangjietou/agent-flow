@@ -23,7 +23,7 @@ function list(value: unknown, path: string, max: number): asserts value is unkno
 }
 
 function readField(raw: unknown, column = false) {
-      const f = object(raw, ['key', 'label', 'type', 'required', 'helpText', 'maxLength', 'minimum', 'maximum', 'options', 'columns', 'maxRows'], ['key', 'label', 'type', 'required'], '字段')
+      const f = object(raw, ['key', 'label', 'type', 'required', 'helpText', 'maxLength', 'minimum', 'maximum', 'options', 'columns', 'maxRows', 'sensitive', 'nodeAccess'], ['key', 'label', 'type', 'required'], '字段')
       text(f.key, '字段标识', 64); text(f.label, '字段名称', 128)
       if (typeof f.required !== 'boolean') throw new Error('字段必填配置必须是布尔值。')
       if (f.helpText != null) text(f.helpText, '填写提示', 1000, true)

@@ -15,6 +15,7 @@ import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionModels;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.ApprovalNotificationService;
+import io.agentflow.organization.OrganizationInitiatorDirectory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +39,13 @@ public class ApprovalApplicationFacade {
     private final DefinitionDraftRepository definitions;
     private final ProcessRuntimePort processRuntime;
     private final ApprovalNotificationService notifications;
+    private final OrganizationInitiatorDirectory initiators;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, List<ApplicationParticipantPort> participantPorts,
                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions,
-                                     ApprovalNotificationService notifications) {
+                                     ApprovalNotificationService notifications, OrganizationInitiatorDirectory initiators) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
@@ -52,6 +54,7 @@ public class ApprovalApplicationFacade {
         this.definitions = definitions;
         this.processRuntime = processRuntime;
         this.notifications = notifications;
+        this.initiators = initiators;
     }
 
     /** 创建申请草稿。 */
@@ -74,9 +77,16 @@ public class ApprovalApplicationFacade {
     /** 提交申请并启动流程。 */
     @Transactional
     public Application submit(UUID id, long expectedVersion) {
+        return submit(id, expectedVersion, null);
+    }
+
+    /** 选择任职只允许当前申请人，内容在当前提交轮次内冻结。 */
+    @Transactional
+    public Application submit(UUID id, long expectedVersion, UUID initiatorAppointmentId) {
         Actor actor = currentActor.actor();
         requireApplicant(actor, id);
-        Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId());
+        var context = initiators.snapshot(actor, initiatorAppointmentId);
+        Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId(), context);
         notifications.submitted(application, actor.userId());
         return application;
     }

@@ -19,7 +19,7 @@ import java.util.Set;
 @JsonComponent
 public class FormSchemaJsonDeserializer extends JsonDeserializer<FormSchema> {
     private static final Set<String> SCHEMA_PROPERTIES = Set.of("schemaVersion", "fields");
-    private static final Set<String> FIELD_PROPERTIES = Set.of("key", "label", "type", "required", "helpText", "maxLength", "minimum", "maximum", "options", "columns", "maxRows");
+    private static final Set<String> FIELD_PROPERTIES = Set.of("key", "label", "type", "required", "helpText", "maxLength", "minimum", "maximum", "options", "columns", "maxRows", "sensitive", "nodeAccess");
     private static final Set<String> OPTION_PROPERTIES = Set.of("value", "label");
     /** 仅解码基础字段与一层明细，具体结构和业务规则由领域值对象校验。 */
     @Override
@@ -56,9 +56,27 @@ public class FormSchemaJsonDeserializer extends JsonDeserializer<FormSchema> {
             columns = new ArrayList<>();
             for (JsonNode child : field.get("columns")) columns.add(readField(child, true));
         }
+        Boolean sensitive = null;
+        if (field.hasNonNull("sensitive")) {
+            if (!field.get("sensitive").isBoolean()) throw invalid();
+            sensitive = field.get("sensitive").booleanValue();
+        }
+        java.util.Map<String, FieldVisibility> access = null;
+        if (field.hasNonNull("nodeAccess")) {
+            var value = field.get("nodeAccess");
+            if (!value.isObject()) throw invalid();
+            access = new java.util.LinkedHashMap<>();
+            var entries = value.fields();
+            while (entries.hasNext()) {
+                var entry = entries.next();
+                if (!entry.getValue().isTextual()) throw invalid();
+                try { access.put(entry.getKey(), FieldVisibility.valueOf(entry.getValue().textValue())); }
+                catch (IllegalArgumentException exception) { throw invalid(); }
+            }
+        }
         return new FormSchema.Field(text(field, "key", true), text(field, "label", true), type,
                 field.get("required").booleanValue(), text(field, "helpText", false), integer(field, "maxLength"),
-                text(field, "minimum", false), text(field, "maximum", false), options, columns, integer(field, "maxRows"));
+                text(field, "minimum", false), text(field, "maximum", false), options, columns, integer(field, "maxRows"), sensitive, access);
     }
 
     private Integer integer(JsonNode node, String key) {

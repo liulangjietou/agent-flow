@@ -274,6 +274,7 @@ async function exercise(base) {
   }
   // 最后启用独立测试租户的本地组织，避免改变前面的演示目录验收前提。
   const org = '/api/v1/organization'
+  await call('GET', org + '/my-appointments', { user: 'alice' })
   await call('GET', org)
   await call('GET', org, { user: 'alice', status: 403 })
   const initKey = randomUUID()
@@ -286,7 +287,9 @@ async function exercise(base) {
   assert.equal(company.revision, 2)
   let person = await call('POST', org + '/people', { status: 201, body: example(org + '/people') })
   let appointment = await call('POST', org + '/appointments', { status: 201, body: { personId: person.id, departmentId: department.id, positionId: position.id, active: true } })
-  appointment = await call('PUT', org + '/appointments/{id}', { path: org + '/appointments/' + appointment.id, body: { active: false, expectedRevision: 1 } })
+  await call('PUT', org + '/units/{id}/head', { path: org + '/units/' + department.id + '/head', body: { appointmentId: appointment.id, expectedRevision: department.revision } })
+  appointment = await call('PUT', org + '/appointments/{id}/supervisor', { path: org + '/appointments/' + appointment.id + '/supervisor', body: { appointmentId: null, expectedRevision: appointment.revision } })
+  appointment = await call('PUT', org + '/appointments/{id}', { path: org + '/appointments/' + appointment.id, body: { active: false, expectedRevision: appointment.revision } })
   assert.equal(appointment.active, false)
   person = await call('PUT', org + '/people/{id}', { path: org + '/people/' + person.id, body: { displayName: '已停用审批人', active: false, approvalEligible: true, expectedRevision: 1 } })
   assert.equal(person.active, false)

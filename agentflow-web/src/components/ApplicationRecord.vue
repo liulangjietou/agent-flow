@@ -7,6 +7,8 @@ import ApplicationComments from './ApplicationComments.vue'
 import AssistRunRecords from './AssistRunRecords.vue'
 import RequestRecovery from './RequestRecovery.vue'
 import FormFields from './FormFields.vue'
+import InitiatorAppointmentPicker from './InitiatorAppointmentPicker.vue'
+import { initiatorContextLabel } from '../initiatorContext'
 import { validatePayload, type FieldErrors } from '../formSchema'
 import { api, type ApiError, type Application, type SubmissionRound } from '../api'
 import type { PendingWrite } from '../pendingWrites.js'
@@ -19,6 +21,7 @@ const application = ref<Application | null>(null)
 const rounds = ref<SubmissionRound[]>([])
 const historyTab = ref<'rounds' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist'>('rounds')
 const title = ref('')
+const initiatorAppointmentId = ref('')
 const amount = ref('')
 const description = ref('')
 const payload = ref<Record<string, unknown>>({})
@@ -118,7 +121,7 @@ async function save(submit = false) {
     await saveChanges()
     if (submit) {
       const value = application.value!
-      setApplication(await api.submitApplication(value.id, value.version))
+      setApplication(await api.submitApplication(value.id, value.version, initiatorAppointmentId.value))
       emit('changed')
       notice.value = `已提交第 ${application.value!.roundNo} 轮审批。`
       rounds.value = (await api.applicationRounds(value.id)).sort((a, b) => b.roundNo - a.roundNo)
@@ -222,6 +225,7 @@ onUnmounted(() => returnFocus?.focus())
             <FormFields v-if="application.formSchema" v-model="payload" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
             <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
+          <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="scopeKey" :disabled="saving || writesBlocked || cancellationOpen" />
           <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
           <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="saving || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="saving || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
@@ -253,7 +257,7 @@ onUnmounted(() => returnFocus?.focus())
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
           <details v-for="round in rounds" :key="round.roundNo" class="round-card">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
-            <div class="round-content"><h4>{{ round.title }}</h4><FormFields :schema="round.formSchema" :model-value="round.payload" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
+            <div class="round-content"><h4>{{ round.title }}</h4><p class="field-help">发起任职：{{ round.initiatorContext ? initiatorContextLabel(round.initiatorContext) : '本轮未记录任职上下文' }}</p><FormFields :schema="round.formSchema" :model-value="round.payload" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
         <RoundComparison v-else-if="historyTab === 'compare'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" />

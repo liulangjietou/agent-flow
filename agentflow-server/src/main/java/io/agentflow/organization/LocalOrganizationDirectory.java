@@ -23,6 +23,9 @@ import java.util.UUID;
 public class LocalOrganizationDirectory implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
     public static final String PERSON_ROLE = "ORG_PERSON_";
     public static final String UNIT_ROLE = "ORG_UNIT_";
+    public static final String SUPERVISOR_RULE = "role:ORG_SUPERVISOR_";
+    public static final String DEPARTMENT_HEAD_RULE = "role:ORG_DEPARTMENT_HEAD";
+    public static final int MAX_SUPERVISOR_LEVEL = 10;
     private static final String ACTIVE_APPOINTMENTS = """
             FROM organization_appointment a
             JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE AND p.approval_eligible=TRUE
@@ -41,7 +44,14 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     }
 
     /** 本地规则只引用不透明实体标识，因此 OIDC 主体中的冒号等字符不会进入表达式。 */
-    public static boolean isLocalRule(String rule) { return rule.startsWith("role:" + PERSON_ROLE) || rule.startsWith("role:" + UNIT_ROLE); }
+    public static boolean isLocalRule(String rule) {
+        return rule != null && (rule.startsWith("role:" + PERSON_ROLE) || rule.startsWith("role:" + UNIT_ROLE) || isContextualRule(rule));
+    }
+
+    /** 动态规则必须从本轮任职解析，不属于身份源静态角色。 */
+    public static boolean isContextualRule(String rule) {
+        return rule != null && (rule.startsWith(SUPERVISOR_RULE) || DEPARTMENT_HEAD_RULE.equals(rule));
+    }
 
     /** 本地资格只约束审批办理；不改写认证角色，也不影响原幂等请求的身份指纹。 */
     @Override
@@ -84,6 +94,10 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     public List<Option> options(String tenantId) {
         if (!repository.initialized(tenantId)) return demo.options(tenantId);
         var result = new ArrayList<Option>();
+        result.add(new Option(DEPARTMENT_HEAD_RULE, "本次任职部门负责人", 0, true));
+        for (int level = 1; level <= MAX_SUPERVISOR_LEVEL; level++) {
+            result.add(new Option(SUPERVISOR_RULE + level, "本次任职 · 第 " + level + " 级主管", 0, true));
+        }
         jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE AND approval_eligible=TRUE ORDER BY display_name,id",
                 (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new Option("role:" + PERSON_ROLE + row.getString("id"), "人员 · " + row.getString("display_name"), 1)), tenantId);
         var counts = new HashMap<String, Integer>();

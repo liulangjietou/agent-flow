@@ -2,7 +2,9 @@ package io.agentflow.approval.process;
 
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionDraftRepository;
+import io.agentflow.organization.LocalOrganizationDirectory;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -31,15 +33,19 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final TaskService taskService;
     private final HistoryService historyService;
     private final DefinitionDraftRepository platformDefinitions;
+    private final JsonUtil json;
+    public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
 
     /** 注入 Flowable 运行服务。 */
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
-                                         TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions) {
+                                         TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
+                                         JsonUtil json) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.historyService = historyService;
         this.platformDefinitions = platformDefinitions;
+        this.json = json;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -57,13 +63,21 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
         if (command.tenantId().equals(definition.getTenantId())) {
             platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion())
-                    .ifPresent(io.agentflow.definition.DefinitionModels.DefinitionDraft::requireStartEnabled);
+                    .ifPresent(published -> {
+                        published.requireStartEnabled();
+                        // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
+                        if (command.initiatorContext() == null && published.graph().nodes().stream().anyMatch(node ->
+                                LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule")))) {
+                            throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+                        }
+                    });
         }
         Map<String, Object> variables = new HashMap<>();
         variables.put("tenantId", command.tenantId());
         variables.put("applicationId", command.applicationId().toString());
         variables.put("businessNo", command.businessNo());
         variables.put("roundNo", command.roundNo());
+        if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
         // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
         variables.put("formData", command.payload() == null ? Map.of()
                 : Collections.unmodifiableMap(new HashMap<>(command.payload())));

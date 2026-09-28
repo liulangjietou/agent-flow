@@ -23,11 +23,13 @@ import java.util.UUID;
 public class ApplicationController {
     private final ApprovalApplicationFacade facade;
     private final IdempotencyExecutor idempotency;
+    private final ApplicationFieldViews fields;
 
     /** 创建控制器。 */
-    public ApplicationController(ApprovalApplicationFacade facade, IdempotencyExecutor idempotency) {
+    public ApplicationController(ApprovalApplicationFacade facade, IdempotencyExecutor idempotency, ApplicationFieldViews fields) {
         this.facade = facade;
         this.idempotency = idempotency;
+        this.fields = fields;
     }
 
     /** 创建申请草稿。 */
@@ -40,13 +42,13 @@ public class ApplicationController {
     /** 查询当前租户申请列表。 */
     @GetMapping
     public List<ApplicationResponse> list() {
-        return facade.list().stream().map(ApplicationResponse::from).toList();
+        return facade.list().stream().map(fields::application).toList();
     }
 
     /** 查询申请详情。 */
     @GetMapping("/{id}")
     public ApplicationResponse get(@PathVariable UUID id) {
-        return ApplicationResponse.from(facade.get(id));
+        return fields.application(facade.get(id));
     }
 
     /** 修改草稿或退回后的申请内容，不改变绑定定义与历史轮次。 */
@@ -60,14 +62,16 @@ public class ApplicationController {
     /** 查询有权访问的申请的全部提交轮次。 */
     @GetMapping("/{id}/rounds")
     public List<SubmissionRoundResponse> rounds(@PathVariable UUID id) {
-        return facade.rounds(id).stream().map(SubmissionRoundResponse::from).toList();
+        var application = facade.get(id);
+        return facade.rounds(id).stream().map(round -> fields.round(application, round)).toList();
     }
 
     /** 提交申请。 */
     @PostMapping("/{id}/submit")
     public ResponseEntity<String> submit(@PathVariable UUID id, @Valid @RequestBody SubmitApplicationRequest request,
                                          HttpServletRequest httpRequest) {
-        return idempotency.execute(httpRequest, HttpStatus.OK, () -> ApplicationResponse.from(facade.submit(id, request.expectedVersion())));
+        return idempotency.execute(httpRequest, HttpStatus.OK, () -> ApplicationResponse.from(
+                facade.submit(id, request.expectedVersion(), request.initiatorAppointmentId())));
     }
 
     /** 发起人撤回当前审批轮次。 */
@@ -109,7 +113,7 @@ public class ApplicationController {
      * 提交申请请求。
      * @author owlzhangfq@gmail.com
      */
-    public record SubmitApplicationRequest(@NotNull Long expectedVersion) { }
+    public record SubmitApplicationRequest(@NotNull Long expectedVersion, UUID initiatorAppointmentId) { }
 
     /**
      * 申请补正请求；业务号、流程标识与定义版本不属于可修改字段。

@@ -24,6 +24,21 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
     }
 
     @Override
+    public java.util.Set<String> readableNodes(String tenantId, String processInstanceId, Actor actor) {
+        if (!tenantId.equals(actor.tenantId()) || !actor.hasRole("APPROVER")) return java.util.Set.of();
+        var active = taskService.createTaskQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
+                .active().includeIdentityLinks().list().stream()
+                .filter(task -> actor.userId().equals(task.getAssignee()) || actor.userId().equals(task.getOwner())
+                        || task.getAssignee() == null && task.getIdentityLinks().stream().anyMatch(link -> "candidate".equals(link.getType())
+                            && (actor.userId().equals(link.getUserId()) || link.getGroupId() != null && actor.hasRole(link.getGroupId()))))
+                .map(org.flowable.task.api.Task::getTaskDefinitionKey).collect(java.util.stream.Collectors.toSet());
+        if (!active.isEmpty()) return java.util.Set.copyOf(active);
+        return historyService.createHistoricTaskInstanceQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
+                .finished().taskAssignee(actor.userId()).list().stream()
+                .map(org.flowable.task.api.history.HistoricTaskInstance::getTaskDefinitionKey).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    @Override
     public boolean isParticipant(String tenantId, UUID applicationId, Actor actor) {
         boolean activeParticipant = taskService.createTaskQuery().includeProcessVariables().includeIdentityLinks()
                 .processVariableValueEquals("applicationId", applicationId.toString())

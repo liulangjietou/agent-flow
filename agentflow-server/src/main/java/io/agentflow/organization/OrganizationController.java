@@ -28,10 +28,22 @@ public class OrganizationController {
     private final OrganizationRepository repository;
     private final OrganizationService service;
     private final IdempotencyExecutor idempotency;
+    private final OrganizationInitiatorDirectory initiators;
 
     /** 只组合已有认证和幂等组件，不引入独立登录或用户密码。 */
-    public OrganizationController(CurrentActor actors, OrganizationRepository repository, OrganizationService service, IdempotencyExecutor idempotency) {
+    public OrganizationController(CurrentActor actors, OrganizationRepository repository, OrganizationService service,
+                                  IdempotencyExecutor idempotency, OrganizationInitiatorDirectory initiators) {
         this.actors = actors; this.repository = repository; this.service = service; this.idempotency = idempotency;
+        this.initiators = initiators;
+    }
+
+    /** 当前登录主体只能读取自己的有效任职，不开放租户或账号查询参数。 */
+    @GetMapping("/my-appointments")
+    public ResponseEntity<Page<InitiatorContext>> myAppointments(@RequestParam Map<String, String> query) {
+        var actor = actors.actor();
+        var parameters = OrganizationQuery.parse(query, Set.of("afterId", "limit"));
+        return noStore(page(initiators.options(actor, parameters.afterId(), parameters.limit()),
+                parameters.limit(), InitiatorContext::appointmentId));
     }
 
     /** 初始化状态明确区分未建目录与已建空目录。 */
@@ -108,6 +120,20 @@ public class OrganizationController {
         return idempotency.execute(request, HttpStatus.OK, () -> service.updateAppointment(actor, id, body.active(), body.expectedRevision()));
     }
 
+    /** 独立修改主管关系，旧版启停请求不会清空新增的关系配置。 */
+    @PutMapping("/appointments/{id}/supervisor")
+    public ResponseEntity<String> supervisor(@PathVariable UUID id, @Valid @RequestBody Relationship body, HttpServletRequest request) {
+        var actor = administrator();
+        return idempotency.execute(request, HttpStatus.OK, () -> service.setSupervisor(actor, id, body.appointmentId(), body.expectedRevision()));
+    }
+
+    /** 指定部门内的负责人任职，空值表示显式清除。 */
+    @PutMapping("/units/{id}/head")
+    public ResponseEntity<String> departmentHead(@PathVariable UUID id, @Valid @RequestBody Relationship body, HttpServletRequest request) {
+        var actor = administrator();
+        return idempotency.execute(request, HttpStatus.OK, () -> service.setDepartmentHead(actor, id, body.appointmentId(), body.expectedRevision()));
+    }
+
     /** 追加审计按目录修订倒序读取，无删除或改写入口。 */
     @GetMapping("/changes")
     public ResponseEntity<ChangePage> changes(@RequestParam Map<String, String> query) {
@@ -162,4 +188,10 @@ public class OrganizationController {
      * @author owlzhangfq@gmail.com
      */
     public record UpdateAppointment(@NotNull Boolean active, @NotNull @Positive Long expectedRevision) { }
+
+    /**
+     * 主管与负责人统一引用明确的任职，空值仅用于清除关系。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Relationship(UUID appointmentId, @NotNull @Positive Long expectedRevision) { }
 }

@@ -57,6 +57,7 @@ class FormSchemaMigrationTest {
         assertThat(definitionAfter).isEqualTo(definitionBefore);
         assertThat(applicationAfter.remove("SEARCH_AMOUNT")).isNull();
         assertThat(applicationAfter).isEqualTo(applicationBefore);
+        assertThat(roundAfter.remove("INITIATOR_CONTEXT_JSON")).isNull();
         assertThat(roundAfter).isEqualTo(roundBefore);
         JsonUtil json = new JsonUtil(new ObjectMapper());
         assertThat(new JdbcDefinitionDraftRepository(jdbc, json).findPublished("demo", "legacy", 1).orElseThrow().formSchema()).isNull();

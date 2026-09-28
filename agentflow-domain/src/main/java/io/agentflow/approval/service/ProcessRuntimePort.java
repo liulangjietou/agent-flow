@@ -2,6 +2,7 @@ package io.agentflow.approval.service;
 
 import java.util.UUID;
 import io.agentflow.form.FormSchema;
+import io.agentflow.organization.InitiatorContext;
 import java.util.Map;
 
 /**
@@ -30,7 +31,14 @@ public interface ProcessRuntimePort {
     record StartProcessCommand(String tenantId, UUID applicationId, String processKey,
                                long definitionVersion, int roundNo, String businessNo,
                                Map<String, Object> payload, FormSchema formSchema,
-                               String runtimeDefinitionId, String previousProcessInstanceId) {
+                               String runtimeDefinitionId, String previousProcessInstanceId, InitiatorContext initiatorContext) {
+        /** 未选择任职的旧调用不补造上下文。 */
+        public StartProcessCommand(String tenantId, UUID applicationId, String processKey, long definitionVersion,
+                                   int roundNo, String businessNo, Map<String, Object> payload, FormSchema formSchema,
+                                   String runtimeDefinitionId, String previousProcessInstanceId) {
+            this(tenantId, applicationId, processKey, definitionVersion, roundNo, businessNo, payload, formSchema,
+                    runtimeDefinitionId, previousProcessInstanceId, null);
+        }
         /** 兼容尚未保存实际定义标识的旧调用。 */
         public StartProcessCommand(String tenantId, UUID applicationId, String processKey, long definitionVersion,
                                    int roundNo, String businessNo, Map<String, Object> payload, FormSchema formSchema) {

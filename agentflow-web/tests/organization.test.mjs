@@ -50,3 +50,15 @@ test('本地组织保存结果未知时复用原正文与幂等键', async () =>
   assert.equal(requests[0].body, requests[1].body)
   assert.equal(requests[0].headers['Idempotency-Key'], requests[1].headers['Idempotency-Key'])
 })
+
+test('主管关系独立保存，恢复原结果后保留正确修订', () => {
+  const baseline = { id: 'a1', personId: 'p', departmentId: 'd', positionId: 'j', active: true, revision: 3, supervisorAppointmentId: 'old' }
+  const draft = { section: 'APPOINTMENT', mode: 'relationship', baseline, form: organizationForm(baseline) }
+  draft.form.relationshipAppointmentId = 'new'
+  const store = new OrganizationDrafts(); store.put('scope', draft)
+  const body = JSON.stringify(organizationPayload(draft)), path = organizationPath(draft)
+  assert.equal(path, '/organization/appointments/a1/supervisor')
+  assert.deepEqual(JSON.parse(body), { appointmentId: 'new', expectedRevision: 3 })
+  assert.equal(store.acknowledge('scope', path, body, { ...baseline, supervisorAppointmentId: 'new', revision: 4 }), true)
+  assert.equal(store.get('scope').mode, 'relationship'); assert.equal(store.hasDrafts(), false)
+})

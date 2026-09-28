@@ -4,6 +4,8 @@ import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.HashSet;
+import java.util.UUID;
 
 /**
  * 节点激活时解析有效成员并记录当时目录修订；单人候选和全员会签共用这个解析边界。
@@ -22,11 +24,65 @@ public class OrganizationAssigneeResolver {
     /** 运行时无人匹配必须回滚节点推进，不能跳过人工审批。 */
     @Transactional
     public Selection resolve(String tenantId, String rule) {
+        return resolve(tenantId, rule, null);
+    }
+
+    /** 动态规则沿服务端冻结的任职起点读取当前组织关系，候选由调用方在节点激活时冻结。 */
+    @Transactional
+    public Selection resolve(String tenantId, String rule, InitiatorContext context) {
         long revision = repository.lock(tenantId);
-        List<String> members = directory.roleMembers(tenantId, rule.substring("role:".length()));
+        List<String> members = LocalOrganizationDirectory.isContextualRule(rule)
+                ? contextualMembers(tenantId, rule, context)
+                : directory.roleMembers(tenantId, rule.substring("role:".length()));
         if (members.isEmpty()) throw new DomainException("ORGANIZATION_NO_APPROVERS", "No active approvers match the organization rule");
         return new Selection(revision, rule, members);
     }
+
+    private List<String> contextualMembers(String tenant, String rule, InitiatorContext context) {
+        if (context == null) throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+        var origin = appointment(tenant, context.appointmentId());
+        if (!origin.personId().equals(context.personId()) || !origin.departmentId().equals(context.departmentId())) throw unavailable();
+        var source = repository.person(tenant, origin.personId()).orElseThrow(OrganizationAssigneeResolver::unavailable);
+        if (!source.subject().equals(context.subject()) || !source.active()) throw unavailable();
+        requireActive(tenant, origin);
+        OrganizationAppointment target;
+        if (LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE.equals(rule)) {
+            var department = repository.unit(tenant, context.departmentId()).orElseThrow(OrganizationAssigneeResolver::unavailable);
+            target = appointment(tenant, department.headAppointmentId());
+            if (!department.id().equals(target.departmentId())) throw unavailable();
+        } else {
+            int level;
+            try { level = Integer.parseInt(rule.substring(LocalOrganizationDirectory.SUPERVISOR_RULE.length())); }
+            catch (NumberFormatException exception) { throw new DomainException("INVALID_ORGANIZATION_RULE", "Supervisor level is invalid"); }
+            if (level < 1 || level > LocalOrganizationDirectory.MAX_SUPERVISOR_LEVEL) throw new DomainException("INVALID_ORGANIZATION_RULE", "Supervisor level is outside the supported range");
+            target = origin;
+            var visited = new HashSet<UUID>(); visited.add(origin.personId());
+            for (int index = 0; index < level; index++) {
+                target = appointment(tenant, target.supervisorAppointmentId());
+                if (!visited.add(target.personId())) throw unavailable();
+                requireActive(tenant, target);
+                var department = repository.unit(tenant, target.departmentId()).orElseThrow(OrganizationAssigneeResolver::unavailable);
+                if (!context.legalEntityId().equals(department.legalEntityId())) throw unavailable();
+            }
+        }
+        requireActive(tenant, target);
+        return repository.person(tenant, target.personId()).filter(OrganizationPerson::canApprove)
+                .map(person -> List.of(person.subject())).orElseThrow(OrganizationAssigneeResolver::unavailable);
+    }
+
+    private OrganizationAppointment appointment(String tenant, UUID id) {
+        if (id == null) throw unavailable();
+        return repository.appointment(tenant, id).orElseThrow(OrganizationAssigneeResolver::unavailable);
+    }
+
+    private void requireActive(String tenant, OrganizationAppointment value) {
+        if (!value.active() || repository.person(tenant, value.personId()).filter(OrganizationPerson::active).isEmpty()) throw unavailable();
+        var department = repository.unit(tenant, value.departmentId()).filter(OrganizationUnit::active).orElseThrow(OrganizationAssigneeResolver::unavailable);
+        if (repository.unit(tenant, value.positionId()).filter(OrganizationUnit::active).isEmpty()
+                || repository.unit(tenant, department.legalEntityId()).filter(OrganizationUnit::active).isEmpty()) throw unavailable();
+    }
+
+    private static DomainException unavailable() { return new DomainException("ORGANIZATION_NO_APPROVERS", "Dynamic organization relationship has no active approver"); }
 
     /**
      * 当时的目录修订、规则和实际成员均保留，不从当前目录补写历史。

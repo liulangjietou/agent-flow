@@ -53,4 +53,31 @@ class OrganizationMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM organization_unit WHERE tenant_id='two'", Integer.class)).isZero();
     }
+    @Test
+    void upgradesV26PreservingAppointmentsAndAddingNoInventedHistoricalContext() {
+        var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+        Flyway.configure().dataSource(source).target("26").load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        String legal = UUID.randomUUID().toString(), department = UUID.randomUUID().toString(), position = UUID.randomUUID().toString();
+        String person = UUID.randomUUID().toString(), appointment = UUID.randomUUID().toString(), application = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO organization_directory VALUES ('retained',1,'admin',CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO organization_unit VALUES ('retained',?,'LEGAL_ENTITY','法人',NULL,NULL,TRUE,1)", legal);
+        jdbc.update("INSERT INTO organization_unit VALUES ('retained',?,'DEPARTMENT','部门',?,NULL,TRUE,1)", department, legal);
+        jdbc.update("INSERT INTO organization_unit VALUES ('retained',?,'POSITION','岗位',?,NULL,TRUE,1)", position, legal);
+        jdbc.update("INSERT INTO organization_person VALUES ('retained',?,'subject','原人员',TRUE,TRUE,1)", person);
+        jdbc.update("INSERT INTO organization_appointment VALUES ('retained',?,?,?,?,TRUE,1)", appointment, person, department, position);
+        jdbc.update("""
+                INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version)
+                VALUES(?,'retained','OLD','legacy',1,'subject','原文','{}','IN_APPROVAL',1,2)
+                """, application);
+        var before = jdbc.queryForMap("SELECT * FROM organization_appointment WHERE id=?", appointment);
+        assertThat(Flyway.configure().dataSource(source).target("28").load().migrate().migrationsExecuted).isEqualTo(2);
+        var after = jdbc.queryForMap("SELECT * FROM organization_appointment WHERE id=?", appointment);
+        assertThat(after.remove("SUPERVISOR_APPOINTMENT_ID")).isNull();
+        assertThat(after).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM organization_unit WHERE head_appointment_id IS NOT NULL", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT title FROM approval_application WHERE id=?", String.class, application)).isEqualTo("原文");
+        assertThat(Flyway.configure().dataSource(source).target("28").load().migrate().migrationsExecuted).isZero();
+    }
+
 }

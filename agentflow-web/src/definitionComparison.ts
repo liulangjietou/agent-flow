@@ -59,7 +59,7 @@ const labels: Record<string, string> = {
   notificationTexts: '站内通知文案', submitted: '申请提交', returned: '申请退回', approved: '申请批准', conditionLanguageVersion: '条件语言版本', entity: '整体配置', name: '名称', type: '类型', label: '字段名称', key: '字段标识', id: '标识',
   source: '起点', target: '终点', condition: '条件', defaultBranch: '默认分支', branchOrder: '条件求值顺序',
   schemaBinding: '绑定申请表单', schemaVersion: '表单格式版本', fieldOrder: '字段填写顺序', required: '必填',
-  helpText: '填写提示', maxLength: '最多字符数', minimum: '最小值', maximum: '最大值', options: '可选项', columns: '明细列', maxRows: '最多明细行数',
+  sensitive: '敏感字段', nodeAccess: '节点字段权限', helpText: '填写提示', maxLength: '最多字符数', minimum: '最小值', maximum: '最大值', options: '可选项', columns: '明细列', maxRows: '最多明细行数',
   properties: '节点属性', assigneeRule: '审批人规则', 'properties.assigneeRule': '审批人规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   'properties.deadlineCalendarId': '期限工作日历', 'properties.deadlineCalendarRevision': '期限日历修订', 'properties.deadlineWorkingMinutes': '期限工作分钟',

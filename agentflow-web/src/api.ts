@@ -1,4 +1,5 @@
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
+import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
 import type { NotificationTexts } from './notificationTexts'
 import type { AssistRunDetail, AssistRunFilter, AssistRunPage } from './assistRuns'
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
@@ -104,7 +105,7 @@ export interface PendingTaskPage { items: PendingTaskItem[]; nextCursor?: string
 /** 提交时保留任务快照版本，不在冲突后自动更新版本。@author owlzhangfq@gmail.com */
 export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number }
-export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null }
+export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null; initiatorContext?: InitiatorContext | null }
 export interface HistoryEvent {
   id: string; sequence: number; occurredAt: string; source: string; action: string
   aggregateVersion?: number; roundNo?: number; actor?: string; targetUser?: string; comment?: string
@@ -213,12 +214,15 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       INVALID_WEBHOOK_QUERY: '投递筛选或分页位置已失效，请重新查询。',
       INVALID_PUBLICATION_NOTE: '请填写 1 至 2000 字的发布变更说明。',
       INVALID_AVAILABILITY_REASON: '请填写 1 至 2000 字的停用或恢复原因。',
+      INITIATOR_APPOINTMENT_REQUIRED: '该流程需要选择本次发起任职，请选择后提交。',
+      INITIATOR_APPOINTMENT_UNAVAILABLE: '所选任职不可用，请刷新并选择本人的有效任职。',
+      ORGANIZATION_SUPERVISOR_CYCLE: '主管链中重复出现了同一人员或任职，请调整关系。',
       ORGANIZATION_NOT_INITIALIZED: '请先明确启用本地组织目录。',
   ORGANIZATION_ALREADY_INITIALIZED: '本地组织目录已经启用，请刷新状态。',
   ORGANIZATION_IDENTITY_CONFLICT: '该身份已绑定本租户人员，请修改原人员记录。',
   ORGANIZATION_APPOINTMENT_CONFLICT: '该任职关系已存在，请修改原任职的在用状态。',
   ORGANIZATION_DEPARTMENT_CYCLE: '部门层级形成了循环，请选择其他上级部门。',
-  ORGANIZATION_RELATION_INVALID: '请选择同一法人下的有效部门和岗位。',
+  ORGANIZATION_RELATION_INVALID: '组织关系须在同一法人内；部门负责人须在该部门任职。',
   ORGANIZATION_RELATION_INACTIVE: '在用关系引用的法人、部门、岗位和人员必须处于在用状态。',
   ORGANIZATION_NO_APPROVERS: '当前组织规则已无人可审批，请联系管理员核对人员与任职。',
   INVALID_ORGANIZATION_UNIT: '请检查组织单元名称、类型和归属。',
@@ -345,7 +349,8 @@ export const api = {
   roundDiagram: (id: string, round: number, signal?: AbortSignal) => request<RoundDiagram>(`/applications/${encodeURIComponent(id)}/rounds/${round}/diagram`, { signal }),
   applicationRounds: (id: string, signal?: AbortSignal) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`, { signal }),
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>('/applications', 'POST', '创建申请草稿', body),
-  submitApplication: (id: string, expectedVersion: number) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion }),
+  myAppointments: (afterId: string | undefined, signal: AbortSignal) => request<InitiatorAppointmentPage>('/organization/my-appointments?limit=30' + (afterId ? '&afterId=' + encodeURIComponent(afterId) : ''), { signal }),
+  submitApplication: (id: string, expectedVersion: number, initiatorAppointmentId?: string) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion, ...(initiatorAppointmentId ? { initiatorAppointmentId } : {}) }),
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   cancelApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/cancel`, 'POST', '作废申请', body),
   definitionAssignees: (signal: AbortSignal) => request<AssigneeOption[]>('/process-definitions/assignee-options', { signal }),

@@ -10,25 +10,27 @@ const draft = ref(organizationDrafts.get(props.scopeKey) ?? emptyOrganizationDra
 const initialized = ref(false), loading = ref(false), saving = ref(false), denied = ref(false), error = ref(''), message = ref('')
 const rows = ref<OrganizationRecord[]>([]), nextId = ref<string | undefined>(), history = ref<OrganizationChange[]>([]), before = ref<number | undefined>()
 const showHistory = ref(false), initializeConfirmed = ref(false)
-const options = reactive<Record<string, { items: Array<OrganizationUnit | OrganizationPerson>; next?: string }>>({ LEGAL_ENTITY: { items: [] }, DEPARTMENT: { items: [] }, POSITION: { items: [] }, PERSON: { items: [] } })
+const options = reactive<Record<string, { items: OrganizationRecord[]; next?: string }>>({ LEGAL_ENTITY: { items: [] }, DEPARTMENT: { items: [] }, POSITION: { items: [] }, PERSON: { items: [] }, APPOINTMENT: { items: [] } })
 let generation = 0, controller: AbortController | null = null, active = true
 const dirty = computed(() => organizationDirty(draft.value))
 const locked = computed(() => props.locked || saving.value || loading.value || denied.value)
 const section = computed(() => draft.value.section)
 const form = computed(() => draft.value.form)
+const relationshipMode = computed(() => draft.value.mode === 'relationship')
+const relationshipChoices = computed(() => options.APPOINTMENT.items.filter(value => 'personId' in value && value.active && value.id !== draft.value.baseline?.id && (section.value !== 'DEPARTMENT' || value.departmentId === draft.value.baseline?.id)))
 const editing = computed(() => !!draft.value.baseline)
 const departments = computed(() => options.DEPARTMENT.items as OrganizationUnit[])
 const positions = computed(() => options.POSITION.items as OrganizationUnit[])
 const selectedDepartment = computed(() => departments.value.find(value => value.id === form.value.departmentId))
 const applicablePositions = computed(() => positions.value.filter(value => !selectedDepartment.value || value.legalEntityId === selectedDepartment.value.legalEntityId))
-function label(record: OrganizationRecord) { return 'displayName' in record ? record.displayName : 'name' in record ? record.name : reference('PERSON', record.personId) + ' · ' + reference('DEPARTMENT', record.departmentId) }
-function reference(kind: string, id: string) { const value = options[kind].items.find(item => item.id === id); return value ? ('displayName' in value ? value.displayName : value.name) : '未载入引用 ' + id.slice(0, 8) }
+function label(record: OrganizationRecord): string { return 'displayName' in record ? record.displayName : 'name' in record ? record.name : reference('PERSON', record.personId) + ' · ' + reference('DEPARTMENT', record.departmentId) }
+function reference(kind: string, id: string): string { const value = options[kind].items.find(item => item.id === id); return value ? label(value) : '未载入引用 ' + id.slice(0, 8) }
 function known(kind: string, id: string) { return options[kind].items.some(item => item.id === id) }
 function fail(cause: unknown) { error.value = (cause as ApiError).message ?? '组织目录暂时无法读取，请重试。'; denied.value = [401, 403].includes((cause as ApiError).status); if (denied.value) { rows.value = []; history.value = []; Object.values(options).forEach(value => { value.items = [] }) } }
 async function references(signal: AbortSignal, version: number) {
-  const values = await Promise.all([api.organizationUnits('LEGAL_ENTITY', undefined, signal), api.organizationUnits('DEPARTMENT', undefined, signal), api.organizationUnits('POSITION', undefined, signal), api.organizationPeople(undefined, signal)])
+  const values = await Promise.all([api.organizationUnits('LEGAL_ENTITY', undefined, signal), api.organizationUnits('DEPARTMENT', undefined, signal), api.organizationUnits('POSITION', undefined, signal), api.organizationPeople(undefined, signal), api.organizationAppointments(undefined, signal)])
   if (version !== generation) return
-  ;['LEGAL_ENTITY', 'DEPARTMENT', 'POSITION', 'PERSON'].forEach((key, index) => { options[key] = { items: values[index].items, next: values[index].nextAfterId ?? undefined } })
+  ;['LEGAL_ENTITY', 'DEPARTMENT', 'POSITION', 'PERSON', 'APPOINTMENT'].forEach((key, index) => { options[key] = { items: values[index].items, next: values[index].nextAfterId ?? undefined } })
 }
 async function load(more = false) {
   controller?.abort(); const version = ++generation, scope = props.scopeKey, kind = section.value
@@ -49,14 +51,14 @@ async function load(more = false) {
   } catch (cause) { if (version === generation) { rows.value = []; fail(cause) } }
   finally { clearTimeout(timer); if (version === generation) loading.value = false }
 }
-async function moreReference(kind: 'LEGAL_ENTITY' | 'DEPARTMENT' | 'POSITION' | 'PERSON') {
+async function moreReference(kind: OrganizationSection) {
   if (locked.value || !options[kind].next) return
   controller?.abort(); controller = new AbortController()
   const version = generation, requestController = controller, signal = requestController.signal
   const timer = setTimeout(() => requestController.abort(), READ_TIMEOUT_MS)
   loading.value = true
   try {
-    const page = kind === 'PERSON' ? await api.organizationPeople(options[kind].next, signal) : await api.organizationUnits(kind, options[kind].next, signal)
+    const page = kind === 'PERSON' ? await api.organizationPeople(options[kind].next, signal) : kind === 'APPOINTMENT' ? await api.organizationAppointments(options[kind].next, signal) : await api.organizationUnits(kind, options[kind].next, signal)
     if (active && version === generation) { options[kind].items.push(...page.items); options[kind].next = page.nextAfterId ?? undefined }
   } catch (cause) { if (active && version === generation) fail(cause) }
   finally { clearTimeout(timer); if (active && version === generation) loading.value = false }
@@ -66,6 +68,10 @@ function select(kind: OrganizationSection, record: OrganizationRecord | null = n
   const changed = kind !== section.value
   draft.value = { section: kind, baseline: record, form: organizationForm(record) }; error.value = ''; message.value = ''
   if (changed) { nextId.value = undefined; void load() }
+}
+function relationshipModeChange() {
+  if (locked.value || dirty.value || !editing.value) return
+  draft.value.mode = relationshipMode.value ? 'record' : 'relationship'
 }
 function discard() { draft.value.form = organizationForm(draft.value.baseline); error.value = ''; message.value = '已放弃本地修改。' }
 async function initialize() {
@@ -115,14 +121,16 @@ onUnmounted(() => { active = false; generation++; controller?.abort() })
       <section v-if="!initialized && !loading" class="panel organization-setup"><h3>启用本地组织目录</h3><p>由本平台维护法人、部门、岗位、人员及任职。OIDC 继续负责登录与系统角色；本地审批资格不会授予管理员或审批角色。</p><p>启用后，本租户的选人目录不再使用演示名单。空目录需要先添加人员，才能发布包含本地审批人的流程。</p><label class="organization-check"><input v-model="initializeConfirmed" type="checkbox" :disabled="locked" />我已了解并采用本地组织目录</label><button class="primary" :disabled="locked || !initializeConfirmed" @click="initialize">启用本地目录</button></section>
       <template v-else-if="initialized">
         <nav class="organization-tabs" aria-label="组织类别"><button v-for="(text, kind) in organizationLabels" :key="kind" :aria-pressed="section === kind" :class="{ active: section === kind }" :disabled="locked || dirty" @click="select(kind)">{{ text }}</button><button class="secondary" :disabled="locked" @click="loadHistory()">查看变更记录</button></nav>
-        <p class="organization-help">指定人员、部门和岗位可用于审批选人。任职调整影响后续创建的任务，已创建任务保留原候选名单；人员停用或取消审批资格后不能继续办理。</p>
+        <p class="organization-help">指定人员、部门、岗位、任职主管及部门负责人可用于审批选人。任职调整影响后续创建的任务，已创建任务保留原候选名单；人员停用或取消审批资格后不能继续办理。</p>
         <p v-if="dirty" class="organization-help">有未保存修改，请先保存或放弃后再切换记录。</p>
         <div class="organization-grid">
           <section class="panel organization-list" aria-label="组织记录列表"><div class="organization-toolbar"><h3>{{ organizationLabels[section] }}目录</h3><button class="secondary" :disabled="locked || dirty" @click="select(section)">新增{{ organizationLabels[section] }}</button></div>
             <button v-for="row in rows" :key="row.id" class="organization-row" :disabled="locked || dirty" :aria-pressed="draft.baseline?.id === row.id" @click="select(section, row)"><strong>{{ label(row) }}</strong><span>{{ row.active ? '在用' : '已停用' }} · v{{ row.revision }}</span><small v-if="'subject' in row">{{ row.subject }} · {{ row.approvalEligible ? '具备本地审批资格' : '无本地审批资格' }}</small><small v-if="'positionId' in row">{{ reference('POSITION', row.positionId) }}</small></button>
             <p v-if="!rows.length && !loading">暂无记录，请先新增{{ organizationLabels[section] }}。</p><button v-if="nextId" class="secondary" :disabled="locked" @click="load(true)">更多记录</button>
           </section>
-          <form class="panel organization-editor" @submit.prevent="save"><h3>{{ editing ? '修改' : '新增' }}{{ organizationLabels[section] }}</h3>
+          <form class="panel organization-editor" @submit.prevent="save"><h3>{{ relationshipMode ? '设置' : editing ? '修改' : '新增' }}{{ relationshipMode ? (section === 'APPOINTMENT' ? '直属主管' : '部门负责人') : organizationLabels[section] }}</h3>
+            <button v-if="editing && ['DEPARTMENT','APPOINTMENT'].includes(section)" type="button" class="secondary" :disabled="locked || dirty" @click="relationshipModeChange">{{ relationshipMode ? '编辑基本信息' : section === 'APPOINTMENT' ? '设置直属主管' : '设置部门负责人' }}</button>
+            <template v-if="!relationshipMode">
             <label v-if="section !== 'APPOINTMENT'">{{ section === 'PERSON' ? '人员名称' : '名称' }}<input v-model="form.name" required maxlength="128" :disabled="locked" /></label>
             <label v-if="section === 'PERSON'">身份源主体标识（sub）<input v-model="form.subject" required maxlength="128" :disabled="locked || editing" /><small>使用可信身份源的稳定 sub，保持原值；显示名称不能代替身份标识。</small></label>
             <label v-if="section === 'DEPARTMENT' || section === 'POSITION'">所属法人<select v-model="form.legalEntityId" required :disabled="locked || editing"><option value="">请选择法人</option><option v-if="form.legalEntityId && !known('LEGAL_ENTITY', form.legalEntityId)" :value="form.legalEntityId">当前引用 {{ form.legalEntityId }}</option><option v-for="item in options.LEGAL_ENTITY.items" :key="item.id" :value="item.id">{{ 'name' in item ? item.name : '' }}{{ item.active ? '' : '（已停用）' }}</option></select></label>
@@ -133,8 +141,14 @@ onUnmounted(() => { active = false; generation++; controller?.abort() })
               <label>岗位<select v-model="form.positionId" required :disabled="locked || editing"><option value="">请选择岗位</option><option v-if="form.positionId && !known('POSITION', form.positionId)" :value="form.positionId">当前引用 {{ form.positionId }}</option><option v-for="item in applicablePositions" :key="item.id" :value="item.id">{{ item.name }}{{ item.active ? '' : '（已停用）' }}</option></select></label>
               <p class="organization-help">调岗请停用旧任职并新增任职；同一人员可同时在多个部门或岗位任职。</p>
             </template>
-            <div class="organization-reference-pages"><template v-for="kind in (['LEGAL_ENTITY','DEPARTMENT','POSITION','PERSON'] as const)" :key="kind"><button v-if="options[kind].next" type="button" class="secondary" :disabled="locked" @click="moreReference(kind)">载入更多{{ organizationLabels[kind] }}选项</button></template></div>
-            <label class="organization-check"><input v-model="form.active" type="checkbox" :disabled="locked" />在用</label>
+            </template>
+            <template v-else>
+              <p>当前记录：{{ draft.baseline ? label(draft.baseline) : '' }}</p>
+              <label>{{ section === 'APPOINTMENT' ? '直属主管的任职' : '负责人在本部门的任职' }}<select v-model="form.relationshipAppointmentId" :disabled="locked"><option value="">未设置／清除关系</option><option v-if="form.relationshipAppointmentId && !known('APPOINTMENT', form.relationshipAppointmentId)" :value="form.relationshipAppointmentId">当前任职尚未载入</option><option v-for="item in relationshipChoices" :key="item.id" :value="item.id">{{ label(item) }} · {{ 'positionId' in item ? reference('POSITION', item.positionId) : '' }}</option></select></label>
+              <p class="organization-help">选择明确的人员任职。主管须属同一法人，部门负责人须在本部门任职；关系不能成环。变更影响后续激活的节点，历史候选保持不变。</p>
+            </template>
+            <div class="organization-reference-pages"><template v-for="kind in (['LEGAL_ENTITY','DEPARTMENT','POSITION','PERSON','APPOINTMENT'] as const)" :key="kind"><button v-if="options[kind].next" type="button" class="secondary" :disabled="locked" @click="moreReference(kind)">载入更多{{ organizationLabels[kind] }}选项</button></template></div>
+            <label v-if="!relationshipMode" class="organization-check"><input v-model="form.active" type="checkbox" :disabled="locked" />在用</label>
             <label v-if="section === 'PERSON'" class="organization-check"><input v-model="form.approvalEligible" type="checkbox" :disabled="locked" />具备本地审批资格</label>
             <p v-if="section === 'PERSON'" class="organization-help">办理任务还要求身份源授予 APPROVER 角色。本页不会授予系统角色。</p>
             <div class="organization-toolbar"><button type="submit" class="primary" :disabled="locked || !dirty">{{ saving ? '正在保存…' : '保存' }}</button><button type="button" class="secondary" :disabled="locked || !dirty" @click="discard">放弃本地修改</button></div>

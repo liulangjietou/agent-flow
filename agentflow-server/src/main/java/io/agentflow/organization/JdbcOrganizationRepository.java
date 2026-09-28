@@ -61,8 +61,8 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
         if (expectedRevision == 0) {
             jdbc.update("INSERT INTO organization_unit(tenant_id,id,kind,name,legal_entity_id,parent_department_id,active,revision) VALUES (?,?,?,?,?,?,?,?)",
                     tenantId, value.id().toString(), value.kind().name(), value.name(), id(value.legalEntityId()), id(value.parentDepartmentId()), value.active(), value.revision());
-        } else changed(jdbc.update("UPDATE organization_unit SET name=?,parent_department_id=?,active=?,revision=? WHERE tenant_id=? AND id=? AND revision=?",
-                value.name(), id(value.parentDepartmentId()), value.active(), value.revision(), tenantId, value.id().toString(), expectedRevision));
+        } else changed(jdbc.update("UPDATE organization_unit SET name=?,parent_department_id=?,active=?,revision=?,head_appointment_id=? WHERE tenant_id=? AND id=? AND revision=?",
+                value.name(), id(value.parentDepartmentId()), value.active(), value.revision(), id(value.headAppointmentId()), tenantId, value.id().toString(), expectedRevision));
     }
 
     @Override
@@ -108,8 +108,8 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
             if (expectedRevision == 0) {
                 jdbc.update("INSERT INTO organization_appointment(tenant_id,id,person_id,department_id,position_id,active,revision) VALUES (?,?,?,?,?,?,?)",
                         tenantId, value.id().toString(), value.personId().toString(), value.departmentId().toString(), value.positionId().toString(), value.active(), value.revision());
-            } else changed(jdbc.update("UPDATE organization_appointment SET active=?,revision=? WHERE tenant_id=? AND id=? AND revision=?",
-                    value.active(), value.revision(), tenantId, value.id().toString(), expectedRevision));
+            } else changed(jdbc.update("UPDATE organization_appointment SET active=?,revision=?,supervisor_appointment_id=? WHERE tenant_id=? AND id=? AND revision=?",
+                    value.active(), value.revision(), id(value.supervisorAppointmentId()), tenantId, value.id().toString(), expectedRevision));
         } catch (DuplicateKeyException exception) { throw new DomainException("ORGANIZATION_APPOINTMENT_CONFLICT", "This appointment already exists; update its active state instead"); }
     }
 
@@ -129,7 +129,7 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
 
     private static RowMapper<OrganizationUnit> unitMapper() {
         return (row, index) -> new OrganizationUnit(uuid(row.getString("id")), OrganizationUnit.Kind.valueOf(row.getString("kind")), row.getString("name"),
-                uuid(row.getString("legal_entity_id")), uuid(row.getString("parent_department_id")), row.getBoolean("active"), row.getLong("revision"));
+                uuid(row.getString("legal_entity_id")), uuid(row.getString("parent_department_id")), row.getBoolean("active"), row.getLong("revision"), uuid(row.getString("head_appointment_id")));
     }
     private static RowMapper<OrganizationPerson> personMapper() {
         return (row, index) -> new OrganizationPerson(uuid(row.getString("id")), row.getString("subject"), row.getString("display_name"),
@@ -137,7 +137,7 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
     }
     private static RowMapper<OrganizationAppointment> appointmentMapper() {
         return (row, index) -> new OrganizationAppointment(uuid(row.getString("id")), uuid(row.getString("person_id")), uuid(row.getString("department_id")),
-                uuid(row.getString("position_id")), row.getBoolean("active"), row.getLong("revision"));
+                uuid(row.getString("position_id")), row.getBoolean("active"), row.getLong("revision"), uuid(row.getString("supervisor_appointment_id")));
     }
     private static UUID uuid(String id) { return id == null ? null : UUID.fromString(id); }
     private static String id(UUID id) { return id == null ? null : id.toString(); }

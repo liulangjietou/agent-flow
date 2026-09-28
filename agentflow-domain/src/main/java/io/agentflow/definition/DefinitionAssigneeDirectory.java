@@ -14,5 +14,8 @@ public interface DefinitionAssigneeDirectory {
      * 可保存的字面量规则及当前有效成员数；成员变化后发布仍需重新读取。
      * @author owlzhangfq@gmail.com
      */
-    record Option(String rule, String label, int memberCount) { }
+    record Option(String rule, String label, int memberCount, boolean contextual) {
+        /** 静态目录保留已有成员计数契约。 */
+        public Option(String rule, String label, int memberCount) { this(rule, label, memberCount, false); }
+    }
 }

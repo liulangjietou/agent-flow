@@ -254,3 +254,12 @@ test('期限日历缺失允许待配置草稿，但不能放行同时存在的�
   assert.deepEqual(review.value.graph, value.graph)
   assert.deepEqual(review.value.notificationTexts, value.notificationTexts)
 })
+
+test('字段敏感标记和节点权限完整往返，错误权限或字符串布尔值拒绝导入', () => {
+  const value = source(); value.formSchema.fields[0].sensitive = true; value.formSchema.fields[0].nodeAccess = { review: 'MASKED' }
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)).formSchema, value.formSchema)
+  for (const fields of [{ sensitive: 'true' }, { nodeAccess: { review: 'EDITABLE' } }, { nodeAccess: [] }]) {
+    const data = envelope(); Object.assign(data.process.formSchema.fields[0], fields)
+    assert.throws(() => parsePortableTemplate(JSON.stringify(data)))
+  }
+})

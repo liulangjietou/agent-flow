@@ -1,6 +1,6 @@
 # 已确认规则：重提守卫与实际审批期限
 
-2026-09-26，用户确认前三项按推荐恢复开发。分支 `codex/governance-identifier-integration`，基线 `60bafa0`。本记录覆盖版本停用重提与实际任务期限；本地组织基础管理与静态选人现已完成，见 [组织实施记录](local-organization.md)；动态主管选人仍待确认，完整项目目标尚未完成。所有改动位于隔离整合树，未部署或创建 PR，Git remote 为空。本文测试数字为 SLA 阶段的实际证据，组织阶段的新验证另行记录。
+2026-09-26，用户确认前三项按推荐恢复开发。分支 `codex/governance-identifier-integration`，基线 `60bafa0`。本记录覆盖版本停用重提与实际任务期限；本地组织基础管理与静态选人现已完成，见 [组织实施记录](local-organization.md)；2026-09-27 后续动态主管和字段权限见[任职上下文与字段权限](organization-context-and-field-permissions.md)，完整项目目标尚未完成。所有改动位于隔离整合树，未部署或创建 PR，Git remote 为空。本文测试数字为 SLA 阶段的实际证据，组织阶段的新验证另行记录。
 
 ## 规则与职责
 

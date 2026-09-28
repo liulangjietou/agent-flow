@@ -29,7 +29,9 @@ public class FlowableOrganizationMembers {
             throw new DomainException("ORGANIZATION_SCOPE_INVALID", "Organization execution tenant is invalid");
         }
         String rule = new String(Base64.getDecoder().decode(encodedRule), StandardCharsets.UTF_8);
-        var selection = resolver.resolve(tenant, rule);
+        Object snapshot = execution.getVariable(FlowableProcessRuntimeAdapter.INITIATOR_CONTEXT);
+        var context = snapshot instanceof String value ? json.read(value, io.agentflow.organization.InitiatorContext.class) : null;
+        var selection = resolver.resolve(tenant, rule, context);
         execution.setVariableLocal(SNAPSHOT_PREFIX + execution.getCurrentActivityId(), json.write(selection));
         return selection.subjects();
     }

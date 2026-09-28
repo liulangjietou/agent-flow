@@ -8,7 +8,11 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record OrganizationAppointment(UUID id, UUID personId, UUID departmentId, UUID positionId,
-                                      boolean active, long revision) {
+                                      boolean active, long revision, UUID supervisorAppointmentId) {
+    /** 兼容尚未维护主管关系的既有任职。 */
+    public OrganizationAppointment(UUID id, UUID personId, UUID departmentId, UUID positionId, boolean active, long revision) {
+        this(id, personId, departmentId, positionId, active, revision, null);
+    }
     /** 任职的身份和归属必须明确，不能把空字段解释为所有部门或所有岗位。 */
     public OrganizationAppointment {
         if (id == null || personId == null || departmentId == null || positionId == null || revision < 1) {
@@ -19,6 +23,12 @@ public record OrganizationAppointment(UUID id, UUID personId, UUID departmentId,
     /** 任职结束通过停用保留事实；调岗创建新任职，不改写历史关系。 */
     public OrganizationAppointment revise(boolean active, long expectedRevision) {
         OrganizationRevision.require(revision, expectedRevision);
-        return new OrganizationAppointment(id, personId, departmentId, positionId, active, revision + 1);
+        return new OrganizationAppointment(id, personId, departmentId, positionId, active, revision + 1, supervisorAppointmentId);
+    }
+
+    /** 主管明确关联任职；跨任职环和法人边界由组织用例检查。 */
+    public OrganizationAppointment withSupervisor(UUID supervisorId, long expectedRevision) {
+        OrganizationRevision.require(revision, expectedRevision);
+        return new OrganizationAppointment(id, personId, departmentId, positionId, active, revision + 1, supervisorId);
     }
 }

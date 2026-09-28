@@ -24,6 +24,7 @@ import AssistRunRecords from './components/AssistRunRecords.vue'
 import { commentDrafts, type CommentDraft, type ApplicationComment } from './applicationComments'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
+import InitiatorAppointmentPicker from './components/InitiatorAppointmentPicker.vue'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
 import TemplateCenter from './components/TemplateCenter.vue'
 import PortableTemplate from './components/PortableTemplate.vue'
@@ -171,6 +172,7 @@ const newApplicationOpen = ref(false)
 const recordApplicationId = ref('')
 const applicationDefinitionId = computed(() => applicationSelection.definition?.id ?? '')
 const applicationTitle = ref('')
+const initiatorAppointmentId = ref('')
 const applicationBusinessNo = ref('')
 const applicationAmount = ref('')
 const applicationDescription = ref('')
@@ -829,7 +831,7 @@ async function createAndSubmitApplication(submit = true) {
       const saved = createdApplication.value
       newApplicationOpen.value = false; createdApplication.value = null; page.value = 'drafts'; templateRefresh.value++; await refreshWorkspace(); notice.value = `草稿 ${saved.businessNo} 已保存，可在我的草稿中继续填写。`; return
     }
-    const submitted = await api.submitApplication(createdApplication.value.id, createdApplication.value.version)
+    const submitted = await api.submitApplication(createdApplication.value.id, createdApplication.value.version, initiatorAppointmentId.value)
     newApplicationOpen.value = false; createdApplication.value = null; page.value = 'started'; templateRefresh.value++; await refreshWorkspace(); notice.value = `申请 ${submitted.businessNo} 已提交，状态：${statusLabel(submitted.status)}`
   } catch (error) {
     applicationFieldErrors.value = (error as ApiError).details?.fieldErrors ?? {}
@@ -1133,7 +1135,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <DefinitionNotificationTexts v-model="definitionNotificationTexts" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <DefinitionAvailability v-if="definitionStatus === 'PUBLISHED' && definitionId && canManageDefinitions" :definition-id="definitionId" :revision="definitionRevision" :start-enabled="definitionStartEnabled" :scope-key="actorScope" :locked="busy || writesBlocked || confirmationOpen" :error="availabilityError" :refresh-version="templateRefresh" @change="changeDefinitionAvailability" @refresh="refreshDefinitionAvailability" />
-          <FormSchemaEditor v-model="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+          <FormSchemaEditor v-model="definitionFormSchema" :approval-nodes="nodes.filter(node => node.type === 'USER_TASK')" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
             <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>
             <template v-if="validationOpened"><p class="validation-live-help">修改后自动重新检查。提醒不阻止发布，分支执行顺序保持不变。</p><ul v-if="validationOtherErrors.length"><li v-for="error in validationOtherErrors" :key="error">{{ simulationIssue(error).label }}<button v-if="simulationIssue(error).target" type="button" class="secondary" @click="locateDesignTarget(simulationIssue(error).target)">定位 {{ simulationIssue(error).target }}</button></li></ul>
@@ -1161,6 +1163,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
               <FormFields v-if="applicationFormSchema" v-model="applicationPayload" :schema="applicationFormSchema" :disabled="busy || writesBlocked || !!createdApplication" :errors="applicationFieldErrors" @update:model-value="applicationFieldErrors = {}" />
               <template v-else><label>申请金额<input v-model="applicationAmount" type="number" min="0" step="0.01" /></label><label>申请说明<textarea v-model="applicationDescription" rows="3" /></label></template>
             </fieldset>
+            <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="actorScope" :disabled="busy || writesBlocked" />
             <p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿；需要修改时请关闭后从申请记录打开。</p>
             <p v-else class="field-help">必填字段在提交时检查，未填完整也可先保存草稿。</p>
             <div class="form-actions"><button type="button" class="secondary" :disabled="busy" @click="newApplicationOpen = false">关闭</button><button v-if="!createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked || !applicationSelection.definition" @click="createAndSubmitApplication(false)">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || (!createdApplication && !applicationSelection.definition)">{{ busy ? '处理中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div>
