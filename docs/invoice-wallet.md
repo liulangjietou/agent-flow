@@ -1,6 +1,6 @@
 # 个人发票原件票夹
 
-票夹在审批申请之外保存员工自己的发票原件。调用链为个人票夹页面/集成方 → `InvoiceWalletService` → `InvoiceOriginal` 与 `Invoice` → 原件仓储、财务资源仓储和 `LocalDocumentStore`。当前完成原件上传与读取 API、数据库约束及配套恢复；验票任务、报销选票和页面仍在后续实施。
+票夹在审批申请之外保存员工自己的发票原件。调用链为个人票夹页面/集成方 → `InvoiceWalletService` → `InvoiceOriginal` 与 `Invoice` → 原件仓储、财务资源仓储和 `LocalDocumentStore`。当前完成原件上传与读取 API、数据库约束及配套恢复；[持久验票任务](invoice-verification.md) 已单独实现，报销选票和页面继续实施。
 
 ## 文件身份与状态
 

@@ -25,6 +25,7 @@ flowable:
 
 agentflow:
   invoices:
+    verification-worker-enabled: ${AGENTFLOW_INVOICE_VERIFICATION_WORKER_ENABLED:true}
     max-wallet-bytes: ${AGENTFLOW_INVOICE_MAX_WALLET_BYTES:1073741824}
     max-wallet-uploads: ${AGENTFLOW_INVOICE_MAX_WALLET_UPLOADS:1000}
   finance-gateway:

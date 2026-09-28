@@ -35,6 +35,17 @@ class FinanceGatewayConfigurationTest {
     }
 
     @Test
+    void destinationFingerprintBindsTenantAndEndpointButSurvivesCredentialRotation() {
+        var config = configured("https://finance.example/api", "first-private-token");
+        String digest = config.destination("tenant-a").orElseThrow().digest("tenant-a");
+        config.getTenants().get("tenant-a").setToken("second-private-token");
+        assertThat(config.destination("tenant-a").orElseThrow().digest("tenant-a")).isEqualTo(digest);
+        assertThat(config.destination("tenant-a").orElseThrow().digest("tenant-b")).isNotEqualTo(digest);
+        config.getTenants().get("tenant-a").setEndpoint("https://finance.example/other");
+        assertThat(config.destination("tenant-a").orElseThrow().digest("tenant-a")).isNotEqualTo(digest);
+    }
+
+    @Test
     void tokenAndTimeoutValidationDoNotExposeSecretsOrChangeDisabledDefaults() {
         var config = configured("https://finance.example", "private-test-token");
         config.validate();

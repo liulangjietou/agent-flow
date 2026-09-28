@@ -5,7 +5,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -82,6 +86,13 @@ public class FinanceGatewayConfiguration {
      * @author owlzhangfq@gmail.com
      */
     public record Destination(URI baseUri, String token, Duration timeout) {
+        /** 排队绑定租户、协议和目的地；凭据轮换不改变已授权目标。 */
+        public String digest(String tenant) {
+            try {
+                String identity = tenant.length() + ":" + tenant + "|finance-contract-1|" + baseUri.toASCIIString();
+                return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(identity.getBytes(StandardCharsets.UTF_8)));
+            } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
+        }
         /** 避免常规日志和诊断意外输出目标凭据。 */
         @Override public String toString() { return "FinanceGatewayDestination[redacted]"; }
     }
