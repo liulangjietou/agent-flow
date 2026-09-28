@@ -355,5 +355,6 @@
     "actualHttp": 422,
     "trigger": "later tenant dynamic definition with same key/version must not affect earlier bundled application",
     "fix": "check context after resolving bound process source; reuse tenant definition lock"
-  }
+  },
+  "followUpPostgresEvidence": "organization-context-postgres-20260927.json"
 }

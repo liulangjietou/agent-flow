@@ -20,6 +20,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.time.Instant;
@@ -36,9 +38,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 通过真实认证、流程节点和多个读取出口验证字段权限，原文只能保留在授权业务链路中。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:field-permissions;DB_CLOSE_DELAY=-1", "agentflow.auth.demo-enabled=true"})
+@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class FieldPermissionsIntegrationTest {
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", () -> System.getProperty("agentflow.field-test.jdbc-url", "jdbc:h2:mem:field-permissions;DB_CLOSE_DELAY=-1"));
+        registry.add("spring.datasource.driver-class-name", () -> System.getProperty("agentflow.field-test.jdbc-driver", "org.h2.Driver"));
+        registry.add("spring.datasource.username", () -> System.getProperty("agentflow.field-test.jdbc-user", "sa"));
+        registry.add("spring.datasource.password", () -> System.getProperty("agentflow.field-test.jdbc-password", ""));
+    }
+
     @Autowired MockMvc mvc;
     @Autowired AuthService auth;
     @Autowired JsonUtil json;

@@ -10,7 +10,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * V26 只新增组织存储，保留旧申请、治理状态、登录会话和迁移历史。
+ * 组织及任职上下文迁移保留旧业务事实，跨租户关系由数据库约束拒绝。
  * @author owlzhangfq@gmail.com
  */
 class OrganizationMigrationTest {
@@ -55,7 +55,10 @@ class OrganizationMigrationTest {
     }
     @Test
     void upgradesV26PreservingAppointmentsAndAddingNoInventedHistoricalContext() {
-        var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+        var source = new DriverManagerDataSource(
+                System.getProperty("agentflow.context-migration.jdbc-url", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
+                System.getProperty("agentflow.context-migration.jdbc-user", "sa"),
+                System.getProperty("agentflow.context-migration.jdbc-password", ""));
         Flyway.configure().dataSource(source).target("26").load().migrate();
         var jdbc = new JdbcTemplate(source);
         String legal = UUID.randomUUID().toString(), department = UUID.randomUUID().toString(), position = UUID.randomUUID().toString();
@@ -70,14 +73,52 @@ class OrganizationMigrationTest {
                 INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version)
                 VALUES(?,'retained','OLD','legacy',1,'subject','原文','{}','IN_APPROVAL',1,2)
                 """, application);
+        jdbc.update("""
+                INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status)
+                VALUES('retained',?,1,'original-instance',1,'原文','{}','subject',CURRENT_TIMESTAMP,'IN_APPROVAL')
+                """, application);
         var before = jdbc.queryForMap("SELECT * FROM organization_appointment WHERE id=?", appointment);
+        var unitsBefore = jdbc.queryForList("SELECT * FROM organization_unit ORDER BY id");
+        var applicationBefore = jdbc.queryForMap("SELECT * FROM approval_application WHERE id=?", application);
+        var roundBefore = jdbc.queryForMap("SELECT * FROM approval_submission_round WHERE application_id=?", application);
+        var historyBefore = jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" ORDER BY \"installed_rank\"");
         assertThat(Flyway.configure().dataSource(source).target("28").load().migrate().migrationsExecuted).isEqualTo(2);
         var after = jdbc.queryForMap("SELECT * FROM organization_appointment WHERE id=?", appointment);
         assertThat(after.remove("SUPERVISOR_APPOINTMENT_ID")).isNull();
         assertThat(after).isEqualTo(before);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM organization_unit WHERE head_appointment_id IS NOT NULL", Integer.class)).isZero();
-        assertThat(jdbc.queryForObject("SELECT title FROM approval_application WHERE id=?", String.class, application)).isEqualTo("原文");
+        var unitsAfter = jdbc.queryForList("SELECT * FROM organization_unit ORDER BY id");
+        unitsAfter.forEach(unit -> assertThat(unit.remove("HEAD_APPOINTMENT_ID")).isNull());
+        assertThat(unitsAfter).isEqualTo(unitsBefore);
+        assertThat(jdbc.queryForMap("SELECT * FROM approval_application WHERE id=?", application)).isEqualTo(applicationBefore);
+        var roundAfter = jdbc.queryForMap("SELECT * FROM approval_submission_round WHERE application_id=?", application);
+        assertThat(roundAfter.remove("INITIATOR_CONTEXT_JSON")).isNull();
+        assertThat(roundAfter).isEqualTo(roundBefore);
+        var historyAfter = jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" ORDER BY \"installed_rank\"");
+        assertThat(historyAfter).hasSize(historyBefore.size() + 2);
+        assertThat(historyAfter.subList(0, historyBefore.size())).isEqualTo(historyBefore);
         assertThat(Flyway.configure().dataSource(source).target("28").load().migrate().migrationsExecuted).isZero();
+
+        // 目标任职确实存在于另一租户，两条新关系都不能借用该标识。
+        String foreignAppointment = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO organization_directory VALUES ('foreign',1,'admin',CURRENT_TIMESTAMP)");
+        for (String unitId : List.of(legal, department, position)) jdbc.update("""
+                INSERT INTO organization_unit(tenant_id,id,kind,name,legal_entity_id,parent_department_id,active,revision)
+                SELECT 'foreign',id,kind,name,legal_entity_id,parent_department_id,active,revision FROM organization_unit WHERE tenant_id='retained' AND id=?
+                """, unitId);
+        jdbc.update("""
+                INSERT INTO organization_person(tenant_id,id,subject,display_name,active,approval_eligible,revision)
+                SELECT 'foreign',id,subject,display_name,active,approval_eligible,revision FROM organization_person WHERE tenant_id='retained'
+                """);
+        jdbc.update("""
+                INSERT INTO organization_appointment(tenant_id,id,person_id,department_id,position_id,active,revision)
+                SELECT 'foreign',?,person_id,department_id,position_id,active,revision FROM organization_appointment WHERE tenant_id='retained'
+                """, foreignAppointment);
+        assertThatThrownBy(() -> jdbc.update("UPDATE organization_appointment SET supervisor_appointment_id=? WHERE tenant_id='retained' AND id=?", foreignAppointment, appointment))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("UPDATE organization_unit SET head_appointment_id=? WHERE tenant_id='retained' AND id=?", foreignAppointment, department))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(jdbc.queryForObject("SELECT supervisor_appointment_id FROM organization_appointment WHERE tenant_id='retained' AND id=?", String.class, appointment)).isNull();
+        assertThat(jdbc.queryForObject("SELECT head_appointment_id FROM organization_unit WHERE tenant_id='retained' AND id=?", String.class, department)).isNull();
     }
 
 }

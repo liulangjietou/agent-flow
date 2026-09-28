@@ -1,0 +1,363 @@
+{
+  "recordedAt": "2026-09-28T03:48:07.974212+00:00",
+  "productionSourceCommit": "4814a28990be9a95279bcfdc3ebaed752898217a",
+  "branch": "codex/governance-identifier-integration",
+  "productionCodeChanged": false,
+  "testChanges": [
+    "configurable field permission datasource",
+    "V26 to V28 legacy facts and tenant foreign key verification"
+  ],
+  "database": {
+    "result": "READY",
+    "container": "agentflow-context-fields-postgres-20260927",
+    "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c",
+    "port": 18678,
+    "version": "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "databases": [
+      "organization",
+      "fields",
+      "migration",
+      "http_acceptance"
+    ],
+    "dataDirectory": "/Volumes/fyoung/tmp/agentflow-context-fields-postgres-20260927/postgres-data"
+  },
+  "postgres": {
+    "result": "PASS",
+    "tests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": [
+      {
+        "class": "io.agentflow.organization.OrganizationApprovalIntegrationTest",
+        "tests": 10
+      },
+      {
+        "class": "io.agentflow.organization.OrganizationMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.approval.FieldPermissionsIntegrationTest",
+        "tests": 3
+      }
+    ],
+    "databases": {
+      "organization": {
+        "schemaVersion": "28",
+        "applications": 12
+      },
+      "fields": {
+        "schemaVersion": "28",
+        "applications": 2
+      },
+      "migration": {
+        "schemaVersion": "28",
+        "applications": 1
+      }
+    }
+  },
+  "h2": {
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "http": {
+    "result": "PASS",
+    "database": "PostgreSQL 17.11",
+    "applicationId": "5b677c9d-ae16-4adf-b6fb-b998c50db4d9",
+    "selectedAppointmentFrozen": true,
+    "steps": [
+      {
+        "actor": "manager",
+        "node": "直属主管审批",
+        "action": "APPROVE"
+      },
+      {
+        "actor": "finance",
+        "node": "部门负责人审批",
+        "action": "APPROVE"
+      }
+    ],
+    "finalStatus": "APPROVED",
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/organization",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/organization/initialize",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/people",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/people",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/people",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "PUT",
+        "path": "/organization/appointments/47d32359-f758-45f9-816b-fb738d9f2c8f/supervisor",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "PUT",
+        "path": "/organization/units/eaca1c88-1248-4a7b-b955-0071b0468760/head",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/organization/my-appointments",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/0742d781-34fc-4188-a835-e3f211ed9c8b/publish",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9/submit",
+        "actor": "alice",
+        "status": 422
+      },
+      {
+        "method": "POST",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9/submit",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9/rounds",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/tasks/f4f1b5c4-baee-11f1-ba7d-a6dcb0a28921/actions",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/tasks",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/tasks/f524acad-baee-11f1-ba7d-a6dcb0a28921/actions",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5b677c9d-ae16-4adf-b6fb-b998c50db4d9/rounds",
+        "actor": "alice",
+        "status": 200
+      }
+    ],
+    "requestCount": 35
+  },
+  "authors": {
+    "javaFiles": 345,
+    "namedTypes": 536,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "build": "PASS",
+  "browserRepeated": false,
+  "frontendRepeated": false,
+  "fullProjectSuiteRun": false,
+  "fullGoalComplete": false,
+  "mainDeploymentChanged": false,
+  "pullRequest": null,
+  "remoteCi": "NOT_RUN",
+  "cleanup": {
+    "testContainerStopped": true,
+    "testHttpServiceStopped": true,
+    "dataRetained": true,
+    "dockerWasInitiallyStopped": true,
+    "dockerRestoredToStopped": true,
+    "dockerStopExitCode": 0
+  },
+  "fixtureCorrections": [
+    "correct parent_department_id column",
+    "insert foreign legal entity before dependent units",
+    "wait for PostgreSQL TCP readiness after initialization"
+  ],
+  "files": [
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/h2-test-harness.log",
+      "sha256": "792e1256a88dfe377c821d3056aa5d04f11ea23776d8feae92284b6a67c531ed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/h2-regression.log",
+      "sha256": "b7eb0ceb5cf1ee3e232d234f3f621d31648e083d3870ae517a75914f299db382"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/h2-final.log",
+      "sha256": "8084d9cf84bcf1f10ee7a5172f919f3eba00fad47527e5189cf2dcb2e9b9d051"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/postgres-regression.log",
+      "sha256": "9ddc7e5fdba38f1f03eee1b7c52fe7247c42e0dfd9eaa4ad48c9061a1135f6af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/regression-evidence.json",
+      "sha256": "deeb467e18c56708efeffd14550fe59b5ea5b935347b0ef79e740aeba7329146"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/http-evidence.json",
+      "sha256": "cf1b2c24f803f1a094731d5646c16ebe2fc4f3a8425b57797310eb262b0ff267"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/completion-http-evidence.json",
+      "sha256": "248fd62daa96b358197cfe12fa1c6399a6cd8fda928f5a74a78cdccc3d346d7b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/authors.log",
+      "sha256": "3ac90c7fce128672ea80fa161008c67aa31a21aaf03c8168ea77c676e9659bf7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-postgres-20260927/cleanup.json",
+      "sha256": "1a4f74c6893365998eabf402de696069ce125479afabd469a9288347c43be902"
+    }
+  ],
+  "jarSha256": "2c2381f2c6f9901b0b73bea844e4b0237fe7381c9db95e81da72de16eb62faf4"
+}
