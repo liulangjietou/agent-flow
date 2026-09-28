@@ -66,6 +66,7 @@ class ExpenseSubmissionIntegrationTest {
     private final String invoiceNumber = String.format("1234567890%010d", SERIAL.incrementAndGet());
     private boolean paperRequired = true;
     private boolean financeStage = true;
+    private boolean afterFinanceTask;
     private BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
     private BudgetObservation.Rejection budgetRejection = BudgetObservation.Rejection.BUDGET_INSUFFICIENT;
     private int writes;
@@ -201,6 +202,20 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void applicantCannotWithdrawOnceTheRoundHasEnteredFinancialReview() throws Exception {
+        paperRequired = false; afterFinanceTask = true; var report = fixture(false).report(); submit(report);
+        ok(act(report, "manager", "APPROVE"), 200); ok(act(report, "finance", "APPROVE"), 200);
+        long version = app(report).version(); String financeTask = task(report).getId();
+        assertCode(send(path(report) + "/withdraw", "alice", lifecycleInput(report)), "EXPENSE_WITHDRAWAL_NOT_ALLOWED");
+        assertThat(app(report).version()).isEqualTo(version); assertThat(app(report).status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(task(report).getId()).isEqualTo(financeTask);
+        budgetWorker.poll(); ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("afterFinance");
+        assertCode(send(path(report) + "/withdraw", "alice", lifecycleInput(report)), "EXPENSE_WITHDRAWAL_NOT_ALLOWED");
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+    }
+
+    @Test
     void pendingBudgetRollsBackLateResubmissionIncludingEngineRoundAndResourceVersions() throws Exception {
         var report = fixture(false).report(); submit(report);
         ok(send(path(report) + "/withdraw", "alice", lifecycleInput(report)), 200);
@@ -301,12 +316,18 @@ class ExpenseSubmissionIntegrationTest {
         return new Fixture(reports.find("demo", id).orElseThrow(), invoice, priorId, advanceId);
     }
     private DefinitionDraft definition() {
-        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+        var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START, Map.of()),
                 new Node("business", "业务审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
                 new Node("receipt", "原件签收", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "RECEIPT")),
                 new Node("finance", "财务审核", NodeType.USER_TASK, financeStage ? Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "FINANCE_REVIEW") : Map.of("assigneeRule", "role:ORG_PERSON_" + finance)),
-                new Node("end", "结束", NodeType.END, Map.of())), List.of(new Edge("a", "start", "business", "", false), new Edge("b", "business", "receipt", "", false),
-                new Edge("c", "receipt", "finance", "", false), new Edge("d", "finance", "end", "", false)));
+                new Node("end", "结束", NodeType.END, Map.of())));
+        var edges = new ArrayList<>(List.of(new Edge("a", "start", "business", "", false), new Edge("b", "business", "receipt", "", false),
+                new Edge("c", "receipt", "finance", "", false), new Edge("d", "finance", afterFinanceTask ? "afterFinance" : "end", "", false)));
+        if (afterFinanceTask) {
+            nodes.add(new Node("afterFinance", "财务后续业务", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)));
+            edges.add(new Edge("e", "afterFinance", "end", "", false));
+        }
+        var graph = new Graph(nodes, edges);
         var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,
                 null, null, null, null, null, null, true, Map.of("business", FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY)),
                 new FormSchema.Field("amount", "本币金额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
