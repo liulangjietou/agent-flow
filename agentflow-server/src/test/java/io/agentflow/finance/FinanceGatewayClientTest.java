@@ -217,6 +217,27 @@ class FinanceGatewayClientTest {
     }
 
     @Test
+    void foreignCurrencyPolicyResultFeedsFreezeWithoutSecondTaxConversion() {
+        var line = new ExpenseLine(1, "TRAINING", DATE, null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM,
+                new Money(new BigDecimal("100"), "USD"), new Money(new BigDecimal("6"), "USD"), List.of(), null,
+                List.of(new CostAllocation("IT", null, new Money(new BigDecimal("100"), "USD"))), "合成境外费用", "行程调整导致超标");
+        var rate = new ExpenseExchangeRate("USD", "CNY", new BigDecimal("7.1"), "synthetic-fx-v1", DATE);
+        var policy = new ExpensePolicySnapshot(UUID.randomUUID(), 4, cny("710"), cny("700"),
+                ExpensePolicySnapshot.Decision.REQUIRES_EXCEPTION, "synthetic-tax", "synthetic-foreign-policy");
+        answer(new ExpensePolicyPort.Assessment(policy, cny("42.60"), false, Instant.now().plusSeconds(60)));
+        var assessed = policies.assess("tenant-a", new ExpensePolicyPort.Request("alice", ENTITY, ExpenseContent.Type.TRAINING, line, rate, List.of())).requireValue();
+        var report = ExpenseReport.draft(UUID.randomUUID(), "tenant-a", UUID.randomUUID(), "alice",
+                new ExpenseContent(ENTITY, ExpenseContent.Type.TRAINING, "合成境外培训", List.of(line), List.of()));
+        var account = new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1");
+        report.freeze(1, 1, "CNY", account, Map.of(1, new ExpenseAssessment(rate, assessed.policy(), assessed.deductibleTax())), "alice", Instant.now());
+        assertThat(report.currentRound().approvedGross()).isEqualTo(cny("710"));
+        assertThat(report.currentRound().approvedTax()).isEqualTo(cny("42.60"));
+        assertThat(report.currentRound().originalLines().get(0).deductibleTaxBase()).isEqualTo(cny("42.60"));
+        assertThat(report.currentRound().originalLines().get(0).original().claimedTax().currency()).isEqualTo("USD");
+        assertThat(report.currentRound().approvedLines().get(0).allocations().get(0).amount()).isEqualTo(cny("710"));
+    }
+
+    @Test
     void invoiceVerificationTransmitsExactOriginalAndRequiresCurrentMatchingFacts() throws Exception {
         byte[] bytes = "%PDF-original-fixture".getBytes(StandardCharsets.UTF_8);
         String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));

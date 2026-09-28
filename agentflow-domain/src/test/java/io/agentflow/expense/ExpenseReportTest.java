@@ -80,6 +80,18 @@ class ExpenseReportTest {
     }
 
     @Test
+    void foreignPolicyFactsMustUseBaseCurrencyAndStayWithinConvertedClaimedTax() {
+        var line = line(1, "100", "6", "USD", List.of(), null);
+        var rate = new ExpenseExchangeRate("USD", "CNY", new BigDecimal("7.1"), "synthetic-rate", line.incurredOn());
+        var report = draft(content(List.of(line), List.of()));
+        var wrongCurrency = new ExpenseAssessment(rate, policy(line.claimedGross(), line.claimedGross(), ExpensePolicySnapshot.Decision.WITHIN_LIMIT), line.claimedTax());
+        fails("EXPENSE_PRECHECK_REQUIRED", () -> report.freeze(1, 1, "CNY", account(), Map.of(1, wrongCurrency), "alice", SUBMITTED));
+        var excessTax = new ExpenseAssessment(rate, policy(money("710", "CNY"), money("710", "CNY"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT), money("42.61", "CNY"));
+        fails("EXPENSE_PRECHECK_REQUIRED", () -> report.freeze(1, 1, "CNY", account(), Map.of(1, excessTax), "alice", SUBMITTED));
+        assertThat(report.rounds()).isEmpty(); assertThat(report.version()).isEqualTo(1);
+    }
+
+    @Test
     void missingMismatchedOrDeniedFactsCannotCreateARound() {
         var line = line(1, "100", "6", "CNY", List.of(), null);
         var report = draft(content(List.of(line), List.of()));
@@ -242,8 +254,9 @@ class ExpenseReportTest {
                 allocations == null ? List.of(allocation("engineering", gross, currency)) : allocations, "费用说明", null);
     }
     private static ExpenseAssessment assessment(ExpenseLine line, String rate) {
-        return new ExpenseAssessment(new ExpenseExchangeRate(line.claimedGross().currency(), "CNY", new BigDecimal(rate), "treasury-test", LocalDate.parse("2026-09-28")),
-                policy(line.claimedGross(), line.claimedGross(), ExpensePolicySnapshot.Decision.WITHIN_LIMIT), line.claimedTax());
+        var exchange = new ExpenseExchangeRate(line.claimedGross().currency(), "CNY", new BigDecimal(rate), "treasury-test", LocalDate.parse("2026-09-28"));
+        var gross = exchange.convert(line.claimedGross());
+        return new ExpenseAssessment(exchange, policy(gross, gross, ExpensePolicySnapshot.Decision.WITHIN_LIMIT), exchange.convert(line.claimedTax()));
     }
     private static ExpensePolicySnapshot policy(Money gross, Money limit, ExpensePolicySnapshot.Decision decision) {
         return new ExpensePolicySnapshot(UUID.randomUUID(), 1, gross, limit, decision, "tax-policy-test", "assessment-test");

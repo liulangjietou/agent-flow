@@ -66,11 +66,10 @@ public final class ExpenseReport {
         var approved = new ArrayList<ExpenseRound.ApprovedLine>();
         for (var line : content.lines()) {
             var fact = assessments.get(line.lineNo());
-            validateAssessment(line, fact, baseCurrency);
-            Money gross = fact.exchangeRate().convert(line.claimedGross());
-            Money tax = fact.exchangeRate().convert(fact.deductibleTax());
-            original.add(new ExpenseRound.FrozenLine(line, fact, gross, tax));
-            approved.add(new ExpenseRound.ApprovedLine(line.lineNo(), gross, tax, CostAllocation.apportion(line.allocations(), gross)));
+            var frozenLine = freezeLine(line, fact, baseCurrency);
+            original.add(frozenLine);
+            approved.add(new ExpenseRound.ApprovedLine(line.lineNo(), frozenLine.claimedBase(), frozenLine.deductibleTaxBase(),
+                    CostAllocation.apportion(line.allocations(), frozenLine.claimedBase())));
         }
         var frozen = new ExpenseRound(roundNo, version, actor, at, content, baseCurrency, account,
                 original, approved, content.advanceOffsets(), List.of());
@@ -132,10 +131,15 @@ public final class ExpenseReport {
         return adjustment;
     }
 
-    private static void validateAssessment(ExpenseLine line, ExpenseAssessment fact, String baseCurrency) {
+    private static ExpenseRound.FrozenLine freezeLine(ExpenseLine line, ExpenseAssessment fact, String baseCurrency) {
         if (fact == null || !baseCurrency.equals(fact.exchangeRate().toCurrency())
-                || fact.policy().assessedGross().compareTo(line.claimedGross()) != 0
-                || fact.deductibleTax().compareTo(line.claimedTax()) > 0) {
+                || !line.claimedGross().currency().equals(fact.exchangeRate().fromCurrency())
+                || !baseCurrency.equals(fact.deductibleTax().currency())) {
+            throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Submission facts do not match this expense line");
+        }
+        Money gross = fact.exchangeRate().convert(line.claimedGross());
+        if (!fact.policy().assessedGross().equals(gross)
+                || fact.deductibleTax().compareTo(fact.exchangeRate().convert(line.claimedTax())) > 0) {
             throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Submission facts do not match this expense line");
         }
         if (fact.policy().decision() == ExpensePolicySnapshot.Decision.DENIED) {
@@ -144,6 +148,8 @@ public final class ExpenseReport {
         if (fact.policy().decision() == ExpensePolicySnapshot.Decision.REQUIRES_EXCEPTION && StringUtils.isBlank(line.exceptionReason())) {
             throw new DomainException("EXPENSE_EXCEPTION_REASON_REQUIRED", "An over-limit expense requires an explicit reason");
         }
+        // 制度与可抵扣额已经按本位币核定，不能再次乘汇率。
+        return new ExpenseRound.FrozenLine(line, fact, gross, fact.deductibleTax());
     }
 
     private static void validateReduction(ExpenseRound.ApprovedLine before, Reduction reduction) {
