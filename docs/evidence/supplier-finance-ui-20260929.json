@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier finance UI, single-use review, authorization and original hold query",
+  "frontend": {
+    "tests": 64,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-finance-ui-tests.log",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-finance-ui-build.log"
+  },
+  "upgrade": {
+    "schemaBefore": 67,
+    "schemaAfter": 70,
+    "businessTablesPreserved": 121,
+    "originalFilesPreserved": 5,
+    "financialCommandFilesPreserved": 12,
+    "backupBytes": 794237
+  },
+  "browser": {
+    "applicationId": "8660ddcf-c73e-4af6-a907-cdc5b5fdcbe5",
+    "requestId": "88259d13-04b9-4648-af74-49f4d57eb106",
+    "roundNo": 2,
+    "approvedAmount": "65.00 CNY",
+    "freshOutstanding": "70.00 CNY",
+    "maskedAccount": "****3456",
+    "reviewStatus": "CONSUMED",
+    "holdStatus": "HELD",
+    "authorizationCount": 1,
+    "originalHoldCommandCount": 1,
+    "queryPreservedIdentity": true,
+    "applicantActions": false,
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/supplier-finance-ui-held.png",
+    "screenshotSha256": "c9db4f24a4a72b6a1c0a63000ee770454822eaf4dc4dbdfdbff93d5f08c06df4",
+    "httpEvidence": "/fyoung/tmp/agentflow-remaining-20260928/supplier-finance-ui-http.json"
+  },
+  "preservation": {
+    "unchangedTables": 119,
+    "changedTables": {
+      "audit_event": {
+        "before": 188,
+        "after": 191,
+        "existingRemovedOrChanged": 0,
+        "newRows": 3
+      },
+      "request_idempotency": {
+        "before": 238,
+        "after": 241,
+        "existingRemovedOrChanged": 0,
+        "newRows": 3
+      }
+    },
+    "supplierCommandCount": 1,
+    "preciseQuantity": "999999999999999.123456",
+    "originalFiles": 5,
+    "originalCommandFiles": 12
+  },
+  "boundaries": [
+    "confirm-time evidence expiry",
+    "late reads and writes isolated after actor change",
+    "no raw account or amounts in write bodies",
+    "unknown response keeps original idempotency body and key",
+    "reads never resubmit writes",
+    "historical approval rounds remain frozen",
+    "202 receipt confirms persistence only"
+  ],
+  "testData": "local synthetic ERP only; no actual bank transaction",
+  "pending": [
+    "supplier cashier and bank execution",
+    "original ERP payable settlement",
+    "real enterprise integration"
+  ]
+}

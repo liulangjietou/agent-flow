@@ -1,3 +1,4 @@
+import type { SupplierFinanceView, SupplierReviewInput, SupplierAuthorizeInput, SupplierHoldInput, SupplierFinanceReceipt } from './supplierFinance'
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
 import type { NotificationTexts } from './notificationTexts'
@@ -343,6 +344,10 @@ export const api = {
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
+  supplierFinance: (id: string, roundNo: number, signal: AbortSignal) => request<SupplierFinanceView>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  reviewSupplierPayable: (id: string, input: SupplierReviewInput) => write<SupplierFinanceReceipt>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment/reviews`, 'POST', '复核供应商原应付', input),
+  authorizeSupplierPayment: (id: string, input: SupplierAuthorizeInput) => write<SupplierFinanceReceipt>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment/authorizations`, 'POST', '确认供应商付款授权', input),
+  supplierHoldAction: (id: string, input: SupplierHoldInput) => write<SupplierFinanceReceipt>(`/supplier-payments/${encodeURIComponent(id)}/finance-actions`, 'POST', '办理供应商原预留', input),
   procurementPayments: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ProcurementPaymentItem>>('/procurement-payments' + historyQuery(filter), { signal, cache: 'no-store' }),
   procurementPayment: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ProcurementDetail>(`/procurement-payments/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   createProcurementPayment: (input: ProcurementCreate) => write<ProcurementReceipt>('/procurement-payments', 'POST', '保存采购付款申请', input),
