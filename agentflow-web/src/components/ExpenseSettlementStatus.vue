@@ -2,10 +2,11 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
 import ExpensePaymentReturn from './ExpensePaymentReturn.vue'
+import ExpenseResourceAdjustment from './ExpenseResourceAdjustment.vue'
 import { settlementLabels, settlementFundingLabels, settlementBudgetLabels, settlementIssue, settlementError, settlementRetry, validateSettlement, validateSettlementReceipt, type SettlementBinding, type SettlementView } from '../expenseSettlement'
 const props = defineProps<{ reportId: string; applicationId: string; roundNo: number; applicationVersion: number; financialVersion: number; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; changed: [] }>()
-const returnBusy = ref(false)
+const returnBusy = ref(false), adjustmentBusy = ref(false)
 const view = ref<SettlementView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false), confirming = ref(false)
 const error = ref(''), notice = ref(''), comment = ref(''), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
@@ -16,11 +17,11 @@ function syncPending() {
   unconfirmed.value = pending
 }
 const unsubscribe = writeRequests.subscribe(syncPending)
-const blocked = computed(() => !!props.locked || loading.value || saving.value || returnBusy.value || requiresRefresh.value || unconfirmed.value)
+const blocked = computed(() => !!props.locked || loading.value || saving.value || returnBusy.value || adjustmentBusy.value || requiresRefresh.value || unconfirmed.value)
 function stop() { epoch++; controller?.abort(); controller = null }
 /** 身份、轮次或版本切换后丢弃迟到状态；读取失败不能保留旧财务按钮。 */
 async function load() {
-  if (saving.value || returnBusy.value || !props.scopeKey) return
+  if (saving.value || returnBusy.value || adjustmentBusy.value || !props.scopeKey) return
   stop(); const current = epoch, request = new AbortController(); controller = request; loading.value = true
   view.value = null; confirming.value = false; comment.value = ''; error.value = ''
   const binding: SettlementBinding = { reportId: props.reportId, applicationId: props.applicationId, roundNo: props.roundNo, applicationVersion: props.applicationVersion, financialVersion: props.financialVersion }
@@ -52,7 +53,7 @@ async function execute() {
   finally { if (current === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
 }
 watch(() => JSON.stringify([props.scopeKey, props.reportId, props.applicationId, props.roundNo, props.applicationVersion, props.financialVersion]), () => {
-  stop(); view.value = null; loading.value = false; saving.value = false; returnBusy.value = false; confirming.value = false; error.value = ''; notice.value = ''; comment.value = ''; requiresRefresh.value = false
+  stop(); view.value = null; loading.value = false; saving.value = false; returnBusy.value = false; adjustmentBusy.value = false; confirming.value = false; error.value = ''; notice.value = ''; comment.value = ''; requiresRefresh.value = false
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
@@ -60,8 +61,8 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
 
 <template>
   <section class="settlement" aria-label="本轮报销结算">
-    <div class="settlement-heading"><h3>第 {{ roundNo }} 轮 · 报销结算</h3><button type="button" class="quiet" :disabled="loading || saving || returnBusy || locked" @click="notice = ''; load()">刷新结算状态</button></div>
-    <p class="settlement-help">核销完成表示本轮发票、额度、借款冲销及预算实际占用均已确认。</p>
+    <div class="settlement-heading"><h3>第 {{ roundNo }} 轮 · 报销结算</h3><button type="button" class="quiet" :disabled="loading || saving || returnBusy || adjustmentBusy || locked" @click="notice = ''; load()">刷新结算状态</button></div>
+    <p class="settlement-help">原结算记录本轮发票、额度、借款冲销及预算实际占用。后续取消结果在独立调整中分别显示。</p>
     <p v-if="loading" class="settlement-help" role="status">正在核对本轮结算进度与权限…</p>
     <p v-if="error" class="settlement-error" role="alert">{{ error }}</p><p v-if="notice" class="settlement-help" role="status">{{ notice }}</p>
     <p v-if="unconfirmed && !saving" class="settlement-error" role="alert">上次重试结果尚未确认，请在未确认操作中恢复原请求后刷新。</p>
@@ -72,7 +73,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
         <strong class="settlement-status" :class="{ complete: view.settlement.status === 'SETTLED' }">{{ settlementLabels[view.settlement.status] }}</strong>
         <div class="settlement-stages">
           <article><small>结算依据</small><p>{{ settlementFundingLabels[view.settlement.funding] }}</p></article>
-          <article><small>发票、额度与借款</small><p>{{ view.settlement.resourcesConsumed ? '本轮资源已核销' : '本轮资源尚未核销' }}</p></article>
+          <article><small>发票、额度与借款</small><p>{{ view.settlement.resourcesConsumed ? '原核销记录已保留' : '本轮资源尚未核销' }}</p></article>
           <article><small>预算实际占用</small><p>{{ view.settlement.budgetStatus ? settlementBudgetLabels[view.settlement.budgetStatus] : '尚未登记本次预算核销' }}</p></article>
         </div>
         <p v-if="view.settlement.issue" class="settlement-error" role="alert">{{ settlementIssue(view.settlement.issue) }}</p>
@@ -84,7 +85,8 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
         <label>处理说明<textarea v-model="comment" rows="3" required maxlength="2000" :disabled="saving" placeholder="说明已核对的依据及处理结果" /></label>
         <div><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : '确认重新办理' }}</button><button type="button" class="quiet" :disabled="saving" @click="confirming = false; comment = ''">取消</button></div>
       </form>
-      <ExpensePaymentReturn v-if="view.settlement?.funding === 'PAYMENT'" :application-id="applicationId" :report-id="reportId" :round-no="roundNo" :scope-key="scopeKey" :locked="locked || saving" @busy="returnBusy = $event; emit('busy', $event)" @changed="emit('changed')" />
+      <ExpensePaymentReturn v-if="view.settlement?.funding === 'PAYMENT'" :application-id="applicationId" :report-id="reportId" :round-no="roundNo" :scope-key="scopeKey" :locked="locked || saving || adjustmentBusy" @busy="returnBusy = $event; emit('busy', $event || adjustmentBusy)" @changed="emit('changed')" />
+      <ExpenseResourceAdjustment v-if="view.settlement?.resourcesConsumed" :application-id="applicationId" :report-id="reportId" :round-no="roundNo" :application-version="applicationVersion" :financial-version="financialVersion" :scope-key="scopeKey" :locked="locked || saving || returnBusy" @busy="adjustmentBusy = $event; emit('busy', $event || returnBusy)" @changed="emit('changed')" />
     </template>
   </section>
 </template>

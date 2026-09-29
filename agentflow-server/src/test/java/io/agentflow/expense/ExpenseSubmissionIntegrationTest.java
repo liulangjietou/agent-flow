@@ -1613,6 +1613,89 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(budgetReversalWrites).isZero();
     }
 
+    @Test void resourceApiScopesOriginalFieldsRejectsInjectedDataAndNeverAuthorizesFromARead() throws Exception {
+        hideBusinessDetails = true; var report = resourceAdjustmentReport(); var endpoint = path(report) + "/resource-adjustment";
+        var response = read(endpoint, "finance"); var view = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(view.path("canPrepare").asBoolean()).isTrue();
+        assertThat(view.path("adjustments")).isEmpty(); assertThat(budgetReversalWrites).isZero();
+        var applicant = ok(read(endpoint, "alice"), 200); assertThat(applicant.path("finance").asBoolean()).isFalse(); assertThat(applicant.path("latestPreparation").isNull()).isTrue();
+        for (var user : List.of("bob", "cashier", "admin", "manager")) assertThat(read(endpoint, user).getStatus()).isIn(403, 404);
+        for (var query : List.of("?tenantId=foreign", "?roundNo=0", "?roundNo=1e2")) assertThat(read(endpoint + query, "finance").getStatus()).isEqualTo(400);
+        assertThat(read(endpoint + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
+        var input = resourcePreparationInput(report);
+        for (var user : List.of("alice", "cashier", "admin")) assertThat(send(endpoint + "/preparations", user, input).getStatus()).isIn(403, 404);
+        var injected = json.read(json.write(input), com.fasterxml.jackson.databind.node.ObjectNode.class).put("amount", "0.01");
+        assertThat(send(endpoint + "/preparations", "finance", injected).getStatus()).isEqualTo(400);
+        String key = UUID.randomUUID().toString(); var queued = ok(send(endpoint + "/preparations", "finance", key, input), 202);
+        var replay = send(endpoint + "/preparations", "finance", key, input); assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true"); assertThat(ok(replay, 202)).isEqualTo(queued);
+        resourceWorker.poll(); var ready = ok(read(endpoint, "finance"), 200); assertThat(ready.path("latestPreparation").path("canAuthorize").asBoolean()).isTrue();
+        assertThat(ok(read(endpoint, "alice"), 200).path("latestPreparation").isNull()).isTrue();
+        assertThat(resourceAdjustments.active("demo", report.id())).isEmpty(); assertThat(budgetReversalWrites).isZero();
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(endpoint + "/preparations", "finance", key, input).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void resourceApiExplicitAuthorizationKeepsBudgetAndResourceResultsSeparateAndReplayCannotDuplicateEffects() throws Exception {
+        var report = resourceAdjustmentReport(); var endpoint = path(report) + "/resource-adjustment"; var prepared = prepareResourceWorkflow(report);
+        var input = resourceAuthorizationInput(report, prepared); String key = UUID.randomUUID().toString();
+        var accepted = ok(send(endpoint + "/authorizations", "finance", key, input), 202);
+        var queued = ok(read(endpoint, "finance"), 200).path("adjustments").get(0);
+        assertThat(queued.path("status").asText()).isEqualTo("WAITING_BUDGET"); assertThat(queued.path("budget").path("status").asText()).isEqualTo("QUEUED");
+        assertThat(queued.path("resourcesReversed").asBoolean()).isFalse(); assertThat(queued.path("canRetire").asBoolean()).isTrue();
+        assertThat(queued.path("availableActions")).isEmpty(); assertThat(budgetReversalWrites).isZero();
+        resourceWorker.poll(); var versions = resourceVersions(report);
+        assertThat(ok(send(endpoint + "/authorizations", "finance", key, input), 202)).isEqualTo(accepted);
+        assertThat(send(endpoint + "/authorizations", "finance", input).getStatus()).isIn(409, 422);
+        var response = read(endpoint, "alice"); var complete = ok(response, 200).path("adjustments").get(0);
+        assertThat(complete.path("status").asText()).isEqualTo("APPLIED"); assertThat(complete.path("resourcesReversed").asBoolean()).isTrue();
+        assertThat(complete.path("budget").path("acceptedReference").isTextual()).isTrue(); assertThat(complete.path("availableActions")).isEmpty();
+        assertThat(response.getContentAsString()).doesNotContain("commandDigest", "targetDigest", "accountDigest", "debitAccountReference", "synthetic-private-account", "authorizedInput");
+        var query = resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY); String queryKey = UUID.randomUUID().toString();
+        var requested = ok(send(endpoint + "/actions", "finance", queryKey, query), 202); resourceWorker.poll();
+        var checking = ok(read(endpoint, "finance"), 200).path("adjustments").get(0);
+        assertThat(checking.path("status").asText()).isEqualTo("REVIEW_REQUIRED"); assertThat(checking.path("availableActions").toString()).contains("CONFIRM_COMPLETED").doesNotContain("RETRY_RESOURCES");
+        assertThat(ok(send(endpoint + "/actions", "finance", queryKey, query), 202)).isEqualTo(requested);
+        ok(send(endpoint + "/actions", "finance", resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.CONFIRM_COMPLETED)), 202);
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(budgetReversalWrites).isEqualTo(1); assertThat(budgetReversalQueries).isEqualTo(1);
+    }
+
+    @Test void resourceApiOriginalQueryRemainsAvailableWhenAccrualSourceChanges() throws Exception {
+        var report = resourceAdjustmentReport(); var endpoint = path(report) + "/resource-adjustment"; var prepared = prepareResourceWorkflow(report);
+        ok(send(endpoint + "/authorizations", "finance", resourceAuthorizationInput(report, prepared)), 202);
+        invalidBudgetReversalResponse = true; resourceWorker.poll(); invalidBudgetReversalResponse = false;
+        var adjustment = resourceAdjustments.active("demo", report.id()).orElseThrow();
+        var accrual = voucherOperations.find("demo", adjustment.input().basis().accrualReversal().operationId()).orElseThrow();
+        tx().executeWithoutResult(status -> voucherExecution.query("demo", accrual.input().command().id(), accrual.version(), Instant.now()));
+        var before = ok(read(endpoint, "finance"), 200); assertThat(before.path("canPrepare").asBoolean()).isFalse();
+        assertThat(before.path("adjustments").get(0).path("availableActions").toString()).contains("QUERY");
+        ok(send(endpoint + "/actions", "finance", resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY)), 202); resourceWorker.poll();
+        var after = ok(read(endpoint, "finance"), 200).path("adjustments").get(0);
+        assertThat(after.path("budget").path("status").asText()).isEqualTo("APPLIED"); assertThat(after.path("status").asText()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(after.path("resourcesReversed").asBoolean()).isFalse(); assertThat(after.path("availableActions").toString()).doesNotContain("RETRY_RESOURCES");
+        assertThat(budgetReversalWrites).isEqualTo(1); assertThat(budgetReversalQueries).isEqualTo(1);
+    }
+
+    @Test void resourceApiSafeRetirementRetainsHistoryAndPreventsCrossReportActions() throws Exception {
+        var report = resourceAdjustmentReport(); var endpoint = path(report) + "/resource-adjustment"; var prepared = prepareResourceWorkflow(report);
+        ok(send(endpoint + "/authorizations", "finance", resourceAuthorizationInput(report, prepared)), 202);
+        var input = resourceRetirementInput(report); String key = UUID.randomUUID().toString();
+        for (var user : List.of("alice", "cashier", "admin")) assertThat(send(endpoint + "/retirements", user, input).getStatus()).isIn(403, 404);
+        var injected = json.read(json.write(input), com.fasterxml.jackson.databind.node.ObjectNode.class).put("resourcesReversed", true);
+        assertThat(send(endpoint + "/retirements", "finance", injected).getStatus()).isEqualTo(400);
+        var accepted = ok(send(endpoint + "/retirements", "finance", key, input), 202); resourceWorker.poll();
+        assertThat(ok(send(endpoint + "/retirements", "finance", key, input), 202)).isEqualTo(accepted);
+        var view = ok(read(endpoint, "finance"), 200); assertThat(view.path("canPrepare").asBoolean()).isTrue();
+        var retired = view.path("adjustments").get(0); assertThat(retired.path("status").asText()).isEqualTo("RETIRED");
+        assertThat(retired.path("retirement").path("evidenceReference").asText()).isEqualTo(input.evidenceReference()); assertThat(retired.path("availableActions")).isEmpty();
+        ok(send(endpoint + "/preparations", "finance", resourcePreparationInput(report)), 202); resourceWorker.poll();
+        assertThat(ok(read(endpoint, "finance"), 200).path("latestPreparation").path("canAuthorize").asBoolean()).isTrue();
+        assertThat(budgetReversalWrites).isZero();
+        paymentMode = "SUCCEEDED"; var other = paymentReport(false); var wrong = new ExpenseResourceAdjustmentActionService.OperationInput(1, app(other).version(), current(other).version(),
+                input.adjustmentId(), input.adjustmentVersion(), input.budgetVersion(), ExpenseResourceAdjustmentActionService.Action.QUERY, "跨单请求不得修改原调整");
+        assertThat(send(path(other) + "/resource-adjustment/actions", "finance", wrong).getStatus()).isEqualTo(409);
+    }
+
     private ExpenseResourceAdjustmentPreparationService.PrepareInput resourcePreparationInput(ExpenseReport report) {
         return new ExpenseResourceAdjustmentPreparationService.PrepareInput(1, app(report).version(), current(report).version(), settlements.find("demo", report.id()).orElseThrow().version(), LocalDate.now(), "full-cancellation-evidence", "独立核对后取消整笔报销");
     }

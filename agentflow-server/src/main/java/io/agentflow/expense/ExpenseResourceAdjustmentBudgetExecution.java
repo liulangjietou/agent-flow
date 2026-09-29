@@ -84,7 +84,7 @@ public class ExpenseResourceAdjustmentBudgetExecution {
         }
         return current;
     }
-    private void requireSendSources(BudgetConsumptionReversalOperation operation) {
+    void requireSendSources(BudgetConsumptionReversalOperation operation) {
         var command = operation.input().command(); var adjustment = adjustment(command.source().tenantId(), command.adjustmentId());
         if (!adjustment.input().budget().equals(operation.input()) || adjustment.budgetReversal() != null || adjustment.resourcesReversed()) throw conflict();
         if (gateway.destination(command.source().tenantId()).filter(value -> value.digest(command.source().tenantId()).equals(operation.input().targetDigest())).isEmpty()) {

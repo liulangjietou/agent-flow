@@ -73,6 +73,14 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("ExpenseResourceAdjustmentWorkspace", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.View.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentOriginal", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Original.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentPreparation", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Preparation.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentBudget", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Budget.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentRetirement", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Retirement.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentEntry", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Adjustment.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentPreparationReceipt", io.agentflow.expense.ExpenseResourceAdjustmentPreparationService.ActionReceipt.class),
+                java.util.Map.entry("ExpenseResourceAdjustmentActionReceipt", io.agentflow.expense.ExpenseResourceAdjustmentActionService.ActionReceipt.class),
                 java.util.Map.entry("PaymentView", io.agentflow.finance.PaymentView.class),
                 java.util.Map.entry("PaymentRequestSummary", io.agentflow.finance.PaymentView.Request.class),
                 java.util.Map.entry("PaymentOperationSummary", io.agentflow.finance.PaymentView.Operation.class),

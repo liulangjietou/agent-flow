@@ -14,6 +14,8 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.Arrays;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +70,33 @@ public class ExpenseResourceAdjustmentActionService {
         var decision = new ExpenseResourceAdjustmentRetirement(before, stopped, actors.actor().userId(), input.evidenceReference(), input.reason(), now);
         adjustments.retire(decision); var event = audit.record(before.input().basis(), before.id(), decision.after().version(), "EXPENSE_ADJUSTMENT_RETIRE", input.reason(), now);
         return receipt(decision.after(), stopped, event);
+    }
+    /** 工作台只投影当前可办理动作，纯领域转换用于预判，不保存任何状态。 */
+    public List<Action> availableActions(ExpenseResourceAdjustment value, BudgetConsumptionReversalOperation budget, Instant at) {
+        if (value.status() == ExpenseResourceAdjustment.Status.RETIRED) return List.of();
+        return Arrays.stream(Action.values()).filter(action -> {
+            try {
+                value.input().basis().requireAuthorization(actors.actor().userId(), at);
+                switch (action) {
+                    case QUERY -> { if (budget.attempts() == 0) return false; budget.requestQuery(at); }
+                    case RESEND_ORIGINAL -> {
+                        if (!budget.input().command().authorizedBy().equals(actors.actor().userId())) return false;
+                        budget.retryNotFound(at); budgetExecution.requireSendSources(budget);
+                    }
+                    case RETRY_RESOURCES -> { value.retryResources(budget, at); sources.requireSupported(value.input().basis()); }
+                    case CONFIRM_COMPLETED -> { value.confirmCompleted(budget, at); sources.requireSupported(value.input().basis()); }
+                }
+                return true;
+            } catch (DomainException unavailable) { return false; }
+        }).toList();
+    }
+    /** 安全结束候选仍须提交时在同一原报销锁下重新核对，页面能力不是授权令牌。 */
+    public boolean canRetire(ExpenseResourceAdjustment value, BudgetConsumptionReversalOperation budget, Instant at) {
+        try {
+            value.input().basis().requireAuthorization(actors.actor().userId(), at);
+            value.retire(budget.status() == BudgetConsumptionReversalOperation.Status.QUEUED ? budget.voidBeforeSend(at) : budget, at);
+            return true;
+        } catch (DomainException unavailable) { return false; }
     }
     private ExpenseResourceAdjustment requireAdjustment(UUID report, int round, UUID id, long version) {
         var value = adjustments.find(actors.actor().tenantId(), id).orElseThrow(ExpenseResourceAdjustmentActionService::conflict);

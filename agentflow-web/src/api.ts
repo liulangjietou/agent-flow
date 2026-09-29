@@ -31,6 +31,7 @@ import type { VoucherReversalView, ReversalQueryInput, ReversalRecordInput, Reve
 import type { VoucherReversalExecutionView, ReversalPrepareInput, ReversalAuthorizeInput, ReversalOperationInput, ReversalExecutionReceipt, ReversalRetirementInput, ReversalRetirementReceipt } from './voucherReversalExecution'
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
 import type { ExpenseReturnView, ExpenseReturnQueryInput, ExpenseReturnRegisterInput, ExpenseReturnActionReceipt } from './expensePaymentReturn'
+import type { AdjustmentView, AdjustmentPrepareInput, AdjustmentAuthorizeInput, AdjustmentOperationInput, AdjustmentRetireInput, AdjustmentPreparationReceipt, AdjustmentActionReceipt } from './expenseResourceAdjustment'
 import type { ExpenseArchiveView } from './expenseArchive'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
@@ -320,6 +321,11 @@ export const api = {
   retireVoucherReversal: (id: string, operationId: string, input: ReversalRetirementInput) => write<ReversalRetirementReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution/retirements`, 'POST', '安全结束本次冲销', input),
   voucherReversalOperationAction: (id: string, operationId: string, input: ReversalOperationInput) => write<ReversalExecutionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution/actions`, 'POST', '办理原冲销命令', input),
   expenseSettlement: (id: string, roundNo: number, signal: AbortSignal) => request<SettlementView>(`/expense-reports/${encodeURIComponent(id)}/settlement` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expenseResourceAdjustment: (id: string, roundNo: number, signal: AbortSignal) => request<AdjustmentView>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  prepareExpenseResourceAdjustment: (id: string, input: AdjustmentPrepareInput) => write<AdjustmentPreparationReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/preparations`, 'POST', '准备报销独立调整', input),
+  authorizeExpenseResourceAdjustment: (id: string, input: AdjustmentAuthorizeInput) => write<AdjustmentPreparationReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/authorizations`, 'POST', '授权报销独立调整', input),
+  actExpenseResourceAdjustment: (id: string, input: AdjustmentOperationInput) => write<AdjustmentActionReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/actions`, 'POST', '办理原报销独立调整', input),
+  retireExpenseResourceAdjustment: (id: string, input: AdjustmentRetireInput) => write<AdjustmentActionReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/retirements`, 'POST', '安全结束报销独立调整', input),
   expensePaymentReturn: (id: string, roundNo: number, signal: AbortSignal) => request<ExpenseReturnView>(`/expense-reports/${encodeURIComponent(id)}/payment-return` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   queryExpensePaymentReturn: (id: string, input: ExpenseReturnQueryInput) => write<ExpenseReturnActionReceipt>(`/expense-reports/${encodeURIComponent(id)}/payment-return/checks`, 'POST', '查询原报销银行退回', input),
   registerExpensePaymentReturn: (id: string, input: ExpenseReturnRegisterInput) => write<ExpenseReturnActionReceipt>(`/expense-reports/${encodeURIComponent(id)}/payment-return/registrations`, 'POST', '登记报销银行退回', input),
