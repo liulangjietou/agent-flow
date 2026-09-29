@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier cashier scoped API, V72 index and original-command actions",
+  "h2Initial": {
+    "SupplierFinanceWorkflowTest": 14,
+    "SupplierPaymentPersistenceTest": 16,
+    "OpenApiContractTest": 5,
+    "PaymentAccessTest": 4,
+    "total": 39
+  },
+  "finalPostgresRegression": {
+    "SupplierFinanceWorkflowTest": 15,
+    "SupplierPaymentPersistenceTest": 16,
+    "actualPostgresTotal": 31,
+    "OpenApiContractTestH2": 5,
+    "PaymentAccessTest": 4,
+    "total": 40,
+    "failed": 0,
+    "skipped": 0
+  },
+  "openapi": {
+    "operations": 209,
+    "schemas": 405,
+    "requestExamples": 75,
+    "originalRawContentPreserved": true
+  },
+  "authors": {
+    "javaFiles": 916,
+    "namedTypes": 1700,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "databases": {
+    "AGENTFLOW_SUPPLIER_PAYMENT": {
+      "database": "supplier_cashier_supplier_payment_45ec0319",
+      "url": "jdbc:postgresql://127.0.0.1:55460/supplier_cashier_supplier_payment_45ec0319",
+      "user": "agentflow"
+    },
+    "AGENTFLOW_SUPPLIER_FINANCE": {
+      "database": "supplier_cashier_supplier_finance_2d7fd790",
+      "url": "jdbc:postgresql://127.0.0.1:55460/supplier_cashier_supplier_finance_2d7fd790",
+      "user": "agentflow"
+    }
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/supplier-cashier-api-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/supplier-cashier-api-postgres.log",
+    "openapi": "/fyoung/tmp/agentflow-remaining-20260928/supplier-cashier-openapi.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/supplier-cashier-api-authors.log"
+  },
+  "verified": [
+    "Current explicit cashier role and legal entity appointment before pagination and before cached write replay",
+    "Three-party separation and original cashier only for original command resend",
+    "No full procurement form or financial command in cashier projection",
+    "Unknown fields and mixed action inputs rejected; displayed versions checked",
+    "Network account lookup rechecks access after external wait and enforces five-minute freshness",
+    "Audit failure rolls back execution intent and idempotency record",
+    "Original command stays unchanged through authoritative not-found and explicit retry"
+  ],
+  "acceptanceRuntime": {
+    "schema": 70,
+    "upgradedToV72": false,
+    "realBankOrErp": false
+  },
+  "remaining": [
+    "Supplier cashier UI and browser acceptance",
+    "ERP original payable settlement",
+    "Bank dispute and subsequent adjustment workflows",
+    "Real enterprise integration"
+  ]
+}

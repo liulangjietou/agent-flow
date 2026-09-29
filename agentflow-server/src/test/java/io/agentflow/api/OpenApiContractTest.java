@@ -73,6 +73,14 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("SupplierCashierView", io.agentflow.procurement.SupplierCashierWorkspace.View.class),
+                java.util.Map.entry("SupplierCashierPage", io.agentflow.procurement.SupplierCashierWorkspace.Page.class),
+                java.util.Map.entry("SupplierCashierHold", io.agentflow.procurement.SupplierCashierWorkspace.Hold.class),
+                java.util.Map.entry("SupplierCashierPreparation", io.agentflow.procurement.SupplierCashierWorkspace.Preparation.class),
+                java.util.Map.entry("SupplierCashierOperation", io.agentflow.procurement.SupplierCashierWorkspace.Operation.class),
+                java.util.Map.entry("SupplierCashierActions", io.agentflow.procurement.SupplierCashierWorkspace.Actions.class),
+                java.util.Map.entry("SupplierCashierAccounts", io.agentflow.procurement.SupplierCashierWorkspace.Accounts.class),
+                java.util.Map.entry("SupplierCashierReceipt", io.agentflow.procurement.SupplierCashierActions.Receipt.class),
                 java.util.Map.entry("SupplierFinanceWorkspace", io.agentflow.procurement.SupplierFinanceWorkspace.View.class),
                 java.util.Map.entry("SupplierFinanceReview", io.agentflow.procurement.SupplierFinanceWorkspace.Review.class),
                 java.util.Map.entry("SupplierFinanceAuthorization", io.agentflow.procurement.SupplierFinanceWorkspace.Authorization.class),

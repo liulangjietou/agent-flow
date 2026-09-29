@@ -272,7 +272,7 @@ class SupplierPaymentPersistenceTest {
         var tables = List.of("approval_application", "procurement_payment", "procurement_payment_revision", "procurement_payable_reservation", "procurement_payable_reservation_revision", "invoice_active_claim",
                 "supplier_payment_authorization", "supplier_payable_hold_operation", "supplier_payable_hold_revision");
         var original = tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList();
-        var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema).load(); assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
+        var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema).target("71").load(); assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList()).isEqualTo(original);
         assertThat(migration.migrate().migrationsExecuted).isZero(); assertThat(migration.validateWithResult().validationSuccessful).isTrue();
         assertThat(prepared(register(hold)).command().holdCommand()).isEqualTo(hold.command());

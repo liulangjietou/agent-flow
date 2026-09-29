@@ -14,6 +14,8 @@ import io.agentflow.expense.InvoiceKey;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.Money;
+import io.agentflow.finance.PaymentAccountsPort;
+import io.agentflow.finance.PaymentObservation;
 import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.OrganizationService;
@@ -58,6 +60,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.expense-plans.precheck-worker-enabled=false",
+        "agentflow.supplier-payments.execution-worker-enabled=false", "agentflow.supplier-payments.payment-worker-enabled=false",
         "agentflow.supplier-payments.hold-worker-enabled=false", "agentflow.supplier-payments.review-worker-enabled=false",
         "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -73,6 +76,7 @@ class SupplierFinanceWorkflowTest {
     private UUID manager;
     private UUID finance;
     private UUID financeAppointment;
+    private UUID cashierAppointment;
     private BiFunction<String, JsonNode, String> responder;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
@@ -107,6 +111,13 @@ class SupplierFinanceWorkflowTest {
     @Autowired SupplierPayableHoldService holdService;
     @Autowired SupplierPayableHoldPort holdPort;
     @Autowired JdbcSupplierPaymentAuthorizationRepository authorizations;
+    @Autowired JdbcSupplierPaymentExecutionRepository cashierRequests;
+    @Autowired JdbcSupplierPaymentOperationRepository bankPayments;
+    @Autowired SupplierPaymentExecutionService cashierPreparation;
+    @Autowired SupplierPaymentService bankService;
+    @Autowired SupplierPaymentEvidenceReader bankReader;
+    @Autowired SupplierPaymentPort bankPort;
+    @Autowired SupplierCashierAccess cashierAccess;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -117,6 +128,9 @@ class SupplierFinanceWorkflowTest {
         appointment = organization.createAppointment(admin, person("alice", false), department.id(), position.id(), true).id();
         manager = person("manager", true); finance = person("finance", true);
         financeAppointment = organization.createAppointment(admin, finance, department.id(), position.id(), true).id();
+        var cashier = person("cashier", false);
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND person_id=?", cashier.toString());
+        cashierAppointment = organization.createAppointment(admin, cashier, department.id(), position.id(), true).id();
         responder = this::normal;
     }
     @AfterEach void settle() {
@@ -253,6 +267,149 @@ class SupplierFinanceWorkflowTest {
         assertThat(count("supplier_payment_authorization", id)).isEqualTo(1);
     }
 
+    @Test void cashierScopeAccountSelectionAndBankExecutionPreserveOneOriginalCommand() throws Exception {
+        UUID request = approved(); UUID id = authorizedHold(request); var displayed = cashierView(id);
+        assertThat(displayed.at("/actions/execute").asBoolean()).isTrue(); assertThat(displayed.at("/amount/value").asText()).isEqualTo("70.00");
+        assertCashierPrivateFactsAbsent(displayed); assertThat(read(path(request), "cashier").getStatus()).isBetween(400, 499);
+        var options = ok(read(cashierPath(id) + "/accounts", "cashier"), 200); assertThat(options.at("/items/0/reference").asText()).isEqualTo("debit-1");
+        var input = executeInput(displayed); String key = UUID.randomUUID().toString(); var response = send(cashierPath(id) + "/actions", "cashier", key, input);
+        var receipt = ok(response, 202); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(cashierPath(id) + "/actions", "cashier", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(receipt.toString()).doesNotContain("debit", "amount", "account", "supplierName");
+        assertThat(cashierView(id).at("/preparation/status").asText()).isEqualTo("QUEUED");
+        var preparation = UUID.fromString(receipt.path("preparationId").asText()); pollPreparation(preparation);
+        var registered = cashierView(id); assertThat(registered.at("/preparation/status").asText()).isEqualTo("READY"); assertThat(registered.at("/operation/status").asText()).isEqualTo("QUEUED");
+        pollBank(id); var paid = cashierView(id); assertThat(paid.at("/operation/status").asText()).isEqualTo("SUCCEEDED"); assertCashierPrivateFactsAbsent(paid);
+        assertThat(paid.at("/hold/status").asText()).isEqualTo("HELD"); assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+        assertThat(bankPayments.find("demo", id).orElseThrow().command().id()).isEqualTo(id);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM supplier_payment_execution_request WHERE tenant_id='demo' AND authorization_id=?", Integer.class, id.toString())).isEqualTo(1);
+        var audit = jdbc.queryForList("SELECT actor_id,payload_json FROM audit_event WHERE application_id=? AND action='SUPPLIER_PAYMENT_EXECUTE'", app(request).id().toString());
+        assertThat(audit).hasSize(1); assertThat(audit.get(0).get("actor_id")).isEqualTo("cashier"); assertThat(audit.toString()).doesNotContain("debit-1", "accountDigest", "commandDigest"); assertNoFinancialWrites(request);
+    }
+
+    @Test void cashierPaginationIsBoundedAndLosingEntityScopeHidesDetailsAndCursor() throws Exception {
+        UUID first = authorizedHold(approved()); UUID second = authorizedHold(approved());
+        var page = ok(read("/api/v1/cashier/supplier-payments?limit=1", "cashier"), 200);
+        assertThat(page.path("items").size()).isEqualTo(1); assertThat(page.at("/items/0/authorizationId").asText()).isEqualTo(second.toString());
+        assertThat(page.path("nextBeforeId").asText()).isEqualTo(second.toString());
+        var next = ok(read("/api/v1/cashier/supplier-payments?limit=1&beforeId=" + second, "cashier"), 200);
+        assertThat(next.at("/items/0/authorizationId").asText()).isEqualTo(first.toString()); assertThat(next.path("nextBeforeId").isNull()).isTrue();
+        for (String query : List.of("limit=101", "limit=0", "beforeId=bad", "tenantId=other", "legalEntityId=" + entity)) okError(read("/api/v1/cashier/supplier-payments?" + query, "cashier"), 400, "INVALID_PAYMENT_QUERY");
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+        okError(read(cashierPath(second), "cashier"), 404, "NOT_FOUND"); okError(read("/api/v1/cashier/supplier-payments?beforeId=" + second, "cashier"), 404, "NOT_FOUND");
+        assertThat(ok(read("/api/v1/cashier/supplier-payments", "cashier"), 200).path("items").isEmpty()).isTrue();
+    }
+
+    @Test void cashierEntryRejectsOtherRolesSeparationViolationsUnknownFactsAndStaleHoldVersion() throws Exception {
+        UUID id = authorizedHold(approved()); var displayed = cashierView(id); var input = executeInput(displayed);
+        for (String user : List.of("alice", "finance", "admin", "manager", "bob")) {
+            okError(read(cashierPath(id), user), 403, "FORBIDDEN"); okError(read(cashierPath(id) + "/accounts", user), 403, "FORBIDDEN");
+            okError(send(cashierPath(id) + "/actions", user, input), 403, "FORBIDDEN");
+        }
+        for (String user : List.of("alice", "finance")) {
+            actors.set(new Actor("demo", user, Set.of("CASHIER")));
+            try { assertThatThrownBy(() -> cashierAccess.requireExecution(id)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); }
+            finally { actors.clear(); }
+        }
+        var invalid = new java.util.HashMap<>(input); invalid.put("amount", Map.of("value", "999", "currency", "CNY"));
+        okError(send(cashierPath(id) + "/actions", "cashier", invalid), 400, "INVALID_REQUEST");
+        invalid.remove("amount"); invalid.put("holdVersion", displayed.at("/hold/version").asLong() - 1);
+        okError(send(cashierPath(id) + "/actions", "cashier", invalid), 409, "CONCURRENCY_CONFLICT");
+        invalid.put("holdVersion", displayed.at("/hold/version").asLong()); invalid.put("operationVersion", 1);
+        okError(send(cashierPath(id) + "/actions", "cashier", invalid), 400, "INVALID_REQUEST"); assertThat(cashierRequests.owner("demo", id)).isEmpty(); assertThat(bankPayments.find("demo", id)).isEmpty();
+    }
+
+    @Test void allCashierWriteReplaysRequireCurrentScopeAndNotFoundRetryPreservesOriginalCommand() throws Exception {
+        UUID id = authorizedHold(approved()); String executeKey = UUID.randomUUID().toString(); var execute = executeInput(cashierView(id));
+        var first = send(cashierPath(id) + "/actions", "cashier", executeKey, execute); UUID preparation = UUID.fromString(ok(first, 202).path("preparationId").asText()); pollPreparation(preparation);
+        var command = bankPayments.find("demo", id).orElseThrow().command();
+        responder = (operation, request) -> operation.equals("supplier-payment-command")
+                ? json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "UNAVAILABLE", "failure", "TIMEOUT")) : normal(operation, request);
+        pollBank(id); var unknown = cashierView(id); assertThat(unknown.at("/operation/status").asText()).isEqualTo("UNKNOWN");
+        String queryKey = UUID.randomUUID().toString(); var query = bankAction(unknown, "QUERY"); ok(send(cashierPath(id) + "/actions", "cashier", queryKey, query), 202);
+        responder = (operation, request) -> operation.equals("supplier-payment-query") ? json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", bankObservation(command, PaymentObservation.Status.NOT_FOUND))) : normal(operation, request);
+        pollBank(id); var absent = cashierView(id); assertThat(absent.at("/operation/status").asText()).isEqualTo("NOT_FOUND");
+        String retryKey = UUID.randomUUID().toString(); var retry = bankAction(absent, "RESEND_ORIGINAL"); ok(send(cashierPath(id) + "/actions", "cashier", retryKey, retry), 202);
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+        try {
+            okError(send(cashierPath(id) + "/actions", "cashier", executeKey, execute), 404, "NOT_FOUND");
+            okError(send(cashierPath(id) + "/actions", "cashier", queryKey, query), 404, "NOT_FOUND");
+            okError(send(cashierPath(id) + "/actions", "cashier", retryKey, retry), 404, "NOT_FOUND");
+        } finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString()); }
+        assertThat(send(cashierPath(id) + "/actions", "cashier", executeKey, execute).getContentAsString()).isEqualTo(first.getContentAsString());
+        responder = this::normal; pollBank(id); var paid = bankPayments.find("demo", id).orElseThrow(); assertThat(paid.settleable()).isTrue(); assertThat(paid.command()).isEqualTo(command); assertThat(paid.dispatches()).isEqualTo(2);
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(2); assertThat(calls.get("supplier-payment-query").get()).isEqualTo(1);
+    }
+
+    @Test void accountLookupRechecksAppointmentAfterExternalWaitAndRejectsStaleDirectory() throws Exception {
+        UUID id = authorizedHold(approved());
+        responder = (operation, request) -> {
+            var response = normal(operation, request);
+            if (operation.equals("debit-accounts")) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+            return response;
+        };
+        okError(read(cashierPath(id) + "/accounts", "cashier"), 404, "NOT_FOUND");
+        jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+        responder = (operation, request) -> operation.equals("debit-accounts")
+                ? json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", directory(json.read(request.path("data").toString(), PaymentAccountsPort.Request.class), Instant.now().minusSeconds(301)))) : normal(operation, request);
+        okError(read(cashierPath(id) + "/accounts", "cashier"), 422, "PAYMENT_ACCOUNT_EVIDENCE_EXPIRED");
+        assertThat(cashierRequests.owner("demo", id)).isEmpty(); assertThat(bankPayments.find("demo", id)).isEmpty(); assertThat(calls.keySet()).doesNotContain("supplier-payment-command");
+    }
+
+    @Test void cashierAuditFailureRollsBackSelectionAndIdempotencyAndCanRetryOriginalKey() throws Exception {
+        UUID request = approved(); UUID id = authorizedHold(request); var input = executeInput(cashierView(id)); String key = UUID.randomUUID().toString();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_cashier_audit CHECK(action<>'SUPPLIER_PAYMENT_EXECUTE' OR application_id<>'" + app(request).id() + "')");
+        try { assertThatThrownBy(() -> send(cashierPath(id) + "/actions", "cashier", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_cashier_audit"); }
+        assertThat(cashierRequests.owner("demo", id)).isEmpty(); assertThat(bankPayments.find("demo", id)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?", Integer.class, key)).isZero();
+        ok(send(cashierPath(id) + "/actions", "cashier", key, input), 202); assertThat(cashierRequests.owner("demo", id)).isPresent();
+    }
+
+    @Test void anotherEligibleCashierCanTrackButCannotResendTheOriginalCashiersCommand() throws Exception {
+        UUID id = authorizedHold(approved()); var response = ok(send(cashierPath(id) + "/actions", "cashier", executeInput(cashierView(id))), 202);
+        pollPreparation(UUID.fromString(response.path("preparationId").asText()));
+        var originalAppointment = jdbc.queryForMap("SELECT department_id,position_id FROM organization_appointment WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+        organization.createAppointment(admin, person("bob", false), UUID.fromString(originalAppointment.get("department_id").toString()), UUID.fromString(originalAppointment.get("position_id").toString()), true);
+        actors.set(new Actor("demo", "bob", Set.of("CASHIER")));
+        try {
+            assertThat(cashierAccess.requireCashier(id).id()).isEqualTo(id);
+            assertThatThrownBy(() -> cashierAccess.requireResend(id)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, error -> assertThat(error.code()).isEqualTo("FORBIDDEN"));
+        } finally { actors.clear(); }
+        actors.set(new Actor("other", "cashier", Set.of("CASHIER")));
+        try { assertThatThrownBy(() -> cashierAccess.requireCashier(id)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, error -> assertThat(error.code()).isEqualTo("NOT_FOUND")); }
+        finally { actors.clear(); }
+        assertThat(bankPayments.find("demo", id).orElseThrow().dispatches()).isZero();
+    }
+
+    private UUID authorizedHold(UUID request) throws Exception {
+        queueAndRead(request); var receipt = ok(send(financePath(request) + "/authorizations", "finance", authorizeInput(request, view(request, "finance"))), 202);
+        UUID id = UUID.fromString(receipt.path("authorizationId").asText()); pollHold(id); return id;
+    }
+    private String cashierPath(UUID id) { return "/api/v1/cashier/supplier-payments/" + id; }
+    private JsonNode cashierView(UUID id) throws Exception { var response = read(cashierPath(id), "cashier"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200); }
+    private Map<String, Object> executeInput(JsonNode view) { return Map.of("action", "EXECUTE", "holdVersion", view.at("/hold/version").asLong(), "debitAccountReference", "debit-1", "debitAccountVersion", "debit-v1", "comment", "已核对供应商、原应付预留与本次出款账户"); }
+    private Map<String, Object> bankAction(JsonNode view, String action) { return Map.of("action", action, "operationVersion", view.at("/operation/version").asLong(), "comment", "按原编号核对银行交易"); }
+    private void assertCashierPrivateFactsAbsent(JsonNode value) { assertPrivateFactsAbsent(value); assertThat(value.toString()).doesNotContain("commandDigest", "private-erp-hold", "private-ledger", "CONTRACT-1", "ACCEPTANCE-1", "debit-1"); }
+    private void pollPreparation(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierPaymentExecutionRepository.class);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(new JdbcSupplierPaymentExecutionRepository.Candidate("demo", id)));
+        new SupplierPaymentExecutionWorker(candidates, cashierPreparation, bankReader).poll();
+    }
+    private void pollBank(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierPaymentOperationRepository.class);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(new JdbcSupplierPaymentOperationRepository.Candidate("demo", id)));
+        new SupplierPaymentWorker(candidates, bankService, bankReader, bankPort).poll();
+    }
+    private PaymentAccountsPort.Directory directory(PaymentAccountsPort.Request request, Instant observedAt) {
+        return new PaymentAccountsPort.Directory(request, "directory-v1", observedAt, observedAt.plusSeconds(600), List.of(new PaymentAccountsPort.DebitAccount("debit-1", "法人基本户", "****5678", "CNY", "debit-v1")));
+    }
+    private PaymentObservation bankObservation(SupplierPaymentCommand command, PaymentObservation.Status status) {
+        return status == PaymentObservation.Status.NOT_FOUND
+                ? new PaymentObservation(command.id(), command.digest(), status, 0L, Instant.now(), null, null, null, null, null, null)
+                : new PaymentObservation(command.id(), command.digest(), status, 1L, Instant.now(), "BANK-1", command.amount(), command.payee().accountDigest(), command.registeredAt(), "RECEIPT-1", null);
+    }
+
     private UUID approved() throws Exception {
         UUID id = id(ok(send("/api/v1/procurement-payments", "alice", createBody(published(), content("70"))), 201)); submit(id);
         ok(send(actionPath(id), "finance", decision(id, "APPROVE")), 200); ok(send(actionPath(id), "manager", decision(id, "APPROVE")), 200); return id;
@@ -333,6 +490,9 @@ class SupplierFinanceWorkflowTest {
             case "procurement-payable" -> payable(json.read(request.path("data").toString(), ProcurementPayablePort.Request.class));
             case "supplier-payable-hold-command" -> held(json.read(request.at("/data/command").toString(), SupplierPayableHoldCommand.class));
             case "supplier-payable-hold-query" -> held(holds.find("demo", UUID.fromString(request.at("/data/authorizationId").asText())).orElseThrow().command());
+            case "debit-accounts" -> directory(json.read(request.path("data").toString(), PaymentAccountsPort.Request.class), Instant.now());
+            case "supplier-payment-command" -> bankObservation(json.read(request.at("/data/command").toString(), SupplierPaymentCommand.class), PaymentObservation.Status.SUCCEEDED);
+            case "supplier-payment-query" -> bankObservation(bankPayments.find("demo", UUID.fromString(request.at("/data/authorizationId").asText())).orElseThrow().command(), PaymentObservation.Status.SUCCEEDED);
             default -> throw new IllegalArgumentException("Unexpected finance operation from supplier finance");
         };
         return json.write(Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", result));

@@ -5,6 +5,10 @@ import io.agentflow.common.JsonUtil;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,6 +63,17 @@ public class JdbcSupplierPaymentAuthorizationRepository {
     /** 新授权独占实际批准申请，结束后的原授权不会重新占用。 */
     public Optional<SupplierPaymentAuthorization> activeForRequest(String tenant, UUID requestId) {
         return jdbc.query("SELECT * FROM supplier_payment_authorization WHERE tenant_id=? AND active_request_id=?", this::restore, tenant, requestId.toString()).stream().findFirst();
+    }
+
+    /** 先按服务端取得的当前法人任职过滤再分页，不把其他法人的授权计入游标。 */
+    public List<SupplierPaymentAuthorization> cashierPage(String tenant, List<UUID> entities, Instant beforeTime, UUID beforeId, int limit) {
+        if (entities.isEmpty()) return List.of();
+        var values = new ArrayList<Object>(); values.add(tenant); entities.forEach(entity -> values.add(entity.toString()));
+        String cursor = "";
+        if (beforeId != null) { cursor = " AND (authorized_at<? OR (authorized_at=? AND id<?))"; values.add(Timestamp.from(beforeTime)); values.add(Timestamp.from(beforeTime)); values.add(beforeId.toString()); }
+        values.add(limit + 1);
+        return jdbc.query("SELECT * FROM supplier_payment_authorization WHERE tenant_id=? AND legal_entity_id IN ("
+                + String.join(",", Collections.nCopies(entities.size(), "?")) + ")" + cursor + " ORDER BY authorized_at DESC,id DESC LIMIT ?", this::restore, values.toArray());
     }
 
     /** 先保存绑定当前安全修订的结束证据，再解除独占；任一步失败回滚原操作停止与结束决定。 */

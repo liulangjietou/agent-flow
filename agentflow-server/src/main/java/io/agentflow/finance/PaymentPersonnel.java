@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * 财务执行只面向当前法人内仍在用的人员；系统角色仍由认证入口校验，本地任职不授予角色。
@@ -27,6 +28,10 @@ public class PaymentPersonnel {
     /** 人员、法人、部门、岗位及任职必须同时有效，其他法人的相同角色不能取得付款范围。 */
     public boolean eligible(String tenant, String user, UUID legalEntityId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(" + ELIGIBLE_ENTITIES + " AND l.id=?)", Boolean.class, tenant, user, legalEntityId.toString()));
+    }
+    /** 供应商出纳目录在数据库分页前使用真实任职范围，不接受客户端传入的法人列表。 */
+    public List<UUID> legalEntities(String tenant, String user) {
+        return jdbc.query("SELECT DISTINCT id FROM (" + ELIGIBLE_ENTITIES + ") eligible_entities", (row, index) -> UUID.fromString(row.getString("id")), tenant, user);
     }
     /** 后台在领取和发送登记时重读当前组织，停用或结束任职后阻止新发送。 */
     public void requireEligible(String tenant, String user, UUID legalEntityId) {
