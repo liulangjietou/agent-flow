@@ -51,7 +51,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
-        "agentflow.budgets.worker-enabled=false"})
+        "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpenseSubmissionIntegrationTest {
     private static final HttpServer SERVER = server();
@@ -80,6 +80,8 @@ class ExpenseSubmissionIntegrationTest {
     private final Map<UUID, VoucherCommand> voucherCommands = new ConcurrentHashMap<>();
     private final Map<UUID, PaymentCommand> paymentCommands = new ConcurrentHashMap<>();
     private String paymentMode = "SUCCEEDED";
+    private boolean verificationUnavailable;
+    private String advanceOffset = "50";
     private int paymentWrites;
     private int accountReads;
     private UUID cashierAppointment;
@@ -103,6 +105,11 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired ApplicationRepository applications;
     @Autowired ExpenseReportRepository reports;
+    @Autowired JdbcExpenseSettlementRepository settlements;
+    @Autowired ExpenseSettlementWorker settlementWorker;
+    @Autowired ExpenseSettlementService settlementService;
+    @Autowired ExpenseSettlementRegistration settlementRegistration;
+    @Autowired PaymentOperationService paymentExecution;
     @Autowired ApprovedVoucherSources voucherSources;
     @Autowired JdbcVoucherPreparationRepository voucherPreparations;
     @Autowired VoucherPreparationWorker voucherPreparationWorker;
@@ -147,6 +154,8 @@ class ExpenseSubmissionIntegrationTest {
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
+            jdbc.update("DELETE FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_settlement WHERE tenant_id='demo' AND report_id=?", report.toString());
             String authorizations = "SELECT id FROM payment_authorization WHERE tenant_id='demo' AND business_id=?";
             jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + "))", report.toString());
             jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
@@ -398,6 +407,10 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(voucherPreparations.find("demo", preparation.input().id()).orElseThrow().status()).isEqualTo(VoucherPreparation.Status.NOT_REQUIRED);
         assertThat(voucherOperations.find("demo", preparation.input().id())).isEmpty();
         assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.FROZEN);
+        var versions = resourceVersions(report); settlementWorker.poll(); budgetWorker.poll();
+        var settled = settlements.find("demo", report.id()).orElseThrow(); assertThat(settled.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(settled.input().voucherOperationId()).isNull(); assertThat(settled.input().payment()).isNull();
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isZero();
     }
 
     @Test
@@ -737,6 +750,150 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(read(path + "?taskId=" + receiptTask, "finance").getStatus()).isEqualTo(403);
     }
 
+    @Test void confirmedExpensePaymentRegistersSettlementWithoutConsumingResourcesInsideTheBankCallback() throws Exception {
+        var report = paidExpense(); var original = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(original.status()).isEqualTo(ExpenseSettlement.Status.QUEUED); assertThat(original.resourcesConsumed()).isFalse();
+        var invoiceId = current(report).currentRound().originalLines().get(0).original().invoiceIds().get(0);
+        assertThat(invoices.find("demo", invoiceId).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.OCCUPIED);
+        settlementWorker.poll(); var pending = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(pending.status()).isEqualTo(ExpenseSettlement.Status.BUDGET_PENDING); assertThat(pending.resourcesConsumed()).isTrue();
+        assertThat(pending.input().payment().amount()).isEqualTo(money("50"));
+        assertThat(invoices.find("demo", invoiceId).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+        var round = current(report).currentRound(); var prior = round.originalLines().get(0).original().priorRequest();
+        assertThat(requests.find("demo", prior.requestId()).orElseThrow().balance(1).consumed()).isEqualTo(money("100"));
+        assertThat(advances.find("demo", round.advanceOffsets().get(0).advanceId()).orElseThrow().balance().consumed()).isEqualTo(money("50"));
+        var versions = resourceVersions(report); settlementWorker.poll(); assertThat(resourceVersions(report)).isEqualTo(versions);
+        budgetWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.CONSUMED);
+        var payment = paymentOperations.find("demo", original.input().payment().operationId()).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", payment.input().command().id(), payment.version(), Instant.now())); paymentWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().input()).isEqualTo(original.input());
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void budgetConsumeRejectionRetriesOnlyBudgetAndKeepsConsumedResources() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); var versions = resourceVersions(report);
+        var first = settlements.find("demo", report.id()).orElseThrow().budgetOperationId();
+        budgetStatus = BudgetObservation.Status.REJECTED; budgetRejection = BudgetObservation.Rejection.ACCOUNTING_PERIOD_CLOSED; budgetWorker.poll();
+        var rejected = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(rejected.status()).isEqualTo(ExpenseSettlement.Status.BUDGET_REJECTED); assertThat(rejected.issue()).isEqualTo("BUDGET_ACCOUNTING_PERIOD_CLOSED");
+        budgetStatus = BudgetObservation.Status.APPLIED;
+        String path = path(report) + "/settlement"; var readResponse = read(path, "finance"); var view = ok(readResponse, 200);
+        assertThat(readResponse.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(view.path("canRetry").asBoolean()).isTrue();
+        assertThat(view.toString()).doesNotContain("account", "commandDigest", "targetDigest", "receiptReference", "synthetic-payment");
+        assertThat(ok(read(path, "alice"), 200).path("canRetry").asBoolean()).isFalse();
+        for (String user : List.of("bob", "cashier", "admin")) assertThat(read(path, user).getStatus()).isIn(403, 404);
+        assertThat(read(path + "?tenantId=foreign", "finance").getStatus()).isEqualTo(400);
+        assertThat(read(path + "?roundNo=0", "finance").getStatus()).isEqualTo(400);
+        var input = Map.<String, Object>of("roundNo", app(report).roundNo(), "applicationVersion", app(report).version(), "financialVersion", current(report).version(), "settlementVersion", rejected.version(), "comment", "会计期间已重新核对");
+        for (String user : List.of("alice", "manager", "admin", "bob", "cashier")) assertThat(send(path + "/retry", user, input).getStatus()).isIn(403, 404);
+        var forged = new HashMap<>(input); forged.put("resourcesConsumed", false); assertThat(send(path + "/retry", "finance", forged).getStatus()).isEqualTo(400);
+        var stale = new HashMap<>(input); stale.put("settlementVersion", rejected.version() - 1); assertCode(send(path + "/retry", "finance", stale), "CONCURRENCY_CONFLICT");
+        String key = UUID.randomUUID().toString(); var response = send(path + "/retry", "finance", key, input); ok(response, 202);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(path + "/retry", "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(path + "/retry", "finance", key, input).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_SETTLEMENT_RETRY'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        settlementWorker.poll();
+        assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().budgetOperationId()).isNotEqualTo(first);
+        budgetWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void localRevisionFailureRollsBackAllConsumptionAndBudgetQueueButNotBankSuccess() throws Exception {
+        var report = paidExpense(); var queued = settlements.find("demo", report.id()).orElseThrow(); var versions = resourceVersions(report);
+        jdbc.update("INSERT INTO expense_settlement_revision(tenant_id,report_id,version,state_json) VALUES('demo',?,2,?)", report.id().toString(), json.write(queued));
+        settlementWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow()).isEqualTo(queued);
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(occupations.find("demo", report.id()).orElseThrow().pendingOperationId()).isNull();
+        assertThat(paymentOperations.find("demo", queued.input().payment().operationId()).orElseThrow().settleable()).isTrue();
+        jdbc.update("DELETE FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=? AND version=2", report.id().toString());
+        settlementWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.BUDGET_PENDING);
+    }
+
+    @Test void disputedAdvanceBlocksWholeConsumptionWithoutErasingBankReceipt() throws Exception {
+        var report = paidExpense(); var id = current(report).currentRound().advanceOffsets().get(0).advanceId();
+        var advance = advances.find("demo", id).orElseThrow(); long version = advance.version(); advance.requirePaymentReview(version); advances.update(advance, version, "fixture", "PAYMENT_REVIEW");
+        var versions = resourceVersions(report); settlementWorker.poll(); var blocked = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(blocked.status()).isEqualTo(ExpenseSettlement.Status.BLOCKED); assertThat(blocked.issue()).isEqualTo("ADVANCE_PAYMENT_REVIEW_REQUIRED");
+        assertThat(blocked.resourcesConsumed()).isFalse(); assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThat(paymentOperations.find("demo", blocked.input().payment().operationId()).orElseThrow().settleable()).isTrue();
+    }
+
+    @Test void failedReverificationAfterReservationBlocksUntilActualNewSuccess() throws Exception {
+        var report = paidExpense(); var invoice = current(report).currentRound().originalLines().get(0).original().invoiceIds().get(0);
+        verificationUnavailable = true; verify(invoice); var versions = resourceVersions(report); settlementWorker.poll();
+        var blocked = settlements.find("demo", report.id()).orElseThrow(); assertThat(blocked.issue()).isEqualTo("INVOICE_VERIFICATION_REQUIRED");
+        assertThat(resourceVersions(report)).isEqualTo(versions); verificationUnavailable = false; verify(invoice);
+        tx().executeWithoutResult(status -> settlementService.retry("demo", report.id(), blocked.version())); settlementWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.BUDGET_PENDING);
+    }
+
+    @Test void fullAdvanceOffsetSettlesAfterAccrualWithoutAnyPaymentAuthorizationOrBankCall() throws Exception {
+        advanceOffset = "100"; var fixture = fixture(true); var report = fixture.report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        voucherPreparationWorker.poll(); assertThat(settlements.find("demo", report.id())).isEmpty(); voucherWorker.poll();
+        var queued = settlements.find("demo", report.id()).orElseThrow(); assertThat(queued.input().payment()).isNull(); assertThat(queued.input().payable()).isEqualTo(money("0"));
+        settlementWorker.poll(); budgetWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().consumed()).isEqualTo(money("100"));
+        assertThat(paymentAuthorizations.latest("demo", report.applicationId(), 1)).isEmpty(); assertThat(paymentWrites).isZero();
+    }
+
+    @Test void lateSuccessAfterApprovalRevocationIsRecordedButCannotConsume() throws Exception {
+        var report = paymentReport(true); UUID id = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
+        paymentMode = "INVALID"; paymentWorker.poll(); var unknown = paymentOperations.find("demo", id).orElseThrow();
+        assertThat(unknown.status()).isEqualTo(PaymentOperation.Status.UNKNOWN);
+        jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", report.applicationId().toString());
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", id, unknown.version(), Instant.now())); paymentMode = "SUCCEEDED"; paymentWorker.poll();
+        assertThat(paymentOperations.find("demo", id).orElseThrow().settleable()).isTrue(); var versions = resourceVersions(report); settlementWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.BLOCKED); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    @Test void upgradeRecoveryUsesOriginalPaidFactWithoutQueryingOrSendingAgain() throws Exception {
+        var report = paidExpense(); var queued = settlements.find("demo", report.id()).orElseThrow();
+        jdbc.update("DELETE FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=?", report.id().toString());
+        jdbc.update("DELETE FROM expense_settlement WHERE tenant_id='demo' AND report_id=?", report.id().toString());
+        var candidate = settlements.recoveryCandidates(null).stream().filter(value -> value.kind() == JdbcExpenseSettlementRepository.FundingKind.PAYMENT && value.reportId().equals(report.id())).findFirst().orElseThrow();
+        settlementRegistration.recover(candidate); settlementRegistration.recover(candidate);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().input()).isEqualTo(queued.input()); assertThat(paymentWrites).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+    }
+
+    @Test void bankReturnFreezesExistingConsumptionAndLateBudgetSuccessCannotClearReview() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); var original = settlements.find("demo", report.id()).orElseThrow(); var versions = resourceVersions(report);
+        var payment = paymentOperations.find("demo", original.input().payment().operationId()).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", payment.input().command().id(), payment.version(), Instant.now())); paymentMode = "REVERSED"; paymentWorker.poll();
+        var review = settlements.find("demo", report.id()).orElseThrow(); assertThat(review.status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(review.input()).isEqualTo(original.input()); assertThat(review.resourcesConsumed()).isTrue();
+        budgetWorker.poll(); settlementWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow()).isEqualTo(review);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.CONSUMED);
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void reversedAccrualFreezesSettledReportWithoutReopeningInvoicesOrOffsets() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); var versions = resourceVersions(report);
+        var source = ok(read(voucherPath(report), "finance"), 200); voucherMode = "REVERSED";
+        ok(send(voucherPath(report) + "/actions", "finance", voucherInput(report, "QUERY", source.path("operation"))), 202); voucherWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().issue()).isEqualTo("EXPENSE_VOUCHER_REVIEW"); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    private ExpenseReport paidExpense() throws Exception {
+        var report = paymentReport(true); UUID id = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); paymentWorker.poll(); assertThat(paymentOperations.find("demo", id).orElseThrow().settleable()).isTrue(); return report;
+    }
+    private List<ExpensePrecheckEvidence.ResourceVersion> resourceVersions(ExpenseReport report) {
+        var round = current(report).currentRound(); var original = round.originalLines().get(0).original();
+        return List.of(new ExpensePrecheckEvidence.ResourceVersion(ExpensePrecheckEvidence.ResourceKind.INVOICE, original.invoiceIds().get(0), invoices.find("demo", original.invoiceIds().get(0)).orElseThrow().version()),
+                new ExpensePrecheckEvidence.ResourceVersion(ExpensePrecheckEvidence.ResourceKind.PRIOR_REQUEST, original.priorRequest().requestId(), requests.find("demo", original.priorRequest().requestId()).orElseThrow().version()),
+                new ExpensePrecheckEvidence.ResourceVersion(ExpensePrecheckEvidence.ResourceKind.ADVANCE, round.advanceOffsets().get(0).advanceId(), advances.find("demo", round.advanceOffsets().get(0).advanceId()).orElseThrow().version()));
+    }
+    private org.springframework.transaction.support.TransactionTemplate tx() { return new org.springframework.transaction.support.TransactionTemplate(transactionManager); }
+
     private MockHttpServletResponse read(String path, String user) throws Exception {
         return mvc.perform(get(path).header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn().getResponse();
     }
@@ -764,7 +921,7 @@ class ExpenseSubmissionIntegrationTest {
             advances.create(advance, "fixture"); advanceId = advance.id();
         }
         var definition = definition(); var content = new ExpenseContent(entity, ExpenseContent.Type.DAILY, "合成正式报销",
-                List.of(line(invoice, priorId)), advanceId == null ? List.of() : List.of(new AdvanceOffset(advanceId, money("50"))));
+                List.of(line(invoice, priorId)), advanceId == null ? List.of() : List.of(new AdvanceOffset(advanceId, money(advanceOffset))));
         var response = ok(send("/api/v1/expense-reports", "alice", Map.of("businessNo", "SYNTHETIC-" + UUID.randomUUID(), "processKey", definition.key(), "definitionVersion", definition.version(), "content", content)), 201);
         UUID id = UUID.fromString(response.path("id").asText()); created.add(id);
         return new Fixture(reports.find("demo", id).orElseThrow(), invoice, priorId, advanceId);
@@ -836,12 +993,13 @@ class ExpenseSubmissionIntegrationTest {
     private String path(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id(); }
     private String voucherPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/vouchers"; }
     private String paymentPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/payments"; }
-    private ExpenseReport paymentReport() throws Exception {
+    private ExpenseReport paymentReport() throws Exception { return paymentReport(false); }
+    private ExpenseReport paymentReport(boolean resources) throws Exception {
         var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成付款部门", entity, null, true);
         var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成付款岗位", entity, null, true);
         organization.createAppointment(admin, finance, department.id(), position.id(), true);
         cashierAppointment = organization.createAppointment(admin, person("cashier", false), department.id(), position.id(), true).id();
-        var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        var report = fixture(resources).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
         voucherPreparationWorker.poll(); voucherWorker.poll();
         assertThat(voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow().usablePosted()).isTrue();
         return report;
@@ -902,10 +1060,11 @@ class ExpenseSubmissionIntegrationTest {
                 else command = paymentCommands.get(UUID.fromString(data.path("authorizationId").asText()));
                 if (paymentMode.equals("INVALID")) yield Map.of("invalidFixture", true);
                 if (paymentMode.equals("NOT_FOUND")) yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null);
-                yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 1L, Instant.now(), "synthetic-payment", command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "synthetic-bank-receipt", null);
+                yield new PaymentObservation(command.id(), command.digest(), paymentMode.equals("REVERSED") ? PaymentObservation.Status.REVERSED : PaymentObservation.Status.SUCCEEDED,
+                        paymentMode.equals("REVERSED") ? 2L : 1L, Instant.now(), "synthetic-payment", command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), paymentMode.equals("REVERSED") ? "synthetic-return-receipt" : "synthetic-bank-receipt", null);
             }
             case "exchange-rate" -> new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic", LocalDate.parse(data.path("rateDate").asText()));
-            case "invoice-verification" -> new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-verification", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
+            case "invoice-verification" -> verificationUnavailable ? Map.of("unavailableFixture", true) : new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-verification", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(json.read(data.toString(), BudgetPrecheckPort.Request.class), "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "accounting-period" -> {
@@ -922,7 +1081,7 @@ class ExpenseSubmissionIntegrationTest {
                 else command = voucherCommands.get(UUID.fromString(data.path("operationId").asText()));
                 if (voucherMode.equals("INVALID")) yield Map.of("invalidFixture", true);
                 if (voucherMode.equals("NOT_FOUND")) yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null, null, null);
-                yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, Instant.now(), "synthetic-posting", "synthetic-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
+                yield new VoucherObservation(command.id(), command.digest(), voucherMode.equals("REVERSED") ? VoucherObservation.Status.REVERSED : VoucherObservation.Status.POSTED, voucherMode.equals("REVERSED") ? 2L : 1L, Instant.now(), "synthetic-posting", "synthetic-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
             }
             case "budget-command", "budget-query" -> {
                 BudgetCommand command;

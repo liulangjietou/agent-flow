@@ -200,10 +200,10 @@ public final class ExpenseSubmissionResources {
      */
     public record AdvanceChange(EmployeeAdvance.State after, Operation operation) { }
     /**
-     * 提交只允许预留、迁移或释放，不在此核销资金。
+     * 资源计划的真实用途；提交、核减与结算各自限制可产生的操作。
      * @author owlzhangfq@gmail.com
      */
-    public enum Operation { RESERVE, MOVE, RELEASE, REDUCE }
+    public enum Operation { RESERVE, MOVE, RELEASE, REDUCE, CONSUME }
     /**
      * 事前批准行及报销行的配对，迁移不得串到另一行的额度。
      * @author owlzhangfq@gmail.com

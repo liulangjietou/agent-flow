@@ -206,6 +206,52 @@ class ExpenseSubmissionResourcesTest {
         fails("EXPENSE_RESERVATION_CHANGED", () -> new ExpenseReductionResources().plan(before, after, resources(List.of(), List.of(consumed), List.of())));
     }
 
+    @Test
+    void settlementConsumesExactApprovedResourcesAndPreservesEachSharedSourceVersion() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("250"); var advance = advance("180");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id()), line(2, "100", List.of(), prior.id())), List.of(new AdvanceOffset(advance.id(), money("150"))));
+        var input = resources(List.of(invoice), List.of(prior), List.of(advance)); var reserved = applied(input, planner.plan(report, input, NOW));
+        var plan = new ExpenseSettlementResources().plan(report, reserved, NOW.plusSeconds(1)); var settled = applied(reserved, plan);
+        assertThat(plan.requests()).extracting(value -> value.after().version()).containsExactly(4L, 5L);
+        assertThat(settled.invoices().get(invoice.id()).occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+        assertThat(settled.requests().get(prior.id()).balances().get(1).consumed()).isEqualTo(money("200"));
+        assertThat(settled.requests().get(prior.id()).balances().get(1).available()).isEqualTo(money("50"));
+        assertThat(settled.advances().get(advance.id()).balance().consumed()).isEqualTo(money("150"));
+        assertThat(settled.advances().get(advance.id()).balance().available()).isEqualTo(money("30"));
+        assertThat(reserved.advances().get(advance.id()).balance().consumed()).isEqualTo(money("0"));
+        fails("INVOICE_OCCUPATION_CHANGED", () -> new ExpenseSettlementResources().plan(report, settled, NOW.plusSeconds(2)));
+    }
+
+    @Test
+    void zeroPayableSettlementConsumesOffsetsAndDoesNotTouchPreviouslyReleasedZeroLines() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var advance = advance("100");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), null), line(2, "100", List.of(), null)), List.of(new AdvanceOffset(advance.id(), money("100"))));
+        var input = resources(List.of(invoice), List.of(), List.of(advance)); var reserved = applied(input, planner.plan(report, input, NOW));
+        var reduced = ExpenseReport.restore(report.state()); reduced.reduce(reduced.version(), List.of(new ExpenseReport.Reduction(1, money("0"), money("0"))), "finance", "INELIGIBLE_COST", "归零释放", NOW.plusSeconds(1));
+        var released = applied(reserved, new ExpenseReductionResources().plan(report, reduced, reserved));
+        var reused = Invoice.restore(released.invoices().get(invoice.id())); reused.occupy(reused.version(), new ExpenseUse(UUID.randomUUID(), 1, 1), "alice", ENTITY, NOW.plusSeconds(2));
+        var current = new ExpenseSubmissionResources.Resources(Map.of(invoice.id(), reused.state()), released.requests(), released.advances());
+        var plan = new ExpenseSettlementResources().plan(reduced, current, NOW.plusSeconds(3));
+        assertThat(reduced.currentRound().payable()).isEqualTo(money("0")); assertThat(plan.invoices()).isEmpty();
+        assertThat(plan.advances().get(0).after().balance().consumed()).isEqualTo(money("100"));
+        assertThat(current.invoices().get(invoice.id()).use()).isEqualTo(reused.use());
+    }
+
+    @Test
+    void settlementFailureOnDisputedAdvanceLeavesEarlierInvoiceAndPriorPlansUnapplied() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("100"); var advance = advance("50");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id())), List.of(new AdvanceOffset(advance.id(), money("50"))));
+        var input = resources(List.of(invoice), List.of(prior), List.of(advance)); var reserved = applied(input, planner.plan(report, input, NOW));
+        var held = EmployeeAdvance.restore(reserved.advances().get(advance.id())); held.requirePaymentReview(held.version());
+        var current = new ExpenseSubmissionResources.Resources(reserved.invoices(), reserved.requests(), Map.of(held.id(), held.state()));
+        fails("ADVANCE_PAYMENT_REVIEW_REQUIRED", () -> new ExpenseSettlementResources().plan(report, current, NOW.plusSeconds(1)));
+        assertThat(current.invoices().get(invoice.id()).occupation()).isEqualTo(Invoice.Occupation.OCCUPIED);
+        assertThat(current.requests().get(prior.id()).balances().get(1).consumed()).isEqualTo(money("0"));
+        fails("INVOICE_VERIFICATION_REQUIRED", () -> new ExpenseSettlementResources().plan(report, reserved, NOW.plusSeconds(300)));
+        fails("EXPENSE_RESERVATION_CHANGED", () -> new ExpenseSettlementResources().plan(report,
+                new ExpenseSubmissionResources.Resources(reserved.invoices(), input.requests(), reserved.advances()), NOW.plusSeconds(1)));
+    }
+
     private ExpenseReport frozen(List<ExpenseLine> lines, List<AdvanceOffset> offsets) {
         var report = ExpenseReport.draft(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", content(lines, offsets)); freeze(report, NOW); return report;
     }

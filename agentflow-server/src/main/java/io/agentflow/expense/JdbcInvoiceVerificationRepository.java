@@ -90,6 +90,19 @@ public class JdbcInvoiceVerificationRepository {
                 .collect(java.util.stream.Collectors.toUnmodifiableMap(value -> value.input().invoiceId(), value -> value));
     }
 
+    /** 占用会增加发票版本；核销接受占用前成功验票，但后续任意新查验必须已成功。 */
+    public java.util.Map<UUID, InvoiceVerificationJob> settlementReceipts(String tenant, java.util.Collection<UUID> invoiceIds) {
+        if (invoiceIds.isEmpty()) return java.util.Map.of();
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+                SELECT j.* FROM invoice_verification_job j JOIN finance_resource r
+                ON r.tenant_id=j.tenant_id AND r.resource_type='INVOICE' AND r.id=j.invoice_id
+                WHERE j.tenant_id=:tenant AND j.invoice_id IN (:ids) AND j.status='SUCCEEDED' AND j.invoice_version<r.version
+                AND NOT EXISTS (SELECT 1 FROM invoice_verification_job later WHERE later.tenant_id=j.tenant_id
+                    AND later.invoice_id=j.invoice_id AND later.invoice_version>j.invoice_version)
+                """, java.util.Map.of("tenant", tenant, "ids", invoiceIds.stream().map(UUID::toString).toList()), row()).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(value -> value.input().invoiceId(), value -> value));
+    }
+
     /** 每次只扫描十项，过期运行用于结算超时而非再次发送。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""

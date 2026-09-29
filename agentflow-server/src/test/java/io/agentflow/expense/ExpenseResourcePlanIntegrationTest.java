@@ -43,6 +43,7 @@ class ExpenseResourcePlanIntegrationTest {
     @Autowired ApplicationRepository applications;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ExpenseResourceChanges changes;
 
     @Test
     void actualDatabaseAcceptsCanonicalReplacementAndPreservesEveryRedistributionRevision() {
@@ -84,6 +85,31 @@ class ExpenseResourcePlanIntegrationTest {
         assertThat(advances.find("demo", advance.id()).orElseThrow().balance().available()).isEqualTo(money("90"));
         assertThat(journal("INVOICE", invoice.id())).isEqualTo(2); assertThat(journal("PRIOR_REQUEST", prior.id())).isEqualTo(1);
         var unchanged = reports.find("demo", report.id()).orElseThrow(); assertThat(unchanged.version()).isEqualTo(1); assertThat(unchanged.rounds()).isEmpty();
+    }
+
+    @Test
+    void settlementPlanCommitsAllResourceUsesOrRollsThemBackOnTheLastBalanceConflict() {
+        var invoice = invoice("32345678901234567890"); var prior = request();
+        var advance = new EmployeeAdvance(UUID.randomUUID(), "demo", ENTITY, "alice", money("100"), "synthetic-" + UUID.randomUUID(), DATE, DATE.plusDays(30)); advances.create(advance, "fixture");
+        var report = report(List.of(line(1, "100", List.of(invoice.id()), prior.id())), List.of(new AdvanceOffset(advance.id(), money("50"))));
+        freeze(report); persist(report, planner.plan(report, resources(List.of(invoice), List.of(prior), List.of(advance)), NOW));
+        var reserved = resources(List.of(invoices.find("demo", invoice.id()).orElseThrow()), List.of(requests.find("demo", prior.id()).orElseThrow()), List.of(advances.find("demo", advance.id()).orElseThrow()));
+        var planned = new ExpenseSettlementResources().plan(report, reserved, NOW.plusSeconds(1));
+        var concurrent = advances.find("demo", advance.id()).orElseThrow(); var other = report(List.of(), List.of());
+        concurrent.reserve(concurrent.version(), new ExpenseUse(other.id(), 1, 0), money("10")); advances.update(concurrent, concurrent.version() - 1, "alice", "OTHER_RESERVE");
+        var transaction = new TransactionTemplate(transactions);
+        assertThatExceptionOfType(DomainException.class).isThrownBy(() -> transaction.executeWithoutResult(status -> changes.persist(planned, "system:settlement")))
+                .satisfies(failure -> assertThat(failure.code()).isEqualTo("CONCURRENCY_CONFLICT"));
+        assertThat(invoices.find("demo", invoice.id()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.OCCUPIED);
+        assertThat(requests.find("demo", prior.id()).orElseThrow().balance(1).consumed()).isEqualTo(money("0"));
+        assertThat(journal("INVOICE", invoice.id())).isEqualTo(3);
+        var current = new ExpenseSubmissionResources.Resources(reserved.invoices(), reserved.requests(), Map.of(concurrent.id(), concurrent.state()));
+        transaction.executeWithoutResult(status -> changes.persist(new ExpenseSettlementResources().plan(report, current, NOW.plusSeconds(2)), "system:settlement"));
+        assertThat(invoices.find("demo", invoice.id()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+        assertThat(requests.find("demo", prior.id()).orElseThrow().balance(1).consumed()).isEqualTo(money("100"));
+        var settled = advances.find("demo", advance.id()).orElseThrow().balance();
+        assertThat(settled.consumed()).isEqualTo(money("50")); assertThat(settled.reservedFor(new ExpenseUse(other.id(), 1, 0))).isEqualTo(money("10"));
+        assertThat(jdbc.queryForObject("SELECT status FROM invoice_active_claim WHERE tenant_id='demo' AND invoice_id=?", String.class, invoice.id().toString())).isEqualTo("CONSUMED");
     }
 
     private void persist(ExpenseReport report, ExpenseSubmissionResources.Plan plan) {
