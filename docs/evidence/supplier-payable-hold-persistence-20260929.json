@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-29",
+  "status": "INTERNAL_PERSISTENCE_AND_RECOVERY_VERIFIED_LOCALLY",
+  "migration": "V68__supplier_payable_holds.sql",
+  "verification": {
+    "h2_final_domain_tests": 19,
+    "h2_final_server_tests": 38,
+    "postgres_run_domain_tests": 18,
+    "postgres_actual_database_tests": 48,
+    "postgres_run_openapi_h2_tests": 5,
+    "test_scopes_overlap": true,
+    "java_files_checked": 879,
+    "named_types_checked": 1623,
+    "missing_authors": 0,
+    "parse_errors": 0,
+    "git_diff_check": "PASS"
+  },
+  "verified_behaviors": [
+    "Actual approved application version, procurement version, payload and active local reservation required",
+    "One authorization and one queue for simultaneous attempts on the same approved request",
+    "Authorization, queue and revision rollback together",
+    "Only one process claims; expired claim recovers by query and ignores late responses",
+    "Immutable commands and relational bindings checked on restore",
+    "New sends stop after source or finance appointment changes; unknown results still query after expiry",
+    "Worker transport outside database transaction and thrown write recovered by query only",
+    "V67 upgrade preserves original procurement, reservation and invoice-origin rows"
+  ],
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-hold-persistence-h2-final.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-hold-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-hold-persistence-authors.log"
+  ],
+  "acceptance_service": {
+    "schema": "V67",
+    "replaced": false,
+    "migrated": false
+  },
+  "not_yet_implemented": [
+    "Safe authorization retirement and replacement",
+    "Fresh payable review and public finance workspace",
+    "Cashier supplier payment and ERP settlement",
+    "Real enterprise ERP acceptance"
+  ]
+}

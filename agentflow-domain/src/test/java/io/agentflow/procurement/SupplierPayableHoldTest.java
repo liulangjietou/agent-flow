@@ -176,6 +176,20 @@ class SupplierPayableHoldTest {
         assertThat(completed.failure()).isEqualTo(SupplierPayableHoldOperation.Failure.INVALID_RESPONSE);
     }
 
+    @Test void sourceChangeStopsOnlyUnclaimedSendingAndPreservesPriorDispatchQueryability() {
+        var queued = queued(); var stopped = queued.voidBeforeSend(AUTHORIZED_AT);
+        assertThat(stopped.status()).isEqualTo(SupplierPayableHoldOperation.Status.VOIDED); assertThat(stopped.dispatches()).isZero();
+        var sending = queued.claim(AUTHORIZED_AT, LEASE);
+        fails("SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT", () -> sending.voidBeforeSend(AUTHORIZED_AT));
+        var unknown = sending.unavailable(SupplierPayableHoldOperation.Failure.TIMEOUT, AUTHORIZED_AT);
+        fails("SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT", () -> unknown.voidBeforeSend(AUTHORIZED_AT));
+        var query = unknown.claim(unknown.nextAttemptAt(), LEASE);
+        var absent = query.complete(new FinanceResult.Success<>(absent(query.command(), query.updatedAt())), query.updatedAt());
+        var noResend = absent.retryNotFound(absent.updatedAt()).voidBeforeSend(absent.updatedAt());
+        assertThat(noResend.observation()).isEqualTo(absent.observation()); assertThat(noResend.dispatches()).isEqualTo(1);
+        assertThat(noResend.requestQuery(noResend.updatedAt()).claim(noResend.updatedAt(), LEASE).status()).isEqualTo(SupplierPayableHoldOperation.Status.QUERYING);
+    }
+
     private static SupplierPayableHoldOperation queued() { return SupplierPayableHoldOperation.queue(new SupplierPayableHoldCommand(authorization()), AUTHORIZED_AT); }
     private static SupplierPayableHoldObservation held(SupplierPayableHoldCommand command, long revision, Instant observedAt) {
         return new SupplierPayableHoldObservation(command.id(), command.digest(), SupplierPayableHoldObservation.Status.HELD, revision, observedAt, "hold-1", "ledger-3", money("70"), account().accountDigest(), AUTHORIZED_AT, null);

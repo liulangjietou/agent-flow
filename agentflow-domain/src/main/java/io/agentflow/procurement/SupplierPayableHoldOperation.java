@@ -22,7 +22,7 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
                 || createdAt == null || updatedAt == null || createdAt.isBefore(command.authorization().authorizedAt())
                 || !createdAt.isBefore(command.sendDeadline()) || updatedAt.isBefore(createdAt) || highestRevision < 0
                 || dispatches == 0 && (attempts != 0 || observation != null || conflictingObservation != null
-                    || status != Status.QUEUED && status != Status.EXPIRED)) throw invalid();
+                    || status != Status.QUEUED && status != Status.EXPIRED && status != Status.VOIDED)) throw invalid();
         boolean running = status == Status.RESERVING || status == Status.QUERYING;
         boolean scheduled = status == Status.QUEUED || status == Status.UNKNOWN;
         if (running ? attempts == 0 || dispatches == 0 || leaseUntil == null || !leaseUntil.isAfter(updatedAt) || failure != null : leaseUntil != null) throw invalid();
@@ -30,7 +30,7 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
         if (observation != null && (!matches(command, observation, true, createdAt, updatedAt) || observation.revision() > highestRevision)
                 || conflictingObservation != null && (!matches(command, conflictingObservation, true, createdAt, updatedAt) || conflictingObservation.revision() > highestRevision)
                 || observation == null && conflictingObservation == null && highestRevision != 0) throw invalid();
-        if ((status == Status.QUEUED || status == Status.RESERVING || status == Status.EXPIRED)
+        if ((status == Status.QUEUED || status == Status.RESERVING || status == Status.EXPIRED || status == Status.VOIDED)
                 && (highestRevision != 0 || conflictingObservation != null || observation != null && observation.status() != SupplierPayableHoldObservation.Status.NOT_FOUND
                     || dispatches > (status == Status.RESERVING ? 1 : 0) && observation == null)) throw invalid();
         if (status == Status.RESERVING) command.requireSendAt(updatedAt);
@@ -42,6 +42,7 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
         if (status == Status.UNKNOWN && failure == null && (observation == null || observation.status() != SupplierPayableHoldObservation.Status.PENDING)
                 || status == Status.RECONCILING && (conflictingObservation == null || failure == null)
                 || status == Status.EXPIRED && failure != Failure.SEND_WINDOW_EXPIRED
+                || status == Status.VOIDED && failure != Failure.SOURCE_CHANGED
                 || status == Status.QUEUED && failure != null) throw invalid();
     }
 
@@ -63,6 +64,12 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
     /** 发送前再检查已保存领取和固定证据窗口，不能延长授权或读取依据。 */
     public void requireSendAt(Instant now) {
         requireTime(now); if (status != Status.RESERVING || expired(now)) throw conflict(); command.requireSendAt(now);
+    }
+
+    /** 当前批准或财务人员失效只能停止未领取的新发送；不据此取消已发送的原预留。 */
+    public SupplierPayableHoldOperation voidBeforeSend(Instant now) {
+        requireTime(now); if (status != Status.QUEUED) throw conflict();
+        return changed(Status.VOIDED, now, null, null, observation, conflictingObservation, highestRevision, Failure.SOURCE_CHANGED);
     }
 
     /** 已领取进程崩溃时，后继执行者只查询；迟到结果不覆盖新领取。 */
@@ -157,12 +164,12 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
      * 预留成功仍需后继银行支付及独立 ERP 结算；RECONCILING 保留矛盾而不自动释放或换号。
      * @author owlzhangfq@gmail.com
      */
-    public enum Status { QUEUED, RESERVING, UNKNOWN, QUERYING, HELD, REJECTED, NOT_FOUND, EXPIRED, RECONCILING }
+    public enum Status { QUEUED, RESERVING, UNKNOWN, QUERYING, HELD, REJECTED, NOT_FOUND, EXPIRED, VOIDED, RECONCILING }
 
     /**
      * 依赖和恢复原因采用封闭分类，不保存远端错误正文。
      * @author owlzhangfq@gmail.com
      */
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE,
-        RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, SEND_WINDOW_EXPIRED, STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
+        RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, SEND_WINDOW_EXPIRED, SOURCE_CHANGED, STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
 }
