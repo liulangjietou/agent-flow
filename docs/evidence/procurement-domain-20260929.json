@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-29",
+  "stage": "procurement-matched-payable-domain-and-read-port",
+  "result": "PASS_DOMAIN_AND_READ_PORT_ONLY",
+  "tests": {"domain": 12, "serverScope": 43, "procurementHttpSubset": 5},
+  "verified": [
+    "Supplier payable is separate from employee advance and expense reimbursement",
+    "Multiple invoice rows cannot multiply the same accepted order quantity or amount",
+    "Canonical invoice lines are unique and original invoice evidence cannot conflict",
+    "Requested amount is positive and no greater than actual outstanding payable",
+    "Submitted rounds preserve exact supplier, account, source and destination",
+    "Approval fixes request terms without creating bank or accounting effects",
+    "Read-only HTTP validates the exact requester, legal entity, supplier, payable and fresh evidence",
+    "Missing configuration, changed destination, malformed responses and unrelated rejection codes fail closed",
+    "Draft content rejects self-reported account, matched, paid and approval facts"
+  ],
+  "publicWorkflow": false,
+  "databaseMigrationAdded": false,
+  "liveAcceptanceSchema": 65,
+  "externalSystem": "Local synthetic HTTP fixture only",
+  "remaining": ["Persisted checks and submissions", "Concurrent payable reservations", "Supplier payment authorization and settlement", "Templates and public UI", "Live database and browser acceptance"],
+  "logs": ["procurement-domain.log", "procurement-domain-final.log", "procurement-gateway.log", "procurement-authors.log"],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

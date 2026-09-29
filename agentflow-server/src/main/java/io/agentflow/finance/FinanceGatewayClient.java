@@ -58,7 +58,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
-                || operation == Operation.EXPENSE_PAYMENT_RETURN
+                || operation == Operation.EXPENSE_PAYMENT_RETURN || operation == Operation.PROCUREMENT_PAYABLE
                 || operation == Operation.VOUCHER_REVERSAL || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.VOUCHER_REVERSAL_QUERY) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
@@ -153,6 +153,12 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> queryExpensePaymentReturn(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.EXPENSE_PAYMENT_RETURN, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 采购应付匹配只读取原目标，不创建应付、余额占用或付款命令。 */
+    public <T> FinanceResult<T> readProcurementPayable(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.PROCUREMENT_PAYABLE, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 独立反向凭证只读核验，不以查询请求触发 ERP 冲销或新的资金动作。 */
@@ -257,6 +263,9 @@ public class FinanceGatewayClient {
         ADVANCE_REPAYMENT_ADJUSTMENT("advance-repayment-adjustment", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         ADVANCE_DISBURSEMENT_RETURN("advance-disbursement-return", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         EXPENSE_PAYMENT_RETURN("expense-payment-return", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
+        PROCUREMENT_PAYABLE("procurement-payable", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE,
+                FinanceResult.Reason.SUPPLIER_UNAVAILABLE, FinanceResult.Reason.ACCOUNT_UNAVAILABLE,
+                FinanceResult.Reason.PROCUREMENT_PAYABLE_UNAVAILABLE, FinanceResult.Reason.PROCUREMENT_MATCH_REQUIRED)),
         VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         VOUCHER_REVERSAL_COMMAND("voucher-reversal-command", Set.of()),
         VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of());
