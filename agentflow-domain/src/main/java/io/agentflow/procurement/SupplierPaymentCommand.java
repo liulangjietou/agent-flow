@@ -78,6 +78,20 @@ public record SupplierPaymentCommand(SupplierPayableHoldCommand holdCommand, Sup
                 && current.observedAt().plus(ProcurementPayablePort.MAX_EVIDENCE_AGE).isAfter(now);
     }
 
+    /** 持久银行登记绑定当时仍无争议的原预留修订，新查询只更新观察而不能替换其身份。 */
+    public boolean registeredFrom(SupplierPayableHoldOperation original) {
+        return original != null && original.status() == SupplierPayableHoldOperation.Status.HELD && holdCommand.equals(original.command())
+                && !registeredAt.isBefore(original.updatedAt()) && sameHold(original.observation(), held)
+                && !held.observedAt().isBefore(original.observation().observedAt());
+    }
+
+    /** 发送前同时对照最新本地确认和本次外部复查，不能用旧结果覆盖期间已取得的新预留事实。 */
+    public boolean matchesCurrentHold(SupplierPayableHoldOperation current, SupplierPayableHoldObservation verified, Instant now) {
+        return current != null && current.status() == SupplierPayableHoldOperation.Status.HELD && holdCommand.equals(current.command())
+                && now != null && !now.isBefore(current.updatedAt()) && sameHold(current.observation(), verified)
+                && !verified.observedAt().isBefore(current.observation().observedAt()) && matchesHold(verified, now);
+    }
+
     private static boolean sameHold(SupplierPayableHoldObservation original, SupplierPayableHoldObservation current) {
         return original != null && current != null && current.status() == SupplierPayableHoldObservation.Status.HELD
                 && original.status() == SupplierPayableHoldObservation.Status.HELD && current.authorizationId().equals(original.authorizationId())
