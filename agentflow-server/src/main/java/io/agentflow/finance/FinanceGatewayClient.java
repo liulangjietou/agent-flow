@@ -58,6 +58,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYABLE_HOLD_QUERY
                 || operation == Operation.SUPPLIER_PAYMENT_COMMAND || operation == Operation.SUPPLIER_PAYMENT_QUERY
+                || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
@@ -131,6 +132,19 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> querySupplierPayment(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 原应付结算固定本次结算号及原银行付款，按独立操作类型去重，不再次调用银行付款。 */
+    public <T> FinanceResult<T> settleSupplierPayable(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A supplier payable settlement identity is required");
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 查询仅向原 ERP 找回原结算，不受原支付授权或会计期间窗口影响。 */
+    public <T> FinanceResult<T> querySupplierPayableSettlement(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYABLE_SETTLEMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 付款前账户复查绑定原目标，只允许员工账户及出纳出款目录两个只读操作。 */
@@ -221,7 +235,8 @@ public class FinanceGatewayClient {
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
                 || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND
-                || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
+                || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND
+                || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -300,6 +315,8 @@ public class FinanceGatewayClient {
         SUPPLIER_PAYABLE_HOLD_QUERY("supplier-payable-hold-query", Set.of()),
         SUPPLIER_PAYMENT_COMMAND("supplier-payment-command", Set.of()),
         SUPPLIER_PAYMENT_QUERY("supplier-payment-query", Set.of()),
+        SUPPLIER_PAYABLE_SETTLEMENT_COMMAND("supplier-payable-settlement-command", Set.of()),
+        SUPPLIER_PAYABLE_SETTLEMENT_QUERY("supplier-payable-settlement-query", Set.of()),
         VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         VOUCHER_REVERSAL_COMMAND("voucher-reversal-command", Set.of()),
         VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of());
