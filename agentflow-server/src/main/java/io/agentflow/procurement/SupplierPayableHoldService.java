@@ -49,6 +49,7 @@ public class SupplierPayableHoldService {
     @Transactional
     public SupplierPayableHoldOperation claim(String tenant, UUID id, Instant now) {
         var current = locked(tenant, id); if (current == null) return null; now = time(now);
+        if (authorizations.retirement(tenant, id).isPresent()) return null;
         if (current.expired(now)) { operations.update(current.expire(now)); return null; }
         if (current.running() || current.nextAttemptAt() == null || now.isBefore(current.nextAttemptAt())) return null;
         if (current.status() == SupplierPayableHoldOperation.Status.QUEUED) {
@@ -83,6 +84,15 @@ public class SupplierPayableHoldService {
         var next = current.retryNotFound(time(now)); operations.update(next); return next;
     }
 
+    /** 已通过财务及原轮次字段权限的独立人员，按安全证据结束原授权并释放本地授权独占。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierAuthorizationRetirement retire(String tenant, UUID id, long expectedVersion, String finance, Instant now) {
+        var current = currentVersion(tenant, id, expectedVersion); var source = current.command().authorization().source().reservation().source();
+        personnel.requireEligible(tenant, finance, source.round().content().legalEntityId()); now = time(now);
+        var stopped = current.stopForRetirement(now); if (!stopped.equals(current)) operations.update(stopped);
+        var decision = SupplierAuthorizationRetirement.from(stopped, finance, now); authorizations.retire(tenant, decision); return decision;
+    }
+
     private SupplierPayableHoldOperation locked(String tenant, UUID id) {
         var current = operations.find(tenant, id).orElse(null); if (current == null) return null;
         sources.lock(current.command().authorization()); return operations.find(tenant, id).orElseThrow(SupplierPayableHoldService::conflict);
@@ -92,7 +102,7 @@ public class SupplierPayableHoldService {
         return current != null && current.running() && current.version() == claimed.version() && current.status() == claimed.status() && current.command().equals(claimed.command()) ? current : null;
     }
     private SupplierPayableHoldOperation currentVersion(String tenant, UUID id, long version) {
-        var current = locked(tenant, id); if (current == null || current.version() != version) throw conflict(); return current;
+        var current = locked(tenant, id); if (current == null || current.version() != version || authorizations.retirement(tenant, id).isPresent()) throw conflict(); return current;
     }
     private void requireSource(SupplierPaymentAuthorization authorization) {
         sources.requireCurrent(authorization); var source = authorization.source().reservation().source();

@@ -42,7 +42,8 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
         if (status == Status.UNKNOWN && failure == null && (observation == null || observation.status() != SupplierPayableHoldObservation.Status.PENDING)
                 || status == Status.RECONCILING && (conflictingObservation == null || failure == null)
                 || status == Status.EXPIRED && failure != Failure.SEND_WINDOW_EXPIRED
-                || status == Status.VOIDED && failure != Failure.SOURCE_CHANGED
+                || status == Status.VOIDED && failure != Failure.SOURCE_CHANGED && failure != Failure.FINANCE_RETIRED
+                || failure == Failure.FINANCE_RETIRED && (status != Status.VOIDED || dispatches != 0 || observation != null)
                 || status == Status.QUEUED && failure != null) throw invalid();
     }
 
@@ -70,6 +71,21 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
     public SupplierPayableHoldOperation voidBeforeSend(Instant now) {
         requireTime(now); if (status != Status.QUEUED) throw conflict();
         return changed(Status.VOIDED, now, null, null, observation, conflictingObservation, highestRevision, Failure.SOURCE_CHANGED);
+    }
+
+    /** 结束依据必须证明未形成外部预留；查无、未知、预留成功和争议都不能重新授权。 */
+    public RetirementBasis retirementBasis() {
+        if (status == Status.REJECTED) return RetirementBasis.CONFIRMED_REJECTED;
+        if (dispatches == 0 && highestRevision == 0 && observation == null && conflictingObservation == null
+                && (status == Status.QUEUED || status == Status.VOIDED || status == Status.EXPIRED)) return RetirementBasis.NEVER_DISPATCHED;
+        return null;
+    }
+
+    /** 与具名结束记录同事务停止队列；已确认拒绝和已有停止原因保留原修订。 */
+    public SupplierPayableHoldOperation stopForRetirement(Instant now) {
+        requireTime(now);
+        if (retirementBasis() == null) throw new DomainException("SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE", "Original payable hold has not been proven safely finished");
+        return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
 
     /** 已领取进程崩溃时，后继执行者只查询；迟到结果不覆盖新领取。 */
@@ -167,9 +183,15 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
     public enum Status { QUEUED, RESERVING, UNKNOWN, QUERYING, HELD, REJECTED, NOT_FOUND, EXPIRED, VOIDED, RECONCILING }
 
     /**
+     * 本地未发送或原 ERP 幂等命令的明确终态拒绝，是当前支持的两个结束依据。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum RetirementBasis { NEVER_DISPATCHED, CONFIRMED_REJECTED }
+
+    /**
      * 依赖和恢复原因采用封闭分类，不保存远端错误正文。
      * @author owlzhangfq@gmail.com
      */
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE,
-        RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, SEND_WINDOW_EXPIRED, SOURCE_CHANGED, STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
+        RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, SEND_WINDOW_EXPIRED, SOURCE_CHANGED, FINANCE_RETIRED, STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
 }

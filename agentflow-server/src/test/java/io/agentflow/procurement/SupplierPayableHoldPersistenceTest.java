@@ -214,10 +214,98 @@ class SupplierPayableHoldPersistenceTest {
         assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList()).isEqualTo(originals);
         assertThat(migration.migrate().migrationsExecuted).isZero(); assertThat(migration.validateWithResult().validationSuccessful).isTrue();
+        Flyway.configure().dataSource(dataSource).defaultSchema(schema).load().migrate();
         assertThat(register(authorization).command().authorization()).isEqualTo(authorization);
         assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_authorization SET reservation_id=? WHERE tenant_id=?", UUID.randomUUID().toString(), tenant)).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_authorization SET request_version=99 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_authorization SET authorized_by=employee_id WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test void neverDispatchedRetirementAllowsNewIdentityAndPreservesTheOriginalAuthorizationAndLocalHold() {
+        var original = approved(); var queued = register(original);
+        var decision = tx.execute(status -> service.retire(tenant, original.id(), queued.version(), "finance", authorizedAt()));
+        assertThat(decision.basis()).isEqualTo(SupplierPayableHoldOperation.RetirementBasis.NEVER_DISPATCHED);
+        assertThat(authorizations.find(tenant, original.id())).contains(original); assertThat(authorizations.retirement(tenant, original.id())).contains(decision);
+        assertThat(authorizations.activeForRequest(tenant, original.source().reservation().source().requestId())).isEmpty();
+        assertThat(service.claim(tenant, original.id(), authorizedAt())).isNull();
+        var replacement = new SupplierPaymentAuthorization(UUID.randomUUID(), original.source(), original.payable(), "finance", authorizedAt().plusSeconds(1), original.expiresAt());
+        var next = tx.execute(status -> service.register(replacement, replacement.authorizedAt()));
+        assertThat(next.command().id()).isNotEqualTo(queued.command().id()); assertThat(authorizations.forRequest(tenant, original.source().reservation().source().requestId())).contains(replacement);
+        assertThat(authorizations.activeForRequest(tenant, original.source().reservation().source().requestId())).contains(replacement);
+        assertThat(reservations.active(tenant, original.source().reservation().source().requestId())).contains(original.source().reservation());
+        assertThat(operations.revision(tenant, original.id(), 1)).contains(queued); assertThat(count("supplier_payment_authorization")).isEqualTo(2);
+        var stopped = operations.find(tenant, original.id()).orElseThrow();
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> service.query(tenant, original.id(), stopped.version(), authorizedAt()))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void rejectedOriginalCommandCanRetireButUnknownNotFoundAndHeldCannot() {
+        var queued = register(approved()); var sending = service.claim(tenant, queued.command().id(), authorizedAt());
+        var rejected = new SupplierPayableHoldObservation(sending.command().id(), sending.command().digest(), SupplierPayableHoldObservation.Status.REJECTED, 1L, authorizedAt(),
+                null, null, null, null, null, SupplierPayableHoldObservation.Rejection.PAYABLE_VERSION_CONFLICT);
+        service.finish(sending, new FinanceResult.Success<>(rejected), authorizedAt()); var terminal = operations.find(tenant, sending.command().id()).orElseThrow();
+        var retirement = tx.execute(status -> service.retire(tenant, sending.command().id(), terminal.version(), "finance", authorizedAt()));
+        assertThat(retirement.basis()).isEqualTo(SupplierPayableHoldOperation.RetirementBasis.CONFIRMED_REJECTED); assertThat(operations.find(tenant, sending.command().id())).contains(terminal);
+        var another = register(approved()); var dispatched = service.claim(tenant, another.command().id(), authorizedAt()); assertUnsafeRetirement(dispatched);
+        service.fail(dispatched, SupplierPayableHoldOperation.Failure.TIMEOUT, authorizedAt()); var unknown = operations.find(tenant, dispatched.command().id()).orElseThrow(); assertUnsafeRetirement(unknown);
+        var query = service.claim(tenant, dispatched.command().id(), unknown.nextAttemptAt());
+        var absent = new SupplierPayableHoldObservation(query.command().id(), query.command().digest(), SupplierPayableHoldObservation.Status.NOT_FOUND, 0L, query.updatedAt(), null, null, null, null, null, null);
+        service.finish(query, new FinanceResult.Success<>(absent), query.updatedAt()); var missing = operations.find(tenant, query.command().id()).orElseThrow(); assertUnsafeRetirement(missing);
+        tx.executeWithoutResult(status -> service.resend(tenant, missing.command().id(), missing.version(), missing.updatedAt()));
+        var secondSend = service.claim(tenant, missing.command().id(), missing.updatedAt()); service.finish(secondSend, new FinanceResult.Success<>(held(secondSend, secondSend.updatedAt())), secondSend.updatedAt());
+        assertUnsafeRetirement(operations.find(tenant, missing.command().id()).orElseThrow());
+        assertThat(authorizations.activeForRequest(tenant, another.command().authorization().source().reservation().source().requestId())).isPresent();
+    }
+
+    @Test void retirementWriteFailureRollsBackQueueStopAndKeepsItsActiveIdentity() {
+        var queued = register(approved()); var id = queued.command().id();
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> service.retire(tenant, id, queued.version(), "alice", authorizedAt()))).isInstanceOf(DomainException.class);
+        assertThat(operations.find(tenant, id)).contains(queued);
+        jdbc.execute("ALTER TABLE supplier_payment_authorization ADD CONSTRAINT synthetic_keep_active CHECK (active_request_id IS NOT NULL)");
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> service.retire(tenant, id, queued.version(), "finance", authorizedAt()))).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(operations.find(tenant, id)).contains(queued); assertThat(authorizations.retirement(tenant, id)).isEmpty();
+        assertThat(authorizations.activeForRequest(tenant, queued.command().authorization().source().reservation().source().requestId())).isPresent();
+        assertThat(count("supplier_payable_hold_revision")).isEqualTo(1);
+    }
+
+    @Test void retireAndClaimRaceCannotBothSucceed() throws Exception {
+        var queued = register(approved()); var id = queued.command().id(); var start = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
+        try {
+            var claim = pool.submit(() -> { start.await(); return service.claim(tenant, id, authorizedAt()); });
+            var retire = pool.submit(() -> { start.await(); try { tx.executeWithoutResult(status -> service.retire(tenant, id, queued.version(), "finance", authorizedAt())); return "RETIRED"; } catch (DomainException failure) { return failure.code(); } });
+            start.countDown(); var claimed = claim.get(15, TimeUnit.SECONDS); var result = retire.get(15, TimeUnit.SECONDS);
+            if (claimed == null) { assertThat(result).isEqualTo("RETIRED"); assertThat(authorizations.retirement(tenant, id)).isPresent(); }
+            else { assertThat(result).isEqualTo("CONCURRENCY_CONFLICT"); assertThat(authorizations.retirement(tenant, id)).isEmpty(); assertThat(claimed.dispatches()).isEqualTo(1); }
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void v68UpgradeKeepsAuthorizationCommandAndRevisionWhileBackfillingActiveSource() {
+        database("68"); var value = approved(); var approved = value.source(); var reservation = approved.reservation(); var source = reservation.source();
+        jdbc.update("""
+                INSERT INTO supplier_payment_authorization(tenant_id,id,request_id,application_id,employee_id,round_no,application_version,request_version,
+                reservation_id,legal_entity_id,authorized_by,authorized_at,expires_at,state_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, tenant, value.id().toString(), source.requestId().toString(), source.applicationId().toString(), "alice", 1, approved.approval().applicationVersion(), approved.approvedRequestVersion(),
+                reservation.id().toString(), entity.toString(), "finance", java.sql.Timestamp.from(value.authorizedAt()), java.sql.Timestamp.from(value.expiresAt()), json.write(value));
+        var queued = SupplierPayableHoldOperation.queue(new SupplierPayableHoldCommand(value), authorizedAt());
+        jdbc.update("""
+                INSERT INTO supplier_payable_hold_operation(tenant_id,id,command_json,command_digest,state_json,version,status,attempts,dispatches,highest_revision,created_at,updated_at,next_attempt_at)
+                VALUES(?,?,?,?,?,1,'QUEUED',0,0,0,?,?,?)
+                """, tenant, value.id().toString(), json.write(queued.command()), queued.command().digest(), json.write(queued), java.sql.Timestamp.from(queued.createdAt()), java.sql.Timestamp.from(queued.updatedAt()), java.sql.Timestamp.from(queued.nextAttemptAt()));
+        jdbc.update("INSERT INTO supplier_payable_hold_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,1,?)", tenant, value.id().toString(), json.write(queued));
+        var operationRows = jdbc.queryForList("SELECT * FROM supplier_payable_hold_operation"); var revisionRows = jdbc.queryForList("SELECT * FROM supplier_payable_hold_revision");
+        var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema).target("69").load(); assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_payable_hold_operation")).isEqualTo(operationRows); assertThat(jdbc.queryForList("SELECT * FROM supplier_payable_hold_revision")).isEqualTo(revisionRows);
+        assertThat(authorizations.find(tenant, value.id())).contains(value); assertThat(authorizations.activeForRequest(tenant, source.requestId())).contains(value);
+        assertThat(operations.find(tenant, value.id())).contains(queued); assertThat(migration.migrate().migrationsExecuted).isZero();
+        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_authorization SET active_request_id=NULL WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_authorization SET active_request_id=NULL,retired_hold_version=1 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        tx.executeWithoutResult(status -> service.retire(tenant, value.id(), queued.version(), "finance", authorizedAt()));
+        assertThat(authorizations.find(tenant, value.id())).contains(value);
+    }
+
+    private void assertUnsafeRetirement(SupplierPayableHoldOperation value) {
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> service.retire(tenant, value.command().id(), value.version(), "finance", value.updatedAt())))
+                .isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE"));
+        assertThat(operations.find(tenant, value.command().id())).contains(value); assertThat(authorizations.retirement(tenant, value.command().id())).isEmpty();
     }
 
     private SupplierPaymentAuthorization approved() {
