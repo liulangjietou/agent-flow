@@ -3,6 +3,8 @@ package io.agentflow.expense;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
+import io.agentflow.finance.BudgetCommand;
+import io.agentflow.finance.BudgetOperation;
 import io.agentflow.finance.VoucherPreparation;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -61,6 +63,22 @@ public record ExpenseSettlement(Input input, long version, Status status, boolea
     public ExpenseSettlement requireReview(String code, Instant at) {
         if (status == Status.REVIEW_REQUIRED) return this;
         return changed(Status.REVIEW_REQUIRED, resourcesConsumed, budgetOperationId, code, at);
+    }
+
+    /** 原资金争议解除后接续实际预算阶段，已消费资源绝不退回可用或再次消费。 */
+    public ExpenseSettlement resolvePaymentReview(BudgetOperation budget, Instant at) {
+        requireStatus(Status.REVIEW_REQUIRED);
+        if (budgetOperationId == null) {
+            if (budget != null) throw conflict();
+            return changed(Status.QUEUED, resourcesConsumed, null, null, at);
+        }
+        if (budget == null || !budgetOperationId.equals(budget.input().command().id())
+                || budget.input().command().action() != BudgetCommand.Action.CONSUME
+                || !input.source().tenantId().equals(budget.input().command().tenantId())
+                || !input.source().businessId().equals(budget.input().command().position().reportId())) throw conflict();
+        if (budget.status() == BudgetOperation.Status.APPLIED) return changed(Status.SETTLED, true, budgetOperationId, null, at);
+        if (budget.status() == BudgetOperation.Status.REJECTED) return changed(Status.BUDGET_REJECTED, true, budgetOperationId, "BUDGET_" + budget.observation().rejection().name(), at);
+        return changed(Status.BUDGET_PENDING, true, budgetOperationId, null, at);
     }
 
     /** 锁后核对完整业务身份与冻结版本，不能将补正单或另一轮的资源用于本结算。 */

@@ -72,6 +72,13 @@ public final class EmployeeAdvance {
         if (!paymentReviewRequired) { paymentReviewRequired = true; version++; }
     }
 
+    /** 财务裁决恢复同一笔原放款；原额度、预留和已核销金额必须完整保留。 */
+    public void resolvePaymentReview(long expectedVersion, EmployeeAdvance confirmed) {
+        requireVersion(expectedVersion);
+        if (!paymentReviewRequired || confirmed == null || !sameDisbursement(confirmed)) throw paymentReview();
+        paymentReviewRequired = false; version++;
+    }
+
     /** 页面可用额度与领域占用规则保持一致，冻结不会改变原余额账本。 */
     public Money available() { return paymentReviewRequired ? Money.zero(balance.limit().currency()) : balance.available(); }
 

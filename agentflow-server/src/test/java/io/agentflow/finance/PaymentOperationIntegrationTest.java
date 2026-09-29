@@ -96,6 +96,8 @@ class PaymentOperationIntegrationTest {
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired PaymentVoucherSources paymentVoucherSources;
     @Autowired FailureListener listener;
+    @Autowired org.springframework.context.ApplicationEventPublisher events;
+    @Autowired JdbcPaymentDisputeResolutionRepository disputeDecisions;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
         values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
@@ -117,6 +119,7 @@ class PaymentOperationIntegrationTest {
             jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?)", id.toString(), id.toString());
         }
         for (var id : fixtures) {
+            jdbc.update("DELETE FROM payment_dispute_resolution WHERE tenant_id='demo' AND payment_id=?", id.toString());
             jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id=?", id.toString());
             String application = "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND id=?";
             jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + "))", id.toString());
@@ -354,6 +357,27 @@ class PaymentOperationIntegrationTest {
         worker.poll(); disbursements.recover("demo", job.input().command().id());
         assertThat(balances.find("demo", id).orElseThrow().version()).isEqualTo(1);
         assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero();
+    }
+
+    @Test void persistedSuccessfulDecisionUnfreezesOnlyOriginalBalanceAndResumesOriginalPaymentVoucher() {
+        var job = job(); worker.poll(); var command = job.input().command(); var id = command.binding().businessId(); var paid = reload(job).observation();
+        var ledger = balances.find("demo", id).orElseThrow().balance(); reverse(job);
+        var at = now(); var corrected = new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 3L, at,
+                paid.paymentReference(), paid.paidAmount(), paid.accountDigest(), paid.completedAt(), paid.receiptReference(), null);
+        RESPONDER.set((path, data) -> path.endsWith("payment-query") ? corrected : response(path, data)); recheck(job); worker.poll();
+        var disputed = reload(job); var frozen = balances.find("demo", id).orElseThrow(); assertThat(frozen.paymentReviewRequired()).isTrue();
+        var history = operations.disputeEvidence("demo", command.id());
+        tx().executeWithoutResult(status -> {
+            sources.lock(authorizations.find("demo", command.id()).orElseThrow()); var now = now();
+            var resolved = disputed.resolveDispute(PaymentObservation.Status.SUCCEEDED, history.firstSuccess(), history.fundingObserved(), now);
+            var decision = new PaymentDisputeResolution(UUID.randomUUID(), "demo", command.id(), disputed.version(), resolved.version(), resolved.observation(), "finance", now, "BANK-ADVANCE-001", "原借款到账事实确认有效");
+            operations.update(resolved); disputeDecisions.create(decision); events.publishEvent(new PaymentOperationChanged(disputed, resolved)); events.publishEvent(new PaymentDisputeResolved(resolved, decision));
+        });
+        var restored = balances.find("demo", id).orElseThrow(); assertThat(restored.balance()).isEqualTo(ledger);
+        assertThat(restored.paymentReviewRequired()).isFalse(); assertThat(restored.available()).isEqualTo(command.amount());
+        assertThat(restored.version()).isEqualTo(frozen.version() + 1); recheck(job); worker.poll();
+        assertThat(balances.find("demo", id).orElseThrow().state()).isEqualTo(restored.state());
+        preparationWorker.poll(); voucherWorker.poll(); assertThat(paymentVoucher(job).usablePosted()).isTrue(); assertThat(WRITES.get()).isEqualTo(1);
     }
 
     @Test void reversalFreezesThePaidBalanceAndRepeatedReceiptDoesNotEraseIt() {

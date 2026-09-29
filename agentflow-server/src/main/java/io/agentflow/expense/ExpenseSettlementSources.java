@@ -61,14 +61,14 @@ public class ExpenseSettlementSources {
         if (preparation.status() != VoucherPreparation.Status.NOT_REQUIRED || preparation.input().source().kind() != VoucherCommand.Kind.EXPENSE_ACCRUAL) return null;
         var round = report.requireFrozenRound();
         if (round.approvedGross().value().signum() != 0) throw mismatch();
-        requireApproved(preparation.input().source(), true);
+        requireApproved(preparation.input().source(), true, false);
         return new ExpenseSettlement.Input(preparation.input().source(), round.approvedGross(), round.offsetTotal(), null, null, null, preparation.completedAt());
     }
 
     /** 核销前重读当前原凭据；已失效的资金或会计依据只暂停核销，不重写到账状态。 */
     public void requireCurrent(ExpenseSettlement settlement, ExpenseReport report) {
         settlement.requireReport(report); var input = settlement.input(); var source = input.source();
-        requireApproved(source, input.gross().value().signum() == 0);
+        requireApproved(source, input.gross().value().signum() == 0, settlement.resourcesConsumed());
         if (input.voucherOperationId() == null) {
             var preparation = preparations.latest(source).orElseThrow(ExpenseSettlementSources::mismatch);
             if (preparation.status() != VoucherPreparation.Status.NOT_REQUIRED || !preparation.input().source().equals(source)) throw mismatch();
@@ -86,8 +86,11 @@ public class ExpenseSettlementSources {
         }
     }
 
-    private void requireApproved(VoucherPreparation.Source source, boolean zero) {
-        try { approved.derive(source); if (zero) throw mismatch(); }
+    private void requireApproved(VoucherPreparation.Source source, boolean zero, boolean consumed) {
+        try {
+            if (consumed) approved.deriveAfterResourceConsumption(source); else approved.derive(source);
+            if (zero) throw mismatch();
+        }
         catch (DomainException problem) { if (!zero || !"VOUCHER_ZERO_AMOUNT".equals(problem.code())) throw problem; }
     }
     private static DomainException mismatch() { return new DomainException("EXPENSE_SETTLEMENT_SOURCE_CHANGED", "Settlement must match its persisted original financial source"); }

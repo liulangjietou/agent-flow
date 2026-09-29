@@ -188,6 +188,51 @@ class PaymentOperationTest {
                 new PaymentAuthorization.Retirement("cashier", proof.reason(), NOW, proof.operationVersion(), proof.basis()))).isInstanceOf(DomainException.class);
     }
 
+    @Test void explicitDecisionCanAcceptCorrectedOriginalReceiptButNextConflictRequiresAnotherDecision() {
+        var original = paid(); var at = NOW.plusSeconds(3);
+        var returned = query(original, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.REVERSED, 3, at)), at);
+        var corrected = query(returned, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.SUCCEEDED, 4, at)), at);
+        assertThat(corrected.status()).isEqualTo(PaymentOperation.Status.RECONCILING);
+        var resolved = corrected.resolveDispute(PaymentObservation.Status.SUCCEEDED, original.observation(), true, at);
+        assertThat(resolved.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(resolved.input()).isEqualTo(original.input());
+        assertThat(resolved.dispatches()).isEqualTo(1); assertThat(resolved.attempts()).isEqualTo(corrected.attempts());
+        assertThat(resolved.version()).isEqualTo(corrected.version() + 1); assertThat(resolved.conflictingObservation()).isNull();
+        var decision = new PaymentDisputeResolution(UUID.randomUUID(), command.tenantId(), command.id(), corrected.version(), resolved.version(), resolved.observation(), "finance", at, "BANK-001", "银行确认原回执有效");
+        assertThat(decision.matches(corrected, resolved)).isTrue(); assertThat(decision.toString()).doesNotContain("BANK-001", "银行确认");
+        assertThat(query(resolved, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.FAILED, 5, at)), at).status()).isEqualTo(PaymentOperation.Status.RECONCILING);
+        for (String actor : List.of("alice", "cashier")) {
+            assertThat(new PaymentDisputeResolution(decision.id(), decision.tenantId(), decision.paymentId(), decision.disputedVersion(), decision.resolvedVersion(), decision.observation(), actor, at, "BANK-001", "核对原件").matches(corrected, resolved)).isFalse();
+        }
+    }
+
+    @Test void resolutionRejectsNonterminalStaleExpiredDifferentReferenceAndDifferentSettlementEvidence() {
+        var original = paid(); var at = NOW.plusSeconds(3);
+        for (var fact : List.of(fact(PaymentObservation.Status.PENDING, 3, at), fact(PaymentObservation.Status.NOT_FOUND, 0, at), fact(PaymentObservation.Status.SUCCEEDED, 1, at),
+                new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 3L, at, "another-payment", command.amount(), command.payee().accountDigest(), NOW, "receipt-1", null),
+                new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 3L, at, "bank-1", command.amount(), command.payee().accountDigest(), NOW, "another-receipt", null))) {
+            var disputed = query(original, at).complete(new FinanceResult.Success<>(fact), at);
+            assertThat(disputed.resolutionIssue(at, original.observation(), true)).isNotNull();
+            assertThatThrownBy(() -> disputed.resolveDispute(fact.status(), original.observation(), true, at)).isInstanceOf(DomainException.class);
+        }
+        var conflict = query(original, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.FAILED, 3, at)), at);
+        var corrected = query(conflict, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.SUCCEEDED, 4, at)), at);
+        assertThat(corrected.resolutionIssue(at.plusSeconds(300), original.observation(), true)).isEqualTo(PaymentOperation.ResolutionIssue.EXPIRED_EVIDENCE);
+        assertThatThrownBy(() -> corrected.resolveDispute(PaymentObservation.Status.FAILED, original.observation(), true, at)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> corrected.resolveDispute(PaymentObservation.Status.SUCCEEDED, original.observation(), true, at.plusSeconds(300))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void failureDecisionRequiresHistoryWithoutAnyFundingAndReversalDecisionNeverBecomesSettleable() {
+        var at = NOW.plusSeconds(3); var failed = sending().complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.FAILED, 2, NOW)), NOW);
+        var conflict = query(failed, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.PENDING, 3, at)), at);
+        var candidate = query(conflict, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.FAILED, 4, at)), at);
+        assertThat(candidate.resolveDispute(PaymentObservation.Status.FAILED, null, false, at).retirementBasis()).isEqualTo(PaymentOperation.RetirementBasis.CONFIRMED_FAILED);
+        assertThat(candidate.resolutionIssue(at, null, true)).isEqualTo(PaymentOperation.ResolutionIssue.FUNDING_ALREADY_OBSERVED);
+        assertThatThrownBy(() -> candidate.resolveDispute(PaymentObservation.Status.FAILED, null, true, at)).isInstanceOf(DomainException.class);
+        var returned = query(conflict, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.REVERSED, 4, at)), at);
+        var resolved = returned.resolveDispute(PaymentObservation.Status.REVERSED, null, true, at);
+        assertThat(resolved.settleable()).isFalse(); assertThat(resolved.retirementBasis()).isNull();
+    }
+
     private PaymentOperation queue() { return PaymentOperation.queue(authorization, NOW); }
     private PaymentOperation sending() { return queue().claim(NOW, LEASE).readyToSend(directory(NOW), account(NOW), NOW); }
     private PaymentOperation paid() { return sending().complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.SUCCEEDED, 2, NOW)), NOW); }

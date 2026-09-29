@@ -19,7 +19,16 @@ export interface PaymentView extends PaymentBinding {
   retirement: null | { retiredBy: string; retiredAt: string; operationVersion: number; basis: keyof typeof retirementBasisLabels }
 }
 export interface PayeeReview { id: string; version: number; status: keyof typeof payeeReviewLabels; requestedAt: string; checkedAt: string | null; validUntil: string | null; maskedAccount: string | null; issue: string | null }
-export interface FinancePaymentView extends PaymentBinding { voucherOperationId: string | null; voucherVersion: number | null; payable: Money | null; payment: PaymentView | null; payeeReview: PayeeReview | null; actions: { authorize: boolean; voidAuthorization: boolean; query: boolean; retire: boolean; reviewAccount: boolean; authorizeReviewed: boolean } }
+export const disputeOutcomeLabels = { PENDING: '资金系统仍在处理', NOT_FOUND: '资金系统查无原交易', SUCCEEDED: '原款项已到账', FAILED: '原付款未成功', REVERSED: '原款项已退回' }
+export const disputeIssueLabels = { NOT_DISPUTED: '请等待本次原交易查询结束。', NON_TERMINAL: '最新结果尚未明确，请继续查询原交易。', STALE_EVIDENCE: '最新回执版本较旧，请重新查询原交易。', EXPIRED_EVIDENCE: '对账证据已超过五分钟，请重新查询。', DIFFERENT_PAYMENT: '交易编号不一致，请先取得原交易的正确回执。', FUNDING_ALREADY_OBSERVED: '历史存在到账或退回证据，不能以失败结论释放付款占用。', DIFFERENT_SETTLEMENT: '最新回执与原到账依据不一致，请向资金系统核实。' }
+export interface PaymentDisputeView {
+  candidate: null | { outcome: keyof typeof disputeOutcomeLabels; revision: number; observedAt: string; validUntil: string; paymentReference: string | null; receiptReference: string | null; completedAt: string | null; failure: string | null }
+  issue: keyof typeof disputeIssueLabels | null; canResolve: boolean
+  latest: null | { id: string; operationVersion: number; outcome: 'SUCCEEDED' | 'FAILED' | 'REVERSED'; resolvedBy: string; resolvedAt: string; evidenceReference: string }
+}
+export interface PaymentDisputeInput { authorizationVersion: number; operationVersion: number; outcome: 'SUCCEEDED' | 'FAILED' | 'REVERSED'; evidenceReference: string; comment: string }
+export interface PaymentDisputeReceipt { applicationId: string; authorizationId: string; resolutionId: string; operationVersion: number; outcome: PaymentDisputeInput['outcome']; auditEventId: string }
+export interface FinancePaymentView extends PaymentBinding { voucherOperationId: string | null; voucherVersion: number | null; payable: Money | null; payment: PaymentView | null; payeeReview: PayeeReview | null; dispute: PaymentDisputeView | null; actions: { authorize: boolean; voidAuthorization: boolean; query: boolean; retire: boolean; reviewAccount: boolean; authorizeReviewed: boolean } }
 export interface CashierPaymentView { payment: PaymentView; actions: { execute: boolean; query: boolean; resendOriginal: boolean } }
 export interface CashierPaymentPage { items: CashierPaymentView[]; nextBeforeId: string | null }
 export interface DebitAccount { reference: string; displayName: string; maskedAccount: string; currency: string; sourceVersion: string }
@@ -73,7 +82,32 @@ export function validateFinancePayment(view: FinancePaymentView, expected: Payme
       || (['READY', 'CONSUMED'].includes(review.status) ? !time(review.checkedAt!) || !time(review.validUntil!) || !mask(review.maskedAccount!) || review.issue !== null
         || Date.parse(review.checkedAt!) < Date.parse(review.requestedAt) || Date.parse(review.validUntil!) <= Date.parse(review.checkedAt!) || Date.parse(review.validUntil!) - Date.parse(review.checkedAt!) > 300_000
         : review.checkedAt !== null || review.validUntil !== null || review.maskedAccount !== null))) throw new Error('账户复核证据不完整，请刷新核对。')
+  const dispute = view.dispute
+  if (dispute !== null) {
+    if (!dispute || !view.payment?.operation || typeof dispute.canResolve !== 'boolean' || dispute.issue !== null && !known(disputeIssueLabels, dispute.issue)) throw new Error('付款争议证据不完整，请刷新核对。')
+    const candidate = dispute.candidate, latest = dispute.latest
+    if (candidate !== null && (!candidate || !known(disputeOutcomeLabels, candidate.outcome) || !time(candidate.observedAt) || !time(candidate.validUntil)
+        || Date.parse(candidate.validUntil) - Date.parse(candidate.observedAt) !== 300_000 || (candidate.outcome === 'NOT_FOUND' ? candidate.revision !== 0 : !positive(candidate.revision) || !candidate.paymentReference)
+        || ['SUCCEEDED', 'REVERSED'].includes(candidate.outcome) && (!candidate.receiptReference || !time(candidate.completedAt!)))
+        || latest !== null && (!latest || !latest.id || !positive(latest.operationVersion) || !['SUCCEEDED', 'FAILED', 'REVERSED'].includes(latest.outcome) || !latest.resolvedBy || !time(latest.resolvedAt) || !latest.evidenceReference)
+        || dispute.canResolve && (!candidate || dispute.issue !== null || view.payment.status !== 'EXECUTION_REGISTERED' || view.payment.operation.status !== 'RECONCILING'
+          || !view.payment.operation.disputed || !['SUCCEEDED', 'FAILED', 'REVERSED'].includes(candidate.outcome))) throw new Error('付款争议状态或回执未通过核对。')
+  }
   return view
+}
+
+/** 财务只确认服务端展示的原交易终态，不能提交账号、金额或自行填写银行回执。 */
+export function paymentDisputeInput(view: FinancePaymentView, reference: string, comment: string, now = Date.now()): PaymentDisputeInput {
+  validateFinancePayment(view, view); const candidate = view.dispute?.candidate
+  if (!view.dispute?.canResolve || !candidate || Date.parse(candidate.observedAt) > now || Date.parse(candidate.validUntil) <= now) throw new Error('裁决证据尚未就绪或已过期，请查询原交易并刷新。')
+  if (!reference.trim() || reference.length > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(reference)) throw new Error('请填写 128 字以内的对账凭据编号。')
+  return { authorizationVersion: view.payment!.version, operationVersion: view.payment!.operation!.version, outcome: candidate.outcome as PaymentDisputeInput['outcome'], evidenceReference: reference.trim(), comment: reason(comment) }
+}
+
+/** 只接受刚确认版本的下一份裁决回执，恢复原请求也不能确认另一笔交易。 */
+export function validatePaymentDisputeReceipt(receipt: PaymentDisputeReceipt, view: FinancePaymentView, input: PaymentDisputeInput) {
+  if (!receipt || receipt.applicationId !== view.applicationId || receipt.authorizationId !== view.payment?.id || !receipt.resolutionId || !receipt.auditEventId
+      || receipt.operationVersion !== input.operationVersion + 1 || receipt.outcome !== input.outcome) throw new Error('付款裁决回执不匹配，请刷新核对原交易。')
 }
 /** 列表与详情使用相同的严格投影，选择另一笔付款后不能显示旧详情。 */
 export function validateCashierPayment(view: CashierPaymentView, id = view?.payment?.id): CashierPaymentView {

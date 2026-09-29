@@ -20657,6 +20657,164 @@
           }
         }
       }
+    },
+    "/api/v1/payments/{id}/dispute-resolutions": {
+      "post": {
+        "operationId": "resolvePaymentDispute",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "明确裁决原付款争议",
+        "description": "采用五分钟内最新持久终态，要求原交易编号和既有到账依据一致；曾出现资金事实时不能用失败释放占用。裁决前后修订和人工对账凭据单独保留。原成功事实可恢复借款或报销的后续使用，退回及独立凭证争议保留原账。不发送新的资金命令。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非申请人及原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原交易裁决、审计及适用的恢复已在本地事务保存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDisputeReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentDisputeInput"
+              },
+              "example": {
+                "authorizationVersion": 2,
+                "operationVersion": 10,
+                "outcome": "SUCCEEDED",
+                "evidenceReference": "BANK-RECONCILIATION-001",
+                "comment": "已核对银行原交易，原到账回执仍有效"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31136,7 +31294,8 @@
           "payment",
           "actions",
           "payable",
-          "payeeReview"
+          "payeeReview",
+          "dispute"
         ],
         "properties": {
           "applicationId": {
@@ -31208,6 +31367,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PaymentPayeeReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dispute": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentDisputeView"
               },
               {
                 "type": "null"
@@ -32219,6 +32388,272 @@
           "auditEventId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "PaymentDisputeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorizationVersion",
+          "operationVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "PaymentDisputeReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "authorizationId",
+          "resolutionId",
+          "operationVersion",
+          "outcome",
+          "auditEventId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resolutionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PaymentDisputeCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "paymentReference",
+          "receiptReference",
+          "completedAt",
+          "failure"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "NOT_FOUND",
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receiptReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACCOUNT_UNAVAILABLE",
+                  "DEBIT_ACCOUNT_UNAVAILABLE",
+                  "INSUFFICIENT_FUNDS",
+                  "AUTHORIZATION_EXPIRED",
+                  "APPROVAL_CHANGED",
+                  "ACCOUNT_CHANGED",
+                  "VOUCHER_UNAVAILABLE",
+                  "PAYMENT_REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentDisputeDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "outcome",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "resolvedBy": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string"
+          }
+        }
+      },
+      "PaymentDisputeView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate",
+          "issue",
+          "canResolve",
+          "latest"
+        ],
+        "properties": {
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentDisputeCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_DISPUTED",
+                  "NON_TERMINAL",
+                  "STALE_EVIDENCE",
+                  "EXPIRED_EVIDENCE",
+                  "DIFFERENT_PAYMENT",
+                  "FUNDING_ALREADY_OBSERVED",
+                  "DIFFERENT_SETTLEMENT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentDisputeDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }

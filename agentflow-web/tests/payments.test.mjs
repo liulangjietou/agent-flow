@@ -12,10 +12,16 @@ const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove
 const clone = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
 const binding = () => ({ applicationId: 'app', businessId: 'report', roundNo: 1, applicationVersion: 9, businessVersion: 3 })
 const payment = () => ({ ...binding(), id: 'authorization', version: 1, status: 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', legalEntityId: 'entity', employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: new Date(Date.now() - 60000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), executedBy: null, request: null, operation: null, retirement: null })
-const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, payeeReview: null, actions: { authorize: true, voidAuthorization: false, query: false, retire: false, reviewAccount: false, authorizeReviewed: false } })
+const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, payeeReview: null, dispute: null, actions: { authorize: true, voidAuthorization: false, query: false, retire: false, reviewAccount: false, authorizeReviewed: false } })
 const cashier = () => ({ payment: payment(), actions: { execute: true, query: false, resendOriginal: false } })
 const accounts = () => ({ authorizationId: 'authorization', authorizationVersion: 1, validUntil: new Date(Date.now() + 60000).toISOString(), items: [{ reference: 'debit-1', displayName: '基本户', maskedAccount: '****4567', currency: 'CNY', sourceVersion: 'v1' }] })
 const operation = () => ({ version: 4, status: 'UNKNOWN', updatedAt: new Date().toISOString(), observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: 'CONNECTION' })
+const disputedFinance = () => {
+  const view = finance(), at = new Date().toISOString()
+  view.payment = payment(); Object.assign(view.payment, { version: 2, status: 'EXECUTION_REGISTERED', executedBy: 'cashier', operation: { ...operation(), status: 'RECONCILING', disputed: true } })
+  view.dispute = { candidate: { outcome: 'SUCCEEDED', revision: 3, observedAt: at, validUntil: new Date(Date.parse(at) + 300000).toISOString(), paymentReference: 'bank-original', receiptReference: 'receipt-original', completedAt: view.payment.authorizedAt, failure: null }, issue: null, canResolve: true, latest: null }
+  view.actions = { ...view.actions, authorize: false, query: true }; return view
+}
 const cashierReceipt = input => ({ authorizationId: 'authorization', authorizationVersion: input.authorizationVersion, action: input.action, requestId: input.action === 'EXECUTE' ? 'request' : null, operationVersion: input.operationVersion ? input.operationVersion + 1 : null, auditEventId: 'audit' })
 const financeReceipt = () => ({ applicationId: 'app', businessId: 'report', roundNo: 1, authorizationId: 'authorization', authorizationVersion: 1, action: 'AUTHORIZE', operationVersion: null, expiresAt: payment().expiresAt, auditEventId: 'audit' })
 let scope = 0
@@ -42,6 +48,51 @@ test('财务授权只发送已展示版本和期限，不能把客户端金额�
   assert.deepEqual(input, { roundNo: 1, applicationVersion: 9, businessVersion: 3, voucherOperationId: 'voucher', voucherVersion: 3, validitySeconds: 900, comment: '核对批准凭证' })
   for (const minutes of [0, 59, 86401, 1.5]) assert.throws(() => rules.financePaymentInput(view, 'AUTHORIZE', '原因', minutes))
   assert.throws(() => rules.financePaymentInput(view, 'AUTHORIZE', '   ')); view.payable.value = '0.00'; assert.throws(() => rules.financePaymentInput(view, 'AUTHORIZE', '原因'))
+})
+
+test('裁决只采用展示终态且要求新鲜证据、明确原因及对账编号', () => {
+  const view = disputedFinance(); view.dispute.candidate.paidAmount = '999.00'
+  const input = rules.paymentDisputeInput(view, ' BANK-001 ', ' 已核对原回单 ')
+  assert.deepEqual(input, { authorizationVersion: 2, operationVersion: 4, outcome: 'SUCCEEDED', evidenceReference: 'BANK-001', comment: '已核对原回单' })
+  assert.throws(() => rules.paymentDisputeInput(view, 'BANK-001', '依据', Date.parse(view.dispute.candidate.validUntil)))
+  for (const reference of ['', '  ', 'x'.repeat(129), 'BANK\n001']) assert.throws(() => rules.paymentDisputeInput(view, reference, '依据'))
+  for (const mutate of [v => v.dispute = null, v => v.dispute.canResolve = false, v => v.dispute.candidate.outcome = 'PENDING', v => v.dispute.issue = 'STALE_EVIDENCE', v => v.payment.operation.disputed = false, v => v.payment.operation.status = 'QUERYING', v => v.dispute.candidate.validUntil = v.dispute.candidate.observedAt]) {
+    const invalid = clone(view); mutate(invalid); assert.throws(() => rules.paymentDisputeInput(invalid, 'BANK-001', '依据'))
+  }
+})
+
+test('裁决回执必须属于原交易和精确下一版本', () => {
+  const view = disputedFinance(), input = rules.paymentDisputeInput(view, 'BANK-001', '依据')
+  const receipt = { applicationId: 'app', authorizationId: 'authorization', resolutionId: 'decision', operationVersion: 5, outcome: 'SUCCEEDED', auditEventId: 'audit' }
+  assert.doesNotThrow(() => rules.validatePaymentDisputeReceipt(receipt, view, input))
+  for (const change of [{ authorizationId: 'other' }, { applicationId: 'other' }, { operationVersion: 4 }, { operationVersion: 6 }, { outcome: 'FAILED' }, { resolutionId: '' }, { auditEventId: '' }]) assert.throws(() => rules.validatePaymentDisputeReceipt({ ...receipt, ...change }, view, input))
+})
+
+test('页面读取和刷新不自动裁决，填写凭据后才发送一次明确决定', async () => {
+  const value = disputedFinance(), sent = []
+  api.financePayment = async () => clone(value)
+  api.resolvePaymentDispute = async (id, input) => { sent.push({ id, input }); return { applicationId: 'app', authorizationId: id, resolutionId: 'decision', operationVersion: input.operationVersion + 1, outcome: input.outcome, auditEventId: 'audit' } }
+  const item = mount(Finance, binding())
+  try {
+    await settle(); await item.state.load(); assert.equal(sent.length, 0)
+    item.state.prepare('RESOLVE_DISPUTE'); item.state.comment = '核对原回单'; await item.state.execute(); assert.equal(sent.length, 0)
+    item.state.evidenceReference = 'BANK-001'; await item.state.execute(); assert.equal(sent.length, 1)
+    assert.equal(sent[0].id, 'authorization'); assert.equal(sent[0].input.outcome, 'SUCCEEDED'); assert.equal(item.state.pending, null)
+  } finally { item.close() }
+})
+
+test('切换身份会清空未提交裁决凭据并丢弃旧身份的迟到回执', async () => {
+  let complete; const value = disputedFinance()
+  api.financePayment = async () => clone(value)
+  api.resolvePaymentDispute = () => new Promise(resolve => { complete = resolve })
+  const item = mount(Finance, binding())
+  try {
+    await settle(); item.state.prepare('RESOLVE_DISPUTE'); item.state.evidenceReference = 'BANK-OLD'; item.state.comment = '旧身份原回单'
+    const pending = item.state.execute(); item.props.scopeKey = 'another-finance'; await settle()
+    assert.equal(item.state.evidenceReference, ''); assert.equal(item.state.pending, null)
+    complete({ applicationId: 'app', authorizationId: 'authorization', resolutionId: 'old-decision', operationVersion: 5, outcome: 'SUCCEEDED', auditEventId: 'audit' }); await pending
+    assert.equal(item.state.notice, ''); assert.equal(item.state.saving, false)
+  } finally { item.close() }
 })
 
 test('账户目录有明确归属、时效和人工选择，提交时只能携带选中引用及版本', () => {

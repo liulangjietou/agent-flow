@@ -63,6 +63,25 @@ public class JdbcPaymentOperationRepository {
             return value;
         }, tenant, id.toString(), version).stream().findFirst();
     }
+    /** 争议裁决逐条核对历史修订，曾出现的到账或退回不能因后续回执覆盖而丢失。 */
+    public DisputeEvidence disputeEvidence(String tenant, UUID id) {
+        return jdbc.query("SELECT version,state_json FROM payment_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", rows -> {
+            PaymentObservation firstSuccess = null; boolean fundingObserved = false;
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), PaymentOperation.class); var command = value.input().command();
+                if (!tenant.equals(command.tenantId()) || !id.equals(command.id()) || value.version() != rows.getLong("version")) throw new IllegalStateException("Persisted dispute evidence identity is inconsistent");
+                if (firstSuccess == null && value.settleable()) firstSuccess = value.observation();
+                fundingObserved |= funding(value.observation()) || funding(value.conflictingObservation());
+            }
+            return new DisputeEvidence(firstSuccess, fundingObserved);
+        }, tenant, id.toString());
+    }
+    private static boolean funding(PaymentObservation value) { return value != null && (value.status() == PaymentObservation.Status.SUCCEEDED || value.status() == PaymentObservation.Status.REVERSED); }
+    /**
+     * 历史只提供领域裁决所需的最小事实，不将所有账户快照载入列表。
+     * @author owlzhangfq@gmail.com
+     */
+    public record DisputeEvidence(PaymentObservation firstSuccess, boolean fundingObserved) { }
     /** 升级后补建缺失的付款准备；只扫描实际成功记录，不查询或重发资金交易。 */
     public List<Candidate> missingVoucherPreparations() {
         return jdbc.query("""

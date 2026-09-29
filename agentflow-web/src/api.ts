@@ -22,7 +22,7 @@ import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseF
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
-import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt } from './payments'
+import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView } from './vouchers'
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
 import type { ExpenseArchiveView } from './expenseArchive'
@@ -313,6 +313,7 @@ export const api = {
   authorizePayment: (id: string, input: PaymentAuthorizationInput) => write<FinancePaymentReceipt>(`/applications/${encodeURIComponent(id)}/payments/authorizations`, 'POST', '财务授权付款', input),
   financePaymentAction: (id: string, input: FinancePaymentActionInput) => write<FinancePaymentReceipt>(`/payments/${encodeURIComponent(id)}/finance-actions`, 'POST', '财务核对付款授权', input),
   reviewPaymentPayee: (id: string, input: PayeeReviewInput) => write<PayeeReviewReceipt>(`/payments/${encodeURIComponent(id)}/payee-reviews`, 'POST', '重新核对本人账户', input),
+  resolvePaymentDispute: (id: string, input: PaymentDisputeInput) => write<PaymentDisputeReceipt>(`/payments/${encodeURIComponent(id)}/dispute-resolutions`, 'POST', '确认原付款对账结果', input),
   cashierPayments: (beforeId: string | undefined, signal: AbortSignal) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),

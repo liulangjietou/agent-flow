@@ -16,6 +16,7 @@ public record PaymentOperation(Input input, long version, Status status, int att
                                PaymentObservation conflictingObservation, long highestRevision, Failure failure) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
 
     /** 恢复时不能把可能发送的记录改回未经查询的首次执行，也不能把账户复查租约当作发送事实。 */
     public PaymentOperation {
@@ -152,6 +153,42 @@ public record PaymentOperation(Input input, long version, Status status, int att
         requireTime(now); if (running() || status == Status.QUEUED || dispatches == 0) throw conflict();
         return changed(Status.UNKNOWN, now, now, null, accountEvidence, observation, conflictingObservation, highestRevision, Failure.RECHECK_REQUESTED);
     }
+
+    /** 人工裁决只采用刚查询到的原交易终态，不能倒退外部版本或改写已经确认的到账回单。 */
+    public ResolutionIssue resolutionIssue(Instant now, PaymentObservation originalSuccess, boolean fundingObserved) {
+        if (status != Status.RECONCILING) return ResolutionIssue.NOT_DISPUTED;
+        var candidate = conflictingObservation;
+        if (candidate.status() != PaymentObservation.Status.SUCCEEDED && candidate.status() != PaymentObservation.Status.FAILED
+                && candidate.status() != PaymentObservation.Status.REVERSED) return ResolutionIssue.NON_TERMINAL;
+        if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())) return ResolutionIssue.STALE_EVIDENCE;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EXPIRED_EVIDENCE;
+        if (observation != null && observation.paymentReference() != null && !observation.paymentReference().equals(candidate.paymentReference())) return ResolutionIssue.DIFFERENT_PAYMENT;
+        if (candidate.status() == PaymentObservation.Status.FAILED && (fundingObserved || funding(observation))) return ResolutionIssue.FUNDING_ALREADY_OBSERVED;
+        var paid = originalSuccess != null ? originalSuccess : observation != null && observation.status() == PaymentObservation.Status.SUCCEEDED ? observation : null;
+        if (paid != null && (candidate.status() == PaymentObservation.Status.SUCCEEDED && !sameSettlement(paid, candidate)
+                || candidate.status() == PaymentObservation.Status.REVERSED && (!paid.paymentReference().equals(candidate.paymentReference())
+                    || candidate.completedAt().isBefore(paid.completedAt())))) return ResolutionIssue.DIFFERENT_SETTLEMENT;
+        return null;
+    }
+
+    /** 清除当前冲突需要单独保存裁决证据，原冲突修订由仓储永久保留；本动作不发送资金命令。 */
+    public PaymentOperation resolveDispute(PaymentObservation.Status outcome, PaymentObservation originalSuccess, boolean fundingObserved, Instant now) {
+        requireTime(now);
+        if (resolutionIssue(now, originalSuccess, fundingObserved) != null || conflictingObservation.status() != outcome) {
+            throw new DomainException("PAYMENT_DISPUTE_UNRESOLVABLE", "A recent terminal observation of the unchanged original payment is required");
+        }
+        return changed(Status.valueOf(outcome.name()), now, null, null, accountEvidence, conflictingObservation, null, highestRevision, null);
+    }
+
+    private static boolean funding(PaymentObservation value) {
+        return value != null && (value.status() == PaymentObservation.Status.SUCCEEDED || value.status() == PaymentObservation.Status.REVERSED);
+    }
+
+    /**
+     * 可解释的拒绝原因不包含资金系统原文，页面不能通过选择结果绕过这些条件。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_EVIDENCE, EXPIRED_EVIDENCE, DIFFERENT_PAYMENT, FUNDING_ALREADY_OBSERVED, DIFFERENT_SETTLEMENT }
 
     /** 权威查无不自动付款；显式重发仍使用原编号、原金额、原出纳，且必须重新检查账户。 */
     public PaymentOperation retryNotFound(Instant now) {

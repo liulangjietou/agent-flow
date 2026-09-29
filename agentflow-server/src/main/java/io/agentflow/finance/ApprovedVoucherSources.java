@@ -46,6 +46,13 @@ public class ApprovedVoucherSources {
     }
     /** 源金额及纸件和预算守卫只在这里读取；零金额也必须经过当前轮次控制。 */
     public VoucherSource.Plan derive(VoucherPreparation.Source source) {
+        return derive(source, true);
+    }
+    /** 已消费资源的结算恢复仍核对批准和纸件；预算后续状态由原消费操作单独证明。 */
+    public VoucherSource.Plan deriveAfterResourceConsumption(VoucherPreparation.Source source) {
+        return derive(source, false);
+    }
+    private VoucherSource.Plan derive(VoucherPreparation.Source source, boolean requireFrozenBudget) {
         var application = applications.findById(source.tenantId(), source.applicationId()).orElseThrow(ApprovedVoucherSources::changed);
         if (!reference(application).equals(source)) throw changed();
         if (source.businessType() == BusinessReference.Type.ADVANCE_REQUEST) {
@@ -54,7 +61,7 @@ public class ApprovedVoucherSources {
         var report = expenses.find(source.tenantId(), source.businessId()).orElseThrow(ApprovedVoucherSources::changed);
         var control = controls.find(source.tenantId(), report.id(), source.roundNo()).orElseThrow(ApprovedVoucherSources::changed);
         var budget = budgets.find(source.tenantId(), report.id()).orElseThrow(ApprovedVoucherSources::changed);
-        if (!budget.frozenFor(BudgetPrecheckPort.Request.fromCurrent(report, control.input().accountingDate()))) {
+        if (requireFrozenBudget && !budget.frozenFor(BudgetPrecheckPort.Request.fromCurrent(report, control.input().accountingDate()))) {
             throw new DomainException("VOUCHER_BUDGET_NOT_FROZEN", "Current expense amount must retain its confirmed budget reservation");
         }
         return VoucherSource.expense(application, report, control);

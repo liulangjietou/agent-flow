@@ -6,6 +6,7 @@ import io.agentflow.finance.PaymentCommand;
 import io.agentflow.finance.PaymentOperation;
 import io.agentflow.finance.PaymentOperationChanged;
 import io.agentflow.finance.PaymentPayeeEvidence;
+import io.agentflow.finance.PaymentDisputeResolved;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -35,6 +36,20 @@ public class AdvanceDisbursementService {
     public void changed(PaymentOperationChanged event) {
         var payment = event.current();
         if (payment.input().command().purpose() == PaymentCommand.Purpose.EMPLOYEE_ADVANCE) apply(payment);
+    }
+
+    /** 明确成功裁决才解除原放款冻结，普通查询及退回裁决均不能清除余额复核标记。 */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void resolved(PaymentDisputeResolved event) {
+        var payment = event.payment(); var command = payment.input().command();
+        if (!payment.settleable() || command.purpose() != PaymentCommand.Purpose.EMPLOYEE_ADVANCE) return;
+        var existing = balances.find(command.tenantId(), command.binding().businessId()).orElse(null);
+        if (existing == null || !existing.paymentReviewRequired()) return;
+        var request = requests.find(command.tenantId(), existing.id()).orElseThrow(AdvanceDisbursementService::mismatch);
+        var expected = request.paidAdvance(payment, payeeEvidence.paymentAccount(payment, request.currentRound().account()));
+        long version = existing.version(); existing.resolvePaymentReview(version, expected);
+        balances.update(existing, version, event.resolution().resolvedBy(), "PAYMENT_DISPUTE_RESOLVED");
     }
 
     /** 恢复旧版本已经确认到账但尚未生成余额的交易；锁后重新读取原资金状态。 */

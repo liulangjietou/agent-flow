@@ -1,0 +1,128 @@
+{
+  "date": "2026-09-29",
+  "scope": "原付款争议裁决及借款/报销恢复",
+  "syntheticExternalServices": true,
+  "migration": "V52 to V53",
+  "redEvidence": [
+    "payment-dispute-red.log",
+    "payment-dispute-green.log",
+    "payment-dispute-precision-red.log"
+  ],
+  "verified": {
+    "domain": 38,
+    "h2Server": 105,
+    "postgresql": 100,
+    "frontend": 24,
+    "http": 29,
+    "testScopesOverlap": true,
+    "productionFrontendBuild": "PASS",
+    "openApi": {
+      "operations": 164,
+      "schemas": 284,
+      "requestExamples": 54
+    },
+    "authors": {
+      "javaFiles": 676,
+      "namedTypes": 1209,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "database": {
+    "migration": 53,
+    "decisions": [
+      {
+        "id": "22eafbda-c08a-4313-a024-3e7eb9fba79a",
+        "disputedVersion": 10,
+        "resolvedVersion": 11,
+        "actor": "finance",
+        "outcome": "SUCCEEDED",
+        "reference": "HTTP-LOCAL-RECONCILIATION-001"
+      },
+      {
+        "id": "67bb7cde-d129-4d07-94b8-e2e66545a6ee",
+        "disputedVersion": 17,
+        "resolvedVersion": 18,
+        "actor": "finance",
+        "outcome": "SUCCEEDED",
+        "reference": "UI-LOCAL-RECONCILIATION-002"
+      }
+    ],
+    "auditCount": 2,
+    "originalRevisionCount": 18
+  },
+  "applicationId": "4063d04c-eb5e-4c70-9440-2ea9dee5feaf",
+  "businessId": "16361344-85c2-4c30-b3e5-16af04216141",
+  "paymentId": "7c17545e-dc2e-4235-93f0-0821df9cf6bb",
+  "businessNo": "UI-PAYEE-50202f67",
+  "before": {
+    "paymentStatus": "RECONCILING",
+    "advanceStatus": "PAYMENT_REVIEW",
+    "available": {
+      "value": "0.00",
+      "currency": "CNY"
+    }
+  },
+  "after": {
+    "paymentStatus": "SUCCEEDED",
+    "advanceStatus": "PAID_OUT",
+    "available": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "paymentVoucher": "UI-VOUCHER-67ab2422"
+  },
+  "bankCommandSha256Before": "a551dcc4462651afe7b4b4d15ba0f19ed57096a31aeef46e99fd477bf78ecce6",
+  "bankCommandSha256After": "a551dcc4462651afe7b4b4d15ba0f19ed57096a31aeef46e99fd477bf78ecce6",
+  "browser": [
+    "最新成功查询仍保持争议和借款冻结",
+    "财务填写对账凭据与原因后明确确认",
+    "当前争议消失，页面显示独立新裁决及原付款凭证",
+    "独立 HTTP 验证借款可用余额恢复且未新增银行命令"
+  ],
+  "screenshots": [
+    "payment-dispute-ui-confirm.png",
+    "payment-dispute-ui-resolved.png",
+    "payment-dispute-ui-narrow.png"
+  ],
+  "viewport": {
+    "document": 500,
+    "panels": [
+      {
+        "className": "modal application-record",
+        "clientWidth": 456,
+        "left": 12,
+        "right": 488,
+        "scrollWidth": 456
+      },
+      {
+        "className": "finance-payment",
+        "clientWidth": 412,
+        "left": 34,
+        "right": 446,
+        "scrollWidth": 412
+      },
+      {
+        "className": "payment-dispute",
+        "clientWidth": 411,
+        "left": 34,
+        "right": 446,
+        "scrollWidth": 411
+      }
+    ],
+    "requestedWidth": 375,
+    "viewport": 500,
+    "resetAfterCheck": true
+  },
+  "backup": {
+    "file": "expense-ui-before-v53.dump",
+    "bytes": 486395
+  },
+  "evidenceRoot": "/fyoung/tmp/agentflow-remaining-20260928",
+  "limits": [
+    "本地合成资金服务不代表企业银行联调",
+    "375 像素覆盖请求实际被浏览器限制为 500 像素",
+    "凭证争议、退款调整和借款还款结清继续实施",
+    "本地 Git 没有配置 remote；未推送或创建 PR"
+  ]
+}

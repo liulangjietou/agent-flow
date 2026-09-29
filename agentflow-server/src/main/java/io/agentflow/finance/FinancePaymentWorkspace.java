@@ -26,12 +26,13 @@ public class FinancePaymentWorkspace {
     private final JdbcPaymentExecutionRequestRepository requests;
     private final JdbcPaymentOperationRepository operations;
     private final JdbcPaymentPayeeReviewRepository reviews;
+    private final PaymentDisputeService disputes;
     /** 全部查询共享一个本地快照，是否可新授权只作为页面提示。 */
     public FinancePaymentWorkspace(CurrentActor actors, VoucherAccess access, PaymentPersonnel personnel, JdbcVoucherOperationRepository vouchers,
                                     JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentExecutionRequestRepository requests, JdbcPaymentOperationRepository operations,
-                                    JdbcPaymentPayeeReviewRepository reviews) {
+                                    JdbcPaymentPayeeReviewRepository reviews, PaymentDisputeService disputes) {
         this.actors = actors; this.access = access; this.personnel = personnel; this.vouchers = vouchers;
-        this.authorizations = authorizations; this.requests = requests; this.operations = operations; this.reviews = reviews;
+        this.authorizations = authorizations; this.requests = requests; this.operations = operations; this.reviews = reviews; this.disputes = disputes;
     }
     /** 查询严格限定一个可读审批轮次，未知参数直接拒绝。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -64,6 +65,7 @@ public class FinancePaymentWorkspace {
                 authorization == null ? null : PaymentView.of(authorization, request, operation),
                 review == null ? null : new PayeeReview(review.input().id(), review.version(), review.status().name(), review.input().requestedAt(), review.checkedAt(),
                         review.account() == null ? null : review.account().validUntil(), review.account() == null ? null : review.account().snapshot().maskedAccount(), review.issue() == null ? null : review.issue().name()),
+                finance && authorization != null ? disputes.view(authorization, operation, now) : null,
                 new Actions(authorize, finance && window, finance && PaymentView.queryable(authorization, operation),
                         finance && authorization != null && authorization.canRetire(operation, actors.actor().userId()),
                         reviewSource && (review == null || !review.active()), reviewSource && review != null && review.usable(now) && review.matchesSource(authorization, voucher, now)));
@@ -75,7 +77,7 @@ public class FinancePaymentWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID applicationId, UUID businessId, int roundNo, long applicationVersion, long businessVersion, UUID voucherOperationId, Long voucherVersion,
-                       Money payable, PaymentView payment, PayeeReview payeeReview, Actions actions) { }
+                       Money payable, PaymentView payment, PayeeReview payeeReview, PaymentDisputeService.View dispute, Actions actions) { }
     /**
      * 写入入口始终重新验证，提示不能代替实际权限。
      * @author owlzhangfq@gmail.com

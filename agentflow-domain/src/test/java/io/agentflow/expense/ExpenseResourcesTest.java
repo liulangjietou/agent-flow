@@ -159,6 +159,17 @@ class ExpenseResourcesTest {
         advance.requirePaymentReview(7); assertThat(advance.version()).isEqualTo(7);
     }
 
+    @Test void explicitOriginalPaymentRecoveryKeepsUsedAndReservedAmountsAndRejectsAnotherDisbursement() {
+        var advance = advance(); var retained = use(0); var consumed = use(0); var original = EmployeeAdvance.restore(advance.state());
+        advance.reserve(1, retained, money("40")); advance.reserve(2, consumed, money("30")); advance.settle(3, consumed);
+        advance.requirePaymentReview(4); var held = advance.state();
+        fails("ADVANCE_PAYMENT_REVIEW_REQUIRED", () -> advance.resolvePaymentReview(5, advance()));
+        assertThat(advance.state()).isEqualTo(held); advance.resolvePaymentReview(5, original);
+        assertThat(advance.balance()).isEqualTo(held.balance()); assertThat(advance.available()).isEqualTo(money("30"));
+        assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.PARTIALLY_SETTLED); assertThat(advance.version()).isEqualTo(6);
+        fails("ADVANCE_PAYMENT_REVIEW_REQUIRED", () -> advance.resolvePaymentReview(6, original));
+    }
+
     @Test
     void advanceRequiresWholeReportReferencesAndRetainsItsBalanceAfterRejectedChanges() {
         var advance = advance(); var use = use(0); advance.reserve(1, use, money("80"));
