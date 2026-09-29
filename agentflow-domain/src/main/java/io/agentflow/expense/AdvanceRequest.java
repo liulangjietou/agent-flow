@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.EmployeeAccountPort;
+import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.PaymentCommand;
 import io.agentflow.finance.PaymentOperation;
@@ -79,14 +80,15 @@ public final class AdvanceRequest {
         return rounds.get(rounds.size() - 1);
     }
 
-    /** 以原批准和无矛盾的成功回执生成固定借款身份；迟到资金不能被当前审批状态抹掉。 */
-    public EmployeeAdvance paidAdvance(PaymentOperation payment) {
+    /** 跨聚合服务核实账户授权证据后，实体按原批准和无矛盾回执生成固定借款身份。 */
+    public EmployeeAdvance paidAdvance(PaymentOperation payment, EmployeeAccountSnapshot authorizedAccount) {
         var command = payment.input().command(); var binding = command.binding();
         if (!payment.settleable() || command.purpose() != PaymentCommand.Purpose.EMPLOYEE_ADVANCE || approval == null
                 || !tenantId.equals(command.tenantId()) || !id.equals(binding.businessId()) || !applicationId.equals(binding.applicationId())
                 || binding.roundNo() != approval.roundNo() || binding.applicationVersion() != approval.applicationVersion()
                 || binding.businessVersion() != version || !employeeId.equals(command.payee().employeeId())
-                || !currentRound().account().equals(command.payee()) || !currentRound().content().amount().equals(command.amount())
+                || !command.payee().equals(authorizedAccount) || !currentRound().legalEntity().id().equals(command.payee().legalEntityId())
+                || !currentRound().content().amount().equals(command.amount())
                 || command.authorization().authorizedAt().isBefore(approval.approvedAt())) {
             throw new DomainException("ADVANCE_PAYMENT_MISMATCH", "Successful payment must match original approved advance terms");
         }

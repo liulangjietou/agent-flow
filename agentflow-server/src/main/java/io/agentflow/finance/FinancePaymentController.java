@@ -49,4 +49,10 @@ public class FinancePaymentController {
     private static ResponseEntity<String> noStore(ResponseEntity<String> result) {
         return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders()).cacheControl(CacheControl.noStore()).body(result.getBody());
     }
+    /** 回放前仍核对原轮次财务权限，回执只确认复核意图入库。 */
+    @PostMapping("/api/v1/payments/{id}/payee-reviews")
+    public ResponseEntity<String> reviewPayee(@PathVariable UUID id, @Valid @RequestBody FinancePaymentActions.ReviewInput input, HttpServletRequest request) {
+        access.requireFinanceAuthorization(id);
+        return noStore(idempotency.execute(request, HttpStatus.ACCEPTED, () -> actions.reviewPayee(id, input)));
+    }
 }

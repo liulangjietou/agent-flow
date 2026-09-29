@@ -25,13 +25,14 @@ public class PaymentVoucherSources {
     private final ExpenseReportRepository expenses;
     private final JdbcExpenseSubmissionControlRepository controls;
     private final JdbcExpensePrecheckRepository prechecks;
+    private final PaymentPayeeEvidence payeeEvidence;
 
     /** 会计日期来自原业务冻结事实，不能查询今天的法人目录重新解释历史到账日。 */
     public PaymentVoucherSources(ApplicationRepository applications, JdbcPaymentOperationRepository payments,
             JdbcPaymentAuthorizationRepository authorizations, JdbcVoucherOperationRepository vouchers, AdvanceRequestRepository advances,
-            ExpenseReportRepository expenses, JdbcExpenseSubmissionControlRepository controls, JdbcExpensePrecheckRepository prechecks) {
+            ExpenseReportRepository expenses, JdbcExpenseSubmissionControlRepository controls, JdbcExpensePrecheckRepository prechecks, PaymentPayeeEvidence payeeEvidence) {
         this.applications = applications; this.payments = payments; this.authorizations = authorizations; this.vouchers = vouchers;
-        this.advances = advances; this.expenses = expenses; this.controls = controls; this.prechecks = prechecks;
+        this.advances = advances; this.expenses = expenses; this.controls = controls; this.prechecks = prechecks; this.payeeEvidence = payeeEvidence;
     }
 
     /** 只定位成功的持久修订，当前有效性留到准备和发送前重新读取。 */
@@ -56,16 +57,18 @@ public class PaymentVoucherSources {
             throw new DomainException("PAYMENT_VOUCHER_ACCRUAL_UNCONFIRMED", "Original accrual voucher must remain confirmed before payment accounting");
         }
         var application = applications.findById(source.tenantId(), source.applicationId()).orElseThrow(PaymentVoucherSources::changed);
-        return VoucherSource.payment(application, command, original.observation(), legalTimeZone(source, command, voucher.input().command()));
+        return VoucherSource.payment(application, command, original.observation(), legalTimeZone(source, authorization, voucher.input().command()));
     }
 
-    private ZoneId legalTimeZone(VoucherPreparation.Source source, PaymentCommand payment, VoucherCommand accrual) {
+    private ZoneId legalTimeZone(VoucherPreparation.Source source, PaymentAuthorization authorization, VoucherCommand accrual) {
+        var payment = authorization.execution().command();
         if (payment.purpose() == PaymentCommand.Purpose.EMPLOYEE_ADVANCE) {
             var request = advances.find(source.tenantId(), source.businessId()).orElseThrow(PaymentVoucherSources::changed);
             var round = request.rounds().stream().filter(value -> value.roundNo() == source.roundNo()).findFirst().orElseThrow(PaymentVoucherSources::changed);
             if (!request.applicationId().equals(source.applicationId()) || !request.employeeId().equals(source.employeeId())
-                    || !round.account().equals(payment.payee()) || !round.content().amount().equals(payment.amount())
+                    || !round.content().amount().equals(payment.amount())
                     || !round.legalEntity().id().equals(payment.payee().legalEntityId())) throw changed();
+            payeeEvidence.requireAuthorizedAccount(authorization, round.account());
             return ZoneId.of(round.legalEntity().timeZone());
         }
         var report = expenses.find(source.tenantId(), source.businessId()).orElseThrow(PaymentVoucherSources::changed);
@@ -74,13 +77,14 @@ public class PaymentVoucherSources {
         var precheck = prechecks.find(source.tenantId(), control.input().precheckId()).orElseThrow(PaymentVoucherSources::changed);
         var input = precheck.input();
         if (!report.applicationId().equals(source.applicationId()) || !report.employeeId().equals(source.employeeId())
-                || !round.account().equals(payment.payee()) || !round.payable().equals(payment.amount())
+                || !round.payable().equals(payment.amount())
                 || !round.approvedGross().equals(accrual.totals().gross()) || !round.offsetTotal().equals(accrual.totals().offset())
                 || precheck.status() != ExpensePrecheckJob.Status.READY || !input.reportId().equals(source.businessId())
                 || !input.applicationId().equals(source.applicationId()) || input.roundNo() != source.roundNo()
                 || input.financialVersion() != round.submittedFinancialVersion()
                 || !precheck.result().evidence().legalEntity().id().equals(payment.payee().legalEntityId())
-                || !precheck.result().evidence().preview().account().equals(payment.payee())) throw changed();
+                || !precheck.result().evidence().preview().account().equals(round.account())) throw changed();
+        payeeEvidence.requireAuthorizedAccount(authorization, round.account());
         return ZoneId.of(precheck.result().evidence().legalEntity().timeZone());
     }
 

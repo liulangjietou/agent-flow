@@ -34,12 +34,13 @@ public class FinancePaymentActions {
     private final JdbcPaymentOperationRepository operations;
     private final PaymentOperationService execution;
     private final PaymentAudit audit;
+    private final PaymentPayeeReviewService reviews;
     /** 真实来源及审计在同一事务中处理，本服务没有外部 HTTP 依赖。 */
     public FinancePaymentActions(CurrentActor actors, PaymentAccess access, ApprovedVoucherSources voucherSources, ApprovedPaymentSources paymentSources,
                                   JdbcVoucherOperationRepository vouchers, JdbcPaymentAuthorizationRepository authorizations,
-                                  JdbcPaymentOperationRepository operations, PaymentOperationService execution, PaymentAudit audit) {
+                                  JdbcPaymentOperationRepository operations, PaymentOperationService execution, PaymentAudit audit, PaymentPayeeReviewService reviews) {
         this.actors = actors; this.access = access; this.voucherSources = voucherSources; this.paymentSources = paymentSources;
-        this.vouchers = vouchers; this.authorizations = authorizations; this.operations = operations; this.execution = execution; this.audit = audit;
+        this.vouchers = vouchers; this.authorizations = authorizations; this.operations = operations; this.execution = execution; this.audit = audit; this.reviews = reviews;
     }
     /** 锁后从实际批准和挂账派生金额与账户，客户端只携带展示版本、期限和理由。 */
     @Transactional
@@ -56,10 +57,22 @@ public class FinancePaymentActions {
             if (current.status() == PaymentAuthorization.Status.AUTHORIZED && !now.isBefore(current.decision().expiresAt())) authorizations.update(current.expire(now));
             else throw new DomainException("PAYMENT_AUTHORIZATION_EXISTS", "The financial business already has an active payment authorization or execution");
         }
+        var review = input.payeeReviewId() == null ? null : reviews.requireReady(application.tenantId(), input.payeeReviewId(), input.payeeReviewVersion(), voucher, actors.actor().userId(), now);
+        if (review != null) payee = review.account().snapshot();
         var authorization = PaymentAuthorization.issue(UUID.randomUUID(), voucher, payee, actors.actor().userId(), now, now.plusSeconds(input.validitySeconds()));
         authorizations.create(authorization);
+        if (review != null) reviews.consume(review, authorization, now);
         var event = audit.record(authorization, authorization.terms().id(), authorization.version(), "FINANCE", "PAYMENT_AUTHORIZE", null, authorization.status().name(), input.comment(), now);
         return receipt(authorization, "AUTHORIZE", null, event);
+    }
+    /** 原授权结束后只登记账户复核，外部读取成功也不会自动签发新授权。 */
+    @Transactional
+    public ReviewReceipt reviewPayee(UUID authorizationId, ReviewInput input) {
+        var initial = access.requireFinanceAuthorization(authorizationId); paymentSources.lock(initial);
+        var original = access.requireFinanceAuthorization(authorizationId); if (original.version() != input.authorizationVersion()) throw conflict();
+        var now = now(); var review = reviews.register(original, input.voucherVersion(), actors.actor().userId(), now);
+        var event = audit.record(original, review.input().id(), review.version(), "FINANCE", "PAYMENT_PAYEE_REVIEW", null, review.status().name(), input.comment(), now);
+        return new ReviewReceipt(original.terms().binding().applicationId(), authorizationId, review.input().id(), review.version(), event);
     }
     /** 原轮次权限每次重读；查询不要求原批准仍有效，作废不能覆盖已经登记的出纳执行。 */
     @Transactional
@@ -102,7 +115,10 @@ public class FinancePaymentActions {
      */
     public record Authorize(@Positive int roundNo, @Positive long applicationVersion, @Positive long businessVersion,
                             @NotNull UUID voucherOperationId, @Positive long voucherVersion,
-                            @Min(MIN_VALIDITY_SECONDS) @Max(MAX_VALIDITY_SECONDS) int validitySeconds, @NotBlank @Size(max = 2000) String comment) {
+                            @Min(MIN_VALIDITY_SECONDS) @Max(MAX_VALIDITY_SECONDS) int validitySeconds, @NotBlank @Size(max = 2000) String comment,
+                            UUID payeeReviewId, @Positive Long payeeReviewVersion) {
+        /** 换账户必须同时携带复核标识和刚展示的版本，缺一不能退回普通授权。 */
+        public Authorize { if ((payeeReviewId == null) != (payeeReviewVersion == null)) throw new IllegalArgumentException("Payee review identity and version must be supplied together"); }
         /** 不静默忽略客户端夹带的财务事实。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown payment authorization field"); }
     }
@@ -123,4 +139,17 @@ public class FinancePaymentActions {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Receipt(UUID applicationId, UUID businessId, int roundNo, UUID authorizationId, long authorizationVersion, String action,
                           Long operationVersion, Instant expiresAt, UUID auditEventId) { }
+    /**
+     * 只接受原授权和挂账展示版本，不接受前端指定的新账户。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ReviewInput(@Positive long authorizationVersion, @Positive long voucherVersion, @NotBlank @Size(max = 2000) String comment) {
+        /** 未知字段必须显式拒绝，避免把账户声明误当作受理结果。 */
+        @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown payee review field"); }
+    }
+    /**
+     * 幂等回执仅说明读取意图已保存，不含账户数据或新付款授权。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ReviewReceipt(UUID applicationId, UUID authorizationId, UUID reviewId, long reviewVersion, UUID auditEventId) { }
 }

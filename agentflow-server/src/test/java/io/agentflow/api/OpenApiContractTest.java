@@ -79,6 +79,8 @@ class OpenApiContractTest {
                 java.util.Map.entry("FinancePaymentWorkspace", io.agentflow.finance.FinancePaymentWorkspace.View.class),
                 java.util.Map.entry("FinancePaymentActions", io.agentflow.finance.FinancePaymentWorkspace.Actions.class),
                 java.util.Map.entry("PaymentRetirement", io.agentflow.finance.PaymentView.Retirement.class),
+                java.util.Map.entry("PaymentPayeeReview", io.agentflow.finance.FinancePaymentWorkspace.PayeeReview.class),
+                java.util.Map.entry("PaymentPayeeReviewReceipt", io.agentflow.finance.FinancePaymentActions.ReviewReceipt.class),
                 java.util.Map.entry("FinancePaymentReceipt", io.agentflow.finance.FinancePaymentActions.Receipt.class),
                 java.util.Map.entry("CashierPaymentWorkspace", io.agentflow.finance.CashierPaymentWorkspace.View.class),
                 java.util.Map.entry("CashierPaymentActions", io.agentflow.finance.CashierPaymentWorkspace.Actions.class),

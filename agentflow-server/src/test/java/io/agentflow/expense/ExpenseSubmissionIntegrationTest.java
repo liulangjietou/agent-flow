@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.approval.model.BusinessReference;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
 import io.agentflow.approval.model.Application;
@@ -49,7 +51,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
-        "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false",
+        "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false", "agentflow.expenses.archive-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -85,6 +87,9 @@ class ExpenseSubmissionIntegrationTest {
     private String advanceOffset = "50";
     private int paymentWrites;
     private int accountReads;
+    private int payeeReads;
+    private volatile EmployeeAccountSnapshot currentPayee;
+    private volatile boolean invalidPayee;
     private UUID cashierAppointment;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
@@ -125,6 +130,9 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcPaymentExecutionRequestRepository paymentRequests;
     @Autowired JdbcPaymentOperationRepository paymentOperations;
     @Autowired PaymentExecutionRequestWorker paymentRequestWorker;
+    @Autowired PaymentPayeeReviewWorker payeeReviewWorker;
+    @Autowired PaymentPayeeReviewService payeeReviewService;
+    @Autowired JdbcPaymentPayeeReviewRepository payeeReviews;
     @Autowired PaymentOperationWorker paymentWorker;
     @Autowired CashierPaymentWorkspace cashierWorkspace;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -166,6 +174,8 @@ class ExpenseSubmissionIntegrationTest {
             jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
             jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", report.toString());
             String authorizations = "SELECT id FROM payment_authorization WHERE tenant_id='demo' AND business_id=?";
+            jdbc.update("DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id IN (SELECT id FROM payment_payee_review WHERE tenant_id='demo' AND original_authorization_id IN (" + authorizations + "))", report.toString());
+            jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND original_authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + "))", report.toString());
             jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
@@ -667,6 +677,48 @@ class ExpenseSubmissionIntegrationTest {
         }
     }
 
+    @Test void financeRegistersPayeeReviewAfterOldAuthorizationEndsWithoutReadingAccountsInRequest() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report);
+        ok(send("/api/v1/payments/" + id + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1, "comment", "本人已维护账户，先结束旧授权")), 202);
+        int before = payeeReads;
+        var receipt = ok(send("/api/v1/payments/" + id + "/payee-reviews", "finance", Map.of("authorizationVersion", 2,
+                "voucherVersion", authorizationInput(report).get("voucherVersion"), "comment", "重新核对当前本人账户")), 202);
+        assertThat(receipt.path("authorizationId").asText()).isEqualTo(id.toString());
+        assertThat(receipt.path("reviewId").asText()).isNotBlank();
+        assertThat(payeeReads).isEqualTo(before); assertThat(paymentWrites).isZero();
+    }
+
+    @Test void reviewedAccountNeedsExplicitNewFinanceAuthorizationAndIndependentCashierBeforeSettlementAndArchive() throws Exception {
+        var report = paymentReport(); UUID originalId = authorizePayment(report);
+        var original = paymentAuthorizations.find("demo", originalId).orElseThrow(); var approvedRound = current(report).currentRound();
+        ok(send("/api/v1/payments/" + originalId + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1, "comment", "账户更新，先作废原授权")), 202);
+        currentPayee = new EmployeeAccountSnapshot(entity, "alice", "synthetic-updated-private-account", "****9876", "b".repeat(64), "v2");
+        var reviewId = registerPayeeReview(report, originalId); var queued = payeeReviews.find("demo", reviewId).orElseThrow();
+        assertCode(send(paymentPath(report) + "/authorizations", "finance", reviewedAuthorizationInput(report, queued)), "PAYMENT_PAYEE_REVIEW_UNAVAILABLE");
+        int before = payeeReads; payeeReviewWorker.poll(); var ready = payeeReviews.find("demo", reviewId).orElseThrow();
+        assertThat(ready.status()).isEqualTo(PaymentPayeeReview.Status.READY); assertThat(payeeReads).isEqualTo(before + 1);
+        assertThat(paymentAuthorizations.active("demo", BusinessReference.Type.EXPENSE, report.id())).isEmpty(); assertThat(paymentWrites).isZero();
+        var view = ok(read(paymentPath(report), "finance"), 200);
+        assertThat(view.at("/payeeReview/maskedAccount").asText()).isEqualTo("****9876"); assertThat(view.at("/actions/authorizeReviewed").asBoolean()).isTrue();
+        assertThat(view.toString()).doesNotContain("synthetic-updated-private-account", "accountDigest", "targetDigest", "sourceVersion");
+        assertThat(ok(read(paymentPath(report), "alice"), 200).path("payeeReview").isNull()).isTrue();
+        var input = reviewedAuthorizationInput(report, ready); String key = UUID.randomUUID().toString();
+        var response = send(paymentPath(report) + "/authorizations", "finance", key, input);
+        UUID replacement = UUID.fromString(ok(response, 202).path("authorizationId").asText());
+        assertThat(send(paymentPath(report) + "/authorizations", "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(payeeReviews.find("demo", reviewId).orElseThrow().consumedAuthorizationId()).isEqualTo(replacement);
+        assertThat(paymentAuthorizations.find("demo", originalId).orElseThrow().terms()).isEqualTo(original.terms());
+        assertThat(current(report).currentRound()).isEqualTo(approvedRound);
+        assertThat(paymentAuthorizations.find("demo", replacement).orElseThrow().terms().payee()).isEqualTo(currentPayee);
+        assertThat(paymentOperations.find("demo", replacement)).isEmpty(); assertThat(paymentWrites).isZero();
+        ok(send("/api/v1/cashier/payments/" + replacement + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); paymentWorker.poll();
+        assertThat(paymentOperations.find("demo", replacement).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        assertThat(paymentWrites).isEqualTo(1); assertThat(paymentCommands.get(replacement).payee()).isEqualTo(currentPayee);
+        settlementWorker.poll(); budgetWorker.poll(); voucherPreparationWorker.poll(); voucherWorker.poll(); pollArchive();
+        assertThat(archives.find("demo", report.id(), 1).orElseThrow().archive()).isNotNull();
+    }
+
     @Test void staleRetirementAndEvidenceWriteFailureLeaveOriginalQueueAndOccupation() throws Exception {
         var report = paymentReport(); UUID id = authorizePayment(report);
         ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
@@ -680,6 +732,81 @@ class ExpenseSubmissionIntegrationTest {
             assertThat(paymentOperations.find("demo", id)).contains(original);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='PAYMENT_RETIRE'", Integer.class, report.applicationId().toString())).isZero();
         } finally { jdbc.execute("ALTER TABLE payment_retirement DROP CONSTRAINT reject_retirement_fixture"); }
+    }
+
+    @Test void payeeReviewRequiresEndedSourceStrictInputAndCurrentFinanceEvenForReplay() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report); String path = "/api/v1/payments/" + id + "/payee-reviews";
+        var input = new HashMap<String, Object>(Map.of("authorizationVersion", 1, "voucherVersion", authorizationInput(report).get("voucherVersion"), "comment", "核对本人账户"));
+        assertCode(send(path, "finance", input), "PAYMENT_SOURCE_CHANGED");
+        ok(send("/api/v1/payments/" + id + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1, "comment", "停止原授权")), 202); input.put("authorizationVersion", 2);
+        for (String user : List.of("alice", "manager", "admin", "cashier")) assertThat(send(path, user, input).getStatus()).isIn(403, 404);
+        for (String field : List.of("accountReference", "accountDigest", "amount", "actor", "tenantId")) {
+            var forged = new HashMap<>(input); forged.put(field, "untrusted"); assertThat(send(path, "finance", forged).getStatus()).isEqualTo(400);
+        }
+        String key = UUID.randomUUID().toString(); var response = send(path, "finance", key, input); ok(response, 202);
+        assertThat(send(path, "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertCode(send(path, "finance", input), "PAYMENT_PAYEE_REVIEW_PENDING");
+        assertThatThrownBy(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status -> { payeeReviewWorker.poll(); return null; }))
+                .isInstanceOf(IllegalStateException.class);
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND person_id=?", finance.toString());
+        assertThat(send(path, "finance", key, input).getStatus()).isIn(403, 404); int before = payeeReads; payeeReviewWorker.poll();
+        var review = payeeReviews.latest("demo", id, "finance").orElseThrow(); assertThat(review.status()).isEqualTo(PaymentPayeeReview.Status.VOIDED);
+        assertThat(payeeReads).isEqualTo(before); assertThat(paymentWrites).isZero();
+    }
+
+    @Test void onlyLatestReadyPayeeReviewCanBeConsumedAndConsumptionFailureRollsBackNewAuthorization() throws Exception {
+        var report = paymentReport(); UUID original = voidedPayment(report); UUID first = registerPayeeReview(report, original); payeeReviewWorker.poll();
+        var previous = payeeReviews.find("demo", first).orElseThrow(); UUID second = registerPayeeReview(report, original);
+        assertCode(send(paymentPath(report) + "/authorizations", "finance", reviewedAuthorizationInput(report, previous)), "PAYMENT_PAYEE_REVIEW_UNAVAILABLE");
+        payeeReviewWorker.poll(); var ready = payeeReviews.find("demo", second).orElseThrow(); var input = reviewedAuthorizationInput(report, ready);
+        var missingVersion = new HashMap<>(input); missingVersion.remove("payeeReviewVersion"); assertThat(send(paymentPath(report) + "/authorizations", "finance", missingVersion).getStatus()).isEqualTo(400);
+        jdbc.execute("ALTER TABLE payment_payee_review ADD CONSTRAINT reject_consumed_review_fixture CHECK (id <> '" + second + "' OR status <> 'CONSUMED')");
+        try {
+            assertThatThrownBy(() -> send(paymentPath(report) + "/authorizations", "finance", input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            assertThat(payeeReviews.find("demo", second)).contains(ready);
+            assertThat(paymentAuthorizations.active("demo", BusinessReference.Type.EXPENSE, report.id())).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='PAYMENT_AUTHORIZE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        } finally { jdbc.execute("ALTER TABLE payment_payee_review DROP CONSTRAINT reject_consumed_review_fixture"); }
+        UUID replacement = UUID.fromString(ok(send(paymentPath(report) + "/authorizations", "finance", input), 202).path("authorizationId").asText());
+        ok(send("/api/v1/payments/" + replacement + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1, "comment", "结束新授权再核对旧证据")), 202);
+        assertCode(send(paymentPath(report) + "/authorizations", "finance", input), "PAYMENT_PAYEE_REVIEW_UNAVAILABLE");
+        assertCode(send("/api/v1/payments/" + original + "/payee-reviews", "finance", Map.of("authorizationVersion", 2,
+                "voucherVersion", authorizationInput(report).get("voucherVersion"), "comment", "更早授权不能再次复核")), "PAYMENT_SOURCE_CHANGED");
+    }
+
+    @Test void payeeReadFailureAndChangedSourceDoNotCreateAuthorizationAndLateLeaseCannotOverwriteNewRead() throws Exception {
+        var report = paymentReport(); UUID original = voidedPayment(report); invalidPayee = true;
+        UUID failedId = registerPayeeReview(report, original); payeeReviewWorker.poll();
+        var failed = payeeReviews.find("demo", failedId).orElseThrow(); assertThat(failed.status()).isEqualTo(PaymentPayeeReview.Status.UNAVAILABLE);
+        assertThat(failed.account()).isNull(); invalidPayee = false;
+        UUID id = registerPayeeReview(report, original); var now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var claimed = payeeReviewService.claim("demo", id, now); assertThat(claimed).isNotNull();
+        var result = new FinanceResult.Success<>(new EmployeeAccountPort.Account(current(report).currentRound().account(), now.plusSeconds(600)));
+        payeeReviewService.finish(claimed, result, claimed.leaseUntil()); assertThat(payeeReviews.find("demo", id).orElseThrow().status()).isEqualTo(PaymentPayeeReview.Status.QUEUED);
+        var next = payeeReviewService.claim("demo", id, claimed.leaseUntil()); assertThat(next.attempts()).isEqualTo(2);
+        payeeReviewService.finish(claimed, result, next.updatedAt()); assertThat(payeeReviews.find("demo", id)).contains(next);
+        jdbc.update("UPDATE approval_application SET status='REVOKED' WHERE tenant_id='demo' AND id=?", report.applicationId().toString());
+        payeeReviewService.finish(next, result, next.updatedAt().plusMillis(1));
+        assertThat(payeeReviews.find("demo", id).orElseThrow().status()).isEqualTo(PaymentPayeeReview.Status.VOIDED);
+        assertThat(paymentAuthorizations.active("demo", BusinessReference.Type.EXPENSE, report.id())).isEmpty(); assertThat(paymentWrites).isZero();
+    }
+
+    @Test void repeatedAccountChangesRetainAuthorizationChainAndLaterMasterChangeStopsCashierExecution() throws Exception {
+        var report = paymentReport(); UUID original = voidedPayment(report);
+        for (int index = 2; index <= 3; index++) {
+            currentPayee = new EmployeeAccountSnapshot(entity, "alice", "synthetic-private-account-v" + index, "****9876", "b".repeat(64), "v" + index);
+            UUID reviewId = registerPayeeReview(report, original); payeeReviewWorker.poll();
+            UUID next = UUID.fromString(ok(send(paymentPath(report) + "/authorizations", "finance", reviewedAuthorizationInput(report, payeeReviews.find("demo", reviewId).orElseThrow())), 202).path("authorizationId").asText());
+            if (index == 2) ok(send("/api/v1/payments/" + next + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1, "comment", "再次更新本人账户")), 202);
+            original = next;
+        }
+        var source = paymentAuthorizations.find("demo", original).orElseThrow();
+        ok(send("/api/v1/cashier/payments/" + original + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        currentPayee = new EmployeeAccountSnapshot(entity, "alice", "synthetic-private-account-v4", "****5432", "c".repeat(64), "v4");
+        paymentRequestWorker.poll();
+        assertThat(paymentRequests.forAuthorization("demo", original).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.BLOCKED);
+        assertThat(paymentAuthorizations.find("demo", original)).contains(source); assertThat(paymentOperations.find("demo", original)).isEmpty(); assertThat(paymentWrites).isZero();
     }
 
     @Test
@@ -1273,6 +1400,18 @@ class ExpenseSubmissionIntegrationTest {
     private UUID authorizePayment(ExpenseReport report) throws Exception {
         return UUID.fromString(ok(send(paymentPath(report) + "/authorizations", "finance", authorizationInput(report)), 202).path("authorizationId").asText());
     }
+    private UUID registerPayeeReview(ExpenseReport report, UUID authorizationId) throws Exception {
+        var authorization = paymentAuthorizations.find("demo", authorizationId).orElseThrow();
+        return UUID.fromString(ok(send("/api/v1/payments/" + authorizationId + "/payee-reviews", "finance", Map.of("authorizationVersion", authorization.version(),
+                "voucherVersion", authorizationInput(report).get("voucherVersion"), "comment", "复核当前本人账户")), 202).path("reviewId").asText());
+    }
+    private UUID voidedPayment(ExpenseReport report) throws Exception {
+        var id = authorizePayment(report);
+        ok(send("/api/v1/payments/" + id + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1, "comment", "账户更新前停止原授权")), 202); return id;
+    }
+    private Map<String, Object> reviewedAuthorizationInput(ExpenseReport report, PaymentPayeeReview review) {
+        var input = new HashMap<>(authorizationInput(report)); input.put("payeeReviewId", review.input().id()); input.put("payeeReviewVersion", review.version()); return input;
+    }
     private Map<String, Object> cashierInput(String action, long authorizationVersion, Long operationVersion) {
         var input = new HashMap<String, Object>(); input.put("action", action); input.put("authorizationVersion", authorizationVersion); input.put("comment", "合成出纳付款办理");
         if (action.equals("EXECUTE")) { input.put("debitAccountReference", "synthetic-debit"); input.put("debitAccountVersion", "v1"); }
@@ -1309,7 +1448,11 @@ class ExpenseSubmissionIntegrationTest {
         return switch (operation) {
             case "catalog" -> new FinanceCatalog("alice", "synthetic-v1", Instant.now().plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", paperRequired, "v1", legalTimeZone)),
                     List.of(new FinanceCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM))), List.of(new FinanceCatalog.CostCenter(entity, "IT", "研发")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
-            case "employee-account" -> new EmployeeAccountPort.Account(new EmployeeAccountSnapshot(entity, "alice", "synthetic-private-account", "****1234", "a".repeat(64), "v1"), Instant.now().plusSeconds(600));
+            case "employee-account" -> {
+                payeeReads++;
+                yield invalidPayee ? Map.of("invalidFixture", true) : new EmployeeAccountPort.Account(currentPayee == null
+                        ? new EmployeeAccountSnapshot(entity, "alice", "synthetic-private-account", "****1234", "a".repeat(64), "v1") : currentPayee, Instant.now().plusSeconds(600));
+            }
             case "debit-accounts" -> {
                 accountReads++; var request = json.read(data.toString(), PaymentAccountsPort.Request.class); var now = Instant.now();
                 yield new PaymentAccountsPort.Directory(request, "directory-v1", now, now.plusSeconds(300),

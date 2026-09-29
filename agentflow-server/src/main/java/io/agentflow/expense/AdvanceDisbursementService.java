@@ -5,6 +5,7 @@ import io.agentflow.finance.JdbcPaymentOperationRepository;
 import io.agentflow.finance.PaymentCommand;
 import io.agentflow.finance.PaymentOperation;
 import io.agentflow.finance.PaymentOperationChanged;
+import io.agentflow.finance.PaymentPayeeEvidence;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,10 +22,11 @@ public class AdvanceDisbursementService {
     private final AdvanceRequestRepository requests;
     private final EmployeeAdvanceRepository balances;
     private final JdbcPaymentOperationRepository payments;
+    private final PaymentPayeeEvidence payeeEvidence;
 
     /** 本地结算只读取持久原付款，不调用外部资金或当前账户目录。 */
-    public AdvanceDisbursementService(AdvanceRequestRepository requests, EmployeeAdvanceRepository balances, JdbcPaymentOperationRepository payments) {
-        this.requests = requests; this.balances = balances; this.payments = payments;
+    public AdvanceDisbursementService(AdvanceRequestRepository requests, EmployeeAdvanceRepository balances, JdbcPaymentOperationRepository payments, PaymentPayeeEvidence payeeEvidence) {
+        this.requests = requests; this.balances = balances; this.payments = payments; this.payeeEvidence = payeeEvidence;
     }
 
     /** 同步消费资金状态，任何余额或审计失败均回滚这次资金确认。 */
@@ -49,7 +51,8 @@ public class AdvanceDisbursementService {
         if (!payment.settleable() && payment.status() != PaymentOperation.Status.RECONCILING && payment.status() != PaymentOperation.Status.REVERSED) return;
         var existing = balances.find(tenant, id).orElse(null);
         if (payment.settleable()) {
-            var expected = requests.find(tenant, id).orElseThrow(AdvanceDisbursementService::mismatch).paidAdvance(payment);
+            var request = requests.find(tenant, id).orElseThrow(AdvanceDisbursementService::mismatch);
+            var expected = request.paidAdvance(payment, payeeEvidence.paymentAccount(payment, request.currentRound().account()));
             if (existing == null) balances.create(expected, SYSTEM_ACTOR);
             else if (!existing.sameDisbursement(expected)) throw mismatch();
         } else if (existing != null && !existing.paymentReviewRequired()) {

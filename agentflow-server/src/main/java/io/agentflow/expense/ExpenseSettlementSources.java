@@ -16,11 +16,12 @@ public class ExpenseSettlementSources {
     private final JdbcVoucherPreparationRepository preparations;
     private final JdbcPaymentAuthorizationRepository authorizations;
     private final JdbcPaymentOperationRepository payments;
+    private final PaymentPayeeEvidence payeeEvidence;
 
     /** 跨财务聚合读取集中在应用层，不让领域模型依赖 JDBC 或外部网关。 */
     public ExpenseSettlementSources(ApprovedVoucherSources approved, JdbcVoucherOperationRepository vouchers,
-            JdbcVoucherPreparationRepository preparations, JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentOperationRepository payments) {
-        this.approved = approved; this.vouchers = vouchers; this.preparations = preparations; this.authorizations = authorizations; this.payments = payments;
+            JdbcVoucherPreparationRepository preparations, JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentOperationRepository payments, PaymentPayeeEvidence payeeEvidence) {
+        this.approved = approved; this.vouchers = vouchers; this.preparations = preparations; this.authorizations = authorizations; this.payments = payments; this.payeeEvidence = payeeEvidence;
     }
 
     /** 实际到账仍属于原授权；当前审批撤销不能把已经发生的银行事实抹去。 */
@@ -36,7 +37,8 @@ public class ExpenseSettlementSources {
         var round = report.requireFrozenRound();
         if (!approved.reference(voucher.input().command()).equals(source) || !voucher.input().command().digest().equals(terms.voucherCommandDigest())
                 || !voucher.input().command().totals().gross().equals(round.approvedGross())
-                || !voucher.input().command().totals().offset().equals(round.offsetTotal()) || !command.payee().equals(round.account())) throw mismatch();
+                || !voucher.input().command().totals().offset().equals(round.offsetTotal())) throw mismatch();
+        payeeEvidence.requireAuthorizedAccount(authorization, round.account());
         var receipt = payment.observation();
         var input = new ExpenseSettlement.Input(source, round.approvedGross(), round.offsetTotal(), terms.voucherOperationId(), terms.voucherCommandDigest(),
                 new ExpenseSettlement.Payment(command.id(), command.digest(), receipt.paidAmount(), receipt.paymentReference(), receipt.receiptReference(), receipt.completedAt()), receipt.completedAt());

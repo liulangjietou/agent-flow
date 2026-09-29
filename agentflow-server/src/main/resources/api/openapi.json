@@ -18909,7 +18909,7 @@
           "凭证与结算"
         ],
         "summary": "财务确认短期付款授权",
-        "description": "依据当前批准与已过账凭证派生金额和收款账户；同一业务只保留一个有效授权。幂等回放前重查当前权限。",
+        "description": "依据当前批准与已过账凭证派生金额和收款账户；同一业务只保留一个有效授权。幂等回放前重查当前权限。 可成对提交 payeeReviewId/payeeReviewVersion，消费当前财务最近一次仍有效的 READY 复核；成功后与新授权原子绑定。",
         "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
         "x-idempotency": true,
         "responses": {
@@ -20490,6 +20490,172 @@
             "description": "省略取当前轮次；其他查询参数拒绝。"
           }
         ]
+      }
+    },
+    "/api/v1/payments/{id}/payee-reviews": {
+      "post": {
+        "operationId": "reviewPaymentPayee",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "登记原付款的本人账户复核",
+        "description": "仅最新的已作废、到期或安全结束原授权允许复核。接口保存读取意图，后台在事务外读取同法人本人账户。当前财务明确使用五分钟内的新证据后才签发新授权。原批准账户、金额和付款记录保持不变。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "复核读取意图已保存；不会创建付款授权或执行资金支付",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPayeeReviewReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPayeeReviewInput"
+              },
+              "example": {
+                "authorizationVersion": 2,
+                "voucherVersion": 3,
+                "comment": "员工已更新本人账户，财务重新核对"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -30931,7 +31097,9 @@
           "authorize",
           "voidAuthorization",
           "query",
-          "retire"
+          "retire",
+          "reviewAccount",
+          "authorizeReviewed"
         ],
         "properties": {
           "authorize": {
@@ -30944,6 +31112,12 @@
             "type": "boolean"
           },
           "retire": {
+            "type": "boolean"
+          },
+          "reviewAccount": {
+            "type": "boolean"
+          },
+          "authorizeReviewed": {
             "type": "boolean"
           }
         }
@@ -30961,7 +31135,8 @@
           "voucherVersion",
           "payment",
           "actions",
-          "payable"
+          "payable",
+          "payeeReview"
         ],
         "properties": {
           "applicationId": {
@@ -31028,6 +31203,16 @@
                 "type": "null"
               }
             ]
+          },
+          "payeeReview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentPayeeReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -31074,8 +31259,80 @@
             "minLength": 1,
             "maxLength": 2000,
             "pattern": "\\S"
+          },
+          "payeeReviewId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payeeReviewVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "payeeReviewId"
+              ],
+              "properties": {
+                "payeeReviewId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "payeeReviewVersion"
+              ],
+              "properties": {
+                "payeeReviewVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "payeeReviewVersion"
+              ],
+              "properties": {
+                "payeeReviewVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "payeeReviewId"
+              ],
+              "properties": {
+                "payeeReviewId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        ]
       },
       "FinancePaymentActionInput": {
         "type": "object",
@@ -31821,6 +32078,147 @@
               "NEVER_DISPATCHED",
               "CONFIRMED_FAILED"
             ]
+          }
+        }
+      },
+      "PaymentPayeeReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "checkedAt",
+          "validUntil",
+          "maskedAccount",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "CONSUMED",
+              "UNAVAILABLE",
+              "BLOCKED",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maskedAccount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "仅当前财务可见的最近一次本人账户读取。READY 需人工确认；有效期最多五分钟，证据仅能消费一次。"
+      },
+      "PaymentPayeeReviewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorizationVersion",
+          "voucherVersion",
+          "comment"
+        ],
+        "properties": {
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "voucherVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "PaymentPayeeReviewReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "authorizationId",
+          "reviewId",
+          "reviewVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       }

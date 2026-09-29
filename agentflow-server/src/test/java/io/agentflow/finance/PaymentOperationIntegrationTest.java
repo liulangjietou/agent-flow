@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.payments.worker-enabled=false", "agentflow.payments.lease-seconds=15",
-        "agentflow.payments.request-worker-enabled=false", "agentflow.payments.request-lease-seconds=15",
+        "agentflow.payments.request-worker-enabled=false", "agentflow.payments.request-lease-seconds=15", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false"})
 @Import(PaymentOperationIntegrationTest.ListenerConfiguration.class)
@@ -86,6 +86,9 @@ class PaymentOperationIntegrationTest {
     @Autowired JdbcPaymentExecutionRequestRepository executionRequests;
     @Autowired PaymentExecutionRequestService requestService;
     @Autowired PaymentExecutionRequestWorker requestWorker;
+    @Autowired PaymentPayeeReviewService payeeReviewService;
+    @Autowired PaymentPayeeReviewWorker payeeReviewWorker;
+    @Autowired JdbcPaymentPayeeReviewRepository payeeReviews;
     @Autowired FinanceGatewayConfiguration configuration;
     @Autowired JdbcVoucherPreparationRepository preparations;
     @Autowired VoucherPreparationService preparationService;
@@ -109,6 +112,10 @@ class PaymentOperationIntegrationTest {
         RESPONDER.set(PaymentOperationIntegrationTest::response); setupOrganization();
     }
     @AfterEach void removeOnlyPaymentFixtures() {
+        for (var id : fixtures) {
+            jdbc.update("DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id IN (SELECT id FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?))", id.toString(), id.toString());
+            jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?)", id.toString(), id.toString());
+        }
         for (var id : fixtures) {
             jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id=?", id.toString());
             String application = "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND id=?";
@@ -391,6 +398,72 @@ class PaymentOperationIntegrationTest {
         assertThat(registered.status()).isEqualTo(PaymentAuthorization.Status.EXECUTION_REGISTERED); assertThat(queued.status()).isEqualTo(PaymentOperation.Status.QUEUED);
         assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isEqualTo(2);
         worker.poll(); assertThat(reload(queued).settleable()).isTrue(); assertThat(WRITES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isEqualTo(4);
+    }
+    @Test void reviewedAdvanceAccountPreservesOriginalApprovalCreatesOneBalanceAndPostsPaymentVoucher() {
+        var original = authorized(); var ended = original.voidBeforeExecution("finance", "合成账户变更", now());
+        tx().executeWithoutResult(status -> authorizations.update(ended));
+        var voucher = vouchers.find("demo", original.terms().voucherOperationId()).orElseThrow();
+        var review = tx().execute(status -> payeeReviewService.register(ended, voucher.version(), "finance", now()));
+        var updatedAccount = new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-updated-account", "****9876", "b".repeat(64), "v2");
+        RESPONDER.set((path, data) -> path.endsWith("employee-account") ? new EmployeeAccountPort.Account(updatedAccount, now().plusSeconds(600)) : response(path, data));
+        payeeReviewWorker.poll(); var ready = payeeReviews.find("demo", review.input().id()).orElseThrow();
+        assertThat(ready.status()).isEqualTo(PaymentPayeeReview.Status.READY); assertThat(WRITES.get()).isZero();
+        assertThatThrownBy(() -> tx().execute(status -> payeeReviewService.requireReady("demo", ready.input().id(), ready.version(), voucher, "cashier", now())))
+                .isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("PAYMENT_PAYEE_REVIEW_UNAVAILABLE"));
+        var replacement = tx().execute(status -> {
+            var at = now(); var proof = payeeReviewService.requireReady("demo", ready.input().id(), ready.version(), voucher, "finance", at);
+            var value = PaymentAuthorization.issue(UUID.randomUUID(), voucher, proof.account().snapshot(), "finance", at, at.plusSeconds(600));
+            authorizations.create(value); payeeReviewService.consume(proof, value, at); return value;
+        }); fixtures.add(replacement.terms().id());
+        tx().executeWithoutResult(status -> {
+            jdbc.update("DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id=?", ready.input().id().toString());
+            jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND id=?", ready.input().id().toString());
+            assertThatThrownBy(() -> sources.requireCurrent(replacement, now())).isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("PAYMENT_PAYEE_EVIDENCE_CHANGED"));
+            status.setRollbackOnly();
+        });
+        tx().executeWithoutResult(status -> requestService.register(replacement, "cashier", "debit-1", "v1", now())); requestWorker.poll(); worker.poll();
+        var payment = operations.find("demo", replacement.terms().id()).orElseThrow(); assertThat(payment.settleable()).isTrue();
+        assertThat(payment.input().command().payee()).isEqualTo(updatedAccount); assertThat(WRITES.get()).isEqualTo(1);
+        var advance = advances.find("demo", original.terms().binding().businessId()).orElseThrow();
+        assertThat(advance.currentRound().account()).isEqualTo(original.terms().payee());
+        var balance = balances.find("demo", advance.id()).orElseThrow(); assertThat(balance.available()).isEqualTo(payment.input().command().amount());
+        disbursements.recover("demo", replacement.terms().id()); assertThat(balances.find("demo", advance.id()).orElseThrow().state()).isEqualTo(balance.state());
+        preparationWorker.poll(); voucherWorker.poll(); assertThat(paymentVoucher(payment).usablePosted()).isTrue();
+        assertThat(authorizations.find("demo", original.terms().id())).contains(ended);
+    }
+    @Test void expiredUnexecutedAuthorizationCanRegisterReviewWithoutReleasingAnyExecutedTransaction() {
+        var original = authorized(); var voucher = vouchers.find("demo", original.terms().voucherOperationId()).orElseThrow();
+        var review = tx().execute(status -> payeeReviewService.register(original, voucher.version(), "finance", original.decision().expiresAt()));
+        assertThat(authorizations.find("demo", original.terms().id()).orElseThrow().status()).isEqualTo(PaymentAuthorization.Status.EXPIRED);
+        assertThat(review.input().authorizationVersion()).isEqualTo(2); assertThat(review.status()).isEqualTo(PaymentPayeeReview.Status.QUEUED);
+        assertThat(ACCOUNT_READS.get()).isZero(); assertThat(WRITES.get()).isZero();
+    }
+    @Test void concurrentFinanceConfirmationsConsumeOneReviewAndCreateOneNewAuthorization() throws Exception {
+        var original = authorized(); var ended = original.voidBeforeExecution("finance", "并发复核样例", now());
+        tx().executeWithoutResult(status -> authorizations.update(ended));
+        var voucher = vouchers.find("demo", original.terms().voucherOperationId()).orElseThrow();
+        var queued = tx().execute(status -> payeeReviewService.register(ended, voucher.version(), "finance", now())); payeeReviewWorker.poll();
+        var ready = payeeReviews.find("demo", queued.input().id()).orElseThrow();
+        var gate = new java.util.concurrent.CountDownLatch(1); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.Callable<PaymentAuthorization> confirm = () -> {
+            gate.await(); return tx().execute(status -> {
+                var at = now(); var proof = payeeReviewService.requireReady("demo", ready.input().id(), ready.version(), voucher, "finance", at);
+                var value = PaymentAuthorization.issue(UUID.randomUUID(), voucher, proof.account().snapshot(), "finance", at, at.plusSeconds(600));
+                authorizations.create(value); payeeReviewService.consume(proof, value, at); return value;
+            });
+        };
+        int saved = 0, rejected = 0; UUID winner = null;
+        try {
+            var first = pool.submit(confirm); var second = pool.submit(confirm); gate.countDown();
+            for (var result : List.of(first, second)) {
+                try { var value = result.get(10, java.util.concurrent.TimeUnit.SECONDS); fixtures.add(value.terms().id()); winner = value.terms().id(); saved++; }
+                catch (java.util.concurrent.ExecutionException failed) { assertThat(failed.getCause()).isInstanceOf(DomainException.class); rejected++; }
+            }
+        } finally { pool.shutdownNow(); }
+        assertThat(saved).isEqualTo(1); assertThat(rejected).isEqualTo(1);
+        assertThat(payeeReviews.find("demo", ready.input().id()).orElseThrow().consumedAuthorizationId()).isEqualTo(winner);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", Integer.class, original.terms().binding().businessId().toString())).isEqualTo(2);
+        assertThat(WRITES.get()).isZero();
     }
     @Test void duplicateCashierSelectionAndChangedDisplayedAccountVersionCannotRegisterPayment() {
         var authorization = authorized(); var request = request(authorization, "outdated");

@@ -10,10 +10,10 @@ defineProps<{ content: AdvanceContent; financial?: AdvanceRound | null }>()
       <div><dt>借款金额</dt><dd class="terms-amount">{{ moneyLabel(content.amount) }}</dd></div>
       <div><dt>归还日期</dt><dd>{{ content.dueOn }}</dd></div>
       <div v-if="financial"><dt>借款法人</dt><dd>{{ financial.legalEntity.name }}</dd></div>
-      <div v-if="financial"><dt>本轮本人收款账户</dt><dd>{{ financial.maskedAccount }}</dd></div>
+      <div v-if="financial"><dt>本轮提交时收款账户</dt><dd>{{ financial.maskedAccount }}</dd></div>
     </dl>
     <div class="terms-purpose"><h4>借款用途</h4><p>{{ content.purpose }}</p></div>
-    <p v-if="financial" class="terms-note">归还日按 {{ financial.legalEntity.timeZone }} 核对。收款账户来自本人财务主数据；需要更换时，先维护账户，再补正并重新提交审批。</p>
+    <p v-if="financial" class="terms-note">归还日按 {{ financial.legalEntity.timeZone }} 核对。账户来自提交时的本人财务主数据。批准前变更需维护账户并补正重提；批准后变更由财务复核并重新授权。</p>
   </div>
 </template>
 

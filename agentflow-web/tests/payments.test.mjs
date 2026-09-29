@@ -12,7 +12,7 @@ const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove
 const clone = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
 const binding = () => ({ applicationId: 'app', businessId: 'report', roundNo: 1, applicationVersion: 9, businessVersion: 3 })
 const payment = () => ({ ...binding(), id: 'authorization', version: 1, status: 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', legalEntityId: 'entity', employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: new Date(Date.now() - 60000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), executedBy: null, request: null, operation: null, retirement: null })
-const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, actions: { authorize: true, voidAuthorization: false, query: false, retire: false } })
+const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, payeeReview: null, actions: { authorize: true, voidAuthorization: false, query: false, retire: false, reviewAccount: false, authorizeReviewed: false } })
 const cashier = () => ({ payment: payment(), actions: { execute: true, query: false, resendOriginal: false } })
 const accounts = () => ({ authorizationId: 'authorization', authorizationVersion: 1, validUntil: new Date(Date.now() + 60000).toISOString(), items: [{ reference: 'debit-1', displayName: '基本户', maskedAccount: '****4567', currency: 'CNY', sourceVersion: 'v1' }] })
 const operation = () => ({ version: 4, status: 'UNKNOWN', updatedAt: new Date().toISOString(), observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: 'CONNECTION' })
@@ -158,7 +158,7 @@ test('账户查询超时不保留旧选项，迟到成功也不能成为可选�
 
 test('安全结束要求服务端许可和原执行版本，回执允许保留银行失败版本且拒绝错绑', () => {
   const view = finance(); view.payment = payment(); Object.assign(view.payment, { version: 2, status: 'EXECUTION_REGISTERED', executedBy: 'cashier', operation: operation() })
-  view.actions = { authorize: false, voidAuthorization: false, query: true, retire: true }
+  Object.assign(view.actions, { authorize: false, voidAuthorization: false, query: true, retire: true })
   for (const status of ['UNKNOWN', 'NOT_FOUND', 'SUCCEEDED', 'REVERSED', 'SENDING', 'QUERYING', 'RECONCILING']) {
     view.payment.operation.status = status; assert.throws(() => rules.financePaymentInput(view, 'RETIRE', '结束原付款'))
   }
@@ -182,7 +182,7 @@ test('已结束付款必须保留匹配依据，出纳无法用旧授权查询�
 
 test('安全结束独立确认且双击只保存一次，结束后不会自动重新授权', async () => {
   const view = finance(); view.payment = payment(); Object.assign(view.payment, { version: 2, status: 'EXECUTION_REGISTERED', executedBy: 'cashier', operation: { ...operation(), status: 'QUEUED' } })
-  view.actions = { authorize: false, voidAuthorization: false, query: false, retire: true }
+  Object.assign(view.actions, { authorize: false, voidAuthorization: false, query: false, retire: true })
   api.financePayment = async () => clone(view); let complete; const writes = [], authorizations = []
   api.financePaymentAction = (id, input) => { writes.push({ id, input }); return new Promise(resolve => complete = resolve) }
   api.authorizePayment = (...input) => authorizations.push(input)
@@ -202,4 +202,50 @@ test('实际 API 读取禁用缓存，原授权路径正确转义，账户不能
     assert.match(calls[0].url, /app%2Fother\/payments\?roundNo=2$/); assert.match(calls[1].url, /cashier\/payments\/id%2Fother$/); assert.match(calls[2].url, /id%2Fother\/accounts$/)
     assert.ok(calls.every(call => call.init.cache === 'no-store'))
   } finally { global.fetch = originalFetch }
+})
+
+const reviewed = () => {
+  const view = finance(); view.payment = { ...payment(), status: 'VOIDED', version: 2 }
+  view.payeeReview = { id: 'review', version: 3, status: 'READY', requestedAt: new Date(Date.now() - 2000).toISOString(), checkedAt: new Date(Date.now() - 1000).toISOString(), validUntil: new Date(Date.now() + 60000).toISOString(), maskedAccount: '****9876', issue: null }
+  Object.assign(view.actions, { reviewAccount: true, authorizeReviewed: true }); return view
+}
+test('按复核账户授权只发送证据标识，过期和未就绪结果无法用于新授权', () => {
+  const view = reviewed(), input = rules.financePaymentInput(view, 'AUTHORIZE_REVIEWED', '财务已核对新账户')
+  assert.equal(input.payeeReviewId, 'review'); assert.equal(input.payeeReviewVersion, 3)
+  for (const field of ['maskedAccount', 'amount', 'accountReference', 'accountDigest']) assert.equal(field in input, false)
+  assert.equal('payeeReviewId' in rules.financePaymentInput(view, 'AUTHORIZE', '按原批准账户'), false)
+  assert.deepEqual(rules.financePaymentInput(view, 'REVIEW_ACCOUNT', '重新读取'), { authorizationVersion: 2, voucherVersion: 3, comment: '重新读取' })
+  assert.throws(() => rules.financePaymentInput(view, 'AUTHORIZE_REVIEWED', '边界过期', 900, Date.parse(view.payeeReview.validUntil)))
+  for (const mutate of [v => v.payeeReview = null, v => v.payeeReview.status = 'CONSUMED', v => v.payeeReview.maskedAccount = '123456789012', v => v.payeeReview.validUntil = new Date(Date.now() + 3600000).toISOString(), v => v.actions.authorizeReviewed = false]) {
+    const changed = clone(view); mutate(changed); assert.throws(() => rules.financePaymentInput(changed, 'AUTHORIZE_REVIEWED', '拒绝旧证据'))
+  }
+})
+test('复核受理回执不能代替授权回执或绑定另一个原付款', () => {
+  const view = reviewed(), receipt = { applicationId: 'app', authorizationId: 'authorization', reviewId: 'review-new', reviewVersion: 1, auditEventId: 'audit' }
+  assert.doesNotThrow(() => rules.validatePayeeReviewReceipt(receipt, view))
+  for (const change of [{ applicationId: 'other' }, { authorizationId: 'other' }, { reviewId: '' }, { reviewVersion: 2 }, { auditEventId: '' }]) assert.throws(() => rules.validatePayeeReviewReceipt({ ...receipt, ...change }, view))
+  assert.throws(() => rules.validateFinancePaymentReceipt(receipt, view, rules.financePaymentInput(view, 'AUTHORIZE_REVIEWED', '确认')))
+})
+test('真实面板复核及刷新只读取状态，按新账户授权需要独立确认且双击只发一次', async () => {
+  api.financePayment = async () => reviewed(); const reviews = [], authorizations = []; let complete
+  api.reviewPaymentPayee = async (id, input) => { reviews.push({ id, input }); return { applicationId: 'app', authorizationId: id, reviewId: 'review-new', reviewVersion: 1, auditEventId: 'audit' } }
+  api.authorizePayment = (id, input) => { authorizations.push({ id, input }); return new Promise(resolve => complete = resolve) }
+  const p = mount(Finance, binding())
+  try {
+    await settle(); p.state.prepare('REVIEW_ACCOUNT'); assert.equal(reviews.length, 0); p.state.comment = '读取本人账户'; await p.state.execute()
+    assert.equal(reviews.length, 1); assert.equal(authorizations.length, 0); await p.state.load(); assert.equal(authorizations.length, 0)
+    p.state.prepare('AUTHORIZE_REVIEWED'); p.state.comment = '核对复核账户并授权'; const pending = p.state.execute(); await p.state.execute()
+    assert.equal(authorizations.length, 1); assert.equal(authorizations[0].input.payeeReviewId, 'review')
+    complete({ ...financeReceipt(), authorizationId: 'replacement' }); await pending; assert.equal(p.state.error, ''); assert.equal(p.state.pending, null)
+  } finally { p.close() }
+})
+test('账户复核回执迟到时不能恢复已经切换身份的结果与按钮', async () => {
+  api.financePayment = async () => reviewed(); let complete
+  api.reviewPaymentPayee = () => new Promise(resolve => complete = resolve)
+  const p = mount(Finance, binding())
+  try {
+    await settle(); p.state.prepare('REVIEW_ACCOUNT'); p.state.comment = '核对'; const pending = p.state.execute()
+    p.props.scopeKey = 'another-finance'; complete({ applicationId: 'app', authorizationId: 'authorization', reviewId: 'old-review', reviewVersion: 1, auditEventId: 'audit' })
+    await pending; assert.equal(p.state.notice, ''); assert.equal(p.state.pending, null); assert.equal(p.state.saving, false)
+  } finally { p.close() }
 })

@@ -25,11 +25,13 @@ public class FinancePaymentWorkspace {
     private final JdbcPaymentAuthorizationRepository authorizations;
     private final JdbcPaymentExecutionRequestRepository requests;
     private final JdbcPaymentOperationRepository operations;
+    private final JdbcPaymentPayeeReviewRepository reviews;
     /** 全部查询共享一个本地快照，是否可新授权只作为页面提示。 */
     public FinancePaymentWorkspace(CurrentActor actors, VoucherAccess access, PaymentPersonnel personnel, JdbcVoucherOperationRepository vouchers,
-                                    JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentExecutionRequestRepository requests, JdbcPaymentOperationRepository operations) {
+                                    JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentExecutionRequestRepository requests, JdbcPaymentOperationRepository operations,
+                                    JdbcPaymentPayeeReviewRepository reviews) {
         this.actors = actors; this.access = access; this.personnel = personnel; this.vouchers = vouchers;
-        this.authorizations = authorizations; this.requests = requests; this.operations = operations;
+        this.authorizations = authorizations; this.requests = requests; this.operations = operations; this.reviews = reviews;
     }
     /** 查询严格限定一个可读审批轮次，未知参数直接拒绝。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -53,12 +55,18 @@ public class FinancePaymentWorkspace {
         boolean authorize = finance && available && app.status() == ApplicationStatus.APPROVED && app.roundNo() == context.roundNo() && voucher != null && voucher.usablePosted()
                 && voucher.input().command().totals().payable().value().signum() > 0
                 && voucher.input().command().binding().applicationVersion() == app.version() && voucher.input().command().binding().businessVersion() == context.businessVersion();
+        var review = finance && authorization != null ? reviews.latest(tenant, authorization.terms().id(), actors.actor().userId()).orElse(null) : null;
+        boolean reviewSource = authorize && authorization != null && authorization.matchesVoucher(voucher, now)
+                && (PaymentPayeeReview.ended(authorization) || authorization.status() == PaymentAuthorization.Status.AUTHORIZED && !window);
         return new View(applicationId, app.businessReference().id(), context.roundNo(), app.version(), context.businessVersion(),
                 voucher == null ? null : voucher.input().command().id(), voucher == null ? null : voucher.version(),
                 voucher == null ? null : voucher.input().command().totals().payable(),
                 authorization == null ? null : PaymentView.of(authorization, request, operation),
+                review == null ? null : new PayeeReview(review.input().id(), review.version(), review.status().name(), review.input().requestedAt(), review.checkedAt(),
+                        review.account() == null ? null : review.account().validUntil(), review.account() == null ? null : review.account().snapshot().maskedAccount(), review.issue() == null ? null : review.issue().name()),
                 new Actions(authorize, finance && window, finance && PaymentView.queryable(authorization, operation),
-                        finance && authorization != null && authorization.canRetire(operation, actors.actor().userId())));
+                        finance && authorization != null && authorization.canRetire(operation, actors.actor().userId()),
+                        reviewSource && (review == null || !review.active()), reviewSource && review != null && review.usable(now) && review.matchesSource(authorization, voucher, now)));
     }
     private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Only a positive roundNo is accepted for application payment status"); }
     /**
@@ -67,10 +75,16 @@ public class FinancePaymentWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID applicationId, UUID businessId, int roundNo, long applicationVersion, long businessVersion, UUID voucherOperationId, Long voucherVersion,
-                       Money payable, PaymentView payment, Actions actions) { }
+                       Money payable, PaymentView payment, PayeeReview payeeReview, Actions actions) { }
     /**
      * 写入入口始终重新验证，提示不能代替实际权限。
      * @author owlzhangfq@gmail.com
      */
-    public record Actions(boolean authorize, boolean voidAuthorization, boolean query, boolean retire) { }
+    public record Actions(boolean authorize, boolean voidAuthorization, boolean query, boolean retire, boolean reviewAccount, boolean authorizeReviewed) { }
+    /**
+     * 财务只获得新账户掩码和证据期限，申请人及出纳不获得这次未授权的账户读取结果。
+     * @author owlzhangfq@gmail.com
+     */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record PayeeReview(UUID id, long version, String status, Instant requestedAt, Instant checkedAt, Instant validUntil, String maskedAccount, String issue) { }
 }
