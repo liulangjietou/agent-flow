@@ -50,7 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false",
-        "agentflow.expenses.archive-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.advances.repayment-worker-enabled=false"})
+        "agentflow.expenses.archive-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.advances.repayment-worker-enabled=false", "agentflow.advances.repayment-review-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AdvanceRepaymentIntegrationTest {
     private static final AtomicReference<AdvanceRepaymentIntegrationTest> ACTIVE = new AtomicReference<>();
@@ -69,6 +69,11 @@ class AdvanceRepaymentIntegrationTest {
     private boolean unavailable;
     private AdvanceRepaymentPort.Channel channel = AdvanceRepaymentPort.Channel.BANK_TRANSFER;
     private String transactionReference, postingReference;
+    private AdvanceRepaymentAdjustmentPort.Status reviewStatus = AdvanceRepaymentAdjustmentPort.Status.CONFIRMED;
+    private long reviewRevision = 1;
+    private boolean reviewUnavailable;
+    private String returnReference;
+    private final Map<UUID, AdvanceRepaymentAdjustmentPort.Receipt> returnFacts = new HashMap<>();
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
     @Autowired AuthService auth;
@@ -94,6 +99,10 @@ class AdvanceRepaymentIntegrationTest {
     @Autowired AdvanceRepaymentService service;
     @Autowired JdbcAdvanceRepaymentCheckRepository checks;
     @Autowired JdbcAdvanceRepaymentRepository repayments;
+    @Autowired AdvanceRepaymentReviewWorker reviewWorker;
+    @Autowired AdvanceRepaymentReviewService reviewService;
+    @Autowired JdbcRepaymentReviewCheckRepository reviewChecks;
+    @Autowired JdbcRepaymentResolutionRepository resolutions;
     @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
         values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
         values.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> "true");
@@ -122,6 +131,124 @@ class AdvanceRepaymentIntegrationTest {
         }
     }
     @AfterAll static void stopServer() { SERVER.stop(0); }
+
+    @Test void trueReturnPreservesOriginalAndRestoresDebtOnceWithoutSendingFundsOrPosting() throws Exception {
+        var loan = paidLoan(); amount = "100"; var repayment = repay(loan, "paid-in-full"); var original = repayments.find("demo", repayment).orElseThrow();
+        assertThat(balance(loan).status()).isEqualTo(EmployeeAdvance.Status.SETTLED); int outgoing = paymentWrites, posting = voucherWrites;
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2; var check = review(loan, repayment); reviewWorker.poll();
+        assertThat(balance(loan).repaid()).isEqualTo(money("100")); assertThat(balance(loan).repaymentReviewRequired()).isTrue();
+        var candidate = reviewView(loan, repayment, "finance"); assertThat(candidate.at("/latestCheck/canResolve").asBoolean()).isTrue();
+        assertThat(candidate.at("/latestCheck/evidence/fundsReturn/amount/value").asText()).isEqualTo("100.00");
+        var input = resolveInput(loan, check); var key = UUID.randomUUID().toString(); var result = send(reviewPath(loan, repayment) + "/resolutions", "finance", key, input); ok(result, 202);
+        assertThat(send(reviewPath(loan, repayment) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(result.getContentAsString());
+        assertThat(repayments.find("demo", repayment).orElseThrow()).isEqualTo(original); assertThat(balance(loan).receivedRepayments()).isEqualTo(money("100"));
+        assertThat(balance(loan).returnedRepayments()).isEqualTo(money("100")); assertThat(balance(loan).repaid()).isEqualTo(money("0"));
+        assertThat(balance(loan).outstanding()).isEqualTo(money("100")); assertThat(balance(loan).repaymentReviewRequired()).isFalse();
+        var owner = reviewView(loan, repayment, "alice"); assertThat(owner.path("latestCheck").isNull()).isTrue(); assertThat(owner.path("canQuery").asBoolean()).isFalse();
+        assertThat(owner.at("/original/returned/fundsReturn/amount/value").asText()).isEqualTo("100.00"); assertThat(owner.at("/latestDecision/outcome").asText()).isEqualTo("RETURNED");
+        assertThat(owner.toString()).doesNotContain("targetDigest", "accountDigest", "private-account");
+        receiptStatus = AdvanceRepaymentPort.Status.REVERSED; query(loan, "paid-in-full"); worker.poll();
+        assertThat(balance(loan).repaymentReviewRequired()).as("Accepted original reversal must not refreeze a recorded actual return").isFalse();
+        assertThat(paymentWrites).isEqualTo(outgoing); assertThat(voucherWrites).isEqualTo(posting);
+    }
+
+    @Test void confirmationOnlyReleasesThatReceiptAndNeverAnotherReceiptOrOriginalPaymentHold() throws Exception {
+        var loan = paidLoan(); var first = repay(loan, "first-original"); var second = repay(loan, "second-original");
+        receiptStatus = AdvanceRepaymentPort.Status.REVERSED; receiptRevision = 2; query(loan, "first-original"); worker.poll(); query(loan, "second-original"); worker.poll();
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> { requests.lock("demo", loan); var value = balance(loan); long version = value.version(); value.requirePaymentReview(version); balances.update(value, version, "test", "TEST_PAYMENT_REVIEW"); });
+        var firstCheck = review(loan, first); reviewWorker.poll(); ok(send(reviewPath(loan, first) + "/resolutions", "finance", resolveInput(loan, firstCheck)), 202);
+        assertThat(balance(loan).repaymentReviews()).containsExactly(second); assertThat(balance(loan).paymentReviewRequired()).isTrue(); assertThat(balance(loan).available()).isEqualTo(money("0"));
+        var secondCheck = review(loan, second); reviewWorker.poll(); ok(send(reviewPath(loan, second) + "/resolutions", "finance", resolveInput(loan, secondCheck)), 202);
+        assertThat(balance(loan).repaymentReviewRequired()).isFalse(); assertThat(balance(loan).paymentReviewRequired()).isTrue(); assertThat(balance(loan).repaid()).isEqualTo(money("50"));
+    }
+
+    @Test void reviewRequiresCurrentFullFieldFinanceAndRechecksBeforeIdempotentReplay() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "access"); var queryInput = Map.of("advanceVersion", balance(loan).version(), "comment", "复核");
+        for (var user : List.of("alice", "admin", "cashier", "bob")) {
+            assertThat(send(reviewPath(loan, repayment) + "/review-checks", user, queryInput).getStatus()).isIn(403, 404);
+            if (!user.equals("alice")) assertThat(read(reviewPath(loan, repayment) + "/review", user).getStatus()).isIn(403, 404);
+        }
+        var forged = new LinkedHashMap<String, Object>(queryInput); forged.put("amount", money("1")); okError(send(reviewPath(loan, repayment) + "/review-checks", "finance", forged), 400);
+        code(read(reviewPath(loan, repayment) + "/review?employeeId=bob", "finance"), "INVALID_REPAYMENT_REVIEW_QUERY");
+        String key = UUID.randomUUID().toString(); var response = send(reviewPath(loan, repayment) + "/review-checks", "finance", key, queryInput); ok(response, 202);
+        assertThat(send(reviewPath(loan, repayment) + "/review-checks", "finance", key, queryInput).getContentAsString()).isEqualTo(response.getContentAsString());
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        assertThat(send(reviewPath(loan, repayment) + "/review-checks", "finance", key, queryInput).getStatus()).isIn(403, 409);
+        reviewWorker.poll(); assertThat(reviewChecks.find("demo", UUID.fromString(ok(response, 202).path("checkId").asText())).orElseThrow().status()).isEqualTo(AdvanceRepaymentReviewCheck.Status.VOIDED);
+        assertThat(reviewView(loan, repayment, "finance").path("latestCheck").isNull()).isTrue();
+    }
+
+    @Test void unavailableUnresolvedAndStaleOriginalEvidenceNeverAdjustDebt() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "stale"); var initial = balance(loan).repaid();
+        reviewUnavailable = true; var unavailable = review(loan, repayment); reviewWorker.poll(); assertThat(reviewChecks.find("demo", unavailable).orElseThrow().status()).isEqualTo(AdvanceRepaymentReviewCheck.Status.UNAVAILABLE);
+        assertThat(balance(loan).repaymentReviewRequired()).isFalse(); reviewUnavailable = false; reviewStatus = AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED;
+        var unresolved = review(loan, repayment); reviewWorker.poll(); assertThat(balance(loan).repaymentReviewRequired()).isTrue();
+        code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, unresolved)), "REPAYMENT_REVIEW_EVIDENCE_UNAVAILABLE");
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.CONFIRMED; reviewRevision = 2; var checked = review(loan, repayment); reviewWorker.poll();
+        receiptRevision = 3; query(loan, "stale"); worker.poll();
+        code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, checked)), "REPAYMENT_REVIEW_EVIDENCE_CHANGED");
+        assertThat(balance(loan).repaid()).isEqualTo(initial); assertThat(resolutions.latest("demo", repayment)).isEmpty();
+    }
+
+    @Test void returnedFundsCannotBeErasedOrCountedAgainAfterReconfirmation() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "return-original"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, check)), 202);
+        var originalDecision = resolutions.returned("demo", repayment).orElseThrow();
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.CONFIRMED; reviewRevision = 2; receiptRevision = 3; var wrong = review(loan, repayment); reviewWorker.poll();
+        assertThat(balance(loan).repaymentReviewRequired()).isTrue(); code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, wrong)), "REPAYMENT_REVIEW_EVIDENCE_CHANGED");
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; reviewRevision = 3; receiptRevision = 4; var correct = review(loan, repayment); reviewWorker.poll();
+        ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, correct)), 202);
+        assertThat(balance(loan).returnedRepayments()).isEqualTo(money("25")); assertThat(balance(loan).outstanding()).isEqualTo(money("100"));
+        assertThat(resolutions.returned("demo", repayment).orElseThrow()).isEqualTo(originalDecision); assertThat(resolutions.latest("demo", repayment).orElseThrow().id()).isNotEqualTo(originalDecision.id());
+        assertThat(balance(loan).repaymentReturns()).hasSize(1); assertThat(balance(loan).repaymentReviewRequired()).isFalse();
+    }
+
+    @Test void regressedReviewOrOriginalQueryAfterAcceptedReturnFreezesThatReceiptAgain() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "regression"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 4; reviewRevision = 4;
+        var check = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, check)), 202);
+        reviewRevision = 3; var regression = review(loan, repayment); reviewWorker.poll();
+        assertThat(balance(loan).repaymentReviewRequired()).as("A lower combined revision must not leave accepted return usable").isTrue();
+        code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, regression)), "REPAYMENT_REVIEW_EVIDENCE_CHANGED");
+        reviewRevision = 5; receiptRevision = 5; var restored = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, restored)), 202);
+        receiptStatus = AdvanceRepaymentPort.Status.REVERSED; receiptRevision = 4; query(loan, "regression"); worker.poll();
+        assertThat(balance(loan).repaymentReviewRequired()).as("Original source revision must include later accepted reconfirmation").isTrue();
+        assertThat(balance(loan).returnedRepayments()).isEqualTo(money("25"));
+    }
+
+    @Test void duplicateReturnedFundsRollBackBalanceConsumedReviewAndDecisionTogether() throws Exception {
+        var loan = paidLoan(); var first = repay(loan, "duplicate-first"); var second = repay(loan, "duplicate-second");
+        returnReference = "same-real-return"; reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var checked = review(loan, first); reviewWorker.poll(); ok(send(reviewPath(loan, first) + "/resolutions", "finance", resolveInput(loan, checked)), 202);
+        var another = review(loan, second); reviewWorker.poll(); var balanceBefore = balance(loan).state(); var checkBefore = reviewChecks.find("demo", another).orElseThrow();
+        code(send(reviewPath(loan, second) + "/resolutions", "finance", resolveInput(loan, another)), "REPAYMENT_RETURN_ALREADY_RECORDED");
+        assertThat(balance(loan).state()).isEqualTo(balanceBefore); assertThat(reviewChecks.find("demo", another).orElseThrow()).isEqualTo(checkBefore); assertThat(resolutions.latest("demo", second)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='ADVANCE_REPAYMENT_REVIEW_RESOLVE'", Integer.class, app(loan).id().toString())).isEqualTo(1);
+    }
+
+    @Test void concurrentResolutionsHaveOneWinnerAndPreserveOriginalExpenseReservation() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "concurrent-return"); var use = reserve(loan, "60"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll(); var input = resolveInput(loan, check);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2); var gate = new java.util.concurrent.CountDownLatch(1);
+        try {
+            java.util.concurrent.Callable<Integer> action = () -> { gate.await(); return send(reviewPath(loan, repayment) + "/resolutions", "finance", input).getStatus(); };
+            var first = pool.submit(action); var second = pool.submit(action); gate.countDown();
+            assertThat(List.of(first.get(15, java.util.concurrent.TimeUnit.SECONDS), second.get(15, java.util.concurrent.TimeUnit.SECONDS))).containsExactlyInAnyOrder(202, 409);
+        } finally { pool.shutdownNow(); }
+        assertThat(balance(loan).balance().reserved()).isEqualTo(money("60")); assertThat(balance(loan).available()).isEqualTo(money("40")); assertThat(balance(loan).repaymentReturns()).hasSize(1);
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> { requests.lock("demo", loan); var value = balance(loan); long version = value.version(); value.settle(version, use); balances.update(value, version, "test", "TEST_SETTLE"); });
+        assertThat(balance(loan).outstanding()).isEqualTo(money("40")); assertThat(balance(loan).returnedRepayments()).isEqualTo(money("25"));
+    }
+
+    @Test void reviewLeaseTimeoutAndDisplayedVersionPreventLateOrStaleResolution() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "lease"); var queued = review(loan, repayment); var claimed = reviewService.claim("demo", queued, Instant.now());
+        assertThat(reviewService.claim("demo", queued, claimed.leaseUntil())).isNull();
+        var receipt = (AdvanceRepaymentAdjustmentPort.Receipt) response("advance-repayment-adjustment", json.read(json.write(claimed.input().request()), JsonNode.class));
+        reviewService.finish(claimed, new FinanceResult.Success<>(receipt), claimed.leaseUntil()); assertThat(reviewChecks.find("demo", queued).orElseThrow().issue()).isEqualTo(AdvanceRepaymentReviewCheck.Issue.TIMEOUT);
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2; var check = review(loan, repayment); reviewWorker.poll();
+        var stale = new LinkedHashMap<>(resolveInput(loan, check)); stale.put("advanceVersion", 1L); code(send(reviewPath(loan, repayment) + "/resolutions", "finance", stale), "CONCURRENCY_CONFLICT");
+        var newer = review(loan, repayment); reviewWorker.poll(); code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, check)), "CONCURRENCY_CONFLICT");
+        assertThat(resolutions.latest("demo", repayment)).isEmpty(); assertThat(balance(loan).repaid()).isEqualTo(money("25"));
+    }
 
     @Test void explicitRepaymentsCloseRealLoanWithoutAnotherPaymentOrVoucherAndReplayOnlyOnce() throws Exception {
         UUID loan = paidLoan(); var before = balance(loan).state(); int outgoing = paymentWrites, postings = voucherWrites;
@@ -298,6 +425,17 @@ class AdvanceRepaymentIntegrationTest {
         executionWorker.poll(); paymentWorker.poll(); assertThat(payments.find("demo", payment).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
         preparationWorker.poll(); voucherWorker.poll(); assertThat(balance(loan).available()).isEqualTo(money("100")); return loan;
     }
+    private UUID repay(UUID loan, String reference) throws Exception {
+        var check = query(loan, reference); worker.poll(); return UUID.fromString(ok(send(path(loan) + "/repayments", "finance", recordInput(loan, check)), 202).path("repaymentId").asText());
+    }
+    private String reviewPath(UUID loan, UUID repayment) { return path(loan) + "/repayments/" + repayment; }
+    private UUID review(UUID loan, UUID repayment) throws Exception {
+        return UUID.fromString(ok(send(reviewPath(loan, repayment) + "/review-checks", "finance", Map.of("advanceVersion", balance(loan).version(), "comment", "核对原收款与真实退回")), 202).path("checkId").asText());
+    }
+    private Map<String, Object> resolveInput(UUID loan, UUID check) {
+        var value = reviewChecks.find("demo", check).orElseThrow(); return Map.of("advanceVersion", balance(loan).version(), "checkId", check, "checkVersion", value.version(), "outcome", value.receipt().status(), "evidenceReference", "proof-1", "comment", "核对独立原件与实际退回分录");
+    }
+    private JsonNode reviewView(UUID loan, UUID repayment, String user) throws Exception { return ok(read(reviewPath(loan, repayment) + "/review", user), 200); }
     private UUID query(UUID loan, String reference) throws Exception {
         var receipt = ok(send(path(loan) + "/repayment-checks", "finance", Map.of("advanceVersion", balance(loan).version(), "receiptReference", reference, "comment", "读取原收款")), 202);
         assertThat(receipt.has("repaymentId")).as("Queued receipt explicitly distinguishes no recorded repayment").isTrue();
@@ -334,6 +472,16 @@ class AdvanceRepaymentIntegrationTest {
                 var command = operation.endsWith("command") ? json.read(data.path("command").toString(), PaymentCommand.class) : paymentCommands.get(UUID.fromString(data.path("authorizationId").asText()));
                 if (operation.endsWith("command")) paymentWrites++; paymentCommands.put(command.id(), command);
                 yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 1L, at, "funding-" + command.id(), command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "bank-" + command.id(), null);
+            }
+            case "advance-repayment-adjustment" -> {
+                if (reviewUnavailable) yield Map.of("malformed", true);
+                var request = json.read(data.toString(), AdvanceRepaymentAdjustmentPort.Request.class); var original = request.original();
+                var current = new AdvanceRepaymentPort.Receipt(original.request(), reviewStatus == AdvanceRepaymentAdjustmentPort.Status.CONFIRMED ? AdvanceRepaymentPort.Status.CONFIRMED : AdvanceRepaymentPort.Status.REVERSED,
+                        receiptRevision, at, at.plusSeconds(300), original.funding(), original.posting());
+                var facts = reviewStatus == AdvanceRepaymentAdjustmentPort.Status.RETURNED ? returnFacts.computeIfAbsent(request.repaymentId(), ignored -> new AdvanceRepaymentAdjustmentPort.Receipt(request, reviewStatus, reviewRevision, at, at.plusSeconds(300), current,
+                        new AdvanceRepaymentAdjustmentPort.FundsReturn(channel, returnReference == null ? "return-" + request.repaymentId() : returnReference, original.funding().amount(), at),
+                        new AdvanceRepaymentAdjustmentPort.ReturnPosting("return-voucher-" + request.repaymentId(), "debit-1", original.funding().amount(), LocalDate.now(), at))) : null;
+                yield new AdvanceRepaymentAdjustmentPort.Receipt(request, reviewStatus, reviewRevision, at, at.plusSeconds(300), current, facts == null ? null : facts.fundsReturn(), facts == null ? null : facts.posting());
             }
             case "advance-repayment" -> {
                 repaymentReads++; if (unavailable) yield Map.of("malformed", true);

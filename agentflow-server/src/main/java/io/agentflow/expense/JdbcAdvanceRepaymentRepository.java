@@ -48,6 +48,8 @@ public class JdbcAdvanceRepaymentRepository {
     public Optional<AdvanceRepayment> forReceipt(String tenant, UUID legalEntity, String reference) {
         return jdbc.query("SELECT * FROM advance_repayment WHERE tenant_id=? AND legal_entity_id=? AND receipt_reference=?", row(), tenant, legalEntity.toString(), reference).stream().findFirst();
     }
+    /** 独立复核先取得原还款事实，再核验同一借款的实时读取权限。 */
+    public Optional<AdvanceRepayment> find(String tenant, UUID id) { return jdbc.query("SELECT * FROM advance_repayment WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst(); }
     /** 有界历史按发生时间和编号稳定翻页；游标必须属于同一借款。 */
     public List<AdvanceRepayment> list(String tenant, UUID advanceId, UUID before, int limit) {
         var args = new java.util.ArrayList<Object>(List.of(tenant, advanceId.toString())); String filter = "";

@@ -34,12 +34,13 @@ public class AdvanceRepaymentService {
     private final PaymentPersonnel personnel;
     private final JdbcAdvanceRepaymentCheckRepository checks;
     private final JdbcAdvanceRepaymentRepository repayments;
+    private final JdbcRepaymentResolutionRepository resolutions;
     private final EmployeeAdvanceRepository balances;
     private final PaymentAudit audit;
     /** 原放款、独立财务与不可变收款事实共同约束确认；不提供手工金额入口。 */
     public AdvanceRepaymentService(CurrentActor actors, AdvanceRepaymentSources sources, PaymentAccess access, PaymentPersonnel personnel,
-            JdbcAdvanceRepaymentCheckRepository checks, JdbcAdvanceRepaymentRepository repayments, EmployeeAdvanceRepository balances, PaymentAudit audit) {
-        this.actors = actors; this.sources = sources; this.access = access; this.personnel = personnel; this.checks = checks; this.repayments = repayments; this.balances = balances; this.audit = audit;
+            JdbcAdvanceRepaymentCheckRepository checks, JdbcAdvanceRepaymentRepository repayments, JdbcRepaymentResolutionRepository resolutions, EmployeeAdvanceRepository balances, PaymentAudit audit) {
+        this.actors = actors; this.sources = sources; this.access = access; this.personnel = personnel; this.checks = checks; this.repayments = repayments; this.resolutions = resolutions; this.balances = balances; this.audit = audit;
     }
     /** 幂等回放前复核当前原轮次完整字段、财务身份及法人任职。 */
     public void authorize(UUID advanceId) {
@@ -108,9 +109,13 @@ public class AdvanceRepaymentService {
         var request = completed.input().request(); var original = repayments.forReceipt(completed.input().tenantId(), request.legalEntityId(), request.receiptReference()).orElse(null);
         if (original == null || !original.receipt().request().advanceId().equals(source.advance().id())) return;
         var receipt = completed.receipt();
-        if (receipt.status() != AdvanceRepaymentPort.Status.CONFIRMED || receipt.revision() < original.receipt().revision() || !receipt.sameSettlement(original.receipt())) {
+        var returned = resolutions.returned(completed.input().tenantId(), original.id()).orElse(null);
+        // 已确认真实退回时，原收款撤销是预期事实；更早版本、原件变化仍须重新核对。
+        var expectedStatus = returned == null ? AdvanceRepaymentPort.Status.CONFIRMED : AdvanceRepaymentPort.Status.REVERSED;
+        long minimumRevision = resolutions.latest(completed.input().tenantId(), original.id()).map(value -> value.receipt().current().revision()).orElse(original.receipt().revision());
+        if (receipt.status() != expectedStatus || receipt.revision() < minimumRevision || !receipt.sameSettlement(original.receipt())) {
             var advance = source.advance();
-            if (!advance.repaymentReviewRequired()) { long version = advance.version(); advance.requireRepaymentReview(version); balances.update(advance, version, "repayment-reconciliation", "REPAYMENT_REVIEW"); }
+            if (!advance.repaymentReviews().contains(original.id())) { long version = advance.version(); advance.requireRepaymentReview(version, original.id()); balances.update(advance, version, "repayment-reconciliation", "REPAYMENT_REVIEW"); }
         }
     }
     /** 非业务异常只记录不可用，不创造未收款结论。 */

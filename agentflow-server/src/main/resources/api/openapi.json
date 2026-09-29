@@ -20823,7 +20823,7 @@
           "借款申请"
         ],
         "summary": "读取借款余额与还款历史",
-        "description": "沿用原轮次完整借款字段权限。申请人可读已确认历史，最新查询仅当前独立财务可见；读取及刷新无副作用。实际放款等于报销冲销、已还款和未还款之和。历史固定每页25条，游标必须属于本笔借款。",
+        "description": "沿用原轮次完整借款字段权限。申请人可读已确认历史，最新查询仅当前独立财务可见；读取及刷新无副作用。实际放款等于报销冲销、净有效还款和未还款之和。历史固定每页25条，游标必须属于本笔借款。",
         "x-access": "申请人或本轮明细可读的实际审批参与者",
         "x-idempotency": false,
         "responses": {
@@ -21416,6 +21416,463 @@
                 "outcome": "POSTED",
                 "evidenceReference": "ERP-RECONCILIATION-001",
                 "comment": "已核对原凭证及最高版本对账结果"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/advance-requests/{id}/repayments/{repaymentId}/review": {
+      "get": {
+        "operationId": "getAdvanceRepaymentReview",
+        "tags": [
+          "借款申请"
+        ],
+        "summary": "读取原还款复核与退回",
+        "description": "沿用原轮次完整字段权限；原收款和已确认退回保留。只有当前独立财务能看到自己的候选证据，申请人读取已确认决定。",
+        "x-access": "申请人或本轮明细可读的实际审批参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepaymentReviewWorkspace"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "repaymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/advance-requests/{id}/repayments/{repaymentId}/review-checks": {
+      "post": {
+        "operationId": "queryAdvanceRepaymentReview",
+        "tags": [
+          "借款申请"
+        ],
+        "summary": "登记原还款只读复核",
+        "description": "只绑定原还款，不允许修改员工、金额或外部目标。查询与明确裁决分开；裁决采用五分钟内最高有效来源。原收款不可覆盖，真实退回只追加一次；每笔还款及原付款的冻结分别处理。余额、决定、任务消费与审计原子保存。",
+        "x-access": "FINANCE + 原轮次完整借款字段可读 + 原法人当前有效任职 + 非申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "意图或裁决已保存；resolutionId 为 null 表示只排队查询。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepaymentReviewActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "repaymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepaymentReviewQueryInput"
+              },
+              "example": {
+                "advanceVersion": 3,
+                "comment": "核对原收款与退回事实"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/advance-requests/{id}/repayments/{repaymentId}/resolutions": {
+      "post": {
+        "operationId": "resolveAdvanceRepayment",
+        "tags": [
+          "借款申请"
+        ],
+        "summary": "明确确认原还款或真实退回",
+        "description": "只绑定原还款，不允许修改员工、金额或外部目标。查询与明确裁决分开；裁决采用五分钟内最高有效来源。原收款不可覆盖，真实退回只追加一次；每笔还款及原付款的冻结分别处理。余额、决定、任务消费与审计原子保存。",
+        "x-access": "FINANCE + 原轮次完整借款字段可读 + 原法人当前有效任职 + 非申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "意图或裁决已保存；resolutionId 为 null 表示只排队查询。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepaymentReviewActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "repaymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepaymentResolutionInput"
+              },
+              "example": {
+                "advanceVersion": 4,
+                "checkId": "55555555-5555-4555-8555-555555555555",
+                "checkVersion": 3,
+                "outcome": "RETURNED",
+                "evidenceReference": "REVIEW-20260929-01",
+                "comment": "已核对真实退回资金及原借款借方调整"
               }
             }
           }
@@ -29433,9 +29890,16 @@
             "$ref": "#/components/schemas/Money"
           },
           "repaid": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/Money",
+            "description": "净有效还款等于累计原收款减去已确认真实退回。"
           },
           "outstanding": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedRepayments": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "returnedRepayments": {
             "$ref": "#/components/schemas/Money"
           }
         },
@@ -29451,7 +29915,9 @@
           "reserved",
           "settled",
           "repaid",
-          "outstanding"
+          "outstanding",
+          "receivedRepayments",
+          "returnedRepayments"
         ],
         "additionalProperties": false
       },
@@ -33396,7 +33862,9 @@
           "reserved",
           "offset",
           "repaid",
-          "outstanding"
+          "outstanding",
+          "receivedRepayments",
+          "returnedRepayments"
         ],
         "properties": {
           "version": {
@@ -33426,9 +33894,16 @@
             "$ref": "#/components/schemas/Money"
           },
           "repaid": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/Money",
+            "description": "净有效还款等于累计原收款减去已确认真实退回。"
           },
           "outstanding": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedRepayments": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "returnedRepayments": {
             "$ref": "#/components/schemas/Money"
           }
         }
@@ -33655,7 +34130,9 @@
           "accountingDate",
           "postedAt",
           "recordedBy",
-          "recordedAt"
+          "recordedAt",
+          "reviewRequired",
+          "returned"
         ],
         "properties": {
           "id": {
@@ -33709,6 +34186,19 @@
           "recordedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "reviewRequired": {
+            "type": "boolean"
+          },
+          "returned": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepaymentReturn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -34064,6 +34554,457 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "RepaymentReturnedFunds": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel",
+          "transactionReference",
+          "amount",
+          "returnedAt"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "BANK_TRANSFER",
+              "CASH",
+              "PAYROLL"
+            ]
+          },
+          "transactionReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "returnedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RepaymentReturnPosting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "voucherReference",
+          "entryReference",
+          "amount",
+          "accountingDate",
+          "postedAt"
+        ],
+        "properties": {
+          "voucherReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "entryReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "已经 ERP 过账的原员工借款借方调整，不是原还款贷方分录。"
+      },
+      "RepaymentReturn": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resolutionId",
+          "repaymentId",
+          "fundsReturn",
+          "posting"
+        ],
+        "properties": {
+          "resolutionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repaymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fundsReturn": {
+            "$ref": "#/components/schemas/RepaymentReturnedFunds"
+          },
+          "posting": {
+            "$ref": "#/components/schemas/RepaymentReturnPosting"
+          }
+        }
+      },
+      "RepaymentReviewEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "originalRevision",
+          "fundsReturn",
+          "posting"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED",
+              "CONFIRMED",
+              "RETURNED"
+            ],
+            "description": "明确采用页面显示的 CONFIRMED 或 RETURNED；UNRESOLVED 可表示外部状态，但不能形成决定。"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fundsReturn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepaymentReturnedFunds"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepaymentReturnPosting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "RepaymentReviewCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue",
+          "evidence",
+          "canResolve",
+          "confirmationIssue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "CHECKED",
+              "RESOLVED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepaymentReviewEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "confirmationIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "RepaymentReviewDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "outcome",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "RETURNED"
+            ]
+          },
+          "resolvedBy": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          }
+        }
+      },
+      "RepaymentReviewWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "advanceId",
+          "roundNo",
+          "balance",
+          "original",
+          "canQuery",
+          "latestCheck",
+          "latestDecision"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "balance": {
+            "$ref": "#/components/schemas/AdvanceRepaymentBalance"
+          },
+          "original": {
+            "$ref": "#/components/schemas/AdvanceRepaymentRecord"
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "latestCheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepaymentReviewCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestDecision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RepaymentReviewDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "RepaymentReviewQueryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "advanceVersion",
+          "comment"
+        ],
+        "properties": {
+          "advanceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "RepaymentResolutionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "advanceVersion",
+          "checkId",
+          "checkVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "advanceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED",
+              "CONFIRMED",
+              "RETURNED"
+            ],
+            "description": "明确采用页面显示的 CONFIRMED 或 RETURNED；UNRESOLVED 可表示外部状态，但不能形成决定。"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "RepaymentReviewActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "advanceId",
+          "repaymentId",
+          "checkId",
+          "checkVersion",
+          "resolutionId",
+          "advanceVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repaymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "resolutionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "advanceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       }

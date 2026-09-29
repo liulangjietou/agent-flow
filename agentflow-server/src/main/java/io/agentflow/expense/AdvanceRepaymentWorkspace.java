@@ -49,7 +49,7 @@ public class AdvanceRepaymentWorkspace {
         if (source.authorization().terms().binding().roundNo() != detail.roundNo()) return new View(detail.applicationId(), id, detail.roundNo(), null, false, null, List.of(), null);
         boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(advance.employeeId()) && personnel.eligible(actor.tenantId(), actor.userId(), advance.legalEntityId());
         var latest = finance ? checks.latest(actor.tenantId(), id, actor.userId()).orElse(null) : null;
-        var rows = repayments.list(actor.tenantId(), id, before, PAGE_SIZE + 1); var page = rows.stream().limit(PAGE_SIZE).map(AdvanceRepaymentWorkspace::recorded).toList();
+        var rows = repayments.list(actor.tenantId(), id, before, PAGE_SIZE + 1); var page = rows.stream().limit(PAGE_SIZE).map(value -> recorded(value, advance)).toList();
         boolean query = finance && source.payment().settleable() && !advance.paymentReviewRequired() && (latest == null || !latest.active());
         return new View(detail.applicationId(), id, detail.roundNo(), balance(advance), query, latest == null ? null : check(source, latest), page,
                 rows.size() > PAGE_SIZE ? page.get(page.size() - 1).id() : null);
@@ -61,10 +61,12 @@ public class AdvanceRepaymentWorkspace {
                 value.issue() == null ? null : value.issue().name(), issue == null, issue);
     }
     /** 本人资金列表与借款详情使用同一余额投影，已还款和报销冲销分别显示。 */
-    public static Balance balance(EmployeeAdvance value) { return new Balance(value.version(), value.status(), value.balance().limit(), value.available(), value.balance().reserved(), value.balance().consumed(), value.repaid(), value.outstanding()); }
-    private static Recorded recorded(AdvanceRepayment value) {
+    public static Balance balance(EmployeeAdvance value) { return new Balance(value.version(), value.status(), value.balance().limit(), value.available(), value.balance().reserved(), value.balance().consumed(), value.repaid(), value.outstanding(), value.receivedRepayments(), value.returnedRepayments()); }
+    /** 原收款一直保留，退回和逐笔冻结作为独立事实同时展示。 */
+    public static Recorded recorded(AdvanceRepayment value, EmployeeAdvance advance) {
         var receipt = value.receipt(); return new Recorded(value.id(), receipt.request().receiptReference(), receipt.funding().channel(), value.amount(), receipt.funding().receivedAt(),
-                receipt.posting().voucherReference(), receipt.posting().entryReference(), receipt.posting().accountingDate(), receipt.posting().postedAt(), value.recordedBy(), value.recordedAt());
+                receipt.posting().voucherReference(), receipt.posting().entryReference(), receipt.posting().accountingDate(), receipt.posting().postedAt(), value.recordedBy(), value.recordedAt(),
+                advance.repaymentReviews().contains(value.id()), advance.repaymentReturns().stream().filter(entry -> entry.repaymentId().equals(value.id())).findFirst().orElse(null));
     }
     private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REPAYMENT_QUERY", "Repayment history query is invalid"); }
     /**
@@ -77,7 +79,7 @@ public class AdvanceRepaymentWorkspace {
      * 保持借出等于报销冲销、已还款及未还款的守恒关系。
      * @author owlzhangfq@gmail.com
      */
-    public record Balance(long version, EmployeeAdvance.Status status, Money paid, Money available, Money reserved, Money offset, Money repaid, Money outstanding) { }
+    public record Balance(long version, EmployeeAdvance.Status status, Money paid, Money available, Money reserved, Money offset, Money repaid, Money outstanding, Money receivedRepayments, Money returnedRepayments) { }
     /**
      * 仅当前财务可见自己的最新查询，查询完成仍需明确确认。
      * @author owlzhangfq@gmail.com
@@ -94,6 +96,7 @@ public class AdvanceRepaymentWorkspace {
      * 已确认历史保留记账依据，金额由原收款派生。
      * @author owlzhangfq@gmail.com
      */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Recorded(UUID id, String receiptReference, AdvanceRepaymentPort.Channel channel, Money amount, Instant receivedAt, String voucherReference,
-                           String entryReference, java.time.LocalDate accountingDate, Instant postedAt, String recordedBy, Instant recordedAt) { }
+                           String entryReference, java.time.LocalDate accountingDate, Instant postedAt, String recordedBy, Instant recordedAt, boolean reviewRequired, AdvanceRepaymentResolution.ReturnEntry returned) { }
 }

@@ -24,8 +24,9 @@ public final class EmployeeAdvance {
     private final LocalDate dueOn;
     private ReservedAmount balance;
     private boolean paymentReviewRequired;
-    private boolean repaymentReviewRequired;
+    private List<UUID> repaymentReviews = List.of();
     private List<AdvanceRepayment.Entry> repayments = List.of();
+    private List<AdvanceRepaymentResolution.ReturnEntry> repaymentReturns = List.of();
     private long version = 1;
 
     /** 放款适配器确认成功后创建；外部放款引用由仓储按租户唯一约束。 */
@@ -66,7 +67,7 @@ public final class EmployeeAdvance {
     /** 预留不等于冲销，状态仅反映真正已结算金额。 */
     public Status status() {
         if (paymentReviewRequired) return Status.PAYMENT_REVIEW;
-        if (repaymentReviewRequired) return Status.REPAYMENT_REVIEW;
+        if (repaymentReviewRequired()) return Status.REPAYMENT_REVIEW;
         return outstanding().value().signum() == 0 ? Status.SETTLED
                 : balance.consumed().plus(repaid()).value().signum() == 0 ? Status.PAID_OUT : Status.PARTIALLY_SETTLED;
     }
@@ -88,7 +89,11 @@ public final class EmployeeAdvance {
     public Money available() { return reviewRequired() ? Money.zero(balance.limit().currency()) : balance.available().minus(repaid()); }
 
     /** 分别保留报销冲销和实际还款，两者共同决定未还余额。 */
-    public Money repaid() { return repayments.stream().map(AdvanceRepayment.Entry::amount).reduce(Money.zero(balance.limit().currency()), Money::plus); }
+    public Money repaid() { return receivedRepayments().minus(returnedRepayments()); }
+    /** 原始收款合计不因后来真实退回而减写。 */
+    public Money receivedRepayments() { return repayments.stream().map(AdvanceRepayment.Entry::amount).reduce(Money.zero(balance.limit().currency()), Money::plus); }
+    /** 独立退回合计与原收款分别保存，净还款才减少当前未还余额。 */
+    public Money returnedRepayments() { return repaymentReturns.stream().map(AdvanceRepaymentResolution.ReturnEntry::amount).reduce(Money.zero(balance.limit().currency()), Money::plus); }
     /** 已预留金额仍是尚未归还的借款，不因预留提前结清。 */
     public Money outstanding() { return balance.limit().minus(balance.consumed()).minus(repaid()); }
 
@@ -105,11 +110,26 @@ public final class EmployeeAdvance {
     }
 
     /** 已确认还款出现撤销或不一致时独立冻结，原放款裁决不能解除这个冻结。 */
-    public void requireRepaymentReview(long expectedVersion) {
+    public void requireRepaymentReview(long expectedVersion, UUID repaymentId) {
         requireVersion(expectedVersion);
-        if (!repaymentReviewRequired) { repaymentReviewRequired = true; version++; }
+        if (repayments.stream().noneMatch(entry -> entry.id().equals(repaymentId))) throw repaymentSourceChanged();
+        if (!repaymentReviews.contains(repaymentId)) {
+            var next = new ArrayList<>(repaymentReviews); next.add(repaymentId); repaymentReviews = List.copyOf(next); version++;
+        }
     }
-    private boolean reviewRequired() { return paymentReviewRequired || repaymentReviewRequired; }
+    /** 只解除本笔还款争议；真实退款首次加回欠款，原预留、冲销及其他冻结完整保留。 */
+    public void resolveRepaymentReview(long expectedVersion, AdvanceRepaymentResolution resolution) {
+        requireVersion(expectedVersion);
+        if (resolution == null || !resolution.belongsTo(this) || !repaymentReviews.contains(resolution.receipt().request().repaymentId())) throw repaymentSourceChanged();
+        var repaymentId = resolution.receipt().request().repaymentId();
+        var existing = repaymentReturns.stream().filter(entry -> entry.repaymentId().equals(repaymentId)).findFirst().orElse(null);
+        if (existing != null && !existing.matches(resolution)) throw repaymentSourceChanged();
+        if (existing == null && resolution.receipt().status() == io.agentflow.finance.AdvanceRepaymentAdjustmentPort.Status.RETURNED) {
+            var next = new ArrayList<>(repaymentReturns); next.add(resolution.returnEntry()); repaymentReturns = List.copyOf(next);
+        }
+        repaymentReviews = repaymentReviews.stream().filter(id -> !id.equals(repaymentId)).toList(); version++;
+    }
+    private boolean reviewRequired() { return paymentReviewRequired || repaymentReviewRequired(); }
     private DomainException review() { return paymentReviewRequired ? paymentReview() : new DomainException("ADVANCE_REPAYMENT_REVIEW_REQUIRED", "Repayment evidence requires finance review before further use"); }
     private void requireRepaymentCapacity(ReservedAmount proposed) { if (proposed.available().compareTo(repaid()) < 0) throw insufficient(); }
     private static DomainException insufficient() { return new DomainException("INSUFFICIENT_FINANCIAL_BALANCE", "Repayment, reservations and offsets exceed the original advance"); }
@@ -134,12 +154,20 @@ public final class EmployeeAdvance {
         var repaid = state.repayments() == null ? List.<AdvanceRepayment.Entry>of() : List.copyOf(state.repayments());
         if (repaid.stream().map(AdvanceRepayment.Entry::id).distinct().count() != repaid.size()
                 || repaid.stream().map(AdvanceRepayment.Entry::receiptReference).distinct().count() != repaid.size()) throw new DomainException("INVALID_ADVANCE", "Persisted repayments must have unique receipts");
-        result.balance = state.balance(); result.repayments = repaid; result.requireRepaymentCapacity(result.balance);
-        result.version = state.version(); result.paymentReviewRequired = state.paymentReviewRequired(); result.repaymentReviewRequired = state.repaymentReviewRequired(); return result;
+        var returned = state.repaymentReturns() == null ? List.<AdvanceRepaymentResolution.ReturnEntry>of() : List.copyOf(state.repaymentReturns());
+        if (returned.stream().map(AdvanceRepaymentResolution.ReturnEntry::resolutionId).distinct().count() != returned.size()
+                || returned.stream().map(AdvanceRepaymentResolution.ReturnEntry::repaymentId).distinct().count() != returned.size()
+                || returned.stream().anyMatch(item -> repaid.stream().noneMatch(original -> original.id().equals(item.repaymentId()) && original.amount().equals(item.amount())))) throw repaymentSourceChanged();
+        // 旧快照只有一个冻结标记，保守地将当时所有还款标为待核对，逐笔裁决后才能恢复。
+        var reviews = state.repaymentReviews() == null ? state.repaymentReviewRequired() ? repaid.stream().map(AdvanceRepayment.Entry::id).toList() : List.<UUID>of() : List.copyOf(state.repaymentReviews());
+        if (reviews.stream().distinct().count() != reviews.size() || state.repaymentReviewRequired() != !reviews.isEmpty()
+                || reviews.stream().anyMatch(id -> repaid.stream().noneMatch(item -> item.id().equals(id)))) throw repaymentSourceChanged();
+        result.balance = state.balance(); result.repayments = repaid; result.repaymentReturns = returned; result.repaymentReviews = reviews; result.requireRepaymentCapacity(result.balance);
+        result.version = state.version(); result.paymentReviewRequired = state.paymentReviewRequired(); return result;
     }
 
     /** 保存不可变放款背景和可变余额，不复制派生状态字段。 */
-    public State state() { return new State(id, tenantId, legalEntityId, employeeId, paymentReference, paidOn, dueOn, balance, version, paymentReviewRequired, repayments, repaymentReviewRequired); }
+    public State state() { return new State(id, tenantId, legalEntityId, employeeId, paymentReference, paidOn, dueOn, balance, version, paymentReviewRequired, repayments, repaymentReviewRequired(), repaymentReviews, repaymentReturns); }
     public UUID id() { return id; }
     public String tenantId() { return tenantId; }
     public UUID legalEntityId() { return legalEntityId; }
@@ -150,8 +178,11 @@ public final class EmployeeAdvance {
     public ReservedAmount balance() { return balance; }
     public long version() { return version; }
     public boolean paymentReviewRequired() { return paymentReviewRequired; }
-    public boolean repaymentReviewRequired() { return repaymentReviewRequired; }
+    public boolean repaymentReviewRequired() { return !repaymentReviews.isEmpty(); }
     public List<AdvanceRepayment.Entry> repayments() { return repayments; }
+    public List<UUID> repaymentReviews() { return repaymentReviews; }
+    public List<AdvanceRepaymentResolution.ReturnEntry> repaymentReturns() { return repaymentReturns; }
+    private static DomainException repaymentSourceChanged() { return new DomainException("ADVANCE_REPAYMENT_SOURCE_CHANGED", "Repayment decision must retain original recorded receipt and adjustment identity"); }
     private static DomainException paymentReview() { return new DomainException("ADVANCE_PAYMENT_REVIEW_REQUIRED", "Disputed advance payment requires finance review before further use"); }
 
     /**
@@ -160,7 +191,8 @@ public final class EmployeeAdvance {
      */
     public record State(UUID id, String tenantId, UUID legalEntityId, String employeeId, String paymentReference,
                          LocalDate paidOn, LocalDate dueOn, ReservedAmount balance, long version, boolean paymentReviewRequired,
-                         List<AdvanceRepayment.Entry> repayments, boolean repaymentReviewRequired) { }
+                         List<AdvanceRepayment.Entry> repayments, boolean repaymentReviewRequired, List<UUID> repaymentReviews,
+                         List<AdvanceRepaymentResolution.ReturnEntry> repaymentReturns) { }
 
     /**
      * 状态由已放款和实际冲销事实派生。

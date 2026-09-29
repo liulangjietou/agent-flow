@@ -85,7 +85,7 @@ public class ExpenseWorkspaceQuery {
         for (var id : ids.stream().limit(page.limit()).toList()) {
             var value = values.get(id); var balance = value.balance();
             items.add(new AdvanceItem(id, value.legalEntityId(), value.version(), value.status(), value.paidOn(), value.dueOn(),
-                    balance.limit(), value.available(), balance.reserved(), balance.consumed(), value.repaid(), value.outstanding()));
+                    balance.limit(), value.available(), balance.reserved(), balance.consumed(), value.repaid(), value.outstanding(), value.receivedRepayments(), value.returnedRepayments()));
         }
         return new AdvancePage(items, ids.size() > page.limit() ? items.get(items.size() - 1).id() : null);
     }
@@ -151,7 +151,7 @@ public class ExpenseWorkspaceQuery {
      * @author owlzhangfq@gmail.com
      */
     public record AdvanceItem(UUID id, UUID legalEntityId, long version, EmployeeAdvance.Status status, LocalDate paidOn, LocalDate dueOn,
-                              Money paid, Money available, Money reserved, Money settled, Money repaid, Money outstanding) { }
+                              Money paid, Money available, Money reserved, Money settled, Money repaid, Money outstanding, Money receivedRepayments, Money returnedRepayments) { }
     /**
      * 当前主体的已放款余额页。
      * @author owlzhangfq@gmail.com

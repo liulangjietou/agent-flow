@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import AdvanceRepaymentReview from './AdvanceRepaymentReview.vue'
+import type { RepaymentReviewView } from '../repaymentReview'
 import { moneyLabel } from '../expenses'
 import { advanceBalanceLabels, repaymentChannelLabels, repaymentCheckLabels, repaymentEvidenceLabels, repaymentIssue, repaymentError, validateRepaymentView, repaymentQueryInput, repaymentRecordInput, validateRepaymentReceipt, type RepaymentView, type RepaymentRecord } from '../advanceRepayment'
 const props = defineProps<{ applicationId: string; advanceId: string; roundNo: number; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<RepaymentView | null>(null), records = ref<RepaymentRecord[]>([]), loading = ref(false), saving = ref(false), loadingMore = ref(false)
 const pending = ref<'QUERY' | 'RECORD' | null>(null), reference = ref(''), comment = ref(''), error = ref(''), notice = ref(''), requiresRefresh = ref(false), unconfirmed = ref(false)
-const form = ref<HTMLFormElement | null>(null)
+const form = ref<HTMLFormElement | null>(null), selectedRepayment = ref<string | null>(null), reviewBusy = ref(false)
 let epoch = 0, controller: AbortController | null = null
-const blocked = computed(() => !!props.locked || loading.value || loadingMore.value || saving.value || requiresRefresh.value || unconfirmed.value)
+const blocked = computed(() => !!props.locked || reviewBusy.value || loading.value || loadingMore.value || saving.value || requiresRefresh.value || unconfirmed.value)
 function stop() { epoch++; controller?.abort(); controller = null }
 function syncPending() {
   const prefix = `/advance-requests/${encodeURIComponent(props.advanceId)}`
@@ -20,13 +22,13 @@ function syncPending() {
 const unsubscribe = writeRequests.subscribe(syncPending)
 /** 读取及翻页只更新同一身份和借款的资料，不能自动确认收款。 */
 async function load(more = false) {
-  if (saving.value || loading.value || loadingMore.value || !props.scopeKey) return
+  if (saving.value || reviewBusy.value || loading.value || loadingMore.value || !props.scopeKey) return
   const beforeId = more ? view.value?.nextBeforeId ?? undefined : undefined
   if (more && (!beforeId || blocked.value)) return
   stop(); const current = epoch, request = new AbortController(); controller = request
   const binding = { applicationId: props.applicationId, advanceId: props.advanceId, roundNo: props.roundNo }
   if (more) loadingMore.value = true
-  else { loading.value = true; view.value = null; records.value = []; pending.value = null; reference.value = ''; comment.value = '' }
+  else { loading.value = true; selectedRepayment.value = null; view.value = null; records.value = []; pending.value = null; reference.value = ''; comment.value = '' }
   error.value = ''
   const timeout = setTimeout(() => { if (current === epoch) { stop(); loading.value = false; loadingMore.value = false; requiresRefresh.value = true; error.value = '还款资料读取超时，请刷新重试。' } }, 12_000)
   try {
@@ -39,7 +41,7 @@ async function load(more = false) {
   } catch (cause) {
     if (current === epoch) {
       // 翻页失权时同时撤下已加载资料，不能让上一页继续暴露原字段内容。
-      if ([401, 403, 404].includes((cause as { status?: number })?.status ?? 0)) { view.value = null; records.value = []; pending.value = null; reference.value = ''; comment.value = '' }
+      if ([401, 403, 404].includes((cause as { status?: number })?.status ?? 0)) { view.value = null; records.value = []; selectedRepayment.value = null; pending.value = null; reference.value = ''; comment.value = '' }
       error.value = repaymentError(cause); requiresRefresh.value = true
     }
   }
@@ -64,11 +66,27 @@ async function execute() {
     pending.value = null; saving.value = false; emit('busy', false)
     notice.value = action === 'QUERY' ? '查询已登记，请刷新查看原收款与入账结果，核对后再确认还款。' : '还款已确认，借款余额及原收款记录已保存。'
     await load()
-  } catch (cause) { if (current === epoch) { error.value = repaymentError(cause); requiresRefresh.value = true } }
+  } catch (cause) {
+    if (current === epoch) {
+      if ([401, 403, 404].includes((cause as { status?: number })?.status ?? 0)) { view.value = null; records.value = []; selectedRepayment.value = null; pending.value = null; reference.value = ''; comment.value = '' }
+      error.value = repaymentError(cause); requiresRefresh.value = true
+    }
+  }
   finally { if (current === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
 }
+/** 子复核显示新的余额时同步摘要，并要求原还款操作重新读取自己的完整依据。 */
+function reviewRefreshed(value: RepaymentReviewView) {
+  if (!view.value || value.advanceId !== view.value.advanceId || value.original.id !== selectedRepayment.value) return
+  if (view.value.balance?.version !== value.balance.version) {
+    requiresRefresh.value = true; view.value.latestCheck = null; pending.value = null; reference.value = ''; comment.value = ''
+    notice.value = '原还款复核已更新，办理其他还款前请刷新还款记录。'
+  }
+  view.value.balance = value.balance
+  records.value = records.value.map(row => row.id === value.original.id ? value.original : row)
+}
+function reviewSaving(value: boolean) { reviewBusy.value = value; emit('busy', value) }
 watch(() => JSON.stringify([props.scopeKey, props.applicationId, props.advanceId, props.roundNo]), () => {
-  stop(); view.value = null; records.value = []; loading.value = false; loadingMore.value = false; saving.value = false
+  stop(); selectedRepayment.value = null; reviewBusy.value = false; view.value = null; records.value = []; loading.value = false; loadingMore.value = false; saving.value = false
   pending.value = null; reference.value = ''; comment.value = ''; error.value = ''; notice.value = ''; requiresRefresh.value = false
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
@@ -77,8 +95,8 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
 
 <template>
   <section class="repayment" aria-label="借款还款与结清">
-    <div class="repayment-heading"><h3>借款还款与结清</h3><button type="button" class="quiet" :disabled="loading || loadingMore || saving || locked" @click="notice = ''; load()">刷新还款记录</button></div>
-    <p class="help">实际还款与报销冲销分别记载，两者共同减少未还款金额。</p>
+    <div class="repayment-heading"><h3>借款还款与结清</h3><button type="button" class="quiet" :disabled="loading || loadingMore || saving || reviewBusy || locked" @click="notice = ''; load()">刷新还款记录</button></div>
+    <p class="help">原收款、真实退回和报销冲销分别记载；净有效还款与报销冲销共同减少未还款。</p>
     <p v-if="loading" class="help" role="status">正在核对借款余额与原收款记录…</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="notice" class="help" role="status">{{ notice }}</p>
     <p v-if="unconfirmed && !saving" class="error" role="alert">上次操作结果尚未确认，请先恢复原操作，再刷新核对余额。</p>
@@ -86,7 +104,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
       <p v-if="!view.balance" class="help">本轮尚无可核对的实际放款余额。</p>
       <template v-else>
         <div class="balance-heading"><strong>{{ advanceBalanceLabels[view.balance.status] }}</strong><span>第 {{ view.roundNo }} 轮借款</span></div>
-        <dl class="balance-grid"><div><dt>实际放款</dt><dd>{{ moneyLabel(view.balance.paid) }}</dd></div><div><dt>已报销冲销</dt><dd>{{ moneyLabel(view.balance.offset) }}</dd></div><div><dt>已还款</dt><dd>{{ moneyLabel(view.balance.repaid) }}</dd></div><div><dt>未还款</dt><dd class="remaining">{{ moneyLabel(view.balance.outstanding) }}</dd></div><div><dt>当前预留</dt><dd>{{ moneyLabel(view.balance.reserved) }}</dd></div><div><dt>可用余额</dt><dd>{{ moneyLabel(view.balance.available) }}</dd></div></dl>
+        <dl class="balance-grid"><div><dt>实际放款</dt><dd>{{ moneyLabel(view.balance.paid) }}</dd></div><div><dt>已报销冲销</dt><dd>{{ moneyLabel(view.balance.offset) }}</dd></div><div><dt>净有效还款</dt><dd>{{ moneyLabel(view.balance.repaid) }}</dd></div><div><dt>累计原收款</dt><dd>{{ moneyLabel(view.balance.receivedRepayments) }}</dd></div><div><dt>已确认退回</dt><dd>{{ moneyLabel(view.balance.returnedRepayments) }}</dd></div><div><dt>未还款</dt><dd class="remaining">{{ moneyLabel(view.balance.outstanding) }}</dd></div><div><dt>当前预留</dt><dd>{{ moneyLabel(view.balance.reserved) }}</dd></div><div><dt>可用余额</dt><dd>{{ moneyLabel(view.balance.available) }}</dd></div></dl>
         <p v-if="view.balance.status === 'REPAYMENT_REVIEW'" class="error">已确认还款的外部记录发生变化，后续使用已暂停。原还款和报销冲销保留，请完成财务核对。</p>
         <article v-if="view.latestCheck" class="receipt" aria-label="原还款凭据查询结果">
           <h4>{{ repaymentCheckLabels[view.latestCheck.status] }}</h4><p>收款编号 {{ view.latestCheck.receiptReference }}</p>
@@ -107,7 +125,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
           <label>核对说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="saving" /></label>
           <div class="buttons"><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : pending === 'QUERY' ? '登记查询' : '确认并保存还款' }}</button><button type="button" class="quiet" :disabled="saving" @click="pending = null; reference = ''; comment = ''">取消</button></div>
         </form>
-        <div class="history"><h4>已确认还款</h4><p v-if="!records.length" class="help">暂无已确认还款。</p><article v-for="row in records" :key="row.id" class="history-row"><div><strong>{{ moneyLabel(row.amount) }}</strong><span>{{ repaymentChannelLabels[row.channel] }}</span></div><p>收款 {{ row.receiptReference }} · {{ new Date(row.receivedAt).toLocaleString() }}<br />凭证 {{ row.voucherReference }} / {{ row.entryReference }} · {{ row.accountingDate }}<br />确认 {{ row.recordedBy }} · {{ new Date(row.recordedAt).toLocaleString() }}</p></article><button v-if="view.nextBeforeId" type="button" class="quiet" :disabled="blocked" @click="load(true)">{{ loadingMore ? '正在读取…' : '更早还款记录' }}</button></div>
+        <div class="history"><h4>已确认还款</h4><p v-if="!records.length" class="help">暂无已确认还款。</p><article v-for="row in records" :key="row.id" class="history-row"><div><strong>{{ moneyLabel(row.amount) }}</strong><span>{{ repaymentChannelLabels[row.channel] }}</span></div><p>收款 {{ row.receiptReference }} · {{ new Date(row.receivedAt).toLocaleString() }}<br />凭证 {{ row.voucherReference }} / {{ row.entryReference }} · {{ row.accountingDate }}<br />确认 {{ row.recordedBy }} · {{ new Date(row.recordedAt).toLocaleString() }}</p><p v-if="row.reviewRequired" class="error">本笔还款待核对</p><p v-if="row.returned">已确认退回 {{ moneyLabel(row.returned.fundsReturn.amount) }} · {{ row.returned.posting.voucherReference }} / {{ row.returned.posting.entryReference }}</p><button type="button" class="quiet" :disabled="saving || reviewBusy || locked || loadingMore" @click="selectedRepayment = selectedRepayment === row.id ? null : row.id">{{ selectedRepayment === row.id ? '收起复核详情' : '查看原还款与复核' }}</button><AdvanceRepaymentReview v-if="selectedRepayment === row.id" :application-id="applicationId" :advance-id="advanceId" :repayment-id="row.id" :round-no="roundNo" :scope-key="scopeKey" :locked="locked || saving || loadingMore" @busy="reviewSaving" @refreshed="reviewRefreshed" /></article><button v-if="view.nextBeforeId" type="button" class="quiet" :disabled="blocked" @click="load(true)">{{ loadingMore ? '正在读取…' : '更早还款记录' }}</button></div>
       </template>
     </template>
   </section>

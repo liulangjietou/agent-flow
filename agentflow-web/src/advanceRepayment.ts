@@ -4,12 +4,14 @@ import { amountMinor, expenseError, type Money } from './expenses.js'
 export interface RepaymentBinding { applicationId: string; advanceId: string; roundNo: number }
 export type RepaymentChannel = 'BANK_TRANSFER' | 'CASH' | 'PAYROLL'
 export type AdvanceBalanceStatus = 'PAID_OUT' | 'PARTIALLY_SETTLED' | 'SETTLED' | 'PAYMENT_REVIEW' | 'REPAYMENT_REVIEW'
-export interface AdvanceBalance { version: number; status: AdvanceBalanceStatus; paid: Money; available: Money; reserved: Money; offset: Money; repaid: Money; outstanding: Money }
+export interface AdvanceBalance { version: number; status: AdvanceBalanceStatus; paid: Money; available: Money; reserved: Money; offset: Money; repaid: Money; outstanding: Money; receivedRepayments: Money; returnedRepayments: Money }
 export interface RepaymentFunding { channel: RepaymentChannel; transactionReference: string; amount: Money; receivedAt: string }
 export interface RepaymentPosting { voucherReference: string; entryReference: string; amount: Money; accountingDate: string; postedAt: string }
 export interface RepaymentEvidence { status: 'NOT_FOUND' | 'PENDING' | 'CONFIRMED' | 'REVERSED'; revision: number; observedAt: string; validUntil: string; funding: RepaymentFunding | null; posting: RepaymentPosting | null }
 export interface RepaymentCheck { id: string; version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RECORDED' | 'UNAVAILABLE' | 'VOIDED'; receiptReference: string; requestedAt: string; updatedAt: string; evidence: RepaymentEvidence | null; issue: string | null; canRecord: boolean; confirmationIssue: string | null }
-export interface RepaymentRecord { id: string; receiptReference: string; channel: RepaymentChannel; amount: Money; receivedAt: string; voucherReference: string; entryReference: string; accountingDate: string; postedAt: string; recordedBy: string; recordedAt: string }
+export interface RepaymentReturnedFunds { channel: RepaymentChannel; transactionReference: string; amount: Money; returnedAt: string }
+export interface RepaymentReturn { resolutionId: string; repaymentId: string; fundsReturn: RepaymentReturnedFunds; posting: RepaymentPosting }
+export interface RepaymentRecord { id: string; receiptReference: string; channel: RepaymentChannel; amount: Money; receivedAt: string; voucherReference: string; entryReference: string; accountingDate: string; postedAt: string; recordedBy: string; recordedAt: string; reviewRequired: boolean; returned: RepaymentReturn | null }
 export interface RepaymentView extends RepaymentBinding { balance: AdvanceBalance | null; canQuery: boolean; latestCheck: RepaymentCheck | null; records: RepaymentRecord[]; nextBeforeId: string | null }
 export interface RepaymentQueryInput { advanceVersion: number; receiptReference: string; comment: string }
 export interface RepaymentRecordInput { advanceVersion: number; checkId: string; checkVersion: number; comment: string }
@@ -49,6 +51,7 @@ export function validateRepaymentView(value: RepaymentView, binding: RepaymentBi
     requireValue(balance && owns(advanceBalanceLabels, balance.status)); version(balance.version)
     const currency = balance.paid.currency, paid = money(balance.paid, currency, true), offset = money(balance.offset, currency), repaid = money(balance.repaid, currency)
     const outstanding = money(balance.outstanding, currency), reserved = money(balance.reserved, currency), available = money(balance.available, currency)
+    requireValue(money(balance.receivedRepayments, currency) - money(balance.returnedRepayments, currency) === repaid)
     const held = balance.status === 'PAYMENT_REVIEW' || balance.status === 'REPAYMENT_REVIEW'
     requireValue(paid === offset + repaid + outstanding && reserved <= outstanding && available === (held ? 0n : outstanding - reserved))
     if (!held) requireValue(balance.status === (outstanding === 0n ? 'SETTLED' : offset + repaid > 0n ? 'PARTIALLY_SETTLED' : 'PAID_OUT'))
@@ -56,6 +59,11 @@ export function validateRepaymentView(value: RepaymentView, binding: RepaymentBi
       for (const field of [row.id, row.receiptReference, row.voucherReference, row.entryReference, row.recordedBy]) identifier(field)
       channel(row.channel); money(row.amount, currency, true); date(row.accountingDate)
       requireValue(instant(row.receivedAt) <= instant(row.postedAt) && instant(row.postedAt) <= instant(row.recordedAt))
+      requireValue(typeof row.reviewRequired === 'boolean')
+      if (row.returned !== null) {
+        requireValue(row.returned && row.returned.repaymentId === row.id); identifier(row.returned.resolutionId)
+        validateRepaymentReturnProof(row.returned.fundsReturn, row.returned.posting, row)
+      }
     }
     requireValue(new Set(value.records.map(row => row.id)).size === value.records.length)
     if (value.nextBeforeId !== null) requireValue(value.records.length === 25 && value.nextBeforeId === value.records[value.records.length - 1]?.id)
@@ -84,6 +92,15 @@ export function validateRepaymentView(value: RepaymentView, binding: RepaymentBi
     }
   }
   return value
+}
+
+/** 原收款和退回分开显示，退款与借方分录的金额、方向及时间不能互相矛盾。 */
+export function validateRepaymentReturnProof(funds: RepaymentReturnedFunds, posting: RepaymentPosting, original: RepaymentRecord) {
+  requireValue(funds && posting); channel(funds.channel); identifier(funds.transactionReference); identifier(posting.voucherReference); identifier(posting.entryReference); date(posting.accountingDate)
+  const currency = original.amount.currency, amount = money(original.amount, currency, true)
+  requireValue(money(funds.amount, currency, true) === amount && money(posting.amount, currency, true) === amount)
+  requireValue(instant(funds.returnedAt) >= instant(original.receivedAt) && instant(posting.postedAt) >= instant(funds.returnedAt) && instant(posting.postedAt) >= instant(original.postedAt))
+  requireValue(posting.voucherReference !== original.voucherReference || posting.entryReference !== original.entryReference)
 }
 
 /** 页面只提交收款引用和已展示余额版本，不提供改写金额、员工或账号的入口。 */

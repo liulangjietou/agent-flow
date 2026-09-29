@@ -65,8 +65,8 @@ class AdvanceRepaymentTest {
     @Test
     void independentRepaymentDisputeSurvivesOriginalPaymentResolutionAndAllowsOnlyRelease() {
         var advance = advance(); var use = new ExpenseUse(UUID.randomUUID(), 1, 0); advance.reserve(1, use, money("40"));
-        advance.repay(2, repayment(advance, "r", "20")); advance.requireRepaymentReview(3); var held = advance.state();
-        advance.requireRepaymentReview(4); assertThat(advance.state()).isEqualTo(held);
+        var repayment = repayment(advance, "r", "20"); advance.repay(2, repayment); advance.requireRepaymentReview(3, repayment.id()); var held = advance.state();
+        advance.requireRepaymentReview(4, repayment.id()); assertThat(advance.state()).isEqualTo(held);
         fails("ADVANCE_REPAYMENT_REVIEW_REQUIRED", () -> advance.settle(4, use));
         fails("ADVANCE_REPAYMENT_REVIEW_REQUIRED", () -> advance.repay(4, repayment(advance, "next", "1")));
         advance.requirePaymentReview(4);
@@ -78,9 +78,9 @@ class AdvanceRepaymentTest {
     @Test
     void legacySnapshotsDefaultToNoRepaymentButDuplicateAndOverdrawnSnapshotsFail() {
         var advance = advance(); var s = advance.state(); var entry = repayment(advance, "r", "60").entry();
-        assertThat(EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 1, false, null, false)).state()).isEqualTo(s);
-        fails("INVALID_ADVANCE", () -> EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 2, false, List.of(entry, entry), false)));
-        fails("INSUFFICIENT_FINANCIAL_BALANCE", () -> EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 2, false, List.of(entry, repayment(advance, "r2", "41").entry()), false)));
+        assertThat(EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 1, false, null, false, null, null)).state()).isEqualTo(s);
+        fails("INVALID_ADVANCE", () -> EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 2, false, List.of(entry, entry), false, null, null)));
+        fails("INSUFFICIENT_FINANCIAL_BALANCE", () -> EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 2, false, List.of(entry, repayment(advance, "r2", "41").entry()), false, null, null)));
     }
     private static EmployeeAdvance advance() { return new EmployeeAdvance(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", money("100"), "payment-original", LocalDate.parse("2026-09-01"), LocalDate.parse("2026-10-01")); }
     private static AdvanceRepayment repayment(EmployeeAdvance advance, String reference, String amount) {

@@ -1,0 +1,105 @@
+{
+  "stage": "advance repayment review and actual full return",
+  "date": "2026-09-29",
+  "localOnly": true,
+  "migration": "V56",
+  "domainScopeTests": 37,
+  "h2ServerScopeTests": 200,
+  "postgresScopeTests": 92,
+  "frontendScopeTests": 70,
+  "scopesOverlap": true,
+  "javaAuthorCheck": {
+    "files": 714,
+    "namedTypes": 1293,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "openapi": {
+    "operations": 171,
+    "schemas": 309,
+    "requestExamples": 59
+  },
+  "actualHttp": {
+    "initialRequestsIncludingLogins": 55,
+    "finalReadRequestsIncludingLogins": 5,
+    "checks": [
+      "unresolved_freezes_only_original_without_changing_debt",
+      "explicit_confirmation_same_original_no_money_change_and_exact_replay",
+      "actual_return_preserves_gross_and_reopens_debt_once",
+      "ordinary_reversed_original_query_does_not_refreeze_accepted_return"
+    ],
+    "businessResponsesSchemaValidated": 53
+  },
+  "browser": {
+    "result": "PASS",
+    "advanceId": "16361344-85c2-4c30-b3e5-16af04216141",
+    "repaymentId": "b9c92e3c-81c3-4b91-8718-155f82b7505e",
+    "adoptedExternalRevision": 5,
+    "evidenceReference": "UI-REPAYMENT-BROWSER-003",
+    "status": "PARTIALLY_SETTLED",
+    "receivedRepayments": "300.00",
+    "returnedRepayments": "100.00",
+    "netRepaid": "200.00",
+    "outstanding": "100.00",
+    "actualReturnCount": 1,
+    "repaymentRecords": 2,
+    "confirmationScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-review-browser-confirm.png",
+    "balanceScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-review-browser-balance.png",
+    "resolvedScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-review-browser-resolved.png",
+    "narrowScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-review-browser-narrow.png",
+    "layout": {
+      "columns": "378.667px",
+      "cssViewportWidth": 500,
+      "documentWidth": 500,
+      "reviewScrollWidth": 411,
+      "reviewWidth": 411
+    },
+    "widthNote": "Requested 375 device pixels; actual CSS viewport was 500 pixels. Verified one column and no horizontal overflow."
+  },
+  "database": {
+    "migration": "56",
+    "decisions": 3,
+    "decisionAudits": 3,
+    "actualReturns": 1,
+    "repaymentRecords": 2,
+    "advanceVersion": 13
+  },
+  "backup": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v56.dump",
+    "bytes": 519272
+  },
+  "immutableEvidenceUnchanged": [
+    "paymentState",
+    "repayments",
+    "vouchers",
+    "oldBalanceRevisions",
+    "payment-ui-synthetic-commands.json",
+    "voucher-ui-synthetic-commands.json",
+    "advance-repayment-ui-originals.json"
+  ],
+  "regressions": {
+    "acceptedReturnOrdinaryQuery": {
+      "red": "repayment-review-integration-red.log",
+      "green": "repayment-review-integration-green.log"
+    },
+    "sourceRevisionRegression": {
+      "red": "repayment-review-regression-red.log",
+      "green": "repayment-review-regression-green.log"
+    },
+    "writePermissionRevoked": {
+      "red": "repayment-review-web-red.log",
+      "green": "repayment-review-web-final.log"
+    },
+    "parentStaleQueryAfterResolution": {
+      "red": "repayment-review-parent-red.log",
+      "green": "repayment-review-web-final.log"
+    }
+  },
+  "limitations": [
+    "Funds and ERP services are synthetic loopback services, not enterprise acceptance.",
+    "Partial returns and original disbursement/voucher reversals remain separate financial work.",
+    "No Git remote, PR or remote CI."
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "testDatabaseManifest": "/fyoung/tmp/agentflow-remaining-20260928/repayment-review-postgres-databases.json"
+}

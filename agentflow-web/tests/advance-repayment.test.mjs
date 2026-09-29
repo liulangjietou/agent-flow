@@ -11,7 +11,7 @@ const clone = value => JSON.parse(JSON.stringify(value)), settle = () => new Pro
 const money = value => ({ value, currency: 'CNY' }), binding = () => ({ applicationId: 'application', advanceId: 'advance', roundNo: 1 })
 function view() {
   const at = new Date(Date.now() - 5000).toISOString()
-  return { ...binding(), balance: { version: 1, status: 'PAID_OUT', paid: money('100.00'), available: money('100.00'), reserved: money('0.00'), offset: money('0.00'), repaid: money('0.00'), outstanding: money('100.00') }, canQuery: true,
+  return { ...binding(), balance: { version: 1, status: 'PAID_OUT', paid: money('100.00'), available: money('100.00'), reserved: money('0.00'), offset: money('0.00'), repaid: money('0.00'), outstanding: money('100.00'), receivedRepayments: money('0.00'), returnedRepayments: money('0.00') }, canQuery: true,
     latestCheck: { id: 'check', version: 3, status: 'CHECKED', receiptReference: 'receipt-original', requestedAt: at, updatedAt: at, issue: null, canRecord: true, confirmationIssue: null,
       evidence: { status: 'CONFIRMED', revision: 1, observedAt: at, validUntil: new Date(Date.parse(at) + 300000).toISOString(), funding: { channel: 'BANK_TRANSFER', transactionReference: 'bank-original', amount: money('25.00'), receivedAt: at }, posting: { voucherReference: 'erp-original', entryReference: 'row-1', amount: money('25.00'), accountingDate: at.slice(0, 10), postedAt: at } } }, records: [], nextBeforeId: null }
 }
@@ -112,10 +112,29 @@ test('未知提交结果使用同一个幂等键恢复，恢复后必须刷新�
 
 test('翻页失去字段权限立即清空已显示的收款记录和余额', async () => {
   const page = view(), at = page.latestCheck.updatedAt
-  page.records = Array.from({ length: 25 }, (_, index) => ({ id: `record-${index}`, receiptReference: `REF-${index}`, channel: 'CASH', amount: money('1.00'), receivedAt: at, voucherReference: `ERP-${index}`, entryReference: '1', accountingDate: at.slice(0, 10), postedAt: at, recordedBy: 'finance', recordedAt: at }))
-  page.nextBeforeId = 'record-24'; page.balance.status = 'PARTIALLY_SETTLED'; page.balance.repaid = money('25.00'); page.balance.outstanding = money('75.00'); page.balance.available = money('75.00')
+  page.records = Array.from({ length: 25 }, (_, index) => ({ id: `record-${index}`, receiptReference: `REF-${index}`, channel: 'CASH', amount: money('1.00'), receivedAt: at, voucherReference: `ERP-${index}`, entryReference: '1', accountingDate: at.slice(0, 10), postedAt: at, recordedBy: 'finance', recordedAt: at, reviewRequired: false, returned: null }))
+  page.nextBeforeId = 'record-24'; page.balance.status = 'PARTIALLY_SETTLED'; page.balance.repaid = money('25.00'); page.balance.receivedRepayments = money('25.00'); page.balance.outstanding = money('75.00'); page.balance.available = money('75.00')
   api.advanceRepayments = async (id, round, before) => { if (before) throw { status: 403, code: 'FORBIDDEN' }; return page }
   const item = mount()
   try { await settle(); assert.equal(item.state.records.length, 25); await item.state.load(true); assert.equal(item.state.view, null); assert.deepEqual(item.state.records, []) }
   finally { item.close() }
+})
+
+
+test('提交时失去字段权限立即撤下余额、原收款及确认表单', async () => {
+  api.advanceRepayments = async () => view(); api.recordAdvanceRepayment = async () => { throw { status: 403, code: 'FORBIDDEN' } }; const item = mount()
+  try {
+    await settle(); item.state.prepare('RECORD'); item.state.comment = '失权前原材料'; await item.state.execute()
+    assert.equal(item.state.view, null); assert.deepEqual(item.state.records, []); assert.equal(item.state.pending, null); assert.equal(item.state.comment, '')
+  } finally { item.close() }
+})
+
+test('逐笔复核更新余额后撤下父面板旧查询与待提交表单，明确要求刷新', async () => {
+  api.advanceRepayments = async () => view(); const item = mount()
+  try {
+    await settle(); item.state.selectedRepayment = 'repayment'; item.state.prepare('QUERY'); item.state.reference = 'old'; item.state.comment = '旧材料'
+    item.state.reviewRefreshed({ advanceId: 'advance', balance: { ...view().balance, version: 2 }, original: { id: 'repayment' } })
+    assert.equal(item.state.view.latestCheck, null); assert.equal(item.state.pending, null); assert.equal(item.state.reference, ''); assert.equal(item.state.comment, '')
+    assert.equal(item.state.requiresRefresh, true); assert.match(item.state.notice, /刷新还款记录/)
+  } finally { item.close() }
 })
