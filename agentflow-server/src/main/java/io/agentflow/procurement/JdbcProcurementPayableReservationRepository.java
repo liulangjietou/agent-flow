@@ -68,6 +68,35 @@ public class JdbcProcurementPayableReservationRepository {
         append(value);
     }
 
+    /** 实际 ERP 终态与当前无争议银行修订一起核对，再原子保存完成依据和本地占用第二版。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ProcurementPayableReservation complete(SupplierPayableSettlementOperation operation, SupplierPaymentOperation bank, Instant now) {
+        var command = operation.command(); var original = command.payment().holdCommand().authorization().source().reservation(); var tenant = command.tenantId();
+        requests.lock(tenant, original.source().requestId());
+        var before = find(tenant, original.id()).orElseThrow(JdbcProcurementPayableReservationRepository::conflict);
+        if (!matchesBank(operation, bank, now) || !original.equals(before)) throw conflict();
+        var saved = jdbc.query("""
+                SELECT o.state_json AS settlement_json,b.state_json AS bank_json FROM supplier_payable_settlement_operation o
+                JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
+                JOIN supplier_payable_settlement_revision r ON r.tenant_id=o.tenant_id AND r.operation_id=o.id AND r.version=o.version
+                JOIN supplier_payment_revision p ON p.tenant_id=b.tenant_id AND p.operation_id=b.id AND p.version=b.version
+                WHERE o.tenant_id=? AND o.id=? AND o.version=? AND o.status='SETTLED' AND o.retired_version IS NULL AND o.active_payment_id=b.id
+                AND o.command_json=? AND o.command_digest=? AND b.version=? AND b.status='SUCCEEDED' AND b.command_json=? AND b.command_digest=?
+                AND r.state_json=o.state_json AND p.state_json=b.state_json
+                """, (row, index) -> operation.equals(json.read(row.getString("settlement_json"), SupplierPayableSettlementOperation.class))
+                        && bank.equals(json.read(row.getString("bank_json"), SupplierPaymentOperation.class)), tenant, command.id().toString(), operation.version(),
+                json.write(command), command.digest(), bank.version(), json.write(bank.command()), bank.command().digest());
+        if (saved.size() != 1 || !saved.get(0)) throw conflict();
+        var value = before.settle(operation, now);
+        jdbc.update("INSERT INTO supplier_settlement_completion(tenant_id,reservation_id,operation_id,operation_version,payment_id,payment_version,completed_at) VALUES(?,?,?,?,?,?,?)",
+                tenant, before.id().toString(), command.id().toString(), operation.version(), bank.command().id().toString(), bank.version(), Timestamp.from(now));
+        int changed = jdbc.update("""
+                UPDATE procurement_payable_reservation SET version=2,state_json=?,settled_at=?,settlement_id=?,settlement_version=?,active_request_id=NULL,active_payable_reference=NULL
+                WHERE tenant_id=? AND id=? AND version=1
+                """, json.write(value), Timestamp.from(now), command.id().toString(), operation.version(), tenant, value.id().toString());
+        if (changed != 1) throw conflict(); append(value); return value;
+    }
+
     /** 当前申请只能有一笔未释放占用，保留中的旧轮次也必须先显式处理。 */
     public Optional<ProcurementPayableReservation> active(String tenant, UUID requestId) {
         return jdbc.query("SELECT * FROM procurement_payable_reservation WHERE tenant_id=? AND active_request_id=?", this::restore,
@@ -95,7 +124,37 @@ public class JdbcProcurementPayableReservationRepository {
                 || !Objects.equals(value.release() == null ? null : value.release().releasedAt(), instant(row.getTimestamp("released_at")))) {
             throw new IllegalStateException("Persisted procurement payable reservation binding is inconsistent");
         }
+        if (value.settlement() != null) {
+            var proof = value.settlement();
+            if (!proof.completedAt().equals(instant(row.getTimestamp("settled_at"))) || !proof.operationId().toString().equals(row.getString("settlement_id"))
+                    || proof.operationVersion() != row.getLong("settlement_version")) throw conflict();
+            requireCompletion(value);
+        }
         return value;
+    }
+    private void requireCompletion(ProcurementPayableReservation value) {
+        var proof = value.settlement();
+        var evidence = jdbc.query("""
+                SELECT c.*,o.state_json AS settlement_json,b.state_json AS bank_json FROM supplier_settlement_completion c
+                JOIN supplier_payable_settlement_revision o ON o.tenant_id=c.tenant_id AND o.operation_id=c.operation_id AND o.version=c.operation_version
+                JOIN supplier_payment_revision b ON b.tenant_id=c.tenant_id AND b.operation_id=c.payment_id AND b.version=c.payment_version
+                WHERE c.tenant_id=? AND c.reservation_id=?
+                """, (row, index) -> {
+                    var operation = json.read(row.getString("settlement_json"), SupplierPayableSettlementOperation.class);
+                    var bank = json.read(row.getString("bank_json"), SupplierPaymentOperation.class);
+                    return proof.operationId().toString().equals(row.getString("operation_id")) && proof.operationVersion() == row.getLong("operation_version")
+                            && proof.paymentId().toString().equals(row.getString("payment_id")) && bank.version() == row.getLong("payment_version")
+                            && proof.completedAt().equals(instant(row.getTimestamp("completed_at"))) && matchesBank(operation, bank, proof.completedAt())
+                            && operation.command().payment().holdCommand().authorization().source().reservation().settle(operation, proof.completedAt()).equals(value);
+                }, value.source().tenantId(), value.id().toString());
+        if (evidence.size() != 1 || !evidence.get(0)) throw conflict();
+    }
+    private static boolean matchesBank(SupplierPayableSettlementOperation operation, SupplierPaymentOperation bank, Instant completedAt) {
+        if (!operation.settled() || bank == null || !bank.settleable() || !bank.command().equals(operation.command().payment())
+                || bank.version() < operation.command().paymentVersion() || completedAt == null || completedAt.isBefore(bank.updatedAt())) return false;
+        var registered = operation.command().paid(); var current = bank.observation();
+        return registered.paymentReference().equals(current.paymentReference()) && registered.paidAmount().equals(current.paidAmount())
+                && registered.accountDigest().equals(current.accountDigest()) && registered.completedAt().equals(current.completedAt()) && registered.receiptReference().equals(current.receiptReference());
     }
     private void append(ProcurementPayableReservation value) {
         jdbc.update("INSERT INTO procurement_payable_reservation_revision(tenant_id,reservation_id,version,state_json) VALUES(?,?,?,?)",

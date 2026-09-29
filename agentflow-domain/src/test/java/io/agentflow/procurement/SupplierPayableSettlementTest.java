@@ -172,9 +172,9 @@ class SupplierPayableSettlementTest {
                 REGISTERED, REGISTERED, REGISTERED, null, null, absent(command, REGISTERED), null, 0, null)).isInstanceOf(DomainException.class);
     }
 
-    private static SupplierPayableSettlementCommand command(SupplierPaymentOperation bank, Instant now) { return SupplierPayableSettlementCommand.register(SETTLEMENT_ID, bank, verified(bank, now), period(bank.command(), now), "finance", now); }
+    static SupplierPayableSettlementCommand command(SupplierPaymentOperation bank, Instant now) { return SupplierPayableSettlementCommand.register(SETTLEMENT_ID, bank, verified(bank, now), period(bank.command(), now), "finance", now); }
     static SupplierPayableSettlementOperation sending() { var command = command(bank(), REGISTERED); return SupplierPayableSettlementOperation.queue(command, REGISTERED).claim(REGISTERED, LEASE).readyToSend(evidence(command, REGISTERED), REGISTERED); }
-    private static SupplierPayableSettlementEvidence evidence(SupplierPayableSettlementCommand command, Instant now) { return SupplierPayableSettlementEvidence.checked(command, held(command.payment().holdCommand(), now), paid(command.payment(), now), period(command.payment(), now), now); }
+    static SupplierPayableSettlementEvidence evidence(SupplierPayableSettlementCommand command, Instant now) { return SupplierPayableSettlementEvidence.checked(command, held(command.payment().holdCommand(), now), paid(command.payment(), now), period(command.payment(), now), now); }
     private static PaymentObservation verified(SupplierPaymentOperation bank, Instant now) { return paid(bank.command(), now); }
     private static PaymentObservation paid(SupplierPaymentCommand payment, Instant now) { return new PaymentObservation(payment.id(), payment.digest(), PaymentObservation.Status.SUCCEEDED, 1L, now, "bank-1", payment.amount(), payment.payee().accountDigest(), AUTHORIZED_AT.plusSeconds(6), "receipt-1", null); }
     private static AccountingPeriodPort.OpenPeriod period(SupplierPaymentCommand payment, Instant now) {
@@ -190,7 +190,7 @@ class SupplierPayableSettlementTest {
         Money amount = command.payment().amount(); return new SupplierPayableSettlementObservation.Posting("settlement-1", hold, "ledger-2", amount, money(before), money(before).plus(amount), bank, receipt, "voucher-1", "period-1", day, REGISTERED);
     }
     private static SupplierPayableSettlementObservation absent(SupplierPayableSettlementCommand command, Instant now) { return new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.NOT_FOUND, 0L, now, null, null); }
-    private static SupplierPaymentOperation bank() {
+    static SupplierPaymentOperation bank() {
         var holdCommand = new SupplierPayableHoldCommand(authorization()); var now = AUTHORIZED_AT.plusSeconds(5);
         var original = SupplierPayableHoldOperation.queue(holdCommand, AUTHORIZED_AT).claim(AUTHORIZED_AT, LEASE).complete(new FinanceResult.Success<>(held(holdCommand, now)), now);
         var directory = new PaymentAccountsPort.Directory(new PaymentAccountsPort.Request(holdCommand.authorization().payable().request().legalEntityId(), "CNY", "cashier"), "v1", now, now.plusSeconds(600), List.of(DEBIT));
