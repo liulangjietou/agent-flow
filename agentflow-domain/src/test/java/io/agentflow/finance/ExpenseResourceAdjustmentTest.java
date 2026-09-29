@@ -104,6 +104,9 @@ class ExpenseResourceAdjustmentTest {
         var matching = new ExpensePaymentReturns(original.request(), original.version(), List.of(new ExpensePaymentReturns.Entry(UUID.randomUUID(), returned)), true, original.createdAt(), original.updatedAt());
         var confirmed = new ExpenseResourceAdjustmentBasis(basis.settlement(), basis.consumption(), basis.accrualReversal(), matching, reversed, record);
         assertThat(confirmed.paymentReturns().totalReturned()).isEqualTo(basis.settlement().input().payable());
+        var later = reversed.requestQuery(NOW.minusSeconds(3)).claim(NOW.minusSeconds(3), Duration.ofSeconds(30))
+                .complete(new FinanceResult.Success<>(voucherObservation(voucher.input().command(), VoucherObservation.Status.REVERSED, 3, NOW.minusSeconds(3))), NOW.minusSeconds(3));
+        assertThatCode(() -> new ExpenseResourceAdjustmentBasis(basis.settlement(), basis.consumption(), basis.accrualReversal(), matching, later, record)).doesNotThrowAnyException();
     }
 
     @Test void paymentAccountingCannotUseAnotherPayableAccountEvenWhenTotalsBalance() {
@@ -130,7 +133,7 @@ class ExpenseResourceAdjustmentTest {
                 NOW.plusSeconds(1), 3L, "budget-reversal", command.period().periodReference(), command.period().request().accountingDate(), NOW.plusSeconds(1), null);
         return BudgetConsumptionReversalOperation.queue(input, NOW).claim(NOW, Duration.ofSeconds(30)).complete(new FinanceResult.Success<>(receipt), NOW.plusSeconds(1));
     }
-    private ExpenseResourceAdjustmentBasis basis(boolean zeroPayable) {
+    ExpenseResourceAdjustmentBasis basis(boolean zeroPayable) {
         var voucher = voucher(zeroPayable); var binding = voucher.binding(); var total = voucher.totals();
         var source = new VoucherPreparation.Source(voucher.tenantId(), BusinessReference.Type.EXPENSE, binding.businessId(), binding.applicationId(), binding.roundNo(), binding.applicationVersion(), binding.businessVersion(), voucher.employeeId());
         var position = new BudgetPrecheckPort.Request(binding.businessId(), binding.roundNo(), binding.businessVersion(), voucher.employeeId(), voucher.legalEntityId(), "CNY", voucher.accountingDate(),

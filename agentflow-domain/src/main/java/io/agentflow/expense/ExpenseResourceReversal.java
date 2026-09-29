@@ -6,6 +6,7 @@ import io.agentflow.finance.ReservedAmount;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import static io.agentflow.expense.ExpenseSubmissionResources.*;
@@ -22,38 +23,59 @@ public final class ExpenseResourceReversal {
                 || round.adjustments().stream().anyMatch(value -> at.isBefore(value.adjustedAt()))) throw conflict();
         var invoices = new ArrayList<InvoiceChange>(); var requests = new ArrayList<PriorChange>(); var advances = new ArrayList<AdvanceChange>();
         var priorValues = new HashMap<UUID, ExpenseRequest>();
-        for (int index = 0; index < round.approvedLines().size(); index++) {
-            var approved = round.approvedLines().get(index);
-            if (approved.gross().value().signum() == 0) continue;
-            var original = round.originalLines().get(index).original();
-            var use = new ExpenseUse(report.id(), round.roundNo(), approved.lineNo());
-            for (var id : original.invoiceIds()) {
-                var invoice = Invoice.restore(require(resources.invoices(), id));
-                if (invoice.facts() == null) throw conflict();
-                owner(report, invoice.tenantId(), invoice.ownerId(), invoice.facts().legalEntityId());
-                invoice.reverseConsumption(invoice.version(), use, adjustmentId, at);
-                invoices.add(new InvoiceChange(invoice.state(), Operation.REVERSE_CONSUMPTION));
+        for (var required : requirements(report)) {
+            switch (required.kind()) {
+                case INVOICE -> {
+                    var invoice = Invoice.restore(require(resources.invoices(), required.resourceId()));
+                    if (invoice.facts() == null) throw conflict();
+                    owner(report, invoice.tenantId(), invoice.ownerId(), invoice.facts().legalEntityId());
+                    invoice.reverseConsumption(invoice.version(), required.use(), adjustmentId, at);
+                    invoices.add(new InvoiceChange(invoice.state(), Operation.REVERSE_CONSUMPTION));
+                }
+                case PRIOR_REQUEST -> {
+                    var request = priorValues.computeIfAbsent(required.resourceId(), id -> ExpenseRequest.restore(require(resources.requests(), id)));
+                    owner(report, request.tenantId(), request.employeeId(), request.legalEntityId());
+                    consumed(request.balance(required.sourceLine()), required.use(), required.amount());
+                    request.reverseConsumption(request.version(), required.sourceLine(), required.use(), adjustmentId, at);
+                    requests.add(new PriorChange(request.state(), Operation.REVERSE_CONSUMPTION));
+                }
+                case ADVANCE -> {
+                    var advance = EmployeeAdvance.restore(require(resources.advances(), required.resourceId()));
+                    owner(report, advance.tenantId(), advance.employeeId(), advance.legalEntityId());
+                    consumed(advance.balance(), required.use(), required.amount());
+                    advance.reverseOffset(advance.version(), required.use(), adjustmentId, at);
+                    advances.add(new AdvanceChange(advance.state(), Operation.REVERSE_CONSUMPTION));
+                }
             }
-            if (original.priorRequest() != null) {
-                var reference = original.priorRequest();
-                var request = priorValues.computeIfAbsent(reference.requestId(), id -> ExpenseRequest.restore(require(resources.requests(), id)));
-                owner(report, request.tenantId(), request.employeeId(), request.legalEntityId());
-                consumed(request.balance(reference.lineNo()), use, approved.gross());
-                request.reverseConsumption(request.version(), reference.lineNo(), use, adjustmentId, at);
-                requests.add(new PriorChange(request.state(), Operation.REVERSE_CONSUMPTION));
-            }
-        }
-        var use = new ExpenseUse(report.id(), round.roundNo(), 0);
-        for (var offset : round.advanceOffsets()) {
-            if (offset.amount().value().signum() == 0) continue;
-            var advance = EmployeeAdvance.restore(require(resources.advances(), offset.advanceId()));
-            owner(report, advance.tenantId(), advance.employeeId(), advance.legalEntityId());
-            consumed(advance.balance(), use, offset.amount());
-            advance.reverseOffset(advance.version(), use, adjustmentId, at);
-            advances.add(new AdvanceChange(advance.state(), Operation.REVERSE_CONSUMPTION));
         }
         return new Plan(invoices, requests, advances);
     }
+
+    /** 计划执行与持久化完成检查共同采用原冻结轮次的精确资源集合。 */
+    public List<Consumption> requirements(ExpenseReport report) {
+        var round = report.requireFrozenRound(); var result = new ArrayList<Consumption>();
+        for (int index = 0; index < round.approvedLines().size(); index++) {
+            var approved = round.approvedLines().get(index); if (approved.gross().value().signum() == 0) continue;
+            var original = round.originalLines().get(index).original(); var use = new ExpenseUse(report.id(), round.roundNo(), approved.lineNo());
+            for (var id : original.invoiceIds()) result.add(new Consumption(Kind.INVOICE, id, 0, use, null));
+            if (original.priorRequest() != null) result.add(new Consumption(Kind.PRIOR_REQUEST, original.priorRequest().requestId(), original.priorRequest().lineNo(), use, approved.gross()));
+        }
+        var use = new ExpenseUse(report.id(), round.roundNo(), 0);
+        for (var offset : round.advanceOffsets()) if (offset.amount().value().signum() > 0) result.add(new Consumption(Kind.ADVANCE, offset.advanceId(), 0, use, offset.amount()));
+        return List.copyOf(result);
+    }
+
+    /**
+     * 业务引用决定资源种类，不接受客户端拼接资源表名。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum Kind { INVOICE, PRIOR_REQUEST, ADVANCE }
+
+    /**
+     * 冲回原核销的完整标识，发票没有单独可编辑金额。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Consumption(Kind kind, UUID resourceId, int sourceLine, ExpenseUse use, Money amount) { }
 
     private static void consumed(ReservedAmount balance, ExpenseUse use, Money amount) {
         if (!balance.consumedAmountFor(use).equals(amount) || balance.reversals().stream().anyMatch(value -> value.use().equals(use))) throw conflict();

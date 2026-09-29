@@ -21,5 +21,13 @@ public record VoucherReversalRecord(UUID id, String tenantId, UUID checkId, long
     }
     public UUID operationId() { return receipt.request().command().id(); }
     public UUID legalEntityId() { return receipt.request().command().legalEntityId(); }
+    /** 正式登记保留为永久依据；后来的同一原件确认可以增加观察版本，未知或争议不能沿用。 */
+    public boolean stillAppliesTo(VoucherOperation current) {
+        return current != null && current.status() == VoucherOperation.Status.REVERSED
+                && current.input().command().equals(receipt.request().command())
+                // 登记只保存核对结果，不回写原凭证；以当时实际的本地修订作为后续读取下界。
+                && current.version() >= operationVersion
+                && receipt.request().matchesOriginal(current.observation());
+    }
     @Override public String toString() { return "VoucherReversalRecord[id=" + id + ", operationId=" + operationId() + "]"; }
 }

@@ -101,6 +101,12 @@ public record BudgetConsumptionReversalOperation(Input input, long version, Stat
     }
     public boolean running() { return status == Status.EXECUTING || status == Status.QUERYING; }
     public boolean expired(Instant now) { return running() && !leaseUntil.isAfter(now); }
+    /** 只有从未发送或明确无副作用的拒绝可以结束占用；未知、查无和矛盾继续保留。 */
+    public boolean safelyUnexecuted() {
+        if (conflictingObservation != null) return false;
+        return attempts == 0 && observation == null && (status == Status.QUEUED || status == Status.EXPIRED || status == Status.VOIDED)
+                || status == Status.REJECTED;
+    }
     private BudgetConsumptionReversalOperation changed(Status next, Instant at, Instant nextAt, BudgetConsumptionReversalObservation accepted,
             BudgetConsumptionReversalObservation disputed, Failure issue) {
         requireTime(at);

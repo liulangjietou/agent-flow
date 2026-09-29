@@ -90,8 +90,7 @@ public record ExpenseResourceAdjustmentBasis(ExpenseSettlement settlement, Budge
             if (reversal != null) throw changed();
             return;
         }
-        if (voucher.status() != VoucherOperation.Status.REVERSED || reversal == null
-                || !command.equals(reversal.receipt().request().command()) || !reversal.receipt().matchesCurrent(voucher.observation())) throw changed();
+        if (reversal == null || !reversal.stillAppliesTo(voucher)) throw changed();
         // 付款凭证已反向过账时，只能采用同一批应付贷方作为银行退回证明，另记一批会把资金冲销两次。
         var posting = reversal.receipt().reversal();
         var credits = posting.lines().stream().filter(line -> line.side() == VoucherCommand.Side.CREDIT).toList();

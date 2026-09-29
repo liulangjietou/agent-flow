@@ -187,6 +187,11 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcExpensePaymentReturnsRepository expenseReturnLedgers;
     @Autowired JdbcExpensePaymentReturnRepository expenseReturnRegistrations;
     @Autowired ExpenseSettlementSources settlementSources;
+    @Autowired ExpenseResourceAdjustmentSources resourceAdjustmentSources;
+    @Autowired JdbcExpenseResourceAdjustmentPreparationRepository resourcePreparations;
+    @Autowired JdbcExpenseResourceAdjustmentRepository resourceAdjustments;
+    @Autowired JdbcBudgetConsumptionReversalRepository budgetReversals;
+    @Autowired AccountingPeriodPort accountingPeriods;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
@@ -200,6 +205,16 @@ class ExpenseSubmissionIntegrationTest {
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
+            String adjustments = "SELECT id FROM expense_resource_adjustment WHERE tenant_id='demo' AND report_id=?";
+            jdbc.update("DELETE FROM finance_consumption_reversal WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_resource_adjustment_retirement WHERE tenant_id='demo' AND adjustment_id IN (" + adjustments + ")", report.toString());
+            jdbc.update("UPDATE expense_resource_adjustment SET budget_reversal_version=NULL,resources_reversed=FALSE,status='WAITING_BUDGET',active_report_id=report_id,issue=NULL WHERE tenant_id='demo' AND report_id=? AND budget_reversal_version IS NOT NULL", report.toString());
+            jdbc.update("DELETE FROM budget_consumption_reversal_operation_revision WHERE tenant_id='demo' AND operation_id IN (" + adjustments + ")", report.toString());
+            jdbc.update("DELETE FROM budget_consumption_reversal_operation WHERE tenant_id='demo' AND id IN (" + adjustments + ")", report.toString());
+            jdbc.update("DELETE FROM expense_resource_adjustment_revision WHERE tenant_id='demo' AND adjustment_id IN (" + adjustments + ")", report.toString());
+            jdbc.update("DELETE FROM expense_resource_adjustment WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_resource_adjustment_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM expense_resource_adjustment_preparation WHERE tenant_id='demo' AND report_id=?)", report.toString());
+            jdbc.update("DELETE FROM expense_resource_adjustment_preparation WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", report.toString());
             jdbc.update("DELETE FROM expense_payment_return_registration WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_payment_return_check_revision WHERE tenant_id='demo' AND check_id IN (SELECT id FROM expense_payment_return_check WHERE tenant_id='demo' AND report_id=?)", report.toString());
@@ -1298,6 +1313,90 @@ class ExpenseSubmissionIntegrationTest {
         } finally { pool.shutdownNow(); }
         assertThat(expenseReturnRegistrations.history("demo", report.id())).hasSize(1); assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries()).hasSize(1);
     }
+
+    @Test void resourceAdjustmentAuthorizationAndBudgetCommandCommitTogetherFromActualOriginalSources() throws Exception {
+        var report = resourceAdjustmentReport(); var sources = resourceAdjustmentSources.find("demo", report.id()); var versions = resourceVersions(report);
+        var prepared = readyResourceAdjustment(report); var id = prepared.input().id();
+        assertThat(resourcePreparations.find("demo", id)).contains(prepared); assertThat(resourcePreparations.find("other", id)).isEmpty();
+        assertThat(resourceAdjustments.active("demo", report.id())).isEmpty(); assertThat(budgetReversals.find("demo", id)).isEmpty();
+        assertThatThrownBy(() -> tx().execute(status -> { authorizeResourceAdjustment(prepared); throw new IllegalStateException("Synthetic adjustment authorization rollback"); }))
+                .hasMessageContaining("Synthetic adjustment authorization rollback");
+        assertThat(resourcePreparations.find("demo", id)).contains(prepared); assertThat(resourceAdjustments.find("demo", id)).isEmpty(); assertThat(budgetReversals.find("demo", id)).isEmpty();
+        var adjustment = authorizeResourceAdjustment(prepared);
+        assertThat(resourceAdjustments.find("demo", id)).contains(adjustment); assertThat(budgetReversals.find("demo", id).orElseThrow().input()).isEqualTo(adjustment.input().budget());
+        assertThat(resourcePreparations.revision("demo", id, prepared.version() + 1).orElseThrow().status()).isEqualTo(ExpenseResourceAdjustmentPreparation.Status.AUTHORIZED);
+        assertThatThrownBy(() -> authorizeResourceAdjustment(prepared)).isInstanceOf(io.agentflow.common.DomainException.class);
+        var another = readyResourceAdjustment(report);
+        assertThatThrownBy(() -> authorizeResourceAdjustment(another)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(resourcePreparations.find("demo", another.input().id())).contains(another); assertThat(budgetReversals.find("demo", another.input().id())).isEmpty();
+        assertThat(resourceAdjustmentSources.find("demo", report.id())).isEqualTo(sources); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    @Test void resourceAdjustmentCannotCompleteWithOnlyABudgetReceiptOrAnUnpersistedBudgetRevision() throws Exception {
+        var report = resourceAdjustmentReport(); var versions = resourceVersions(report); var adjustment = authorizeResourceAdjustment(readyResourceAdjustment(report));
+        var queued = budgetReversals.find("demo", adjustment.id()).orElseThrow(); var at = adjustmentTime();
+        var claimed = queued.claim(at, java.time.Duration.ofSeconds(30)); var command = claimed.input().command();
+        var receipt = new BudgetConsumptionReversalObservation(command.id(), command.digest(), BudgetConsumptionReversalObservation.Status.APPLIED, at,
+                command.consumed().ledgerRevision() + 1, "resource-budget-return", command.period().periodReference(), command.period().request().accountingDate(), at, null);
+        var completed = claimed.complete(new FinanceResult.Success<>(receipt), at); var ready = adjustment.budgetApplied(completed, at);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> resourceAdjustments.update(ready))).isInstanceOf(io.agentflow.common.DomainException.class);
+        tx().executeWithoutResult(status -> { budgetReversals.update(claimed); budgetReversals.update(completed); resourceAdjustments.update(ready); });
+        assertThat(resourceAdjustments.find("demo", adjustment.id())).contains(ready);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> resourceAdjustments.update(ready.applied(adjustmentTime())))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(resourceAdjustments.find("demo", adjustment.id())).contains(ready); assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThat(resourceAdjustments.revision("demo", adjustment.id(), 1)).contains(adjustment);
+    }
+
+    @Test void resourceAdjustmentRetirementRollsBackAtomicallyAndPreservesOldAuthorizationForANewPreparation() throws Exception {
+        var report = resourceAdjustmentReport(); var adjustment = authorizeResourceAdjustment(readyResourceAdjustment(report)); var versions = resourceVersions(report);
+        var queued = budgetReversals.find("demo", adjustment.id()).orElseThrow(); var at = adjustmentTime(); var stopped = queued.voidBeforeSend(at);
+        var decision = new ExpenseResourceAdjustmentRetirement(adjustment, stopped, "finance", "retirement-proof", "结束未发送调整后重新准备", at);
+        assertThatThrownBy(() -> tx().execute(status -> { budgetReversals.update(stopped); resourceAdjustments.retire(decision); throw new IllegalStateException("Synthetic adjustment retirement rollback"); }))
+                .hasMessageContaining("Synthetic adjustment retirement rollback");
+        assertThat(budgetReversals.find("demo", adjustment.id())).contains(queued); assertThat(resourceAdjustments.active("demo", report.id())).contains(adjustment);
+        assertThat(resourceAdjustments.retirement("demo", adjustment.id())).isEmpty();
+        tx().executeWithoutResult(status -> { budgetReversals.update(stopped); resourceAdjustments.retire(decision); });
+        assertThat(resourceAdjustments.active("demo", report.id())).isEmpty(); assertThat(resourceAdjustments.retirement("demo", adjustment.id())).contains(decision);
+        assertThat(resourceAdjustments.find("demo", adjustment.id())).contains(decision.after());
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> budgetReversals.update(stopped.requestQuery(adjustmentTime())))).isInstanceOf(io.agentflow.common.DomainException.class);
+        var replacement = authorizeResourceAdjustment(readyResourceAdjustment(report));
+        assertThat(resourceAdjustments.history("demo", report.id())).containsExactly(decision.after(), replacement); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    @Test void resourceAdjustmentUnknownBudgetResultCannotReleaseItsActiveReportClaim() throws Exception {
+        var report = resourceAdjustmentReport(); var adjustment = authorizeResourceAdjustment(readyResourceAdjustment(report));
+        var queued = budgetReversals.find("demo", adjustment.id()).orElseThrow(); var at = adjustmentTime(); var claimed = queued.claim(at, java.time.Duration.ofSeconds(30));
+        var unknown = claimed.unavailable(BudgetConsumptionReversalOperation.Failure.TIMEOUT, at);
+        tx().executeWithoutResult(status -> { budgetReversals.update(claimed); budgetReversals.update(unknown); });
+        assertThatThrownBy(() -> new ExpenseResourceAdjustmentRetirement(adjustment, unknown, "finance", "timeout-proof", "未知不证明未执行", adjustmentTime())).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(resourceAdjustments.active("demo", report.id())).contains(adjustment); assertThat(budgetReversals.due(unknown.nextAttemptAt())).anyMatch(value -> value.id().equals(adjustment.id()));
+    }
+
+    private ExpenseReport resourceAdjustmentReport() throws Exception {
+        var report = archiveReadyExpense(); var payment = paymentOperations.find("demo", settlements.find("demo", report.id()).orElseThrow().input().payment().operationId()).orElseThrow();
+        paymentMode = "REVERSED"; tx().executeWithoutResult(status -> paymentExecution.query("demo", payment.input().command().id(), payment.version(), Instant.now())); paymentWorker.poll();
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, UUID.randomUUID().toString(), "50"));
+        registerExpenseReturn(report, queryExpenseReturn(report));
+        var accrual = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var checked = checkedReversal(report, accrual);
+        ok(send(reversalPath(accrual) + "/records", "finance", reversalRecordInput(report, accrual, checked)), 202); return current(report);
+    }
+    private ExpenseResourceAdjustmentPreparation readyResourceAdjustment(ExpenseReport report) {
+        var basis = resourceAdjustmentSources.find("demo", report.id());
+        var prepared = ExpenseResourceAdjustmentPreparation.queue(new ExpenseResourceAdjustmentPreparation.Input(UUID.randomUUID(), basis, LocalDate.now(), "finance", "full-cancellation", "完整取消已核销报销", adjustmentTime()));
+        tx().executeWithoutResult(status -> resourcePreparations.create(prepared)); var claimed = prepared.claim(adjustmentTime(), java.time.Duration.ofSeconds(30));
+        tx().executeWithoutResult(status -> resourcePreparations.update(claimed));
+        var period = accountingPeriods.period("demo", basis.consumption().input().targetDigest(), prepared.input().periodRequest());
+        assertThat(period).isInstanceOf(FinanceResult.Success.class); var ready = claimed.ready(((FinanceResult.Success<AccountingPeriodPort.OpenPeriod>) period).value(), adjustmentTime());
+        tx().executeWithoutResult(status -> resourcePreparations.update(ready)); return ready;
+    }
+    private ExpenseResourceAdjustment authorizeResourceAdjustment(ExpenseResourceAdjustmentPreparation prepared) {
+        return tx().execute(status -> {
+            var authorized = prepared.authorize(adjustmentTime()); resourcePreparations.update(authorized);
+            var adjustment = ExpenseResourceAdjustment.begin(authorized.authorizedInput()); resourceAdjustments.create(adjustment, authorized.version());
+            budgetReversals.create(BudgetConsumptionReversalOperation.queue(adjustment.input().budget(), authorized.updatedAt())); return adjustment;
+        });
+    }
+    private static Instant adjustmentTime() { return Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS); }
 
     private ExpensePaymentReturnCheck queueExpenseReturn(ExpenseReport report) {
         var ledger = expenseReturnLedgers.find("demo", report.id()).orElse(null); var settlement = settlements.find("demo", report.id()).orElseThrow();

@@ -32,6 +32,25 @@ class VoucherReversalTest {
         assertThat(receipt.toString()).doesNotContain("alice", "1122", "100.00");
     }
 
+    @Test void registeredReversalAcceptsItsOriginalLocalRevisionAndLaterMatchingQueries() {
+        var request = request(VoucherCommand.Kind.EXPENSE_ACCRUAL); var command = request.command();
+        var posted = VoucherOperation.queue(new VoucherOperation.Input(command, "a".repeat(64)), command.createdAt())
+                .claim(command.createdAt(), Duration.ofSeconds(60)).complete(new FinanceResult.Success<>(request.original()), NOW.minusSeconds(30));
+        var local = posted.requestQuery(NOW.minusSeconds(5)).claim(NOW.minusSeconds(5), Duration.ofSeconds(30))
+                .complete(new FinanceResult.Success<>(observation(command, VoucherObservation.Status.REVERSED, NOW.minusSeconds(5))), NOW.minusSeconds(5));
+        var receipt = verified(request, posting(request));
+        var record = new VoucherReversalRecord(UUID.randomUUID(), command.tenantId(), UUID.randomUUID(), local.version(), receipt, "finance", NOW, "proof", "登记核对期间取得的新证据");
+        assertThat(receipt.matchesCurrent(local.observation())).isTrue();
+        assertThat(record.stillAppliesTo(local)).isTrue();
+        var querying = local.requestQuery(NOW.plusSeconds(1)); assertThat(record.stillAppliesTo(querying)).isFalse();
+        var later = querying.claim(NOW.plusSeconds(1), Duration.ofSeconds(30))
+                .complete(new FinanceResult.Success<>(observation(command, VoucherObservation.Status.REVERSED, NOW.plusSeconds(1))), NOW.plusSeconds(1));
+        assertThat(record.stillAppliesTo(later)).isTrue();
+        var laterRecord = new VoucherReversalRecord(record.id(), record.tenantId(), record.checkId(), later.version(), receipt, "finance", NOW, "proof", "不得读取登记前的旧修订");
+        assertThat(laterRecord.stillAppliesTo(local)).isFalse();
+        assertThat(record.stillAppliesTo(posted)).isFalse(); assertThat(record.stillAppliesTo(null)).isFalse();
+    }
+
     @Test void balancedButDifferentAccountsAmountsDirectionsAndDimensionsFail() {
         var request = request(VoucherCommand.Kind.EXPENSE_ACCRUAL); var good = posting(request); var first = good.lines().get(0);
         List<UnaryOperator<VoucherReversalPort.Line>> changes = List.of(

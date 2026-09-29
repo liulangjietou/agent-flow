@@ -22,6 +22,7 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
                 || !budgetReversal.matches(input.budget().command(), true, updatedAt))) throw invalid();
         if ((status == Status.READY || status == Status.APPLIED || resourcesReversed) && budgetReversal == null
                 || status == Status.WAITING_BUDGET && budgetReversal != null || status == Status.APPLIED && !resourcesReversed
+                || status == Status.RETIRED && (budgetReversal != null || resourcesReversed)
                 || resourcesReversed && status != Status.APPLIED && status != Status.REVIEW_REQUIRED) throw invalid();
         if (status == Status.REVIEW_REQUIRED ? issue == null || !issue.matches("[A-Z][A-Z0-9_]{0,63}") : issue != null) throw invalid();
     }
@@ -48,7 +49,7 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
 
     /** 资金、会计或资源来源变化时留下独立问题；已发生的预算或资源调整保留。 */
     public ExpenseResourceAdjustment requireReview(String code, Instant at) {
-        requireTime(at);
+        requireTime(at); if (status == Status.RETIRED) throw conflict();
         if (status == Status.REVIEW_REQUIRED && Objects.equals(issue, code)) return this;
         return new ExpenseResourceAdjustment(input, version + 1, Status.REVIEW_REQUIRED, budgetReversalVersion, budgetReversal, resourcesReversed, code, createdAt, at);
     }
@@ -61,6 +62,15 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
                 || budgetReversal != null && !sameApplied(budgetReversal, operation.observation())) throw conflict();
         return new ExpenseResourceAdjustment(input, version + 1, Status.READY, budgetReversalVersion == null ? operation.version() : budgetReversalVersion,
                 budgetReversal == null ? operation.observation() : budgetReversal, false, null, createdAt, at);
+    }
+
+    /** 明确结束不会冲回资源或删除历史，只为后续重新准备释放本调整的办理占用。 */
+    public ExpenseResourceAdjustment retire(BudgetConsumptionReversalOperation operation, Instant at) {
+        requireTime(at);
+        if (status == Status.RETIRED || resourcesReversed || budgetReversal != null || !input.budget().equals(operation.input())
+                || !operation.safelyUnexecuted() || operation.status() == BudgetConsumptionReversalOperation.Status.QUEUED
+                || at.isBefore(operation.updatedAt())) throw conflict();
+        return new ExpenseResourceAdjustment(input, version + 1, Status.RETIRED, null, null, false, null, createdAt, at);
     }
 
     public UUID id() { return input.budget().command().adjustmentId(); }
@@ -92,5 +102,5 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
      * 原结算保留冻结，调整完成状态由独立账本呈现。
      * @author owlzhangfq@gmail.com
      */
-    public enum Status { WAITING_BUDGET, READY, APPLIED, REVIEW_REQUIRED }
+    public enum Status { WAITING_BUDGET, READY, APPLIED, REVIEW_REQUIRED, RETIRED }
 }
