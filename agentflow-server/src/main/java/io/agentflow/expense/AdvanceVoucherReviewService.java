@@ -96,5 +96,5 @@ public class AdvanceVoucherReviewService {
         return command.kind() == VoucherCommand.Kind.EMPLOYEE_ADVANCE || command.kind() == VoucherCommand.Kind.PAYMENT
                 && command.payment().command().purpose() == PaymentCommand.Purpose.EMPLOYEE_ADVANCE;
     }
-    private static boolean requiresReview(VoucherOperation voucher) { return voucher.status() == VoucherOperation.Status.REVERSED || voucher.status() == VoucherOperation.Status.RECONCILING; }
+    private static boolean requiresReview(VoucherOperation voucher) { return voucher.reversalId() != null || voucher.status() == VoucherOperation.Status.REVERSED || voucher.status() == VoucherOperation.Status.RECONCILING; }
 }

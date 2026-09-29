@@ -35449,7 +35449,8 @@
                   "STALE_OBSERVATION",
                   "EVIDENCE_EXPIRED",
                   "DIFFERENT_POSTING",
-                  "POSTING_ALREADY_OBSERVED"
+                  "POSTING_ALREADY_OBSERVED",
+                  "REVERSAL_IN_PROGRESS"
                 ]
               },
               {

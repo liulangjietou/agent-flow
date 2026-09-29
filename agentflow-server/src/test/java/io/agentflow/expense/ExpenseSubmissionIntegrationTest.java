@@ -50,7 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
-        "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false",
+        "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false", "agentflow.expenses.archive-worker-enabled=false"})
@@ -86,6 +86,12 @@ class ExpenseSubmissionIntegrationTest {
     private boolean verificationUnavailable;
     private String advanceOffset = "50";
     private int paymentWrites;
+    private int reversalWrites;
+    private int reversalQueries;
+    private boolean invalidReversalResponse;
+    private final Map<UUID, VoucherReversalCommand> reversalCommands = new ConcurrentHashMap<>();
+    private final Map<UUID, VoucherReversalPort.Posting> reversePostings = new ConcurrentHashMap<>();
+    private final Set<UUID> reversedOriginals = ConcurrentHashMap.newKeySet();
     private int accountReads;
     private int payeeReads;
     private volatile EmployeeAccountSnapshot currentPayee;
@@ -131,6 +137,12 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired VoucherReversalWorker voucherReversalWorker;
     @Autowired JdbcVoucherReversalCheckRepository voucherReversalChecks;
     @Autowired JdbcVoucherReversalRecordRepository voucherReversalRecords;
+    @Autowired VoucherReversalPreparationService reversalPreparing;
+    @Autowired JdbcVoucherReversalPreparationRepository reversalPreparations;
+    @Autowired JdbcVoucherReversalOperationRepository reversalOperations;
+    @Autowired VoucherReversalExecutionService reversalExecution;
+    @Autowired VoucherReversalExecutionWorker reversalExecutionWorker;
+    @Autowired AccountingReversalPort reversalPort;
     @Autowired VoucherDisputeService voucherDisputes;
     @Autowired JdbcVoucherDisputeResolutionRepository voucherDecisions;
     @Autowired JdbcPaymentAuthorizationRepository paymentAuthorizations;
@@ -195,6 +207,11 @@ class ExpenseSubmissionIntegrationTest {
             jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", report.toString());
             String voucherIds = "SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?";
+            jdbc.update("UPDATE voucher_operation SET reversal_id=NULL WHERE tenant_id='demo' AND business_id=?", report.toString());
+            jdbc.update("DELETE FROM voucher_reversal_operation_revision WHERE tenant_id='demo' AND reversal_id IN (SELECT id FROM voucher_reversal_operation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + "))", report.toString());
+            jdbc.update("DELETE FROM voucher_reversal_operation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + ")", report.toString());
+            jdbc.update("DELETE FROM voucher_reversal_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_reversal_preparation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + "))", report.toString());
+            jdbc.update("DELETE FROM voucher_reversal_preparation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + ")", report.toString());
             jdbc.update("DELETE FROM voucher_reversal_record WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + ")", report.toString());
             jdbc.update("DELETE FROM voucher_reversal_check_revision WHERE tenant_id='demo' AND check_id IN (SELECT id FROM voucher_reversal_check WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + "))", report.toString());
             jdbc.update("DELETE FROM voucher_reversal_check WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + ")", report.toString());
@@ -1725,6 +1742,102 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(settlements.find("demo", report.id()).orElseThrow().issue()).isEqualTo("EXPENSE_VOUCHER_REVIEW"); assertThat(resourceVersions(report)).isEqualTo(versions);
     }
 
+    @Test void reversalExecutionRequiresExplicitAuthorizationFreezesOriginalAndPreservesConsumedResources() throws Exception {
+        var report = archiveReadyExpense(); var versions = resourceVersions(report); var paymentCount = paymentWrites;
+        var prepared = prepareExecution(report); var source = prepared.input().source().command();
+        assertThat(reversalWrites).isZero(); assertThat(voucherOperations.find("demo", source.id()).orElseThrow().usablePosted()).isTrue();
+        var receipt = authorizeExecution(report, prepared); var held = voucherOperations.find("demo", source.id()).orElseThrow();
+        assertThat(held.reversalId()).isEqualTo(prepared.input().id()); assertThat(held.usablePosted()).isFalse();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(reversalWrites).isZero(); reversalExecutionWorker.poll();
+        var operation = reversalOperations.find("demo", receipt.reversalId()).orElseThrow();
+        assertThat(operation.status()).isEqualTo(VoucherReversalOperation.Status.POSTED); assertThat(reversalWrites).isEqualTo(1);
+        voucherWorker.poll(); assertThat(voucherOperations.find("demo", source.id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.REVERSED);
+        assertThat(voucherOperations.find("demo", source.id()).orElseThrow().reversalId()).isEqualTo(prepared.input().id());
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(paymentCount);
+        assertThat(voucherReversalRecords.forOperation("demo", source.id())).isEmpty();
+        assertThat(reversalOperations.find("foreign", receipt.reversalId())).isEmpty();
+    }
+
+    @Test void reversalExecutionAuthorizationRollbackPreservesOriginalAndReadyEvidence() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var source = prepared.input().source().command();
+        assertThatThrownBy(() -> asFinance(() -> tx().execute(status -> { reversalPreparing.authorize(report.applicationId(), source.id(), executionAuthorization(report, prepared)); throw new IllegalStateException("Synthetic authorization rollback"); }))).hasMessageContaining("Synthetic authorization rollback");
+        assertThat(reversalPreparations.find("demo", prepared.input().id())).contains(prepared); assertThat(reversalOperations.forOriginal("demo", source.id())).isEmpty();
+        assertThat(voucherOperations.find("demo", source.id()).orElseThrow().usablePosted()).isTrue(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalExecutionQueriesTheOriginalAfterLostWriteResponseWithoutResending() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var receipt = authorizeExecution(report, prepared);
+        invalidReversalResponse = true; reversalExecutionWorker.poll(); var unknown = reversalOperations.find("demo", receipt.reversalId()).orElseThrow();
+        assertThat(unknown.status()).isEqualTo(VoucherReversalOperation.Status.UNKNOWN); assertThat(reversalWrites).isEqualTo(1);
+        invalidReversalResponse = false; var claimed = reversalExecution.claim("demo", receipt.reversalId(), unknown.nextAttemptAt());
+        assertThat(claimed.status()).isEqualTo(VoucherReversalOperation.Status.QUERYING);
+        var result = reversalPort.query(claimed.input().targetDigest(), claimed.input().command()); reversalExecution.finish(claimed, result, claimed.updatedAt().plusMillis(1));
+        assertThat(reversalOperations.find("demo", receipt.reversalId()).orElseThrow().status()).isEqualTo(VoucherReversalOperation.Status.POSTED);
+        assertThat(reversalWrites).isEqualTo(1); assertThat(reversalQueries).isEqualTo(1);
+    }
+
+    @Test void reversalExecutionCurrentPersonnelAndOriginalVersionsInvalidateNewSendingOnly() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); authorizeExecution(report, prepared);
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { reversalExecutionWorker.poll(); assertThat(reversalOperations.find("demo", prepared.input().id()).orElseThrow().status()).isEqualTo(VoucherReversalOperation.Status.VOIDED); assertThat(reversalWrites).isZero(); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(voucherOperations.find("demo", prepared.input().source().command().id()).orElseThrow().usablePosted()).isFalse();
+    }
+
+    @Test void reversalExecutionOnlyOneConcurrentAuthorizationAndClaimCanSucceed() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var source = prepared.input().source().command(); var input = executionAuthorization(report, prepared);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2); var gate = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.Callable<VoucherReversalPreparationService.ActionReceipt> authorize = () -> { gate.await(); return asFinance(() -> reversalPreparing.authorize(report.applicationId(), source.id(), input)); };
+        int success = 0, rejected = 0;
+        try { var first = pool.submit(authorize); var second = pool.submit(authorize); gate.countDown();
+            for (var future : List.of(first, second)) { try { future.get(10, java.util.concurrent.TimeUnit.SECONDS); success++; }
+                catch (java.util.concurrent.ExecutionException failure) { assertThat(failure.getCause()).isInstanceOf(io.agentflow.common.DomainException.class); rejected++; } }
+            assertThat(success).isEqualTo(1); assertThat(rejected).isEqualTo(1);
+            var one = pool.submit(() -> reversalExecution.claim("demo", prepared.input().id(), Instant.now())); var two = pool.submit(() -> reversalExecution.claim("demo", prepared.input().id(), Instant.now()));
+            var claimed = java.util.stream.Stream.of(one.get(10, java.util.concurrent.TimeUnit.SECONDS), two.get(10, java.util.concurrent.TimeUnit.SECONDS)).filter(java.util.Objects::nonNull).toList();
+            assertThat(claimed).hasSize(1); assertThat(claimed.get(0).status()).isEqualTo(VoucherReversalOperation.Status.POSTING);
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void reversalExecutionStalePreparationAndLateReadCannotAuthorize() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var source = prepared.input().source().command(); var original = voucherOperations.find("demo", source.id()).orElseThrow();
+        observeVoucher(original, new VoucherObservation(source.id(), source.digest(), VoucherObservation.Status.POSTED, 1L, Instant.now(), original.observation().postingReference(), original.observation().voucherReference(), source.period().periodReference(), source.accountingDate(), source.totals().gross(), source.totals().gross(), original.observation().postedAt(), null));
+        assertThatThrownBy(() -> authorizeExecution(report, prepared)).isInstanceOf(io.agentflow.common.DomainException.class); assertThat(reversalOperations.forOriginal("demo", source.id())).isEmpty();
+        var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), source.id(), executionPreparation(report, voucherOperations.find("demo", source.id()).orElseThrow())));
+        var claimed = reversalPreparing.claim("demo", queued.preparationId(), Instant.now());
+        reversalPreparing.finish(claimed, new FinanceResult.Success<>(prepared.command().verifiedOriginal()), new FinanceResult.Success<>(prepared.command().period()), claimed.leaseUntil());
+        assertThat(reversalPreparations.find("demo", queued.preparationId()).orElseThrow().issue()).isEqualTo("TIMEOUT"); assertThat(reversalWrites).isZero();
+    }
+
+    private VoucherReversalPreparation prepareExecution(ExpenseReport report) {
+        var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), original.input().command().id(), executionPreparation(report, original)));
+        reversalExecutionWorker.poll(); var ready = reversalPreparations.find("demo", queued.preparationId()).orElseThrow();
+        assertThat(ready.status()).isEqualTo(VoucherReversalPreparation.Status.READY); return ready;
+    }
+    private VoucherReversalPreparationService.PrepareInput executionPreparation(ExpenseReport report, VoucherOperation original) {
+        return new VoucherReversalPreparationService.PrepareInput(1, app(report).version(), current(report).version(), original.version(), original.input().command().accountingDate(), "REVERSE-EXECUTION-PROOF", "核对原凭证后准备独立冲销");
+    }
+    private VoucherReversalPreparationService.AuthorizeInput executionAuthorization(ExpenseReport report, VoucherReversalPreparation prepared) {
+        return new VoucherReversalPreparationService.AuthorizeInput(1, app(report).version(), current(report).version(), prepared.input().operationVersion(), prepared.input().id(), prepared.version(), "明确授权原凭证的完整反向命令");
+    }
+    private VoucherReversalPreparationService.ActionReceipt authorizeExecution(ExpenseReport report, VoucherReversalPreparation prepared) {
+        return asFinance(() -> reversalPreparing.authorize(report.applicationId(), prepared.input().source().command().id(), executionAuthorization(report, prepared)));
+    }
+    private <T> T asFinance(java.util.function.Supplier<T> action) {
+        actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"))); try { return action.get(); } finally { actors.clear(); }
+    }
+    private VoucherReversalObservation executionReceipt(VoucherReversalCommand command) {
+        var at = Instant.now(); var original = command.verifiedOriginal(); var reversed = new VoucherObservation(original.operationId(), original.commandDigest(), VoucherObservation.Status.REVERSED,
+                original.revision() + 1, at, original.postingReference(), original.voucherReference(), original.periodReference(), original.accountingDate(), original.debitTotal(), original.creditTotal(), original.postedAt(), null);
+        var posting = reversePostings.computeIfAbsent(command.id(), id -> new VoucherReversalPort.Posting("executed-reverse-posting-" + id, "executed-reverse-voucher-" + id, command.period().periodReference(), command.period().request().accountingDate(), at,
+                command.lines().stream().map(line -> new VoucherReversalPort.Line("executed-entry-" + line.originalLineNo(), line.originalLineNo(), line.accountCode(), line.side(), line.amount(), line.sourceLineNo(), line.costCenter(), line.projectCode(), line.advanceId())).toList()));
+        return new VoucherReversalObservation(command.id(), command.digest(), VoucherReversalObservation.Status.POSTED, 2, at, "executed-acceptance-" + command.id(),
+                new VoucherReversalPort.Receipt(command.source(), VoucherReversalPort.Status.VERIFIED, 2, at, at.plusSeconds(300), reversed, posting), null);
+    }
+
     private ExpenseReport paidExpense() throws Exception {
         var report = paymentReport(true); UUID id = authorizePayment(report);
         ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
@@ -1946,13 +2059,21 @@ class ExpenseSubmissionIntegrationTest {
                 if (!request.equals(check.input().request())) throw new IllegalStateException("Synthetic reversal source changed");
                 yield reversalReceipt(check, 1, request.command().id().toString());
             }
+            case "voucher-reversal-command", "voucher-reversal-query" -> {
+                VoucherReversalCommand command;
+                if (operation.equals("voucher-reversal-command")) { reversalWrites++; command = json.read(data.path("command").toString(), VoucherReversalCommand.class); reversalCommands.put(command.id(), command); reversedOriginals.add(command.source().command().id()); }
+                else { reversalQueries++; command = reversalCommands.get(UUID.fromString(data.path("operationId").asText())); }
+                if (invalidReversalResponse) yield Map.of("invalidFixture", true);
+                yield executionReceipt(command);
+            }
             case "voucher-command", "voucher-query" -> {
                 VoucherCommand command;
                 if (operation.equals("voucher-command")) { command = json.read(data.path("command").toString(), VoucherCommand.class); voucherCommands.put(command.id(), command); }
                 else command = voucherCommands.get(UUID.fromString(data.path("operationId").asText()));
                 if (voucherMode.equals("INVALID")) yield Map.of("invalidFixture", true);
                 if (voucherMode.equals("NOT_FOUND")) yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null, null, null);
-                yield new VoucherObservation(command.id(), command.digest(), voucherMode.equals("REVERSED") ? VoucherObservation.Status.REVERSED : VoucherObservation.Status.POSTED, voucherMode.equals("REVERSED") ? 2L : 1L, Instant.now(), "synthetic-posting", "synthetic-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
+                boolean reversed = voucherMode.equals("REVERSED") || reversedOriginals.contains(command.id());
+                yield new VoucherObservation(command.id(), command.digest(), reversed ? VoucherObservation.Status.REVERSED : VoucherObservation.Status.POSTED, reversed ? 2L : 1L, Instant.now(), "synthetic-posting", "synthetic-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
             }
             case "budget-command", "budget-query" -> {
                 BudgetCommand command;

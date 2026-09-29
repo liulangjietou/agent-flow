@@ -46,10 +46,10 @@ public class JdbcVoucherOperationRepository {
     public void update(VoucherOperation value) {
         var command = value.input().command();
         int changed = jdbc.update("""
-                UPDATE voucher_operation SET version=?,status=?,attempts=?,highest_revision=?,state_json=?,updated_at=?,next_attempt_at=?,lease_until=?
+                UPDATE voucher_operation SET version=?,status=?,attempts=?,highest_revision=?,state_json=?,updated_at=?,next_attempt_at=?,lease_until=?,reversal_id=?
                 WHERE tenant_id=? AND id=? AND version=? AND input_json=? AND command_digest=?
                 """, value.version(), value.status().name(), value.attempts(), value.highestRevision(), json.write(value), timestamp(value.updatedAt()),
-                timestamp(value.nextAttemptAt()), timestamp(value.leaseUntil()), command.tenantId(), command.id().toString(), value.version() - 1,
+                timestamp(value.nextAttemptAt()), timestamp(value.leaseUntil()), value.reversalId() == null ? null : value.reversalId().toString(), command.tenantId(), command.id().toString(), value.version() - 1,
                 json.write(value.input()), command.digest());
         if (changed != 1) throw conflict(); append(value);
     }
@@ -114,7 +114,7 @@ public class JdbcVoucherOperationRepository {
                 AND r.version>COALESCE((SELECT MAX(d.resolved_version) FROM voucher_dispute_resolution d
                     WHERE d.tenant_id=r.tenant_id AND d.operation_id=r.operation_id AND d.outcome='POSTED'),0)
                 """, (row, index) -> json.read(row.getString("state_json"), VoucherOperation.class), tenant, id.toString())
-                .stream().anyMatch(value -> value.status() == VoucherOperation.Status.REVERSED || value.status() == VoucherOperation.Status.RECONCILING);
+                .stream().anyMatch(value -> value.reversalId() != null || value.status() == VoucherOperation.Status.REVERSED || value.status() == VoucherOperation.Status.RECONCILING);
     }
 
     /** 每批只扫描十个已到期任务，不在扫描中加载敏感凭证正文。 */
@@ -142,7 +142,8 @@ public class JdbcVoucherOperationRepository {
                     || value.version() != row.getLong("version") || !value.status().name().equals(row.getString("status")) || value.attempts() != row.getInt("attempts")
                     || value.highestRevision() != row.getLong("highest_revision") || !value.createdAt().equals(instant(row.getTimestamp("created_at")))
                     || !value.updatedAt().equals(instant(row.getTimestamp("updated_at"))) || !Objects.equals(value.nextAttemptAt(), instant(row.getTimestamp("next_attempt_at")))
-                    || !Objects.equals(value.leaseUntil(), instant(row.getTimestamp("lease_until")))) throw new IllegalStateException("Persisted voucher operation identity is inconsistent");
+                    || !Objects.equals(value.leaseUntil(), instant(row.getTimestamp("lease_until")))
+                    || !Objects.equals(value.reversalId() == null ? null : value.reversalId().toString(), row.getString("reversal_id"))) throw new IllegalStateException("Persisted voucher operation identity is inconsistent");
             return value;
         };
     }

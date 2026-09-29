@@ -1,0 +1,60 @@
+{
+  "date": "2026-09-29",
+  "stage": "voucher-reversal-preparation-persistence-and-execution",
+  "schemaVersion": 62,
+  "result": "PASS",
+  "scope": "Internal services and synthetic HTTP only; public workflow and existing live database upgrade pending",
+  "tests": {
+    "domainFocused": 30,
+    "h2ServerFocused": 9,
+    "postgresDomain": 45,
+    "postgresServer": 134,
+    "frontendExistingVoucher": 21,
+    "overlappingScopes": true
+  },
+  "postgresServerBreakdown": {
+    "ExpenseSubmissionIntegrationTest": 85,
+    "AdvanceRepaymentIntegrationTest": 37,
+    "GatewayAccountingReversalTest": 6,
+    "GatewayVoucherReversalTest": 5,
+    "VoucherReversalExecutionMigrationTest": 1
+  },
+  "openApi": {
+    "operations": 177,
+    "schemas": 330,
+    "requestExamples": 63
+  },
+  "authors": {
+    "javaFiles": 770,
+    "namedTypes": 1408,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "validated": [
+    "Explicit authorization separate from read preparation",
+    "Authorization rollback leaves original posted and preparation ready",
+    "Concurrent authorization and lease each succeed once",
+    "Lost write response recovers by querying original reversal identity",
+    "Current personnel changes stop first send",
+    "Late preparation cannot authorize",
+    "Original accrual and payment voucher authorization freeze funded loan without changing money or reservations",
+    "Original reversal binding survives queries and blocks POSTED dispute restoration",
+    "V61 to V62 migration preserves old voucher bytes and revisions with same-tenant original-specific foreign keys"
+  ],
+  "logs": {
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-postgres.log",
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-focused.log",
+    "frontend": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-ui-regression.log"
+  },
+  "publicApiImplemented": false,
+  "liveDatabaseUpgradePerformed": false,
+  "browserAcceptancePerformed": false,
+  "remoteCiRun": false,
+  "realErpAcceptance": false,
+  "next": [
+    "Public workspace and explicit operation endpoints",
+    "Financial operation UI and local browser acceptance",
+    "Safe termination of never-sent or definitely failed reversals",
+    "Remaining finance and platform work"
+  ]
+}

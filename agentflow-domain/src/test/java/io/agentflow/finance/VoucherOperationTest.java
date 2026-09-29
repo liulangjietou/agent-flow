@@ -170,6 +170,21 @@ class VoucherOperationTest {
         assertThat(disputed.resolutionIssue(disputed.updatedAt(), null, true)).isEqualTo(VoucherOperation.ResolutionIssue.DIFFERENT_POSTING);
     }
 
+    @Test void independentReversalHoldsTheOriginalAcrossQueriesAndCannotBeReleasedByDispute() {
+        var original = posted(); var reversal = java.util.UUID.randomUUID(); var held = original.requestReversal(reversal, original.updatedAt().plusSeconds(1));
+        assertThat(held.usablePosted()).isFalse(); assertThat(held.status()).isEqualTo(VoucherOperation.Status.POSTED);
+        assertThat(held.observation()).isEqualTo(original.observation()); assertThat(held.input()).isEqualTo(original.input());
+        assertThatThrownBy(() -> held.requestReversal(java.util.UUID.randomUUID(), held.updatedAt())).isInstanceOf(DomainException.class);
+        var current = observe(held, VoucherObservation.Status.POSTED, 3, "voucher-1");
+        assertThat(current.reversalId()).isEqualTo(reversal); assertThat(current.usablePosted()).isFalse();
+        var disputed = observe(current, VoucherObservation.Status.PENDING, 4, null);
+        var corrected = observe(disputed, VoucherObservation.Status.POSTED, 5, "voucher-1");
+        assertThat(corrected.resolutionIssue(corrected.updatedAt(), original.observation(), true)).isEqualTo(VoucherOperation.ResolutionIssue.REVERSAL_IN_PROGRESS);
+        assertThatThrownBy(() -> corrected.resolveDispute(VoucherObservation.Status.POSTED, original.observation(), true, corrected.updatedAt())).isInstanceOf(DomainException.class);
+        var reversed = observe(held, VoucherObservation.Status.REVERSED, 3, "voucher-1");
+        assertThat(reversed.reversalId()).isEqualTo(reversal); assertThat(reversed.status()).isEqualTo(VoucherOperation.Status.REVERSED);
+    }
+
     private static VoucherOperation observe(VoucherOperation original, VoucherObservation.Status status, long revision, String voucher) {
         var query = query(original); var at = query.updatedAt().plusSeconds(1); return query.complete(success(fact(query, status, revision, at, voucher)), at);
     }

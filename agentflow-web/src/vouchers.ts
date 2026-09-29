@@ -68,7 +68,7 @@ export function validateVoucherDisputeReceipt(receipt: VoucherDisputeReceipt, vi
     throw new Error('凭证裁决回执未通过核对，请刷新状态后确认。')
   }
 }
-const disputeIssues: Record<string, string> = { NOT_DISPUTED: '原凭证正在查询或已经发生变化', NON_TERMINAL: 'ERP 尚未提供可采用的终态', STALE_OBSERVATION: '查询结果早于已知会计版本', EVIDENCE_EXPIRED: '核对依据已过期，请重新查询 ERP', DIFFERENT_POSTING: '查询结果与原凭证身份不一致', POSTING_ALREADY_OBSERVED: '历史存在过账记录，不能采用失败结论删除该事实' }
+const disputeIssues: Record<string, string> = { NOT_DISPUTED: '原凭证正在查询或已经发生变化', NON_TERMINAL: 'ERP 尚未提供可采用的终态', STALE_OBSERVATION: '查询结果早于已知会计版本', EVIDENCE_EXPIRED: '核对依据已过期，请重新查询 ERP', DIFFERENT_POSTING: '查询结果与原凭证身份不一致', POSTING_ALREADY_OBSERVED: '历史存在过账记录，不能采用失败结论删除该事实', REVERSAL_IN_PROGRESS: '已授权独立冲销，原凭证继续停用，请核对原冲销命令' }
 export function voucherDisputeIssue(code: string | null) { return code ? disputeIssues[code] ?? '原凭证裁决条件尚未满足' : '' }
 
 /** 确认时再核对发送期限，永远只传原编号和已展示版本。 */

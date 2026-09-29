@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * 凭证副作用的持久状态机，保留最高外部版本和既有事实，未知结果只查询原操作。
@@ -11,7 +12,7 @@ import java.util.Objects;
  */
 public record VoucherOperation(Input input, long version, Status status, int attempts, Instant createdAt, Instant updatedAt,
                                Instant nextAttemptAt, Instant leaseUntil, VoucherObservation observation,
-                               VoucherObservation conflictingObservation, long highestRevision, Failure failure) {
+                               VoucherObservation conflictingObservation, long highestRevision, Failure failure, UUID reversalId) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
     public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
@@ -40,6 +41,14 @@ public record VoucherOperation(Input input, long version, Status status, int att
                     || observation != null && observation.status() != VoucherObservation.Status.NOT_FOUND)
                 || status == Status.VOIDED && (failure != Failure.SOURCE_CHANGED || highestRevision != 0 || conflictingObservation != null
                     || observation != null && observation.status() != VoucherObservation.Status.NOT_FOUND)) throw invalid();
+        if (reversalId != null && (reversalId.equals(input.command().id()) || !posted(observation))) throw invalid();
+    }
+
+    /** 旧持久快照没有冲销绑定，历史构造入口保持原语义。 */
+    public VoucherOperation(Input input, long version, Status status, int attempts, Instant createdAt, Instant updatedAt,
+                            Instant nextAttemptAt, Instant leaseUntil, VoucherObservation observation,
+                            VoucherObservation conflictingObservation, long highestRevision, Failure failure) {
+        this(input, version, status, attempts, createdAt, updatedAt, nextAttemptAt, leaseUntil, observation, conflictingObservation, highestRevision, failure, null);
     }
 
     /** 只登记原始命令，事务提交前不能有 ERP 副作用。 */
@@ -54,7 +63,7 @@ public record VoucherOperation(Input input, long version, Status status, int att
         if ((status != Status.QUEUED && status != Status.UNKNOWN) || now.isBefore(nextAttemptAt) || lease.isZero() || lease.isNegative()) throw conflict();
         if (status == Status.QUEUED && !now.isBefore(input.command().expiresAt())) return changed(Status.EXPIRED, now, null, observation, conflictingObservation, highestRevision, Failure.EVIDENCE_EXPIRED);
         return new VoucherOperation(input, Math.incrementExact(version), status == Status.QUEUED ? Status.POSTING : Status.QUERYING,
-                Math.incrementExact(attempts), createdAt, now, null, now.plus(lease), observation, conflictingObservation, highestRevision, null);
+                Math.incrementExact(attempts), createdAt, now, null, now.plus(lease), observation, conflictingObservation, highestRevision, null, reversalId);
     }
 
     /** 领取超时无法证明 ERP 未执行，保留原过账事实和最高版本，立即转查询。 */
@@ -116,12 +125,20 @@ public record VoucherOperation(Input input, long version, Status status, int att
     public boolean running() { return status == Status.POSTING || status == Status.QUERYING; }
     public boolean expired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     /** 待对账、冲销和读取中的既有凭证不能作为新的付款授权依据。 */
-    public boolean usablePosted() { return status == Status.POSTED; }
+    public boolean usablePosted() { return status == Status.POSTED && reversalId == null; }
+
+    /** 独立冲销授权和原件停用同事务保存，ERP 尚未返回时也不能继续授权付款或使用借款。 */
+    public VoucherOperation requestReversal(UUID id, Instant now) {
+        requireTime(now); if (!usablePosted() || id == null || id.equals(input.command().id())) throw conflict();
+        return new VoucherOperation(input, Math.incrementExact(version), status, attempts, createdAt, now, null, null,
+                observation, conflictingObservation, highestRevision, failure, id);
+    }
 
     /** 人工裁决只接受近期最高版本终态；原凭证身份和曾出现的过账事实不能被删除。 */
     public ResolutionIssue resolutionIssue(Instant now, VoucherObservation originalPosting, boolean postingObserved) {
         var candidate = conflictingObservation;
         if (status != Status.RECONCILING || candidate == null) return ResolutionIssue.NOT_DISPUTED;
+        if (reversalId != null && candidate.status() == VoucherObservation.Status.POSTED) return ResolutionIssue.REVERSAL_IN_PROGRESS;
         if (candidate.status() != VoucherObservation.Status.POSTED && candidate.status() != VoucherObservation.Status.FAILED
                 && candidate.status() != VoucherObservation.Status.REVERSED) return ResolutionIssue.NON_TERMINAL;
         if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())) return ResolutionIssue.STALE_OBSERVATION;
@@ -148,7 +165,7 @@ public record VoucherOperation(Input input, long version, Status status, int att
     }
     private VoucherOperation changed(Status next, Instant now, Instant retryAt, VoucherObservation accepted, VoucherObservation disputed, long highest, Failure problem) {
         requireTime(now);
-        return new VoucherOperation(input, Math.incrementExact(version), next, attempts, createdAt, now, retryAt, null, accepted, disputed, highest, problem);
+        return new VoucherOperation(input, Math.incrementExact(version), next, attempts, createdAt, now, retryAt, null, accepted, disputed, highest, problem, reversalId);
     }
     private static boolean allowed(VoucherObservation before, VoucherObservation after) {
         if (before.status() == VoucherObservation.Status.NOT_FOUND) return true;
@@ -192,7 +209,7 @@ public record VoucherOperation(Input input, long version, Status status, int att
      * 页面展示未满足的裁决条件，不接收客户端豁免。
      * @author owlzhangfq@gmail.com
      */
-    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_OBSERVATION, EVIDENCE_EXPIRED, DIFFERENT_POSTING, POSTING_ALREADY_OBSERVED }
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_OBSERVATION, EVIDENCE_EXPIRED, DIFFERENT_POSTING, POSTING_ALREADY_OBSERVED, REVERSAL_IN_PROGRESS }
     /**
      * 只存封闭错误码，不存远端响应正文或账户信息。
      * @author owlzhangfq@gmail.com

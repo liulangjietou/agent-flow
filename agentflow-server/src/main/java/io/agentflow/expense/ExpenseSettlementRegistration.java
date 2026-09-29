@@ -52,7 +52,7 @@ public class ExpenseSettlementRegistration {
         var value = event.current(); var command = value.input().command();
         if (command.kind() != VoucherCommand.Kind.EXPENSE_ACCRUAL) return;
         String tenant = command.tenantId(); UUID id = command.binding().businessId(); reports.lock(tenant, id);
-        if (value.status() == VoucherOperation.Status.REVERSED || value.status() == VoucherOperation.Status.RECONCILING) {
+        if (value.reversalId() != null || value.status() == VoucherOperation.Status.REVERSED || value.status() == VoucherOperation.Status.RECONCILING) {
             var current = settlements.find(tenant, id).orElse(null);
             if (current != null && command.id().equals(current.input().voucherOperationId())) review(current, "EXPENSE_VOUCHER_REVIEW");
         } else if (value.usablePosted() && settlements.find(tenant, id).isEmpty()) registerOffset(value, report(tenant, id));

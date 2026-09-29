@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
-        "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.budgets.worker-enabled=false",
+        "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false",
         "agentflow.expenses.archive-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.advances.repayment-worker-enabled=false", "agentflow.advances.repayment-review-worker-enabled=false", "agentflow.advances.disbursement-return-worker-enabled=false"})
@@ -106,6 +106,8 @@ class AdvanceRepaymentIntegrationTest {
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired VoucherOperationService voucherExecution;
     @Autowired JdbcVoucherOperationRepository vouchers;
+    @Autowired VoucherReversalPreparationService reversalPreparing;
+    @Autowired JdbcVoucherReversalPreparationRepository reversalPreparations;
     @Autowired PaymentExecutionRequestWorker executionWorker;
     @Autowired PaymentOperationWorker paymentWorker;
     @Autowired JdbcPaymentOperationRepository payments;
@@ -146,6 +148,27 @@ class AdvanceRepaymentIntegrationTest {
         }
     }
     @AfterAll static void stopServer() { SERVER.stop(0); }
+
+    @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})
+    void authorizedReversalImmediatelyFreezesExistingLoanWithoutChangingRepaymentsOrReservations(VoucherCommand.Kind kind) throws Exception {
+        var loan = paidLoan(); repay(loan, "before-reversal-authorization"); reserve(loan, "20"); var before = balance(loan);
+        var original = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow(); var command = original.input().command();
+        UUID id;
+        actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { id = reversalPreparing.prepare(app(loan).id(), command.id(), new VoucherReversalPreparationService.PrepareInput(1, app(loan).version(), request(loan).version(), original.version(), command.accountingDate(), "LOAN-REVERSE-PROOF", "明确核对原借款凭证")).preparationId(); }
+        finally { actors.clear(); }
+        var claimed = reversalPreparing.claim("demo", id, Instant.now()); var now = Instant.now(); var fact = original.observation();
+        var verified = new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, fact.revision(), now, fact.postingReference(), fact.voucherReference(), fact.periodReference(), fact.accountingDate(), fact.debitTotal(), fact.creditTotal(), fact.postedAt(), null);
+        var period = new AccountingPeriodPort.OpenPeriod(new AccountingPeriodPort.Request(command.legalEntityId(), "CNY", command.accountingDate()), "new-reverse-period", "v2", command.accountingDate(), command.accountingDate(), now, now.plusSeconds(300));
+        reversalPreparing.finish(claimed, new FinanceResult.Success<>(verified), new FinanceResult.Success<>(period), Instant.now());
+        var prepared = reversalPreparations.find("demo", id).orElseThrow(); assertThat(prepared.status()).isEqualTo(VoucherReversalPreparation.Status.READY);
+        actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { reversalPreparing.authorize(app(loan).id(), command.id(), new VoucherReversalPreparationService.AuthorizeInput(1, app(loan).version(), request(loan).version(), original.version(), id, prepared.version(), "确认完整冲销，原资金另行办理")); }
+        finally { actors.clear(); }
+        var held = balance(loan); assertThat(held.voucherReviews()).containsExactly(command.id()); assertThat(held.available()).isEqualTo(money("0"));
+        assertThat(held.outstanding()).isEqualTo(before.outstanding()); assertThat(held.balance()).isEqualTo(before.balance()); assertThat(held.repayments()).isEqualTo(before.repayments());
+        queryVoucher(loan, kind); assertThat(balance(loan).voucherReviews()).containsExactly(command.id()); assertThat(balance(loan).available()).isEqualTo(money("0"));
+    }
 
     @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})
     void originalVoucherReversalFreezesLoanAndOnlyExplicitPostingResolutionRestoresIt(VoucherCommand.Kind kind) throws Exception {
