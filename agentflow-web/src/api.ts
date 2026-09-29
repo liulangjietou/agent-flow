@@ -22,6 +22,7 @@ import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseF
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
+import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
 import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView } from './vouchers'
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
@@ -320,6 +321,9 @@ export const api = {
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
   advanceRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceRequestItem>>('/advance-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   advanceRequest: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<AdvanceDetail>(`/advance-requests/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  advanceRepayments: (id: string, roundNo: number, beforeId: string | undefined, signal: AbortSignal) => request<RepaymentView>(`/advance-requests/${encodeURIComponent(id)}/repayments` + historyQuery({ roundNo, beforeId }), { signal, cache: 'no-store' }),
+  queryAdvanceRepayment: (id: string, input: RepaymentQueryInput) => write<RepaymentActionReceipt>(`/advance-requests/${encodeURIComponent(id)}/repayment-checks`, 'POST', '查询原还款凭据', input),
+  recordAdvanceRepayment: (id: string, input: RepaymentRecordInput) => write<RepaymentActionReceipt>(`/advance-requests/${encodeURIComponent(id)}/repayments`, 'POST', '确认借款还款', input),
   createAdvanceRequest: (input: AdvanceCreate) => write<AdvanceReceipt>('/advance-requests', 'POST', '保存借款申请', input),
   reviseAdvanceRequest: (id: string, input: AdvanceRevise) => write<AdvanceReceipt>(`/advance-requests/${encodeURIComponent(id)}/revise`, 'POST', '保存借款申请修改', input),
   advanceCheckOptions: (id: string, signal: AbortSignal) => request<AdvanceCheckOptions>(`/advance-requests/${encodeURIComponent(id)}/prechecks/options`, { signal, cache: 'no-store' }),

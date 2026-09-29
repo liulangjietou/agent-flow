@@ -20815,6 +20815,443 @@
           }
         }
       }
+    },
+    "/api/v1/advance-requests/{id}/repayments": {
+      "get": {
+        "operationId": "getAdvanceRepayments",
+        "tags": [
+          "借款申请"
+        ],
+        "summary": "读取借款余额与还款历史",
+        "description": "沿用原轮次完整借款字段权限。申请人可读已确认历史，最新查询仅当前独立财务可见；读取及刷新无副作用。实际放款等于报销冲销、已还款和未还款之和。历史固定每页25条，游标必须属于本笔借款。",
+        "x-access": "申请人或本轮明细可读的实际审批参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceRepaymentWorkspace"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "上一页 nextBeforeId；固定每页最多25条。"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "recordAdvanceRepayment",
+        "tags": [
+          "借款申请"
+        ],
+        "summary": "明确确认本笔借款还款",
+        "description": "只采用五分钟内同一财务查询的原凭据，完整冲减该笔收款金额，不接收手工金额或账号。余额与查询双版本校验；收款、资金流水及会计分录分别防重，不侵占报销预留。余额、凭据、查询消费及审计原子保存，不发起扣款或再次制证。",
+        "x-access": "FINANCE + 原轮次完整借款字段可读 + 原法人当前有效任职 + 非申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原查询或还款确认已持久保存；repaymentId 为 null 表示仅排队查询",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceRepaymentActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceRepaymentRecordInput"
+              },
+              "example": {
+                "advanceVersion": 1,
+                "checkId": "55555555-5555-4555-8555-555555555555",
+                "checkVersion": 3,
+                "comment": "核对原收款与会计分录后确认还款"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/advance-requests/{id}/repayment-checks": {
+      "post": {
+        "operationId": "queryAdvanceRepayment",
+        "tags": [
+          "借款申请"
+        ],
+        "summary": "登记原还款凭据查询",
+        "description": "固定原放款成功修订与外部目标，后台事务外只读查询已收资金与已入账员工借款贷方分录。202仅表示查询已保存，不冲减余额。",
+        "x-access": "FINANCE + 原轮次完整借款字段可读 + 原法人当前有效任职 + 非申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原查询或还款确认已持久保存；repaymentId 为 null 表示仅排队查询",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceRepaymentActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceRepaymentQueryInput"
+              },
+              "example": {
+                "advanceVersion": 1,
+                "receiptReference": "RECEIPT-001",
+                "comment": "核对原借款收款及会计分录"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28802,7 +29239,8 @@
               "PAID_OUT",
               "PARTIALLY_SETTLED",
               "SETTLED",
-              "PAYMENT_REVIEW"
+              "PAYMENT_REVIEW",
+              "REPAYMENT_REVIEW"
             ]
           },
           "paidOn": {
@@ -28824,6 +29262,12 @@
           },
           "settled": {
             "$ref": "#/components/schemas/Money"
+          },
+          "repaid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "outstanding": {
+            "$ref": "#/components/schemas/Money"
           }
         },
         "required": [
@@ -28836,7 +29280,9 @@
           "paid",
           "available",
           "reserved",
-          "settled"
+          "settled",
+          "repaid",
+          "outstanding"
         ],
         "additionalProperties": false
       },
@@ -32649,6 +33095,504 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PaymentDisputeDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AdvanceRepaymentQueryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "advanceVersion",
+          "receiptReference",
+          "comment"
+        ],
+        "properties": {
+          "advanceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "receiptReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "AdvanceRepaymentRecordInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "advanceVersion",
+          "checkId",
+          "checkVersion",
+          "comment"
+        ],
+        "properties": {
+          "advanceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "AdvanceRepaymentActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "advanceId",
+          "checkId",
+          "checkVersion",
+          "repaymentId",
+          "advanceVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "repaymentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "advanceVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AdvanceRepaymentBalance": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "paid",
+          "available",
+          "reserved",
+          "offset",
+          "repaid",
+          "outstanding"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PAID_OUT",
+              "PARTIALLY_SETTLED",
+              "SETTLED",
+              "PAYMENT_REVIEW",
+              "REPAYMENT_REVIEW"
+            ]
+          },
+          "paid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "available": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "reserved": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "offset": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "repaid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "outstanding": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "AdvanceRepaymentFunding": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel",
+          "transactionReference",
+          "amount",
+          "receivedAt"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "BANK_TRANSFER",
+              "CASH",
+              "PAYROLL"
+            ]
+          },
+          "transactionReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdvanceRepaymentPosting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "voucherReference",
+          "entryReference",
+          "amount",
+          "accountingDate",
+          "postedAt"
+        ],
+        "properties": {
+          "voucherReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "entryReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdvanceRepaymentEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "funding",
+          "posting"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND",
+              "PENDING",
+              "CONFIRMED",
+              "REVERSED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "funding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdvanceRepaymentFunding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdvanceRepaymentPosting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AdvanceRepaymentCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "receiptReference",
+          "requestedAt",
+          "updatedAt",
+          "evidence",
+          "issue",
+          "canRecord",
+          "confirmationIssue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "CHECKED",
+              "RECORDED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "receiptReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdvanceRepaymentEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canRecord": {
+            "type": "boolean"
+          },
+          "confirmationIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AdvanceRepaymentRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "receiptReference",
+          "channel",
+          "amount",
+          "receivedAt",
+          "voucherReference",
+          "entryReference",
+          "accountingDate",
+          "postedAt",
+          "recordedBy",
+          "recordedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "BANK_TRANSFER",
+              "CASH",
+              "PAYROLL"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voucherReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "entryReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdvanceRepaymentWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "advanceId",
+          "roundNo",
+          "balance",
+          "canQuery",
+          "latestCheck",
+          "records",
+          "nextBeforeId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdvanceRepaymentBalance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "latestCheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdvanceRepaymentCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "records": {
+            "type": "array",
+            "maxItems": 25,
+            "items": {
+              "$ref": "#/components/schemas/AdvanceRepaymentRecord"
+            }
+          },
+          "nextBeforeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
               },
               {
                 "type": "null"

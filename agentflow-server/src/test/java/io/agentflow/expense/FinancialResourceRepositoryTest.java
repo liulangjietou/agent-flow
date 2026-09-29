@@ -49,7 +49,7 @@ class FinancialResourceRepositoryTest {
     void preSettlementStoredAdvanceLoadsWithoutReviewFlagAndRetainsBalances() {
         var advance = advance("demo", "legacy-payment-" + UUID.randomUUID()); advances.create(advance, "fixture");
         var state = json.read(json.write(advance.state()), com.fasterxml.jackson.databind.node.ObjectNode.class);
-        state.remove("paymentReviewRequired");
+        state.remove(List.of("paymentReviewRequired", "repayments", "repaymentReviewRequired"));
         jdbc.update("UPDATE finance_resource SET state_json=? WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", json.write(state), advance.id().toString());
         var restored = advances.find("demo", advance.id()).orElseThrow();
         assertThat(restored.state()).isEqualTo(advance.state());
@@ -147,7 +147,7 @@ class FinancialResourceRepositoryTest {
         fails("FINANCIAL_RESOURCE_EXISTS", () -> advances.create(advance("demo", source), "gateway"));
         var state = advance.state();
         var forged = EmployeeAdvance.restore(new EmployeeAdvance.State(state.id(), state.tenantId(), state.legalEntityId(), state.employeeId(), state.paymentReference(),
-                state.paidOn(), state.dueOn(), ReservedAmount.available(money("1000")), state.version(), state.paymentReviewRequired()));
+                state.paidOn(), state.dueOn(), ReservedAmount.available(money("1000")), state.version(), state.paymentReviewRequired(), state.repayments(), state.repaymentReviewRequired()));
         forged.reserve(1, new ExpenseUse(report("demo").id(), 1, 0), money("200"));
         fails("CONCURRENCY_CONFLICT", () -> advances.update(forged, 1, "alice", "RESERVE"));
         assertThat(advances.find("demo", advance.id()).orElseThrow().balance().limit()).isEqualTo(money("100"));

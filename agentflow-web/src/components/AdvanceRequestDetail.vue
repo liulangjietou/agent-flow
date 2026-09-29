@@ -7,6 +7,7 @@ import AdvanceRequestEditor from './AdvanceRequestEditor.vue'
 import AdvanceRequestTerms from './AdvanceRequestTerms.vue'
 import VoucherStatus from './VoucherStatus.vue'
 import FinancePaymentStatus from './FinancePaymentStatus.vue'
+import AdvanceRepaymentStatus from './AdvanceRepaymentStatus.vue'
 
 const props = defineProps<{ requestId: string; applicationId: string; scopeKey: string; version?: number; roundNo?: number; owner?: boolean; locked?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean] }>()
@@ -70,12 +71,13 @@ onUnmounted(() => { stop(); emit('busy', false) })
       <template v-else>
         <button v-if="detail.editable && roundNo === undefined" type="button" class="primary" :disabled="blocked" @click="editing = true">填写并提交借款</button>
         <div class="advance-context"><strong>{{ detail.content.title }}</strong><span>{{ detail.businessNo }}</span></div>
-        <p class="advance-help">{{ roundNo !== undefined ? '此处保留本轮借款约定。是否已付款，请以实际到账及结算记录为准。' : detail.approval ? '借款已批准，等待后续结算。实际付款成功后才会出现在已到账借款余额中。' : '提交及审批中的借款金额尚未形成可冲销余额。' }}</p>
+        <p class="advance-help">{{ roundNo !== undefined ? '此处保留本轮借款约定。是否已付款，请以实际到账及结算记录为准。' : detail.approval ? '本轮借款已批准，实际到账、还款和结清状态见下方资金记录。' : '提交及审批中的借款金额尚未形成可冲销余额。' }}</p>
         <AdvanceRequestTerms :content="detail.content" :financial="detail.financialRound" />
         <p v-if="detail.approval" class="advance-help">本轮批准：{{ detail.approval.approvedBy }} · {{ new Date(detail.approval.approvedAt).toLocaleString('zh-CN') }}</p>
         <VoucherStatus v-if="detail.approval" :application-id="detail.applicationId" :business-id="detail.id" business-type="ADVANCE_REQUEST" :round-no="detail.roundNo" :application-version="detail.applicationVersion" :business-version="detail.requestVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
         <FinancePaymentStatus v-if="detail.approval" :application-id="detail.applicationId" :business-id="detail.id" :round-no="detail.roundNo" :application-version="detail.applicationVersion" :business-version="detail.requestVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
         <VoucherStatus v-if="detail.approval" payment :application-id="detail.applicationId" :business-id="detail.id" business-type="ADVANCE_REQUEST" :round-no="detail.roundNo" :application-version="detail.applicationVersion" :business-version="detail.requestVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
+        <AdvanceRepaymentStatus v-if="detail.financialRound" :application-id="detail.applicationId" :advance-id="detail.id" :round-no="detail.roundNo" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
         <div v-if="!pending" class="advance-actions"><button v-if="canWithdraw" type="button" class="secondary" :disabled="blocked" @click="prepare('WITHDRAW')">撤回借款审批</button><button v-if="canCancel" type="button" class="return" :disabled="blocked" @click="prepare('CANCEL')">作废借款申请</button></div>
         <form v-else class="advance-confirmation" @submit.prevent="execute"><h4>{{ pending === 'WITHDRAW' ? '确认撤回本轮借款' : '确认作废借款申请' }}</h4><p>{{ pending === 'WITHDRAW' ? '撤回将停止本轮待办。补正后重新提交会开始新一轮，原轮次和审批意见保留。' : '作废后不能恢复编辑或提交，原内容和历史审批记录保留。' }}</p><label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" :disabled="blocked" required /></label><div class="advance-actions"><button type="button" class="secondary" :disabled="saving" @click="pending = null">返回核对</button><button class="return" :disabled="blocked">{{ saving ? '正在处理…' : pending === 'WITHDRAW' ? '确认撤回借款' : '确认作废借款' }}</button></div></form>
       </template>
