@@ -76,7 +76,9 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
-            case "INVALID_PROCUREMENT_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "INVALID_PROCUREMENT_QUERY", "INVALID_SUPPLIER_PAYMENT_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "SUPPLIER_PAYABLE_REVIEW_PENDING", "SUPPLIER_PAYABLE_REVIEW_STATE_CONFLICT", "SUPPLIER_PAYMENT_ALREADY_AUTHORIZED",
+                    "SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT", "SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE" -> HttpStatus.CONFLICT;
             case "PROCUREMENT_CHECK_ACTIVE", "PROCUREMENT_CHECK_STATE_CONFLICT", "PROCUREMENT_PAYABLE_OCCUPIED",
                     "PROCUREMENT_RESERVATION_CONTEXT_CHANGED" -> HttpStatus.CONFLICT;
             case "INVALID_ATTACHMENT_QUERY", "INVALID_EXPENSE_QUERY", "INVALID_FINANCE_QUERY", "INVALID_INVOICE_QUERY", "INVALID_VOUCHER_QUERY", "INVALID_VOUCHER_REVERSAL_QUERY", "INVALID_PAYMENT_QUERY", "INVALID_ADVANCE_REPAYMENT_QUERY", "INVALID_EXPENSE_PAYMENT_RETURN_QUERY", "INVALID_EXPENSE_ADJUSTMENT_QUERY" -> HttpStatus.BAD_REQUEST;

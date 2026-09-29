@@ -65,3 +65,6 @@
 图的 `conditionLanguageVersion` 缺省为 1，显式 2 启用括号、取反及枚举 IN。升级入口 `/process-definitions/upgrade-conditions` 只转换并返回图，不保存或发布；调用方应保留返回的版本字段。完整语法、缺失值语义和版本迁移见 [条件语言说明](condition-language.md)。
 
 校验接口新增 `branchDiagnostics`，返回遗漏/重叠的精确字符串示例。缺少覆盖且无默认分支阻止发布，重叠与无法证明覆盖为提醒；提醒随发布摘要保存。草稿保存仍允许覆盖待修正，详见 [分支覆盖检查](branch-coverage.md)。
+
+
+供应商采购付款办理使用 `/api/v1/procurement-payments/{id}/supplier-payment` 读取原轮次状态，`/reviews` 登记新鲜应付复核，`/authorizations` 消费同一财务的证据并登记固定预留。`/api/v1/supplier-payments/{id}/finance-actions` 只恢复同一原授权；`QUERY`、`RETRY`、`RETIRE` 分别受原状态和展示版本约束。FINANCE 角色、非申请人、原轮次敏感字段可读与当前法人任职缺一不可，幂等回放也重新检查。202 不是银行付款或 ERP 结算成功，完整规则见 [供应商付款](supplier-payments.md)。

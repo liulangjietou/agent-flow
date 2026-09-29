@@ -73,6 +73,12 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("SupplierFinanceWorkspace", io.agentflow.procurement.SupplierFinanceWorkspace.View.class),
+                java.util.Map.entry("SupplierFinanceReview", io.agentflow.procurement.SupplierFinanceWorkspace.Review.class),
+                java.util.Map.entry("SupplierFinanceAuthorization", io.agentflow.procurement.SupplierFinanceWorkspace.Authorization.class),
+                java.util.Map.entry("SupplierFinanceHold", io.agentflow.procurement.SupplierFinanceWorkspace.Hold.class),
+                java.util.Map.entry("SupplierFinanceActions", io.agentflow.procurement.SupplierFinanceWorkspace.Actions.class),
+                java.util.Map.entry("SupplierFinanceReceipt", io.agentflow.procurement.SupplierFinanceActions.Receipt.class),
                 java.util.Map.entry("ProcurementPaymentContent", io.agentflow.procurement.ProcurementPaymentContent.class),
                 java.util.Map.entry("ProcurementPaymentRound", io.agentflow.procurement.ProcurementPaymentRoundView.class),
                 java.util.Map.entry("ProcurementPaymentPayable", io.agentflow.procurement.ProcurementPaymentRoundView.PayableView.class),
