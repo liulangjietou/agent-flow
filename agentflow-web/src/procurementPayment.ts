@@ -72,6 +72,7 @@ export const procurementIssues: Record<string, string> = {
   PROCUREMENT_CHECK_ACTIVE: '已有采购付款预检正在执行，请刷新状态', PROCUREMENT_FORM_REQUIRED: '请选择支持采购付款的流程版本',
   PROCUREMENT_REVIEW_REQUIRED: '所选流程有绕过人工审核的路径，请联系流程管理员',
   PROCUREMENT_REVIEW_FIELDS_REQUIRED: '审批节点需要完整读取采购付款明细，请联系流程管理员',
+  INVOICE_OCCUPIED: '发票已被报销占用或归属其他采购应付，请核对原业务后重新预检',
   PROCUREMENT_CATALOG_CHANGED: '本人财务目录已变化，请重新预检', PROCUREMENT_PAYABLE_OCCUPIED: '该原应付已有有效付款申请，请核对现有申请后处理',
   PROCUREMENT_BASE_CURRENCY_REQUIRED: '采购付款金额必须使用所选法人的本位币', PROCUREMENT_AMOUNT_EXCEEDS_PAYABLE: '本次付款额超过原应付未结余额，请补正后重新预检',
   PROCUREMENT_INITIATOR_MISMATCH: '所选任职须属于本人与本次采购付款法人', PROCUREMENT_PAYABLE_UNAVAILABLE: '原应付不可用，请核对法人、供应商与原应付编号',

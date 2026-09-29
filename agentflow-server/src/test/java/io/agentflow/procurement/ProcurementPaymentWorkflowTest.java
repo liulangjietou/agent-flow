@@ -102,6 +102,8 @@ class ProcurementPaymentWorkflowTest {
     @Autowired JdbcProcurementPaymentCheckRepository checks;
     @Autowired JdbcProcurementPayableReservationRepository reservations;
     @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired io.agentflow.expense.InvoiceRepository invoices;
+    @Autowired io.agentflow.expense.ExpenseReportRepository expenses;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -158,6 +160,27 @@ class ProcurementPaymentWorkflowTest {
         for (String user : List.of("alice", "manager")) assertPrivateFactsAbsent(ok(read(path(id), user), 200));
         assertThat(read(path(id), "admin").getStatus()).isEqualTo(403);
         assertThat(send(path(id) + "/cancel", "alice", lifecycle(id)).getStatus()).isBetween(400, 499);
+    }
+
+    @Test void anExpenseClaimArrivingAfterPrecheckDisablesReadyAndBlocksBothSubmissionAndFreshPrecheck() throws Exception {
+        UUID id = create(), checked = ready(id); var ready = check(checked); var before = current(id).state();
+        var invoice = io.agentflow.expense.Invoice.uploaded(UUID.randomUUID(), "demo", "alice", UUID.randomUUID(), "b".repeat(64)); invoices.create(invoice, "alice");
+        var now = Instant.now();
+        invoice.verified(1, new io.agentflow.expense.Invoice.VerifiedFacts(ready.result().evidence().preview().payable().lines().get(0).invoice(), entity,
+                money("100"), money("10"), LocalDate.now(), "b".repeat(64), "synthetic-verification", now, now.plusSeconds(300)));
+        invoices.update(invoice, 1, "fixture", "VERIFY");
+        var reportId = UUID.randomUUID();
+        var app = Application.draftBusiness(UUID.randomUUID(), "demo", "EXP-" + reportId, "fixture", 1, "alice", "测试报销", Map.of(), null, null, null,
+                new io.agentflow.approval.model.BusinessReference(io.agentflow.approval.model.BusinessReference.Type.EXPENSE, reportId)); applications.save(app);
+        var report = io.agentflow.expense.ExpenseReport.draft(reportId, "demo", app.id(), "alice",
+                new io.agentflow.expense.ExpenseContent(entity, io.agentflow.expense.ExpenseContent.Type.DAILY, "测试报销", List.of(), List.of())); expenses.create(report, "alice");
+        invoice.occupy(2, new io.agentflow.expense.ExpenseUse(reportId, 1, 1), "alice", entity, now); invoices.update(invoice, 2, "alice", "OCCUPY");
+        var view = ok(read(path(id) + "/prechecks/" + checked, "alice"), 200);
+        assertThat(view.path("usable").asBoolean()).isFalse(); assertThat(view.path("unavailableCode").asText()).isEqualTo("INVOICE_OCCUPIED");
+        assertThat(ok(send(path(id) + "/submit", "alice", submission(id, checked)), 409).path("code").asText()).isEqualTo("INVOICE_OCCUPIED");
+        assertThat(current(id).state()).isEqualTo(before); assertThat(reservations.active("demo", id)).isEmpty();
+        UUID fresh = enqueue(id); worker.poll(); assertThat(check(fresh).status()).isEqualTo(Status.BLOCKED); assertThat(check(fresh).result().code()).isEqualTo("INVOICE_OCCUPIED");
+        assertThat(invoices.find("demo", invoice.id()).orElseThrow().state()).isEqualTo(invoice.state()); assertNoFinancialWrites(id);
     }
 
     @Test void copiedTemplateUsesTheChosenAppointmentsSupervisorThenFinancialReview() throws Exception {
@@ -455,7 +478,7 @@ class ProcurementPaymentWorkflowTest {
         return new ProcurementPayablePort.Payable(request, "synthetic-ap-v1", now, now.plusSeconds(300), "合成供应商",
                 new SupplierAccountSnapshot(request.legalEntityId(), request.supplierReference(), "private-supplier-account", "****3456", "a".repeat(64), "account-v1"),
                 "CONTRACT-1", "ORDER-1", "MATCH-1", "ACCRUAL-1", "BUDGET-RECOGNITION-1", LocalDate.now().plusDays(10), money("100"), money("30"),
-                List.of(new ProcurementPayablePort.MatchedLine(1, 1, "ACCEPTANCE-1", new InvoiceKey(InvoiceKey.Type.DIGITAL, null, "00123456789012345678"), 1,
+                List.of(new ProcurementPayablePort.MatchedLine(1, 1, "ACCEPTANCE-1", new InvoiceKey(InvoiceKey.Type.DIGITAL, null, String.format("%020d", Integer.toUnsignedLong((request.legalEntityId() + request.payableReference()).hashCode()))), 1,
                         "b".repeat(64), "private-verification", "件", BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN, money("100"), money("100"), money("100"), money("10"))));
     }
     private static void await(CountDownLatch latch) { try { if (!latch.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Synthetic wait timed out"); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); } }

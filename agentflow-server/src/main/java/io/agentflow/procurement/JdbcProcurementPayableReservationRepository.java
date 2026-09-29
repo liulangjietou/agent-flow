@@ -25,10 +25,11 @@ public class JdbcProcurementPayableReservationRepository {
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     private final ProcurementPaymentRepository requests;
+    private final JdbcProcurementInvoiceClaims invoices;
 
     /** 占用引用实际冻结版本，不能由页面自行填写余额或原应付事实。 */
-    public JdbcProcurementPayableReservationRepository(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests) {
-        this.jdbc = jdbc; this.json = json; this.requests = requests;
+    public JdbcProcurementPayableReservationRepository(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests, JdbcProcurementInvoiceClaims invoices) {
+        this.jdbc = jdbc; this.json = json; this.requests = requests; this.invoices = invoices;
     }
 
     /** 唯一冲突拒绝第二张申请；不会覆盖原占用或把较小金额当作可并行承诺。 */
@@ -48,6 +49,7 @@ public class JdbcProcurementPayableReservationRepository {
         } catch (DuplicateKeyException occupied) {
             throw new DomainException("PROCUREMENT_PAYABLE_OCCUPIED", "Original payable already has an active local payment request");
         }
+        invoices.recognize(value);
         append(value);
     }
 

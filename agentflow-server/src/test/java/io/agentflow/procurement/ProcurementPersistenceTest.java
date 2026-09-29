@@ -51,10 +51,10 @@ class ProcurementPersistenceTest {
     @BeforeEach void database() {
         var source = new DriverManagerDataSource(System.getenv().getOrDefault("AGENTFLOW_PROCUREMENT_PERSISTENCE_URL", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
                 System.getenv().getOrDefault("AGENTFLOW_PROCUREMENT_PERSISTENCE_USER", "sa"), System.getenv().getOrDefault("AGENTFLOW_PROCUREMENT_PERSISTENCE_PASSWORD", ""));
-        Flyway.configure().dataSource(source).target("66").load().migrate();
+        Flyway.configure().dataSource(source).load().migrate();
         jdbc = new JdbcTemplate(source); tx = new TransactionTemplate(new DataSourceTransactionManager(source));
         requests = new JdbcProcurementPaymentRepository(jdbc, json); checks = new JdbcProcurementPaymentCheckRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc));
         reservationService = new ProcurementPayableReservations(reservations); applications = new JdbcApplicationRepository(jdbc, json);
     }
 
@@ -202,7 +202,7 @@ class ProcurementPersistenceTest {
     private InitiatorContext initiator() { return new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位"); }
     private Evidence evidence(ProcurementPaymentRequest original) {
         var catalog = new FinanceCatalog("alice", "v1", NOW.plusSeconds(300), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
-        var line = new ProcurementPayablePort.MatchedLine(1, 1, "receipt", new InvoiceKey(InvoiceKey.Type.DIGITAL, null, "00000000000000000001"), 1, "b".repeat(64), "verified", "件",
+        var line = new ProcurementPayablePort.MatchedLine(1, 1, "receipt", new InvoiceKey(InvoiceKey.Type.DIGITAL, null, String.format("%020d", Integer.toUnsignedLong(original.content().payableReference().hashCode()))), 1, "b".repeat(64), "verified", "件",
                 BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, money("100"), money("100"), money("100"), money("6"));
         var payable = new ProcurementPayablePort.Payable(original.content().payableRequest("alice"), "v1", NOW, NOW.plusSeconds(300), "供应商",
                 new SupplierAccountSnapshot(entity, "supplier", "account", "****1234", "c".repeat(64), "v1"), "contract", "order", "matching", "accrual", "budget", LocalDate.parse("2026-10-01"), money("100"), money("30"), List.of(line));

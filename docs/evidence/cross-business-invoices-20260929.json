@@ -1,0 +1,57 @@
+{
+  "scope": "Procurement and expense canonical invoice ownership",
+  "schemaVersion": 67,
+  "result": "LOCAL_ACCEPTANCE_PASSED",
+  "syntheticFinanceOnly": true,
+  "redTests": {
+    "crossBusinessDoubleSuccess": 5,
+    "missingDigitalCodeCompatibility": 3
+  },
+  "tests": {
+    "h2Scope": 59,
+    "postgresRelatedScope": 184,
+    "frontend": 51,
+    "compatibilityH2Retest": 10,
+    "compatibilityPostgresRetest": 3,
+    "scopesOverlap": true,
+    "package": "PASS",
+    "authorCheck": {
+      "javaFiles": 861,
+      "namedTypes": 1597,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "http": {
+    "businessResponses": 17,
+    "logins": 18,
+    "totalRecorded": 35,
+    "responseSchemas": "PASS",
+    "raw": "/fyoung/tmp/agentflow-remaining-20260928/invoice-claim-http.json"
+  },
+  "upgrade": {
+    "migration": 67,
+    "existingBusinessTablesPreserved": 115,
+    "originalExpenseClaims": 2,
+    "procurementInvoiceOriginsBackfilled": 2,
+    "files": 5,
+    "commandFiles": 5
+  },
+  "backup": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-claim-before-v66.dump",
+    "bytes": 790403
+  },
+  "browser": {
+    "businessNo": "UI-INVOICE-CLAIM-20260929",
+    "precheckAttempt": 2,
+    "status": "BLOCKED",
+    "code": "INVOICE_OCCUPIED",
+    "submitEnabled": false,
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/invoice-claim-browser-blocked.png"
+  },
+  "remaining": [
+    "Independent supplier payment authorization and execution",
+    "External original payable reservation and settlement",
+    "Actual ERP and bank integration"
+  ]
+}

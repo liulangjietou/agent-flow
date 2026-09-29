@@ -37,16 +37,17 @@ public class ProcurementPaymentCheckService {
     private final OrganizationInitiatorDirectory initiators;
     private final FinanceGatewayConfiguration configuration;
     private final JdbcProcurementPaymentCheckRepository jobs;
+    private final JdbcProcurementInvoiceClaims invoices;
     private final int timeoutSeconds;
 
     /** 身份检查不复用管理员读取权限，所有外部事实由独立执行器获取。 */
     public ProcurementPaymentCheckService(CurrentActor actors, ProcurementPaymentRepository requests, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
-            JdbcProcurementPaymentCheckRepository jobs,
+            JdbcProcurementPaymentCheckRepository jobs, JdbcProcurementInvoiceClaims invoices,
             @Value("${agentflow.procurement-payments.precheck-timeout-seconds:300}") int timeoutSeconds) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Procurement payment check timeout must be between 15 and 900 seconds");
         this.actors = actors; this.requests = requests; this.applications = applications; this.applicationRepository = applicationRepository;
-        this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.timeoutSeconds = timeoutSeconds;
+        this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.invoices = invoices; this.timeoutSeconds = timeoutSeconds;
     }
 
     /** 返回实际目标和双版本，不把配置可用解释为采购付款申请已经通过。 */
@@ -141,6 +142,8 @@ public class ProcurementPaymentCheckService {
         String failure = contextFailure(job); if (failure != null) return failure;
         var preview = job.result().evidence().preview();
         if (!preview.content().equals(payment.content())) return "CONTEXT_CHANGED";
+        try { invoices.requireAvailable(payment.tenantId(), preview); }
+        catch (DomainException occupied) { return occupied.code(); }
         return null;
     }
 

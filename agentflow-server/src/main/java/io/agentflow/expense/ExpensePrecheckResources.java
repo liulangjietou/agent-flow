@@ -90,8 +90,9 @@ public class ExpensePrecheckResources {
                 .collect(Collectors.toMap(change -> change.after().facts().key().canonical(), change -> change.after().id()));
         if (wanted.isEmpty()) return;
         var claims = jdbc.query("SELECT invoice_key,invoice_id FROM invoice_active_claim WHERE tenant_id=:tenant AND invoice_key IN (:keys)",
-                Map.of("tenant", tenant, "keys", wanted.keySet()), (row, index) -> Map.entry(row.getString("invoice_key"), UUID.fromString(row.getString("invoice_id"))));
-        if (claims.stream().anyMatch(value -> !wanted.get(value.getKey()).equals(value.getValue()) && !released.contains(value.getValue()))) {
+                Map.of("tenant", tenant, "keys", wanted.keySet()), (row, index) -> new InvoiceClaim(row.getString("invoice_key"),
+                        row.getString("invoice_id") == null ? null : UUID.fromString(row.getString("invoice_id"))));
+        if (claims.stream().anyMatch(value -> value.invoiceId() == null || !wanted.get(value.key()).equals(value.invoiceId()) && !released.contains(value.invoiceId()))) {
             throw new DomainException("INVOICE_OCCUPIED", "A canonical invoice has another active or consumed occupation");
         }
     }
@@ -130,4 +131,10 @@ public class ExpensePrecheckResources {
             if (line.priorRequest() != null) requests.add(line.priorRequest().requestId());
         }
     }
+
+    /**
+     * 原采购应付没有员工上传文件标识，仍是有效且不可被报销释放的票号归属。
+     * @author owlzhangfq@gmail.com
+     */
+    private record InvoiceClaim(String key, UUID invoiceId) { }
 }

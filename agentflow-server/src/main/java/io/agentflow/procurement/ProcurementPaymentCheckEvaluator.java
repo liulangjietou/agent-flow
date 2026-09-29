@@ -21,11 +21,12 @@ public class ProcurementPaymentCheckEvaluator {
     private final FinanceMasterDataPort catalogs;
     private final ProcurementPayablePort payables;
     private final FinanceGatewayConfiguration configuration;
+    private final JdbcProcurementInvoiceClaims invoices;
 
     /** 目录和原应付均来自财务端口，不能由客户端提供账户或匹配通过状态。 */
     public ProcurementPaymentCheckEvaluator(ProcurementPaymentRepository requests, FinanceMasterDataPort catalogs,
-                                           ProcurementPayablePort payables, FinanceGatewayConfiguration configuration) {
-        this.requests = requests; this.catalogs = catalogs; this.payables = payables; this.configuration = configuration;
+                                           ProcurementPayablePort payables, FinanceGatewayConfiguration configuration, JdbcProcurementInvoiceClaims invoices) {
+        this.requests = requests; this.catalogs = catalogs; this.payables = payables; this.configuration = configuration; this.invoices = invoices;
     }
 
     /** 外部不可用和已确认的业务阻断分别保存，网络等待不持有申请锁。 */
@@ -45,6 +46,7 @@ public class ProcurementPaymentCheckEvaluator {
         var payable = value(payables.payable(input.tenantId(), input.targetDigest(), input.content().payableRequest(input.employeeId())));
         ensureLive(job); Instant checkedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         request.freeze(input.requestVersion(), input.roundNo(), catalog, input.targetDigest(), payable, input.initiator(), checkedAt);
+        invoices.requireAvailable(input.tenantId(), request.currentRound());
         Instant validUntil = Stream.of(catalog.validUntil(), payable.validUntil(), payable.observedAt().plus(ProcurementPayablePort.MAX_EVIDENCE_AGE))
                 .min(Instant::compareTo).orElseThrow();
         if (!validUntil.isAfter(Instant.now())) return Result.unavailable("FACTS_EXPIRED");

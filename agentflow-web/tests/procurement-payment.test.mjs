@@ -323,12 +323,12 @@ test('更换法人清除原供应商、原应付和金额，避免带入另一�
   finally { p.close() }
 })
 
-test('原应付已被占用时关闭确认并禁止自动重发', async () => {
+for (const [code, message] of [['PROCUREMENT_PAYABLE_OCCUPIED', /已有有效付款申请/], ['INVOICE_OCCUPIED', /发票已被报销占用或归属其他采购应付/]]) test(`${code} 时关闭确认并禁止自动重发`, async () => {
   const p = submission(); let sent = 0
-  api.submitProcurementPayment = async () => { sent++; throw { status: 409, code: 'PROCUREMENT_PAYABLE_OCCUPIED' } }
+  api.submitProcurementPayment = async () => { sent++; throw { status: 409, code } }
   try {
     await settle(); p.state.appointment = 'appointment'; await settle(); p.state.prepare(); await p.state.submit(); await p.state.submit()
-    assert.equal(sent, 1); assert.match(p.state.error, /已有有效付款申请/); assert.equal(p.state.requiresRefresh, true); assert.equal(p.state.confirm, false)
+    assert.equal(sent, 1); assert.match(p.state.error, message); assert.equal(p.state.requiresRefresh, true); assert.equal(p.state.confirm, false)
   } finally { p.close() }
 })
 
