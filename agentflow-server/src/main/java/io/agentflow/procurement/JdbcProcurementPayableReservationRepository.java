@@ -56,7 +56,7 @@ public class JdbcProcurementPayableReservationRepository {
     /** 只保存从现行占用产生的精确释放，不允许换来源或复用已释放行。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void release(ProcurementPayableReservation value) {
-        if (value.held()) throw conflict();
+        if (value.held() || value.release() == null) throw conflict();
         var before = find(value.source().tenantId(), value.id()).orElseThrow(JdbcProcurementPayableReservationRepository::conflict);
         var decision = value.release();
         if (!before.release(decision.reason(), decision.releasedBy(), decision.releasedAt()).equals(value)) throw conflict();

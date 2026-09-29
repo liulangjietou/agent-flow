@@ -29,7 +29,7 @@ class SupplierPayableHoldTest {
         for (var changed : alternate) assertThat(new SupplierPayableHoldCommand(changed).digest()).isNotEqualTo(command.digest());
         var source = authorization.source(); var reservation = source.reservation(); var old = reservation.source(); var round = old.round();
         var changedRound = new ProcurementPaymentRound(round.roundNo(), round.submittedRequestVersion(), round.submittedBy(), round.submittedAt(), round.content(), round.legalEntity(), round.catalogVersion(), "b".repeat(64), round.payable());
-        var changedSource = new ApprovedProcurementPayment(new ProcurementPayableReservation(reservation.id(), new ProcurementPayableReservation.Source(old.tenantId(), old.requestId(), old.applicationId(), old.employeeId(), old.requestVersion(), changedRound), 1, reservation.heldAt(), null), source.approval(), source.approvedRequestVersion());
+        var changedSource = new ApprovedProcurementPayment(new ProcurementPayableReservation(reservation.id(), new ProcurementPayableReservation.Source(old.tenantId(), old.requestId(), old.applicationId(), old.employeeId(), old.requestVersion(), changedRound), 1, reservation.heldAt(), null, null), source.approval(), source.approvedRequestVersion());
         var changedTarget = new SupplierPayableHoldCommand(new SupplierPaymentAuthorization(AUTHORIZATION_ID, changedSource, authorization.payable(), "finance", AUTHORIZED_AT, authorization.expiresAt()));
         assertThat(changedTarget.digest()).isNotEqualTo(command.digest()); assertThat(changedTarget.targetDigest()).isEqualTo("b".repeat(64));
         assertThat(command.toString()).isEqualTo("SupplierPayableHoldCommand[id=" + AUTHORIZATION_ID + "]");

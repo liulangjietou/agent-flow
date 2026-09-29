@@ -41,7 +41,8 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
         }
         if (status == Status.UNKNOWN && failure == null && (observation == null || observation.status() != SupplierPayableSettlementObservation.Status.PENDING)
                 || status == Status.RECONCILING && (conflictingObservation == null || failure == null)
-                || status == Status.VOIDED && (failure != Failure.SOURCE_CHANGED && failure != Failure.EVIDENCE_CHANGED || highestRevision != 0 || conflictingObservation != null)) throw invalid();
+                || status == Status.VOIDED && (failure != Failure.SOURCE_CHANGED && failure != Failure.EVIDENCE_CHANGED && failure != Failure.FINANCE_RETIRED || highestRevision != 0 || conflictingObservation != null)) throw invalid();
+        if (failure == Failure.FINANCE_RETIRED && (status != Status.VOIDED || dispatches != 0 || observation != null)) throw invalid();
         if (version == 1 && (status != Status.QUEUED || attempts != 0 || dispatches != 0 || !createdAt.equals(updatedAt)
                 || !createdAt.equals(nextAttemptAt) || observation != null || conflictingObservation != null || failure != null)) throw invalid();
     }
@@ -114,6 +115,22 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
         return changed(Status.UNKNOWN, now, retryAt(now), null, evidence, observation, conflictingObservation, highestRevision, Objects.requireNonNull(reason));
     }
 
+    /** 仅从未发送或 ERP 明确拒绝可以安全结束尝试；查无、未知和争议均不能换记账日期。 */
+    public RetirementBasis retirementBasis() {
+        if (status == Status.REJECTED && observation.rejection() != SupplierPayableSettlementObservation.Rejection.ALREADY_SETTLED) return RetirementBasis.CONFIRMED_REJECTED;
+        if (dispatches == 0 && highestRevision == 0 && observation == null && conflictingObservation == null
+                && (status == Status.QUEUED || status == Status.CHECKING || status == Status.VOIDED)) return RetirementBasis.NEVER_DISPATCHED;
+        return null;
+    }
+
+    /** 只读领取也可在原锁下停止；迟到复查必须由持久版本拒绝，不能再进入外发。 */
+    public SupplierPayableSettlementOperation stopForRetirement(Instant now) {
+        requireTime(now);
+        if (retirementBasis() == null) throw new DomainException("SUPPLIER_SETTLEMENT_RETIREMENT_UNSAFE", "Original settlement has not been proven free of external effects");
+        return status == Status.QUEUED || status == Status.CHECKING
+                ? changed(Status.VOIDED, now, null, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
+    }
+
     /** 已停止新发送也可继续查询；已有争议和最高外部版本不会被重置。 */
     public SupplierPayableSettlementOperation requestQuery(Instant now) {
         requireTime(now); if (running() || status == Status.QUEUED || dispatches == 0) throw conflict();
@@ -169,10 +186,16 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
     public enum Status { QUEUED, CHECKING, SETTLING, UNKNOWN, QUERYING, SETTLED, REJECTED, NOT_FOUND, RECONCILING, VOIDED }
 
     /**
+     * 未发送和原 ERP 确认拒绝是结束旧尝试的两个独立依据。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum RetirementBasis { NEVER_DISPATCHED, CONFIRMED_REJECTED }
+
+    /**
      * 闭集原因区分复查失败与结算未知结果，不保存远端正文。
      * @author owlzhangfq@gmail.com
      */
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE,
-        RESPONSE_TOO_LARGE, INTERNAL_ERROR, LEASE_EXPIRED, SOURCE_CHANGED, EVIDENCE_CHANGED,
+        RESPONSE_TOO_LARGE, INTERNAL_ERROR, LEASE_EXPIRED, SOURCE_CHANGED, EVIDENCE_CHANGED, FINANCE_RETIRED,
         STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
 }

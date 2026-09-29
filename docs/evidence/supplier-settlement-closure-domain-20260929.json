@@ -1,0 +1,38 @@
+{
+  "date": "2026-09-29",
+  "scope": "Safe supplier settlement retirement and local payable reservation completion domain",
+  "redTest": {
+    "class": "SupplierSettlementClosureTest",
+    "tests": 6,
+    "failures": 1,
+    "case": "alreadySettledElsewhereRequiresReconciliationInsteadOfAnotherAttempt",
+    "cause": "All terminal ERP rejections were initially treated as proof allowing replacement; ALREADY_SETTLED signals a possible settlement for the same bank payment and must block replacement"
+  },
+  "finalTests": {
+    "domain": 64,
+    "serverH2AndLoopback": 61,
+    "total": 125,
+    "newClosureTests": 6,
+    "failures": 0
+  },
+  "authors": {
+    "javaFiles": 926,
+    "namedTypes": 1719,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "verified": [
+    "Never-dispatched queue and read-only claim must stop before retirement",
+    "Unknown, pending, dispatched NOT_FOUND and ALREADY_SETTLED cannot retire",
+    "Independent finance decision binds original settlement, bank identity and revision",
+    "Only exact confirmed ERP settlement can complete the original local reservation",
+    "Completion and lifecycle release are mutually exclusive",
+    "Original source and historical hold remain immutable",
+    "Old JSON without settlement field remains readable through procurement, bank and HTTP regression"
+  ],
+  "limitations": [
+    "Database storage and atomic local reservation completion still require the next migration and service change",
+    "No public settlement or retirement endpoint is exposed yet",
+    "Runtime remains V72 with no real ERP settlement"
+  ]
+}

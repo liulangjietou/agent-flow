@@ -20,7 +20,7 @@ class SupplierPaymentAuthorizationTest {
         fails("PROCUREMENT_PAYMENT_SOURCE_CHANGED", () -> ApprovedProcurementPayment.from(request, hold.release(ProcurementPayableReservation.ReleaseReason.CANCELLED, "alice", APPROVED_AT)));
         fails("PROCUREMENT_PAYMENT_SOURCE_CHANGED", () -> ApprovedProcurementPayment.from(request, approved().reservation()));
         var source = hold.source();
-        var foreign = new ProcurementPayableReservation(hold.id(), new ProcurementPayableReservation.Source("other-tenant", source.requestId(), source.applicationId(), source.employeeId(), source.requestVersion(), source.round()), 1, hold.heldAt(), null);
+        var foreign = new ProcurementPayableReservation(hold.id(), new ProcurementPayableReservation.Source("other-tenant", source.requestId(), source.applicationId(), source.employeeId(), source.requestVersion(), source.round()), 1, hold.heldAt(), null, null);
         fails("PROCUREMENT_PAYMENT_SOURCE_CHANGED", () -> ApprovedProcurementPayment.from(request, foreign));
         assertThat(ApprovedProcurementPayment.from(request, hold).approvedRequestVersion()).isEqualTo(3);
     }

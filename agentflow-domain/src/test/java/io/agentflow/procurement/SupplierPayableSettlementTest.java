@@ -173,7 +173,7 @@ class SupplierPayableSettlementTest {
     }
 
     private static SupplierPayableSettlementCommand command(SupplierPaymentOperation bank, Instant now) { return SupplierPayableSettlementCommand.register(SETTLEMENT_ID, bank, verified(bank, now), period(bank.command(), now), "finance", now); }
-    private static SupplierPayableSettlementOperation sending() { var command = command(bank(), REGISTERED); return SupplierPayableSettlementOperation.queue(command, REGISTERED).claim(REGISTERED, LEASE).readyToSend(evidence(command, REGISTERED), REGISTERED); }
+    static SupplierPayableSettlementOperation sending() { var command = command(bank(), REGISTERED); return SupplierPayableSettlementOperation.queue(command, REGISTERED).claim(REGISTERED, LEASE).readyToSend(evidence(command, REGISTERED), REGISTERED); }
     private static SupplierPayableSettlementEvidence evidence(SupplierPayableSettlementCommand command, Instant now) { return SupplierPayableSettlementEvidence.checked(command, held(command.payment().holdCommand(), now), paid(command.payment(), now), period(command.payment(), now), now); }
     private static PaymentObservation verified(SupplierPaymentOperation bank, Instant now) { return paid(bank.command(), now); }
     private static PaymentObservation paid(SupplierPaymentCommand payment, Instant now) { return new PaymentObservation(payment.id(), payment.digest(), PaymentObservation.Status.SUCCEEDED, 1L, now, "bank-1", payment.amount(), payment.payee().accountDigest(), AUTHORIZED_AT.plusSeconds(6), "receipt-1", null); }
@@ -181,7 +181,7 @@ class SupplierPayableSettlementTest {
         var day = now.atZone(ZoneId.of(payment.holdCommand().authorization().source().reservation().source().round().legalEntity().timeZone())).toLocalDate();
         return new AccountingPeriodPort.OpenPeriod(new AccountingPeriodPort.Request(payment.payee().legalEntityId(), "CNY", day), "period-1", "v1", day.minusDays(30), day.plusDays(30), now, now.plusSeconds(600));
     }
-    private static SupplierPayableSettlementObservation settled(SupplierPayableSettlementCommand command, long revision, Instant now, Instant settledAt) {
+    static SupplierPayableSettlementObservation settled(SupplierPayableSettlementCommand command, long revision, Instant now, Instant settledAt) {
         var p = posting(command, "hold-1", "30", "bank-1", "receipt-1", command.period().request().accountingDate());
         var posting = new SupplierPayableSettlementObservation.Posting(p.settlementReference(), p.holdReference(), p.ledgerVersion(), p.settledAmount(), p.settledBefore(), p.settledAfter(), p.bankPaymentReference(), p.bankReceiptReference(), p.voucherReference(), p.periodReference(), p.accountingDate(), settledAt);
         return new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.SETTLED, revision, now, posting, null);
