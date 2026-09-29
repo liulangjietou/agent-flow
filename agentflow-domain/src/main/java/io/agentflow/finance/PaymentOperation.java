@@ -43,7 +43,8 @@ public record PaymentOperation(Input input, long version, Status status, int att
         if (status == Status.UNKNOWN && failure == null && (observation == null || observation.status() != PaymentObservation.Status.PENDING)
                 || status == Status.RECONCILING && (conflictingObservation == null || failure == null)
                 || status == Status.EXPIRED && (failure != Failure.AUTHORIZATION_EXPIRED || highestRevision != 0 || conflictingObservation != null)
-                || status == Status.VOIDED && (failure != Failure.SOURCE_CHANGED && failure != Failure.ACCOUNT_CHANGED || highestRevision != 0 || conflictingObservation != null)) throw invalid();
+                || status == Status.VOIDED && (failure != Failure.SOURCE_CHANGED && failure != Failure.ACCOUNT_CHANGED && failure != Failure.FINANCE_RETIRED || highestRevision != 0 || conflictingObservation != null)
+                || failure == Failure.FINANCE_RETIRED && (status != Status.VOIDED || dispatches != 0 || observation != null)) throw invalid();
     }
 
     /** 只允许由已保存的单次出纳执行登记建队列，尚未调用资金系统。 */
@@ -85,6 +86,30 @@ public record PaymentOperation(Input input, long version, Status status, int att
         if (status != Status.QUEUED && status != Status.CHECKING || reason != Failure.SOURCE_CHANGED && reason != Failure.ACCOUNT_CHANGED) throw conflict();
         return changed(Status.VOIDED, now, null, null, null, observation, conflictingObservation, highestRevision, reason);
     }
+
+    /** 查无和退回不证明可以另起交易；仅从未进入发送或无矛盾的银行终态失败可供财务结束。 */
+    public RetirementBasis retirementBasis() {
+        if (status == Status.FAILED) return RetirementBasis.CONFIRMED_FAILED;
+        if (dispatches == 0 && highestRevision == 0 && observation == null && conflictingObservation == null
+                && (status == Status.QUEUED || status == Status.CHECKING || status == Status.VOIDED || status == Status.EXPIRED)) {
+            return RetirementBasis.NEVER_DISPATCHED;
+        }
+        return null;
+    }
+
+    /** 使未发送队列及正在复查账户的旧领取失效，已确认失败和已停止状态保留原外部事实。 */
+    public PaymentOperation stopForRetirement(Instant now) {
+        requireTime(now);
+        if (retirementBasis() == null) throw new DomainException("PAYMENT_RETIREMENT_UNSAFE", "Original payment is not proven safely finished");
+        return status == Status.QUEUED || status == Status.CHECKING
+                ? changed(Status.VOIDED, now, null, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
+    }
+
+    /**
+     * 结束依据只来自本地发送记录或原资金交易的终态失败，不由客户端声明。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum RetirementBasis { NEVER_DISPATCHED, CONFIRMED_FAILED }
 
     /** 检查租约过期仍可检查；发送或查询租约过期后只查询原授权。 */
     public PaymentOperation expire(Instant now) {
@@ -231,5 +256,5 @@ public record PaymentOperation(Input input, long version, Status status, int att
      */
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE,
         RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, AUTHORIZATION_EXPIRED, SOURCE_CHANGED, ACCOUNT_CHANGED,
-        STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
+        STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED, FINANCE_RETIRED }
 }

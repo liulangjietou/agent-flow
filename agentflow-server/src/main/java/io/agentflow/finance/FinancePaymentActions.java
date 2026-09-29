@@ -18,7 +18,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
- * 财务只决定短期付款授权、未执行作废和原交易复查，不能替出纳选择出款账户或执行付款。
+ * 财务决定短期授权、作废、安全结束和原交易复查，不能替出纳选择出款账户或执行付款。
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -70,6 +70,11 @@ public class FinancePaymentActions {
         if (input.action() == Action.VOID) {
             before = authorization.status().name(); authorization = authorization.voidBeforeExecution(actors.actor().userId(), input.comment(), now);
             authorizations.update(authorization); after = authorization.status().name(); version = authorization.version();
+        } else if (input.action() == Action.RETIRE) {
+            before = authorization.status().name();
+            var stopped = execution.stopForRetirement(authorization.terms().tenantId(), authorizationId, input.operationVersion(), now);
+            authorization = authorization.retire(stopped, actors.actor().userId(), input.comment(), now);
+            authorizations.update(authorization); after = authorization.status().name(); version = authorization.version(); operationVersion = stopped.version();
         } else {
             var operation = operations.find(authorization.terms().tenantId(), authorizationId).orElseThrow(FinancePaymentActions::notFound);
             before = operation.status().name(); var queried = execution.query(authorization.terms().tenantId(), authorizationId, input.operationVersion(), now);
@@ -87,10 +92,10 @@ public class FinancePaymentActions {
     private static DomainException changedSource() { return new DomainException("PAYMENT_SOURCE_CHANGED", "Current approved financial source and posted voucher are required"); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original payment operation not found"); }
     /**
-     * 财务动作不含出纳执行和换号重付。
+     * 安全结束只释放原业务占用，新授权和出纳执行分别再次确认。
      * @author owlzhangfq@gmail.com
      */
-    public enum Action { VOID, QUERY }
+    public enum Action { VOID, QUERY, RETIRE }
     /**
      * 客户端不提交金额、本人账户、财务目标或授权主体。
      * @author owlzhangfq@gmail.com
@@ -102,7 +107,7 @@ public class FinancePaymentActions {
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown payment authorization field"); }
     }
     /**
-     * 两类动作只接受相应版本，查询引用原付款操作。
+     * 查询及结束均须提交刚展示的原执行版本，不接受客户端声明结束证据。
      * @author owlzhangfq@gmail.com
      */
     public record Input(@NotNull Action action, @Positive long authorizationVersion, @Positive Long operationVersion, @NotBlank @Size(max = 2000) String comment) {

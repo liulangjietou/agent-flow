@@ -11,13 +11,13 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record PaymentAuthorization(Terms terms, Decision decision, long version, Status status, Instant updatedAt,
-                                   Execution execution, Withdrawal withdrawal) {
+                                   Execution execution, Withdrawal withdrawal, Retirement retirement) {
     public static final Duration MAX_VALIDITY = Duration.ofHours(24);
 
     /** 恢复快照时核对授权与已登记命令一致，不能把已登记执行恢复成可二次执行。 */
     public PaymentAuthorization {
         if (terms == null || decision == null || status == null || updatedAt == null || updatedAt.isBefore(decision.authorizedAt())
-                || terms.payee().employeeId().equals(decision.authorizedBy())) throw invalid();
+                || terms.payee().employeeId().equals(decision.authorizedBy()) || (status == Status.RETIRED) != (retirement != null)) throw invalid();
         switch (status) {
             case AUTHORIZED -> { if (version != 1 || execution != null || withdrawal != null || !updatedAt.equals(decision.authorizedAt())) throw invalid(); }
             case EXECUTION_REGISTERED -> {
@@ -30,7 +30,19 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
                         || terms.payee().employeeId().equals(withdrawal.withdrawnBy())) throw invalid();
             }
             case EXPIRED -> { if (version != 2 || execution != null || withdrawal != null || updatedAt.isBefore(decision.expiresAt())) throw invalid(); }
+            case RETIRED -> {
+                if (version != 3 || execution == null || withdrawal != null || !updatedAt.equals(retirement.retiredAt())
+                        || updatedAt.isBefore(execution.registeredAt()) || terms.payee().employeeId().equals(retirement.retiredBy())
+                        || execution.command().authorization().executedBy().equals(retirement.retiredBy())
+                        || !execution.command().equals(command(terms, decision, execution.command().authorization().executedBy(), execution.debitAccount()))) throw invalid();
+                execution.command().requireSendAt(execution.registeredAt());
+            }
         }
+    }
+
+    /** 兼容既有未结束授权的构造与历史快照，结束证据只出现在第三版。 */
+    public PaymentAuthorization(Terms terms, Decision decision, long version, Status status, Instant updatedAt, Execution execution, Withdrawal withdrawal) {
+        this(terms, decision, version, status, updatedAt, execution, withdrawal, null);
     }
 
     /** 金额、轮次、目标和凭证引用均从已保存的实际过账派生，财务只能决定是否授权及期限。 */
@@ -75,6 +87,33 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
     public PaymentAuthorization expire(Instant now) {
         if (status != Status.AUTHORIZED || now == null || now.isBefore(decision.expiresAt())) throw conflict();
         return new PaymentAuthorization(terms, decision, 2, Status.EXPIRED, now, null, null);
+    }
+
+    /** 操作者仍由入口验证财务岗位；实体另保证申请人及原出纳不能结束自己的付款。 */
+    public boolean canRetire(PaymentOperation operation, String actor) {
+        return status == Status.EXECUTION_REGISTERED && !invalidText(actor) && !terms.payee().employeeId().equals(actor)
+                && !execution.command().authorization().executedBy().equals(actor) && matchesOperation(operation) && operation.retirementBasis() != null;
+    }
+
+    /** 跨聚合编排须先停止未发送队列，再以实际原执行版本结束授权，不能仅凭人工说明释放占用。 */
+    public PaymentAuthorization retire(PaymentOperation operation, String actor, String reason, Instant now) {
+        if (!canRetire(operation, actor) || operation.running() || operation.status() == PaymentOperation.Status.QUEUED
+                || now == null || now.isBefore(operation.updatedAt()) || now.isBefore(updatedAt)) {
+            throw new DomainException("PAYMENT_RETIREMENT_UNSAFE", "Original payment is not proven safely finished for this finance actor");
+        }
+        return new PaymentAuthorization(terms, decision, 3, Status.RETIRED, now, execution, null,
+                new Retirement(actor, reason, now, operation.version(), operation.retirementBasis()));
+    }
+
+    /** 恢复结束记录时与保留的原执行修订交叉核验，防止快照声明替代实际资金证据。 */
+    public boolean matchesRetirement(PaymentOperation proof) {
+        return status == Status.RETIRED && matchesOperation(proof) && !proof.running() && proof.status() != PaymentOperation.Status.QUEUED
+                && retirement.operationVersion() == proof.version() && retirement.basis() == proof.retirementBasis() && !proof.updatedAt().isAfter(retirement.retiredAt());
+    }
+
+    private boolean matchesOperation(PaymentOperation operation) {
+        return operation != null && execution != null && operation.input().command().equals(execution.command())
+                && operation.input().targetDigest().equals(terms.targetDigest()) && operation.input().debitAccount().equals(execution.debitAccount());
     }
 
     /** 重新核对已过账事实，查询中、冲突、已冲销或更换命令的凭证均不可继续付款。 */
@@ -161,8 +200,20 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
     }
 
     /**
+     * 安全结束保留财务决定与原执行修订；已发送且未知的交易无法形成此证据。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Retirement(String retiredBy, String reason, Instant retiredAt, long operationVersion, PaymentOperation.RetirementBasis basis) {
+        /** 原因和版本必填，已执行付款不能通过无依据的结束快照恢复。 */
+        public Retirement {
+            if (invalidText(retiredBy) || StringUtils.isBlank(reason) || reason.length() > 2000 || retiredAt == null || operationVersion < 1 || basis == null) throw invalid();
+            reason = reason.trim();
+        }
+    }
+
+    /**
      * 执行已登记不等于已提交资金系统，更不等于付款成功。
      * @author owlzhangfq@gmail.com
      */
-    public enum Status { AUTHORIZED, EXECUTION_REGISTERED, VOIDED, EXPIRED }
+    public enum Status { AUTHORIZED, EXECUTION_REGISTERED, VOIDED, EXPIRED, RETIRED }
 }

@@ -166,6 +166,7 @@ class ExpenseSubmissionIntegrationTest {
             jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
             jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", report.toString());
             String authorizations = "SELECT id FROM payment_authorization WHERE tenant_id='demo' AND business_id=?";
+            jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + "))", report.toString());
             jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id IN (" + authorizations + ")", report.toString());
@@ -599,6 +600,86 @@ class ExpenseSubmissionIntegrationTest {
         jdbc.update("UPDATE approval_application SET status='REVOKED' WHERE tenant_id='demo' AND id=?", report.applicationId().toString());
         paymentWorker.poll(); assertThat(paymentOperations.find("demo", replacement).orElseThrow().status()).isEqualTo(PaymentOperation.Status.VOIDED);
         assertThat(paymentWrites).isZero();
+    }
+
+    @Test
+    void financeRetiresNeverDispatchedExecutionBeforeASeparateNewAuthorization() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); var original = paymentOperations.find("demo", id).orElseThrow();
+        var input = Map.of("action", "RETIRE", "authorizationVersion", 2, "operationVersion", original.version(), "comment", "确认原命令从未发送，结束后重新授权");
+        var receipt = ok(send("/api/v1/payments/" + id + "/finance-actions", "finance", input), 202);
+        assertThat(receipt.path("authorizationVersion").asLong()).isEqualTo(3);
+        assertThat(paymentOperations.find("demo", id).orElseThrow().status()).isEqualTo(PaymentOperation.Status.VOIDED);
+        paymentWorker.poll(); assertThat(paymentWrites).isZero();
+        UUID replacement = authorizePayment(report); assertThat(replacement).isNotEqualTo(id);
+        assertThat(paymentOperations.find("demo", replacement)).isEmpty();
+        assertThat(paymentAuthorizations.find("demo", id).orElseThrow().status().name()).isEqualTo("RETIRED");
+    }
+
+    @Test void confirmedFailureCanRetireOnceAndReplacementNeedsIndependentCashierExecution() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
+        paymentMode = "FAILED"; paymentWorker.poll(); var failed = paymentOperations.find("demo", id).orElseThrow();
+        assertThat(failed.status()).isEqualTo(PaymentOperation.Status.FAILED);
+        var input = Map.of("action", "RETIRE", "authorizationVersion", 2, "operationVersion", failed.version(), "comment", "确认资金系统原交易为终态失败");
+        String key = UUID.randomUUID().toString(), path = "/api/v1/payments/" + id + "/finance-actions";
+        for (String user : List.of("alice", "manager", "admin", "cashier")) assertThat(send(path, user, key, input).getStatus()).isIn(403, 404);
+        var response = send(path, "finance", key, input); var receipt = ok(response, 202);
+        assertThat(receipt.path("operationVersion").asLong()).isEqualTo(failed.version());
+        assertThat(send(path, "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertCode(send(path, "finance", input), "CONCURRENCY_CONFLICT");
+        assertThat(paymentOperations.find("demo", id)).contains(failed);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='PAYMENT_RETIRE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        var financeView = ok(read(paymentPath(report), "finance"), 200);
+        assertThat(financeView.at("/payment/retirement/basis").asText()).isEqualTo("CONFIRMED_FAILED");
+        assertThat(financeView.at("/actions/authorize").asBoolean()).isTrue();
+        var cashier = ok(read("/api/v1/cashier/payments/" + id, "cashier"), 200);
+        assertThat(cashier.at("/actions/query").asBoolean()).isFalse(); assertThat(cashier.toString()).doesNotContain("确认资金系统原交易", "commandDigest");
+        assertCode(send(path, "finance", Map.of("action", "QUERY", "authorizationVersion", 3, "operationVersion", failed.version(), "comment", "旧授权不能重新启用")), "CONCURRENCY_CONFLICT");
+        assertCode(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("QUERY", 3, failed.version())), "CONCURRENCY_CONFLICT");
+        UUID replacement = authorizePayment(report); assertThat(paymentWrites).isEqualTo(1); assertThat(paymentOperations.find("demo", replacement)).isEmpty();
+        ok(send("/api/v1/cashier/payments/" + replacement + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentMode = "SUCCEEDED"; paymentRequestWorker.poll(); paymentWorker.poll();
+        assertThat(paymentOperations.find("demo", replacement).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        assertThat(paymentWrites).isEqualTo(2); assertThat(paymentCommands).hasSize(2);
+        settlementWorker.poll(); budgetWorker.poll(); voucherPreparationWorker.poll(); voucherWorker.poll(); pollArchive();
+        assertThat(archives.find("demo", report.id(), 1).orElseThrow().archive()).isNotNull();
+        assertThat(paymentOperations.find("demo", id)).contains(failed);
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND person_id=?", finance.toString());
+        assertThat(send(path, "finance", key, input).getStatus()).isIn(403, 404);
+    }
+
+    @Test void unknownMissingReturnedAndPaidOperationsCannotReleaseBusinessOccupation() throws Exception {
+        for (String mode : List.of("INVALID", "NOT_FOUND", "SUCCEEDED", "REVERSED")) {
+            var report = paymentReport(); UUID id = authorizePayment(report);
+            ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
+            paymentMode = mode.equals("NOT_FOUND") ? "INVALID" : mode; paymentWorker.poll(); var operation = paymentOperations.find("demo", id).orElseThrow();
+            if (mode.equals("NOT_FOUND")) {
+                paymentMode = "NOT_FOUND"; ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("QUERY", 2, operation.version())), 202);
+                paymentWorker.poll(); operation = paymentOperations.find("demo", id).orElseThrow();
+            }
+            var input = Map.of("action", "RETIRE", "authorizationVersion", 2, "operationVersion", operation.version(), "comment", "不安全的结束应拒绝");
+            assertThat(ok(read(paymentPath(report), "finance"), 200).at("/actions/retire").asBoolean()).isFalse();
+            assertCode(send("/api/v1/payments/" + id + "/finance-actions", "finance", input), "PAYMENT_RETIREMENT_UNSAFE");
+            assertCode(send(paymentPath(report) + "/authorizations", "finance", authorizationInput(report)), "PAYMENT_AUTHORIZATION_EXISTS");
+            assertThat(paymentOperations.find("demo", id)).contains(operation);
+        }
+    }
+
+    @Test void staleRetirementAndEvidenceWriteFailureLeaveOriginalQueueAndOccupation() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
+        var original = paymentOperations.find("demo", id).orElseThrow(); String path = "/api/v1/payments/" + id + "/finance-actions";
+        assertCode(send(path, "finance", Map.of("action", "RETIRE", "authorizationVersion", 2, "operationVersion", original.version() + 1, "comment", "过时页面")), "CONCURRENCY_CONFLICT");
+        jdbc.execute("ALTER TABLE payment_retirement ADD CONSTRAINT reject_retirement_fixture CHECK (authorization_id <> '" + id + "')");
+        try {
+            assertThatThrownBy(() -> send(path, "finance", Map.of("action", "RETIRE", "authorizationVersion", 2, "operationVersion", original.version(), "comment", "证据写入失败不能结束")))
+                    .hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            assertThat(paymentAuthorizations.find("demo", id).orElseThrow().status()).isEqualTo(PaymentAuthorization.Status.EXECUTION_REGISTERED);
+            assertThat(paymentOperations.find("demo", id)).contains(original);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='PAYMENT_RETIRE'", Integer.class, report.applicationId().toString())).isZero();
+        } finally { jdbc.execute("ALTER TABLE payment_retirement DROP CONSTRAINT reject_retirement_fixture"); }
     }
 
     @Test
@@ -1240,6 +1321,7 @@ class ExpenseSubmissionIntegrationTest {
                 else command = paymentCommands.get(UUID.fromString(data.path("authorizationId").asText()));
                 if (paymentMode.equals("INVALID")) yield Map.of("invalidFixture", true);
                 if (paymentMode.equals("NOT_FOUND")) yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null);
+                if (paymentMode.equals("FAILED")) yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.FAILED, 1L, Instant.now(), "synthetic-failed-payment", null, null, null, null, PaymentObservation.Failure.PAYMENT_REJECTED);
                 yield new PaymentObservation(command.id(), command.digest(), paymentMode.equals("REVERSED") ? PaymentObservation.Status.REVERSED : PaymentObservation.Status.SUCCEEDED,
                         paymentMode.equals("REVERSED") ? 2L : 1L, Instant.now(), "synthetic-payment", command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), paymentMode.equals("REVERSED") ? "synthetic-return-receipt" : "synthetic-bank-receipt", null);
             }

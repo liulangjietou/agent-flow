@@ -92,8 +92,17 @@ public class PaymentOperationService {
         var current = currentVersion(tenant, id, expectedVersion); requireSource(authorization(tenant, id), time(now));
         var next = current.retryNotFound(time(now)); complete(current, next); return next;
     }
+    /** 只在财务结束事务内停止未发送队列，迟到账户复查无法继续发送旧授权。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PaymentOperation stopForRetirement(String tenant, UUID id, long expectedVersion, Instant now) {
+        var current = currentVersion(tenant, id, expectedVersion); var next = current.stopForRetirement(time(now));
+        if (!next.equals(current)) complete(current, next);
+        return next;
+    }
     private PaymentOperation currentVersion(String tenant, UUID id, long expected) {
-        var current = locked(tenant, id); if (current == null || current.version() != expected) throw conflict(); return current;
+        var current = locked(tenant, id);
+        if (current == null || current.version() != expected || authorization(tenant, id).status() != PaymentAuthorization.Status.EXECUTION_REGISTERED) throw conflict();
+        return current;
     }
     private PaymentOperation locked(String tenant, UUID id) {
         var current = operations.find(tenant, id).orElse(null); if (current == null) return null;

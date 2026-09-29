@@ -1,11 +1,12 @@
 import type { Money } from './expenses'
 
-export const authorizationLabels = { AUTHORIZED: '财务已授权', EXECUTION_REGISTERED: '出纳执行已登记', VOIDED: '授权已作废', EXPIRED: '授权已到期' }
+export const authorizationLabels = { AUTHORIZED: '财务已授权', EXECUTION_REGISTERED: '出纳执行已登记', VOIDED: '授权已作废', EXPIRED: '授权已到期', RETIRED: '原付款已安全结束' }
 export const paymentRequestLabels = { QUEUED: '等待复核账户', RUNNING: '正在复核账户', READY: '已进入付款队列', BLOCKED: '账户复核未通过', VOIDED: '本次选择已停止', EXPIRED: '授权期限已过' }
 export const paymentOperationLabels = { QUEUED: '等待执行付款', CHECKING: '发送前复核账户', SENDING: '正在请求付款', QUERYING: '正在查询原交易', UNKNOWN: '付款结果待确认', SUCCEEDED: '银行已确认到账', FAILED: '银行未通过付款', NOT_FOUND: '资金系统确认原交易不存在', EXPIRED: '发送期限已过', VOIDED: '付款发送已停止', RECONCILING: '资金结果存在冲突', REVERSED: '银行已退回款项' }
-export type FinancePaymentAction = 'AUTHORIZE' | 'VOID' | 'QUERY'
+export type FinancePaymentAction = 'AUTHORIZE' | 'VOID' | 'QUERY' | 'RETIRE'
 export type CashierPaymentAction = 'EXECUTE' | 'QUERY' | 'RESEND_ORIGINAL'
-export const financePaymentLabels: Record<FinancePaymentAction, string> = { AUTHORIZE: '授权付款', VOID: '作废未执行授权', QUERY: '查询原交易' }
+export const financePaymentLabels: Record<FinancePaymentAction, string> = { AUTHORIZE: '授权付款', VOID: '作废未执行授权', QUERY: '查询原交易', RETIRE: '安全结束原付款' }
+export const retirementBasisLabels = { NEVER_DISPATCHED: '原命令从未进入发送阶段', CONFIRMED_FAILED: '资金系统已确认终态失败' }
 export const cashierPaymentLabels: Record<CashierPaymentAction, string> = { EXECUTE: '登记付款执行', QUERY: '查询原交易', RESEND_ORIGINAL: '按原编号重发' }
 export interface PaymentBinding { applicationId: string; businessId: string; roundNo: number; applicationVersion: number; businessVersion: number }
 export interface PaymentView extends PaymentBinding {
@@ -13,14 +14,15 @@ export interface PaymentView extends PaymentBinding {
   legalEntityId: string; employeeId: string; amount: Money; maskedPayeeAccount: string; authorizedBy: string; authorizedAt: string; expiresAt: string; executedBy: string | null
   request: null | { id: string; version: number; status: keyof typeof paymentRequestLabels; cashier: string; createdAt: string; updatedAt: string; issue: string | null }
   operation: null | { version: number; status: keyof typeof paymentOperationLabels; updatedAt: string; observedStatus: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REVERSED' | 'NOT_FOUND' | null; paymentReference: string | null; receiptReference: string | null; completedAt: string | null; disputed: boolean; issue: string | null }
+  retirement: null | { retiredBy: string; retiredAt: string; operationVersion: number; basis: keyof typeof retirementBasisLabels }
 }
-export interface FinancePaymentView extends PaymentBinding { voucherOperationId: string | null; voucherVersion: number | null; payable: Money | null; payment: PaymentView | null; actions: { authorize: boolean; voidAuthorization: boolean; query: boolean } }
+export interface FinancePaymentView extends PaymentBinding { voucherOperationId: string | null; voucherVersion: number | null; payable: Money | null; payment: PaymentView | null; actions: { authorize: boolean; voidAuthorization: boolean; query: boolean; retire: boolean } }
 export interface CashierPaymentView { payment: PaymentView; actions: { execute: boolean; query: boolean; resendOriginal: boolean } }
 export interface CashierPaymentPage { items: CashierPaymentView[]; nextBeforeId: string | null }
 export interface DebitAccount { reference: string; displayName: string; maskedAccount: string; currency: string; sourceVersion: string }
 export interface PaymentAccounts { authorizationId: string; authorizationVersion: number; validUntil: string; items: DebitAccount[] }
 export interface PaymentAuthorizationInput { roundNo: number; applicationVersion: number; businessVersion: number; voucherOperationId: string; voucherVersion: number; validitySeconds: number; comment: string }
-export interface FinancePaymentActionInput { action: 'VOID' | 'QUERY'; authorizationVersion: number; operationVersion?: number; comment: string }
+export interface FinancePaymentActionInput { action: 'VOID' | 'QUERY' | 'RETIRE'; authorizationVersion: number; operationVersion?: number; comment: string }
 export interface CashierPaymentActionInput { action: CashierPaymentAction; authorizationVersion: number; operationVersion?: number; debitAccountReference?: string; debitAccountVersion?: string; comment: string }
 export interface FinancePaymentReceipt { applicationId: string; businessId: string; roundNo: number; authorizationId: string; authorizationVersion: number; action: FinancePaymentAction; operationVersion: number | null; expiresAt: string; auditEventId: string }
 export interface CashierPaymentReceipt { authorizationId: string; authorizationVersion: number; action: CashierPaymentAction; requestId: string | null; operationVersion: number | null; auditEventId: string }
@@ -41,15 +43,21 @@ export function validatePayment(value: PaymentView, id = value?.id): PaymentView
   if (request && (!request.id || !positive(request.version) || !request.cashier || !known(paymentRequestLabels, request.status))
       || operation && (!positive(operation.version) || !known(paymentOperationLabels, operation.status) || typeof operation.disputed !== 'boolean'
         || ['SUCCEEDED', 'REVERSED'].includes(operation.status) && (operation.disputed || operation.observedStatus !== operation.status || !operation.paymentReference || !operation.receiptReference || !time(operation.completedAt!)))
-      || value.status === 'EXECUTION_REGISTERED' && (!value.executedBy || !operation)
-      || value.status !== 'EXECUTION_REGISTERED' && (value.executedBy !== null || operation !== null)
+      || ['EXECUTION_REGISTERED', 'RETIRED'].includes(value.status) && (!value.executedBy || !operation)
+      || !['EXECUTION_REGISTERED', 'RETIRED'].includes(value.status) && (value.executedBy !== null || operation !== null)
       || request?.status === 'READY' && !operation) throw new Error('付款状态或回单未通过核对，请刷新。')
+  const retirement = value.retirement
+  if (value.status === 'RETIRED' ? value.version !== 3 || !retirement || !retirement.retiredBy || !time(retirement.retiredAt)
+      || !known(retirementBasisLabels, retirement.basis) || retirement.operationVersion !== operation?.version || operation?.disputed
+      || retirement.basis === 'CONFIRMED_FAILED' && (operation?.status !== 'FAILED' || operation.observedStatus !== 'FAILED')
+      || retirement.basis === 'NEVER_DISPATCHED' && (!['VOIDED', 'EXPIRED'].includes(operation?.status ?? '') || operation?.observedStatus !== null)
+      || Date.parse(retirement.retiredAt) < Date.parse(operation!.updatedAt) : retirement !== null) throw new Error('原付款结束证据不完整，请刷新核对。')
   return value
 }
 /** 原付款保留授权时版本；外层明细必须与当前展示版本一致，撤销后仍可查询旧交易。 */
 export function validateFinancePayment(view: FinancePaymentView, expected: PaymentBinding): FinancePaymentView {
   if (!view || !bindingKeys.every(key => view[key] === expected[key]) || ![view.roundNo, view.applicationVersion, view.businessVersion].every(positive)
-      || !view.actions || ['authorize', 'voidAuthorization', 'query'].some(key => typeof view.actions[key as keyof typeof view.actions] !== 'boolean')
+      || !view.actions || ['authorize', 'voidAuthorization', 'query', 'retire'].some(key => typeof view.actions[key as keyof typeof view.actions] !== 'boolean')
       || view.payable !== null && !money(view.payable) || view.voucherOperationId !== null && (!view.voucherOperationId || !positive(view.voucherVersion!))) throw new Error('财务轮次或版本已变化，请刷新业务明细。')
   if (view.payment) {
     validatePayment(view.payment)
@@ -72,12 +80,12 @@ export function validatePaymentAccounts(options: PaymentAccounts, payment: Payme
 }
 function reason(value: string) { if (!value.trim() || value.length > 2000) throw new Error('请填写 2000 字以内的办理说明。'); return value.trim() }
 function requireWindow(payment: PaymentView, now: number) { if (Date.parse(payment.expiresAt) <= now) throw new Error('付款授权已到期，请刷新后由财务处理。') }
-function requireQuery(payment: PaymentView) { if (!payment.operation || ['QUEUED', 'CHECKING', 'SENDING', 'QUERYING'].includes(payment.operation.status)) throw new Error('原交易尚不允许此操作，请刷新状态。') }
+function requireQuery(payment: PaymentView) { if (payment.status !== 'EXECUTION_REGISTERED' || !payment.operation || ['QUEUED', 'CHECKING', 'SENDING', 'QUERYING'].includes(payment.operation.status)) throw new Error('原交易尚不允许此操作，请刷新状态。') }
 
 /** 金额和账户由服务端派生，财务仅提交已核对版本、期限和说明。 */
 export function financePaymentInput(view: FinancePaymentView, action: FinancePaymentAction, comment: string, validitySeconds = 900, now = Date.now()): PaymentAuthorizationInput | FinancePaymentActionInput {
   validateFinancePayment(view, view); const explanation = reason(comment)
-  if (!view.actions[({ AUTHORIZE: 'authorize', VOID: 'voidAuthorization', QUERY: 'query' } as const)[action]]) throw new Error('当前不允许此财务操作，请刷新。')
+  if (!view.actions[({ AUTHORIZE: 'authorize', VOID: 'voidAuthorization', QUERY: 'query', RETIRE: 'retire' } as const)[action]]) throw new Error('当前不允许此财务操作，请刷新。')
   if (action === 'AUTHORIZE') {
     if (!view.voucherOperationId || !positive(view.voucherVersion!) || !money(view.payable) || view.payable!.value === '0.00'
         || !Number.isSafeInteger(validitySeconds) || validitySeconds < 60 || validitySeconds > 86400) throw new Error('请核对应付金额与 1 分钟至 24 小时的授权期限。')
@@ -85,8 +93,11 @@ export function financePaymentInput(view: FinancePaymentView, action: FinancePay
   }
   const payment = view.payment; if (!payment) throw new Error('当前没有付款授权。')
   if (action === 'VOID') { requireWindow(payment, now); if (payment.status !== 'AUTHORIZED') throw new Error('已经登记执行的授权不能作废。') }
+  else if (action === 'RETIRE') {
+    if (payment.status !== 'EXECUTION_REGISTERED' || !payment.operation || payment.operation.disputed || !['QUEUED', 'CHECKING', 'VOIDED', 'EXPIRED', 'FAILED'].includes(payment.operation.status)) throw new Error('原交易尚不具备安全结束依据，请核对资金结果。')
+  }
   else requireQuery(payment)
-  return { action, authorizationVersion: payment.version, ...(action === 'QUERY' ? { operationVersion: payment.operation!.version } : {}), comment: explanation }
+  return { action, authorizationVersion: payment.version, ...(action !== 'VOID' ? { operationVersion: payment.operation!.version } : {}), comment: explanation }
 }
 /** 出纳确认只固化目录中的账户引用和版本；未知结果不能改账户或换号付款。 */
 export function cashierPaymentInput(view: CashierPaymentView, action: CashierPaymentAction, comment: string, accounts: PaymentAccounts | null = null, selected = '', now = Date.now()): CashierPaymentActionInput {
@@ -107,14 +118,15 @@ export function validateFinancePaymentReceipt(receipt: FinancePaymentReceipt, vi
   const authorize = 'roundNo' in input
   if (!receipt || receipt.applicationId !== view.applicationId || receipt.businessId !== view.businessId || receipt.roundNo !== view.roundNo || !receipt.auditEventId || !receipt.authorizationId || !time(receipt.expiresAt)
       || (authorize ? receipt.action !== 'AUTHORIZE' || receipt.authorizationVersion !== 1 || receipt.operationVersion !== null
-        : receipt.action !== input.action || receipt.authorizationId !== view.payment?.id || receipt.authorizationVersion !== input.authorizationVersion + (input.action === 'VOID' ? 1 : 0)
-          || (input.action === 'VOID' ? receipt.operationVersion !== null : !positive(receipt.operationVersion!) || receipt.operationVersion! <= input.operationVersion!))) throw new Error('财务回执不匹配，请刷新核对原授权。')
+        : receipt.action !== input.action || receipt.authorizationId !== view.payment?.id || receipt.authorizationVersion !== input.authorizationVersion + (input.action === 'QUERY' ? 0 : 1)
+          || (input.action === 'VOID' ? receipt.operationVersion !== null : !positive(receipt.operationVersion!)
+            || (input.action === 'RETIRE' ? receipt.operationVersion! < input.operationVersion! || receipt.operationVersion! > input.operationVersion! + 1 : receipt.operationVersion! <= input.operationVersion!)))) throw new Error('财务回执不匹配，请刷新核对原授权。')
 }
 export function validateCashierPaymentReceipt(receipt: CashierPaymentReceipt, id: string, input: CashierPaymentActionInput) {
   if (!receipt || receipt.authorizationId !== id || receipt.authorizationVersion !== input.authorizationVersion || receipt.action !== input.action || !receipt.auditEventId
       || (input.action === 'EXECUTE' ? !receipt.requestId || receipt.operationVersion !== null : receipt.requestId !== null || !positive(receipt.operationVersion!) || receipt.operationVersion! <= input.operationVersion!)) throw new Error('出纳回执不匹配，请刷新核对原交易。')
 }
-const issues: Record<string, string> = { NOT_CONFIGURED: '资金服务尚未配置', TARGET_CHANGED: '原资金服务配置已变化', TIMEOUT: '资金服务响应超时', CONNECTION: '暂时无法连接资金服务', AUTHENTICATION: '资金服务认证失败', REMOTE_FAILURE: '资金服务暂不可用', INVALID_RESPONSE: '资金响应未通过校验', RESPONSE_TOO_LARGE: '资金响应未通过校验', SOURCE_CHANGED: '原批准、凭证或人员依据已变化', ACCOUNT_CHANGED: '账户已变化，已停止本次新发送', AUTHORIZATION_EXPIRED: '原授权期限已过', LEASE_EXPIRED: '处理超时，正在恢复原操作', INSUFFICIENT_FUNDS: '出款账户资金不足', ACCOUNT_UNAVAILABLE: '收款账户不可用', DEBIT_ACCOUNT_UNAVAILABLE: '出款账户不可用', INCONSISTENT_OBSERVATION: '资金结果相互矛盾，需要对账', STALE_OBSERVATION: '资金系统返回了旧版本结果', RECHECK_REQUESTED: '已登记原交易查询' }
+const issues: Record<string, string> = { FINANCE_RETIRED: '财务已安全停止未发送原命令', PAYMENT_REJECTED: '资金系统已明确拒绝本次付款', NOT_CONFIGURED: '资金服务尚未配置', TARGET_CHANGED: '原资金服务配置已变化', TIMEOUT: '资金服务响应超时', CONNECTION: '暂时无法连接资金服务', AUTHENTICATION: '资金服务认证失败', REMOTE_FAILURE: '资金服务暂不可用', INVALID_RESPONSE: '资金响应未通过校验', RESPONSE_TOO_LARGE: '资金响应未通过校验', SOURCE_CHANGED: '原批准、凭证或人员依据已变化', ACCOUNT_CHANGED: '账户已变化，已停止本次新发送', AUTHORIZATION_EXPIRED: '原授权期限已过', LEASE_EXPIRED: '处理超时，正在恢复原操作', INSUFFICIENT_FUNDS: '出款账户资金不足', ACCOUNT_UNAVAILABLE: '收款账户不可用', DEBIT_ACCOUNT_UNAVAILABLE: '出款账户不可用', INCONSISTENT_OBSERVATION: '资金结果相互矛盾，需要对账', STALE_OBSERVATION: '资金系统返回了旧版本结果', RECHECK_REQUESTED: '已登记原交易查询' }
 export function paymentIssue(code: string | null) { return code ? issues[code] ?? '付款依据或外部结果需要核对' : '' }
 export function paymentError(cause: unknown) {
   const error = cause as { status?: number; code?: string }

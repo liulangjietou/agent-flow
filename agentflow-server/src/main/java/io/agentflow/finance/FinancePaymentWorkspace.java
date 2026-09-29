@@ -56,7 +56,9 @@ public class FinancePaymentWorkspace {
         return new View(applicationId, app.businessReference().id(), context.roundNo(), app.version(), context.businessVersion(),
                 voucher == null ? null : voucher.input().command().id(), voucher == null ? null : voucher.version(),
                 voucher == null ? null : voucher.input().command().totals().payable(),
-                authorization == null ? null : PaymentView.of(authorization, request, operation), new Actions(authorize, finance && window, finance && PaymentView.queryable(operation)));
+                authorization == null ? null : PaymentView.of(authorization, request, operation),
+                new Actions(authorize, finance && window, finance && PaymentView.queryable(authorization, operation),
+                        finance && authorization != null && authorization.canRetire(operation, actors.actor().userId())));
     }
     private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Only a positive roundNo is accepted for application payment status"); }
     /**
@@ -70,5 +72,5 @@ public class FinancePaymentWorkspace {
      * 写入入口始终重新验证，提示不能代替实际权限。
      * @author owlzhangfq@gmail.com
      */
-    public record Actions(boolean authorize, boolean voidAuthorization, boolean query) { }
+    public record Actions(boolean authorize, boolean voidAuthorization, boolean query, boolean retire) { }
 }

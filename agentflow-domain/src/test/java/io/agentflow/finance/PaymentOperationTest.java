@@ -147,6 +147,47 @@ class PaymentOperationTest {
         assertThatThrownBy(() -> new PaymentOperation(sending.input(), sending.version(), PaymentOperation.Status.SUCCEEDED, sending.attempts(), 0, NOW, NOW, null, null, null, fact(PaymentObservation.Status.SUCCEEDED, 1, NOW), null, 1, null)).isInstanceOf(DomainException.class);
     }
 
+    @Test void retirementStopsOnlyNeverDispatchedWorkAndPreservesFailedBankEvidence() {
+        var checking = queue().claim(NOW, LEASE);
+        for (var original : List.of(queue(), checking, queue().claim(command.authorization().expiresAt(), LEASE))) {
+            var stopped = original.stopForRetirement(original.updatedAt());
+            assertThat(stopped.retirementBasis()).isEqualTo(PaymentOperation.RetirementBasis.NEVER_DISPATCHED);
+            assertThat(stopped.nextAttemptAt()).isNull(); assertThat(stopped.leaseUntil()).isNull();
+            var retired = authorization.retire(stopped, "finance", "未发送，结束原执行", stopped.updatedAt());
+            assertThat(retired.status()).isEqualTo(PaymentAuthorization.Status.RETIRED);
+            assertThat(retired.execution()).isEqualTo(authorization.execution()); assertThat(retired.matchesRetirement(stopped)).isTrue();
+        }
+        var failed = sending().complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.FAILED, 2, NOW)), NOW);
+        assertThat(failed.stopForRetirement(NOW)).isSameAs(failed);
+        assertThat(authorization.retire(failed, "finance", "银行已确认未付", NOW).retirement().basis()).isEqualTo(PaymentOperation.RetirementBasis.CONFIRMED_FAILED);
+        assertThat(authorization.canRetire(failed, "cashier")).isFalse(); assertThat(authorization.canRetire(failed, "alice")).isFalse();
+        assertThatThrownBy(() -> authorization.retire(checking, "finance", "未停止队列", NOW)).isInstanceOf(DomainException.class);
+    }
+
+    @Test void noRetirementForUnknownAbsenceReturnOrConflictingFactsEvenAfterResendStops() {
+        var at = NOW.plusSeconds(1);
+        var unknown = sending().unavailable(PaymentOperation.Failure.TIMEOUT, at);
+        var missing = query(unknown, at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.NOT_FOUND, 0, at)), at);
+        var resending = missing.retryNotFound(at);
+        var reversed = query(paid(), at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.REVERSED, 3, at)), at);
+        var conflict = query(paid(), at).complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.FAILED, 3, at)), at);
+        for (var unsafe : List.of(sending(), unknown, missing, resending, resending.claim(at, LEASE),
+                resending.voidBeforeSend(PaymentOperation.Failure.ACCOUNT_CHANGED, at), resending.claim(command.authorization().expiresAt(), LEASE), paid(), reversed, conflict)) {
+            assertThat(unsafe.retirementBasis()).isNull(); assertThat(authorization.canRetire(unsafe, "finance")).isFalse();
+            assertThatThrownBy(() -> unsafe.stopForRetirement(unsafe.updatedAt())).isInstanceOf(DomainException.class);
+        }
+    }
+
+    @Test void restoredRetirementMustKeepOriginalExecutionAndExactProofRevision() {
+        var stopped = queue().stopForRetirement(NOW); var retired = authorization.retire(stopped, "finance", "停止未发送原件", NOW);
+        assertThat(retired.matchesRetirement(queue())).isFalse(); assertThat(retired.canRetire(stopped, "finance")).isFalse();
+        assertThatThrownBy(() -> new PaymentAuthorization(retired.terms(), retired.decision(), 3, PaymentAuthorization.Status.RETIRED, NOW, retired.execution(), null))
+                .isInstanceOf(DomainException.class);
+        var proof = retired.retirement();
+        assertThatThrownBy(() -> new PaymentAuthorization(retired.terms(), retired.decision(), 3, PaymentAuthorization.Status.RETIRED, NOW, retired.execution(), null,
+                new PaymentAuthorization.Retirement("cashier", proof.reason(), NOW, proof.operationVersion(), proof.basis()))).isInstanceOf(DomainException.class);
+    }
+
     private PaymentOperation queue() { return PaymentOperation.queue(authorization, NOW); }
     private PaymentOperation sending() { return queue().claim(NOW, LEASE).readyToSend(directory(NOW), account(NOW), NOW); }
     private PaymentOperation paid() { return sending().complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.SUCCEEDED, 2, NOW)), NOW); }

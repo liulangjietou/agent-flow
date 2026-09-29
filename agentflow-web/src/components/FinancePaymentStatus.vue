@@ -30,7 +30,7 @@ async function load() {
   } catch (cause) { if (current === epoch) error.value = paymentError(cause) }
   finally { clearTimeout(timeout); if (current === epoch) { loading.value = false; controller = null } }
 }
-function allowed(action: FinancePaymentAction) { return !!view.value?.actions[({ AUTHORIZE: 'authorize', VOID: 'voidAuthorization', QUERY: 'query' } as const)[action]] }
+function allowed(action: FinancePaymentAction) { return !!view.value?.actions[({ AUTHORIZE: 'authorize', VOID: 'voidAuthorization', QUERY: 'query', RETIRE: 'retire' } as const)[action]] }
 function prepare(action: FinancePaymentAction) {
   if (blocked.value || !allowed(action)) return
   pending.value = action; comment.value = ''; error.value = ''; notice.value = ''; const current = epoch
@@ -67,11 +67,12 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
     <template v-if="view">
       <PaymentFacts v-if="view.payment" :payment="view.payment" />
       <p v-else class="payment-help">尚无本轮付款授权。<span v-if="view.payable">本次应付 {{ view.payable.currency }} {{ view.payable.value }}。</span></p>
-      <div v-if="!pending" class="payment-buttons"><button v-for="action in (['AUTHORIZE', 'VOID', 'QUERY'] as const)" v-show="allowed(action)" :key="action" type="button" :class="action === 'AUTHORIZE' ? 'primary' : 'quiet'" :disabled="blocked" @click="prepare(action)">{{ financePaymentLabels[action] }}</button></div>
+      <div v-if="!pending" class="payment-buttons"><button v-for="action in (['AUTHORIZE', 'VOID', 'QUERY', 'RETIRE'] as const)" v-show="allowed(action)" :key="action" type="button" :class="action === 'AUTHORIZE' ? 'primary' : 'quiet'" :disabled="blocked" @click="prepare(action)">{{ financePaymentLabels[action] }}</button></div>
       <form v-else ref="form" class="payment-confirm" @submit.prevent="execute">
         <h4>{{ financePaymentLabels[pending] }}</h4>
         <p v-if="pending === 'AUTHORIZE'">确认应付 {{ view.payable?.currency }} {{ view.payable?.value }}，依据本轮已批准内容与已过账凭证授权。出纳将在授权期限内执行。</p>
         <p v-else-if="pending === 'VOID'">停止这份尚未登记执行的授权。出纳已经登记执行的付款不能在这里取消。</p>
+        <p v-else-if="pending === 'RETIRE'">确认原命令从未发送，或资金系统已确认终态失败。结束后保留原记录，重新付款需要财务再次授权和独立出纳确认；本次操作不会发起付款。</p>
         <p v-else>只查询原交易及回单，不发起新的付款。</p>
         <label v-if="pending === 'AUTHORIZE'">授权有效期（分钟）<input v-model.number="validityMinutes" type="number" min="1" max="1440" step="1" required :disabled="saving" /></label>
         <label>办理说明<textarea v-model="comment" maxlength="2000" required rows="3" :disabled="saving" placeholder="说明本次授权、停止或核对的依据" /></label>

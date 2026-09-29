@@ -110,6 +110,7 @@ class PaymentOperationIntegrationTest {
     }
     @AfterEach void removeOnlyPaymentFixtures() {
         for (var id : fixtures) {
+            jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id=?", id.toString());
             String application = "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND id=?";
             jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + "))", id.toString());
             jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + ")", id.toString());
@@ -125,6 +126,25 @@ class PaymentOperationIntegrationTest {
         jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN ('finance','cashier')");
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test void financeRetirementWhileAccountReadIsInFlightPreventsLateWorkerFromSending() throws Exception {
+        var job = job(); var id = job.input().command().id(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        RESPONDER.set((path, data) -> { if (path.endsWith("debit-accounts")) { entered.countDown(); await(release); } return response(path, data); });
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            var running = pool.submit(worker::poll); assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            var checking = reload(job); assertThat(checking.status()).isEqualTo(PaymentOperation.Status.CHECKING);
+            tx().executeWithoutResult(status -> {
+                var original = authorizations.find("demo", id).orElseThrow(); sources.lock(original);
+                var stopped = execution.stopForRetirement("demo", id, checking.version(), now());
+                authorizations.update(original.retire(stopped, "finance", "结束未发送的原付款", now()));
+            });
+            release.countDown(); running.get(4, TimeUnit.SECONDS); worker.poll();
+            assertThat(WRITES.get()).isZero(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.VOIDED);
+            var retired = authorizations.find("demo", id).orElseThrow(); assertThat(retired.matchesRetirement(reload(job))).isTrue();
+            assertThat(authorizations.active("demo", BusinessReference.Type.ADVANCE_REQUEST, job.input().command().binding().businessId())).isEmpty();
+        } finally { release.countDown(); pool.shutdownNow(); }
+    }
 
     @Test void workerRechecksBothAccountsAndOnlySendsTheCommittedOriginalCommand() {
         var job = job(); assertThat(WRITES.get()).isZero(); worker.poll(); var done = reload(job);

@@ -19078,7 +19078,7 @@
         "tags": [
           "凭证与结算"
         ],
-        "summary": "作废尚未执行的授权或查询原交易",
+        "summary": "财务作废、复查或安全结束原付款",
         "description": "VOID 仅允许未登记执行且仍在有效期内的授权；QUERY 只追踪原资金操作，授权到期后仍可查询。幂等回放不跳过当前权限。",
         "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
         "x-idempotency": true,
@@ -19229,9 +19229,10 @@
                 "$ref": "#/components/schemas/FinancePaymentActionInput"
               },
               "example": {
-                "action": "VOID",
-                "authorizationVersion": 1,
-                "comment": "尚未执行，停止本次授权。"
+                "action": "RETIRE",
+                "authorizationVersion": 2,
+                "operationVersion": 4,
+                "comment": "资金系统已确认原交易终态失败"
               }
             }
           }
@@ -30808,7 +30809,8 @@
           "expiresAt",
           "executedBy",
           "request",
-          "operation"
+          "operation",
+          "retirement"
         ],
         "properties": {
           "id": {
@@ -30825,7 +30827,8 @@
               "AUTHORIZED",
               "EXECUTION_REGISTERED",
               "VOIDED",
-              "EXPIRED"
+              "EXPIRED",
+              "RETIRED"
             ]
           },
           "purpose": {
@@ -30908,6 +30911,16 @@
                 "type": "null"
               }
             ]
+          },
+          "retirement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -30917,7 +30930,8 @@
         "required": [
           "authorize",
           "voidAuthorization",
-          "query"
+          "query",
+          "retire"
         ],
         "properties": {
           "authorize": {
@@ -30927,6 +30941,9 @@
             "type": "boolean"
           },
           "query": {
+            "type": "boolean"
+          },
+          "retire": {
             "type": "boolean"
           }
         }
@@ -31073,7 +31090,8 @@
             "type": "string",
             "enum": [
               "VOID",
-              "QUERY"
+              "QUERY",
+              "RETIRE"
             ]
           },
           "authorizationVersion": {
@@ -31103,7 +31121,10 @@
             "if": {
               "properties": {
                 "action": {
-                  "const": "QUERY"
+                  "enum": [
+                    "QUERY",
+                    "RETIRE"
+                  ]
                 }
               }
             },
@@ -31168,7 +31189,8 @@
             "enum": [
               "AUTHORIZE",
               "VOID",
-              "QUERY"
+              "QUERY",
+              "RETIRE"
             ]
           },
           "operationVersion": {
@@ -31769,6 +31791,36 @@
           },
           "canDownload": {
             "type": "boolean"
+          }
+        }
+      },
+      "PaymentRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "retiredBy",
+          "retiredAt",
+          "operationVersion",
+          "basis"
+        ],
+        "properties": {
+          "retiredBy": {
+            "type": "string"
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_FAILED"
+            ]
           }
         }
       }

@@ -73,9 +73,9 @@ public class CashierPaymentWorkspace {
         boolean separated = !actor.userId().equals(terms.payee().employeeId()) && !actor.userId().equals(value.decision().authorizedBy());
         boolean window = now.isBefore(value.decision().expiresAt());
         boolean execute = separated && window && value.status() == PaymentAuthorization.Status.AUTHORIZED && request == null;
-        boolean resend = separated && window && value.execution() != null && actor.userId().equals(value.execution().command().authorization().executedBy())
+        boolean resend = separated && window && value.status() == PaymentAuthorization.Status.EXECUTION_REGISTERED && actor.userId().equals(value.execution().command().authorization().executedBy())
                 && operation != null && operation.status() == PaymentOperation.Status.NOT_FOUND && operation.highestRevision() == 0 && operation.conflictingObservation() == null;
-        return new View(PaymentView.of(value, request, operation), new Actions(execute, PaymentView.queryable(operation), resend));
+        return new View(PaymentView.of(value, request, operation), new Actions(execute, PaymentView.queryable(value, operation), resend));
     }
     private static Query page(Map<String, String> parameters) {
         if (!Set.of("limit", "beforeId").containsAll(parameters.keySet())) throw invalid();

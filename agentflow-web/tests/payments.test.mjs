@@ -11,8 +11,8 @@ global.localStorage = { getItem: () => 'test-token', setItem() {}, removeItem() 
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 const clone = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
 const binding = () => ({ applicationId: 'app', businessId: 'report', roundNo: 1, applicationVersion: 9, businessVersion: 3 })
-const payment = () => ({ ...binding(), id: 'authorization', version: 1, status: 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', legalEntityId: 'entity', employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: new Date(Date.now() - 60000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), executedBy: null, request: null, operation: null })
-const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, actions: { authorize: true, voidAuthorization: false, query: false } })
+const payment = () => ({ ...binding(), id: 'authorization', version: 1, status: 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', legalEntityId: 'entity', employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: new Date(Date.now() - 60000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), executedBy: null, request: null, operation: null, retirement: null })
+const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, actions: { authorize: true, voidAuthorization: false, query: false, retire: false } })
 const cashier = () => ({ payment: payment(), actions: { execute: true, query: false, resendOriginal: false } })
 const accounts = () => ({ authorizationId: 'authorization', authorizationVersion: 1, validUntil: new Date(Date.now() + 60000).toISOString(), items: [{ reference: 'debit-1', displayName: '基本户', maskedAccount: '****4567', currency: 'CNY', sourceVersion: 'v1' }] })
 const operation = () => ({ version: 4, status: 'UNKNOWN', updatedAt: new Date().toISOString(), observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: 'CONNECTION' })
@@ -154,6 +154,45 @@ test('账户查询超时不保留旧选项，迟到成功也不能成为可选�
     const waiting = p.state.prepare('EXECUTE'); expire(); assert.equal(signal.aborted, true); assert.equal(p.state.accountsLoading, false)
     complete(accounts()); await waiting; assert.equal(p.state.options, null); assert.match(p.state.error, /超时/)
   } finally { global.setTimeout = timer; global.clearTimeout = clear; p.close() }
+})
+
+test('安全结束要求服务端许可和原执行版本，回执允许保留银行失败版本且拒绝错绑', () => {
+  const view = finance(); view.payment = payment(); Object.assign(view.payment, { version: 2, status: 'EXECUTION_REGISTERED', executedBy: 'cashier', operation: operation() })
+  view.actions = { authorize: false, voidAuthorization: false, query: true, retire: true }
+  for (const status of ['UNKNOWN', 'NOT_FOUND', 'SUCCEEDED', 'REVERSED', 'SENDING', 'QUERYING', 'RECONCILING']) {
+    view.payment.operation.status = status; assert.throws(() => rules.financePaymentInput(view, 'RETIRE', '结束原付款'))
+  }
+  Object.assign(view.payment.operation, { status: 'FAILED', observedStatus: 'FAILED', paymentReference: 'original-bank-id' })
+  const input = rules.financePaymentInput(view, 'RETIRE', ' 银行确认未付款 ')
+  assert.deepEqual(input, { action: 'RETIRE', authorizationVersion: 2, operationVersion: 4, comment: '银行确认未付款' })
+  const receipt = { ...financeReceipt(), action: 'RETIRE', authorizationVersion: 3, operationVersion: 4 }
+  assert.doesNotThrow(() => rules.validateFinancePaymentReceipt(receipt, view, input))
+  for (const change of [{ authorizationVersion: 2 }, { authorizationId: 'different' }, { operationVersion: 3 }, { operationVersion: 6 }]) assert.throws(() => rules.validateFinancePaymentReceipt({ ...receipt, ...change }, view, input))
+  view.actions.retire = false; assert.throws(() => rules.financePaymentInput(view, 'RETIRE', '无权结束'))
+})
+
+test('已结束付款必须保留匹配依据，出纳无法用旧授权查询或重发', () => {
+  const value = payment(); Object.assign(value, { status: 'RETIRED', version: 3, executedBy: 'cashier', operation: { ...operation(), status: 'VOIDED', observedStatus: null }, retirement: { retiredBy: 'finance', retiredAt: new Date().toISOString(), operationVersion: 4, basis: 'NEVER_DISPATCHED' } })
+  assert.equal(rules.validatePayment(value), value)
+  for (const mutate of [v => v.retirement = null, v => v.retirement.operationVersion = 3, v => v.retirement.basis = 'UNKNOWN', v => v.operation.status = 'NOT_FOUND', v => v.status = 'EXECUTION_REGISTERED']) {
+    const invalid = clone(value); mutate(invalid); assert.throws(() => rules.validatePayment(invalid))
+  }
+  for (const action of ['QUERY', 'RESEND_ORIGINAL']) assert.throws(() => rules.cashierPaymentInput({ payment: value, actions: { execute: false, query: true, resendOriginal: true } }, action, '旧按钮'))
+})
+
+test('安全结束独立确认且双击只保存一次，结束后不会自动重新授权', async () => {
+  const view = finance(); view.payment = payment(); Object.assign(view.payment, { version: 2, status: 'EXECUTION_REGISTERED', executedBy: 'cashier', operation: { ...operation(), status: 'QUEUED' } })
+  view.actions = { authorize: false, voidAuthorization: false, query: false, retire: true }
+  api.financePayment = async () => clone(view); let complete; const writes = [], authorizations = []
+  api.financePaymentAction = (id, input) => { writes.push({ id, input }); return new Promise(resolve => complete = resolve) }
+  api.authorizePayment = (...input) => authorizations.push(input)
+  const p = mount(Finance, binding())
+  try {
+    await settle(); p.state.prepare('RETIRE'); assert.equal(writes.length, 0); p.state.comment = '从未发送，确认结束'
+    const pending = p.state.execute(); await p.state.execute(); assert.equal(writes.length, 1)
+    complete({ ...financeReceipt(), action: 'RETIRE', authorizationVersion: 3, operationVersion: 5 }); await pending
+    assert.equal(authorizations.length, 0); assert.equal(p.state.pending, null); assert.equal(p.state.error, '')
+  } finally { p.close() }
 })
 
 test('实际 API 读取禁用缓存，原授权路径正确转义，账户不能从其他路由获取', async () => {
