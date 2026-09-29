@@ -61,7 +61,7 @@ public class AdvanceRepaymentWorkspace {
                 value.issue() == null ? null : value.issue().name(), issue == null, issue);
     }
     /** 本人资金列表与借款详情使用同一余额投影，已还款和报销冲销分别显示。 */
-    public static Balance balance(EmployeeAdvance value) { return new Balance(value.version(), value.status(), value.balance().limit(), value.available(), value.balance().reserved(), value.balance().consumed(), value.repaid(), value.outstanding(), value.receivedRepayments(), value.returnedRepayments()); }
+    public static Balance balance(EmployeeAdvance value) { return new Balance(value.version(), value.status(), value.balance().limit(), value.available(), value.balance().reserved(), value.balance().consumed(), value.repaid(), value.outstanding(), value.receivedRepayments(), value.returnedRepayments(), value.returnedDisbursements()); }
     /** 原收款一直保留，退回和逐笔冻结作为独立事实同时展示。 */
     public static Recorded recorded(AdvanceRepayment value, EmployeeAdvance advance) {
         var returns = advance.repaymentReturns().stream().filter(entry -> entry.repaymentId().equals(value.id())).toList();
@@ -80,7 +80,7 @@ public class AdvanceRepaymentWorkspace {
      * 保持借出等于报销冲销、已还款及未还款的守恒关系。
      * @author owlzhangfq@gmail.com
      */
-    public record Balance(long version, EmployeeAdvance.Status status, Money paid, Money available, Money reserved, Money offset, Money repaid, Money outstanding, Money receivedRepayments, Money returnedRepayments) { }
+    public record Balance(long version, EmployeeAdvance.Status status, Money paid, Money available, Money reserved, Money offset, Money repaid, Money outstanding, Money receivedRepayments, Money returnedRepayments, Money returnedDisbursements) { }
     /**
      * 仅当前财务可见自己的最新查询，查询完成仍需明确确认。
      * @author owlzhangfq@gmail.com

@@ -3,8 +3,8 @@ import { amountMinor, expenseError, type Money } from './expenses.js'
 /** 还款独立保留资金和记账依据，所有金额来自服务端。@author owlzhangfq@gmail.com */
 export interface RepaymentBinding { applicationId: string; advanceId: string; roundNo: number }
 export type RepaymentChannel = 'BANK_TRANSFER' | 'CASH' | 'PAYROLL'
-export type AdvanceBalanceStatus = 'PAID_OUT' | 'PARTIALLY_SETTLED' | 'SETTLED' | 'PAYMENT_REVIEW' | 'REPAYMENT_REVIEW'
-export interface AdvanceBalance { version: number; status: AdvanceBalanceStatus; paid: Money; available: Money; reserved: Money; offset: Money; repaid: Money; outstanding: Money; receivedRepayments: Money; returnedRepayments: Money }
+export type AdvanceBalanceStatus = 'PAID_OUT' | 'PARTIALLY_SETTLED' | 'SETTLED' | 'RETURNED' | 'PAYMENT_REVIEW' | 'REPAYMENT_REVIEW'
+export interface AdvanceBalance { version: number; status: AdvanceBalanceStatus; paid: Money; available: Money; reserved: Money; offset: Money; repaid: Money; outstanding: Money; receivedRepayments: Money; returnedRepayments: Money; returnedDisbursements?: Money }
 export interface RepaymentFunding { channel: RepaymentChannel; transactionReference: string; amount: Money; receivedAt: string }
 export interface RepaymentPosting { voucherReference: string; entryReference: string; amount: Money; accountingDate: string; postedAt: string }
 export interface RepaymentEvidence { status: 'NOT_FOUND' | 'PENDING' | 'CONFIRMED' | 'REVERSED'; revision: number; observedAt: string; validUntil: string; funding: RepaymentFunding | null; posting: RepaymentPosting | null }
@@ -17,7 +17,7 @@ export interface RepaymentView extends RepaymentBinding { balance: AdvanceBalanc
 export interface RepaymentQueryInput { advanceVersion: number; receiptReference: string; comment: string }
 export interface RepaymentRecordInput { advanceVersion: number; checkId: string; checkVersion: number; comment: string }
 export interface RepaymentActionReceipt { advanceId: string; checkId: string; checkVersion: number; repaymentId: string | null; advanceVersion: number; auditEventId: string }
-export const advanceBalanceLabels: Record<AdvanceBalanceStatus, string> = { PAID_OUT: '已放款', PARTIALLY_SETTLED: '部分归还 / 冲销', SETTLED: '已结清', PAYMENT_REVIEW: '付款待核对，暂停使用', REPAYMENT_REVIEW: '还款待核对，暂停使用' }
+export const advanceBalanceLabels: Record<AdvanceBalanceStatus, string> = { PAID_OUT: '已放款', PARTIALLY_SETTLED: '部分归还 / 冲销', SETTLED: '已结清', RETURNED: '原放款已全额退回', PAYMENT_REVIEW: '付款待核对，暂停使用', REPAYMENT_REVIEW: '还款待核对，暂停使用' }
 export const repaymentChannelLabels: Record<RepaymentChannel, string> = { BANK_TRANSFER: '银行转账', CASH: '现金收款', PAYROLL: '工资抵扣' }
 export const repaymentCheckLabels: Record<RepaymentCheck['status'], string> = { QUEUED: '等待查询', RUNNING: '正在查询', CHECKED: '已取得查询结果', RECORDED: '已确认还款', UNAVAILABLE: '本次查询不可用', VOIDED: '本次查询已失效' }
 export const repaymentEvidenceLabels: Record<RepaymentEvidence['status'], string> = { NOT_FOUND: '未查到原收款', PENDING: '尚未完成收款及入账', CONFIRMED: '已收款并已入账', REVERSED: '原收款已撤销' }
@@ -52,10 +52,11 @@ export function validateRepaymentView(value: RepaymentView, binding: RepaymentBi
     requireValue(balance && owns(advanceBalanceLabels, balance.status)); version(balance.version)
     const currency = balance.paid.currency, paid = money(balance.paid, currency, true), offset = money(balance.offset, currency), repaid = money(balance.repaid, currency)
     const outstanding = money(balance.outstanding, currency), reserved = money(balance.reserved, currency), available = money(balance.available, currency)
+    const returned = balance.returnedDisbursements === undefined ? 0n : money(balance.returnedDisbursements, currency)
     requireValue(money(balance.receivedRepayments, currency) - money(balance.returnedRepayments, currency) === repaid)
     const held = balance.status === 'PAYMENT_REVIEW' || balance.status === 'REPAYMENT_REVIEW'
-    requireValue(paid === offset + repaid + outstanding && reserved <= outstanding && available === (held ? 0n : outstanding - reserved))
-    if (!held) requireValue(balance.status === (outstanding === 0n ? 'SETTLED' : offset + repaid > 0n ? 'PARTIALLY_SETTLED' : 'PAID_OUT'))
+    requireValue(paid === offset + repaid + returned + outstanding && reserved <= outstanding && available === (held ? 0n : outstanding - reserved))
+    if (!held) requireValue(balance.status === (returned === paid ? 'RETURNED' : outstanding === 0n ? 'SETTLED' : offset + repaid + returned > 0n ? 'PARTIALLY_SETTLED' : 'PAID_OUT'))
     for (const row of value.records) {
       for (const field of [row.id, row.receiptReference, row.voucherReference, row.entryReference, row.recordedBy]) identifier(field)
       channel(row.channel); money(row.amount, currency, true); date(row.accountingDate)

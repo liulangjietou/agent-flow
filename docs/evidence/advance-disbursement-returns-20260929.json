@@ -1,0 +1,180 @@
+{
+  "date": "2026-09-29",
+  "scope": "原放款与累计银行退回独立复核和确认；外部服务为合成回环",
+  "migration": "V59",
+  "validation": {
+    "domainFocused": 8,
+    "domainPostgreSqlRunIncludingRepaymentRegression": 15,
+    "serverH2": 37,
+    "serverPostgreSQL": 102,
+    "frontend": 27,
+    "frontendBuild": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 174,
+      "schemas": 320,
+      "requestExamples": 61
+    },
+    "actualHttpIncludingLogins": [
+      25,
+      12
+    ],
+    "businessHttpSchemas": {
+      "result": "PASS",
+      "responses": 31
+    },
+    "authorCheck": {
+      "javaFiles": 735,
+      "namedTypes": 1335,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "overlap": "各测试范围重叠，不累加为唯一测试数"
+  },
+  "upgrade": {
+    "result": "PASS",
+    "from": 58,
+    "to": 59,
+    "unchangedTables": 13,
+    "unchangedFiles": 4,
+    "backfilledRepaymentCredits": 2,
+    "backupBytes": 548923
+  },
+  "preservation": {
+    "result": "PASS",
+    "oldTables": {
+      "advance_repayment": {
+        "before": 2,
+        "after": 2,
+        "allOldRowsUnchanged": true
+      },
+      "advance_repayment_return": {
+        "before": 3,
+        "after": 3,
+        "allOldRowsUnchanged": true
+      },
+      "advance_repayment_resolution": {
+        "before": 5,
+        "after": 5,
+        "allOldRowsUnchanged": true
+      },
+      "repayment_review_check": {
+        "before": 7,
+        "after": 7,
+        "allOldRowsUnchanged": true
+      },
+      "repayment_review_check_revision": {
+        "before": 26,
+        "after": 26,
+        "allOldRowsUnchanged": true
+      },
+      "advance_repayment_check": {
+        "before": 6,
+        "after": 6,
+        "allOldRowsUnchanged": true
+      },
+      "advance_repayment_check_revision": {
+        "before": 20,
+        "after": 20,
+        "allOldRowsUnchanged": true
+      },
+      "finance_resource_revision": {
+        "before": 38,
+        "after": 42,
+        "allOldRowsUnchanged": true
+      },
+      "payment_operation": {
+        "before": 4,
+        "after": 4,
+        "allOldRowsUnchanged": true
+      },
+      "payment_operation_revision": {
+        "before": 30,
+        "after": 30,
+        "allOldRowsUnchanged": true
+      },
+      "payment_authorization": {
+        "before": 5,
+        "after": 5,
+        "allOldRowsUnchanged": true
+      },
+      "voucher_operation": {
+        "before": 7,
+        "after": 7,
+        "allOldRowsUnchanged": true
+      }
+    },
+    "unchangedFiles": 4,
+    "unchangedPaymentAndVoucherCommands": true,
+    "newTables": {
+      "advance_receipt_credit": 4,
+      "advance_disbursement_resolution": 2,
+      "disbursement_return_check": 3
+    }
+  },
+  "browser": {
+    "confirmed": "累计银行退回70.00，本次新增30.00",
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/disbursement-return-browser-saved.png",
+    "narrowScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/disbursement-return-browser-narrow.png",
+    "layout": {
+      "actualCssWidth": 500,
+      "documentScrollWidth": 500,
+      "dialog": {
+        "width": 456,
+        "scrollWidth": 456
+      },
+      "balance": {
+        "width": 412,
+        "scrollWidth": 412
+      },
+      "returnPanel": {
+        "width": 411,
+        "scrollWidth": 411
+      },
+      "horizontalOverflow": false
+    },
+    "viewportReset": true
+  },
+  "finalBalance": {
+    "version": 21,
+    "status": "PARTIALLY_SETTLED",
+    "paid": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "available": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "reserved": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "offset": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "repaid": {
+      "value": "130.00",
+      "currency": "CNY"
+    },
+    "outstanding": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "receivedRepayments": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "returnedRepayments": {
+      "value": "170.00",
+      "currency": "CNY"
+    },
+    "returnedDisbursements": {
+      "value": "70.00",
+      "currency": "CNY"
+    }
+  },
+  "finalDecisionReference": "UI-BANK-RETURN-BROWSER-002",
+  "remoteDelivery": "未配置远端，未运行 GitHub CI；本地验证不等于企业系统联调"
+}

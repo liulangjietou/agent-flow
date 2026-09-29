@@ -63,6 +63,17 @@ public class JdbcPaymentOperationRepository {
             return value;
         }, tenant, id.toString(), version).stream().findFirst();
     }
+    /** 原放款退回始终绑定首次真实成功修订，后续争议或账户变化不替换它。 */
+    public Optional<PaymentOperation> firstSuccessfulRevision(String tenant, UUID id) {
+        return jdbc.query("SELECT version,state_json FROM payment_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", rows -> {
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), PaymentOperation.class); var command = value.input().command();
+                if (!tenant.equals(command.tenantId()) || !id.equals(command.id()) || value.version() != rows.getLong("version")) throw new IllegalStateException("Persisted payment revision identity is inconsistent");
+                if (value.settleable()) return Optional.of(value);
+            }
+            return Optional.empty();
+        }, tenant, id.toString());
+    }
     /** 争议裁决逐条核对历史修订，曾出现的到账或退回不能因后续回执覆盖而丢失。 */
     public DisputeEvidence disputeEvidence(String tenant, UUID id) {
         return jdbc.query("SELECT version,state_json FROM payment_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", rows -> {

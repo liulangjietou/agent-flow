@@ -45,6 +45,17 @@ test('查询与确认只发送引用和原版本，证据过期或说明为空�
   value.latestCheck.canRecord = false; assert.throws(() => rules.repaymentRecordInput(value, '确认'))
 })
 
+test('原放款退回独立减少欠款，全额退回不能伪装为主动还款或保留可用额度', () => {
+  const value = view(); value.balance.returnedDisbursements = money('40.00'); value.balance.outstanding = money('60.00'); value.balance.available = money('60.00'); value.balance.status = 'PARTIALLY_SETTLED'
+  assert.doesNotThrow(() => rules.validateRepaymentView(value, binding()))
+  for (const change of [v => v.balance.available = money('100.00'), v => v.balance.outstanding = money('100.00'), v => v.balance.returnedDisbursements = null, v => v.balance.returnedDisbursements = money('40.01'), v => v.balance.repaid = money('40.00')]) {
+    const invalid = clone(value); change(invalid); assert.throws(() => rules.validateRepaymentView(invalid, binding()))
+  }
+  value.balance.returnedDisbursements = money('100.00'); value.balance.available = money('0.00'); value.balance.outstanding = money('0.00'); value.balance.status = 'RETURNED'; value.latestCheck.canRecord = false
+  assert.doesNotThrow(() => rules.validateRepaymentView(value, binding()))
+  value.balance.status = 'SETTLED'; assert.throws(() => rules.validateRepaymentView(value, binding()))
+})
+
 test('动作回执必须匹配原借款、原查询及精确下一版本', () => {
   const value = view(), input = rules.repaymentRecordInput(value, '确认')
   assert.doesNotThrow(() => rules.validateRepaymentReceipt(receipt(input), value, input))

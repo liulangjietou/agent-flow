@@ -25,7 +25,8 @@ public class JdbcEmployeeAdvanceRepository implements EmployeeAdvanceRepository 
 
     @Override @Transactional
     public void create(EmployeeAdvance advance, String actor) {
-        if (!advance.balance().reservations().isEmpty() || !advance.balance().consumptions().isEmpty() || !advance.repayments().isEmpty()) throw new DomainException("INVALID_ADVANCE", "A new advance must be an unallocated actual payment");
+        if (!advance.balance().reservations().isEmpty() || !advance.balance().consumptions().isEmpty() || !advance.repayments().isEmpty()
+                || !advance.disbursementReturns().isEmpty()) throw new DomainException("INVALID_ADVANCE", "A new advance must be an unallocated actual payment");
         store.create(KIND, stored(advance), actor);
     }
 

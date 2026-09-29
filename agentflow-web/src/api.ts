@@ -23,6 +23,7 @@ import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, Pre
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
 import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
+import type { DisbursementReturnView, DisbursementReturnQueryInput, DisbursementResolutionInput, DisbursementReturnActionReceipt } from './disbursementReturn'
 import type { RepaymentReviewView, RepaymentReviewQueryInput, RepaymentResolutionInput, RepaymentReviewActionReceipt } from './repaymentReview'
 import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView, VoucherDisputeInput, VoucherDisputeReceipt } from './vouchers'
@@ -323,6 +324,9 @@ export const api = {
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
   advanceRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceRequestItem>>('/advance-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   advanceRequest: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<AdvanceDetail>(`/advance-requests/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  advanceDisbursementReview: (id: string, roundNo: number, signal: AbortSignal) => request<DisbursementReturnView>(`/advance-requests/${encodeURIComponent(id)}/disbursement-review` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  queryAdvanceDisbursementReview: (id: string, input: DisbursementReturnQueryInput) => write<DisbursementReturnActionReceipt>(`/advance-requests/${encodeURIComponent(id)}/disbursement-review-checks`, 'POST', '查询原放款与银行退回', input),
+  resolveAdvanceDisbursement: (id: string, input: DisbursementResolutionInput) => write<DisbursementReturnActionReceipt>(`/advance-requests/${encodeURIComponent(id)}/disbursement-resolutions`, 'POST', '确认原放款复核与退回', input),
   advanceRepaymentReview: (id: string, repaymentId: string, roundNo: number, signal: AbortSignal) => request<RepaymentReviewView>(`/advance-requests/${encodeURIComponent(id)}/repayments/${encodeURIComponent(repaymentId)}/review` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   queryAdvanceRepaymentReview: (id: string, repaymentId: string, input: RepaymentReviewQueryInput) => write<RepaymentReviewActionReceipt>(`/advance-requests/${encodeURIComponent(id)}/repayments/${encodeURIComponent(repaymentId)}/review-checks`, 'POST', '查询原还款复核依据', input),
   resolveAdvanceRepayment: (id: string, repaymentId: string, input: RepaymentResolutionInput) => write<RepaymentReviewActionReceipt>(`/advance-requests/${encodeURIComponent(id)}/repayments/${encodeURIComponent(repaymentId)}/resolutions`, 'POST', '确认原还款复核与退回', input),

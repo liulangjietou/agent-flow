@@ -56,7 +56,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
-                || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT) {
+                || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
         return exchange(tenantId, null, operation, UUID.randomUUID(), data, resultType, matchesRequest);
@@ -125,6 +125,12 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> queryRepaymentAdjustment(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.ADVANCE_REPAYMENT_ADJUSTMENT, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 原放款退回仅按已固定目标读取公司实际回款与借款调整，禁止发送资金命令。 */
+    public <T> FinanceResult<T> queryDisbursementReturn(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.ADVANCE_DISBURSEMENT_RETURN, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     private <T> FinanceResult<T> exchange(String tenantId, String targetDigest, Operation operation, UUID requestId,
@@ -204,7 +210,8 @@ public class FinanceGatewayClient {
         VOUCHER_COMMAND("voucher-command", Set.of()),
         VOUCHER_QUERY("voucher-query", Set.of()),
         ADVANCE_REPAYMENT("advance-repayment", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
-        ADVANCE_REPAYMENT_ADJUSTMENT("advance-repayment-adjustment", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE));
+        ADVANCE_REPAYMENT_ADJUSTMENT("advance-repayment-adjustment", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
+        ADVANCE_DISBURSEMENT_RETURN("advance-disbursement-return", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE));
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
         Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }

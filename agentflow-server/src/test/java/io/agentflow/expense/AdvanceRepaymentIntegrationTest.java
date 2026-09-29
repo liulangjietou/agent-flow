@@ -50,7 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false",
-        "agentflow.expenses.archive-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.advances.repayment-worker-enabled=false", "agentflow.advances.repayment-review-worker-enabled=false"})
+        "agentflow.expenses.archive-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.advances.repayment-worker-enabled=false", "agentflow.advances.repayment-review-worker-enabled=false", "agentflow.advances.disbursement-return-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AdvanceRepaymentIntegrationTest {
     private static final AtomicReference<AdvanceRepaymentIntegrationTest> ACTIVE = new AtomicReference<>();
@@ -75,6 +75,15 @@ class AdvanceRepaymentIntegrationTest {
     private String returnReference;
     private List<AdvanceRepaymentAdjustmentPort.ReturnItem> partialReturns;
     private final Map<UUID, AdvanceRepaymentAdjustmentPort.Receipt> returnFacts = new HashMap<>();
+    private PaymentObservation.Status paymentStatus = PaymentObservation.Status.SUCCEEDED;
+    private long paymentRevision = 1, disbursementRevision = 1;
+    private AdvanceDisbursementReturnPort.Status disbursementStatus = AdvanceDisbursementReturnPort.Status.CONFIRMED;
+    private List<AdvanceDisbursementReturnPort.ReturnItem> disbursementFacts = List.of();
+    @Autowired AdvanceDisbursementReturnWorker disbursementWorker;
+    @Autowired AdvanceDisbursementReturnService disbursementService;
+    @Autowired JdbcDisbursementReturnCheckRepository disbursementChecks;
+    @Autowired JdbcDisbursementResolutionRepository disbursementDecisions;
+    @Autowired JdbcPaymentAuthorizationRepository paymentAuthorizations;
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
     @Autowired AuthService auth;
@@ -132,6 +141,100 @@ class AdvanceRepaymentIntegrationTest {
         }
     }
     @AfterAll static void stopServer() { SERVER.stop(0); }
+
+    @Test void bankReturnsAreCumulativeAndDistinctFromRepaymentsAndReservations() throws Exception {
+        var loan = paidLoan(); amount = "20"; repay(loan, "employee-paid"); reserve(loan, "20");
+        int outgoing = paymentWrites, posting = voucherWrites;
+        var first = bankReturn("bank-first", "40"); disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED; disbursementFacts = List.of(first);
+        var check = disbursementReview(loan); disbursementWorker.poll();
+        assertThat(balance(loan).returnedDisbursements()).isEqualTo(money("0")); assertThat(balance(loan).paymentReviewRequired()).isTrue();
+        assertThat(disbursementView(loan, "finance").at("/latestCheck/canResolve").asBoolean()).isTrue();
+        var input = disbursementInput(loan, check); var key = UUID.randomUUID().toString();
+        var accepted = send(path(loan) + "/disbursement-resolutions", "finance", key, input); ok(accepted, 202);
+        assertThat(send(path(loan) + "/disbursement-resolutions", "finance", key, input).getContentAsString()).isEqualTo(accepted.getContentAsString());
+        var preserved = balance(loan).disbursementReturns().get(0);
+        disbursementRevision = 2; disbursementFacts = List.of(bankReturn("bank-second", "20"), first);
+        var second = disbursementReview(loan); disbursementWorker.poll(); ok(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, second)), 202);
+        var value = balance(loan); assertThat(value.disbursementReturns()).contains(preserved).hasSize(2);
+        assertThat(value.repaid()).isEqualTo(money("20")); assertThat(value.returnedDisbursements()).isEqualTo(money("60"));
+        assertThat(value.outstanding()).isEqualTo(money("20")); assertThat(value.available()).isEqualTo(money("0")); assertThat(value.paymentReviewRequired()).isFalse();
+        var owner = disbursementView(loan, "alice"); assertThat(owner.path("latestCheck").isNull()).isTrue(); assertThat(owner.path("canQuery").asBoolean()).isFalse();
+        assertThat(owner.path("returns")).hasSize(2); assertThat(owner.toString()).doesNotContain("accountDigest", "private-account", "targetDigest", "debitAccount");
+        disbursementReview(loan); disbursementWorker.poll(); queryOriginalPayment(loan);
+        assertThat(balance(loan).paymentReviewRequired()).isFalse(); assertThat(balance(loan).returnedDisbursements()).isEqualTo(money("60"));
+        assertThat(paymentWrites).isEqualTo(outgoing); assertThat(voucherWrites).isEqualTo(posting);
+    }
+
+    @Test void repaymentThenBankReturnCannotSpendOneIncomingCreditTwiceAndRollsBackEarlierNewEntry() throws Exception {
+        var employeeLoan = paidLoan(); var bankLoan = paidLoan(); amount = "20";
+        var repayment = repayments.find("demo", repay(employeeLoan, "shared-incoming")).orElseThrow();
+        var fresh = bankReturn("otherwise-new", "5");
+        disbursementFacts = List.of(fresh, new AdvanceDisbursementReturnPort.ReturnItem(repayment.receipt().funding(), repayment.receipt().posting()));
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED;
+        var check = disbursementReview(bankLoan); disbursementWorker.poll(); var before = balance(bankLoan).state(); var checked = disbursementChecks.find("demo", check).orElseThrow();
+        code(send(path(bankLoan) + "/disbursement-resolutions", "finance", disbursementInput(bankLoan, check)), "DISBURSEMENT_RETURN_ALREADY_RECORDED");
+        assertThat(balance(bankLoan).state()).isEqualTo(before); assertThat(disbursementChecks.find("demo", check).orElseThrow()).isEqualTo(checked);
+        assertThat(disbursementDecisions.latest("demo", bankLoan)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM advance_receipt_credit WHERE tenant_id='demo' AND legal_entity_id=?", Integer.class, entity.toString())).isEqualTo(1);
+        assertThat(balance(employeeLoan).repaid()).isEqualTo(money("20"));
+    }
+
+    @Test void bankReturnThenRepaymentCannotSpendOneIncomingCreditTwice() throws Exception {
+        var bankLoan = paidLoan(); var employeeLoan = paidLoan(); var returned = bankReturn("bank-shared", "20");
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED; disbursementFacts = List.of(returned);
+        var check = disbursementReview(bankLoan); disbursementWorker.poll(); ok(send(path(bankLoan) + "/disbursement-resolutions", "finance", disbursementInput(bankLoan, check)), 202);
+        amount = "20"; transactionReference = returned.funding().transactionReference(); postingReference = returned.posting().voucherReference();
+        var employeeCheck = query(employeeLoan, "same-bank-credit"); worker.poll(); var before = balance(employeeLoan).state();
+        code(send(path(employeeLoan) + "/repayments", "finance", recordInput(employeeLoan, employeeCheck)), "ADVANCE_REPAYMENT_ALREADY_RECORDED");
+        assertThat(balance(employeeLoan).state()).isEqualTo(before); assertThat(view(employeeLoan, "alice").path("records")).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM advance_receipt_credit WHERE tenant_id='demo' AND legal_entity_id=?", Integer.class, entity.toString())).isEqualTo(1);
+    }
+
+    @Test void fullBankReturnRequiresOriginalPaymentResolutionAndLaterBankQueryDoesNotFreezeAgain() throws Exception {
+        var loan = paidLoan(); int outgoing = paymentWrites, posting = voucherWrites;
+        paymentStatus = PaymentObservation.Status.REVERSED; paymentRevision = 1; queryOriginalPayment(loan);
+        UUID paymentId = originalPayment(loan); assertThat(payments.find("demo", paymentId).orElseThrow().status()).isEqualTo(PaymentOperation.Status.RECONCILING);
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.RETURNED; disbursementFacts = List.of(bankReturn("full-bank-return", "100"));
+        var unreviewed = disbursementReview(loan); disbursementWorker.poll();
+        code(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, unreviewed)), "DISBURSEMENT_RETURN_PAYMENT_UNRESOLVED");
+        paymentRevision = 2; queryOriginalPayment(loan);
+        ok(send("/api/v1/payments/" + paymentId + "/dispute-resolutions", "finance", Map.of("authorizationVersion", paymentAuthorizations.find("demo", paymentId).orElseThrow().version(),
+                "operationVersion", payments.find("demo", paymentId).orElseThrow().version(), "outcome", "REVERSED", "evidenceReference", "original-bank-proof", "comment", "独立核对原放款状态")), 202);
+        var check = disbursementReview(loan); disbursementWorker.poll(); ok(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, check)), 202);
+        assertThat(balance(loan).status()).isEqualTo(EmployeeAdvance.Status.RETURNED); assertThat(balance(loan).outstanding()).isEqualTo(money("0"));
+        queryOriginalPayment(loan); assertThat(balance(loan).paymentReviewRequired()).isFalse(); assertThat(balance(loan).status()).isEqualTo(EmployeeAdvance.Status.RETURNED);
+        assertThat(balance(loan).repaid()).isEqualTo(money("0")); assertThat(paymentWrites).isEqualTo(outgoing); assertThat(voucherWrites).isEqualTo(posting);
+    }
+
+    @Test void bankReturnEvidenceCannotOmitEarlierFactsOrOverrunCurrentCapacity() throws Exception {
+        var loan = paidLoan(); var first = bankReturn("first-seen", "40");
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED; disbursementFacts = List.of(first);
+        disbursementReview(loan); disbursementWorker.poll();
+        disbursementRevision = 2; disbursementFacts = List.of(bankReturn("replacement", "40"));
+        var changed = disbursementReview(loan); disbursementWorker.poll(); code(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, changed)), "DISBURSEMENT_RETURN_EVIDENCE_CHANGED");
+        disbursementRevision = 3; disbursementFacts = List.of(first, disbursementFacts.get(0));
+        var corrected = disbursementReview(loan); disbursementWorker.poll(); ok(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, corrected)), 202);
+        assertThat(balance(loan).returnedDisbursements()).isEqualTo(money("80"));
+        reserve(loan, "10"); disbursementRevision = 4; disbursementFacts = List.of(first, disbursementFacts.get(1), bankReturn("too-large", "15"));
+        var excessive = disbursementReview(loan); disbursementWorker.poll();
+        assertThat(disbursementView(loan, "finance").at("/latestCheck/canResolve").asBoolean()).isFalse();
+        assertThat(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, excessive)).getStatus()).isBetween(400, 499);
+        assertThat(balance(loan).returnedDisbursements()).isEqualTo(money("80"));
+    }
+
+    @Test void bankReturnUsesCurrentPermissionsAndRejectsInjectedFinancialFields() throws Exception {
+        var loan = paidLoan(); var input = Map.of("advanceVersion", balance(loan).version(), "comment", "核对银行退回");
+        for (String user : List.of("alice", "cashier", "admin")) assertThat(send(path(loan) + "/disbursement-review-checks", user, input).getStatus()).as(user).isIn(403, 404);
+        var injected = new HashMap<String, Object>(input); injected.put("targetDigest", "forged"); okError(send(path(loan) + "/disbursement-review-checks", "finance", injected), 400);
+        code(read(path(loan) + "/disbursement-review?advanceId=" + loan, "finance"), "INVALID_DISBURSEMENT_RETURN_QUERY");
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED; disbursementFacts = List.of(bankReturn("permission-proof", "20"));
+        var check = disbursementReview(loan); disbursementWorker.poll(); var action = disbursementInput(loan, check); var key = UUID.randomUUID().toString();
+        var mismatched = new HashMap<String, Object>(action); mismatched.put("outcome", "RETURNED"); code(send(path(loan) + "/disbursement-resolutions", "finance", mismatched), "DISBURSEMENT_RETURN_OUTCOME_CHANGED");
+        ok(send(path(loan) + "/disbursement-resolutions", "finance", key, action), 202);
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        okError(send(path(loan) + "/disbursement-resolutions", "finance", key, action), 403);
+        assertThat(balance(loan).returnedDisbursements()).isEqualTo(money("20"));
+    }
 
     @Test void trueReturnPreservesOriginalAndRestoresDebtOnceWithoutSendingFundsOrPosting() throws Exception {
         var loan = paidLoan(); amount = "100"; var repayment = repay(loan, "paid-in-full"); var original = repayments.find("demo", repayment).orElseThrow();
@@ -480,6 +583,26 @@ class AdvanceRepaymentIntegrationTest {
         executionWorker.poll(); paymentWorker.poll(); assertThat(payments.find("demo", payment).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
         preparationWorker.poll(); voucherWorker.poll(); assertThat(balance(loan).available()).isEqualTo(money("100")); return loan;
     }
+    private AdvanceDisbursementReturnPort.ReturnItem bankReturn(String reference, String value) {
+        var now = Instant.now(); return new AdvanceDisbursementReturnPort.ReturnItem(
+                new AdvanceRepaymentPort.Funding(AdvanceRepaymentPort.Channel.BANK_TRANSFER, reference, money(value), now),
+                new AdvanceRepaymentPort.Posting("credit-" + reference, "row-1", money(value), LocalDate.now(), now));
+    }
+    private UUID disbursementReview(UUID loan) throws Exception {
+        return UUID.fromString(ok(send(path(loan) + "/disbursement-review-checks", "finance", Map.of("advanceVersion", balance(loan).version(), "comment", "核对原放款与银行退回")), 202).path("checkId").asText());
+    }
+    private Map<String, Object> disbursementInput(UUID loan, UUID check) {
+        var value = disbursementChecks.find("demo", check).orElseThrow();
+        assertThat(value.receipt()).as("Independent original disbursement and return evidence is available").isNotNull();
+        return Map.of("advanceVersion", balance(loan).version(), "checkId", check, "checkVersion", value.version(), "outcome", value.receipt().status(), "evidenceReference", "bank-return-proof", "comment", "核对原放款、回款和应收贷方分录");
+    }
+    private JsonNode disbursementView(UUID loan, String user) throws Exception { return ok(read(path(loan) + "/disbursement-review", user), 200); }
+    private UUID originalPayment(UUID loan) { return paymentCommands.values().stream().filter(value -> value.binding().businessId().equals(loan)).findFirst().orElseThrow().id(); }
+    private void queryOriginalPayment(UUID loan) throws Exception {
+        UUID payment = originalPayment(loan);
+        ok(send("/api/v1/payments/" + payment + "/finance-actions", "finance", Map.of("action", "QUERY", "authorizationVersion", paymentAuthorizations.find("demo", payment).orElseThrow().version(),
+                "operationVersion", payments.find("demo", payment).orElseThrow().version(), "comment", "读取原银行结果")), 202); paymentWorker.poll();
+    }
     private UUID repay(UUID loan, String reference) throws Exception {
         var check = query(loan, reference); worker.poll(); return UUID.fromString(ok(send(path(loan) + "/repayments", "finance", recordInput(loan, check)), 202).path("repaymentId").asText());
     }
@@ -526,7 +649,13 @@ class AdvanceRepaymentIntegrationTest {
             case "payment-command", "payment-query" -> {
                 var command = operation.endsWith("command") ? json.read(data.path("command").toString(), PaymentCommand.class) : paymentCommands.get(UUID.fromString(data.path("authorizationId").asText()));
                 if (operation.endsWith("command")) paymentWrites++; paymentCommands.put(command.id(), command);
-                yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 1L, at, "funding-" + command.id(), command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "bank-" + command.id(), null);
+                yield new PaymentObservation(command.id(), command.digest(), paymentStatus, paymentRevision, at, "funding-" + command.id(), command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "bank-" + command.id(), null);
+            }
+            case "advance-disbursement-return" -> {
+                var request = json.read(data.toString(), AdvanceDisbursementReturnPort.Request.class); var original = request.original();
+                var current = new PaymentObservation(original.authorizationId(), original.commandDigest(), paymentStatus, paymentRevision, at, original.paymentReference(),
+                        original.paidAmount(), original.accountDigest(), original.completedAt(), original.receiptReference(), null);
+                yield new AdvanceDisbursementReturnPort.Receipt(request, disbursementStatus, disbursementRevision, at, at.plusSeconds(300), current, disbursementFacts);
             }
             case "advance-repayment-adjustment" -> {
                 if (reviewUnavailable) yield Map.of("malformed", true);

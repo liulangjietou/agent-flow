@@ -24,10 +24,11 @@ public class AdvanceDisbursementService {
     private final EmployeeAdvanceRepository balances;
     private final JdbcPaymentOperationRepository payments;
     private final PaymentPayeeEvidence payeeEvidence;
+    private final JdbcDisbursementResolutionRepository returns;
 
     /** 本地结算只读取持久原付款，不调用外部资金或当前账户目录。 */
-    public AdvanceDisbursementService(AdvanceRequestRepository requests, EmployeeAdvanceRepository balances, JdbcPaymentOperationRepository payments, PaymentPayeeEvidence payeeEvidence) {
-        this.requests = requests; this.balances = balances; this.payments = payments; this.payeeEvidence = payeeEvidence;
+    public AdvanceDisbursementService(AdvanceRequestRepository requests, EmployeeAdvanceRepository balances, JdbcPaymentOperationRepository payments, PaymentPayeeEvidence payeeEvidence, JdbcDisbursementResolutionRepository returns) {
+        this.requests = requests; this.balances = balances; this.payments = payments; this.payeeEvidence = payeeEvidence; this.returns = returns;
     }
 
     /** 同步消费资金状态，任何余额或审计失败均回滚这次资金确认。 */
@@ -45,7 +46,7 @@ public class AdvanceDisbursementService {
         var payment = event.payment(); var command = payment.input().command();
         if (!payment.settleable() || command.purpose() != PaymentCommand.Purpose.EMPLOYEE_ADVANCE) return;
         var existing = balances.find(command.tenantId(), command.binding().businessId()).orElse(null);
-        if (existing == null || !existing.paymentReviewRequired()) return;
+        if (existing == null || !existing.paymentReviewRequired() || !existing.disbursementReturns().isEmpty()) return;
         var request = requests.find(command.tenantId(), existing.id()).orElseThrow(AdvanceDisbursementService::mismatch);
         var expected = request.paidAdvance(payment, payeeEvidence.paymentAccount(payment, request.currentRound().account()));
         long version = existing.version(); existing.resolvePaymentReview(version, expected);
@@ -70,10 +71,16 @@ public class AdvanceDisbursementService {
             var expected = request.paidAdvance(payment, payeeEvidence.paymentAccount(payment, request.currentRound().account()));
             if (existing == null) balances.create(expected, SYSTEM_ACTOR);
             else if (!existing.sameDisbursement(expected)) throw mismatch();
-        } else if (existing != null && !existing.paymentReviewRequired()) {
+        } else if (existing != null && !existing.paymentReviewRequired() && !acceptedReturn(payment, existing)) {
             long version = existing.version(); existing.requirePaymentReview(version);
             balances.update(existing, version, SYSTEM_ACTOR, "PAYMENT_REVIEW");
         }
+    }
+
+    private boolean acceptedReturn(PaymentOperation payment, EmployeeAdvance existing) {
+        if (payment.status() != PaymentOperation.Status.REVERSED || existing.disbursementReturns().isEmpty()) return false;
+        return returns.latest(existing.tenantId(), existing.id()).filter(decision -> decision.receipt().samePaymentFacts(payment.observation())
+                && payment.observation().revision() >= decision.receipt().current().revision()).isPresent();
     }
 
     private static DomainException mismatch() { return new DomainException("ADVANCE_PAYMENT_MISMATCH", "Original successful advance payment and existing disbursement must match"); }

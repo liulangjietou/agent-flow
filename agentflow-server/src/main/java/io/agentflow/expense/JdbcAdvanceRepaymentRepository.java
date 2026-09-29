@@ -23,8 +23,9 @@ public class JdbcAdvanceRepaymentRepository {
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     private final JdbcAdvanceRepaymentCheckRepository checks;
+    private final JdbcAdvanceReceiptCreditRepository credits;
     /** 关联原查询和借款连续修订，不保存没有余额归属的人工声明。 */
-    public JdbcAdvanceRepaymentRepository(JdbcTemplate jdbc, JsonUtil json, JdbcAdvanceRepaymentCheckRepository checks) { this.jdbc = jdbc; this.json = json; this.checks = checks; }
+    public JdbcAdvanceRepaymentRepository(JdbcTemplate jdbc, JsonUtil json, JdbcAdvanceRepaymentCheckRepository checks, JdbcAdvanceReceiptCreditRepository credits) { this.jdbc = jdbc; this.json = json; this.checks = checks; this.credits = credits; }
     /** 原确认、借款余额、规范化防重键及审计必须一起提交。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void create(AdvanceRepayment value, EmployeeAdvance after) {
@@ -42,6 +43,7 @@ public class JdbcAdvanceRepaymentRepository {
                     """, value.tenantId(), value.id().toString(), request.advanceId().toString(), after.version(), value.checkId().toString(), check.version(), request.legalEntityId().toString(),
                     request.receiptReference(), receipt.funding().channel().name(), receipt.funding().transactionReference(), receipt.posting().voucherReference(), receipt.posting().entryReference(),
                     value.amount().value(), value.amount().currency(), value.recordedBy(), Timestamp.from(value.recordedAt()), json.write(value));
+            credits.record(value);
         } catch (DuplicateKeyException duplicate) { throw new DomainException("ADVANCE_REPAYMENT_ALREADY_RECORDED", "Receipt, received funds or accounting entry has already been recorded"); }
     }
     /** 同法人外部收款编号唯一，不因更换借款或查询编号再次入账。 */

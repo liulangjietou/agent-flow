@@ -42,7 +42,7 @@ export interface ExpenseItem extends ExpenseVersions { id: string; applicationId
 export interface ExpensePage<T> { items: T[]; nextBeforeId: string | null }
 export interface ExpenseFilter { beforeId?: string; limit?: number; status?: string }
 export interface PriorRequestItem { id: string; applicationId: string; legalEntityId: string; version: number; closed: boolean; lines: Array<{ lineNo: number; approved: Money; limit: Money; available: Money; reserved: Money; consumed: Money }> }
-export interface AdvanceItem { id: string; legalEntityId: string; version: number; status: string; paidOn: string; dueOn: string; paid: Money; available: Money; reserved: Money; settled: Money; repaid: Money; outstanding: Money; receivedRepayments: Money; returnedRepayments: Money }
+export interface AdvanceItem { id: string; legalEntityId: string; version: number; status: string; paidOn: string; dueOn: string; paid: Money; available: Money; reserved: Money; settled: Money; repaid: Money; outstanding: Money; receivedRepayments: Money; returnedRepayments: Money; returnedDisbursements?: Money }
 
 export const reductionReasons: Record<ReductionReason, string> = { INELIGIBLE_COST: '不符合报销范围', OVER_STANDARD_NOT_ACCEPTED: '超标部分不予报销', INVALID_INVOICE: '票据不符合要求', TAX_CORRECTION: '调整可抵扣税额', OTHER: '其他原因' }
 export const expenseStatuses: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '审批通过', CANCELLED: '已作废', REVOKED: '已撤销' }
