@@ -12,6 +12,7 @@ import WebhookDeliveries from './components/WebhookDeliveries.vue'
 import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
+import CashierWorkspace from './components/CashierWorkspace.vue'
 import ExpenseDetail from './components/ExpenseDetail.vue'
 import ExpensePlanDetail from './components/ExpensePlanDetail.vue'
 import AdvanceRequestDetail from './components/AdvanceRequestDetail.vue'
@@ -229,6 +230,7 @@ const palette: Array<{ type: NodeType; label: string; icon: string }> = [
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedId.value) ?? null)
 const selectedEdge = computed(() => edges.value.find(edge => edge.id === selectedEdgeId.value) ?? null)
 const canManageDefinitions = computed(() => actor.value?.roles.some(role => ['PROCESS_ADMIN', 'ADMIN'].includes(role)) ?? false)
+const canCashier = computed(() => actor.value?.roles.includes('CASHIER') ?? false)
 const canInspectSystem = computed(() => actor.value?.roles.includes('ADMIN') ?? false)
 const readonlyDefinition = computed(() => definitionStatus.value !== 'DRAFT')
 const editorLocked = computed(() => readonlyDefinition.value || (writesBlocked.value && !autosave.saving) || busy.value || confirmationOpen.value || publicationOpen.value || logoutOpen.value)
@@ -947,6 +949,8 @@ async function recoverOperation(id: string) {
       } else if (/^\/invoices\/[^/]+\/verifications$/.test(request.path)) {
         templateRefresh.value++
         notice.value = '原验票任务已确认受理，请打开原票据并刷新查验状态。'
+      } else if (request.path.startsWith('/cashier/payments/') || request.path.startsWith('/payments/') || /\/applications\/[^/]+\/payments\/authorizations$/.test(request.path)) {
+        notice.value = '原付款操作已确认，请刷新付款详情，核对最新授权与银行状态。'
       } else if (request.path.startsWith('/advance-requests')) {
         if (request.body && (request.path === '/advance-requests' || request.path.endsWith('/revise'))) {
           const value = result as AdvanceReceipt
@@ -1079,7 +1083,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <label>用户名<input v-model="username" autocomplete="username" placeholder="admin" /></label>
           <label>密码<input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" /></label>
           <button class="primary wide" :disabled="busy">{{ busy ? '正在登录…' : '进入工作台 ↗' }}</button>
-          <small>演示租户 demo；账号 admin / manager / finance / alice，密码 demo</small>
+          <small>演示租户 demo；账号 admin / manager / finance / cashier / alice，密码 demo</small>
         </template>
         <template v-else-if="authOptions?.mode === 'OIDC'">
           <p class="login-copy">使用企业账号登录，租户空间和权限由管理员分配。</p>
@@ -1094,7 +1098,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
     </section>
     <template v-else>
       <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'assist' ? 'Agent 助理' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :can-cashier="canCashier" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'assist' ? 'Agent 助理' : page === 'cashier' ? '出纳付款' : page === 'expense' ? '费用报销' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
         <div v-if="notice && !sessionExpired" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
@@ -1214,6 +1218,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </template>
           </section>
         </section>
+        <CashierWorkspace v-else-if="page === 'cashier' && canCashier" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>
       <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />

@@ -5,6 +5,7 @@ import { ExpenseDetailQuery, budgetIssues, expenseTypes, moneyLabel, reductionRe
 import ExpenseActions from './ExpenseActions.vue'
 import ExpenseEditor from './ExpenseEditor.vue'
 import VoucherStatus from './VoucherStatus.vue'
+import FinancePaymentStatus from './FinancePaymentStatus.vue'
 const props = defineProps<{ reportId: string; applicationId: string; scopeKey: string; version?: number; taskId?: string; roundNo?: number; locked?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean] }>()
 const query = reactive(new ExpenseDetailQuery(api.expenseReport, api.expenseWorkflow))
@@ -70,6 +71,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
       <section v-if="financial?.adjustments.length" class="adjustment-history" aria-label="财务核减记录"><h4>核减记录</h4><article v-for="adjustment in financial.adjustments" :key="adjustment.id"><p><strong>{{ reductionReasons[adjustment.reasonCode] ?? adjustment.reasonCode }}</strong> · {{ adjustment.adjustedBy }} · {{ timeLabel(adjustment.adjustedAt) }}</p><p class="preserved-text">{{ adjustment.comment }}</p><ul><li v-for="line in adjustment.lineChanges" :key="line.lineNo">第 {{ line.lineNo }} 行：{{ moneyLabel(line.previousGross) }} → {{ moneyLabel(line.approvedGross) }}；税额 {{ moneyLabel(line.previousTax) }} → {{ moneyLabel(line.approvedTax) }}</li><li v-for="offset in adjustment.offsetChanges" :key="offset.advanceId">借款 {{ offset.advanceId }}：{{ moneyLabel(offset.previousAmount) }} → {{ moneyLabel(offset.amount) }}</li></ul></article></section>
       <ExpenseActions v-if="query.workflow && roundNo === undefined" :detail="query.detail" :workflow="query.workflow" :scope-key="scopeKey" :locked="locked" @changed="changed" @busy="emit('busy', $event)" @refresh="load" />
       <VoucherStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :business-id="query.detail.id" business-type="EXPENSE" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
+      <FinancePaymentStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :business-id="query.detail.id" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
       </template>
     </template>
   </section>

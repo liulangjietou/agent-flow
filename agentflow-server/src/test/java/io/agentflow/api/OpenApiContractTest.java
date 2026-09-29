@@ -73,6 +73,18 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("PaymentView", io.agentflow.finance.PaymentView.class),
+                java.util.Map.entry("PaymentRequestSummary", io.agentflow.finance.PaymentView.Request.class),
+                java.util.Map.entry("PaymentOperationSummary", io.agentflow.finance.PaymentView.Operation.class),
+                java.util.Map.entry("FinancePaymentWorkspace", io.agentflow.finance.FinancePaymentWorkspace.View.class),
+                java.util.Map.entry("FinancePaymentActions", io.agentflow.finance.FinancePaymentWorkspace.Actions.class),
+                java.util.Map.entry("FinancePaymentReceipt", io.agentflow.finance.FinancePaymentActions.Receipt.class),
+                java.util.Map.entry("CashierPaymentWorkspace", io.agentflow.finance.CashierPaymentWorkspace.View.class),
+                java.util.Map.entry("CashierPaymentActions", io.agentflow.finance.CashierPaymentWorkspace.Actions.class),
+                java.util.Map.entry("CashierPaymentPage", io.agentflow.finance.CashierPaymentWorkspace.Page.class),
+                java.util.Map.entry("CashierPaymentAccounts", io.agentflow.finance.CashierPaymentWorkspace.Accounts.class),
+                java.util.Map.entry("PaymentDebitAccount", io.agentflow.finance.PaymentAccountsPort.DebitAccount.class),
+                java.util.Map.entry("CashierPaymentReceipt", io.agentflow.finance.CashierPaymentActions.Receipt.class),
                 java.util.Map.entry("VoucherWorkspace", io.agentflow.finance.VoucherWorkspace.View.class),
                 java.util.Map.entry("VoucherPreparationSummary", io.agentflow.finance.VoucherWorkspace.Preparation.class),
                 java.util.Map.entry("VoucherOperationSummary", io.agentflow.finance.VoucherWorkspace.Operation.class),

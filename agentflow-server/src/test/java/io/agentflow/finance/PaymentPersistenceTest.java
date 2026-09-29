@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.organization.JdbcOrganizationRepository;
+import io.agentflow.organization.OrganizationAppointment;
+import io.agentflow.organization.OrganizationPerson;
+import io.agentflow.organization.OrganizationUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -106,6 +110,27 @@ class PaymentPersistenceTest {
         assertThatThrownBy(() -> operations.find(TENANT, terms.id())).isInstanceOf(IllegalStateException.class);
         jdbc.update("UPDATE payment_authorization SET business_version=business_version+1 WHERE tenant_id=? AND id=?", TENANT, terms.id().toString());
         assertThatThrownBy(() -> authorizations.find(TENANT, terms.id())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test void cashierPaginationFiltersCurrentEntityBeforeLimitAndNeverTrustsTamperedScopeColumn() {
+        var visible = issue(voucher()); var hidden = issue(voucher()); var entity = visible.terms().payee().legalEntityId();
+        var organization = new JdbcOrganizationRepository(jdbc, json); String subject = "cashier-scope-" + UUID.randomUUID();
+        var department = new OrganizationUnit(UUID.randomUUID(), OrganizationUnit.Kind.DEPARTMENT, "财务部", entity, null, true, 1);
+        var position = new OrganizationUnit(UUID.randomUUID(), OrganizationUnit.Kind.POSITION, "出纳岗位", entity, null, true, 1);
+        var person = new OrganizationPerson(UUID.randomUUID(), subject, "出纳", true, false, 1);
+        var appointment = new OrganizationAppointment(UUID.randomUUID(), person.id(), department.id(), position.id(), true, 1);
+        tx.executeWithoutResult(status -> {
+            if (!organization.initialized(TENANT)) organization.initialize(TENANT, "admin", NOW);
+            organization.save(TENANT, new OrganizationUnit(entity, OrganizationUnit.Kind.LEGAL_ENTITY, "付款法人", null, null, true, 1), 0);
+            organization.save(TENANT, department, 0); organization.save(TENANT, position, 0); organization.save(TENANT, person, 0); organization.save(TENANT, appointment, 0);
+        });
+        assertThat(authorizations.cashierPage(TENANT, subject, null, null, 1)).containsExactly(visible);
+        assertThat(authorizations.cashierPage("foreign", subject, null, null, 1)).isEmpty();
+        assertThat(new PaymentPersonnel(jdbc).eligible(TENANT, subject, hidden.terms().payee().legalEntityId())).isFalse();
+        tx.executeWithoutResult(status -> organization.save(TENANT, appointment.revise(false, 1), 1));
+        assertThat(authorizations.cashierPage(TENANT, subject, null, null, 1)).isEmpty();
+        jdbc.update("UPDATE payment_authorization SET legal_entity_id=? WHERE tenant_id=? AND id=?", hidden.terms().payee().legalEntityId().toString(), TENANT, visible.terms().id().toString());
+        assertThatThrownBy(() -> authorizations.find(TENANT, visible.terms().id())).isInstanceOf(IllegalStateException.class);
     }
 
     private PaymentAuthorization issue(VoucherOperation voucher) { var value = authorization(voucher); tx.executeWithoutResult(status -> authorizations.create(value)); return value; }

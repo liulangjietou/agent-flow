@@ -9,6 +9,9 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,11 +34,11 @@ public class JdbcPaymentAuthorizationRepository {
         var terms = value.terms(); var binding = terms.binding(); var decision = value.decision();
         jdbc.update("""
                 INSERT INTO payment_authorization(tenant_id,id,business_type,business_id,application_id,round_no,application_version,business_version,
-                purpose,voucher_operation_id,voucher_kind,terms_json,decision_json,state_json,version,status,active_business_id,authorized_at,expires_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'AUTHORIZED',?,?,?,?)
+                purpose,voucher_operation_id,voucher_kind,terms_json,decision_json,state_json,version,status,active_business_id,authorized_at,expires_at,updated_at,legal_entity_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'AUTHORIZED',?,?,?,?,?)
                 """, terms.tenantId(), terms.id().toString(), businessType(terms.purpose()).name(), binding.businessId().toString(), binding.applicationId().toString(),
                 binding.roundNo(), binding.applicationVersion(), binding.businessVersion(), terms.purpose().name(), terms.voucherOperationId().toString(), kind(terms.purpose()).name(),
-                json.write(terms), json.write(decision), json.write(value), activeBusiness(value), Timestamp.from(decision.authorizedAt()), Timestamp.from(decision.expiresAt()), Timestamp.from(value.updatedAt()));
+                json.write(terms), json.write(decision), json.write(value), activeBusiness(value), Timestamp.from(decision.authorizedAt()), Timestamp.from(decision.expiresAt()), Timestamp.from(value.updatedAt()), terms.payee().legalEntityId().toString());
         append(value);
     }
 
@@ -64,6 +67,17 @@ public class JdbcPaymentAuthorizationRepository {
         return jdbc.query("SELECT * FROM payment_authorization WHERE tenant_id=? AND application_id=? AND round_no=? ORDER BY authorized_at DESC,id DESC LIMIT 1",
                 row(), tenant, applicationId.toString(), round).stream().findFirst();
     }
+    /** 出纳列表先在数据库按当前法人任职过滤，再读取原授权；不扫描全租户付款后交给页面筛选。 */
+    public List<PaymentAuthorization> cashierPage(String tenant, String cashier, Instant beforeTime, UUID beforeId, int limit) {
+        var args = new ArrayList<Object>(List.of(tenant, tenant, cashier)); var filter = "";
+        if (beforeTime != null) {
+            filter = " AND (authorized_at<? OR (authorized_at=? AND id<?))";
+            args.add(Timestamp.from(beforeTime)); args.add(Timestamp.from(beforeTime)); args.add(beforeId.toString());
+        }
+        args.add(limit + 1);
+        return jdbc.query("SELECT * FROM payment_authorization WHERE tenant_id=? AND legal_entity_id IN (" + PaymentPersonnel.ELIGIBLE_ENTITIES + ")"
+                + filter + " ORDER BY authorized_at DESC,id DESC LIMIT ?", row(), args.toArray());
+    }
     /** 业务种类固定取原用途，不接受客户端单独声明。 */
     public static BusinessReference.Type businessType(PaymentCommand.Purpose purpose) { return purpose == PaymentCommand.Purpose.EMPLOYEE_ADVANCE ? BusinessReference.Type.ADVANCE_REQUEST : BusinessReference.Type.EXPENSE; }
     /** 付款只依赖借款或费用挂账凭证，不能反向依赖付款凭证。 */
@@ -79,6 +93,7 @@ public class JdbcPaymentAuthorizationRepository {
                     || binding.applicationVersion() != row.getLong("application_version") || binding.businessVersion() != row.getLong("business_version")
                     || !terms.purpose().name().equals(row.getString("purpose")) || !terms.voucherOperationId().toString().equals(row.getString("voucher_operation_id"))
                     || !kind(terms.purpose()).name().equals(row.getString("voucher_kind")) || !Objects.equals(activeBusiness(value), row.getString("active_business_id"))
+                    || !terms.payee().legalEntityId().toString().equals(row.getString("legal_entity_id"))
                     || value.version() != row.getLong("version") || !value.status().name().equals(row.getString("status"))
                     || !value.decision().authorizedAt().equals(row.getTimestamp("authorized_at").toInstant()) || !value.decision().expiresAt().equals(row.getTimestamp("expires_at").toInstant())
                     || !value.updatedAt().equals(row.getTimestamp("updated_at").toInstant())) throw new IllegalStateException("Persisted payment authorization identity is inconsistent");

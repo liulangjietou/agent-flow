@@ -22,6 +22,7 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
     private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
             "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "PROCESS_ADMIN", "ADMIN"),
             "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"),
+            "cashier", Set.of("EMPLOYEE", "CASHIER"),
             "manager", Set.of("EMPLOYEE", "APPROVER", "MANAGER"),
             "employee", Set.of("EMPLOYEE", "APPROVER"),
             "alice", Set.of("EMPLOYEE", "APPROVER"),

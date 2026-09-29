@@ -1,0 +1,42 @@
+{
+  "date": "2026-09-28",
+  "status": "LOCAL_PAYMENT_WORKSPACE_ACCEPTANCE_PASSED",
+  "migration": "V47",
+  "syntheticFinance": true,
+  "externalFundsTransferred": false,
+  "enterpriseAcceptance": false,
+  "tests": {
+    "finalH2Scope": 60,
+    "postgresqlScopeBeforeFinalPayableAndQueryAssertions": 53,
+    "frontendScope": 70,
+    "scopesOverlap": true,
+    "frontendBuild": "PASS",
+    "openapi": {"operations": 156, "schemas": 269, "requestExamples": 51},
+    "javaAuthors": {"files": 630, "namedTypes": 1124, "missing": 0, "parseErrors": 0}
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": ["payment-api-scope.log", "payment-api-postgres.log", "payment-ui-tests-first.log", "payment-ui-build.log", "payment-ui-package.log"],
+  "httpEvidence": "payment-ui-http-evidence.json",
+  "httpChecks": 28,
+  "browser": {
+    "result": "PASS",
+    "businessNo": "UI-VOUCHER-15cd9b04",
+    "applicationId": "fbd0c472-4a8f-40f3-8c72-142b0a64ea41",
+    "authorizationId": "25b50dd7-b4a6-4e01-b6fc-f81595247a8a",
+    "amount": {"value": "300.00", "currency": "CNY"},
+    "authorizedBy": "finance",
+    "executedBy": "cashier",
+    "accountManuallySelected": true,
+    "paymentStatus": "SUCCEEDED",
+    "paymentReference": "UI-PAYMENT-25b50dd7",
+    "receiptReference": "UI-BANK-25b50dd7",
+    "authorizationCount": 1,
+    "requestCount": 1,
+    "operationCount": 1,
+    "actualPaidBalanceCountAtThisStage": 0,
+    "observedViewportWidth": 480,
+    "observedScrollWidth": 480,
+    "screenshots": ["payment-ui-authorized.png", "payment-ui-paid.png", "payment-ui-mobile.png"]
+  },
+  "remaining": ["Successful receipt settlement", "Zero-payable expense closure", "Payment voucher and archive", "Safe payment retirement and voucher conflict resolution", "Enterprise acceptance"]
+}

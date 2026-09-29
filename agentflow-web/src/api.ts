@@ -22,6 +22,7 @@ import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseF
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
+import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView } from './vouchers'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
@@ -291,6 +292,13 @@ export const api = {
   vouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   voucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/actions`, 'POST', '办理本轮凭证操作', input),
   financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),
+  financePayment: (id: string, roundNo: number, signal: AbortSignal) => request<FinancePaymentView>(`/applications/${encodeURIComponent(id)}/payments` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  authorizePayment: (id: string, input: PaymentAuthorizationInput) => write<FinancePaymentReceipt>(`/applications/${encodeURIComponent(id)}/payments/authorizations`, 'POST', '财务授权付款', input),
+  financePaymentAction: (id: string, input: FinancePaymentActionInput) => write<FinancePaymentReceipt>(`/payments/${encodeURIComponent(id)}/finance-actions`, 'POST', '财务核对付款授权', input),
+  cashierPayments: (beforeId: string | undefined, signal: AbortSignal) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
+  cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
+  paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
+  cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
   advanceRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceRequestItem>>('/advance-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   advanceRequest: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<AdvanceDetail>(`/advance-requests/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   createAdvanceRequest: (input: AdvanceCreate) => write<AdvanceReceipt>('/advance-requests', 'POST', '保存借款申请', input),

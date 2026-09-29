@@ -49,6 +49,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
+        "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.budgets.worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -77,6 +78,11 @@ class ExpenseSubmissionIntegrationTest {
     private int queries;
     private String voucherMode = "POSTED";
     private final Map<UUID, VoucherCommand> voucherCommands = new ConcurrentHashMap<>();
+    private final Map<UUID, PaymentCommand> paymentCommands = new ConcurrentHashMap<>();
+    private String paymentMode = "SUCCEEDED";
+    private int paymentWrites;
+    private int accountReads;
+    private UUID cashierAppointment;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
@@ -103,6 +109,12 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcVoucherOperationRepository voucherOperations;
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired VoucherPreparationService voucherPreparationService;
+    @Autowired JdbcPaymentAuthorizationRepository paymentAuthorizations;
+    @Autowired JdbcPaymentExecutionRequestRepository paymentRequests;
+    @Autowired JdbcPaymentOperationRepository paymentOperations;
+    @Autowired PaymentExecutionRequestWorker paymentRequestWorker;
+    @Autowired PaymentOperationWorker paymentWorker;
+    @Autowired CashierPaymentWorkspace cashierWorkspace;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired InvoiceRepository invoices;
     @Autowired ExpenseRequestRepository requests;
@@ -135,6 +147,13 @@ class ExpenseSubmissionIntegrationTest {
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
+            String authorizations = "SELECT id FROM payment_authorization WHERE tenant_id='demo' AND business_id=?";
+            jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + "))", report.toString());
+            jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
+            jdbc.update("DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id IN (" + authorizations + ")", report.toString());
+            jdbc.update("DELETE FROM payment_operation WHERE tenant_id='demo' AND id IN (" + authorizations + ")", report.toString());
+            jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
+            jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", report.toString());
             jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
             jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", report.toString());
             jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?)", report.toString());
@@ -460,6 +479,106 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void paymentApiSeparatesFinanceCashierAndApplicantThroughRealApprovalAndBankQueue() throws Exception {
+        var report = paymentReport(); String path = paymentPath(report); var input = authorizationInput(report);
+        var initial = ok(read(path, "finance"), 200); assertThat(initial.at("/actions/authorize").asBoolean()).isTrue();
+        assertThat(initial.at("/payable/value").asText()).isEqualTo("100.00");
+        assertThat(ok(read(path, "alice"), 200).at("/actions/authorize").asBoolean()).isFalse();
+        assertThat(read(path, "admin").getStatus()).isEqualTo(403); assertThat(read(path, "cashier").getStatus()).isEqualTo(404);
+        for (String user : List.of("alice", "manager", "admin", "cashier")) assertThat(send(path + "/authorizations", user, input).getStatus()).isIn(403, 404);
+        var forged = new HashMap<>(input); forged.put("amount", "999.99"); assertThat(send(path + "/authorizations", "finance", forged).getStatus()).isEqualTo(400);
+        var stale = new HashMap<>(input); stale.put("voucherVersion", 1); assertCode(send(path + "/authorizations", "finance", stale), "CONCURRENCY_CONFLICT");
+        String key = UUID.randomUUID().toString(); var first = send(path + "/authorizations", "finance", key, input); var receipt = ok(first, 202);
+        UUID id = UUID.fromString(receipt.path("authorizationId").asText()); String cashierPath = "/api/v1/cashier/payments/" + id;
+        assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(path + "/authorizations", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        assertCode(send(path + "/authorizations", "finance", input), "PAYMENT_AUTHORIZATION_EXISTS");
+        for (String user : List.of("finance", "admin", "alice")) assertThat(read(cashierPath, user).getStatus()).isEqualTo(403);
+        var detail = ok(read(cashierPath, "cashier"), 200); assertThat(detail.at("/actions/execute").asBoolean()).isTrue();
+        assertThat(detail.at("/payment/amount/value").asText()).isEqualTo("100.00");
+        assertThat(detail.toString()).doesNotContain("targetDigest", "accountDigest", "commandDigest", "accountReference", "synthetic-private-account");
+        assertThat(ok(read("/api/v1/cashier/payments", "cashier"), 200).at("/items/0/payment/id").asText()).isEqualTo(id.toString());
+        var options = ok(read(cashierPath + "/accounts", "cashier"), 200); assertThat(options.at("/items/0/maskedAccount").asText()).isEqualTo("****4567");
+        actors.set(new Actor("demo", "cashier", Set.of("CASHIER")));
+        try { assertThatThrownBy(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status -> cashierWorkspace.accountOptions(id)))
+                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class); }
+        finally { actors.clear(); }
+        int readsBefore = accountReads; String executeKey = UUID.randomUUID().toString(); var executeInput = cashierInput("EXECUTE", 1, null);
+        var executed = send(cashierPath + "/actions", "cashier", executeKey, executeInput); ok(executed, 202);
+        assertThat(accountReads).isEqualTo(readsBefore); assertThat(paymentWrites).isZero();
+        assertThat(send(cashierPath + "/actions", "cashier", executeKey, executeInput).getContentAsString()).isEqualTo(executed.getContentAsString());
+        assertCode(send(cashierPath + "/actions", "cashier", executeInput), "PAYMENT_EXECUTION_ALREADY_REQUESTED");
+        assertThat(paymentRequests.forAuthorization("demo", id).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.QUEUED);
+        assertThat(paymentOperations.find("demo", id)).isEmpty();
+        paymentRequestWorker.poll(); assertThat(paymentOperations.find("demo", id).orElseThrow().status()).isEqualTo(PaymentOperation.Status.QUEUED);
+        assertThat(paymentWrites).isZero(); paymentWorker.poll();
+        var paid = ok(read(cashierPath, "cashier"), 200); assertThat(paid.at("/payment/operation/status").asText()).isEqualTo("SUCCEEDED");
+        assertThat(paid.at("/payment/operation/receiptReference").asText()).isEqualTo("synthetic-bank-receipt"); assertThat(paymentWrites).isEqualTo(1);
+        assertThat(ok(read(path, "alice"), 200).at("/payment/operation/status").asText()).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action IN ('PAYMENT_AUTHORIZE','PAYMENT_EXECUTE')", Integer.class, report.applicationId().toString())).isEqualTo(2);
+        var queryInput = Map.of("action", "QUERY", "authorizationVersion", 2, "operationVersion", paid.at("/payment/operation/version").asLong(), "comment", "财务核对原银行回单");
+        ok(send("/api/v1/payments/" + id + "/finance-actions", "finance", queryInput), 202); paymentWorker.poll();
+        assertThat(paymentOperations.find("demo", id).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test
+    void paymentReplayRechecksCurrentPersonnelAndCashierDirectoryScopeBeforeReturningReceipt() throws Exception {
+        var report = paymentReport(); String path = paymentPath(report); String key = UUID.randomUUID().toString(); var input = authorizationInput(report);
+        var first = send(path + "/authorizations", "finance", key, input); UUID id = UUID.fromString(ok(first, 202).path("authorizationId").asText());
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(path + "/authorizations", "finance", key, input).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        String cashierPath = "/api/v1/cashier/payments/" + id; String executeKey = UUID.randomUUID().toString(); var execution = cashierInput("EXECUTE", 1, null);
+        var registered = send(cashierPath + "/actions", "cashier", executeKey, execution); ok(registered, 202);
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+        assertThat(read(cashierPath, "cashier").getStatus()).isEqualTo(404);
+        assertThat(send(cashierPath + "/actions", "cashier", executeKey, execution).getStatus()).isEqualTo(404);
+        assertThat(ok(read("/api/v1/cashier/payments", "cashier"), 200).path("items")).isEmpty();
+        assertThat(read("/api/v1/cashier/payments?beforeId=" + id, "cashier").getStatus()).isEqualTo(404);
+        for (String query : List.of("limit=101", "tenantId=foreign", "beforeId=1-1-1-1-1")) assertThat(read("/api/v1/cashier/payments?" + query, "cashier").getStatus()).isEqualTo(400);
+        paymentRequestWorker.poll(); assertThat(paymentRequests.forAuthorization("demo", id).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.VOIDED);
+        assertThat(paymentWrites).isZero();
+    }
+
+    @Test
+    void cashierUnknownPaymentQueriesOriginalNumberAndResendsOnlyAfterAuthoritativeNotFound() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report); String path = "/api/v1/cashier/payments/" + id;
+        ok(send(path + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
+        paymentMode = "INVALID"; paymentWorker.poll(); var unknown = paymentOperations.find("demo", id).orElseThrow();
+        assertThat(unknown.status()).isEqualTo(PaymentOperation.Status.UNKNOWN); var original = unknown.input();
+        assertThat(ok(read(path, "cashier"), 200).at("/actions/resendOriginal").asBoolean()).isFalse();
+        assertThat(send(path + "/actions", "cashier", cashierInput("RESEND_ORIGINAL", 2, unknown.version())).getStatus()).isBetween(400, 499);
+        assertThat(send("/api/v1/payments/" + id + "/finance-actions", "cashier", Map.of("action", "QUERY", "authorizationVersion", 2, "operationVersion", unknown.version(), "comment", "测试")).getStatus()).isIn(403, 404);
+        paymentMode = "NOT_FOUND"; ok(send(path + "/actions", "cashier", cashierInput("QUERY", 2, unknown.version())), 202); paymentWorker.poll();
+        var missing = paymentOperations.find("demo", id).orElseThrow(); assertThat(missing.status()).isEqualTo(PaymentOperation.Status.NOT_FOUND);
+        assertThat(ok(read(path, "cashier"), 200).at("/actions/resendOriginal").asBoolean()).isTrue();
+        var forged = new HashMap<>(cashierInput("RESEND_ORIGINAL", 2, missing.version())); forged.put("debitAccountReference", "other");
+        assertThat(send(path + "/actions", "cashier", forged).getStatus()).isEqualTo(400);
+        String key = UUID.randomUUID().toString(); var input = cashierInput("RESEND_ORIGINAL", 2, missing.version()); var replay = send(path + "/actions", "cashier", key, input); ok(replay, 202);
+        assertThat(send(path + "/actions", "cashier", key, input).getContentAsString()).isEqualTo(replay.getContentAsString());
+        paymentMode = "SUCCEEDED"; paymentWorker.poll(); assertThat(paymentOperations.find("demo", id).orElseThrow().input()).isEqualTo(original);
+        assertThat(paymentWrites).isEqualTo(2); assertThat(paymentCommands).hasSize(1);
+        assertThat(ok(read(paymentPath(report), "finance"), 200).at("/actions/authorize").asBoolean()).isFalse();
+    }
+
+    @Test
+    void financeMayVoidQueuedSelectionButCannotCancelRegisteredExecutionOrPayChangedSource() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report); String path = "/api/v1/cashier/payments/" + id;
+        ok(send(path + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        var input = Map.of("action", "VOID", "authorizationVersion", 1, "comment", "财务停止尚未执行的选择");
+        ok(send("/api/v1/payments/" + id + "/finance-actions", "finance", input), 202); paymentRequestWorker.poll();
+        assertThat(paymentAuthorizations.find("demo", id).orElseThrow().status()).isEqualTo(PaymentAuthorization.Status.VOIDED);
+        assertThat(paymentRequests.forAuthorization("demo", id).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.VOIDED);
+        assertThat(paymentOperations.find("demo", id)).isEmpty(); UUID replacement = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + replacement + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll();
+        assertThat(send("/api/v1/payments/" + replacement + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 2, "comment", "不能取消可能执行的资金操作")).getStatus()).isEqualTo(409);
+        jdbc.update("UPDATE approval_application SET status='REVOKED' WHERE tenant_id='demo' AND id=?", report.applicationId().toString());
+        paymentWorker.poll(); assertThat(paymentOperations.find("demo", replacement).orElseThrow().status()).isEqualTo(PaymentOperation.Status.VOIDED);
+        assertThat(paymentWrites).isZero();
+    }
+
+    @Test
     void reductionRequiresActualFinancialTaskAuthorityStrictFieldsAndCurrentDoubleVersions() throws Exception {
         var report = fixture(false).report(); submit(report); budgetWorker.poll();
         assertCode(send(reductionPath(report), "manager", reductionInput(report, "50", "3")), "EXPENSE_FINANCE_TASK_REQUIRED");
@@ -709,6 +828,30 @@ class ExpenseSubmissionIntegrationTest {
     private ExpenseReport current(ExpenseReport report) { return reports.find("demo", report.id()).orElseThrow(); }
     private String path(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id(); }
     private String voucherPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/vouchers"; }
+    private String paymentPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/payments"; }
+    private ExpenseReport paymentReport() throws Exception {
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成付款部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成付款岗位", entity, null, true);
+        organization.createAppointment(admin, finance, department.id(), position.id(), true);
+        cashierAppointment = organization.createAppointment(admin, person("cashier", false), department.id(), position.id(), true).id();
+        var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        voucherPreparationWorker.poll(); voucherWorker.poll();
+        assertThat(voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow().usablePosted()).isTrue();
+        return report;
+    }
+    private Map<String, Object> authorizationInput(ExpenseReport report) {
+        var voucher = voucherOperations.forRound("demo", report.applicationId(), app(report).roundNo(), VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        return Map.of("roundNo", app(report).roundNo(), "applicationVersion", app(report).version(), "businessVersion", current(report).version(),
+                "voucherOperationId", voucher.input().command().id(), "voucherVersion", voucher.version(), "validitySeconds", 900, "comment", "合成财务付款授权");
+    }
+    private UUID authorizePayment(ExpenseReport report) throws Exception {
+        return UUID.fromString(ok(send(paymentPath(report) + "/authorizations", "finance", authorizationInput(report)), 202).path("authorizationId").asText());
+    }
+    private Map<String, Object> cashierInput(String action, long authorizationVersion, Long operationVersion) {
+        var input = new HashMap<String, Object>(); input.put("action", action); input.put("authorizationVersion", authorizationVersion); input.put("comment", "合成出纳付款办理");
+        if (action.equals("EXECUTE")) { input.put("debitAccountReference", "synthetic-debit"); input.put("debitAccountVersion", "v1"); }
+        else input.put("operationVersion", operationVersion); return input;
+    }
     private Map<String, Object> voucherInput(ExpenseReport report, String action, JsonNode operation) {
         var input = new HashMap<String, Object>(); input.put("action", action); input.put("roundNo", app(report).roundNo());
         input.put("applicationVersion", app(report).version()); input.put("businessVersion", current(report).version()); input.put("comment", "合成财务对账操作");
@@ -741,6 +884,19 @@ class ExpenseSubmissionIntegrationTest {
             case "catalog" -> new FinanceCatalog("alice", "synthetic-v1", Instant.now().plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", paperRequired, "v1", "UTC")),
                     List.of(new FinanceCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM))), List.of(new FinanceCatalog.CostCenter(entity, "IT", "研发")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
             case "employee-account" -> new EmployeeAccountPort.Account(new EmployeeAccountSnapshot(entity, "alice", "synthetic-private-account", "****1234", "a".repeat(64), "v1"), Instant.now().plusSeconds(600));
+            case "debit-accounts" -> {
+                accountReads++; var request = json.read(data.toString(), PaymentAccountsPort.Request.class); var now = Instant.now();
+                yield new PaymentAccountsPort.Directory(request, "directory-v1", now, now.plusSeconds(300),
+                        List.of(new PaymentAccountsPort.DebitAccount("synthetic-debit", "合成基本户", "****4567", "CNY", "v1")));
+            }
+            case "payment-command", "payment-query" -> {
+                PaymentCommand command;
+                if (operation.equals("payment-command")) { paymentWrites++; command = json.read(data.path("command").toString(), PaymentCommand.class); paymentCommands.put(command.id(), command); }
+                else command = paymentCommands.get(UUID.fromString(data.path("authorizationId").asText()));
+                if (paymentMode.equals("INVALID")) yield Map.of("invalidFixture", true);
+                if (paymentMode.equals("NOT_FOUND")) yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null);
+                yield new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, 1L, Instant.now(), "synthetic-payment", command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "synthetic-bank-receipt", null);
+            }
             case "exchange-rate" -> new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic", LocalDate.parse(data.path("rateDate").asText()));
             case "invoice-verification" -> new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-verification", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));

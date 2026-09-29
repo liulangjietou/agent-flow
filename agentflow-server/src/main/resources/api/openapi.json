@@ -18786,6 +18786,951 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/payments": {
+      "get": {
+        "operationId": "getApplicationPayments",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取原轮次付款状态",
+        "description": "只展示当前或指定轮次。沿用完整财务明细权限，敏感字段不可绕过。授权、执行登记、资金结果分别显示。",
+        "x-access": "本人或原轮次可读参与者；财务按钮还要求当前法人任职",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前权限范围内的最小付款视图",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancePaymentWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "省略取当前轮次；其他查询参数拒绝。"
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/payments/authorizations": {
+      "post": {
+        "operationId": "authorizeApplicationPayment",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "财务确认短期付款授权",
+        "description": "依据当前批准与已过账凭证派生金额和收款账户；同一业务只保留一个有效授权。幂等回放前重查当前权限。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "人工决定已登记；后台确认原交易结果，不能据此认定银行已付款",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancePaymentReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentAuthorizationInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 8,
+                "businessVersion": 2,
+                "voucherOperationId": "a1b2c3d4-1234-4234-8234-123456789abc",
+                "voucherVersion": 3,
+                "validitySeconds": 900,
+                "comment": "已核对本轮金额及已过账凭证。"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{id}/finance-actions": {
+      "post": {
+        "operationId": "actOnFinancePayment",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "作废尚未执行的授权或查询原交易",
+        "description": "VOID 仅允许未登记执行且仍在有效期内的授权；QUERY 只追踪原资金操作，授权到期后仍可查询。幂等回放不跳过当前权限。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "人工决定已登记；后台确认原交易结果，不能据此认定银行已付款",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancePaymentReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinancePaymentActionInput"
+              },
+              "example": {
+                "action": "VOID",
+                "authorizationVersion": 1,
+                "comment": "尚未执行，停止本次授权。"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cashier/payments": {
+      "get": {
+        "operationId": "listCashierPayments",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "按当前法人列出付款",
+        "description": "数据库先按当前有效任职筛选，再按授权时间和编号分页；beforeId 也必须在当前范围内。",
+        "x-access": "明确 CASHIER 角色 + 当前法人有效任职；ADMIN 或 FINANCE 不隐含出纳角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前权限范围内的最小付款视图",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashierPaymentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/cashier/payments/{id}": {
+      "get": {
+        "operationId": "getCashierPayment",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取出纳最小付款明细",
+        "description": "只显示付款用途、金额、掩码及原交易状态，不授予完整申请或其他轮次读取权。",
+        "x-access": "明确 CASHIER 角色 + 当前法人有效任职；ADMIN 或 FINANCE 不隐含出纳角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前权限范围内的最小付款视图",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashierPaymentWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/cashier/payments/{id}/accounts": {
+      "get": {
+        "operationId": "getCashierPaymentAccounts",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取本次出纳可选出款账户",
+        "description": "只在尚未登记账户意图且授权有效时读取。事务外查询当前出纳、法人、币种的原资金目录，等待前后复查权限。选项过期后重新读取，后台执行仍复查两端账户。",
+        "x-access": "明确 CASHIER 角色 + 当前法人有效任职；ADMIN 或 FINANCE 不隐含出纳角色 + 非申请人和原财务授权人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前权限范围内的最小付款视图",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashierPaymentAccounts"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/cashier/payments/{id}/actions": {
+      "post": {
+        "operationId": "actOnCashierPayment",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "登记账户选择或跟踪原付款",
+        "description": "EXECUTE 只持久化原账户引用与来源版本。QUERY 在未知、失败或成功后查询原交易；RESEND_ORIGINAL 仅原出纳在权威查无且原授权有效时重发原编号，不能换账户。三者幂等回放前均复核当前权限。",
+        "x-access": "明确 CASHIER 角色 + 当前法人有效任职；ADMIN 或 FINANCE 不隐含出纳角色；EXECUTE 与 RESEND_ORIGINAL 还要求申请人、财务、出纳分离",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "人工决定已登记；后台确认原交易结果，不能据此认定银行已付款",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashierPaymentReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashierPaymentActionInput"
+              },
+              "example": {
+                "action": "EXECUTE",
+                "authorizationVersion": 1,
+                "debitAccountReference": "treasury-account-1",
+                "debitAccountVersion": "v1",
+                "comment": "已核对收款人、金额和所选出款账户。"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28878,6 +29823,879 @@
             ]
           },
           "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PaymentRequestSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "cashier",
+          "createdAt",
+          "updatedAt",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "BLOCKED",
+              "VOIDED",
+              "EXPIRED"
+            ]
+          },
+          "cashier": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentOperationSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "updatedAt",
+          "observedStatus",
+          "paymentReference",
+          "receiptReference",
+          "completedAt",
+          "disputed",
+          "issue"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CHECKING",
+              "SENDING",
+              "QUERYING",
+              "UNKNOWN",
+              "SUCCEEDED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "SUCCEEDED",
+                  "FAILED",
+                  "REVERSED",
+                  "NOT_FOUND"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paymentReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receiptReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disputed": {
+            "type": "boolean"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "purpose",
+          "applicationId",
+          "businessId",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "legalEntityId",
+          "employeeId",
+          "amount",
+          "maskedPayeeAccount",
+          "authorizedBy",
+          "authorizedAt",
+          "expiresAt",
+          "executedBy",
+          "request",
+          "operation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AUTHORIZED",
+              "EXECUTION_REGISTERED",
+              "VOIDED",
+              "EXPIRED"
+            ]
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_REIMBURSEMENT"
+            ]
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "employeeId": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "maskedPayeeAccount": {
+            "type": "string"
+          },
+          "authorizedBy": {
+            "type": "string"
+          },
+          "authorizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentRequestSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentOperationSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "FinancePaymentActions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorize",
+          "voidAuthorization",
+          "query"
+        ],
+        "properties": {
+          "authorize": {
+            "type": "boolean"
+          },
+          "voidAuthorization": {
+            "type": "boolean"
+          },
+          "query": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FinancePaymentWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "businessId",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "voucherOperationId",
+          "voucherVersion",
+          "payment",
+          "actions",
+          "payable"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "voucherOperationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voucherVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actions": {
+            "$ref": "#/components/schemas/FinancePaymentActions"
+          },
+          "payable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentAuthorizationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "voucherOperationId",
+          "voucherVersion",
+          "validitySeconds",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "voucherOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "voucherVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "validitySeconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 86400
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "FinancePaymentActionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "authorizationVersion",
+          "comment"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "VOID",
+              "QUERY"
+            ]
+          },
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "QUERY"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "operationVersion"
+              ],
+              "properties": {
+                "operationVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "operationVersion": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "FinancePaymentReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "businessId",
+          "roundNo",
+          "authorizationId",
+          "authorizationVersion",
+          "action",
+          "operationVersion",
+          "expiresAt",
+          "auditEventId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "AUTHORIZE",
+              "VOID",
+              "QUERY"
+            ]
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CashierPaymentActions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "execute",
+          "query",
+          "resendOriginal"
+        ],
+        "properties": {
+          "execute": {
+            "type": "boolean"
+          },
+          "query": {
+            "type": "boolean"
+          },
+          "resendOriginal": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CashierPaymentWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payment",
+          "actions"
+        ],
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/PaymentView"
+          },
+          "actions": {
+            "$ref": "#/components/schemas/CashierPaymentActions"
+          }
+        }
+      },
+      "CashierPaymentPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextBeforeId"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashierPaymentWorkspace"
+            },
+            "maxItems": 100
+          },
+          "nextBeforeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentDebitAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "displayName",
+          "maskedAccount",
+          "currency",
+          "sourceVersion"
+        ],
+        "properties": {
+          "reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          },
+          "maskedAccount": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "sourceVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "CashierPaymentAccounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorizationId",
+          "authorizationVersion",
+          "validUntil",
+          "items"
+        ],
+        "properties": {
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentDebitAccount"
+            },
+            "maxItems": 200
+          }
+        }
+      },
+      "CashierPaymentActionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "authorizationVersion",
+          "comment"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "EXECUTE",
+              "QUERY",
+              "RESEND_ORIGINAL"
+            ]
+          },
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "debitAccountReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "debitAccountVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "EXECUTE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "debitAccountReference",
+                "debitAccountVersion"
+              ],
+              "properties": {
+                "operationVersion": {
+                  "type": "null"
+                },
+                "debitAccountReference": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "debitAccountVersion": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "else": {
+              "required": [
+                "operationVersion"
+              ],
+              "properties": {
+                "operationVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "debitAccountReference": {
+                  "type": "null"
+                },
+                "debitAccountVersion": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "CashierPaymentReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorizationId",
+          "authorizationVersion",
+          "action",
+          "requestId",
+          "operationVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "EXECUTE",
+              "QUERY",
+              "RESEND_ORIGINAL"
+            ]
+          },
+          "requestId": {
             "anyOf": [
               {
                 "type": "string",
