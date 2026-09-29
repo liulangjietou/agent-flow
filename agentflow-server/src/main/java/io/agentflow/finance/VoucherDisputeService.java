@@ -32,14 +32,15 @@ public class VoucherDisputeService {
     private final ApprovedVoucherSources sources;
     private final JdbcVoucherOperationRepository operations;
     private final JdbcVoucherDisputeResolutionRepository resolutions;
+    private final JdbcVoucherReversalRecordRepository reversals;
     private final ApplicationEventPublisher events;
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     /** 此服务不访问 ERP，所有候选必须先经原操作查询持久化。 */
     public VoucherDisputeService(CurrentActor actors, VoucherAccess access, PaymentPersonnel personnel, ApprovedVoucherSources sources,
-            JdbcVoucherOperationRepository operations, JdbcVoucherDisputeResolutionRepository resolutions, ApplicationEventPublisher events, JdbcTemplate jdbc, JsonUtil json) {
+            JdbcVoucherOperationRepository operations, JdbcVoucherDisputeResolutionRepository resolutions, JdbcVoucherReversalRecordRepository reversals, ApplicationEventPublisher events, JdbcTemplate jdbc, JsonUtil json) {
         this.actors = actors; this.access = access; this.personnel = personnel; this.sources = sources; this.operations = operations;
-        this.resolutions = resolutions; this.events = events; this.jdbc = jdbc; this.json = json;
+        this.resolutions = resolutions; this.reversals = reversals; this.events = events; this.jdbc = jdbc; this.json = json;
     }
 
     /** 幂等回放前也核验原轮次字段权限、当前法人任职及独立财务身份。 */
@@ -60,6 +61,9 @@ public class VoucherDisputeService {
             throw new DomainException("CONCURRENCY_CONFLICT", "Displayed approval, financial or voucher version changed");
         }
         var tenant = application.tenantId(); var actor = actors.actor().userId(); var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        if (input.outcome() == VoucherObservation.Status.POSTED && reversals.forOperation(tenant, operationId).isPresent()) {
+            throw new DomainException("VOUCHER_REVERSAL_ALREADY_RECORDED", "An independently recorded reverse voucher prevents restoring the original posting");
+        }
         var history = operations.disputeEvidence(tenant, operationId);
         var after = before.resolveDispute(input.outcome(), history.originalPosting(), history.postingObserved(), now);
         var decision = new VoucherDisputeResolution(UUID.randomUUID(), tenant, operationId, before.version(), after.version(), after.observation(), actor, now, input.evidenceReference(), input.comment());
@@ -86,8 +90,9 @@ public class VoucherDisputeService {
             var history = operations.disputeEvidence(command.tenantId(), command.id()); issue = operation.resolutionIssue(now, history.originalPosting(), history.postingObserved());
         }
         boolean eligible = VoucherDisputeResolution.independent(command, actors.actor().userId()) && personnel.eligible(command.tenantId(), actors.actor().userId(), command.legalEntityId());
+        boolean reversalRecorded = candidate != null && candidate.status() == VoucherObservation.Status.POSTED && reversals.forOperation(command.tenantId(), command.id()).isPresent();
         return new View(candidate == null ? null : new Candidate(candidate.status(), candidate.revision(), candidate.observedAt(), candidate.observedAt().plus(VoucherOperation.DISPUTE_EVIDENCE_LIFETIME),
-                candidate.postingReference(), candidate.voucherReference(), candidate.postedAt(), candidate.failure()), issue, candidate != null && issue == null && eligible,
+                candidate.postingReference(), candidate.voucherReference(), candidate.postedAt(), candidate.failure()), issue, candidate != null && issue == null && eligible && !reversalRecorded,
                 latest == null ? null : new Decision(latest.id(), latest.resolvedVersion(), latest.observation().status(), latest.resolvedBy(), latest.resolvedAt(), latest.evidenceReference()));
     }
     private VoucherOperation original(VoucherAccess.Context context, UUID operationId) {

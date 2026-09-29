@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import VoucherReversal from './VoucherReversal.vue'
 import { voucherOutcomeLabels, operationLabels, preparationLabels, validateVoucherReceipt, validateVoucherView, voucherActionInput, voucherActionLabels, voucherDisputeInput, validateVoucherDisputeReceipt, voucherDisputeIssue, voucherError, voucherIssue, type VoucherAction, type VoucherBinding, type VoucherView } from '../vouchers'
 
 const props = defineProps<{ applicationId: string; businessId: string; businessType: 'EXPENSE' | 'ADVANCE_REQUEST'; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; payment?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<VoucherView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
+const reversalBusy = ref(false)
 type Action = VoucherAction | 'RESOLVE_DISPUTE'
 const error = ref(''), notice = ref(''), pending = ref<Action | null>(null), comment = ref(''), evidenceReference = ref(''), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
@@ -17,11 +19,12 @@ function syncPending() {
   unconfirmed.value = current
 }
 const unsubscribe = writeRequests.subscribe(syncPending)
-const blocked = computed(() => !!props.locked || saving.value || loading.value || requiresRefresh.value || unconfirmed.value)
+const blocked = computed(() => !!props.locked || saving.value || reversalBusy.value || loading.value || requiresRefresh.value || unconfirmed.value)
+function reversalBusyChanged(value: boolean) { reversalBusy.value = value; emit('busy', value || saving.value) }
 function stop() { epoch++; controller?.abort(); controller = null }
 /** 切换身份、轮次和版本后清空旧状态，查询超时或迟到也不能恢复旧内容。 */
 async function load() {
-  if (saving.value || !props.scopeKey) return
+  if (saving.value || reversalBusy.value || !props.scopeKey) return
   stop(); const version = epoch, request = new AbortController(); controller = request
   view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''; error.value = ''; loading.value = true
   const binding: VoucherBinding = { applicationId: props.applicationId, businessId: props.businessId, businessType: props.businessType, roundNo: props.roundNo, applicationVersion: props.applicationVersion, businessVersion: props.businessVersion,
@@ -83,7 +86,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
 
 <template>
   <section class="voucher-status" :aria-label="`本轮${title}`">
-    <div class="voucher-heading"><h3>第 {{ roundNo }} 轮 · {{ title }}</h3><button type="button" class="quiet" :disabled="loading || saving || locked" @click="notice = ''; load()">刷新{{ title }}状态</button></div>
+    <div class="voucher-heading"><h3>第 {{ roundNo }} 轮 · {{ title }}</h3><button type="button" class="quiet" :disabled="loading || saving || reversalBusy || locked" @click="notice = ''; load()">刷新{{ title }}状态</button></div>
     <p class="voucher-help">{{ payment ? '根据原支付命令和成功回单办理会计入账。付款凭证的准备、查询及重发均不会再次付款。' : '挂账凭证记录本轮已批准的费用或借款。已过账后仍须办理实际付款与结算。' }}</p>
     <p v-if="loading" class="voucher-help" role="status">正在核对本轮凭证与读取权限…</p>
     <p v-if="error" class="voucher-error" role="alert">{{ error }}</p><p v-if="notice" class="voucher-help" role="status">{{ notice }}</p>
@@ -109,6 +112,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
         <p v-else>ERP 已明确确认原操作不存在。本次仍使用原编号、原金额和原会计日期，发送期限为 {{ timeLabel(view.operation!.sendExpiresAt) }}。</p>
         <label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="blocked" /></label><div class="voucher-actions"><button type="button" class="secondary" :disabled="saving" @click="pending = null">返回核对</button><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : `确认${actionLabel(pending)}` }}</button></div>
       </form>
+      <VoucherReversal v-if="view.operation?.voucherReference && (view.operation.observedStatus === 'REVERSED' || view.operation.status === 'RECONCILING')" :application-id="applicationId" :operation-id="view.operation!.id" :round-no="roundNo" :application-version="applicationVersion" :business-version="businessVersion" :operation-version="view.operation!.version" :kind="view.kind" :scope-key="scopeKey" :locked="locked || saving || loading || !!pending || unconfirmed || requiresRefresh" @busy="reversalBusyChanged" @recorded="load" />
     </template>
   </section>
 </template>

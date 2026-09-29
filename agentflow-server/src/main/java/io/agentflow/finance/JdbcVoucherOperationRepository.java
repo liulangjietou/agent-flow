@@ -78,6 +78,18 @@ public class JdbcVoucherOperationRepository {
             return new DisputeEvidence(originalPosting, postingObserved);
         }, tenant, id.toString());
     }
+
+    /** 冲销固定最初实际接受的原过账修订，争议候选不能成为原件。 */
+    public Optional<VoucherOperation> firstAcceptedPosting(String tenant, UUID id) {
+        return jdbc.query("SELECT version,state_json FROM voucher_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", rows -> {
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), VoucherOperation.class);
+                requireRevision(value, tenant, id, rows.getLong("version"));
+                if (posted(value.observation())) return Optional.of(value);
+            }
+            return Optional.<VoucherOperation>empty();
+        }, tenant, id.toString());
+    }
     private static void requireRevision(VoucherOperation value, String tenant, UUID id, long version) {
         if (!value.input().command().tenantId().equals(tenant) || !value.input().command().id().equals(id) || value.version() != version) {
             throw new IllegalStateException("Persisted voucher revision identity is inconsistent");

@@ -66,6 +66,7 @@ jobs:
             'AGENTFLOW_REPAYMENT_TEST:advance_repayments'
             'AGENTFLOW_DISBURSEMENT_RETURN_MIGRATION:disbursement_return_migration'
             'AGENTFLOW_ADVANCE_VOUCHER_MIGRATION:advance_voucher_migration'
+            'AGENTFLOW_VOUCHER_REVERSAL_MIGRATION:voucher_reversal_migration'
           )
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
@@ -76,7 +77,7 @@ jobs:
             export "${test_config_prefix}_PASSWORD=${AGENTFLOW_SCHEMA_TEST_PASSWORD}"
             export "${test_config_prefix}_DRIVER=org.postgresql.Driver"
           done
-          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest,ApplicationCopyIntegrationTest,CopyMigrationTest,AssistExecutionIntegrationTest,AssistExecutionMigrationTest,AdvanceRepaymentIntegrationTest,DisbursementReturnMigrationTest,AdvanceVoucherReviewMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest,ApplicationCopyIntegrationTest,CopyMigrationTest,AssistExecutionIntegrationTest,AssistExecutionMigrationTest,AdvanceRepaymentIntegrationTest,DisbursementReturnMigrationTest,AdvanceVoucherReviewMigrationTest,VoucherReversalMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
             test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"
