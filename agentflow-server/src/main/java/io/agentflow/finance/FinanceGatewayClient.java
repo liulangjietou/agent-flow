@@ -53,6 +53,7 @@ public class FinanceGatewayClient {
     /** 业务适配器核对结果与请求一致性，基础传输只认固定操作及封闭结果类型。 */
     public <T> FinanceResult<T> read(String tenantId, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.BUDGET_QUERY
+                || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_QUERY
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
@@ -75,6 +76,19 @@ public class FinanceGatewayClient {
         requireTarget(targetDigest);
         if (operationId == null) throw new IllegalArgumentException("A budget operation identity is required");
         return exchange(tenantId, targetDigest, Operation.BUDGET_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 独立冲正使用已持久化的授权编号，不改写原预算消费命令。 */
+    public <T> FinanceResult<T> executeBudgetReversal(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A budget reversal operation identity is required");
+        return exchange(tenantId, targetDigest, Operation.BUDGET_REVERSAL_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 冲正恢复始终查询原目标和原授权，不能创建替代命令。 */
+    public <T> FinanceResult<T> queryBudgetReversal(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.BUDGET_REVERSAL_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 付款查询始终使用原租户、原目标和原授权，不能改查当前新配置的资金系统。 */
@@ -171,7 +185,7 @@ public class FinanceGatewayClient {
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
-                || operation == Operation.VOUCHER_REVERSAL_COMMAND) request.header("Idempotency-Key", requestId.toString());
+                || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -230,6 +244,8 @@ public class FinanceGatewayClient {
                 FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         BUDGET_COMMAND("budget-command", Set.of()),
         BUDGET_QUERY("budget-query", Set.of()),
+        BUDGET_REVERSAL_COMMAND("budget-consumption-reversal-command", Set.of()),
+        BUDGET_REVERSAL_QUERY("budget-consumption-reversal-query", Set.of()),
         PAYMENT_COMMAND("payment-command", Set.of()),
         PAYMENT_QUERY("payment-query", Set.of()),
         DEBIT_ACCOUNTS("debit-accounts", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.CASHIER_UNAVAILABLE, FinanceResult.Reason.DEBIT_ACCOUNT_UNAVAILABLE)),

@@ -1,0 +1,42 @@
+{
+  "date": "2026-09-29",
+  "stage": "budget-consumption-reversal-protocol",
+  "result": "PASS_PROTOCOL_ONLY",
+  "tests": {
+    "domainBudgetScope": 22,
+    "gatewayBudgetAndTransportScope": 26,
+    "newDomainCommandAndState": 12,
+    "newGateway": 6,
+    "overlap": true
+  },
+  "http": "Synthetic loopback through actual bounded gateway adapter",
+  "schemaChanged": false,
+  "publicApiOrUiAdded": false,
+  "liveAcceptanceSchema": 64,
+  "remaining": [
+    "Persistence and source guard",
+    "Independent adjustment preparation and authorization",
+    "Worker recovery and original resource reversals",
+    "Public API and UI",
+    "PostgreSQL migration and live acceptance"
+  ],
+  "logs": [
+    "budget-consumption-reversal-state.log",
+    "budget-consumption-reversal-protocol.log",
+    "budget-consumption-reversal-authors.log"
+  ],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "snapshotRecoveryFix": {
+    "redTest": 1,
+    "failure": "Zero attempts with an applied receipt could restore an impossible execution state",
+    "guard": "Any accepted or conflicting observation requires at least one processing attempt",
+    "redLog": "budget-consumption-reversal-snapshot-red.log",
+    "greenLog": "budget-consumption-reversal-state-green.log"
+  },
+  "authors": {
+    "javaFiles": 803,
+    "namedTypes": 1479,
+    "missing": 0,
+    "parseErrors": 0
+  }
+}
