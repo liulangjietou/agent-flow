@@ -23,7 +23,7 @@ public interface InvoiceVerificationPort {
      */
     record Request(String employeeId, UUID legalEntityId, UUID originalFileId, String originalDigest, String mediaType, byte[] original) {
         public static final int MAX_ORIGINAL_BYTES = 20 * 1024 * 1024;
-        private static final Set<String> MEDIA_TYPES = Set.of("application/pdf", "application/ofd", "image/png", "image/jpeg");
+        private static final Set<String> MEDIA_TYPES = Set.of("application/pdf", "application/ofd", "image/png", "image/jpeg", "application/xml");
 
         /** 防御性复制保留授权时的字节，文件类型的内容识别由原件上传入口完成。 */
         public Request {

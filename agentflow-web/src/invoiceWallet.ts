@@ -1,6 +1,6 @@
 import type { Money } from './expenses.js'
 
-export type InvoiceFormat = 'PDF' | 'OFD' | 'PNG' | 'JPEG'
+export type InvoiceFormat = 'PDF' | 'OFD' | 'PNG' | 'JPEG' | 'XML'
 export interface InvoiceOriginal { id: string; filename: string; size: number; sha256: string; format: InvoiceFormat; status: 'UPLOADING' | 'READY' | 'FAILED'; createdAt: string }
 export interface InvoiceItem {
   id: string; version: number; original: InvoiceOriginal
@@ -44,9 +44,9 @@ export function invoiceFileFormat(file: File, options: InvoiceWalletOptions): In
   if (!options.enabled) throw new Error('原件存储尚未就绪。')
   if (!file.size || file.size > options.maxFileBytes) throw new Error('文件不能为空，也不能超过页面显示的单份上限。')
   if (!file.name || file.name.length > 255 || /[\u0000-\u001f\u007f/\\]/.test(file.name)) throw new Error('文件名不能含路径或控制字符，且最多 255 个字符。')
-  const formats: Readonly<Record<string, InvoiceFormat | undefined>> = { pdf: 'PDF', ofd: 'OFD', png: 'PNG', jpg: 'JPEG', jpeg: 'JPEG' }
+  const formats: Readonly<Record<string, InvoiceFormat | undefined>> = { pdf: 'PDF', ofd: 'OFD', png: 'PNG', jpg: 'JPEG', jpeg: 'JPEG', xml: 'XML' }
   const format = formats[file.name.split('.').pop()!.toLowerCase()]
-  if (!format || !options.formats.includes(format)) throw new Error('请选择页面支持的 PDF、OFD、PNG 或 JPEG 原件。')
+  if (!format || !options.formats.includes(format)) throw new Error('请选择页面支持的 PDF、OFD、PNG、JPEG 或 XML 原件。')
   return format
 }
 export interface InvoiceUploadAttempt { file: File; key: string; invoiceId?: string; input?: InvoiceUploadInput; registrationSent: boolean }

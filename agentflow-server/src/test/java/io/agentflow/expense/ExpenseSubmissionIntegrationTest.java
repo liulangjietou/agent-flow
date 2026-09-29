@@ -148,6 +148,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired org.flowable.engine.RuntimeService runtime;
     @Autowired io.agentflow.approval.repository.SubmissionRoundRepository rounds;
     @Autowired InvoiceWalletService wallet;
+    private InvoiceOriginal.Format invoiceOriginalFormat = InvoiceOriginal.Format.PDF;
     @Autowired InvoiceVerificationService verification;
     @Autowired InvoiceVerificationWorker invoiceWorker;
     @Autowired ExpensePrecheckWorker precheckWorker;
@@ -1013,6 +1014,20 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(view.path("originalCount").asInt()).isEqualTo(1); assertThat(view.path("voucherCount").asInt()).isEqualTo(2);
     }
 
+    @Test void xmlInvoiceIsConsumedAndArchivedWithoutReencodingItsOriginal() throws Exception {
+        invoiceOriginalFormat = InvoiceOriginal.Format.XML;
+        var report = archiveReadyExpense(); pollArchive();
+        var entry = archives.find("demo", report.id(), 1).orElseThrow();
+        assertThat(entry.archive()).isNotNull(); var original = entry.archive().manifest().originals().get(0);
+        byte[] expected = syntheticXmlOriginal();
+        var contents = unzipArchive(archiveDownload(report, "alice"));
+        assertThat(contents.get(original.entryName())).isEqualTo(expected);
+        assertThat(original.file().sha256()).isEqualTo(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(expected)));
+        assertThat(original.file().filename()).endsWith(".xml");
+        UUID invoice = current(report).currentRound().originalLines().get(0).original().invoiceIds().get(0);
+        assertThat(invoices.find("demo", invoice).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+    }
+
     @Test void missingOrDamagedOriginalBlocksArchiveAndDownloadWithoutReplacingFrozenReceipt() throws Exception {
         var report = archiveReadyExpense(); var manifest = archiveService.prepare("demo", report.id());
         var original = manifest.originals().get(0); var file = DIRECTORY.resolve(original.file().id() + ".bin"); var bytes = java.nio.file.Files.readAllBytes(file);
@@ -1621,12 +1636,16 @@ class ExpenseSubmissionIntegrationTest {
                 List.of(new CostAllocation("IT", null, money("100"))), "合成办公费", null);
     }
     private UUID original() throws Exception {
-        byte[] bytes = ("%PDF-1.7\nsynthetic-submission-" + UUID.randomUUID() + "\n%%EOF").getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = invoiceOriginalFormat == InvoiceOriginal.Format.XML ? syntheticXmlOriginal()
+                : ("%PDF-1.7\nsynthetic-submission-" + UUID.randomUUID() + "\n%%EOF").getBytes(StandardCharsets.UTF_8);
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            UUID id = wallet.reserve(new InvoiceWalletService.UploadInput("合成发票.pdf", (long) bytes.length, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)), InvoiceOriginal.Format.PDF)).id();
+            UUID id = wallet.reserve(new InvoiceWalletService.UploadInput("合成发票." + invoiceOriginalFormat.name().toLowerCase(java.util.Locale.ROOT), (long) bytes.length, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)), invoiceOriginalFormat)).id();
             wallet.upload(id, new ByteArrayInputStream(bytes)); return id;
         } finally { actors.clear(); }
+    }
+    private static byte[] syntheticXmlOriginal() {
+        return "\ufeff<Invoice xmlns='urn:synthetic'><Name>合成归档原件</Name><Memo><![CDATA[原始字节不变]]></Memo></Invoice>".getBytes(StandardCharsets.UTF_8);
     }
     private void verify(UUID invoice) {
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));

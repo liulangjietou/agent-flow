@@ -76,7 +76,7 @@ async function upload() {
     <div><p class="eyebrow">ORIGINAL DOCUMENT</p><h3>{{ restoreId ? '恢复原件上传' : '添加一份发票原件' }}</h3></div>
     <p class="upload-help">{{ restoreId ? '选择原登记对应的同一份文件，继续使用已有发票记录。' : '保存原件后，再明确选择法人查验。查验通过的发票可在报销费用行中选择。' }}</p>
     <template v-if="options?.enabled">
-      <label v-if="!attempt" class="file-picker">{{ restoreId ? '选择原文件' : '选择发票原件' }}<input type="file" accept=".pdf,.ofd,.png,.jpg,.jpeg" :disabled="locked || uploading" :aria-label="restoreId ? '选择原文件恢复票据' : '选择发票原件'" @change="selected" /></label>
+      <label v-if="!attempt" class="file-picker">{{ restoreId ? '选择原文件' : '选择发票原件' }}<input type="file" accept=".pdf,.ofd,.png,.jpg,.jpeg,.xml" :disabled="locked || uploading" :aria-label="restoreId ? '选择原文件恢复票据' : '选择发票原件'" @change="selected" /></label>
       <div v-else class="upload-selection"><div><strong>{{ attempt.file.name }}</strong><small>{{ fileSize(attempt.file.size) }} · {{ attempt.invoiceId ? '继续原登记' : attempt.registrationSent ? '登记结果待确认' : '等待确认上传' }}</small></div><div class="upload-actions"><button class="primary" type="button" :disabled="locked || uploading" @click="upload">{{ uploading ? '上传中…' : attempt.registrationSent || attempt.invoiceId ? '继续原上传' : '确认上传原件' }}</button><button v-if="!attempt.registrationSent" class="quiet" type="button" :disabled="uploading" @click="discard">重新选择</button></div></div>
       <p class="upload-help">支持 {{ options.formats.join(' / ') }}；单份最多 {{ fileSize(options.maxFileBytes) }}。本人累计最多 {{ options.maxWalletUploads }} 次 / {{ fileSize(options.maxWalletBytes) }}，包含历史及未完成上传。</p>
     </template>

@@ -142,6 +142,20 @@ class InvoiceVerificationIntegrationTest {
     }
 
     @Test
+    void xmlIsForwardedByteForByteWithItsMediaTypeAndOnlyGatewayFactsCanVerifyIt() throws Exception {
+        byte[] xml = "<?xml version='1.0' encoding='UTF-16'?><Invoice><Gross>999999</Gross><Status>VERIFIED</Status></Invoice>".getBytes(StandardCharsets.UTF_16);
+        UUID invoice = original(xml, InvoiceOriginal.Format.XML, true);
+        assertThat(invoice(invoice).verification()).isEqualTo(Invoice.Verification.PENDING);
+        UUID id = enqueue(invoice); assertThat(CALLS.get()).isZero(); worker.poll();
+        assertThat(job(id).status()).isEqualTo(InvoiceVerificationJob.Status.SUCCEEDED);
+        assertThat(RECEIVED.get().at("/data/mediaType").asText()).isEqualTo("application/xml");
+        assertThat(Base64.getDecoder().decode(RECEIVED.get().at("/data/original").asText())).isEqualTo(xml);
+        assertThat(RECEIVED.get().at("/data/originalDigest").asText()).isEqualTo(invoice(invoice).originalDigest());
+        assertThat(invoice(invoice).facts().gross().value()).isEqualByComparingTo("100");
+        assertThat(files.read(originals.find("demo", invoice).orElseThrow())).isEqualTo(xml);
+    }
+
+    @Test
     void ownershipAndExplicitTargetApplyToEveryReadAndWrite() throws Exception {
         UUID invoice = original(true); var input = input(invoice);
         for (String user : List.of("admin", "manager")) {
@@ -276,11 +290,14 @@ class InvoiceVerificationIntegrationTest {
         try { execution.queue(invoice, input); return "QUEUED"; } catch (DomainException failure) { return failure.code(); } finally { actors.clear(); }
     }
     private UUID original(boolean publish) throws Exception {
+        return original(PDF, InvoiceOriginal.Format.PDF, publish);
+    }
+    private UUID original(byte[] bytes, InvoiceOriginal.Format format, boolean publish) throws Exception {
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(PDF));
-            UUID id = wallet.reserve(new InvoiceWalletService.UploadInput("合成查验.pdf", (long) PDF.length, digest, InvoiceOriginal.Format.PDF)).id();
-            if (publish) wallet.upload(id, new ByteArrayInputStream(PDF)); return id;
+            String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            UUID id = wallet.reserve(new InvoiceWalletService.UploadInput("合成查验." + format.name().toLowerCase(java.util.Locale.ROOT), (long) bytes.length, digest, format)).id();
+            if (publish) wallet.upload(id, new ByteArrayInputStream(bytes)); return id;
         } finally { actors.clear(); }
     }
     private InvoiceVerificationService.QueueInput input(UUID invoice) { return new InvoiceVerificationService.QueueInput(invoice(invoice).version(), ENTITY, digestTarget()); }

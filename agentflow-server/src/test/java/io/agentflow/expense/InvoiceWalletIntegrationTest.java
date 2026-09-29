@@ -131,6 +131,45 @@ class InvoiceWalletIntegrationTest {
     }
 
     @Test
+    void xmlOriginalRetainsEncodingAndOwnerIsolationWithoutClaimingVerification() throws Exception {
+        for (byte[] xml : List.of(("\ufeff<Invoice><Status>VERIFIED</Status></Invoice>").getBytes(StandardCharsets.UTF_8),
+                "<?xml version='1.0' encoding='UTF-16'?><Invoice>合成原件</Invoice>".getBytes(StandardCharsets.UTF_16))) {
+            String invoice = reserve(xml, InvoiceOriginal.Format.XML);
+            assertThat(upload(invoice, "alice", xml).getStatus()).isEqualTo(200);
+            var item = getItem(invoice, "alice", 200);
+            assertThat(item.at("/original/format").asText()).isEqualTo("XML");
+            assertThat(item.at("/original/status").asText()).isEqualTo("READY");
+            assertThat(item.path("verification").asText()).isEqualTo("PENDING");
+            assertThat(item.has("facts")).isFalse();
+            var response = download(invoice, "alice");
+            assertThat(response.getStatus()).isEqualTo(200); assertThat(response.getContentAsByteArray()).isEqualTo(xml);
+            assertThat(response.getHeader("Content-Type")).isEqualTo("application/octet-stream");
+            assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
+            assertThat(response.getHeader("Content-Disposition")).startsWith("attachment;");
+            assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+            for (String other : List.of("bob", "admin")) {
+                getItem(invoice, other, 404); assertThat(download(invoice, other).getStatus()).isEqualTo(404);
+                assertThat(upload(invoice, other, xml).getStatus()).isEqualTo(404);
+            }
+        }
+    }
+
+    @Test
+    void malformedXmlIsFailedAndCannotBeDownloadedOrClaimVerification() throws Exception {
+        for (String text : List.of("<Invoice>", "<!DOCTYPE Invoice [<!ENTITY x SYSTEM 'file:///private-test-marker'>]><Invoice>&x;</Invoice>")) {
+            byte[] xml = text.getBytes(StandardCharsets.UTF_8); String invoice = reserve(xml, InvoiceOriginal.Format.XML);
+            var failure = upload(invoice, "alice", xml);
+            assertThat(failure.getStatus()).isEqualTo(422);
+            assertThat(tree(failure).path("code").asText()).isEqualTo("INVOICE_ORIGINAL_FORMAT_MISMATCH");
+            assertThat(failure.getContentAsString()).doesNotContain("private-test-marker", text);
+            var item = getItem(invoice, "alice", 200);
+            assertThat(item.at("/original/status").asText()).isEqualTo("FAILED");
+            assertThat(item.path("verification").asText()).isEqualTo("PENDING"); assertThat(item.has("facts")).isFalse();
+            assertThat(download(invoice, "alice").getStatus()).isEqualTo(422);
+        }
+    }
+
+    @Test
     void contentLengthCannotBypassActualStreamLimitAndCorruptionCannotBeDownloaded() throws Exception {
         String invoice = reserve(PDF, InvoiceOriginal.Format.PDF);
         assertThat(upload(invoice, "alice", new byte[2048]).getStatus()).isEqualTo(413);

@@ -67,7 +67,7 @@ agentflow:
 
 制度请求含员工、法人、报销种类、完整 `ExpenseLine`、已选 `ExpenseExchangeRate` 及逐张 `InvoiceEvidence(invoiceId, facts)`；票据必须完整对应本行的本地发票标识，不得多出、漏掉或跨法人。制度结果含 `policy`、本位币 `deductibleTax`、`priorRequestRequired`、`validUntil`。`policy` 保留制度 ID/版本、核算额、制度允许额、`WITHIN_LIMIT` / `REQUIRES_EXCEPTION` / `DENIED`、税务规则引用及证据引用。超标不是已获特批，后续审批仍然必需。
 
-验票请求含 `employeeId`、`legalEntityId`、`originalFileId`、`originalDigest`、`mediaType` 和 Base64 编码的 `original`。实际字节必须从服务器原件存储读取，并与 SHA-256 摘要相符；最大 20 MiB，支持 PDF、OFD、PNG、JPEG。接口不接受文件下载 URL。成功结果保留规范票号、法人、含税金额、税额、开票日期、相同原件摘要、查验引用、查验时刻及有效期。数电票使用 `DIGITAL` 和二十位 `number`，`code` 为 null 或省略；传统票使用 `TRADITIONAL`、`code` 和 `number`。真实票种、真实性及买方校验责任在企业查验服务。
+验票请求含 `employeeId`、`legalEntityId`、`originalFileId`、`originalDigest`、`mediaType` 和 Base64 编码的 `original`。实际字节必须从服务器原件存储读取，并与 SHA-256 摘要相符；最大 20 MiB，支持 PDF、OFD、PNG、JPEG、XML（媒体类型 `application/xml`）。XML 已经过禁用外部访问的结构检查，保留原始编码和签名字节，不执行样式表或引用；企业查验端仍须安全解析并验证签名及业务真实性，详见 [XML 原件](invoice-xml-originals.md)。接口不接受文件下载 URL。成功结果保留规范票号、法人、含税金额、税额、开票日期、相同原件摘要、查验引用、查验时刻及有效期。数电票使用 `DIGITAL` 和二十位 `number`，`code` 为 null 或省略；传统票使用 `TRADITIONAL`、`code` 和 `number`。真实票种、真实性及买方校验责任在企业查验服务。
 
 预算预检请求含 `reportId`、`roundNo`、`financialVersion`（待提交财务版本）、`employeeId`、`legalEntityId`、`baseCurrency`、`accountingDate` 和 `allocations`。每项分摊为 `expenseLineNo`、`allocationNo`（均从 1 开始）、`categoryCode` 及 `cost: {costCenter, projectCode, amount}`。费用类别到真实预算科目的映射由企业预算服务提供，本地不编造科目或额度。上限为 200 行费用、每行 50 个分摊，同一位置不能重复，所有金额必须为法人本位币。
 

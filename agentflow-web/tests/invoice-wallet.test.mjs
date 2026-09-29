@@ -11,7 +11,7 @@ const originals = { ...api }, renderer = createRenderer({ createComment: () => (
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 const settle = () => new Promise(resolve => setImmediate(resolve))
 const file = new File(['abc'], '发票.pdf'), sha256 = await fileDigest(file)
-const limits = { enabled: true, maxFileBytes: 1024, maxWalletBytes: 4096, maxWalletUploads: 10, formats: ['PDF', 'OFD', 'PNG', 'JPEG'] }
+const limits = { enabled: true, maxFileBytes: 1024, maxWalletBytes: 4096, maxWalletUploads: 10, formats: ['PDF', 'OFD', 'PNG', 'JPEG', 'XML'] }
 const item = (status = 'READY') => ({ id: 'invoice', version: 1, original: { id: 'original-file', filename: file.name, size: file.size, sha256, format: 'PDF', status }, verification: 'PENDING', occupation: 'AVAILABLE', facts: null })
 const options = () => ({ invoiceVersion: 1, enabled: true, destination: 'finance.test', targetDigest: 'a'.repeat(64), confirmedLegalEntityId: null })
 const catalog = () => ({ validUntil: new Date(Date.now() + 3600000).toISOString(), legalEntities: [{ id: 'legal', name: '本人法人' }] })
@@ -31,10 +31,24 @@ function panel(Component, extra = {}) {
 function choose(p, value = file) { p.state.selected({ target: { files: [value], value: 'fakepath' } }) }
 
 test('原件登记只接受支持格式和有界文件，内存恢复按账号隔离', () => {
-  assert.equal(invoiceFileFormat(file, limits), 'PDF'); assert.equal(invoiceFileFormat(new File(['a'], '原件.JPG'), limits), 'JPEG')
+  assert.equal(invoiceFileFormat(new File(['<Invoice/>'], '原件.XML'), limits), 'XML'); assert.throws(() => invoiceFileFormat(new File(['<Invoice/>'], '原件.xml'), { ...limits, formats: ['PDF'] })); assert.equal(invoiceFileFormat(file, limits), 'PDF'); assert.equal(invoiceFileFormat(new File(['a'], '原件.JPG'), limits), 'JPEG')
   for (const invalid of [new File([], 'a.pdf'), new File(['abc'], '../a.pdf'), new File(['abc'], 'a.svg'), new File(['a'.repeat(1025)], 'a.pdf')]) assert.throws(() => invoiceFileFormat(invalid, limits))
   const store = new InvoiceUploads(), attempt = { file, key: 'original', registrationSent: false }; store.set('alice', attempt)
   assert.equal(store.get('alice').file, file); assert.equal(store.get('bob'), null); assert.equal(store.hasPending(), true); store.clear('alice'); assert.equal(store.hasPending(), false)
+})
+
+test('XML 上传登记格式与原始字节一致，不从文件内自报状态生成查验结果', async () => {
+  defaults()
+  const xml = new File(['\ufeff<Invoice><Status>VERIFIED</Status></Invoice>'], '合成原件.XML', { type: 'application/xml' }), digest = await fileDigest(xml), requests = []
+  const metadata = { ...item('UPLOADING'), original: { ...item('UPLOADING').original, filename: xml.name, size: xml.size, sha256: digest, format: 'XML' } }
+  api.reserveInvoice = async input => { requests.push(input); return { id: 'invoice' } }; api.invoice = async () => metadata
+  api.uploadInvoice = async (id, bytes) => { assert.equal(id, 'invoice'); assert.equal(bytes, xml); assert.deepEqual(await bytes.arrayBuffer(), await xml.arrayBuffer()); return { ...metadata.original, status: 'READY' } }
+  const p = panel(Uploader)
+  try {
+    choose(p, xml); await p.state.upload()
+    assert.deepEqual(requests, [{ filename: xml.name, size: xml.size, sha256: digest, format: 'XML' }]); assert.deepEqual(p.events, ['invoice'])
+    assert.equal(metadata.verification, 'PENDING'); assert.equal(metadata.facts, null); assert.equal(invoiceUploads.get(p.props.scopeKey), null)
+  } finally { p.close() }
 })
 
 test('登记响应丢失后导航返回只重发原键和原正文，不新增原件', async () => {

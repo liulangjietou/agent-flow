@@ -3,6 +3,14 @@ package io.agentflow.expense;
 import io.agentflow.common.DomainException;
 import io.agentflow.storage.LocalDocumentStore;
 import org.springframework.stereotype.Component;
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
+import org.xml.sax.helpers.DefaultHandler;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +26,9 @@ import java.util.zip.ZipFile;
 @Component
 public class InvoiceOriginalFiles {
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+    private static final int MAX_XML_DEPTH = 64;
+    private static final int MAX_XML_ELEMENTS = 100_000;
+    private static final int MAX_XML_ATTRIBUTES = 64;
     private final LocalDocumentStore documents;
 
     /** 共用目录使数据库和原件能够使用同一个配套恢复点。 */
@@ -51,6 +62,7 @@ public class InvoiceOriginalFiles {
                 case PNG -> Arrays.equals(header, PNG_SIGNATURE);
                 case JPEG -> header.length >= 3 && header[0] == (byte) 0xff && header[1] == (byte) 0xd8 && header[2] == (byte) 0xff;
                 case OFD -> isOfdContainer(staged);
+                case XML -> isXmlDocument(staged);
             };
             if (!matches) throw invalid();
         } catch (IOException malformed) { throw invalid(); }
@@ -62,6 +74,53 @@ public class InvoiceOriginalFiles {
             var descriptor = archive.getEntry("OFD.xml");
             return descriptor != null && !descriptor.isDirectory() && descriptor.getSize() > 0;
         }
+    }
+    private boolean isXmlDocument(Path staged) throws IOException {
+        // 直接读取原字节，保留声明编码、BOM、签名和摘要；不构建 DOM、不解析票面或执行引用。
+        var factory = SAXParserFactory.newDefaultInstance();
+        factory.setNamespaceAware(true);
+        factory.setXIncludeAware(false);
+        try (var input = Files.newInputStream(staged)) {
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            var reader = factory.newSAXParser().getXMLReader();
+            reader.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            reader.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            // 将命名空间声明计入每个元素的属性限制，避免只限制普通属性。
+            reader.setFeature("http://xml.org/sax/features/namespace-prefixes", true);
+            var handler = new XmlStructureLimits();
+            reader.setContentHandler(handler);
+            reader.setErrorHandler(handler);
+            reader.setEntityResolver((publicId, systemId) -> { throw new SAXException("External XML resolution is disabled"); });
+            reader.parse(new InputSource(input));
+            return true;
+        } catch (SAXException malformed) {
+            // 不向响应或日志泄露原文、系统路径和解析器上下文。
+            return false;
+        } catch (ParserConfigurationException unavailable) {
+            throw new IllegalStateException("Secure XML parser is unavailable", unavailable);
+        }
+    }
+
+    /**
+     * 流式结构上限只识别 XML 容器，是否为真实有效发票仍由查验端口判断。
+     * @author owlzhangfq@gmail.com
+     */
+    private static final class XmlStructureLimits extends DefaultHandler {
+        private int depth;
+        private int elements;
+
+        @Override public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) throws SAXException {
+            if (++depth > MAX_XML_DEPTH || ++elements > MAX_XML_ELEMENTS || attributes.getLength() > MAX_XML_ATTRIBUTES) {
+                throw new SAXException("Invoice XML structure exceeds limits");
+            }
+        }
+        @Override public void endElement(String uri, String localName, String qualifiedName) { depth--; }
+        @Override public void error(SAXParseException failure) throws SAXException { throw failure; }
+        @Override public void fatalError(SAXParseException failure) throws SAXException { throw failure; }
     }
     private static DomainException invalid() { return new DomainException("INVOICE_ORIGINAL_FORMAT_MISMATCH", "Original content does not match its declared invoice format"); }
 }

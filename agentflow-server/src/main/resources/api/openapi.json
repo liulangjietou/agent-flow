@@ -28489,7 +28489,8 @@
               "PDF",
               "OFD",
               "PNG",
-              "JPEG"
+              "JPEG",
+              "XML"
             ]
           },
           "status": {
@@ -28760,7 +28761,8 @@
                 "PDF",
                 "OFD",
                 "PNG",
-                "JPEG"
+                "JPEG",
+                "XML"
               ]
             },
             "uniqueItems": true
@@ -28799,7 +28801,8 @@
               "PDF",
               "OFD",
               "PNG",
-              "JPEG"
+              "JPEG",
+              "XML"
             ]
           }
         },

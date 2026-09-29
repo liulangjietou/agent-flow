@@ -44,7 +44,7 @@ public record InvoiceOriginal(UUID id, UUID invoiceId, String tenantId, String o
      * @author owlzhangfq@gmail.com
      */
     public enum Format {
-        PDF("application/pdf"), OFD("application/ofd"), PNG("image/png"), JPEG("image/jpeg");
+        PDF("application/pdf"), OFD("application/ofd"), PNG("image/png"), JPEG("image/jpeg"), XML("application/xml");
         private final String mediaType;
         Format(String mediaType) { this.mediaType = mediaType; }
         public String mediaType() { return mediaType; }
