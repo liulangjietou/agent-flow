@@ -30,6 +30,11 @@ public interface VoucherReversalPort {
             if (command == null || original == null || original.status() != VoucherObservation.Status.POSTED && original.status() != VoucherObservation.Status.REVERSED
                     || !original.matches(command, true, original.observedAt())) throw invalid();
         }
+        /** 再次读取仍须属于同一已接受原件，不能用较早或另一张过账替换历史依据。 */
+        public boolean matchesOriginal(VoucherObservation value) {
+            return value != null && value.matches(command, true, value.observedAt()) && value.revision() >= original.revision()
+                    && !value.observedAt().isBefore(original.observedAt()) && samePosting(value, original);
+        }
         @Override public String toString() { return "VoucherReversalRequest[operationId=" + command.id() + "]"; }
     }
 

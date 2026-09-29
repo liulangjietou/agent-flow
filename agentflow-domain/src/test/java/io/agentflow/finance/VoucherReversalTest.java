@@ -120,7 +120,7 @@ class VoucherReversalTest {
         return new VoucherObservation(command.id(), command.digest(), status, status == VoucherObservation.Status.POSTED ? 1L : 2L, observedAt,
                 "original-posting", "original-voucher", command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
     }
-    private static VoucherCommand command(VoucherCommand.Kind kind) {
+    static VoucherCommand command(VoucherCommand.Kind kind) {
         var base = VoucherCommandTest.advanceCommand(); if (kind == VoucherCommand.Kind.EMPLOYEE_ADVANCE) return base;
         List<VoucherCommand.Line> lines; VoucherCommand.PaymentProof proof = null;
         if (kind == VoucherCommand.Kind.EXPENSE_ACCRUAL) {

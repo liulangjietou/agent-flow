@@ -57,7 +57,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
-                || operation == Operation.VOUCHER_REVERSAL) {
+                || operation == Operation.VOUCHER_REVERSAL || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.VOUCHER_REVERSAL_QUERY) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
         return exchange(tenantId, null, operation, UUID.randomUUID(), data, resultType, matchesRequest);
@@ -140,6 +140,19 @@ public class FinanceGatewayClient {
         return exchange(tenantId, targetDigest, Operation.VOUCHER_REVERSAL, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
+    /** 真正冲销命令使用本地持久编号作幂等键，不能与只读分录核验混用。 */
+    public <T> FinanceResult<T> postVoucherReversal(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A persisted reversal operation identity is required");
+        return exchange(tenantId, targetDigest, Operation.VOUCHER_REVERSAL_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 查询已经发出的原冲销命令，传输关联号变化不改变业务编号和摘要。 */
+    public <T> FinanceResult<T> queryVoucherReversalOperation(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.VOUCHER_REVERSAL_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
     private <T> FinanceResult<T> exchange(String tenantId, String targetDigest, Operation operation, UUID requestId,
                                         Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Finance gateway must run outside a transaction");
@@ -150,7 +163,8 @@ public class FinanceGatewayClient {
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(operation.path)).timeout(destination.timeout())
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
-        if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND) request.header("Idempotency-Key", requestId.toString());
+        if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
+                || operation == Operation.VOUCHER_REVERSAL_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -219,7 +233,9 @@ public class FinanceGatewayClient {
         ADVANCE_REPAYMENT("advance-repayment", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         ADVANCE_REPAYMENT_ADJUSTMENT("advance-repayment-adjustment", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         ADVANCE_DISBURSEMENT_RETURN("advance-disbursement-return", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
-        VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE));
+        VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
+        VOUCHER_REVERSAL_COMMAND("voucher-reversal-command", Set.of()),
+        VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of());
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
         Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }
