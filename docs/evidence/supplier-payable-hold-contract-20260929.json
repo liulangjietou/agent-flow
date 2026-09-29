@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier financial authorization and original ERP payable hold domain and HTTP adapter",
+  "status": "DOMAIN_AND_ADAPTER_VERIFIED_LOCALLY",
+  "implemented": [
+    "Exact approved procurement and still-held original local payable binding",
+    "Fresh immutable payable facts, independent finance authorization and cashier separation",
+    "Original ERP payable hold command digest and bounded send window",
+    "Unknown-result query recovery, explicit same-command retry and retained conflicting evidence",
+    "Fixed-target typed HTTP adapter with stable write identity and read-only recovery"
+  ],
+  "verification": {
+    "domain_tests": 30,
+    "gateway_tests": 32,
+    "total_tests": 62,
+    "red_first_persistence_boundary_failures": 2,
+    "java_files_checked": 872,
+    "named_types_checked": 1614,
+    "missing_authors": 0,
+    "parse_errors": 0,
+    "git_diff_check": "PASS",
+    "actual_enterprise_gateway": false,
+    "database_migration": false,
+    "live_acceptance_schema": "V67"
+  },
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-hold-state-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-hold-contract.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-hold-authors.log"
+  ],
+  "remaining": [
+    "Database authorization and durable hold queue with transaction and concurrency verification",
+    "Finance and cashier application access and public workspaces",
+    "Supplier bank payment, original ERP settlement and safe hold release",
+    "Real external-system acceptance"
+  ]
+}
