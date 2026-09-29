@@ -73,6 +73,7 @@ class AdvanceRepaymentIntegrationTest {
     private long reviewRevision = 1;
     private boolean reviewUnavailable;
     private String returnReference;
+    private List<AdvanceRepaymentAdjustmentPort.ReturnItem> partialReturns;
     private final Map<UUID, AdvanceRepaymentAdjustmentPort.Receipt> returnFacts = new HashMap<>();
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
@@ -237,6 +238,60 @@ class AdvanceRepaymentIntegrationTest {
         assertThat(balance(loan).balance().reserved()).isEqualTo(money("60")); assertThat(balance(loan).available()).isEqualTo(money("40")); assertThat(balance(loan).repaymentReturns()).hasSize(1);
         new TransactionTemplate(transactions).executeWithoutResult(tx -> { requests.lock("demo", loan); var value = balance(loan); long version = value.version(); value.settle(version, use); balances.update(value, version, "test", "TEST_SETTLE"); });
         assertThat(balance(loan).outstanding()).isEqualTo(money("40")); assertThat(balance(loan).returnedRepayments()).isEqualTo(money("25"));
+    }
+
+    @Test void successivePartialReturnsAppendNewRowsAndRetainOriginalReceiptAndReservations() throws Exception {
+        var loan = paidLoan(); amount = "60"; var repayment = repay(loan, "partial-sequence"); reserve(loan, "40"); int originalVoucherWrites = voucherWrites;
+        var first = partialItem("first-30", "30"); var second = partialItem("second-20", "20"); var third = partialItem("third-10", "10");
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED; partialReturns = List.of(first); receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll();
+        assertThat(balance(loan).repaid()).isEqualTo(money("60")); assertThat(balance(loan).repaymentReviewRequired()).isTrue();
+        String key = UUID.randomUUID().toString(); var input = resolveInput(loan, check); var saved = send(reviewPath(loan, repayment) + "/resolutions", "finance", key, input); ok(saved, 202);
+        assertThat(send(reviewPath(loan, repayment) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(saved.getContentAsString());
+        var retained = balance(loan).repaymentReturns().get(0); assertThat(balance(loan).repaid()).isEqualTo(money("30"));
+        query(loan, "partial-sequence"); worker.poll(); assertThat(balance(loan).repaymentReviewRequired()).isFalse();
+        reviewRevision = 2; receiptRevision = 3; partialReturns = List.of(first, second, third); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED;
+        var all = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, all)), 202);
+        assertThat(balance(loan).repaymentReturns()).hasSize(3).contains(retained); assertThat(balance(loan).repaid()).isEqualTo(money("0"));
+        assertThat(balance(loan).receivedRepayments()).isEqualTo(money("60")); assertThat(balance(loan).returnedRepayments()).isEqualTo(money("60"));
+        assertThat(balance(loan).balance().reserved()).isEqualTo(money("40")); assertThat(balance(loan).available()).isEqualTo(money("60"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM advance_repayment_return WHERE tenant_id='demo' AND repayment_id=?", Integer.class, repayment.toString())).isEqualTo(3);
+        var owner = reviewView(loan, repayment, "alice"); assertThat(owner.at("/original/additionalReturns")).hasSize(2);
+        receiptStatus = AdvanceRepaymentPort.Status.REVERSED; query(loan, "partial-sequence"); worker.poll(); assertThat(balance(loan).repaymentReviewRequired()).isFalse();
+        assertThat(paymentWrites).isEqualTo(1); assertThat(voucherWrites).isEqualTo(originalVoucherWrites);
+    }
+
+    @Test void newerPartialSnapshotCannotOmitEarlierObservedOrAcceptedReturn() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "partial-history"); var first = partialItem("history-first", "5"); var second = partialItem("history-second", "5");
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED; partialReturns = List.of(first); receiptRevision = 2;
+        var firstCheck = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, firstCheck)), 202);
+        partialReturns = List.of(first, second); var sameRevision = review(loan, repayment); reviewWorker.poll();
+        code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, sameRevision)), "REPAYMENT_REVIEW_EVIDENCE_CHANGED");
+        reviewRevision = 2; receiptRevision = 3; var complete = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, complete)), 202);
+        var retained = balance(loan).repaymentReturns(); partialReturns = List.of(first); reviewRevision = 3; receiptRevision = 4;
+        var missing = review(loan, repayment); reviewWorker.poll(); code(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, missing)), "REPAYMENT_REVIEW_EVIDENCE_CHANGED");
+        assertThat(balance(loan).repaymentReturns()).isEqualTo(retained); assertThat(balance(loan).returnedRepayments()).isEqualTo(money("10"));
+        assertThat(balance(loan).repaymentReviewRequired()).isTrue();
+    }
+
+    @Test void duplicateExternalPartialReturnRollsBackEarlierNewRowsInTheSameDecision() throws Exception {
+        var firstLoan = paidLoan(); var firstRepayment = repay(firstLoan, "partial-other-loan");
+        var secondLoan = paidLoan(); var secondRepayment = repay(secondLoan, "partial-conflict-loan");
+        var duplicate = partialItem("cross-loan-shared", "10"); var fresh = partialItem("cross-loan-new", "5");
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED; partialReturns = List.of(duplicate); receiptRevision = 2;
+        var accepted = review(firstLoan, firstRepayment); reviewWorker.poll(); ok(send(reviewPath(firstLoan, firstRepayment) + "/resolutions", "finance", resolveInput(firstLoan, accepted)), 202);
+        partialReturns = List.of(fresh, duplicate); var candidate = review(secondLoan, secondRepayment); reviewWorker.poll();
+        var before = balance(secondLoan).state(); var check = reviewChecks.find("demo", candidate).orElseThrow();
+        code(send(reviewPath(secondLoan, secondRepayment) + "/resolutions", "finance", resolveInput(secondLoan, candidate)), "REPAYMENT_RETURN_ALREADY_RECORDED");
+        assertThat(balance(secondLoan).state()).isEqualTo(before); assertThat(reviewChecks.find("demo", candidate).orElseThrow()).isEqualTo(check);
+        assertThat(resolutions.latest("demo", secondRepayment)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM advance_repayment_return WHERE tenant_id='demo' AND transaction_reference='cross-loan-new'", Integer.class)).isZero();
+    }
+
+    private AdvanceRepaymentAdjustmentPort.ReturnItem partialItem(String reference, String value) {
+        var at = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        return new AdvanceRepaymentAdjustmentPort.ReturnItem(new AdvanceRepaymentAdjustmentPort.FundsReturn(AdvanceRepaymentPort.Channel.BANK_TRANSFER, reference, money(value), at),
+                new AdvanceRepaymentAdjustmentPort.ReturnPosting("partial-" + reference, "debit-1", money(value), LocalDate.now(), at));
     }
 
     @Test void reviewLeaseTimeoutAndDisplayedVersionPreventLateOrStaleResolution() throws Exception {
@@ -476,8 +531,10 @@ class AdvanceRepaymentIntegrationTest {
             case "advance-repayment-adjustment" -> {
                 if (reviewUnavailable) yield Map.of("malformed", true);
                 var request = json.read(data.toString(), AdvanceRepaymentAdjustmentPort.Request.class); var original = request.original();
-                var current = new AdvanceRepaymentPort.Receipt(original.request(), reviewStatus == AdvanceRepaymentAdjustmentPort.Status.CONFIRMED ? AdvanceRepaymentPort.Status.CONFIRMED : AdvanceRepaymentPort.Status.REVERSED,
+                var current = new AdvanceRepaymentPort.Receipt(original.request(), reviewStatus == AdvanceRepaymentAdjustmentPort.Status.CONFIRMED || reviewStatus == AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED ? AdvanceRepaymentPort.Status.CONFIRMED : AdvanceRepaymentPort.Status.REVERSED,
                         receiptRevision, at, at.plusSeconds(300), original.funding(), original.posting());
+                if (partialReturns != null) yield new AdvanceRepaymentAdjustmentPort.Receipt(request, reviewStatus, reviewRevision, at, at.plusSeconds(300), current,
+                        partialReturns.get(0).fundsReturn(), partialReturns.get(0).posting(), partialReturns.subList(1, partialReturns.size()));
                 var facts = reviewStatus == AdvanceRepaymentAdjustmentPort.Status.RETURNED ? returnFacts.computeIfAbsent(request.repaymentId(), ignored -> new AdvanceRepaymentAdjustmentPort.Receipt(request, reviewStatus, reviewRevision, at, at.plusSeconds(300), current,
                         new AdvanceRepaymentAdjustmentPort.FundsReturn(channel, returnReference == null ? "return-" + request.repaymentId() : returnReference, original.funding().amount(), at),
                         new AdvanceRepaymentAdjustmentPort.ReturnPosting("return-voucher-" + request.repaymentId(), "debit-1", original.funding().amount(), LocalDate.now(), at))) : null;

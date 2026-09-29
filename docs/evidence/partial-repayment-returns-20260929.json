@@ -1,0 +1,87 @@
+{
+  "date": "2026-09-29",
+  "scope": "V58 partial and cumulative returns of confirmed original advance repayments",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "branch": "codex/governance-identifier-integration",
+  "tests": {
+    "domain": 15,
+    "h2Server": 37,
+    "postgresServer": 96,
+    "frontend": 19,
+    "scopesOverlap": true,
+    "build": "PASS",
+    "openapi": {
+      "operations": 171,
+      "schemas": 310,
+      "requestExamples": 59
+    },
+    "authors": {
+      "files": 719,
+      "namedTypes": 1300,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "migration": {
+    "result": "PASS",
+    "unchangedTables": 10,
+    "unchangedFiles": 4
+  },
+  "persistence": {
+    "result": "PASS",
+    "oldRowsPreserved": true,
+    "newReturnRows": 2,
+    "totalReturnRows": 3,
+    "newDecisions": 2,
+    "originalRepayments": 2,
+    "immutableFiles": 4,
+    "originalCommandAndProofFilesUnchanged": [
+      "payment-ui-synthetic-commands.json",
+      "voucher-ui-synthetic-commands.json",
+      "advance-repayment-ui-originals.json",
+      "repayment-review-ui-return-originals.json"
+    ]
+  },
+  "http": {
+    "resumedRequestsIncludingLogins": 12,
+    "afterBrowserRequestsIncludingLogins": 10,
+    "schemaResponses": 17,
+    "initialRunExcludedFromCounts": "Timestamp string comparison stopped the script after the first 40.00 return and second query. Equivalent UTC instants verified; original records retained."
+  },
+  "browser": {
+    "advanceId": "16361344-85c2-4c30-b3e5-16af04216141",
+    "repaymentId": "613bbf3a-0b27-472f-b83b-36063ec20d42",
+    "originalRepayment": "200.00 CNY",
+    "confirmedReturns": [
+      "40.00 CNY",
+      "30.00 CNY"
+    ],
+    "cumulativeThisRepayment": "70.00 CNY",
+    "oldOtherReturn": "100.00 CNY",
+    "grossReceived": "300.00 CNY",
+    "netRepayment": "130.00 CNY",
+    "outstanding": "170.00 CNY",
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/partial-repayment-return-browser-saved.png"
+  },
+  "backup": {
+    "database": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v58.dump",
+    "bytes": 544568,
+    "files": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v58-files"
+  },
+  "regressions": [
+    "cumulative partial followed by full return",
+    "new batch appends without duplicating previous decisions",
+    "observed proofs cannot be omitted or rewritten",
+    "same revision cannot change economic outcome",
+    "duplicate external funds or posting rolls back all new rows",
+    "original queries preserve accepted partial and full returns",
+    "original expense reservations remain",
+    "old JSON and migrated rows unchanged"
+  ],
+  "limitations": [
+    "External finance service is synthetic loopback; enterprise integration not claimed.",
+    "No Git remote; local commit only.",
+    "Existing frontend bundle-size warning remains."
+  ],
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

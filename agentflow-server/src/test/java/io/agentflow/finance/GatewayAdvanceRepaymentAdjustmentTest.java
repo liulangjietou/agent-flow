@@ -117,11 +117,12 @@ class GatewayAdvanceRepaymentAdjustmentTest {
                 new AdvanceRepaymentPort.Posting("voucher", "entry", amount, LocalDate.now(), at.minusSeconds(10)));
     }
     private AdvanceRepaymentAdjustmentPort.Receipt receipt(AdvanceRepaymentAdjustmentPort.Status status) {
-        var at = Instant.now().minusSeconds(1); boolean returned = status == AdvanceRepaymentAdjustmentPort.Status.RETURNED;
-        var current = new AdvanceRepaymentPort.Receipt(originalRequest, returned ? AdvanceRepaymentPort.Status.REVERSED : AdvanceRepaymentPort.Status.CONFIRMED, 2, at, at.plusSeconds(120), original.funding(), original.posting());
+        var at = Instant.now().minusSeconds(1); boolean returned = status == AdvanceRepaymentAdjustmentPort.Status.RETURNED || status == AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED;
+        var amount = status == AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED ? new Money(new BigDecimal("1.00"), "CNY") : original.funding().amount();
+        var current = new AdvanceRepaymentPort.Receipt(originalRequest, status == AdvanceRepaymentAdjustmentPort.Status.RETURNED ? AdvanceRepaymentPort.Status.REVERSED : AdvanceRepaymentPort.Status.CONFIRMED, 2, at, at.plusSeconds(120), original.funding(), original.posting());
         return new AdvanceRepaymentAdjustmentPort.Receipt(request, status, 3, at, at.plusSeconds(120), current,
-                returned ? new AdvanceRepaymentAdjustmentPort.FundsReturn(AdvanceRepaymentPort.Channel.PAYROLL, "return-row", original.funding().amount(), at.minusSeconds(10)) : null,
-                returned ? new AdvanceRepaymentAdjustmentPort.ReturnPosting("return-voucher", "debit", original.funding().amount(), LocalDate.now(), at.minusSeconds(5)) : null);
+                returned ? new AdvanceRepaymentAdjustmentPort.FundsReturn(AdvanceRepaymentPort.Channel.PAYROLL, "return-row", amount, at.minusSeconds(10)) : null,
+                returned ? new AdvanceRepaymentAdjustmentPort.ReturnPosting("return-voucher", "debit", amount, LocalDate.now(), at.minusSeconds(5)) : null);
     }
     private void answer(Object value) { responder.set(input -> json.write(success(input, value))); }
     private ObjectNode success(JsonNode input, Object value) { return json.read(json.write(Map.of("contractVersion", 1, "tenantId", "tenant-a", "requestId", input.path("requestId").asText(), "outcome", "SUCCESS", "data", value)), ObjectNode.class); }

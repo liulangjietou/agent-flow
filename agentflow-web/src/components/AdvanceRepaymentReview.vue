@@ -2,8 +2,8 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
 import { moneyLabel } from '../expenses'
-import { repaymentChannelLabels } from '../advanceRepayment'
-import { repaymentReviewLabels, repaymentReviewCheckLabels, repaymentReviewIssue, repaymentReviewError, validateRepaymentReview, repaymentReviewQueryInput, repaymentResolutionInput, validateRepaymentReviewReceipt, type RepaymentReviewView, type RepaymentReviewQueryInput, type RepaymentResolutionInput } from '../repaymentReview'
+import { repaymentChannelLabels, recordedRepaymentReturns, repaymentReturnTotal } from '../advanceRepayment'
+import { repaymentReviewReturns, repaymentReviewLabels, repaymentReviewCheckLabels, repaymentReviewIssue, repaymentReviewError, validateRepaymentReview, repaymentReviewQueryInput, repaymentResolutionInput, validateRepaymentReviewReceipt, type RepaymentReviewView, type RepaymentReviewQueryInput, type RepaymentResolutionInput } from '../repaymentReview'
 const props = defineProps<{ applicationId: string; advanceId: string; repaymentId: string; roundNo: number; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; refreshed: [value: RepaymentReviewView] }>()
 const returnChannelLabels = { ...repaymentChannelLabels, CASH: '现金退回', PAYROLL: '工资调整退回' }
@@ -11,6 +11,9 @@ const view = ref<RepaymentReviewView | null>(null), loading = ref(false), saving
 const reference = ref(''), comment = ref(''), error = ref(''), notice = ref(''), requiresRefresh = ref(false), unconfirmed = ref(false), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
 const blocked = computed(() => !!props.locked || loading.value || saving.value || requiresRefresh.value || unconfirmed.value)
+const confirmedReturns = computed(() => view.value ? recordedRepaymentReturns(view.value.original) : [])
+const candidateReturns = computed(() => view.value?.latestCheck?.evidence ? repaymentReviewReturns(view.value.latestCheck.evidence) : [])
+const newReturns = computed(() => candidateReturns.value.filter(entry => !confirmedReturns.value.some(old => old.fundsReturn.channel === entry.fundsReturn.channel && old.fundsReturn.transactionReference === entry.fundsReturn.transactionReference)))
 function stop() { epoch++; controller?.abort(); controller = null }
 function clearMaterials() { view.value = null; pending.value = null; reference.value = ''; comment.value = '' }
 function syncPending() {
@@ -74,13 +77,14 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
     <p v-if="unconfirmed && !saving" class="error" role="alert">上次复核结果尚未确认，请先恢复原操作，再刷新核对。</p>
     <template v-if="view">
       <p>原收款 {{ view.original.receiptReference }} · {{ moneyLabel(view.original.amount) }}<br />{{ view.original.reviewRequired ? '本笔还款待核对，借款使用已暂停。' : '本笔还款当前没有待解除的冻结。' }}</p>
-      <p v-if="view.original.returned">已确认退回 {{ moneyLabel(view.original.returned.fundsReturn.amount) }} · 流水 {{ view.original.returned.fundsReturn.transactionReference }}<br />退回凭证 {{ view.original.returned.posting.voucherReference }} / {{ view.original.returned.posting.entryReference }}</p>
+      <p v-if="confirmedReturns.length">累计已确认退回 {{ moneyLabel(repaymentReturnTotal(confirmedReturns, view.original.amount.currency)) }} · {{ confirmedReturns.length }} 笔</p>
+      <p v-for="entry in confirmedReturns" :key="JSON.stringify([entry.fundsReturn.channel, entry.fundsReturn.transactionReference])">已确认退回 {{ moneyLabel(entry.fundsReturn.amount) }} · 流水 {{ entry.fundsReturn.transactionReference }}<br />退回凭证 {{ entry.posting.voucherReference }} / {{ entry.posting.entryReference }}</p>
       <p v-if="view.latestDecision">最近确认：{{ repaymentReviewLabels[view.latestDecision.outcome] }}<br />{{ view.latestDecision.resolvedBy }} · {{ new Date(view.latestDecision.resolvedAt).toLocaleString() }} · 材料 {{ view.latestDecision.evidenceReference }}</p>
       <article v-if="view.latestCheck" class="evidence">
         <strong>{{ repaymentReviewCheckLabels[view.latestCheck.status] }}</strong>
         <template v-if="view.latestCheck.evidence">
           <p>{{ repaymentReviewLabels[view.latestCheck.evidence.status] }}</p>
-          <dl v-if="view.latestCheck.evidence.fundsReturn && view.latestCheck.evidence.posting"><div><dt>实际退回金额</dt><dd>{{ moneyLabel(view.latestCheck.evidence.fundsReturn.amount) }}</dd></div><div><dt>退回方式</dt><dd>{{ returnChannelLabels[view.latestCheck.evidence.fundsReturn.channel] }}</dd></div><div><dt>退回资金流水</dt><dd>{{ view.latestCheck.evidence.fundsReturn.transactionReference }}</dd></div><div><dt>借款借方调整凭证 / 分录</dt><dd>{{ view.latestCheck.evidence.posting.voucherReference }} / {{ view.latestCheck.evidence.posting.entryReference }}</dd></div><div><dt>实际退回时间</dt><dd>{{ new Date(view.latestCheck.evidence.fundsReturn.returnedAt).toLocaleString() }}</dd></div><div><dt>入账日期</dt><dd>{{ view.latestCheck.evidence.posting.accountingDate }}</dd></div></dl>
+          <dl v-for="entry in candidateReturns" :key="JSON.stringify([entry.fundsReturn.channel, entry.fundsReturn.transactionReference])"><div><dt>实际退回金额</dt><dd>{{ moneyLabel(entry.fundsReturn.amount) }}</dd></div><div><dt>退回方式</dt><dd>{{ returnChannelLabels[entry.fundsReturn.channel] }}</dd></div><div><dt>退回资金流水</dt><dd>{{ entry.fundsReturn.transactionReference }}</dd></div><div><dt>借款借方调整凭证 / 分录</dt><dd>{{ entry.posting.voucherReference }} / {{ entry.posting.entryReference }}</dd></div><div><dt>实际退回时间</dt><dd>{{ new Date(entry.fundsReturn.returnedAt).toLocaleString() }}</dd></div><div><dt>入账日期</dt><dd>{{ entry.posting.accountingDate }}</dd></div></dl>
           <p>本次依据有效至 {{ new Date(view.latestCheck.evidence.validUntil).toLocaleString() }}</p>
         </template>
         <p v-if="view.latestCheck.issue">{{ repaymentReviewIssue(view.latestCheck.issue) }}</p>
@@ -90,7 +94,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
       <form v-else ref="form" @submit.prevent="execute">
         <h4>{{ pending === 'QUERY' ? '读取原还款与退回依据' : '确认本次复核结论' }}</h4>
         <p v-if="pending === 'QUERY'">按这笔原还款读取当前资金与会计记录，查询结果需要独立财务核对。</p>
-        <p v-else-if="view.latestCheck!.evidence!.status === 'RETURNED'">确认已实际退回 {{ moneyLabel(view.latestCheck!.evidence!.fundsReturn!.amount) }}，采用上方退款流水和借款借方分录。首次确认将增加同额未还款；此前已确认的同一退回不会重复记账。</p>
+        <p v-else-if="candidateReturns.length">确认累计实际退回 {{ moneyLabel(repaymentReturnTotal(candidateReturns, view.original.amount.currency)) }}，采用上方 {{ candidateReturns.length }} 笔退款流水和借款借方分录。本次新增确认 {{ moneyLabel(repaymentReturnTotal(newReturns, view.original.amount.currency)) }}，增加同额未还款；此前已确认的记录保留且不重复记账。</p>
         <p v-else>确认原还款仍然有效，本次只解除这笔还款的冻结。其他还款及原放款的冻结继续独立处理。</p>
         <label v-if="pending === 'RESOLVE'">核验材料编号<input v-model="reference" maxlength="128" required :disabled="saving" /></label>
         <label>核对说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="saving" /></label>

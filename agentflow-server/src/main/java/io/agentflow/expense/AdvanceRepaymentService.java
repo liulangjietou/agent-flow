@@ -110,8 +110,9 @@ public class AdvanceRepaymentService {
         if (original == null || !original.receipt().request().advanceId().equals(source.advance().id())) return;
         var receipt = completed.receipt();
         var returned = resolutions.returned(completed.input().tenantId(), original.id()).orElse(null);
-        // 已确认真实退回时，原收款撤销是预期事实；更早版本、原件变化仍须重新核对。
-        var expectedStatus = returned == null ? AdvanceRepaymentPort.Status.CONFIRMED : AdvanceRepaymentPort.Status.REVERSED;
+        // 全额退回才预期原收款撤销；部分退回保留原收款，欠款由独立借方分录增加。
+        var expectedStatus = returned != null && returned.receipt().status() == io.agentflow.finance.AdvanceRepaymentAdjustmentPort.Status.RETURNED
+                ? AdvanceRepaymentPort.Status.REVERSED : AdvanceRepaymentPort.Status.CONFIRMED;
         long minimumRevision = resolutions.latest(completed.input().tenantId(), original.id()).map(value -> value.receipt().current().revision()).orElse(original.receipt().revision());
         if (receipt.status() != expectedStatus || receipt.revision() < minimumRevision || !receipt.sameSettlement(original.receipt())) {
             var advance = source.advance();

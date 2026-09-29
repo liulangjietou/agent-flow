@@ -2,7 +2,6 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -34,7 +33,6 @@ public class JdbcRepaymentResolutionRepository {
         if (check.status() != AdvanceRepaymentReviewCheck.Status.RESOLVED || !decision.id().equals(check.resolutionId()) || !decision.receipt().equals(check.receipt())
                 || !decision.resolvedBy().equals(check.input().requestedBy()) || !decision.resolvedAt().equals(check.updatedAt())) throw changed();
         var before = revision(after.tenantId(), after.id(), after.version() - 1);
-        boolean firstReturn = before.repaymentReturns().stream().noneMatch(entry -> entry.repaymentId().equals(decision.receipt().request().repaymentId()));
         before.resolveRepaymentReview(before.version(), decision);
         if (!before.state().equals(after.state()) || !revision(after.tenantId(), after.id(), after.version()).state().equals(after.state())) throw changed();
         jdbc.update("""
@@ -42,14 +40,14 @@ public class JdbcRepaymentResolutionRepository {
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                 """, decision.tenantId(), decision.id().toString(), after.id().toString(), after.version(), decision.receipt().request().repaymentId().toString(), decision.checkId().toString(), check.version(),
                 decision.receipt().status().name(), decision.resolvedBy(), timestamp(decision.receipt().observedAt()), timestamp(decision.resolvedAt()), json.write(decision));
-        if (firstReturn && decision.receipt().status() == AdvanceRepaymentAdjustmentPort.Status.RETURNED) {
+        for (var entry : after.repaymentReturns().stream().filter(value -> value.resolutionId().equals(decision.id())).toList()) {
             var receipt = decision.receipt(); var source = receipt.request().original().request();
             try {
                 jdbc.update("""
                         INSERT INTO advance_repayment_return(tenant_id,repayment_id,resolution_id,legal_entity_id,channel,transaction_reference,voucher_reference,entry_reference,amount,currency)
                         VALUES(?,?,?,?,?,?,?,?,?,?)
-                        """, decision.tenantId(), receipt.request().repaymentId().toString(), decision.id().toString(), source.legalEntityId().toString(), receipt.fundsReturn().channel().name(),
-                        receipt.fundsReturn().transactionReference(), receipt.posting().voucherReference(), receipt.posting().entryReference(), receipt.fundsReturn().amount().value(), receipt.fundsReturn().amount().currency());
+                        """, decision.tenantId(), receipt.request().repaymentId().toString(), decision.id().toString(), source.legalEntityId().toString(), entry.fundsReturn().channel().name(),
+                        entry.fundsReturn().transactionReference(), entry.posting().voucherReference(), entry.posting().entryReference(), entry.amount().value(), entry.amount().currency());
             } catch (DuplicateKeyException duplicate) { throw new DomainException("REPAYMENT_RETURN_ALREADY_RECORDED", "Returned funds or accounting entry already belongs to a repayment adjustment"); }
         }
     }
@@ -62,14 +60,16 @@ public class JdbcRepaymentResolutionRepository {
         return jdbc.query("""
                 SELECT d.*,r.legal_entity_id,r.channel,r.transaction_reference,r.voucher_reference,r.entry_reference,r.amount,r.currency
                 FROM advance_repayment_return r JOIN advance_repayment_resolution d ON d.tenant_id=r.tenant_id AND d.id=r.resolution_id
-                WHERE r.tenant_id=? AND r.repayment_id=?
+                WHERE r.tenant_id=? AND r.repayment_id=? ORDER BY d.advance_version DESC,r.channel,r.transaction_reference
                 """, (data, index) -> {
             var decision = row().mapRow(data, index); var receipt = decision.receipt();
-            if (receipt.status() != AdvanceRepaymentAdjustmentPort.Status.RETURNED || !receipt.request().repaymentId().equals(repaymentId)
+            String channel = data.getString("channel"), reference = data.getString("transaction_reference");
+            var item = receipt.returns().stream().filter(value -> value.fundsReturn().channel().name().equals(channel)
+                    && value.fundsReturn().transactionReference().equals(reference)).findFirst().orElse(null);
+            if (item == null || !receipt.request().repaymentId().equals(repaymentId)
                     || !receipt.request().original().request().legalEntityId().toString().equals(data.getString("legal_entity_id"))
-                    || !receipt.fundsReturn().channel().name().equals(data.getString("channel")) || !receipt.fundsReturn().transactionReference().equals(data.getString("transaction_reference"))
-                    || !receipt.posting().voucherReference().equals(data.getString("voucher_reference")) || !receipt.posting().entryReference().equals(data.getString("entry_reference"))
-                    || receipt.fundsReturn().amount().value().compareTo(data.getBigDecimal("amount")) != 0 || !receipt.fundsReturn().amount().currency().equals(data.getString("currency"))) throw new IllegalStateException("Persisted repayment return identity is inconsistent");
+                    || !item.posting().voucherReference().equals(data.getString("voucher_reference")) || !item.posting().entryReference().equals(data.getString("entry_reference"))
+                    || item.fundsReturn().amount().value().compareTo(data.getBigDecimal("amount")) != 0 || !item.fundsReturn().amount().currency().equals(data.getString("currency"))) throw new IllegalStateException("Persisted repayment return identity is inconsistent");
             return decision;
         }, tenant, repaymentId.toString()).stream().findFirst();
     }

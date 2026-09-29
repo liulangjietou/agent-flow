@@ -87,7 +87,7 @@ public class AdvanceRepaymentReviewService {
         if (!source.advance().repaymentReviews().contains(request.repaymentId())) return "REPAYMENT_REVIEW_NOT_REQUIRED";
         if (evidenceChanged(check)) return "REPAYMENT_REVIEW_EVIDENCE_CHANGED";
         var returned = decisions.returned(tenant, request.repaymentId()).orElse(null);
-        if (returned != null && !receipt.sameReturn(returned.receipt())) return "REPAYMENT_REVIEW_RETURN_CHANGED";
+        if (returned != null && !receipt.preservesReturns(returned.receipt())) return "REPAYMENT_REVIEW_RETURN_CHANGED";
         return null;
     }
     private boolean evidenceChanged(AdvanceRepaymentReviewCheck check) {
@@ -95,7 +95,9 @@ public class AdvanceRepaymentReviewService {
         var history = checks.history(tenant, request.repaymentId());
         if (history.stream().anyMatch(value -> value.receipt().revision() > receipt.revision() || value.receipt().observedAt().isAfter(receipt.observedAt())
                 || value.receipt().current() != null && value.receipt().current().revision() > receipt.current().revision()
-                || value.receipt().status() == AdvanceRepaymentAdjustmentPort.Status.RETURNED && !receipt.sameReturn(value.receipt()))) return true;
+                || !value.receipt().returns().isEmpty() && !receipt.preservesReturns(value.receipt())
+                || value.receipt().revision() == receipt.revision() && value.receipt().status() != AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED
+                    && (value.receipt().status() != receipt.status() || !value.receipt().returns().isEmpty() && !receipt.sameReturn(value.receipt())))) return true;
         return originalChecks.receiptHistory(tenant, original.advanceId(), original.receiptReference()).stream().anyMatch(value ->
                 value.receipt().revision() > receipt.current().revision() || value.receipt().observedAt().isAfter(receipt.observedAt()));
     }

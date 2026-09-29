@@ -122,11 +122,13 @@ public final class EmployeeAdvance {
         requireVersion(expectedVersion);
         if (resolution == null || !resolution.belongsTo(this) || !repaymentReviews.contains(resolution.receipt().request().repaymentId())) throw repaymentSourceChanged();
         var repaymentId = resolution.receipt().request().repaymentId();
-        var existing = repaymentReturns.stream().filter(entry -> entry.repaymentId().equals(repaymentId)).findFirst().orElse(null);
-        if (existing != null && !existing.matches(resolution)) throw repaymentSourceChanged();
-        if (existing == null && resolution.receipt().status() == io.agentflow.finance.AdvanceRepaymentAdjustmentPort.Status.RETURNED) {
-            var next = new ArrayList<>(repaymentReturns); next.add(resolution.returnEntry()); repaymentReturns = List.copyOf(next);
+        var existing = repaymentReturns.stream().filter(entry -> entry.repaymentId().equals(repaymentId)).toList();
+        if (existing.stream().anyMatch(entry -> !entry.matches(resolution))) throw repaymentSourceChanged();
+        var next = new ArrayList<>(repaymentReturns);
+        for (var entry : resolution.returnEntries()) {
+            if (existing.stream().noneMatch(previous -> previous.proof().equals(entry.proof()))) next.add(entry);
         }
+        requireValidReturns(repayments, next); repaymentReturns = List.copyOf(next);
         repaymentReviews = repaymentReviews.stream().filter(id -> !id.equals(repaymentId)).toList(); version++;
     }
     private boolean reviewRequired() { return paymentReviewRequired || repaymentReviewRequired(); }
@@ -155,15 +157,26 @@ public final class EmployeeAdvance {
         if (repaid.stream().map(AdvanceRepayment.Entry::id).distinct().count() != repaid.size()
                 || repaid.stream().map(AdvanceRepayment.Entry::receiptReference).distinct().count() != repaid.size()) throw new DomainException("INVALID_ADVANCE", "Persisted repayments must have unique receipts");
         var returned = state.repaymentReturns() == null ? List.<AdvanceRepaymentResolution.ReturnEntry>of() : List.copyOf(state.repaymentReturns());
-        if (returned.stream().map(AdvanceRepaymentResolution.ReturnEntry::resolutionId).distinct().count() != returned.size()
-                || returned.stream().map(AdvanceRepaymentResolution.ReturnEntry::repaymentId).distinct().count() != returned.size()
-                || returned.stream().anyMatch(item -> repaid.stream().noneMatch(original -> original.id().equals(item.repaymentId()) && original.amount().equals(item.amount())))) throw repaymentSourceChanged();
+        requireValidReturns(repaid, returned);
         // 旧快照只有一个冻结标记，保守地将当时所有还款标为待核对，逐笔裁决后才能恢复。
         var reviews = state.repaymentReviews() == null ? state.repaymentReviewRequired() ? repaid.stream().map(AdvanceRepayment.Entry::id).toList() : List.<UUID>of() : List.copyOf(state.repaymentReviews());
         if (reviews.stream().distinct().count() != reviews.size() || state.repaymentReviewRequired() != !reviews.isEmpty()
                 || reviews.stream().anyMatch(id -> repaid.stream().noneMatch(item -> item.id().equals(id)))) throw repaymentSourceChanged();
         result.balance = state.balance(); result.repayments = repaid; result.repaymentReturns = returned; result.repaymentReviews = reviews; result.requireRepaymentCapacity(result.balance);
         result.version = state.version(); result.paymentReviewRequired = state.paymentReviewRequired(); return result;
+    }
+
+    private static void requireValidReturns(List<AdvanceRepayment.Entry> repayments, List<AdvanceRepaymentResolution.ReturnEntry> returns) {
+        if (returns.stream().map(entry -> entry.proof().fundsIdentity()).distinct().count() != returns.size()
+                || returns.stream().map(entry -> entry.proof().postingIdentity()).distinct().count() != returns.size()) {
+            throw new DomainException("REPAYMENT_RETURN_ALREADY_RECORDED", "Returned funds or accounting entry already belongs to a repayment adjustment");
+        }
+        if (returns.stream().anyMatch(entry -> repayments.stream().noneMatch(original -> original.id().equals(entry.repaymentId()) && original.amount().currency().equals(entry.amount().currency())))) throw repaymentSourceChanged();
+        for (var original : repayments) {
+            var total = returns.stream().filter(entry -> entry.repaymentId().equals(original.id())).map(AdvanceRepaymentResolution.ReturnEntry::amount)
+                    .reduce(Money.zero(original.amount().currency()), Money::plus);
+            if (total.compareTo(original.amount()) > 0) throw repaymentSourceChanged();
+        }
     }
 
     /** 保存不可变放款背景和可变余额，不复制派生状态字段。 */

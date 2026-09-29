@@ -34135,7 +34135,8 @@
           "recordedBy",
           "recordedAt",
           "reviewRequired",
-          "returned"
+          "returned",
+          "additionalReturns"
         ],
         "properties": {
           "id": {
@@ -34202,6 +34203,13 @@
                 "type": "null"
               }
             ]
+          },
+          "additionalReturns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepaymentReturn"
+            },
+            "maxItems": 99
           }
         }
       },
@@ -34666,7 +34674,8 @@
           "validUntil",
           "originalRevision",
           "fundsReturn",
-          "posting"
+          "posting",
+          "additionalReturns"
         ],
         "properties": {
           "status": {
@@ -34674,6 +34683,7 @@
             "enum": [
               "UNRESOLVED",
               "CONFIRMED",
+              "PARTIALLY_RETURNED",
               "RETURNED"
             ],
             "description": "明确采用页面显示的 CONFIRMED 或 RETURNED；UNRESOLVED 可表示外部状态，但不能形成决定。"
@@ -34720,6 +34730,13 @@
                 "type": "null"
               }
             ]
+          },
+          "additionalReturns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepaymentReturnProof"
+            },
+            "maxItems": 99
           }
         }
       },
@@ -34819,6 +34836,7 @@
             "type": "string",
             "enum": [
               "CONFIRMED",
+              "PARTIALLY_RETURNED",
               "RETURNED"
             ]
           },
@@ -34943,6 +34961,7 @@
             "enum": [
               "UNRESOLVED",
               "CONFIRMED",
+              "PARTIALLY_RETURNED",
               "RETURNED"
             ],
             "description": "明确采用页面显示的 CONFIRMED 或 RETURNED；UNRESOLVED 可表示外部状态，但不能形成决定。"
@@ -35008,6 +35027,22 @@
           "auditEventId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "RepaymentReturnProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fundsReturn",
+          "posting"
+        ],
+        "properties": {
+          "fundsReturn": {
+            "$ref": "#/components/schemas/RepaymentReturnedFunds"
+          },
+          "posting": {
+            "$ref": "#/components/schemas/RepaymentReturnPosting"
           }
         }
       }

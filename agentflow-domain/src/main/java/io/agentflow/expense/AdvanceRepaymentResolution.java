@@ -5,6 +5,7 @@ import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,25 +33,29 @@ public record AdvanceRepaymentResolution(UUID id, String tenantId, UUID checkId,
     }
     /** 只有真实已退资金才产生借款余额调整；再次确认相同调整不再加回金额。 */
     public ReturnEntry returnEntry() {
-        if (receipt.status() != AdvanceRepaymentAdjustmentPort.Status.RETURNED) throw invalid();
-        return new ReturnEntry(id, receipt.request().repaymentId(), receipt.fundsReturn(), receipt.posting());
+        var entries = returnEntries(); if (entries.size() != 1) throw invalid(); return entries.get(0);
+    }
+    /** 每一笔实际退回有自己的资金和会计身份，同次裁决可以确认多笔新增事实。 */
+    public List<ReturnEntry> returnEntries() {
+        return receipt.returns().stream().map(value -> new ReturnEntry(id, receipt.request().repaymentId(), value.fundsReturn(), value.posting())).toList();
     }
     @Override public String toString() { return "AdvanceRepaymentResolution[id=" + id + ", repaymentId=" + receipt.request().repaymentId() + "]"; }
 
     /**
-     * 借款聚合保留第一笔真实退回的不可变余额归属，后续争议决定不覆盖它。
+     * 借款聚合保留每笔真实退回首次入账的不可变归属，后续争议决定不覆盖它。
      * @author owlzhangfq@gmail.com
      */
     public record ReturnEntry(UUID resolutionId, UUID repaymentId, AdvanceRepaymentAdjustmentPort.FundsReturn fundsReturn,
                               AdvanceRepaymentAdjustmentPort.ReturnPosting posting) {
-        /** 同一原还款整笔退回只登记一次，资金与借方分录金额必须相等。 */
+        /** 每笔真实退回只登记一次，资金与借方分录金额必须相等。 */
         public ReturnEntry {
             if (resolutionId == null || repaymentId == null || fundsReturn == null || posting == null || !fundsReturn.amount().equals(posting.amount())) throw invalid();
         }
         public Money amount() { return fundsReturn.amount(); }
+        public AdvanceRepaymentAdjustmentPort.ReturnItem proof() { return new AdvanceRepaymentAdjustmentPort.ReturnItem(fundsReturn, posting); }
         /** 新观测可以增加版本，已退款流水及已入账分录不能换成另一个。 */
         public boolean matches(AdvanceRepaymentResolution decision) {
-            return repaymentId.equals(decision.receipt().request().repaymentId()) && fundsReturn.equals(decision.receipt().fundsReturn()) && posting.equals(decision.receipt().posting());
+            return repaymentId.equals(decision.receipt().request().repaymentId()) && decision.receipt().returns().contains(proof());
         }
     }
     private static DomainException invalid() { return new DomainException("INVALID_REPAYMENT_RESOLUTION", "Repayment decision requires recent original evidence and independent finance review"); }

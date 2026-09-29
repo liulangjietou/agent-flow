@@ -73,6 +73,47 @@ class AdvanceRepaymentResolutionTest {
                 state.balance(), state.version(), false, state.repayments(), false, List.of(), List.of(refund, refund)))).isInstanceOf(DomainException.class);
     }
 
+    @Test void multiplePartialReturnsAppendOnlyNewDebtAndPreserveEveryPriorPosting() {
+        var advance = advance(); var repayment = repayment(advance, "60"); advance.repay(1, repayment);
+        var use = new ExpenseUse(UUID.randomUUID(), 1, 0); advance.reserve(2, use, money("40"));
+        var first = returnItem("first", "30"); var second = returnItem("second", "20"); var last = returnItem("last", "10");
+        advance.requireRepaymentReview(3, repayment.id()); advance.resolveRepaymentReview(4, partialDecision(repayment, List.of(first)));
+        var retained = advance.repaymentReturns().get(0);
+        assertThat(advance.repaid()).isEqualTo(money("30")); assertThat(advance.available()).isEqualTo(money("30"));
+        advance.requireRepaymentReview(5, repayment.id()); advance.resolveRepaymentReview(6, partialDecision(repayment, List.of(first, second)));
+        assertThat(advance.repaymentReturns()).hasSize(2).contains(retained); assertThat(advance.repaid()).isEqualTo(money("10"));
+        var entries = advance.repaymentReturns();
+        advance.requireRepaymentReview(7, repayment.id()); advance.resolveRepaymentReview(8, partialDecision(repayment, List.of(second, first)));
+        assertThat(advance.repaymentReturns()).isEqualTo(entries);
+        advance.requireRepaymentReview(9, repayment.id()); advance.resolveRepaymentReview(10, partialDecision(repayment, List.of(first, second, last)));
+        assertThat(advance.receivedRepayments()).isEqualTo(money("60")); assertThat(advance.returnedRepayments()).isEqualTo(money("60"));
+        assertThat(advance.repaid()).isEqualTo(money("0")); assertThat(advance.balance().reserved()).isEqualTo(money("40")); assertThat(advance.available()).isEqualTo(money("60"));
+        assertThat(advance.repayments()).containsExactly(repayment.entry()); assertThat(EmployeeAdvance.restore(advance.state()).state()).isEqualTo(advance.state());
+    }
+
+    @Test void laterPartialDecisionCannotDropOrRewriteAnAcceptedReturn() {
+        var advance = advance(); var repayment = repayment(advance, "60"); advance.repay(1, repayment);
+        var first = returnItem("first", "30"); advance.requireRepaymentReview(2, repayment.id()); advance.resolveRepaymentReview(3, partialDecision(repayment, List.of(first)));
+        advance.requireRepaymentReview(4, repayment.id()); var frozen = advance.state();
+        assertThatThrownBy(() -> advance.resolveRepaymentReview(5, partialDecision(repayment, List.of(returnItem("different", "20"))))).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> advance.resolveRepaymentReview(5, partialDecision(repayment, List.of(returnItem("first", "31"))))).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> advance.resolveRepaymentReview(5, decision(repayment, false))).isInstanceOf(DomainException.class);
+        assertThat(advance.state()).isEqualTo(frozen);
+    }
+
+    private static AdvanceRepaymentAdjustmentPort.ReturnItem returnItem(String reference, String amount) {
+        return new AdvanceRepaymentAdjustmentPort.ReturnItem(new AdvanceRepaymentAdjustmentPort.FundsReturn(AdvanceRepaymentPort.Channel.CASH, reference, money(amount), NOW.minusSeconds(2)),
+                new AdvanceRepaymentAdjustmentPort.ReturnPosting("return-" + reference, "debit-1", money(amount), DATE, NOW.minusSeconds(1)));
+    }
+    private static AdvanceRepaymentResolution partialDecision(AdvanceRepayment repayment, List<AdvanceRepaymentAdjustmentPort.ReturnItem> entries) {
+        boolean full = entries.stream().map(value -> value.fundsReturn().amount()).reduce(money("0"), Money::plus).equals(repayment.amount());
+        var original = repayment.receipt(); var request = new AdvanceRepaymentAdjustmentPort.Request(repayment.id(), original);
+        var current = new AdvanceRepaymentPort.Receipt(original.request(), full ? AdvanceRepaymentPort.Status.REVERSED : AdvanceRepaymentPort.Status.CONFIRMED, 2, NOW, NOW.plusSeconds(300), original.funding(), original.posting());
+        var receipt = new AdvanceRepaymentAdjustmentPort.Receipt(request, full ? AdvanceRepaymentAdjustmentPort.Status.RETURNED : AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED, 2, NOW, NOW.plusSeconds(300), current,
+                entries.get(0).fundsReturn(), entries.get(0).posting(), entries.subList(1, entries.size()));
+        return new AdvanceRepaymentResolution(UUID.randomUUID(), "demo", UUID.randomUUID(), receipt, "finance", NOW, "ERP-PARTIAL", "核对累计退回资金及借方分录");
+    }
+
     private static AdvanceRepaymentResolution decision(AdvanceRepayment repayment, boolean returned) {
         var original = repayment.receipt(); var request = new AdvanceRepaymentAdjustmentPort.Request(repayment.id(), original);
         var current = new AdvanceRepaymentPort.Receipt(original.request(), returned ? AdvanceRepaymentPort.Status.REVERSED : AdvanceRepaymentPort.Status.CONFIRMED, 2, NOW, NOW.plusSeconds(300), original.funding(), original.posting());

@@ -1,17 +1,17 @@
-import { expenseError } from './expenses.js'
-import { validateRepaymentView, validateRepaymentReturnProof, type AdvanceBalance, type RepaymentBinding, type RepaymentRecord, type RepaymentReturnedFunds, type RepaymentPosting } from './advanceRepayment.js'
+import { amountMinor, expenseError } from './expenses.js'
+import { validateRepaymentView, validateRepaymentReturns, recordedRepaymentReturns, type AdvanceBalance, type RepaymentBinding, type RepaymentRecord, type RepaymentReturnedFunds, type RepaymentPosting, type RepaymentReturnProof } from './advanceRepayment.js'
 
 /** 原还款不覆盖，真实退回的资金与借方分录单独展示。@author owlzhangfq@gmail.com */
-export type RepaymentReviewOutcome = 'UNRESOLVED' | 'CONFIRMED' | 'RETURNED'
+export type RepaymentReviewOutcome = 'UNRESOLVED' | 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'
 export interface RepaymentReviewBinding extends RepaymentBinding { repaymentId: string }
-export interface RepaymentReviewEvidence { status: RepaymentReviewOutcome; revision: number; observedAt: string; validUntil: string; originalRevision: number | null; fundsReturn: RepaymentReturnedFunds | null; posting: RepaymentPosting | null }
+export interface RepaymentReviewEvidence { status: RepaymentReviewOutcome; revision: number; observedAt: string; validUntil: string; originalRevision: number | null; fundsReturn: RepaymentReturnedFunds | null; posting: RepaymentPosting | null; additionalReturns?: RepaymentReturnProof[] }
 export interface RepaymentReviewCheck { id: string; version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RESOLVED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null; evidence: RepaymentReviewEvidence | null; canResolve: boolean; confirmationIssue: string | null }
-export interface RepaymentReviewDecision { id: string; outcome: 'CONFIRMED' | 'RETURNED'; resolvedBy: string; resolvedAt: string; evidenceReference: string }
+export interface RepaymentReviewDecision { id: string; outcome: Exclude<RepaymentReviewOutcome, 'UNRESOLVED'>; resolvedBy: string; resolvedAt: string; evidenceReference: string }
 export interface RepaymentReviewView extends RepaymentBinding { balance: AdvanceBalance; original: RepaymentRecord; canQuery: boolean; latestCheck: RepaymentReviewCheck | null; latestDecision: RepaymentReviewDecision | null }
 export interface RepaymentReviewQueryInput { advanceVersion: number; comment: string }
-export interface RepaymentResolutionInput extends RepaymentReviewQueryInput { checkId: string; checkVersion: number; outcome: 'CONFIRMED' | 'RETURNED'; evidenceReference: string }
+export interface RepaymentResolutionInput extends RepaymentReviewQueryInput { checkId: string; checkVersion: number; outcome: Exclude<RepaymentReviewOutcome, 'UNRESOLVED'>; evidenceReference: string }
 export interface RepaymentReviewActionReceipt { advanceId: string; repaymentId: string; checkId: string; checkVersion: number; resolutionId: string | null; advanceVersion: number; auditEventId: string }
-export const repaymentReviewLabels: Record<RepaymentReviewOutcome, string> = { UNRESOLVED: '原还款尚未核清', CONFIRMED: '原还款仍然有效', RETURNED: '原还款已全额退回并入账' }
+export const repaymentReviewLabels: Record<RepaymentReviewOutcome, string> = { UNRESOLVED: '原还款尚未核清', CONFIRMED: '原还款仍然有效', PARTIALLY_RETURNED: '原还款已部分退回并入账', RETURNED: '原还款已全额退回并入账' }
 export const repaymentReviewCheckLabels: Record<RepaymentReviewCheck['status'], string> = { QUEUED: '等待复核查询', RUNNING: '正在读取原件', CHECKED: '已取得复核依据', RESOLVED: '本次复核已确认', UNAVAILABLE: '本次查询不可用', VOIDED: '复核来源已变化' }
 const issues: Record<string, string> = {
   REPAYMENT_REVIEW_EVIDENCE_UNAVAILABLE: '尚无完整、有效的复核依据，请核对原收款及退回记录后重新查询。', REPAYMENT_REVIEW_NOT_REQUIRED: '这笔还款当前没有待解除的冻结。',
@@ -49,20 +49,30 @@ export function validateRepaymentReview(value: RepaymentReviewView, binding: Rep
       requireValue(at <= instant(check.updatedAt) && until > at && until - at <= 300000)
       if (evidence.originalRevision !== null) requireValue(Number.isSafeInteger(evidence.originalRevision) && evidence.originalRevision >= 0)
       if (evidence.status !== 'UNRESOLVED') requireValue(evidence.originalRevision !== null && evidence.originalRevision > 0)
-      if (evidence.status === 'RETURNED') {
-        requireValue(evidence.fundsReturn && evidence.posting); validateRepaymentReturnProof(evidence.fundsReturn, evidence.posting, value.original)
-        requireValue(instant(evidence.posting.postedAt) <= at)
-      } else requireValue(evidence.fundsReturn === null && evidence.posting === null)
+      const returns = repaymentReviewReturns(evidence), total = validateRepaymentReturns(returns, value.original)
+      if (evidence.status === 'RETURNED' || evidence.status === 'PARTIALLY_RETURNED') {
+        requireValue(returns.length > 0 && (evidence.status === 'RETURNED' ? total === amountMinor(value.original.amount.value) : total < amountMinor(value.original.amount.value)))
+        for (const entry of returns) requireValue(instant(entry.posting.postedAt) <= at)
+      } else requireValue(returns.length === 0)
       if (check.canResolve) requireValue(check.status === 'CHECKED' && evidence.status !== 'UNRESOLVED' && check.confirmationIssue === null && value.original.reviewRequired)
       if (check.status === 'RESOLVED') requireValue(evidence.status !== 'UNRESOLVED' && !check.canResolve)
     }
   }
   if (value.latestDecision !== null) {
-    const decision = value.latestDecision; requireValue(decision && ['CONFIRMED', 'RETURNED'].includes(decision.outcome))
+    const decision = value.latestDecision; requireValue(decision && ['CONFIRMED', 'PARTIALLY_RETURNED', 'RETURNED'].includes(decision.outcome))
     identifier(decision.id); identifier(decision.resolvedBy); identifier(decision.evidenceReference); instant(decision.resolvedAt)
-    requireValue((decision.outcome === 'RETURNED') === (value.original.returned !== null))
+    const total = validateRepaymentReturns(recordedRepaymentReturns(value.original), value.original)
+    requireValue(decision.outcome === 'CONFIRMED' ? total === 0n : decision.outcome === 'RETURNED' ? total === amountMinor(value.original.amount.value) : total > 0n && total < amountMinor(value.original.amount.value))
   }
   return value
+}
+/** 查询保留原首笔字段并追加独立退回，缺失配对或缺失首笔不能被当成零退款。 */
+export function repaymentReviewReturns(evidence: RepaymentReviewEvidence): RepaymentReturnProof[] {
+  const additional = evidence.additionalReturns === undefined ? [] : evidence.additionalReturns
+  requireValue(Array.isArray(additional) && additional.length < 100)
+  if (evidence.fundsReturn === null && evidence.posting === null) { requireValue(additional.length === 0); return [] }
+  requireValue(evidence.fundsReturn && evidence.posting)
+  return [{ fundsReturn: evidence.fundsReturn, posting: evidence.posting }, ...additional]
 }
 /** 查询只引用当前借款版本，全部外部身份由服务端取得。 */
 export function repaymentReviewQueryInput(view: RepaymentReviewView, comment: string): RepaymentReviewQueryInput {

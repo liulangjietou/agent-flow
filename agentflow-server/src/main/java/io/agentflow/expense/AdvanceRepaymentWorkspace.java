@@ -64,9 +64,10 @@ public class AdvanceRepaymentWorkspace {
     public static Balance balance(EmployeeAdvance value) { return new Balance(value.version(), value.status(), value.balance().limit(), value.available(), value.balance().reserved(), value.balance().consumed(), value.repaid(), value.outstanding(), value.receivedRepayments(), value.returnedRepayments()); }
     /** 原收款一直保留，退回和逐笔冻结作为独立事实同时展示。 */
     public static Recorded recorded(AdvanceRepayment value, EmployeeAdvance advance) {
+        var returns = advance.repaymentReturns().stream().filter(entry -> entry.repaymentId().equals(value.id())).toList();
         var receipt = value.receipt(); return new Recorded(value.id(), receipt.request().receiptReference(), receipt.funding().channel(), value.amount(), receipt.funding().receivedAt(),
                 receipt.posting().voucherReference(), receipt.posting().entryReference(), receipt.posting().accountingDate(), receipt.posting().postedAt(), value.recordedBy(), value.recordedAt(),
-                advance.repaymentReviews().contains(value.id()), advance.repaymentReturns().stream().filter(entry -> entry.repaymentId().equals(value.id())).findFirst().orElse(null));
+                advance.repaymentReviews().contains(value.id()), returns.isEmpty() ? null : returns.get(0), returns.stream().skip(1).toList());
     }
     private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REPAYMENT_QUERY", "Repayment history query is invalid"); }
     /**
@@ -98,5 +99,6 @@ public class AdvanceRepaymentWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Recorded(UUID id, String receiptReference, AdvanceRepaymentPort.Channel channel, Money amount, Instant receivedAt, String voucherReference,
-                           String entryReference, java.time.LocalDate accountingDate, Instant postedAt, String recordedBy, Instant recordedAt, boolean reviewRequired, AdvanceRepaymentResolution.ReturnEntry returned) { }
+                           String entryReference, java.time.LocalDate accountingDate, Instant postedAt, String recordedBy, Instant recordedAt, boolean reviewRequired,
+                           AdvanceRepaymentResolution.ReturnEntry returned, List<AdvanceRepaymentResolution.ReturnEntry> additionalReturns) { }
 }

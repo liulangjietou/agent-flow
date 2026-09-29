@@ -8,6 +8,7 @@ import io.agentflow.finance.PaymentPersonnel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -49,7 +50,7 @@ public class AdvanceRepaymentReviewWorkspace {
     private Check check(AdvanceRepaymentSources.Source source, AdvanceRepaymentReviewCheck value) {
         var receipt = value.receipt(); var issue = service.confirmationIssue(source, value, Instant.now());
         return new Check(value.input().id(), value.version(), value.status(), value.input().requestedAt(), value.updatedAt(), value.issue() == null ? null : value.issue().name(),
-                receipt == null ? null : new Evidence(receipt.status(), receipt.revision(), receipt.observedAt(), receipt.validUntil(), receipt.current() == null ? null : receipt.current().revision(), receipt.fundsReturn(), receipt.posting()), issue == null, issue);
+                receipt == null ? null : new Evidence(receipt.status(), receipt.revision(), receipt.observedAt(), receipt.validUntil(), receipt.current() == null ? null : receipt.current().revision(), receipt.fundsReturn(), receipt.posting(), receipt.additionalReturns()), issue == null, issue);
     }
     private static DomainException invalid() { return new DomainException("INVALID_REPAYMENT_REVIEW_QUERY", "Repayment review query is invalid"); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original repayment is unavailable in the current scope"); }
@@ -71,7 +72,7 @@ public class AdvanceRepaymentReviewWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Evidence(AdvanceRepaymentAdjustmentPort.Status status, long revision, Instant observedAt, Instant validUntil, Long originalRevision,
-            AdvanceRepaymentAdjustmentPort.FundsReturn fundsReturn, AdvanceRepaymentAdjustmentPort.ReturnPosting posting) { }
+            AdvanceRepaymentAdjustmentPort.FundsReturn fundsReturn, AdvanceRepaymentAdjustmentPort.ReturnPosting posting, List<AdvanceRepaymentAdjustmentPort.ReturnItem> additionalReturns) { }
     /**
      * 已确认决定保留独立操作者与核验材料编号。
      * @author owlzhangfq@gmail.com

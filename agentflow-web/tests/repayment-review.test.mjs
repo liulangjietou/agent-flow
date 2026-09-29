@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRenderer, reactive } from 'vue'
 const rules = await import(process.env.AGENTFLOW_TEST_REPAYMENT_REVIEW)
+const returns = await import(process.env.AGENTFLOW_TEST_ADVANCE_REPAYMENT)
 const { default: Component } = await import(process.env.AGENTFLOW_TEST_ADVANCEREPAYMENTREVIEW)
 const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
 const originalApi = { ...api }, originalFetch = global.fetch
@@ -17,6 +18,13 @@ function view() {
     canQuery: true, latestDecision: null, latestCheck: { id: 'check', version: 3, status: 'CHECKED', requestedAt: at, updatedAt: at, issue: null, canResolve: true, confirmationIssue: null,
       evidence: { status: 'RETURNED', revision: 2, observedAt: at, validUntil: new Date(Date.parse(at) + 300000).toISOString(), originalRevision: 2,
         fundsReturn: { channel: 'CASH', transactionReference: 'refund', amount: money('25.00'), returnedAt: at }, posting: { voucherReference: 'return-voucher', entryReference: 'debit', amount: money('25.00'), accountingDate: at.slice(0, 10), postedAt: at } } } }
+}
+function partialView() {
+  const value = view(), evidence = value.latestCheck.evidence
+  evidence.status = 'PARTIALLY_RETURNED'
+  evidence.fundsReturn.amount = money('5.00'); evidence.posting.amount = money('5.00')
+  evidence.additionalReturns = [{ fundsReturn: { ...evidence.fundsReturn, transactionReference: 'second-refund', amount: money('7.00') }, posting: { ...evidence.posting, entryReference: 'second-debit', amount: money('7.00') } }]
+  return value
 }
 const receipt = input => ({ advanceId: 'advance', repaymentId: 'repayment', checkId: 'checkId' in input ? input.checkId : 'new-check', checkVersion: 'checkId' in input ? input.checkVersion + 1 : 1, resolutionId: 'checkId' in input ? 'resolution' : null, advanceVersion: input.advanceVersion + ('checkId' in input ? 1 : 0), auditEventId: 'audit' })
 let scope = 0
@@ -44,6 +52,46 @@ test('裁决只发送展示结论与版本，过期、空材料或跨还款回�
   assert.throws(() => rules.repaymentResolutionInput(value, 'proof', '核对', Date.parse(value.latestCheck.evidence.validUntil)))
   assert.doesNotThrow(() => rules.validateRepaymentReviewReceipt(receipt(input), value, input))
   for (const change of [{ repaymentId: 'other' }, { resolutionId: null }, { checkVersion: 3 }, { advanceVersion: 3 }, { checkId: 'other' }]) assert.throws(() => rules.validateRepaymentReviewReceipt({ ...receipt(input), ...change }, value, input))
+})
+test('多笔部分退回必须独立配对且累计不超过原款，旧单笔字段仍兼容', () => {
+  const value = partialView()
+  assert.doesNotThrow(() => rules.validateRepaymentReview(value, binding()))
+  assert.deepEqual(returns.repaymentReturnTotal(rules.repaymentReviewReturns(value.latestCheck.evidence), 'CNY'), money('12.00'))
+  for (const change of [
+    v => v.latestCheck.evidence.additionalReturns[0].fundsReturn.transactionReference = 'refund',
+    v => v.latestCheck.evidence.additionalReturns[0].posting.entryReference = 'debit',
+    v => v.latestCheck.evidence.additionalReturns[0].posting.amount = money('6.99'),
+    v => { v.latestCheck.evidence.additionalReturns[0].fundsReturn.amount = money('20.01'); v.latestCheck.evidence.additionalReturns[0].posting.amount = money('20.01') },
+    v => { v.latestCheck.evidence.additionalReturns[0].fundsReturn.amount = money('20.00'); v.latestCheck.evidence.additionalReturns[0].posting.amount = money('20.00') },
+    v => v.latestCheck.evidence.status = 'RETURNED',
+    v => { v.latestCheck.evidence.fundsReturn = null; v.latestCheck.evidence.posting = null },
+    v => v.latestCheck.evidence.additionalReturns = null,
+    v => v.original.additionalReturns = null
+  ]) { const invalid = partialView(); change(invalid); assert.throws(() => rules.validateRepaymentReview(invalid, binding())) }
+  value.latestCheck.evidence.additionalReturns[0].fundsReturn.amount = money('20.00')
+  value.latestCheck.evidence.additionalReturns[0].posting.amount = money('20.00')
+  value.latestCheck.evidence.status = 'RETURNED'
+  assert.doesNotThrow(() => rules.validateRepaymentReview(value, binding()))
+})
+test('已确认五元和新增七元分别展示，确认只发送版本和部分退回结论', async () => {
+  const value = partialView(), evidence = value.latestCheck.evidence
+  value.original.returned = { resolutionId: 'first-resolution', repaymentId: 'repayment', fundsReturn: evidence.fundsReturn, posting: evidence.posting }
+  value.balance.returnedRepayments = money('5.00'); value.balance.repaid = money('20.00'); value.balance.outstanding = money('80.00')
+  value.latestDecision = { id: 'first-resolution', outcome: 'PARTIALLY_RETURNED', resolvedBy: 'finance', resolvedAt: value.latestCheck.updatedAt, evidenceReference: 'first-proof' }
+  const writes = []; api.advanceRepaymentReview = async () => value
+  api.resolveAdvanceRepayment = async (loan, repayment, input) => { writes.push(input); return receipt(input) }
+  const item = mount()
+  try {
+    await settle(); assert.equal(item.state.error, '')
+    assert.equal(item.state.confirmedReturns.length, 1); assert.equal(item.state.candidateReturns.length, 2); assert.equal(item.state.newReturns.length, 1)
+    assert.deepEqual(returns.repaymentReturnTotal(item.state.newReturns, 'CNY'), money('7.00'))
+    item.state.prepare('RESOLVE'); item.state.reference = 'second-proof'; item.state.comment = '核对累计退回十二元'; await item.state.execute()
+    assert.deepEqual(writes, [{ advanceVersion: 3, checkId: 'check', checkVersion: 3, outcome: 'PARTIALLY_RETURNED', evidenceReference: 'second-proof', comment: '核对累计退回十二元' }])
+    value.original.additionalReturns = [{ resolutionId: 'second-resolution', repaymentId: 'repayment', ...evidence.additionalReturns[0] }]
+    value.balance.returnedRepayments = money('12.00'); value.balance.repaid = money('13.00'); value.balance.outstanding = money('87.00'); value.balance.available = money('87.00'); value.balance.status = 'PARTIALLY_SETTLED'
+    value.original.reviewRequired = false; value.latestCheck = null
+    await item.state.load(); assert.equal(item.state.error, ''); assert.equal(item.state.confirmedReturns.length, 2); assert.equal(item.state.newReturns.length, 0)
+  } finally { item.close() }
 })
 test('读取和刷新没有写入，查询与裁决分别明确确认', async () => {
   const writes = []; api.advanceRepaymentReview = async () => view()
