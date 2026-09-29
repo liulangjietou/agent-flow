@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-29",
+  "scope": "V70 supplier payable review and atomic single-use authorization",
+  "h2": {
+    "domain": 5,
+    "persistence": 26,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-review-h2.log"
+  },
+  "postgres": {
+    "domain": 28,
+    "actualPostgres": 54,
+    "h2OpenApi": 5,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-review-postgres.log"
+  },
+  "migration": {
+    "from": 69,
+    "to": 70,
+    "preserves": "original applications, procurement revisions, payable and invoice claims, supplier authorizations, retirement and hold history",
+    "repeatApplied": 0
+  },
+  "authors": {
+    "javaFiles": 888,
+    "namedTypes": 1638,
+    "missing": 0
+  },
+  "pending": [
+    "public finance access and actions",
+    "supplier finance UI",
+    "supplier bank payment",
+    "ERP payable settlement",
+    "real enterprise integration"
+  ],
+  "longRunningAcceptanceSchema": 67,
+  "externalData": "synthetic local fixtures only"
+}

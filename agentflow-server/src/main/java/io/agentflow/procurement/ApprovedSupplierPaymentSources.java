@@ -27,7 +27,13 @@ public class ApprovedSupplierPaymentSources {
     /** 沿用审批申请优先的锁顺序；查询恢复同样按原申请定位锁。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock(SupplierPaymentAuthorization authorization) {
-        var source = authorization.source().reservation().source(); requests.lock(source.tenantId(), source.requestId());
+        lock(authorization.source());
+    }
+
+    /** 授权前的应付读取同样使用原批准申请的锁，尚未产生财务决定时无需构造虚假授权。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lock(ApprovedProcurementPayment approved) {
+        var source = approved.reservation().source(); requests.lock(source.tenantId(), source.requestId());
     }
 
     /** 新授权及发送读取真实最终批准版本、冻结内容和仍保留的本地应付占用。 */
