@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.CurrentActor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,13 +23,26 @@ public class VoucherWorkspace {
     private final VoucherAccess access;
     private final JdbcVoucherPreparationRepository preparations;
     private final JdbcVoucherOperationRepository operations;
+    private final VoucherSources sources;
+    private final PaymentPersonnel personnel;
+    private final CurrentActor actors;
     /** 查询仅投影状态、凭证号和时间，不返回外部目标、账户、科目或原始响应。 */
-    public VoucherWorkspace(VoucherAccess access, JdbcVoucherPreparationRepository preparations, JdbcVoucherOperationRepository operations) {
+    public VoucherWorkspace(VoucherAccess access, JdbcVoucherPreparationRepository preparations, JdbcVoucherOperationRepository operations,
+                            VoucherSources sources, PaymentPersonnel personnel, CurrentActor actors) {
         this.access = access; this.preparations = preparations; this.operations = operations;
+        this.sources = sources; this.personnel = personnel; this.actors = actors;
     }
     /** 一个数据库快照内读取当轮事实和操作提示；写入仍会重新检查权限和状态。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public View get(UUID applicationId, Map<String, String> parameters) {
+        return read(applicationId, parameters, false);
+    }
+    /** 付款凭证按相同字段权限单独读取，不将挂账准备或凭证号混入本视图。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public View payment(UUID applicationId, Map<String, String> parameters) {
+        return read(applicationId, parameters, true);
+    }
+    private View read(UUID applicationId, Map<String, String> parameters, boolean payment) {
         if (!Set.of("roundNo").containsAll(parameters.keySet())) throw invalid();
         Integer round = null;
         if (parameters.containsKey("roundNo")) {
@@ -36,18 +50,29 @@ public class VoucherWorkspace {
             catch (IllegalArgumentException failure) { throw invalid(); }
         }
         var context = access.read(applicationId, round); var application = context.application();
-        var preparation = preparations.latest(application.tenantId(), applicationId, context.roundNo(), context.kind()).orElse(null);
-        var operation = operations.forRound(application.tenantId(), applicationId, context.roundNo(), context.kind()).orElse(null);
+        var kind = payment ? VoucherCommand.Kind.PAYMENT : context.kind();
+        var preparation = preparations.latest(application.tenantId(), applicationId, context.roundNo(), kind).orElse(null);
+        var operation = operations.forRound(application.tenantId(), applicationId, context.roundNo(), kind).orElse(null);
         boolean current = application.status() == ApplicationStatus.APPROVED && application.roundNo() == context.roundNo();
         boolean finance = context.finance();
-        boolean prepare = finance && current && operation == null && (preparation == null || !preparation.active() && preparation.status() != VoucherPreparation.Status.NOT_REQUIRED);
+        if (payment) {
+            var accrual = operations.forRound(application.tenantId(), applicationId, context.roundNo(), context.kind()).orElse(null);
+            finance = finance && accrual != null && personnel.eligible(application.tenantId(), actors.actor().userId(), accrual.input().command().legalEntityId());
+        }
+        boolean prepare = finance && (payment ? preparation != null : current) && operation == null
+                && (preparation == null || !preparation.active() && preparation.status() != VoucherPreparation.Status.NOT_REQUIRED);
         boolean query = finance && operation != null && !operation.running() && operation.status() != VoucherOperation.Status.QUEUED;
-        boolean resend = finance && current && operation != null && operation.status() == VoucherOperation.Status.NOT_FOUND && operation.highestRevision() == 0
+        boolean resend = finance && (payment || current) && operation != null && operation.status() == VoucherOperation.Status.NOT_FOUND && operation.highestRevision() == 0
                 && operation.conflictingObservation() == null && operation.input().command().expiresAt().isAfter(Instant.now())
-                && operation.input().command().binding().applicationVersion() == application.version() && operation.input().command().binding().businessVersion() == context.businessVersion();
+                && (payment ? paymentSourceMatches(operation) : operation.input().command().binding().applicationVersion() == application.version()
+                    && operation.input().command().binding().businessVersion() == context.businessVersion());
         return new View(applicationId, application.businessReference().type(), application.businessReference().id(), context.roundNo(), application.version(), context.businessVersion(),
                 preparation == null ? null : new Preparation(preparation.input().id(), preparation.status(), preparation.input().attempt(), preparation.createdAt(), preparation.completedAt(), preparation.result() == null ? null : preparation.result().code()),
-                operation == null ? null : operation(operation), new Actions(prepare, query, resend));
+                operation == null ? null : operation(operation), new Actions(prepare, query, resend), kind);
+    }
+    private boolean paymentSourceMatches(VoucherOperation operation) {
+        try { return sources.derive(sources.reference(operation.input().command())).matches(operation.input().command()); }
+        catch (DomainException changed) { return false; }
     }
     private static Operation operation(VoucherOperation operation) {
         var command = operation.input().command(); var observation = operation.observation();
@@ -63,7 +88,7 @@ public class VoucherWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID applicationId, BusinessReference.Type businessType, UUID businessId, int roundNo, long applicationVersion, long businessVersion,
-                       Preparation preparation, Operation operation, Actions actions) { }
+                       Preparation preparation, Operation operation, Actions actions, VoucherCommand.Kind kind) { }
     /**
      * 不公开准备的财务目标或完整输入。
      * @author owlzhangfq@gmail.com

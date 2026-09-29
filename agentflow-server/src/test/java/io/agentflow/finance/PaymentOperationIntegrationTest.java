@@ -61,8 +61,10 @@ class PaymentOperationIntegrationTest {
     private static final String ENDPOINT = "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/finance";
     private static final AtomicReference<BiFunction<String, JsonNode, Object>> RESPONDER = new AtomicReference<>();
     private static final AtomicInteger WRITES = new AtomicInteger(), QUERIES = new AtomicInteger(), ACCOUNT_READS = new AtomicInteger();
+    private static final AtomicInteger VOUCHER_WRITES = new AtomicInteger(), VOUCHER_QUERIES = new AtomicInteger();
     private static final AtomicReference<String> LAST_KEY = new AtomicReference<>();
     private static final Map<UUID, PaymentCommand> COMMANDS = new ConcurrentHashMap<>();
+    private static final Map<UUID, VoucherCommand> VOUCHER_COMMANDS = new ConcurrentHashMap<>();
     private static JsonUtil wire;
     private final List<UUID> fixtures = new ArrayList<>();
     @Autowired JsonUtil json;
@@ -85,6 +87,11 @@ class PaymentOperationIntegrationTest {
     @Autowired PaymentExecutionRequestService requestService;
     @Autowired PaymentExecutionRequestWorker requestWorker;
     @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired JdbcVoucherPreparationRepository preparations;
+    @Autowired VoucherPreparationService preparationService;
+    @Autowired VoucherPreparationWorker preparationWorker;
+    @Autowired VoucherOperationWorker voucherWorker;
+    @Autowired PaymentVoucherSources paymentVoucherSources;
     @Autowired FailureListener listener;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
@@ -97,11 +104,17 @@ class PaymentOperationIntegrationTest {
     }
     @BeforeEach void setup() {
         wire = json; WRITES.set(0); QUERIES.set(0); ACCOUNT_READS.set(0); listener.reject.set(false); configuration.setEnabled(true);
+        VOUCHER_WRITES.set(0); VOUCHER_QUERIES.set(0); VOUCHER_COMMANDS.clear();
         configuration.getTenants().get("demo").setEndpoint(ENDPOINT); configuration.getTenants().get("demo").setTimeoutSeconds(2);
         RESPONDER.set(PaymentOperationIntegrationTest::response); setupOrganization();
     }
     @AfterEach void removeOnlyPaymentFixtures() {
         for (var id : fixtures) {
+            String application = "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND id=?";
+            jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + "))", id.toString());
+            jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + ")", id.toString());
+            jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + "))", id.toString());
+            jdbc.update("DELETE FROM voucher_operation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + ")", id.toString());
             jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id=?)", id.toString());
             jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id=?", id.toString());
             jdbc.update("DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=?", id.toString());
@@ -134,6 +147,102 @@ class PaymentOperationIntegrationTest {
         assertThat(balances.find("demo", id).orElseThrow().state()).isEqualTo(advance.state());
         assertThat(balances.find("foreign", id)).isEmpty();
         assertThat(WRITES.get()).isEqualTo(1);
+    }
+
+    @Test void confirmedBankReceiptQueuesItsSeparatePaymentVoucher() {
+        var payment = job(); worker.poll();
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT'",
+                Integer.class, payment.input().command().binding().applicationId().toString())).isEqualTo(1);
+        assertThat(WRITES.get()).isEqualTo(1);
+    }
+
+    @Test void repeatedBankQueriesKeepOriginalSuccessfulRevisionAndPostOneSeparateVoucher() {
+        var payment = job(); worker.poll(); var original = reload(payment); var queued = paymentPreparation(payment);
+        assertThat(queued.input().source().paymentVersion()).isEqualTo(original.version());
+        recheck(payment); worker.poll(); assertThat(reload(payment).version()).isGreaterThan(original.version());
+        assertThat(paymentPreparation(payment)).isEqualTo(queued);
+        preparationWorker.poll(); var prepared = paymentVoucher(payment);
+        assertThat(prepared.input().command().payment().receipt()).isEqualTo(original.observation());
+        assertThat(prepared.input().command().lines().get(1).account().selector()).isEqualTo(payment.input().command().debitAccountReference());
+        voucherWorker.poll(); assertThat(paymentVoucher(payment).status()).isEqualTo(VoucherOperation.Status.POSTED);
+        preparationWorker.poll(); voucherWorker.poll();
+        assertThat(VOUCHER_WRITES.get()).isEqualTo(1); assertThat(WRITES.get()).isEqualTo(1);
+        assertThat(paymentVoucherSources.derive(queued.input().source()).matches(prepared.input().command())).isTrue();
+    }
+
+    @Test void laterApprovalRevocationCannotRewritePaidAccountingBinding() {
+        var payment = job(); worker.poll(); revoke(payment); preparationWorker.poll(); voucherWorker.poll();
+        var voucher = paymentVoucher(payment);
+        assertThat(voucher.status()).isEqualTo(VoucherOperation.Status.POSTED);
+        assertThat(voucher.input().command().binding().applicationVersion()).isEqualTo(payment.input().command().binding().applicationVersion());
+        assertThat(applications.findById("demo", payment.input().command().binding().applicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.REVOKED);
+    }
+
+    @Test void aQueryCompletingDuringAccountingReadsCannotReplaceTheFrozenReceipt() throws Exception {
+        var payment = job(); worker.poll(); var original = reload(payment).observation();
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        RESPONDER.set((path, data) -> { if (path.endsWith("account-mapping")) { entered.countDown(); await(release); } return response(path, data); });
+        var thread = Executors.newSingleThreadExecutor();
+        try {
+            var running = thread.submit(preparationWorker::poll); assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            recheck(payment); worker.poll(); release.countDown(); running.get(4, TimeUnit.SECONDS);
+            assertThat(paymentPreparation(payment).status()).isEqualTo(VoucherPreparation.Status.READY);
+            assertThat(paymentVoucher(payment).input().command().payment().receipt()).isEqualTo(original);
+        } finally { release.countDown(); thread.shutdownNow(); }
+    }
+
+    @Test void accountingRejectionRetainsBankSuccessAndExplicitRetryKeepsOriginalProof() {
+        var payment = job(); worker.poll(); var source = paymentPreparation(payment).input().source();
+        RESPONDER.set((path, data) -> path.endsWith("accounting-period") ? new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED) : response(path, data));
+        preparationWorker.poll(); assertThat(paymentPreparation(payment).status()).isEqualTo(VoucherPreparation.Status.BLOCKED);
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(VOUCHER_WRITES.get()).isZero();
+        recheck(payment); worker.poll();
+        tx().executeWithoutResult(status -> preparationService.retryPayment("demo", source.applicationId(), source.roundNo(), "finance", now()));
+        assertThat(paymentPreparation(payment).input().source()).isEqualTo(source);
+        RESPONDER.set(PaymentOperationIntegrationTest::response); preparationWorker.poll(); voucherWorker.poll();
+        assertThat(paymentPreparation(payment).input().attempt()).isEqualTo(2); assertThat(paymentVoucher(payment).usablePosted()).isTrue();
+        assertThat(WRITES.get()).isEqualTo(1);
+    }
+
+    @Test void bankReversalBeforeVoucherSendStopsNewPostingAndKeepsPreparedProof() {
+        var payment = job(); worker.poll(); preparationWorker.poll(); var prepared = paymentVoucher(payment);
+        reverse(payment); voucherWorker.poll();
+        var stopped = paymentVoucher(payment); assertThat(stopped.status()).isEqualTo(VoucherOperation.Status.VOIDED);
+        assertThat(stopped.input()).isEqualTo(prepared.input()); assertThat(VOUCHER_WRITES.get()).isZero();
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.REVERSED);
+    }
+
+    @Test void postedVoucherRemainsQueryableAfterBankReturnWithoutAnotherPosting() {
+        var payment = job(); worker.poll(); preparationWorker.poll(); voucherWorker.poll(); var posted = paymentVoucher(payment);
+        reverse(payment);
+        tx().executeWithoutResult(status -> voucherExecution.query("demo", posted.input().command().id(), posted.version(), now()));
+        voucherWorker.poll(); assertThat(paymentVoucher(payment).usablePosted()).isTrue();
+        assertThat(paymentVoucher(payment).input()).isEqualTo(posted.input());
+        assertThat(VOUCHER_WRITES.get()).isEqualTo(1); assertThat(VOUCHER_QUERIES.get()).isEqualTo(1);
+    }
+
+    @Test void upgradeBackfillAndRepeatedPollingDoNotSendOrQueryBank() {
+        var payment = job(); worker.poll(); var preparation = paymentPreparation(payment);
+        jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id=?", preparation.input().id().toString());
+        jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND id=?", preparation.input().id().toString());
+        assertThat(operations.missingVoucherPreparations()).extracting(JdbcPaymentOperationRepository.Candidate::id).contains(payment.input().command().id());
+        preparationWorker.poll(); preparationWorker.poll();
+        assertThat(paymentPreparation(payment).status()).isEqualTo(VoucherPreparation.Status.READY);
+        assertThat(operations.missingVoucherPreparations()).extracting(JdbcPaymentOperationRepository.Candidate::id).doesNotContain(payment.input().command().id());
+        assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero();
+    }
+
+    @Test void callerCannotRegisterPaymentVoucherWithoutPersistedPreparationOrSwapSuccessfulRevision() {
+        var payment = job(); worker.poll(); var source = paymentPreparation(payment).input().source(); var plan = paymentVoucherSources.derive(source);
+        var at = now(); var date = plan.accountingDate();
+        var forged = plan.prepare(UUID.randomUUID(), new AccountingPeriodPort.OpenPeriod(plan.periodRequest(), "period", "v1", date.minusDays(1), date.plusDays(1), at, at.plusSeconds(300)),
+                new AccountMappingPort.Mapping(plan.mappingRequest(), "v1", at, at.plusSeconds(300), plan.mappingRequest().keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList()), at);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> voucherExecution.register(forged, configuration.destination("demo").orElseThrow().digest("demo"), now())))
+                .isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("PAYMENT_VOUCHER_SOURCE_CHANGED"));
+        var pending = new VoucherPreparation.Source(source.tenantId(), source.businessType(), source.businessId(), source.applicationId(), source.roundNo(), source.applicationVersion(), source.businessVersion(), source.employeeId(), source.paymentOperationId(), 1L);
+        assertThatThrownBy(() -> paymentVoucherSources.derive(pending)).isInstanceOf(DomainException.class);
+        assertThat(operations.revision("foreign", source.paymentOperationId(), source.paymentVersion())).isEmpty();
     }
 
     @Test void rollbackAndTransactionGuardPreventAnyExternalRequest() {
@@ -199,6 +308,8 @@ class PaymentOperationIntegrationTest {
         var done = reload(job); assertThat(done.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isZero();
         assertThat(balances.find("demo", job.input().command().binding().businessId())).isPresent();
         execution.finish(sending, new FinanceResult.Success<>(paid(job.input().command(), 1)), now()); assertThat(reload(job)).isEqualTo(done);
+        preparationWorker.poll(); voucherWorker.poll();
+        assertThat(paymentVoucher(job).usablePosted()).isTrue(); assertThat(WRITES.get()).isZero();
     }
     @Test void localSettlementFailureRollsBackThenOnlyQueriesOriginalPayment() {
         var job = job(); listener.reject.set(true); worker.poll(); var unknown = reload(job);
@@ -366,6 +477,15 @@ class PaymentOperationIntegrationTest {
     }
     private void revoke(PaymentOperation job) { jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", job.input().command().binding().applicationId().toString()); }
     private PaymentOperation reload(PaymentOperation value) { return operations.find("demo", value.input().command().id()).orElseThrow(); }
+    private VoucherPreparation paymentPreparation(PaymentOperation payment) { return preparations.latest("demo", payment.input().command().binding().applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow(); }
+    private VoucherOperation paymentVoucher(PaymentOperation payment) { return vouchers.forRound("demo", payment.input().command().binding().applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow(); }
+    private void reverse(PaymentOperation payment) {
+        var success = reload(payment).observation(); var at = now();
+        var reversal = new PaymentObservation(success.authorizationId(), success.commandDigest(), PaymentObservation.Status.REVERSED, 2L, at,
+                success.paymentReference(), success.paidAmount(), success.accountDigest(), at, "returned-" + payment.input().command().id(), null);
+        RESPONDER.set((path, data) -> path.endsWith("payment-query") ? reversal : response(path, data)); recheck(payment); worker.poll();
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.REVERSED);
+    }
     private void recheck(PaymentOperation value) { tx().executeWithoutResult(status -> execution.query("demo", value.input().command().id(), reload(value).version(), now())); }
     private TransactionTemplate tx() { return new TransactionTemplate(transactions); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
@@ -379,6 +499,21 @@ class PaymentOperationIntegrationTest {
     private static Object response(String path, JsonNode request) {
         if (path.endsWith("debit-accounts")) return directory(now());
         if (path.endsWith("employee-account")) return account(now());
+        var data = request.path("data"); var at = now();
+        if (path.endsWith("accounting-period")) {
+            var period = wire.read(data.toString(), AccountingPeriodPort.Request.class); var date = period.accountingDate();
+            return new AccountingPeriodPort.OpenPeriod(period, "synthetic-period", "v1", date.minusDays(30), date.plusDays(30), at, at.plusSeconds(300));
+        }
+        if (path.endsWith("account-mapping")) {
+            var mapping = wire.read(data.toString(), AccountMappingPort.Request.class);
+            return new AccountMappingPort.Mapping(mapping, "v1", at, at.plusSeconds(300), mapping.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+        }
+        if (path.endsWith("voucher-command") || path.endsWith("voucher-query")) {
+            var voucher = path.endsWith("voucher-command") ? wire.read(data.path("command").toString(), VoucherCommand.class) : VOUCHER_COMMANDS.get(UUID.fromString(data.path("operationId").asText()));
+            VOUCHER_COMMANDS.put(voucher.id(), voucher);
+            return new VoucherObservation(voucher.id(), voucher.digest(), VoucherObservation.Status.POSTED, 1L, at, "posted-" + voucher.id(), "voucher-" + voucher.id(),
+                    voucher.period().periodReference(), voucher.accountingDate(), voucher.totals().gross(), voucher.totals().gross(), voucher.createdAt(), null);
+        }
         var command = path.endsWith("payment-command") ? wire.read(request.at("/data/command").toString(), PaymentCommand.class) : COMMANDS.get(UUID.fromString(request.at("/data/authorizationId").asText()));
         return paid(command, 1);
     }
@@ -391,7 +526,9 @@ class PaymentOperationIntegrationTest {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); server.setExecutor(HTTP_THREADS);
             server.createContext("/finance/", exchange -> {
                 var path = exchange.getRequestURI().getPath();
-                if (path.endsWith("payment-command")) WRITES.incrementAndGet(); else if (path.endsWith("payment-query")) QUERIES.incrementAndGet(); else ACCOUNT_READS.incrementAndGet();
+                if (path.endsWith("payment-command")) WRITES.incrementAndGet(); else if (path.endsWith("payment-query")) QUERIES.incrementAndGet();
+                else if (path.endsWith("voucher-command")) VOUCHER_WRITES.incrementAndGet(); else if (path.endsWith("voucher-query")) VOUCHER_QUERIES.incrementAndGet();
+                else if (path.endsWith("debit-accounts") || path.endsWith("employee-account")) ACCOUNT_READS.incrementAndGet();
                 LAST_KEY.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
                 var request = wire.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class); var value = RESPONDER.get().apply(path, request);
                 var envelope = value instanceof FinanceResult.Rejected<?> rejected

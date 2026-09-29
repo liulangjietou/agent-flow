@@ -53,6 +53,27 @@ public class JdbcPaymentOperationRepository {
     }
     /** 按原授权读取，领域构造及关系列共同校验持久状态。 */
     public Optional<PaymentOperation> find(String tenant, UUID id) { return jdbc.query("SELECT * FROM payment_operation WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst(); }
+    /** 付款凭证沿用已经保存的成功回单修订，重新查询不替换原会计依据。 */
+    public Optional<PaymentOperation> revision(String tenant, UUID id, long version) {
+        return jdbc.query("SELECT state_json FROM payment_operation_revision WHERE tenant_id=? AND operation_id=? AND version=?", (row, index) -> {
+            var value = json.read(row.getString("state_json"), PaymentOperation.class); var command = value.input().command();
+            if (!command.tenantId().equals(tenant) || !command.id().equals(id) || value.version() != version) {
+                throw new IllegalStateException("Persisted payment revision identity is inconsistent");
+            }
+            return value;
+        }, tenant, id.toString(), version).stream().findFirst();
+    }
+    /** 升级后补建缺失的付款准备；只扫描实际成功记录，不查询或重发资金交易。 */
+    public List<Candidate> missingVoucherPreparations() {
+        return jdbc.query("""
+                SELECT p.tenant_id,p.id FROM payment_operation p
+                JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id
+                WHERE p.status='SUCCEEDED'
+                AND NOT EXISTS (SELECT 1 FROM voucher_preparation v WHERE v.tenant_id=a.tenant_id AND v.application_id=a.application_id AND v.round_no=a.round_no AND v.kind='PAYMENT')
+                AND NOT EXISTS (SELECT 1 FROM voucher_operation v WHERE v.tenant_id=a.tenant_id AND v.application_id=a.application_id AND v.round_no=a.round_no AND v.kind='PAYMENT')
+                ORDER BY p.updated_at,p.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))));
+    }
     /** 扫描只取十个标识，不加载或输出账户及金额。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""

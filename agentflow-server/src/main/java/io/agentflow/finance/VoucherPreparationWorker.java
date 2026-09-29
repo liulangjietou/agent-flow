@@ -19,13 +19,22 @@ public class VoucherPreparationWorker {
     private final VoucherPreparationService execution;
     private final AccountingPeriodPort periods;
     private final AccountMappingPort mappings;
+    private final JdbcPaymentOperationRepository payments;
+    private final PaymentVoucherRegistration paid;
     /** 两类只读端口不能直接产生凭证副作用。 */
-    public VoucherPreparationWorker(JdbcVoucherPreparationRepository preparations, VoucherPreparationService execution, AccountingPeriodPort periods, AccountMappingPort mappings) {
+    public VoucherPreparationWorker(JdbcVoucherPreparationRepository preparations, VoucherPreparationService execution, AccountingPeriodPort periods, AccountMappingPort mappings,
+                                    JdbcPaymentOperationRepository payments, PaymentVoucherRegistration paid) {
         this.preparations = preparations; this.execution = execution; this.periods = periods; this.mappings = mappings;
+        this.payments = payments; this.paid = paid;
     }
     /** 每批有界，重复领取和迟到结果由持久版本隔离。 */
     public void poll() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Voucher preparation must execute outside a database transaction");
+        for (var candidate : payments.missingVoucherPreparations()) {
+            if (Thread.currentThread().isInterrupted()) return;
+            try { paid.recover(candidate.tenantId(), candidate.id()); }
+            catch (RuntimeException failed) { LOG.error("Payment voucher registration failed, errorCode={}, paymentId={}", "REGISTRATION_FAILURE", candidate.id()); }
+        }
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try {

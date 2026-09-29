@@ -66,16 +66,19 @@ public final class VoucherSource {
                 source.accountingDate(), new VoucherCommand.Totals(round.approvedGross(), round.approvedTax(), round.offsetTotal()), lines, null);
     }
 
-    /** 成功付款另生成银行凭证，日期由已固定法人时区解释实际到账时刻。 */
+    /** 已发生的付款按原命令记账；审批随后撤销不抹去银行事实，持久来源由应用服务核验。 */
     public static Plan payment(Application application, PaymentCommand command, PaymentObservation receipt, ZoneId legalTimeZone) {
         var source = command.binding();
         var type = command.purpose() == PaymentCommand.Purpose.EMPLOYEE_ADVANCE ? BusinessReference.Type.ADVANCE_REQUEST : BusinessReference.Type.EXPENSE;
-        requireApproval(application, command.tenantId(), source.applicationId(), source.businessId(), command.payee().employeeId(), type);
-        if (application.version() != source.applicationVersion() || application.roundNo() != source.roundNo() || legalTimeZone == null) throw mismatch();
+        if (!application.tenantId().equals(command.tenantId()) || !application.id().equals(source.applicationId())
+                || !application.createdBy().equals(command.payee().employeeId()) || application.businessReference() == null
+                || application.businessReference().type() != type || !application.businessReference().id().equals(source.businessId())
+                || application.version() < source.applicationVersion() || application.roundNo() < source.roundNo() || legalTimeZone == null) throw mismatch();
         var proof = new VoucherCommand.PaymentProof(command, receipt); var lines = new ArrayList<VoucherCommand.Line>();
         add(lines, key(AccountMappingPort.Role.EMPLOYEE_PAYABLE), VoucherCommand.Side.DEBIT, command.amount(), 0, null, null, null);
         add(lines, new AccountMappingPort.Key(AccountMappingPort.Role.BANK, command.debitAccountReference()), VoucherCommand.Side.CREDIT, command.amount(), 0, null, null, null);
-        return new Plan(command.tenantId(), VoucherCommand.Kind.PAYMENT, binding(application, source.businessVersion()), command.payee().legalEntityId(), command.payee().employeeId(),
+        var original = new VoucherCommand.Binding(source.businessId(), source.applicationId(), source.roundNo(), source.applicationVersion(), source.businessVersion());
+        return new Plan(command.tenantId(), VoucherCommand.Kind.PAYMENT, original, command.payee().legalEntityId(), command.payee().employeeId(),
                 LocalDate.ofInstant(receipt.completedAt(), legalTimeZone), new VoucherCommand.Totals(command.amount(), Money.zero(command.amount().currency()), Money.zero(command.amount().currency())), lines, proof);
     }
 

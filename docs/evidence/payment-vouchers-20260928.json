@@ -1,0 +1,75 @@
+{
+  "recordedAt": "2026-09-29T02:29:07.934773+00:00",
+  "scope": "Local implementation and synthetic finance acceptance only",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "96727536334b252c56ec755cbd81ba58ba0d57ae",
+  "migration": "V49__payment_voucher_preparation.sql",
+  "tests": {
+    "domain": 11,
+    "postgres": {
+      "payment": 31,
+      "expenseSubmission": 38,
+      "voucherOperations": 16,
+      "upgrade": 1
+    },
+    "contractH2": 5,
+    "frontend": 62,
+    "openApi": {
+      "operations": 160,
+      "schemas": 274,
+      "requestExamples": 52
+    },
+    "javaAuthors": {
+      "files": 649,
+      "namedTypes": 1155,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "browser": {
+    "businessId": "15b71173-0aef-4d0f-a89e-292e9951dc71",
+    "applicationId": "fbd0c472-4a8f-40f3-8c72-142b0a64ea41",
+    "preparationAttempts": 2,
+    "paymentVoucherStatus": "POSTED",
+    "voucherReference": "UI-VOUCHER-ec5fb4ca",
+    "checks": {
+      "bankWritesUnchanged": true,
+      "noBankQueryOrSendDuringRetry": true,
+      "oneVoucherPost": true,
+      "originalPersistedReceiptUnchanged": true,
+      "oneRetryAudit": true,
+      "migrationVersion": 49,
+      "actualCssWidth": 480,
+      "narrowHorizontalOverflow": false,
+      "narrowCardsStacked": true
+    },
+    "newFinanceOperations": [
+      "accounting-period",
+      "account-mapping",
+      "voucher-command"
+    ]
+  },
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "payment-voucher-source-red.log",
+    "payment-voucher-runtime-red.log",
+    "payment-voucher-postgres.log",
+    "payment-voucher-http.log",
+    "payment-voucher-ui.log",
+    "payment-voucher-ui-build.log",
+    "payment-voucher-package.log",
+    "payment-voucher-authors.log",
+    "payment-voucher-openapi.log"
+  ],
+  "screenshots": [
+    "payment-voucher-ui-completed.png",
+    "payment-voucher-ui-mobile.png"
+  ],
+  "remaining": [
+    "archive",
+    "dispute resolution",
+    "safe retirement and reissue",
+    "enterprise finance acceptance"
+  ],
+  "remoteConfigured": false
+}

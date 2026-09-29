@@ -21,14 +21,14 @@ import java.util.UUID;
 @Service
 public class VoucherPreparationService {
     private final ApplicationRepository applications;
-    private final ApprovedVoucherSources sources;
+    private final VoucherSources sources;
     private final JdbcVoucherPreparationRepository preparations;
     private final JdbcVoucherOperationRepository operations;
     private final VoucherOperationService execution;
     private final FinanceGatewayConfiguration configuration;
     private final Duration lease;
     /** 两次只读 HTTP 共用有界准备租约，与实际过账租约分开。 */
-    public VoucherPreparationService(ApplicationRepository applications, ApprovedVoucherSources sources, JdbcVoucherPreparationRepository preparations,
+    public VoucherPreparationService(ApplicationRepository applications, VoucherSources sources, JdbcVoucherPreparationRepository preparations,
             JdbcVoucherOperationRepository operations, VoucherOperationService execution, FinanceGatewayConfiguration configuration,
             @Value("${agentflow.vouchers.preparation-lease-seconds:150}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Voucher preparation lease must be between 15 and 300 seconds");
@@ -44,6 +44,25 @@ public class VoucherPreparationService {
         var source = sources.reference(application); sources.lock(source);
         if (preparations.latest(source).isPresent() || operations.forRound(source.tenantId(), source.applicationId(), source.roundNo(), source.kind()).isPresent()) return;
         enqueue(source, 1, actor, time(Instant.now()));
+    }
+    /** 已保存的成功付款只登记只读准备，ERP 或会计规则暂不可用不回滚真实银行成功。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void paid(PaymentOperation payment) {
+        var source = sources.reference(payment); sources.lock(source);
+        if (preparations.latest(source).isPresent() || operations.forRound(source.tenantId(), source.applicationId(), source.roundNo(), source.kind()).isPresent()) return;
+        enqueue(source, 1, payment.input().command().authorization().executedBy(), time(Instant.now()));
+    }
+    /** 付款准备重试保留原回单修订；不能借重试刷新或替换支付命令。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public VoucherPreparation retryPayment(String tenant, UUID applicationId, int roundNo, String actor, Instant now) {
+        var original = preparations.latest(tenant, applicationId, roundNo, VoucherCommand.Kind.PAYMENT).orElseThrow(VoucherPreparationService::notFound);
+        sources.lock(original.input().source());
+        var current = preparations.latest(tenant, applicationId, roundNo, VoucherCommand.Kind.PAYMENT).orElseThrow(VoucherPreparationService::notFound);
+        if (operations.forRound(tenant, applicationId, roundNo, VoucherCommand.Kind.PAYMENT).isPresent()) {
+            throw new DomainException("VOUCHER_OPERATION_EXISTS", "Reconcile the original payment voucher before preparing another command");
+        }
+        if (current.active()) return current;
+        return enqueue(current.input().source(), Math.incrementExact(current.input().attempt()), actor, time(now));
     }
     /** 财务操作入口只允许重做失败的只读准备，已登记凭证不能换编号再准备。 */
     @Transactional

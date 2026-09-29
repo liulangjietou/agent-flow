@@ -31,11 +31,11 @@ public class JdbcVoucherPreparationRepository {
         var input = value.input(); var source = input.source();
         jdbc.update("""
                 INSERT INTO voucher_preparation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
-                employee_id,attempt_no,input_json,state_json,version,status,active_application_id,created_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                employee_id,attempt_no,input_json,state_json,version,status,active_application_id,created_at,payment_operation_id,payment_version)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?,?,?)
                 """, source.tenantId(), input.id().toString(), source.businessType().name(), source.businessId().toString(), source.applicationId().toString(), source.roundNo(),
                 source.kind().name(), source.applicationVersion(), source.businessVersion(), source.employeeId(), input.attempt(), json.write(input), json.write(value),
-                source.applicationId().toString(), timestamp(value.createdAt()));
+                source.applicationId().toString(), timestamp(value.createdAt()), source.paymentOperationId() == null ? null : source.paymentOperationId().toString(), source.paymentVersion());
         append(value);
     }
     /** 固定原输入和前一版本，落库失败连同凭证登记一并回滚。 */
@@ -74,6 +74,8 @@ public class JdbcVoucherPreparationRepository {
                     || !source.businessId().toString().equals(row.getString("business_id")) || !source.applicationId().toString().equals(row.getString("application_id"))
                     || !source.employeeId().equals(row.getString("employee_id")) || !source.kind().name().equals(row.getString("kind")) || source.roundNo() != row.getInt("round_no")
                     || source.applicationVersion() != row.getLong("application_version") || source.businessVersion() != row.getLong("business_version")
+                    || !Objects.equals(source.paymentOperationId() == null ? null : source.paymentOperationId().toString(), row.getString("payment_operation_id"))
+                    || !Objects.equals(source.paymentVersion(), row.getObject("payment_version", Long.class))
                     || input.attempt() != row.getLong("attempt_no") || value.version() != row.getLong("version") || !value.status().name().equals(row.getString("status"))
                     || !Objects.equals(value.active() ? source.applicationId().toString() : null, row.getString("active_application_id"))
                     || !Objects.equals(operation, row.getString("operation_id")) || !value.createdAt().equals(instant(row.getTimestamp("created_at")))

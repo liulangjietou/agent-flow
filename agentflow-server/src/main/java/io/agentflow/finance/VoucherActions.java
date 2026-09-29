@@ -25,6 +25,7 @@ import java.util.UUID;
 public class VoucherActions {
     private final CurrentActor actors;
     private final VoucherAccess access;
+    private final PaymentAccess payments;
     private final ApprovedVoucherSources sources;
     private final VoucherPreparationService preparations;
     private final JdbcVoucherOperationRepository operations;
@@ -32,28 +33,37 @@ public class VoucherActions {
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     /** 权限、原事实、版本与审计共用一个事务，后台再执行网络查询或原编号重发。 */
-    public VoucherActions(CurrentActor actors, VoucherAccess access, ApprovedVoucherSources sources, VoucherPreparationService preparations,
+    public VoucherActions(CurrentActor actors, VoucherAccess access, PaymentAccess payments, ApprovedVoucherSources sources, VoucherPreparationService preparations,
                           JdbcVoucherOperationRepository operations, VoucherOperationService execution, JdbcTemplate jdbc, JsonUtil json) {
         this.actors = actors; this.access = access; this.sources = sources; this.preparations = preparations;
+        this.payments = payments;
         this.operations = operations; this.execution = execution; this.jdbc = jdbc; this.json = json;
     }
     /** 锁后重新检查当轮访问和批准版本，历史查询不触发另一轮命令。 */
     @Transactional
     public Receipt act(UUID applicationId, Input input) {
-        var initial = access.requireFinance(applicationId, input.roundNo()); sources.lock(initial.source());
-        var context = access.requireFinance(applicationId, input.roundNo()); var application = context.application(); var actor = actors.actor();
+        return apply(applicationId, input, false);
+    }
+    /** 付款会计操作复核当前法人任职；审批随后变化不妨碍处理已发生付款的原凭证。 */
+    @Transactional
+    public Receipt payment(UUID applicationId, Input input) { return apply(applicationId, input, true); }
+    private Receipt apply(UUID applicationId, Input input, boolean payment) {
+        var initial = payment ? payments.requireFinance(applicationId, input.roundNo()) : access.requireFinance(applicationId, input.roundNo()); sources.lock(initial.source());
+        var context = payment ? payments.requireFinance(applicationId, input.roundNo()) : access.requireFinance(applicationId, input.roundNo());
+        var application = context.application(); var actor = actors.actor(); var kind = payment ? VoucherCommand.Kind.PAYMENT : context.kind();
         if (application.version() != input.applicationVersion() || context.businessVersion() != input.businessVersion()) throw conflict();
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
-        if (input.action() != Action.QUERY && (application.status() != ApplicationStatus.APPROVED || application.roundNo() != input.roundNo())) {
+        if (!payment && input.action() != Action.QUERY && (application.status() != ApplicationStatus.APPROVED || application.roundNo() != input.roundNo())) {
             throw new DomainException("VOUCHER_SOURCE_CHANGED", "Original financial approval is no longer current");
         }
         UUID preparationId = null, operationId = null; Long operationVersion = null; long revision; String previous = null, current;
         if (input.action() == Action.PREPARE) {
-            var preparation = preparations.retry(actor.tenantId(), applicationId, input.applicationVersion(), actor.userId(), now);
+            var preparation = payment ? preparations.retryPayment(actor.tenantId(), applicationId, input.roundNo(), actor.userId(), now)
+                    : preparations.retry(actor.tenantId(), applicationId, input.applicationVersion(), actor.userId(), now);
             preparationId = preparation.input().id(); revision = preparation.version(); current = preparation.status().name();
         } else {
             var original = operations.find(actor.tenantId(), input.operationId()).orElseThrow(VoucherActions::notFound); var command = original.input().command();
-            if (!command.binding().applicationId().equals(applicationId) || command.binding().roundNo() != input.roundNo() || command.kind() != context.kind()) throw notFound();
+            if (!command.binding().applicationId().equals(applicationId) || command.binding().roundNo() != input.roundNo() || command.kind() != kind) throw notFound();
             if (original.version() != input.operationVersion()) throw conflict(); previous = original.status().name();
             var operation = input.action() == Action.QUERY ? execution.query(actor.tenantId(), command.id(), input.operationVersion(), now)
                     : execution.resend(actor.tenantId(), command.id(), input.operationVersion(), now);
@@ -63,12 +73,13 @@ public class VoucherActions {
         payload.put("roundNo", input.roundNo()); payload.put("action", input.action().name()); payload.put("actor", actor.userId()); payload.put("authorizedRole", "FINANCE");
         payload.put("applicationVersion", application.version()); payload.put("businessVersion", context.businessVersion()); payload.put("previousStatus", previous);
         payload.put("currentStatus", current); payload.put("comment", input.comment().trim());
+        payload.put("kind", kind.name());
         jdbc.update("""
                 INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)
                 VALUES(?,?,?,'Voucher',?,?,?,?,?,?,?)
                 """, UUID.randomUUID().toString(), actor.tenantId(), eventId.toString(), (operationId == null ? preparationId : operationId).toString(), revision,
-                applicationId.toString(), "VOUCHER_" + input.action().name(), actor.userId(), json.write(payload), java.sql.Timestamp.from(now));
-        return new Receipt(applicationId, application.businessReference().id(), input.roundNo(), input.action(), preparationId, operationId, operationVersion, eventId);
+                applicationId.toString(), (payment ? "PAYMENT_VOUCHER_" : "VOUCHER_") + input.action().name(), actor.userId(), json.write(payload), java.sql.Timestamp.from(now));
+        return new Receipt(applicationId, application.businessReference().id(), input.roundNo(), input.action(), preparationId, operationId, operationVersion, eventId, kind);
     }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed approval, financial or voucher version has changed"); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher for the selected financial round not found"); }
@@ -99,5 +110,5 @@ public class VoucherActions {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Receipt(UUID applicationId, UUID businessId, int roundNo, Action action, UUID preparationId, UUID operationId,
-                          Long operationVersion, UUID auditEventId) { }
+                          Long operationVersion, UUID auditEventId, VoucherCommand.Kind kind) { }
 }

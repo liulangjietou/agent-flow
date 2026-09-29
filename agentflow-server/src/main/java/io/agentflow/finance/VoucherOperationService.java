@@ -17,13 +17,13 @@ import java.util.UUID;
  */
 @Service
 public class VoucherOperationService {
-    private final ApprovedVoucherSources sources;
+    private final VoucherSources sources;
     private final JdbcVoucherOperationRepository operations;
     private final ApplicationEventPublisher events;
     private final Duration lease;
 
     /** 领取租约有界，网络调用不进入本服务的事务。 */
-    public VoucherOperationService(ApprovedVoucherSources sources, JdbcVoucherOperationRepository operations,
+    public VoucherOperationService(VoucherSources sources, JdbcVoucherOperationRepository operations,
             ApplicationEventPublisher events, @Value("${agentflow.vouchers.lease-seconds:90}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Voucher lease must be between 15 and 300 seconds");
         this.sources = sources;

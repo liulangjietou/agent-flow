@@ -42,18 +42,26 @@ public record VoucherPreparation(Input input, long version, Status status, Insta
     private static DomainException conflict() { return new DomainException("VOUCHER_PREPARATION_STATE_CONFLICT", "Voucher preparation is no longer executable"); }
 
     /**
-     * 指向真实批准的双版本；准备阶段目前只支持借款与费用挂账。
+     * 挂账绑定批准双版本，付款另绑定实际成功回单的本地修订，不随重复查询漂移。
      * @author owlzhangfq@gmail.com
      */
     public record Source(String tenantId, BusinessReference.Type businessType, UUID businessId, UUID applicationId,
-                         int roundNo, long applicationVersion, long businessVersion, String employeeId) {
+                         int roundNo, long applicationVersion, long businessVersion, String employeeId,
+                         UUID paymentOperationId, Long paymentVersion) {
         /** 明确业务类型，不能让普通表单自行声明财务金额。 */
         public Source {
             if (StringUtils.isBlank(tenantId) || tenantId.length() > 64 || businessId == null || applicationId == null || roundNo < 1
                     || applicationVersion < 1 || businessVersion < 1 || StringUtils.isBlank(employeeId) || employeeId.length() > 128
-                    || businessType != BusinessReference.Type.ADVANCE_REQUEST && businessType != BusinessReference.Type.EXPENSE) throw invalid();
+                    || businessType != BusinessReference.Type.ADVANCE_REQUEST && businessType != BusinessReference.Type.EXPENSE
+                    || (paymentOperationId == null) != (paymentVersion == null) || paymentVersion != null && paymentVersion < 1) throw invalid();
         }
-        public VoucherCommand.Kind kind() { return businessType == BusinessReference.Type.ADVANCE_REQUEST ? VoucherCommand.Kind.EMPLOYEE_ADVANCE : VoucherCommand.Kind.EXPENSE_ACCRUAL; }
+        /** 原挂账输入继续保持相同 JSON；缺少付款绑定不能成为付款凭证。 */
+        public Source(String tenantId, BusinessReference.Type businessType, UUID businessId, UUID applicationId,
+                      int roundNo, long applicationVersion, long businessVersion, String employeeId) {
+            this(tenantId, businessType, businessId, applicationId, roundNo, applicationVersion, businessVersion, employeeId, null, null);
+        }
+        public VoucherCommand.Kind kind() { return paymentOperationId != null ? VoucherCommand.Kind.PAYMENT
+                : businessType == BusinessReference.Type.ADVANCE_REQUEST ? VoucherCommand.Kind.EMPLOYEE_ADVANCE : VoucherCommand.Kind.EXPENSE_ACCRUAL; }
     }
     /**
      * 每次准备绑定请求者与当时目标，凭据不进入任务。

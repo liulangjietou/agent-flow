@@ -292,6 +292,8 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 export const api = {
   vouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   voucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/actions`, 'POST', '办理本轮凭证操作', input),
+  paymentVouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers/payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  paymentVoucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/payment/actions`, 'POST', '办理本轮付款凭证操作', input),
   expenseSettlement: (id: string, roundNo: number, signal: AbortSignal) => request<SettlementView>(`/expense-reports/${encodeURIComponent(id)}/settlement` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   retryExpenseSettlement: (id: string, input: SettlementRetry) => write<SettlementReceipt>(`/expense-reports/${encodeURIComponent(id)}/settlement/retry`, 'POST', '重新办理报销核销', input),
   financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),

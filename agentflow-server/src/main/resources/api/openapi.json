@@ -19994,6 +19994,252 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/vouchers/payment": {
+      "get": {
+        "operationId": "getApplicationPaymentVoucher",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取原付款对应的付款凭证状态",
+        "description": "沿用本轮完整敏感字段权限，仅返回 kind=PAYMENT 的独立准备和会计凭证。成功付款固定原回单修订及法人时区；全额冲销与零金额不创建付款凭证。队列准备、ERP 过账及归档各自独立。响应 no-store。",
+        "x-access": "有权读取完整本轮费用或借款明细的本人或参与者；管理员仍受敏感字段约束",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "省略取当前轮次；其他查询参数拒绝。"
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/vouchers/payment/actions": {
+      "post": {
+        "operationId": "actOnApplicationPaymentVoucher",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "登记付款凭证准备、查询或原号重发",
+        "description": "当前 FINANCE 角色、原轮次完整敏感字段权限、同法人有效任职且非申请人。PREPARE 仅重做原成功回单的会计准备；QUERY 与 RESEND_ORIGINAL 只接受本轮 PAYMENT 类型的原操作。审批随后撤销不替换原付款事实。重发仍须原成功支付及挂账凭证有效，且 ERP 权威查无。操作不会执行银行付款。幂等回放前重新检查当前权限和任职，响应 no-store。",
+        "x-access": "FINANCE + 原轮次完整明细权限 + 同法人当前有效任职 + 非申请人",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "请求已登记；实际 ERP 处理由后台进行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherActionInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -29907,7 +30153,8 @@
           "businessVersion",
           "preparation",
           "operation",
-          "actions"
+          "actions",
+          "kind"
         ],
         "properties": {
           "applicationId": {
@@ -29959,6 +30206,14 @@
           },
           "actions": {
             "$ref": "#/components/schemas/VoucherActionOptions"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_ACCRUAL",
+              "PAYMENT"
+            ]
           }
         }
       },
@@ -30052,7 +30307,8 @@
           "preparationId",
           "operationId",
           "operationVersion",
-          "auditEventId"
+          "auditEventId",
+          "kind"
         ],
         "properties": {
           "applicationId": {
@@ -30111,6 +30367,14 @@
           "auditEventId": {
             "type": "string",
             "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_ACCRUAL",
+              "PAYMENT"
+            ]
           }
         }
       },

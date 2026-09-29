@@ -68,6 +68,7 @@ class ExpenseSubmissionIntegrationTest {
     private UUID finance;
     private final String invoiceNumber = String.format("1234567890%010d", SERIAL.incrementAndGet());
     private boolean paperRequired = true;
+    private String legalTimeZone = "UTC";
     private boolean financeStage = true;
     private boolean afterFinanceTask;
     private boolean reductionRoute;
@@ -156,6 +157,8 @@ class ExpenseSubmissionIntegrationTest {
         for (UUID report : created) {
             jdbc.update("DELETE FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_settlement WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
+            jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", report.toString());
             String authorizations = "SELECT id FROM payment_authorization WHERE tenant_id='demo' AND business_id=?";
             jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + "))", report.toString());
             jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
@@ -163,8 +166,6 @@ class ExpenseSubmissionIntegrationTest {
             jdbc.update("DELETE FROM payment_operation WHERE tenant_id='demo' AND id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", report.toString());
-            jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
-            jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", report.toString());
             jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?)", report.toString());
             jdbc.update("DELETE FROM voucher_operation WHERE tenant_id='demo' AND business_id=?", report.toString());
         }
@@ -850,6 +851,55 @@ class ExpenseSubmissionIntegrationTest {
         tx().executeWithoutResult(status -> paymentExecution.query("demo", id, unknown.version(), Instant.now())); paymentMode = "SUCCEEDED"; paymentWorker.poll();
         assertThat(paymentOperations.find("demo", id).orElseThrow().settleable()).isTrue(); var versions = resourceVersions(report); settlementWorker.poll();
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.BLOCKED); assertThat(resourceVersions(report)).isEqualTo(versions);
+        voucherPreparationWorker.poll(); voucherWorker.poll();
+        assertThat(voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow().usablePosted()).isTrue();
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void paymentVoucherUsesFrozenExpenseTimeZoneAfterResourcesAndBudgetWereConsumed() throws Exception {
+        legalTimeZone = "America/New_York"; var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        var versions = resourceVersions(report); var source = voucherPreparations.latest("demo", report.applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow().input().source();
+        var original = paymentOperations.revision("demo", source.paymentOperationId(), source.paymentVersion()).orElseThrow();
+        legalTimeZone = "Asia/Shanghai"; voucherPreparationWorker.poll(); voucherWorker.poll();
+        var voucher = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow();
+        assertThat(voucher.usablePosted()).isTrue();
+        assertThat(voucher.input().command().accountingDate()).isEqualTo(LocalDate.ofInstant(original.observation().completedAt(), java.time.ZoneId.of("America/New_York")));
+        assertThat(voucher.input().command().totals().gross()).isEqualTo(current(report).currentRound().payable());
+        assertThat(voucher.input().command().payment().receipt()).isEqualTo(original.observation());
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void paymentVoucherHttpRequiresCurrentFinanceScopeAndNeverAcceptsAccrualOperationIds() throws Exception {
+        var report = paidExpense(); String path = voucherPath(report) + "/payment";
+        configuration.setEnabled(false); voucherPreparationWorker.poll(); configuration.setEnabled(true);
+        var response = read(path, "finance"); var view = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(view.path("kind").asText()).isEqualTo("PAYMENT"); assertThat(view.path("preparation").path("status").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(view.path("actions").path("prepare").asBoolean()).isTrue();
+        assertThat(view.toString()).doesNotContain("accountDigest", "debitAccountReference", "paymentVersion", "targetDigest", "commandDigest", "receiptReference");
+        assertThat(ok(read(path, "alice"), 200).path("actions").path("prepare").asBoolean()).isFalse();
+        for (String user : List.of("bob", "cashier", "admin")) assertThat(read(path, user).getStatus()).isIn(403, 404);
+        assertThat(read(path + "?kind=EXPENSE_ACCRUAL", "finance").getStatus()).isEqualTo(400);
+        var input = voucherInput(report, "PREPARE", null);
+        for (String user : List.of("alice", "manager", "cashier", "admin", "bob")) assertThat(send(path + "/actions", user, input).getStatus()).isIn(403, 404);
+        var forged = new HashMap<>(input); forged.put("paymentVersion", 99); assertThat(send(path + "/actions", "finance", forged).getStatus()).isEqualTo(400);
+        var stale = new HashMap<>(input); stale.put("applicationVersion", app(report).version() - 1); assertCode(send(path + "/actions", "finance", stale), "CONCURRENCY_CONFLICT");
+        String key = UUID.randomUUID().toString(); var accepted = send(path + "/actions", "finance", key, input); var receipt = ok(accepted, 202);
+        assertThat(receipt.path("kind").asText()).isEqualTo("PAYMENT"); assertThat(accepted.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(path + "/actions", "finance", key, input).getContentAsString()).isEqualTo(accepted.getContentAsString());
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(path + "/actions", "finance", key, input).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='PAYMENT_VOUCHER_PREPARE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        voucherPreparationWorker.poll(); voucherWorker.poll();
+        var posted = ok(read(path, "finance"), 200); assertThat(posted.path("operation").path("status").asText()).isEqualTo("POSTED");
+        var accrual = ok(read(voucherPath(report), "finance"), 200);
+        assertThat(send(path + "/actions", "finance", voucherInput(report, "QUERY", accrual.path("operation"))).getStatus()).isEqualTo(404);
+        assertThat(send(voucherPath(report) + "/actions", "finance", voucherInput(report, "QUERY", posted.path("operation"))).getStatus()).isEqualTo(404);
+        ok(send(path + "/actions", "finance", voucherInput(report, "QUERY", posted.path("operation"))), 202); voucherWorker.poll();
+        assertThat(paymentWrites).isEqualTo(1);
     }
 
     @Test void upgradeRecoveryUsesOriginalPaidFactWithoutQueryingOrSendingAgain() throws Exception {
@@ -1046,7 +1096,7 @@ class ExpenseSubmissionIntegrationTest {
     }
     private Object data(String operation, JsonNode data) {
         return switch (operation) {
-            case "catalog" -> new FinanceCatalog("alice", "synthetic-v1", Instant.now().plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", paperRequired, "v1", "UTC")),
+            case "catalog" -> new FinanceCatalog("alice", "synthetic-v1", Instant.now().plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", paperRequired, "v1", legalTimeZone)),
                     List.of(new FinanceCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM))), List.of(new FinanceCatalog.CostCenter(entity, "IT", "研发")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
             case "employee-account" -> new EmployeeAccountPort.Account(new EmployeeAccountSnapshot(entity, "alice", "synthetic-private-account", "****1234", "a".repeat(64), "v1"), Instant.now().plusSeconds(600));
             case "debit-accounts" -> {

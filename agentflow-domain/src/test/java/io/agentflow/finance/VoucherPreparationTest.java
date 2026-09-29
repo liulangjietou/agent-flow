@@ -46,6 +46,13 @@ class VoucherPreparationTest {
         assertThatThrownBy(() -> new VoucherPreparation.Source(source.tenantId(), BusinessReference.Type.EXPENSE_PLAN, source.businessId(), source.applicationId(), 1, 5, 3, "alice")).isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> new VoucherPreparation.Source(source.tenantId(), BusinessReference.Type.EXPENSE, source.businessId(), source.applicationId(), 1, 5, 0, "alice")).isInstanceOf(DomainException.class);
     }
+    @Test void paymentSourceRequiresBothOriginalOperationAndPersistedRevision() {
+        var source = input(null).source(); var id = UUID.randomUUID();
+        var paid = new VoucherPreparation.Source(source.tenantId(), source.businessType(), source.businessId(), source.applicationId(), 1, 5, 3, "alice", id, 4L);
+        assertThat(paid.kind()).isEqualTo(VoucherCommand.Kind.PAYMENT);
+        assertThatThrownBy(() -> new VoucherPreparation.Source(source.tenantId(), source.businessType(), source.businessId(), source.applicationId(), 1, 5, 3, "alice", id, null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new VoucherPreparation.Source(source.tenantId(), source.businessType(), source.businessId(), source.applicationId(), 1, 5, 3, "alice", null, 4L)).isInstanceOf(DomainException.class);
+    }
     private static VoucherPreparation.Input input(String target) {
         return new VoucherPreparation.Input(UUID.randomUUID(), new VoucherPreparation.Source("demo", BusinessReference.Type.ADVANCE_REQUEST, UUID.randomUUID(), UUID.randomUUID(), 1, 5, 3, "alice"), 1, "manager", target);
     }

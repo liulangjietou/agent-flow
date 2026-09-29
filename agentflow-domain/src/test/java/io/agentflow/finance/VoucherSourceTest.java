@@ -89,7 +89,10 @@ class VoucherSourceTest {
         var command = prepare(plan, NOW.plusSeconds(601));
         assertThat(command.lines().get(1).account()).isEqualTo(new AccountMappingPort.Key(AccountMappingPort.Role.BANK, "bank-source-1"));
         assertThat(command.payment().receipt()).isEqualTo(receipt);
-        assertThatThrownBy(() -> VoucherSource.payment(changed(app, ApplicationStatus.REVOKED, 6, app.payload()), payment, receipt, ZoneId.of("UTC"))).isInstanceOf(DomainException.class);
+        var revoked = changed(app, ApplicationStatus.REVOKED, 6, app.payload());
+        var afterRevocation = VoucherSource.payment(revoked, payment, receipt, ZoneId.of("America/New_York"));
+        assertThat(afterRevocation).isEqualTo(plan);
+        assertThat(afterRevocation.binding().applicationVersion()).isEqualTo(5);
     }
 
     private static VoucherCommand prepare(VoucherSource.Plan plan, Instant at) {

@@ -9,12 +9,12 @@ global.localStorage = { getItem: () => 'test-token', setItem() {}, removeItem() 
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 const copy = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
 const binding = () => ({ applicationId: 'app', businessId: 'report', businessType: 'EXPENSE', roundNo: 2, applicationVersion: 10, businessVersion: 6 })
-const view = () => ({ ...binding(), preparation: { id: 'operation', status: 'READY', attempt: 1, createdAt: new Date().toISOString(), completedAt: new Date().toISOString(), issue: null },
+const view = () => ({ ...binding(), kind: 'EXPENSE_ACCRUAL', preparation: { id: 'operation', status: 'READY', attempt: 1, createdAt: new Date().toISOString(), completedAt: new Date().toISOString(), issue: null },
   operation: { id: 'operation', version: 3, kind: 'EXPENSE_ACCRUAL', status: 'NOT_FOUND', attempts: 1, accountingDate: '2026-09-28', updatedAt: new Date().toISOString(), sendExpiresAt: new Date(Date.now() + 60000).toISOString(), observedStatus: 'NOT_FOUND', voucherReference: null, postedAt: null, disputed: false, issue: null }, actions: { prepare: false, query: true, resendOriginal: true } })
-const receipt = input => ({ applicationId: 'app', businessId: 'report', roundNo: 2, action: input.action, preparationId: input.action === 'PREPARE' ? 'preparation' : null, operationId: input.operationId ?? null, operationVersion: input.operationVersion ? input.operationVersion + 1 : null, auditEventId: 'audit' })
+const receipt = input => ({ applicationId: 'app', businessId: 'report', roundNo: 2, kind: 'EXPENSE_ACCRUAL', action: input.action, preparationId: input.action === 'PREPARE' ? 'preparation' : null, operationId: input.operationId ?? null, operationVersion: input.operationVersion ? input.operationVersion + 1 : null, auditEventId: 'audit' })
 let scope = 0
-function panel() {
-  const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false }), events = []
+function panel(overrides = {}) {
+  const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false, ...overrides }), events = []
   const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onBusy: value => events.push(value) })
   const mounted = app.mount({})
   return { props, events, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); global.fetch = originalFetch; bindAuthenticationActor(null) } }
@@ -28,6 +28,63 @@ test('凭证响应必须绑定同一业务、轮次、双版本和准备编号�
   for (const mutate of [v => v.preparation.id = 'foreign', v => v.operation.kind = 'PAYMENT', v => v.operation.status = 'PAID', v => v.actions.query = 'true', v => v.operation.version = 0, v => v.operation.sendExpiresAt = 'invalid', v => v.operation.status = 'POSTED']) {
     const invalid = copy(value); mutate(invalid); assert.throws(() => validateVoucherView(invalid, binding()))
   }
+})
+
+test('付款凭证即使尚无操作记录也必须携带付款类型，不能借用挂账响应', () => {
+  const expected = { ...binding(), kind: 'PAYMENT' }, value = { ...view(), kind: 'PAYMENT', preparation: null, operation: null }
+  assert.equal(validateVoucherView(value, expected), value)
+  assert.throws(() => validateVoucherView(value, binding()))
+  assert.throws(() => validateVoucherView({ ...value, kind: 'EXPENSE_ACCRUAL' }, expected))
+  value.operation = view().operation; assert.throws(() => validateVoucherView(value, expected))
+  value.operation.kind = 'PAYMENT'; assert.equal(validateVoucherView(value, expected), value)
+  const input = voucherActionInput(value, 'QUERY', '核对付款入账')
+  assert.throws(() => validateVoucherReceipt(receipt(input), value, input))
+  assert.doesNotThrow(() => validateVoucherReceipt({ ...receipt(input), kind: 'PAYMENT' }, value, input))
+})
+
+test('真实付款凭证面板使用独立读写入口且只发送原操作身份', async () => {
+  const value = view(); value.kind = 'PAYMENT'; value.operation.kind = 'PAYMENT'
+  let reads = 0, writes = 0
+  api.vouchers = async () => { throw new Error('不应读取挂账入口') }
+  api.voucherAction = async () => { throw new Error('不应写入挂账入口') }
+  api.paymentVouchers = async () => { reads++; return value }
+  api.paymentVoucherAction = async (id, input) => { writes++; assert.equal(id, 'app'); assert.equal(input.operationId, 'operation'); return { ...receipt(input), kind: 'PAYMENT' } }
+  const p = panel({ payment: true })
+  try {
+    await settle(); assert.equal(p.state.view.kind, 'PAYMENT'); assert.equal(p.state.title, '付款凭证')
+    p.state.prepare('QUERY'); p.state.comment = '核对银行回单对应凭证'; await p.state.execute()
+    assert.equal(writes, 1); assert.equal(reads, 2); assert.match(p.state.notice, /已登记/)
+  } finally { p.close() }
+})
+
+test('切换挂账和付款凭证时取消旧读取，迟到的挂账结果不能覆盖付款状态', async () => {
+  let complete, aborted
+  api.vouchers = (id, round, signal) => { aborted = signal; return new Promise(resolve => complete = resolve) }
+  const value = view(); value.kind = 'PAYMENT'; value.operation.kind = 'PAYMENT'; api.paymentVouchers = async () => value
+  const p = panel()
+  try {
+    p.props.payment = true; await settle(); assert.equal(aborted.aborted, true); assert.equal(p.state.view.kind, 'PAYMENT')
+    complete(view()); await settle(); assert.equal(p.state.view.kind, 'PAYMENT'); assert.equal(p.state.pending, null)
+  } finally { p.close() }
+})
+
+test('付款凭证未知写入保留独立路径与原请求，恢复回执也校验凭证类型', async () => {
+  bindAuthenticationActor({ tenantId: 'demo', userId: 'payment-voucher-unknown-' + ++scope, roles: ['FINANCE'] })
+  const value = view(); value.kind = 'PAYMENT'; value.operation.kind = 'PAYMENT'; api.paymentVouchers = async () => value
+  const requests = []; let fail = true
+  global.fetch = async (url, init) => {
+    requests.push({ url, init }); if (fail) throw new Error('connection lost')
+    return new Response(JSON.stringify({ ...receipt(JSON.parse(init.body)), kind: 'PAYMENT' }), { status: 202, headers: { 'Content-Type': 'application/json' } })
+  }
+  const p = panel({ payment: true })
+  try {
+    await settle(); p.state.prepare('QUERY'); p.state.comment = '恢复原会计查询'; await p.state.execute()
+    assert.equal(p.state.unconfirmed, true); const entry = writeRequests.pending()[0]
+    assert.equal(entry.path, '/applications/app/vouchers/payment/actions'); fail = false; await writeRequests.recover(entry.id)
+    assert.equal(requests[0].init.body, requests[1].init.body)
+    assert.equal(requests[0].init.headers.get('Idempotency-Key'), requests[1].init.headers.get('Idempotency-Key'))
+    assert.equal(p.state.requiresRefresh, true); await p.state.load(); assert.equal(p.state.unconfirmed, false)
+  } finally { p.close() }
 })
 
 test('重发只携带原编号与显示版本，确认时再次校验期限和权威查无', () => {
