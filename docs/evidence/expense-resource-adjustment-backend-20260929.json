@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-29",
+  "stage": "expense-resource-adjustment-authorized-backend",
+  "result": "PASS_BACKEND_ONLY",
+  "tests": {"domainScope": 49, "postgresServerScope": 171, "workflowFocusedSubset": 10, "h2WorkflowScope": 10, "scopeOverlap": true},
+  "verified": [
+    "Read-only period preparation does not dispatch a write command",
+    "Independent finance authorizes their latest preparation exactly once with an atomic audit and budget outbox",
+    "Changed source, inactive authorizer or changed destination prevents first dispatch",
+    "Unknown results remain queryable after source changes and authorizer inactivation",
+    "Authoritative not-found requires explicit resend by the original authorizer under the original expiry",
+    "Resource recovery and completion confirmation preserve earlier budget and resource effects",
+    "Applicant, original cashier, administrator without financial fields and stale versions cannot authorize",
+    "Zero payable reverses actual resources without a fabricated payment or bank return",
+    "Retirement competes atomically with first command claim and preserves immutable prior history",
+    "Confirmed local resource completion remains available with the gateway disabled"
+  ],
+  "liveAcceptanceSchema": 64,
+  "testSchema": 65,
+  "publicApiOrUiAdded": false,
+  "remaining": ["Public API and permissioned workspace", "UI", "Existing live database upgrade and end-to-end acceptance"],
+  "logs": ["expense-resource-adjustment-postgres.log", "expense-resource-adjustment-workflow-expanded.log", "expense-resource-adjustment-backend-authors.log"],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

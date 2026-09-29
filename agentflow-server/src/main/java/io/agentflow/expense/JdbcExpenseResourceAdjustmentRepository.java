@@ -61,7 +61,11 @@ public class JdbcExpenseResourceAdjustmentRepository {
                 yield before.status() == ExpenseResourceAdjustment.Status.WAITING_BUDGET
                         ? before.budgetApplied(operation, value.updatedAt()) : before.retryResources(operation, value.updatedAt());
             }
-            case APPLIED -> { requireResourceEffects(value); yield before.applied(value.updatedAt()); }
+            case APPLIED -> {
+                requireResourceEffects(value);
+                yield before.resourcesReversed() ? before.confirmCompleted(budgets.find(tenant, value.id()).orElseThrow(JdbcExpenseResourceAdjustmentRepository::conflict), value.updatedAt())
+                        : before.applied(value.updatedAt());
+            }
             default -> throw conflict();
         };
         if (!value.equals(expected)) throw conflict();

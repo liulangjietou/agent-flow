@@ -7,8 +7,6 @@ import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 调整只采用原已核销报销的正式财务记录，来源读取和锁顺序集中在应用层。
@@ -32,12 +30,6 @@ public class ExpenseResourceAdjustmentSources {
             JdbcExpensePaymentReturnsRepository returns, JdbcExpensePaymentReturnRepository registrations, JdbcPaymentOperationRepository payments) {
         this.reports = reports; this.applications = applications; this.settlements = settlements; this.budgets = budgets; this.vouchers = vouchers;
         this.reversals = reversals; this.returns = returns; this.registrations = registrations; this.payments = payments;
-    }
-
-    /** 与原付款、结算及资源保持申请在前、报销在后的锁顺序。 */
-    @Transactional(propagation = Propagation.MANDATORY)
-    public ExpenseResourceAdjustmentBasis locked(String tenant, UUID reportId) {
-        reports.lock(tenant, reportId); return find(tenant, reportId);
     }
 
     /** 全部原凭据满足才返回取消依据，未完成或冲突状态不能由客户端补成成功。 */

@@ -40,6 +40,10 @@ class ExpenseResourceAdjustmentTest {
         var disputed = complete.requireReview("BUDGET_RECHECK_REQUIRED", NOW.plusSeconds(3));
         assertThat(disputed.resourcesReversed()).isTrue(); assertThat(disputed.budgetReversal()).isEqualTo(complete.budgetReversal());
         assertInvalid(() -> disputed.retryResources(operation, NOW.plusSeconds(4)));
+        var confirmed = disputed.confirmCompleted(operation, NOW.plusSeconds(4));
+        assertThat(confirmed.status()).isEqualTo(ExpenseResourceAdjustment.Status.APPLIED); assertThat(confirmed.resourcesReversed()).isTrue();
+        assertThat(confirmed.budgetReversalVersion()).isEqualTo(complete.budgetReversalVersion()); assertThat(confirmed.budgetReversal()).isEqualTo(complete.budgetReversal());
+        assertInvalid(() -> queued.confirmCompleted(operation, NOW.plusSeconds(4)));
     }
 
     @Test void resourceRetryPreservesTheFirstAcceptedBudgetReversalAndRejectsOtherCommands() {

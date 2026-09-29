@@ -79,6 +79,12 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
         if (budgetReversal == null || operation == null || !input.budget().equals(operation.input())
                 || operation.status() != BudgetConsumptionReversalOperation.Status.APPLIED || !sameApplied(budgetReversal, operation.observation())) throw conflict();
     }
+    /** 已完成资源后重新核对预算，只能确认原成功仍成立，不能再执行资源或替换成功事实。 */
+    public ExpenseResourceAdjustment confirmCompleted(BudgetConsumptionReversalOperation operation, Instant at) {
+        requireTime(at); requireAcceptedBudget(operation);
+        if (status != Status.REVIEW_REQUIRED || !resourcesReversed || at.isBefore(operation.updatedAt())) throw conflict();
+        return new ExpenseResourceAdjustment(input, version + 1, Status.APPLIED, budgetReversalVersion, budgetReversal, true, null, createdAt, at);
+    }
     private static boolean sameApplied(BudgetConsumptionReversalObservation original, BudgetConsumptionReversalObservation current) {
         return original.operationId().equals(current.operationId()) && original.commandDigest().equals(current.commandDigest())
                 && original.ledgerRevision().equals(current.ledgerRevision()) && original.reference().equals(current.reference())

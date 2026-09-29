@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.payment-return-worker-enabled=false",
-        "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false", "agentflow.expenses.archive-worker-enabled=false"})
+        "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false", "agentflow.expenses.archive-worker-enabled=false", "agentflow.expenses.resource-adjustment-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpenseSubmissionIntegrationTest {
     private static final HttpServer SERVER = server();
@@ -100,6 +100,12 @@ class ExpenseSubmissionIntegrationTest {
     private ExpensePaymentReturnPort.Status expenseReturnStatus = ExpensePaymentReturnPort.Status.CONFIRMED;
     private long expenseReturnRevision = 1;
     private List<ExpensePaymentReturnPort.ReturnItem> expenseReturnRows = List.of();
+    private int budgetReversalWrites;
+    private int budgetReversalQueries;
+    private boolean invalidBudgetReversalResponse;
+    private BudgetConsumptionReversalObservation.Status budgetReversalStatus = BudgetConsumptionReversalObservation.Status.APPLIED;
+    private final Map<UUID, BudgetConsumptionReversalCommand> budgetReversalCommands = new ConcurrentHashMap<>();
+    private final Map<UUID, Instant> budgetReversalAppliedAt = new ConcurrentHashMap<>();
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
@@ -195,6 +201,10 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseResourceAdjustmentExecution resourceAdjustmentExecution;
     @Autowired ExpensePrecheckResources financialResources;
     @Autowired ExpenseResourceChanges resourceChanges;
+    @Autowired ExpenseResourceAdjustmentPreparationService resourcePreparing;
+    @Autowired ExpenseResourceAdjustmentActionService resourceActions;
+    @Autowired ExpenseResourceAdjustmentBudgetExecution resourceBudgetExecution;
+    @Autowired ExpenseResourceAdjustmentWorker resourceWorker;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
@@ -1435,6 +1445,193 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(budgetReversals.find("demo", ready.id()).orElseThrow().attempts()).isEqualTo(1);
     }
 
+    @Test void resourceWorkflowPreparesWithoutWritingAndExplicitAuthorizationCompletesExactlyOnce() throws Exception {
+        var report = resourceAdjustmentReport(); var versions = resourceVersions(report); var prepared = prepareResourceWorkflow(report);
+        assertThat(prepared.status()).isEqualTo(ExpenseResourceAdjustmentPreparation.Status.READY); assertThat(budgetReversalWrites).isZero();
+        assertThat(budgetReversals.find("demo", prepared.input().id())).isEmpty(); assertThat(resourceVersions(report)).isEqualTo(versions);
+        var input = resourceAuthorizationInput(report, prepared); var accepted = asFinance(() -> resourcePreparing.authorize(report.id(), input));
+        assertThat(accepted.adjustmentVersion()).isEqualTo(1); assertThat(accepted.budgetVersion()).isEqualTo(1); assertThat(budgetReversalWrites).isZero();
+        assertThatThrownBy(() -> asFinance(() -> resourcePreparing.authorize(report.id(), input))).isInstanceOf(io.agentflow.common.DomainException.class);
+        resourceWorker.poll(); var complete = resourceAdjustments.find("demo", accepted.adjustmentId()).orElseThrow();
+        assertThat(complete.status()).isEqualTo(ExpenseResourceAdjustment.Status.APPLIED); assertThat(complete.resourcesReversed()).isTrue(); assertThat(budgetReversalWrites).isEqualTo(1);
+        var after = resourceVersions(report); resourceWorker.poll(); assertThat(resourceVersions(report)).isEqualTo(after); assertThat(budgetReversalWrites).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND aggregate_id=? AND action IN ('EXPENSE_ADJUSTMENT_PREPARE','EXPENSE_ADJUSTMENT_AUTHORIZE')", Integer.class, complete.id().toString())).isEqualTo(2);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> resourceWorker.poll())).isInstanceOf(IllegalStateException.class);
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY)));
+        assertThat(resourceAdjustments.find("demo", complete.id()).orElseThrow().resourcesReversed()).isTrue(); resourceWorker.poll();
+        assertThat(resourceAdjustments.find("demo", complete.id()).orElseThrow().status()).isEqualTo(ExpenseResourceAdjustment.Status.REVIEW_REQUIRED);
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.CONFIRM_COMPLETED)));
+        assertThat(resourceAdjustments.find("demo", complete.id()).orElseThrow().status()).isEqualTo(ExpenseResourceAdjustment.Status.APPLIED);
+        assertThat(resourceVersions(report)).isEqualTo(after); assertThat(budgetReversalWrites).isEqualTo(1); assertThat(budgetReversalQueries).isEqualTo(1);
+    }
+
+    @Test void resourceWorkflowAuthorizationRollbackAndConcurrencyPreserveSingleSourceConsumption() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report); var input = resourceAuthorizationInput(report, prepared);
+        assertThatThrownBy(() -> asFinance(() -> tx().execute(status -> { resourcePreparing.authorize(report.id(), input); throw new IllegalStateException("Synthetic service authorization rollback"); })))
+                .hasMessageContaining("Synthetic service authorization rollback");
+        assertThat(resourcePreparations.find("demo", prepared.input().id())).contains(prepared); assertThat(resourceAdjustments.active("demo", report.id())).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND aggregate_id=? AND action='EXPENSE_ADJUSTMENT_AUTHORIZE'", Integer.class, prepared.input().id().toString())).isZero();
+        var gate = new java.util.concurrent.CountDownLatch(1); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.Callable<String> action = () -> { gate.await(); try { asFinance(() -> resourcePreparing.authorize(report.id(), input)); return "AUTHORIZED"; }
+            catch (io.agentflow.common.DomainException conflict) { return conflict.code(); } };
+        try {
+            var first = pool.submit(action); var second = pool.submit(action); gate.countDown();
+            assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder("AUTHORIZED", "CONCURRENCY_CONFLICT");
+        } finally { pool.shutdownNow(); }
+        resourceWorker.poll(); assertThat(budgetReversalWrites).isEqualTo(1); assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isTrue();
+    }
+
+    @Test void resourceWorkflowUnavailableFinanceStopsBeforeSendingAndCanBeSafelyEndedAfterEligibilityReturns() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { resourceWorker.poll(); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        var adjustment = resourceAdjustments.active("demo", report.id()).orElseThrow(); var stopped = budgetReversals.find("demo", adjustment.id()).orElseThrow();
+        assertThat(stopped.status()).isEqualTo(BudgetConsumptionReversalOperation.Status.VOIDED); assertThat(stopped.attempts()).isZero(); assertThat(budgetReversalWrites).isZero();
+        var input = resourceRetirementInput(report);
+        assertThatThrownBy(() -> asFinance(() -> tx().execute(status -> { resourceActions.retire(report.id(), input); throw new IllegalStateException("Synthetic service retirement rollback"); })))
+                .hasMessageContaining("Synthetic service retirement rollback");
+        assertThat(resourceAdjustments.active("demo", report.id())).contains(adjustment); assertThat(resourceAdjustments.retirement("demo", adjustment.id())).isEmpty();
+        asFinance(() -> resourceActions.retire(report.id(), input)); assertThat(resourceAdjustments.active("demo", report.id())).isEmpty();
+        assertThat(resourceAdjustments.retirement("demo", adjustment.id())).isPresent(); assertThat(prepareResourceWorkflow(report).status()).isEqualTo(ExpenseResourceAdjustmentPreparation.Status.READY);
+    }
+
+    @Test void resourceWorkflowQueriesUnknownBudgetDespiteSourceAndPersonnelChangesThenRequiresExplicitLocalRecovery() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        invalidBudgetReversalResponse = true; resourceWorker.poll(); var adjustment = resourceAdjustments.active("demo", report.id()).orElseThrow();
+        assertThat(budgetReversals.find("demo", adjustment.id()).orElseThrow().status()).isEqualTo(BudgetConsumptionReversalOperation.Status.UNKNOWN);
+        assertThat(budgetReversalWrites).isEqualTo(1); assertThat(adjustment.resourcesReversed()).isFalse();
+        var accrual = voucherOperations.find("demo", adjustment.input().basis().accrualReversal().operationId()).orElseThrow();
+        tx().executeWithoutResult(status -> voucherExecution.query("demo", accrual.input().command().id(), accrual.version(), Instant.now()));
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY)));
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        invalidBudgetReversalResponse = false;
+        try { resourceWorker.poll(); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        var budget = budgetReversals.find("demo", adjustment.id()).orElseThrow(); assertThat(budget.status()).isEqualTo(BudgetConsumptionReversalOperation.Status.APPLIED);
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseResourceAdjustment.Status.REVIEW_REQUIRED);
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isFalse(); assertThat(budgetReversalWrites).isEqualTo(1); assertThat(budgetReversalQueries).isEqualTo(1);
+        var claimed = voucherExecution.claim("demo", accrual.input().command().id(), Instant.now());
+        voucherExecution.finish(claimed, new FinanceResult.Success<>(voucherFact(accrual, VoucherObservation.Status.REVERSED, accrual.highestRevision() + 1)), Instant.now().plusMillis(1));
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.RETRY_RESOURCES))); resourceWorker.poll();
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isTrue(); assertThat(budgetReversalWrites).isEqualTo(1);
+    }
+
+    @Test void resourceWorkflowNotFoundNeedsExplicitOriginalAuthorizerResendAndKeepsOneCommand() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        invalidBudgetReversalResponse = true; resourceWorker.poll(); invalidBudgetReversalResponse = false; budgetReversalStatus = BudgetConsumptionReversalObservation.Status.NOT_FOUND;
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY))); resourceWorker.poll();
+        var before = resourceAdjustments.active("demo", report.id()).orElseThrow(); var command = budgetReversals.find("demo", before.id()).orElseThrow().input();
+        assertThat(budgetReversals.find("demo", before.id()).orElseThrow().status()).isEqualTo(BudgetConsumptionReversalOperation.Status.NOT_FOUND);
+        resourceWorker.poll(); assertThat(budgetReversalWrites).isEqualTo(1);
+        assertThatThrownBy(() -> asFinance(() -> resourceActions.retire(report.id(), resourceRetirementInput(report)))).isInstanceOf(io.agentflow.common.DomainException.class);
+        actors.set(new Actor("demo", "manager", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { assertThatThrownBy(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.RESEND_ORIGINAL))).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { actors.clear(); }
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.RESEND_ORIGINAL)));
+        budgetReversalStatus = BudgetConsumptionReversalObservation.Status.APPLIED; resourceWorker.poll();
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isTrue(); assertThat(budgetReversalWrites).isEqualTo(2);
+        assertThat(budgetReversalCommands).hasSize(1); assertThat(budgetReversals.find("demo", before.id()).orElseThrow().input()).isEqualTo(command);
+    }
+
+    @Test void resourceWorkflowBlocksCashierAndHiddenFinancialFieldsAndRecoversLocalResourcesWithoutGateway() throws Exception {
+        var report = resourceAdjustmentReport(); var input = resourcePreparationInput(report);
+        for (String user : List.of("alice", "cashier", "admin")) {
+            actors.set(new Actor("demo", user, Set.of("EMPLOYEE", "APPROVER", "ADMIN", "FINANCE")));
+            try { assertThatThrownBy(() -> resourcePreparing.prepare(report.id(), input)).isInstanceOf(io.agentflow.common.DomainException.class); }
+            finally { actors.clear(); }
+        }
+        var ready = readyResourceExecution(report); configuration.setEnabled(false);
+        try { resourceWorker.poll(); } finally { configuration.setEnabled(true); }
+        assertThat(resourceAdjustments.find("demo", ready.id()).orElseThrow().resourcesReversed()).isTrue(); assertThat(budgetReversalWrites).isZero();
+        paymentMode = "SUCCEEDED"; hideBusinessDetails = true; var hidden = archiveReadyExpense();
+        assertThatThrownBy(() -> asFinance(() -> resourcePreparing.prepare(hidden.id(), resourcePreparationInput(hidden)))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(resourcePreparations.latest("demo", hidden.id(), "finance")).isEmpty();
+    }
+
+    @Test void resourceWorkflowZeroPayableReversesResourcesWithoutInventingAnyBankReturn() throws Exception {
+        advanceOffset = "100"; var report = paymentReport(true); settlementWorker.poll(); budgetWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        var accrual = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var checked = checkedReversal(report, accrual);
+        ok(send(reversalPath(accrual) + "/records", "finance", reversalRecordInput(report, accrual, checked)), 202);
+        var prepared = prepareResourceWorkflow(report); assertThat(prepared.input().basis().paymentReturns()).isNull();
+        assertThat(prepared.input().basis().paymentVoucher()).isNull(); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        resourceWorker.poll(); var complete = resourceAdjustments.active("demo", report.id()).orElseThrow();
+        assertThat(complete.resourcesReversed()).isTrue(); assertThat(paymentWrites).isZero(); assertThat(budgetReversalWrites).isEqualTo(1);
+        assertThat(expenseReturnLedgers.find("demo", report.id())).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_consumption_reversal WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(3);
+    }
+
+    @Test void resourceWorkflowSourceChangeDuringPreparationVoidsTheCandidateAndDisabledDestinationNeverSends() throws Exception {
+        var report = resourceAdjustmentReport(); var queued = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report)));
+        var claimed = resourcePreparing.claim("demo", queued.preparationId(), Instant.now());
+        var accrual = voucherOperations.find("demo", claimed.input().basis().accrualReversal().operationId()).orElseThrow();
+        observeVoucher(accrual, voucherFact(accrual, VoucherObservation.Status.REVERSED, accrual.highestRevision() + 1));
+        // 挂账登记仍对应同一原件，改用付款凭证的新修订使未授权准备明确失效。
+        var voucher = claimed.input().basis().paymentVoucher(); observeVoucher(voucher, voucherFact(voucher, VoucherObservation.Status.POSTED, voucher.highestRevision() + 1));
+        var period = accountingPeriods.period("demo", target(), claimed.input().periodRequest()); resourcePreparing.finish(claimed, period, Instant.now());
+        assertThat(resourcePreparations.find("demo", queued.preparationId()).orElseThrow().status()).isEqualTo(ExpenseResourceAdjustmentPreparation.Status.VOIDED);
+        assertThat(resourceAdjustments.active("demo", report.id())).isEmpty(); assertThat(budgetReversalWrites).isZero();
+        var prepared = prepareResourceWorkflow(report); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        configuration.setEnabled(false); try { resourceWorker.poll(); } finally { configuration.setEnabled(true); }
+        var stopped = budgetReversals.find("demo", prepared.input().id()).orElseThrow(); assertThat(stopped.status()).isEqualTo(BudgetConsumptionReversalOperation.Status.VOIDED);
+        assertThat(stopped.attempts()).isZero(); assertThat(budgetReversalWrites).isZero();
+    }
+
+    @Test void resourceWorkflowExplicitBudgetRejectionCanBeRetiredAndRepreparedForAnotherOpenDate() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        budgetReversalStatus = BudgetConsumptionReversalObservation.Status.REJECTED; resourceWorker.poll(); var rejected = budgetReversals.find("demo", prepared.input().id()).orElseThrow();
+        assertThat(rejected.status()).isEqualTo(BudgetConsumptionReversalOperation.Status.REJECTED); assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isFalse();
+        asFinance(() -> resourceActions.retire(report.id(), resourceRetirementInput(report))); var originalInput = resourcePreparationInput(report);
+        var newInput = new ExpenseResourceAdjustmentPreparationService.PrepareInput(originalInput.roundNo(), originalInput.applicationVersion(), originalInput.businessVersion(), originalInput.settlementVersion(),
+                originalInput.accountingDate().plusDays(1), "new-open-period-evidence", "原期间拒绝后选择新的开放记账日");
+        var next = asFinance(() -> resourcePreparing.prepare(report.id(), newInput)); resourceWorker.poll();
+        var ready = resourcePreparations.find("demo", next.preparationId()).orElseThrow(); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, ready)));
+        budgetReversalStatus = BudgetConsumptionReversalObservation.Status.APPLIED; resourceWorker.poll();
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isTrue();
+        assertThat(budgetReversals.find("demo", prepared.input().id())).contains(rejected);
+        assertThat(budgetReversals.find("demo", next.preparationId()).orElseThrow().input().command().period().request().accountingDate()).isEqualTo(newInput.accountingDate());
+        assertThat(budgetReversalWrites).isEqualTo(2); assertThat(resourceAdjustments.history("demo", report.id())).hasSize(2);
+    }
+
+    @Test void resourceWorkflowRetirementAndFirstDispatchClaimCannotBothWin() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report); asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        var input = resourceRetirementInput(report); var gate = new java.util.concurrent.CountDownLatch(1); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var retirement = pool.submit(() -> { gate.await(); try { asFinance(() -> resourceActions.retire(report.id(), input)); return "RETIRED"; }
+                catch (io.agentflow.common.DomainException conflict) { return "BLOCKED"; } });
+            var dispatch = pool.submit(() -> { gate.await(); try { return resourceBudgetExecution.claim("demo", prepared.input().id(), Instant.now()) == null ? "NONE" : "CLAIMED"; }
+                catch (io.agentflow.common.DomainException conflict) { return "BLOCKED"; } });
+            gate.countDown(); var ended = retirement.get(); var claimed = dispatch.get(); var operation = budgetReversals.find("demo", prepared.input().id()).orElseThrow();
+            if (ended.equals("RETIRED")) {
+                assertThat(claimed).isEqualTo("BLOCKED"); assertThat(operation.attempts()).isZero(); assertThat(resourceAdjustments.active("demo", report.id())).isEmpty();
+            } else {
+                assertThat(claimed).isEqualTo("CLAIMED"); assertThat(operation.status()).isEqualTo(BudgetConsumptionReversalOperation.Status.EXECUTING);
+                assertThat(resourceAdjustments.retirement("demo", prepared.input().id())).isEmpty(); assertThat(resourceAdjustments.active("demo", report.id())).isPresent();
+            }
+        } finally { pool.shutdownNow(); }
+        assertThat(budgetReversalWrites).isZero();
+    }
+
+    private ExpenseResourceAdjustmentPreparationService.PrepareInput resourcePreparationInput(ExpenseReport report) {
+        return new ExpenseResourceAdjustmentPreparationService.PrepareInput(1, app(report).version(), current(report).version(), settlements.find("demo", report.id()).orElseThrow().version(), LocalDate.now(), "full-cancellation-evidence", "独立核对后取消整笔报销");
+    }
+    private ExpenseResourceAdjustmentPreparation prepareResourceWorkflow(ExpenseReport report) {
+        var action = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report))); resourceWorker.poll();
+        return resourcePreparations.find("demo", action.preparationId()).orElseThrow();
+    }
+    private ExpenseResourceAdjustmentPreparationService.AuthorizeInput resourceAuthorizationInput(ExpenseReport report, ExpenseResourceAdjustmentPreparation value) {
+        return new ExpenseResourceAdjustmentPreparationService.AuthorizeInput(1, app(report).version(), current(report).version(), settlements.find("demo", report.id()).orElseThrow().version(), value.input().id(), value.version(), "确认原完整准备和预算冲正授权");
+    }
+    private ExpenseResourceAdjustmentActionService.OperationInput resourceActionInput(ExpenseReport report, ExpenseResourceAdjustmentActionService.Action action) {
+        var current = resourceAdjustments.active("demo", report.id()).orElseThrow(); var budget = budgetReversals.find("demo", current.id()).orElseThrow();
+        return new ExpenseResourceAdjustmentActionService.OperationInput(1, app(report).version(), current(report).version(), current.id(), current.version(), budget.version(), action, "核对原操作后明确继续办理");
+    }
+    private ExpenseResourceAdjustmentActionService.RetireInput resourceRetirementInput(ExpenseReport report) {
+        var current = resourceAdjustments.active("demo", report.id()).orElseThrow(); var budget = budgetReversals.find("demo", current.id()).orElseThrow();
+        return new ExpenseResourceAdjustmentActionService.RetireInput(1, app(report).version(), current(report).version(), current.id(), current.version(), budget.version(), "safe-retirement-evidence", "确认原命令未产生副作用后结束");
+    }
+
     private ExpenseResourceAdjustment readyResourceExecution(ExpenseReport report) {
         var adjustment = authorizeResourceAdjustment(readyResourceAdjustment(report)); var queued = budgetReversals.find("demo", adjustment.id()).orElseThrow(); var at = adjustmentTime();
         var claimed = queued.claim(at, java.time.Duration.ofSeconds(30)); var command = claimed.input().command();
@@ -2591,6 +2788,19 @@ class ExpenseSubmissionIntegrationTest {
     }
     private Object data(String operation, JsonNode data) {
         return switch (operation) {
+            case "budget-consumption-reversal-command", "budget-consumption-reversal-query" -> {
+                BudgetConsumptionReversalCommand command;
+                if (operation.equals("budget-consumption-reversal-command")) {
+                    budgetReversalWrites++; command = json.read(data.path("command").toString(), BudgetConsumptionReversalCommand.class); budgetReversalCommands.put(command.id(), command);
+                } else { budgetReversalQueries++; command = budgetReversalCommands.get(UUID.fromString(data.path("operationId").asText())); }
+                if (invalidBudgetReversalResponse) yield Map.of("invalidFixture", true);
+                var at = Instant.now(); boolean applied = budgetReversalStatus == BudgetConsumptionReversalObservation.Status.APPLIED;
+                yield new BudgetConsumptionReversalObservation(command.id(), command.digest(), budgetReversalStatus, at,
+                        applied ? command.consumed().ledgerRevision() + 1 : null, applied ? "synthetic-budget-reversal-" + command.id() : null,
+                        applied ? command.period().periodReference() : null, applied ? command.period().request().accountingDate() : null,
+                        applied ? budgetReversalAppliedAt.computeIfAbsent(command.id(), id -> at) : null,
+                        budgetReversalStatus == BudgetConsumptionReversalObservation.Status.REJECTED ? BudgetConsumptionReversalObservation.Rejection.ACCOUNTING_PERIOD_CLOSED : null);
+            }
             case "expense-payment-return" -> expenseReturnReceipt(json.read(data.toString(), ExpensePaymentReturnPort.Request.class));
             case "catalog" -> new FinanceCatalog("alice", "synthetic-v1", Instant.now().plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", paperRequired, "v1", legalTimeZone)),
                     List.of(new FinanceCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM))), List.of(new FinanceCatalog.CostCenter(entity, "IT", "研发")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
