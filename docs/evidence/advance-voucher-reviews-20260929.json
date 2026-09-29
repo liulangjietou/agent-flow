@@ -1,0 +1,178 @@
+{
+  "date": "2026-09-29",
+  "stage": "original-advance-voucher-review",
+  "schemaVersion": 60,
+  "result": "PASS",
+  "scope": "Local development and synthetic finance only",
+  "redRegression": {
+    "tests": 2,
+    "expectedAvailable": "0.00",
+    "actualBeforeFix": "55.00",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/advance-voucher-hold-red.log"
+  },
+  "tests": {
+    "h2Domain": 16,
+    "h2Server": 37,
+    "postgresDomain": 23,
+    "postgresServer": 106,
+    "frontend": 29,
+    "openApiJava": 5,
+    "overlappingScopes": true
+  },
+  "openApi": {
+    "operations": 174,
+    "schemas": 320,
+    "requestExamples": 61,
+    "actualBusinessResponses": 34
+  },
+  "httpRequestsIncludingLogins": [
+    14,
+    19,
+    6
+  ],
+  "upgrade": {
+    "result": "PASS",
+    "from": 59,
+    "to": 60,
+    "unchangedTables": [
+      "advance_repayment",
+      "advance_repayment_return",
+      "advance_repayment_resolution",
+      "repayment_review_check",
+      "repayment_review_check_revision",
+      "advance_repayment_check",
+      "advance_repayment_check_revision",
+      "payment_operation",
+      "payment_operation_revision",
+      "payment_authorization",
+      "voucher_operation",
+      "advance_disbursement_resolution",
+      "disbursement_return_check",
+      "disbursement_return_check_revision",
+      "advance_receipt_credit"
+    ],
+    "oldRevisionRowsPreserved": true,
+    "unchangedFiles": 4,
+    "balance": {
+      "version": 22,
+      "status": "VOUCHER_REVIEW",
+      "paid": {
+        "value": "300.00",
+        "currency": "CNY"
+      },
+      "available": {
+        "value": "0.00",
+        "currency": "CNY"
+      },
+      "reserved": {
+        "value": "0.00",
+        "currency": "CNY"
+      },
+      "offset": {
+        "value": "0.00",
+        "currency": "CNY"
+      },
+      "repaid": {
+        "value": "130.00",
+        "currency": "CNY"
+      },
+      "outstanding": {
+        "value": "100.00",
+        "currency": "CNY"
+      },
+      "receivedRepayments": {
+        "value": "300.00",
+        "currency": "CNY"
+      },
+      "returnedRepayments": {
+        "value": "170.00",
+        "currency": "CNY"
+      },
+      "returnedDisbursements": {
+        "value": "70.00",
+        "currency": "CNY"
+      }
+    },
+    "voucherHolds": [
+      "67ab2422-e63d-47b1-ba4a-0dfa73863523",
+      "8eb8139a-7caa-4e73-955e-377fb021f58b"
+    ]
+  },
+  "finalBalance": {
+    "version": 24,
+    "status": "PARTIALLY_SETTLED",
+    "paid": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "available": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "reserved": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "offset": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "repaid": {
+      "value": "130.00",
+      "currency": "CNY"
+    },
+    "outstanding": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "receivedRepayments": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "returnedRepayments": {
+      "value": "170.00",
+      "currency": "CNY"
+    },
+    "returnedDisbursements": {
+      "value": "70.00",
+      "currency": "CNY"
+    }
+  },
+  "oldRevisionAndDecisionRowsPreserved": true,
+  "unchangedTablesAfterAcceptance": [
+    "advance_repayment",
+    "advance_repayment_return",
+    "advance_repayment_resolution",
+    "repayment_review_check",
+    "repayment_review_check_revision",
+    "advance_repayment_check",
+    "advance_repayment_check_revision",
+    "payment_operation",
+    "payment_operation_revision",
+    "payment_authorization",
+    "advance_disbursement_resolution",
+    "disbursement_return_check",
+    "disbursement_return_check_revision",
+    "advance_receipt_credit"
+  ],
+  "originalCommandHashesPreserved": true,
+  "unchangedFiles": 4,
+  "backupBytes": 573682,
+  "backupRestoredForBaselineComparison": true,
+  "browser": {
+    "explicitSecondVoucherResolution": true,
+    "balanceExplicitlyRefreshed": true,
+    "narrowViewportRetested": false,
+    "heldScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/advance-voucher-hold-browser-held.png",
+    "restoredScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/advance-voucher-hold-browser-restored.png"
+  },
+  "authors": {
+    "javaFiles": 738,
+    "namedTypes": 1339,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remoteCiRun": false,
+  "realErpAcceptance": false,
+  "next": "Independent voucher reversals and expense payment returns"
+}

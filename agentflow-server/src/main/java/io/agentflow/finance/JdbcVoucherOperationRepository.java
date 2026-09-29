@@ -95,6 +95,16 @@ public class JdbcVoucherOperationRepository {
         return jdbc.query("SELECT * FROM voucher_operation WHERE tenant_id=? AND application_id=? AND round_no=? AND kind=?", row(), tenant, applicationId.toString(), round, kind.name()).stream().findFirst();
     }
 
+    /** 未经明确有效过账裁决的历史冲销或争议，在重新查询期间仍需冻结原借款。 */
+    public boolean requiresAdvanceReview(String tenant, UUID id) {
+        return jdbc.query("""
+                SELECT r.state_json FROM voucher_operation_revision r WHERE r.tenant_id=? AND r.operation_id=?
+                AND r.version>COALESCE((SELECT MAX(d.resolved_version) FROM voucher_dispute_resolution d
+                    WHERE d.tenant_id=r.tenant_id AND d.operation_id=r.operation_id AND d.outcome='POSTED'),0)
+                """, (row, index) -> json.read(row.getString("state_json"), VoucherOperation.class), tenant, id.toString())
+                .stream().anyMatch(value -> value.status() == VoucherOperation.Status.REVERSED || value.status() == VoucherOperation.Status.RECONCILING);
+    }
+
     /** 每批只扫描十个已到期任务，不在扫描中加载敏感凭证正文。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""

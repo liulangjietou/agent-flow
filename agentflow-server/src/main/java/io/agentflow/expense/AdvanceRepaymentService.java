@@ -79,6 +79,7 @@ public class AdvanceRepaymentService {
     /** 页面与确认共用守卫，另一位财务的新观测能使旧页面立即失效。 */
     public String confirmationIssue(AdvanceRepaymentSources.Source source, AdvanceRepaymentCheck check, Instant now) {
         if (!source.payment().settleable() || source.advance().paymentReviewRequired()) return "ADVANCE_PAYMENT_REVIEW_REQUIRED";
+        if (source.advance().voucherReviewRequired()) return "ADVANCE_VOUCHER_REVIEW_REQUIRED";
         if (source.advance().repaymentReviewRequired()) return "ADVANCE_REPAYMENT_REVIEW_REQUIRED";
         if (check == null || !check.usable(now)) return "ADVANCE_REPAYMENT_EVIDENCE_UNAVAILABLE";
         var receipt = check.receipt(); var request = check.input().request();

@@ -35,6 +35,17 @@ test('余额采用精确分，原借款绑定和资金守恒不允许跨轮次�
   assert.doesNotThrow(() => rules.validateRepaymentView(unpaid, binding()))
 })
 
+test('凭证冻结保留原余额事实并禁止将可用额或确认权伪装为恢复', () => {
+  const held = view(); held.balance.status = 'VOUCHER_REVIEW'; held.balance.available = money('0.00')
+  held.latestCheck.canRecord = false; held.latestCheck.confirmationIssue = 'ADVANCE_VOUCHER_REVIEW_REQUIRED'
+  assert.doesNotThrow(() => rules.validateRepaymentView(held, binding()))
+  assert.match(rules.repaymentIssue('ADVANCE_VOUCHER_REVIEW_REQUIRED'), /原借款.*凭证/)
+  assert.throws(() => rules.repaymentRecordInput(held, '仍有凭证争议'))
+  for (const change of [v => v.balance.available = money('100.00'), v => { v.latestCheck.canRecord = true; v.latestCheck.confirmationIssue = null }]) {
+    const invalid = clone(held); change(invalid); assert.throws(() => rules.validateRepaymentView(invalid, binding()))
+  }
+})
+
 test('查询与确认只发送引用和原版本，证据过期或说明为空不能继续', () => {
   const value = view(); value.amount = '999'; value.employeeId = 'forged'
   assert.deepEqual(rules.repaymentQueryInput(value, ' RECEIPT-1 ', ' 查询原收款 '), { advanceVersion: 1, receiptReference: 'RECEIPT-1', comment: '查询原收款' })

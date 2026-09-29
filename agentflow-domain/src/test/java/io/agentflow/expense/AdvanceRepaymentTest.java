@@ -76,6 +76,37 @@ class AdvanceRepaymentTest {
         assertThat(advance.repaid()).isEqualTo(money("20")); assertThat(advance.outstanding()).isEqualTo(money("80"));
     }
     @Test
+    void voucherHoldsPreserveLedgerAllowReleaseAndRequireEachOriginalDecision() {
+        var advance = advance(); var use = new ExpenseUse(UUID.randomUUID(), 1, 0); advance.reserve(1, use, money("40"));
+        advance.repay(2, repayment(advance, "kept", "20")); var ledger = advance.balance(); var repayments = advance.repayments();
+        var accrual = UUID.randomUUID(); var payment = UUID.randomUUID();
+        advance.requireVoucherReview(3, accrual); advance.requireVoucherReview(4, payment); var held = advance.state();
+        advance.requireVoucherReview(5, accrual); assertThat(advance.state()).isEqualTo(held);
+        assertThat(EmployeeAdvance.restore(held).state()).isEqualTo(held); assertThat(advance.available()).isEqualTo(money("0"));
+        assertThat(advance.balance()).isEqualTo(ledger); assertThat(advance.outstanding()).isEqualTo(money("80"));
+        fails("ADVANCE_VOUCHER_REVIEW_REQUIRED", () -> advance.reserve(5, use, money("41")));
+        fails("ADVANCE_VOUCHER_REVIEW_REQUIRED", () -> advance.settle(5, use));
+        fails("ADVANCE_VOUCHER_REVIEW_REQUIRED", () -> advance.move(5, use, new ExpenseUse(use.reportId(), 2, 0), money("40")));
+        fails("ADVANCE_VOUCHER_REVIEW_REQUIRED", () -> advance.repay(5, repayment(advance, "next", "1")));
+        fails("ADVANCE_VOUCHER_REVIEW_REQUIRED", () -> advance.resolveVoucherReview(5, UUID.randomUUID()));
+        advance.reserve(5, use, money("30")); advance.resolveVoucherReview(6, accrual);
+        assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.VOUCHER_REVIEW); assertThat(advance.voucherReviews()).containsExactly(payment);
+        advance.resolveVoucherReview(7, payment); assertThat(advance.available()).isEqualTo(money("50")); assertThat(advance.repayments()).isEqualTo(repayments);
+    }
+
+    @Test
+    void voucherResolutionNeverClearsIndependentPaymentOrRepaymentHolds() {
+        var advance = advance(); var original = EmployeeAdvance.restore(advance.state()); var repayment = repayment(advance, "r", "20");
+        advance.repay(1, repayment); advance.requireRepaymentReview(2, repayment.id()); advance.requirePaymentReview(3);
+        var voucher = UUID.randomUUID(); advance.requireVoucherReview(4, voucher); advance.resolveVoucherReview(5, voucher);
+        assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.PAYMENT_REVIEW);
+        advance.requireVoucherReview(6, voucher); advance.resolvePaymentReview(7, original);
+        assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.VOUCHER_REVIEW);
+        advance.resolveVoucherReview(8, voucher); assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.REPAYMENT_REVIEW);
+        assertThat(advance.available()).isEqualTo(money("0")); assertThat(advance.repaymentReviews()).containsExactly(repayment.id());
+    }
+
+    @Test
     void legacySnapshotsDefaultToNoRepaymentButDuplicateAndOverdrawnSnapshotsFail() {
         var advance = advance(); var s = advance.state(); var entry = repayment(advance, "r", "60").entry();
         assertThat(EmployeeAdvance.restore(new EmployeeAdvance.State(s.id(), s.tenantId(), s.legalEntityId(), s.employeeId(), s.paymentReference(), s.paidOn(), s.dueOn(), s.balance(), 1, false, null, false, null, null)).state()).isEqualTo(s);

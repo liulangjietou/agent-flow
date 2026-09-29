@@ -34,7 +34,7 @@ export function validateRepaymentReview(value: RepaymentReviewView, binding: Rep
   requireValue(value && value.original?.id === binding.repaymentId && value.balance)
   validateRepaymentView({ applicationId: value.applicationId, advanceId: value.advanceId, roundNo: value.roundNo, balance: value.balance, records: [value.original], latestCheck: null, canQuery: false, nextBeforeId: null }, binding)
   requireValue(typeof value.canQuery === 'boolean')
-  if (value.original.reviewRequired) requireValue(['PAYMENT_REVIEW', 'REPAYMENT_REVIEW'].includes(value.balance.status))
+  if (value.original.reviewRequired) requireValue(['PAYMENT_REVIEW', 'VOUCHER_REVIEW', 'REPAYMENT_REVIEW'].includes(value.balance.status))
   const check = value.latestCheck
   if (check !== null) {
     requireValue(check && known(repaymentReviewCheckLabels, check.status)); identifier(check.id); version(check.version)

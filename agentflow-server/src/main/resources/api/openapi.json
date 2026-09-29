@@ -30299,6 +30299,7 @@
               "PARTIALLY_SETTLED",
               "SETTLED",
               "PAYMENT_REVIEW",
+              "VOUCHER_REVIEW",
               "REPAYMENT_REVIEW",
               "RETURNED"
             ]
@@ -34317,6 +34318,7 @@
               "PARTIALLY_SETTLED",
               "SETTLED",
               "PAYMENT_REVIEW",
+              "VOUCHER_REVIEW",
               "REPAYMENT_REVIEW",
               "RETURNED"
             ]

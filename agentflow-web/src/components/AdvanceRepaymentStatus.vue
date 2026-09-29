@@ -117,6 +117,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
       <template v-else>
         <div class="balance-heading"><strong>{{ advanceBalanceLabels[view.balance.status] }}</strong><span>第 {{ view.roundNo }} 轮借款</span></div>
         <dl class="balance-grid"><div><dt>实际放款</dt><dd>{{ moneyLabel(view.balance.paid) }}</dd></div><div><dt>已报销冲销</dt><dd>{{ moneyLabel(view.balance.offset) }}</dd></div><div><dt>净有效还款</dt><dd>{{ moneyLabel(view.balance.repaid) }}</dd></div><div><dt>累计原收款</dt><dd>{{ moneyLabel(view.balance.receivedRepayments) }}</dd></div><div><dt>还款已退回</dt><dd>{{ moneyLabel(view.balance.returnedRepayments) }}</dd></div><div v-if="view.balance.returnedDisbursements"><dt>原放款已退回</dt><dd>{{ moneyLabel(view.balance.returnedDisbursements) }}</dd></div><div><dt>未还款</dt><dd class="remaining">{{ moneyLabel(view.balance.outstanding) }}</dd></div><div><dt>当前预留</dt><dd>{{ moneyLabel(view.balance.reserved) }}</dd></div><div><dt>可用余额</dt><dd>{{ moneyLabel(view.balance.available) }}</dd></div></dl>
+        <p v-if="view.balance.status === 'VOUCHER_REVIEW'" class="error">原借款挂账或付款凭证存在争议，后续使用已暂停。请在原凭证中完成财务核对；现有还款、预留和冲销记录保留。</p>
         <p v-if="view.balance.status === 'REPAYMENT_REVIEW'" class="error">已确认还款的外部记录发生变化，后续使用已暂停。原还款和报销冲销保留，请完成财务核对。</p>
         <article v-if="view.latestCheck" class="receipt" aria-label="原还款凭据查询结果">
           <h4>{{ repaymentCheckLabels[view.latestCheck.status] }}</h4><p>收款编号 {{ view.latestCheck.receiptReference }}</p>

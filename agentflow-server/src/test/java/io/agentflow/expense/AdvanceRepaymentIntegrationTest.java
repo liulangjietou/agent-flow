@@ -19,6 +19,7 @@ import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
@@ -75,6 +76,9 @@ class AdvanceRepaymentIntegrationTest {
     private String returnReference;
     private List<AdvanceRepaymentAdjustmentPort.ReturnItem> partialReturns;
     private final Map<UUID, AdvanceRepaymentAdjustmentPort.Receipt> returnFacts = new HashMap<>();
+    private VoucherObservation.Status voucherQueryStatus = VoucherObservation.Status.POSTED;
+    private long voucherQueryRevision = 1;
+    private boolean reverseVoucherBeforeReceipt, queryVoucherBeforeReceipt;
     private PaymentObservation.Status paymentStatus = PaymentObservation.Status.SUCCEEDED;
     private long paymentRevision = 1, disbursementRevision = 1;
     private AdvanceDisbursementReturnPort.Status disbursementStatus = AdvanceDisbursementReturnPort.Status.CONFIRMED;
@@ -100,6 +104,7 @@ class AdvanceRepaymentIntegrationTest {
     @Autowired AdvanceRequestCheckWorker precheckWorker;
     @Autowired VoucherPreparationWorker preparationWorker;
     @Autowired VoucherOperationWorker voucherWorker;
+    @Autowired VoucherOperationService voucherExecution;
     @Autowired JdbcVoucherOperationRepository vouchers;
     @Autowired PaymentExecutionRequestWorker executionWorker;
     @Autowired PaymentOperationWorker paymentWorker;
@@ -141,6 +146,37 @@ class AdvanceRepaymentIntegrationTest {
         }
     }
     @AfterAll static void stopServer() { SERVER.stop(0); }
+
+    @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})
+    void originalVoucherReversalFreezesLoanAndOnlyExplicitPostingResolutionRestoresIt(VoucherCommand.Kind kind) throws Exception {
+        var loan = paidLoan(); repay(loan, "kept-employee-repayment"); reserve(loan, "20"); var before = balance(loan);
+        voucherQueryStatus = VoucherObservation.Status.REVERSED; voucherQueryRevision = 2; queryVoucher(loan, kind);
+        assertThat(balance(loan).available()).as("An advance cannot be reused while its original accounting voucher is reversed").isEqualTo(money("0"));
+        assertThat(balance(loan).status().name()).isEqualTo("VOUCHER_REVIEW");
+        assertThat(balance(loan).outstanding()).isEqualTo(before.outstanding()); assertThat(balance(loan).repaid()).isEqualTo(before.repaid());
+        assertThat(balance(loan).balance()).isEqualTo(before.balance());
+        var blocked = query(loan, "held-voucher-repayment"); worker.poll();
+        assertThat(view(loan, "finance").at("/latestCheck/confirmationIssue").asText()).isEqualTo("ADVANCE_VOUCHER_REVIEW_REQUIRED");
+        code(send(path(loan) + "/repayments", "finance", recordInput(loan, blocked)), "ADVANCE_VOUCHER_REVIEW_REQUIRED");
+        voucherQueryStatus = VoucherObservation.Status.POSTED; voucherQueryRevision = 3; queryVoucher(loan, kind);
+        assertThat(balance(loan).status().name()).isEqualTo("VOUCHER_REVIEW");
+        var voucher = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow();
+        assertThat(voucher.status()).isEqualTo(VoucherOperation.Status.RECONCILING);
+        ok(send("/api/v1/applications/" + app(loan).id() + "/vouchers/" + voucher.input().command().id() + "/dispute-resolutions", "finance", Map.of(
+                "roundNo", 1, "applicationVersion", app(loan).version(), "businessVersion", request(loan).version(), "operationVersion", voucher.version(),
+                "outcome", "POSTED", "evidenceReference", "restored-original-posting", "comment", "独立核对原凭证有效过账")), 202);
+        assertThat(balance(loan).available()).isEqualTo(before.available()); assertThat(balance(loan).status()).isEqualTo(before.status());
+        assertThat(balance(loan).balance()).isEqualTo(before.balance()); assertThat(balance(loan).repayments()).isEqualTo(before.repayments());
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void incomingSuccessfulPaymentInheritsEarlierVoucherHoldIncludingDuringRequery(boolean requery) throws Exception {
+        reverseVoucherBeforeReceipt = true; queryVoucherBeforeReceipt = requery; var loan = paidLoan();
+        var original = vouchers.forRound("demo", app(loan).id(), 1, VoucherCommand.Kind.EMPLOYEE_ADVANCE).orElseThrow();
+        assertThat(balance(loan).voucherReviews()).containsExactly(original.input().command().id());
+        assertThat(balance(loan).balance().limit()).isEqualTo(money("100")); assertThat(balance(loan).available()).isEqualTo(money("0"));
+        var before = balance(loan).state(); queryOriginalPayment(loan); assertThat(balance(loan).state()).isEqualTo(before);
+    }
 
     @Test void bankReturnsAreCumulativeAndDistinctFromRepaymentsAndReservations() throws Exception {
         var loan = paidLoan(); amount = "20"; repay(loan, "employee-paid"); reserve(loan, "20");
@@ -581,7 +617,7 @@ class AdvanceRepaymentIntegrationTest {
         UUID payment = UUID.fromString(ok(send("/api/v1/applications/" + app(loan).id() + "/payments/authorizations", "finance", Map.of("roundNo", 1, "applicationVersion", app(loan).version(), "businessVersion", request(loan).version(), "voucherOperationId", voucher.input().command().id(), "voucherVersion", voucher.version(), "validitySeconds", 900, "comment", "合成授权")), 202).path("authorizationId").asText());
         ok(send("/api/v1/cashier/payments/" + payment + "/actions", "cashier", Map.of("action", "EXECUTE", "authorizationVersion", 1, "debitAccountReference", "debit-1", "debitAccountVersion", "v1", "comment", "合成执行")), 202);
         executionWorker.poll(); paymentWorker.poll(); assertThat(payments.find("demo", payment).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
-        preparationWorker.poll(); voucherWorker.poll(); assertThat(balance(loan).available()).isEqualTo(money("100")); return loan;
+        preparationWorker.poll(); voucherWorker.poll(); assertThat(balance(loan).available()).isEqualTo(money(reverseVoucherBeforeReceipt ? "0" : "100")); return loan;
     }
     private AdvanceDisbursementReturnPort.ReturnItem bankReturn(String reference, String value) {
         var now = Instant.now(); return new AdvanceDisbursementReturnPort.ReturnItem(
@@ -598,6 +634,12 @@ class AdvanceRepaymentIntegrationTest {
     }
     private JsonNode disbursementView(UUID loan, String user) throws Exception { return ok(read(path(loan) + "/disbursement-review", user), 200); }
     private UUID originalPayment(UUID loan) { return paymentCommands.values().stream().filter(value -> value.binding().businessId().equals(loan)).findFirst().orElseThrow().id(); }
+    private void queryVoucher(UUID loan, VoucherCommand.Kind kind) throws Exception {
+        var voucher = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow();
+        ok(send("/api/v1/applications/" + app(loan).id() + "/vouchers" + (kind == VoucherCommand.Kind.PAYMENT ? "/payment" : "") + "/actions", "finance", Map.of(
+                "action", "QUERY", "roundNo", 1, "applicationVersion", app(loan).version(), "businessVersion", request(loan).version(),
+                "operationId", voucher.input().command().id(), "operationVersion", voucher.version(), "comment", "读取原 ERP 凭证状态")), 202); voucherWorker.poll();
+    }
     private void queryOriginalPayment(UUID loan) throws Exception {
         UUID payment = originalPayment(loan);
         ok(send("/api/v1/payments/" + payment + "/finance-actions", "finance", Map.of("action", "QUERY", "authorizationVersion", paymentAuthorizations.find("demo", payment).orElseThrow().version(),
@@ -644,11 +686,12 @@ class AdvanceRepaymentIntegrationTest {
             case "voucher-command", "voucher-query" -> {
                 var command = operation.endsWith("command") ? json.read(data.path("command").toString(), VoucherCommand.class) : voucherCommands.get(UUID.fromString(data.path("operationId").asText()));
                 if (operation.endsWith("command")) voucherWrites++; voucherCommands.put(command.id(), command);
-                yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, at, "posting-" + command.id(), "voucher-" + command.id(), command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
+                yield new VoucherObservation(command.id(), command.digest(), operation.endsWith("query") ? voucherQueryStatus : VoucherObservation.Status.POSTED, operation.endsWith("query") ? voucherQueryRevision : 1L, at, "posting-" + command.id(), "voucher-" + command.id(), command.period().periodReference(), command.accountingDate(), command.totals().gross(), command.totals().gross(), command.createdAt(), null);
             }
             case "payment-command", "payment-query" -> {
                 var command = operation.endsWith("command") ? json.read(data.path("command").toString(), PaymentCommand.class) : paymentCommands.get(UUID.fromString(data.path("authorizationId").asText()));
                 if (operation.endsWith("command")) paymentWrites++; paymentCommands.put(command.id(), command);
+                if (operation.endsWith("command") && reverseVoucherBeforeReceipt) reverseOriginalWhilePaymentInFlight(command);
                 yield new PaymentObservation(command.id(), command.digest(), paymentStatus, paymentRevision, at, "funding-" + command.id(), command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "bank-" + command.id(), null);
             }
             case "advance-disbursement-return" -> {
@@ -680,6 +723,17 @@ class AdvanceRepaymentIntegrationTest {
             }
             default -> throw new IllegalStateException("Unexpected synthetic finance operation");
         };
+    }
+    private void reverseOriginalWhilePaymentInFlight(PaymentCommand payment) {
+        var original = vouchers.forRound("demo", payment.binding().applicationId(), payment.binding().roundNo(), VoucherCommand.Kind.EMPLOYEE_ADVANCE).orElseThrow();
+        var command = original.input().command(); var transaction = new TransactionTemplate(transactions);
+        transaction.executeWithoutResult(tx -> voucherExecution.query("demo", command.id(), original.version(), Instant.now()));
+        var claimed = voucherExecution.claim("demo", command.id(), Instant.now()); var now = Instant.now();
+        var reversed = new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.REVERSED, 2L, now,
+                "posting-" + command.id(), "voucher-" + command.id(), command.period().periodReference(), command.accountingDate(),
+                command.totals().gross(), command.totals().gross(), command.createdAt(), null);
+        voucherExecution.finish(claimed, new FinanceResult.Success<>(reversed), Instant.now());
+        if (queryVoucherBeforeReceipt) transaction.executeWithoutResult(tx -> voucherExecution.query("demo", command.id(), vouchers.find("demo", command.id()).orElseThrow().version(), Instant.now()));
     }
     private static HttpServer server() {
         try {

@@ -35,6 +35,13 @@ function mount() {
   return { props, state: instance.$.setupState, close() { app.unmount(); Object.assign(api, originalApi); global.fetch = originalFetch; bindAuthenticationActor(null) } }
 }
 
+test('原凭证同时冻结时仍可独立核对员工还款，不将凭证冻结当成已解除', () => {
+  const held = view(); held.balance.status = 'VOUCHER_REVIEW'
+  assert.doesNotThrow(() => rules.validateRepaymentReview(held, binding()))
+  held.balance.available = money('75.00')
+  assert.throws(() => rules.validateRepaymentReview(held, binding()))
+})
+
 test('原收款绑定、净额守恒、真实退回全额及独立借方分录不能被页面替换', () => {
   assert.doesNotThrow(() => rules.validateRepaymentReview(view(), binding()))
   for (const change of [v => v.original.id = 'other', v => v.roundNo = 2, v => v.balance.returnedRepayments.value = '25.00', v => v.latestCheck.evidence.fundsReturn.amount.value = '24.99', v => v.latestCheck.evidence.posting = null, v => v.latestCheck.evidence.originalRevision = 0, v => v.latestCheck.evidence.status = 'UNRESOLVED', v => v.latestCheck.evidence.validUntil = 'invalid', v => v.latestCheck.evidence.posting.accountingDate = '2026-02-31', v => v.original.reviewRequired = false, v => delete v.latestDecision]) {
