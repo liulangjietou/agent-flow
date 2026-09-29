@@ -30444,7 +30444,8 @@
             "enum": [
               "EXPENSE",
               "EXPENSE_PLAN",
-              "ADVANCE_REQUEST"
+              "ADVANCE_REQUEST",
+              "PROCUREMENT_PAYMENT"
             ]
           },
           "id": {

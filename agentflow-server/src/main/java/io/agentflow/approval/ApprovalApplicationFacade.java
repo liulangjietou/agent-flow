@@ -5,6 +5,7 @@ import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.expense.ExpenseFormContract;
 import io.agentflow.expense.ExpensePlanFormContract;
 import io.agentflow.expense.AdvanceRequestFormContract;
+import io.agentflow.procurement.ProcurementPaymentFormContract;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -89,12 +90,13 @@ public class ApprovalApplicationFacade {
         if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
         if (reference == null && (ExpenseFormContract.structured(formSchema) || ExpensePlanFormContract.structured(formSchema)
-                || AdvanceRequestFormContract.structured(formSchema))) throw businessEndpointRequired();
+                || AdvanceRequestFormContract.structured(formSchema) || ProcurementPaymentFormContract.structured(formSchema))) throw businessEndpointRequired();
         if (reference != null) {
             switch (reference.type()) {
                 case EXPENSE -> ExpenseFormContract.requireSchema(formSchema);
                 case EXPENSE_PLAN -> ExpensePlanFormContract.requireSchema(formSchema);
                 case ADVANCE_REQUEST -> AdvanceRequestFormContract.requireSchema(formSchema);
+                case PROCUREMENT_PAYMENT -> ProcurementPaymentFormContract.requireSchema(formSchema);
             }
         }
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);

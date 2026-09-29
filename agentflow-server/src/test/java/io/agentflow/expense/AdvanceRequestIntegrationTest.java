@@ -22,6 +22,7 @@ import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.OrganizationService;
 import io.agentflow.organization.OrganizationUnit;
+import io.agentflow.procurement.ProcurementPaymentFormContract;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -218,6 +219,21 @@ class AdvanceRequestIntegrationTest {
         for (String action : List.of("submit", "withdraw", "cancel")) code(send("/api/v1/applications/" + app(id).id() + "/" + action, "alice", Map.of("expectedVersion", 1)), "USE_BUSINESS_ENDPOINT");
         code(send(path(id) + "/submit", "alice", submission(id, UUID.randomUUID())), "NOT_FOUND");
         assertThat(app(id).status()).isEqualTo(ApplicationStatus.DRAFT); assertThat(paidAdvances.find("demo", id)).isEmpty();
+    }
+
+    @Test void genericApplicationCannotBypassTheReservedProcurementForm() throws Exception {
+        var original = published(false, false);
+        var access = Map.of("review", FieldVisibility.READ_ONLY, "finalReview", FieldVisibility.READ_ONLY);
+        var schema = new FormSchema(2, List.of(new FormSchema.Field(ProcurementPaymentFormContract.DETAILS, "采购应付明细", FormSchema.FieldType.TEXT,
+                true, null, null, null, null, null, null, null, true, access),
+                new FormSchema.Field("amount", "本次付款额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
+                new FormSchema.Field("currency", "币种", FormSchema.FieldType.TEXT, true, null, null, null, null, null)));
+        var draft = definitions.create("demo", "procurement-guard-" + UUID.randomUUID(), "采购付款入口隔离", original.graph(), schema, null);
+        var definition = definitions.publish(admin, draft.id(), draft.revision(), "采购付款入口验收");
+        String businessNo = "forged-procurement-" + UUID.randomUUID();
+        code(send("/api/v1/applications", "alice", Map.of("businessNo", businessNo, "processKey", definition.key(),
+                "definitionVersion", definition.version(), "title", "伪造采购付款", "payload", ProcurementPaymentFormContract.draftPayload())), "USE_BUSINESS_ENDPOINT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_application WHERE tenant_id='demo' AND business_no=?", Integer.class, businessNo)).isZero();
     }
 
     @Test void noHumanPathOrMaskedReviewCannotSubmitAndNoRoundSurvivesFailure() throws Exception {
