@@ -1,0 +1,104 @@
+{
+  "recordedAt": "2026-09-29T03:06:34.471197+00:00",
+  "scope": "Local implementation and synthetic finance acceptance only",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "b915909635de39dbf1a843615e7d72c421a0a254",
+  "migration": "V50__expense_archives.sql",
+  "tests": {
+    "h2": {
+      "expense": 45,
+      "migration": 1
+    },
+    "postgres": {
+      "expense": 45,
+      "payment": 31,
+      "voucher": 16,
+      "migration": 1
+    },
+    "contractH2": 5,
+    "frontend": 23,
+    "javaAuthors": {
+      "files": 659,
+      "namedTypes": 1174,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "openApi": {
+      "operations": 162,
+      "schemas": 275,
+      "requestExamples": 52
+    }
+  },
+  "http": {
+    "scope": "Local PostgreSQL V50, synthetic finance and actual HTTP",
+    "requests": 10,
+    "view": {
+      "reportId": "e00e96fa-24e1-4f43-a462-f754f2036187",
+      "applicationId": "ffe1557e-6467-47db-bda3-f64168259cfd",
+      "roundNo": 1,
+      "applicationVersion": 8,
+      "financialVersion": 2,
+      "status": "ARCHIVED",
+      "manifestSha256": "63ec287aac477553e5c3a2a872d59b1729c1907f14974918de9cf9d7b21555c3",
+      "archivedAt": "2026-09-29T02:57:45.221644Z",
+      "originalCount": 1,
+      "voucherCount": 1,
+      "issue": null,
+      "canDownload": true
+    },
+    "entries": [
+      "manifest.json",
+      "manifest.sha256",
+      "originals/caa1c533-02a6-40ed-ac63-7e6ada8e9ffa.pdf"
+    ],
+    "checks": {
+      "manifestDigest": true,
+      "originalBytesAndDigest": true,
+      "stableRepeatedPackage": true,
+      "fullOffsetNoBankReceipt": true,
+      "adminDenied": true,
+      "foreignRoundDenied": true,
+      "unknownQueryDenied": true
+    },
+    "package": "/fyoung/tmp/agentflow-remaining-20260928/expense-archive-http.zip"
+  },
+  "browser": {
+    "layout": {
+      "cards": [
+        {
+          "width": 372,
+          "x": 34,
+          "y": 544.2916870117188
+        },
+        {
+          "width": 372,
+          "x": 34,
+          "y": 628.0208740234375
+        }
+      ],
+      "overflow": false,
+      "text": "第 1 轮 · 电子档案刷新归档状态本轮报销、审批轨迹、核减记录、会计凭证、付款回单及发票原文件一起保留。资料齐全后由后台完成归档。原档案已归档归档时间2026/9/28 22:57:45资料数量1 份原文件 · 1 份凭证下载包包含清单校验文件，可核对保存的原始资料。后续争议请结合当前财务状态处理。下载本轮档案包",
+      "width": 480
+    },
+    "downloadResponseStatus": 200,
+    "downloadResponseType": "application/zip",
+    "downloadContentLength": 3910,
+    "downloadEvent": "unavailable in in-app browser",
+    "screenshots": [
+      "expense-archive-ui-desktop.png",
+      "expense-archive-ui-mobile.png"
+    ]
+  },
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "expense-archive-red.log",
+    "expense-archive-scope.log",
+    "expense-archive-postgres.log",
+    "expense-archive-ui.log",
+    "expense-archive-ui-build.log",
+    "expense-archive-package.log",
+    "expense-archive-authors.log",
+    "expense-archive-openapi.log"
+  ],
+  "remoteConfigured": false
+}

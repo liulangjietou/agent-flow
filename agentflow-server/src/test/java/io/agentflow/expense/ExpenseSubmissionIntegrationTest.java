@@ -51,7 +51,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
-        "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false"})
+        "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false", "agentflow.expenses.archive-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpenseSubmissionIntegrationTest {
     private static final HttpServer SERVER = server();
@@ -107,6 +107,10 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ApplicationRepository applications;
     @Autowired ExpenseReportRepository reports;
     @Autowired JdbcExpenseSettlementRepository settlements;
+    @Autowired JdbcExpenseArchiveRepository archives;
+    @Autowired ExpenseArchiveWorker archiveWorker;
+    @Autowired ExpenseArchiveService archiveService;
+    @Autowired ExpenseArchiveFiles archiveFiles;
     @Autowired ExpenseSettlementWorker settlementWorker;
     @Autowired ExpenseSettlementService settlementService;
     @Autowired ExpenseSettlementRegistration settlementRegistration;
@@ -155,6 +159,8 @@ class ExpenseSubmissionIntegrationTest {
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
+            jdbc.update("DELETE FROM expense_archive_original WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_archive WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_settlement WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", report.toString());
@@ -412,6 +418,9 @@ class ExpenseSubmissionIntegrationTest {
         var settled = settlements.find("demo", report.id()).orElseThrow(); assertThat(settled.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(settled.input().voucherOperationId()).isNull(); assertThat(settled.input().payment()).isNull();
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isZero();
+        pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow().archive();
+        assertThat(archive).isNotNull(); assertThat(archive.manifest().vouchers()).isEmpty();
+        assertThat(archive.manifest().expense().adjustments()).hasSize(1); assertThat(archive.manifest().originals()).hasSize(1);
     }
 
     @Test
@@ -751,6 +760,124 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(read(path + "?taskId=" + receiptTask, "finance").getStatus()).isEqualTo(403);
     }
 
+    @Test void archiveWaitsForBothSettlementAndPaymentVoucher() throws Exception {
+        var report = paidExpense();
+        var view = ok(read(path(report) + "/archive", "finance"), 200);
+        assertThat(view.path("status").asText()).isEqualTo("WAITING");
+        assertThat(view.path("issue").asText()).isEqualTo("ARCHIVE_SETTLEMENT_REQUIRED");
+        settlementWorker.poll(); budgetWorker.poll();
+        view = ok(read(path(report) + "/archive", "finance"), 200);
+        assertThat(view.path("status").asText()).isEqualTo("WAITING");
+        assertThat(view.path("canDownload").asBoolean()).isFalse();
+        pollArchive(); view = ok(read(path(report) + "/archive", "finance"), 200);
+        assertThat(view.path("status").asText()).isEqualTo("BLOCKED");
+        assertThat(view.path("issue").asText()).isEqualTo("ARCHIVE_PAYMENT_VOUCHER_REQUIRED");
+        assertCode(read(path(report) + "/archive/content", "finance"), "ARCHIVE_NOT_READY");
+    }
+
+    @Test void sealedArchiveContainsOriginalBytesAndStableEvidenceWithoutRepeatingFinancialEffects() throws Exception {
+        var report = archiveReadyExpense(); var versions = resourceVersions(report);
+        pollArchive(); var entry = archives.find("demo", report.id(), 1).orElseThrow();
+        assertThat(entry.archive()).isNotNull(); var manifest = entry.archive().manifest();
+        assertThat(manifest.vouchers()).extracting(ExpenseArchive.Voucher::kind).containsExactly(VoucherCommand.Kind.EXPENSE_ACCRUAL, VoucherCommand.Kind.PAYMENT);
+        assertThat(manifest.history()).anyMatch(event -> "APPROVE".equals(event.action()));
+        assertThat(manifest.control().paperReady()).isTrue();
+        assertThat(entry.encoded()).doesNotContain("targetDigest", "debitAccountReference", "bearerToken", "gateway");
+        byte[] zip = archiveDownload(report, "finance"); var contents = unzipArchive(zip);
+        assertThat(contents.get("manifest.json")).isEqualTo(entry.encoded().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(new String(contents.get("manifest.sha256"), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo(entry.sha256() + "  manifest.json\n");
+        var original = manifest.originals().get(0);
+        assertThat(contents.get(original.entryName())).isEqualTo(java.nio.file.Files.readAllBytes(DIRECTORY.resolve(original.file().id() + ".bin")));
+        pollArchive(); pollArchive();
+        assertThat(archiveDownload(report, "alice")).isEqualTo(zip);
+        assertThat(archives.find("demo", report.id(), 1).orElseThrow()).isEqualTo(entry);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_ARCHIVED'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
+        var response = read(path(report) + "/archive", "finance"); var view = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(view.path("issue").isNull()).isTrue();
+        assertThat(view.path("originalCount").asInt()).isEqualTo(1); assertThat(view.path("voucherCount").asInt()).isEqualTo(2);
+    }
+
+    @Test void missingOrDamagedOriginalBlocksArchiveAndDownloadWithoutReplacingFrozenReceipt() throws Exception {
+        var report = archiveReadyExpense(); var manifest = archiveService.prepare("demo", report.id());
+        var original = manifest.originals().get(0); var file = DIRECTORY.resolve(original.file().id() + ".bin"); var bytes = java.nio.file.Files.readAllBytes(file);
+        try {
+            java.nio.file.Files.write(file, new byte[] { 0, 1 }); pollArchive();
+            var entry = archives.find("demo", report.id(), 1).orElseThrow(); assertThat(entry.archive()).isNull(); assertThat(entry.issue()).isEqualTo("FILE_INTEGRITY_FAILED");
+            java.nio.file.Files.write(file, bytes); pollArchive(); pollArchive();
+            entry = archives.find("demo", report.id(), 1).orElseThrow(); assertThat(entry.archive()).isNotNull();
+            assertThat(entry.archive().manifest().originals().get(0)).isEqualTo(original);
+            java.nio.file.Files.write(file, new byte[] { 1 });
+            assertThat(ok(read(path(report) + "/archive/content", "finance"), 503).path("code").asText()).isEqualTo("FILE_INTEGRITY_FAILED");
+            assertThat(archives.find("demo", report.id(), 1).orElseThrow()).isEqualTo(entry);
+        } finally { java.nio.file.Files.write(file, bytes); }
+    }
+
+    @Test void bankReturnDuringFileCheckCannotSeal() throws Exception {
+        var report = archiveReadyExpense(); var candidate = archiveService.prepare("demo", report.id()); archiveFiles.verify(candidate);
+        var payment = paymentOperations.find("demo", candidate.settlement().input().payment().operationId()).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", payment.input().command().id(), payment.version(), Instant.now()));
+        paymentMode = "REVERSED"; paymentWorker.poll();
+        assertThatThrownBy(() -> archiveService.complete(candidate)).isInstanceOf(io.agentflow.common.DomainException.class).hasMessageContaining("not ready");
+        assertThat(archives.find("demo", report.id(), 1)).isEmpty();
+    }
+
+    @Test void paymentVoucherReversalKeepsOriginalArchiveAndShowsCurrentDispute() throws Exception {
+        var report = archiveReadyExpense(); pollArchive(); var entry = archives.find("demo", report.id(), 1).orElseThrow();
+        byte[] before = archiveDownload(report, "finance"); var path = voucherPath(report) + "/payment";
+        var view = ok(read(path, "finance"), 200); voucherMode = "REVERSED";
+        ok(send(path + "/actions", "finance", voucherInput(report, "QUERY", view.path("operation"))), 202); voucherWorker.poll();
+        var after = ok(read(path(report) + "/archive", "finance"), 200);
+        assertThat(after.path("status").asText()).isEqualTo("ARCHIVED"); assertThat(after.path("issue").asText()).isEqualTo("ARCHIVE_PAYMENT_VOUCHER_REQUIRED");
+        assertThat(after.path("canDownload").asBoolean()).isTrue(); assertThat(archiveDownload(report, "finance")).isEqualTo(before);
+        assertThat(archives.find("demo", report.id(), 1).orElseThrow()).isEqualTo(entry); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void archiveAccessAlwaysUsesOriginalRoundFieldsAndCurrentIdentity() throws Exception {
+        hideBusinessDetails = true; var report = archiveReadyExpense(); pollArchive(); String path = path(report) + "/archive";
+        ok(read(path, "finance"), 200); ok(read(path, "alice"), 200);
+        for (String user : List.of("bob", "cashier", "admin", "manager")) {
+            assertThat(read(path, user).getStatus()).isIn(403, 404); assertThat(read(path + "/content", user).getStatus()).isIn(403, 404);
+        }
+        assertThat(read(path + "?tenantId=other", "finance").getStatus()).isEqualTo(400);
+        assertThat(read(path + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(read(path + "/content", "finance").getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(archiveDownload(report, "alice")).isNotEmpty();
+    }
+
+    @Test void originalReferenceFailureRollsBackSealAndAuditTogether() throws Exception {
+        var report = archiveReadyExpense(); var candidate = archiveService.prepare("demo", report.id());
+        archiveService.block("demo", report.id(), "ARCHIVE_CHECK_PENDING"); var original = candidate.originals().get(0);
+        jdbc.update("INSERT INTO expense_archive_original(tenant_id,report_id,round_no,original_id) VALUES('demo',?,1,?)", report.id().toString(), original.file().id().toString());
+        assertThatThrownBy(() -> archiveService.complete(candidate)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(archives.find("demo", report.id(), 1).orElseThrow().archive()).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_ARCHIVED'", Integer.class, report.applicationId().toString())).isZero();
+        jdbc.update("DELETE FROM expense_archive_original WHERE tenant_id='demo' AND report_id=?", report.id().toString());
+        pollArchive(); assertThat(archives.find("demo", report.id(), 1).orElseThrow().archive()).isNotNull();
+    }
+
+    private void pollArchive() { archiveWorker.poll(); archiveWorker.poll(); }
+    private ExpenseReport archiveReadyExpense() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); voucherPreparationWorker.poll(); voucherWorker.poll(); return report;
+    }
+    private byte[] archiveDownload(ExpenseReport report, String user) throws Exception {
+        var pending = mvc.perform(get(path(report) + "/archive/content?roundNo=1").header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn();
+        assertThat(pending.getRequest().isAsyncStarted()).isTrue(); pending.getAsyncResult(5000);
+        var response = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch(pending)).andReturn().getResponse();
+        assertThat(response.getStatus()).isEqualTo(200); assertThat(response.getContentType()).isEqualTo("application/zip");
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return response.getContentAsByteArray();
+    }
+    private Map<String, byte[]> unzipArchive(byte[] value) throws Exception {
+        var entries = new LinkedHashMap<String, byte[]>();
+        try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(value))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) entries.put(entry.getName(), zip.readAllBytes());
+        }
+        return entries;
+    }
+
     @Test void confirmedExpensePaymentRegistersSettlementWithoutConsumingResourcesInsideTheBankCallback() throws Exception {
         var report = paidExpense(); var original = settlements.find("demo", report.id()).orElseThrow();
         assertThat(original.status()).isEqualTo(ExpenseSettlement.Status.QUEUED); assertThat(original.resourcesConsumed()).isFalse();
@@ -840,6 +967,9 @@ class ExpenseSubmissionIntegrationTest {
         settlementWorker.poll(); budgetWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().consumed()).isEqualTo(money("100"));
         assertThat(paymentAuthorizations.latest("demo", report.applicationId(), 1)).isEmpty(); assertThat(paymentWrites).isZero();
+        pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow().archive();
+        assertThat(archive).isNotNull(); assertThat(archive.manifest().vouchers()).extracting(ExpenseArchive.Voucher::kind).containsExactly(VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        assertThat(archive.manifest().settlement().input().payment()).isNull();
     }
 
     @Test void lateSuccessAfterApprovalRevocationIsRecordedButCannotConsume() throws Exception {

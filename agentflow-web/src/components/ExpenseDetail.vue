@@ -7,6 +7,7 @@ import ExpenseEditor from './ExpenseEditor.vue'
 import VoucherStatus from './VoucherStatus.vue'
 import FinancePaymentStatus from './FinancePaymentStatus.vue'
 import ExpenseSettlementStatus from './ExpenseSettlementStatus.vue'
+import ExpenseArchiveStatus from './ExpenseArchiveStatus.vue'
 const props = defineProps<{ reportId: string; applicationId: string; scopeKey: string; version?: number; taskId?: string; roundNo?: number; locked?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean] }>()
 const query = reactive(new ExpenseDetailQuery(api.expenseReport, api.expenseWorkflow))
@@ -75,6 +76,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
       <FinancePaymentStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :business-id="query.detail.id" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
       <VoucherStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" payment :application-id="query.detail.applicationId" :business-id="query.detail.id" business-type="EXPENSE" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
       <ExpenseSettlementStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :report-id="query.detail.id" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :financial-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
+      <ExpenseArchiveStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :report-id="query.detail.id" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :financial-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="locked" @busy="emit('busy', $event)" />
       </template>
     </template>
   </section>

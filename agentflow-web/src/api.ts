@@ -25,6 +25,7 @@ import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, A
 import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView } from './vouchers'
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
+import type { ExpenseArchiveView } from './expenseArchive'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
@@ -166,7 +167,7 @@ function historyQuery(query: object) {
   return params.size ? '?' + params.toString() : ''
 }
 
-async function request<T>(path: string, init: RequestInit = {}, format: 'json' | 'xlsx' | 'binary' = 'json'): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, format: 'json' | 'xlsx' | 'binary' | 'zip' = 'json'): Promise<T> {
   const headers = new Headers(init.headers)
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const token = localStorage.getItem('agentflow.token')
@@ -265,6 +266,15 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
     throw { status: response.status, code, message: messages[code] ?? message, details } satisfies ApiError
   }
   try {
+    if (format === 'zip') {
+      if (response.headers.get('Content-Type')?.split(';')[0] !== 'application/zip') throw new Error('Unexpected archive content type')
+      const blob = await response.blob()
+      if (blob.size < 22) throw new Error('Incomplete archive')
+      const head = new Uint8Array(await blob.slice(0, 4).arrayBuffer()), end = new Uint8Array(await blob.slice(-22).arrayBuffer())
+      if (head[0] !== 80 || head[1] !== 75 || head[2] !== 3 || head[3] !== 4
+          || end[0] !== 80 || end[1] !== 75 || end[2] !== 5 || end[3] !== 6 || end[20] !== 0 || end[21] !== 0) throw new Error('Incomplete archive directory')
+      return blob as T
+    }
     if (format === 'binary') {
       if (response.headers.get('Content-Type')?.split(';')[0] !== 'application/octet-stream') throw new Error('Unexpected attachment content type')
       return await response.blob() as T
@@ -295,6 +305,8 @@ export const api = {
   paymentVouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers/payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   paymentVoucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/payment/actions`, 'POST', '办理本轮付款凭证操作', input),
   expenseSettlement: (id: string, roundNo: number, signal: AbortSignal) => request<SettlementView>(`/expense-reports/${encodeURIComponent(id)}/settlement` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<ExpenseArchiveView>(`/expense-reports/${encodeURIComponent(id)}/archive` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  downloadExpenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<Blob>(`/expense-reports/${encodeURIComponent(id)}/archive/content` + historyQuery({ roundNo }), { signal, cache: 'no-store' }, 'zip'),
   retryExpenseSettlement: (id: string, input: SettlementRetry) => write<SettlementReceipt>(`/expense-reports/${encodeURIComponent(id)}/settlement/retry`, 'POST', '重新办理报销核销', input),
   financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),
   financePayment: (id: string, roundNo: number, signal: AbortSignal) => request<FinancePaymentView>(`/applications/${encodeURIComponent(id)}/payments` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
