@@ -60,6 +60,16 @@ public class JdbcPaymentOperationRepository {
                 OR (status IN ('CHECKING','SENDING','QUERYING') AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
     }
+    /** 旧版本的成功借款付款按原业务身份补建余额，不重新发送资金命令。 */
+    public List<Candidate> missingAdvanceBalances() {
+        return jdbc.query("""
+                SELECT p.tenant_id,p.id FROM payment_operation p
+                JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id
+                WHERE p.status='SUCCEEDED' AND a.purpose='EMPLOYEE_ADVANCE'
+                AND NOT EXISTS (SELECT 1 FROM finance_resource r WHERE r.tenant_id=a.tenant_id AND r.resource_type='ADVANCE' AND r.id=a.business_id)
+                ORDER BY p.updated_at,p.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))));
+    }
     private RowMapper<PaymentOperation> row() {
         return (row, index) -> {
             var value = json.read(row.getString("state_json"), PaymentOperation.class); var command = value.input().command();

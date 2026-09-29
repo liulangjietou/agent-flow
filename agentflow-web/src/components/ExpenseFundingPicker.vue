@@ -11,7 +11,7 @@ const current = computed(() => kind.value === 'invoices' ? invoices : kind.value
 const selectedLine = computed(() => content.value.lines.find(line => line.lineNo === lineNo.value))
 const availableInvoices = computed(() => invoices.items.filter(item => invoiceSelectable(item, content.value.legalEntityId, props.reportId)))
 const legalRequests = computed(() => requests.items.filter(item => item.legalEntityId === content.value.legalEntityId))
-const legalAdvances = computed(() => advances.items.filter(item => item.legalEntityId === content.value.legalEntityId && item.paid.currency === props.baseCurrency && item.status !== 'SETTLED'))
+const legalAdvances = computed(() => advances.items.filter(item => item.legalEntityId === content.value.legalEntityId && item.paid.currency === props.baseCurrency && ['PAID_OUT', 'PARTIALLY_SETTLED'].includes(item.status)))
 function clear() { invoices.clear(); requests.clear(); advances.clear() }
 function load(more = false) { return current.value.load(props.scopeKey, undefined, more) }
 function addInvoice(item: InvoiceItem) {

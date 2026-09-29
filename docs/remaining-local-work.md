@@ -48,4 +48,4 @@
 
 机器可读检查点为 `/fyoung/tmp/agentflow-completion-checkpoint-01a0dfed.json`。恢复时以当前分支 HEAD 和检查点为准，历史报告中的“尚未开发/未验收”应与本清单和新证据对照，避免反复处理已完成的事项。
 
-凭证从真实批准金额派生、持久执行与原操作恢复已完成，见 [凭证持久执行](voucher-operations.md)。85 项范围测试和 10 项 PostgreSQL 测试通过（范围重叠）；最终批准后的自动准备已完成，见 [准备链路](voucher-preparation.md)；财务状态与操作页面已完成，见 [凭证工作区](voucher-workspace.md)。付款账户端口、授权及执行领域模型和 V45 持久状态已完成，见 [付款持久状态](payment-persistence.md)；实际批准来源与后台执行器已通过本地和回环 HTTP 验证，见 [付款执行](payment-execution.md)；V46 已接入出纳选择的事务外复查及原子执行登记，见 [执行请求](payment-execution-requests.md)。财务／出纳办理入口与页面已完成，见 [付款工作区](payment-workspace.md)；到账结算、真实资金联调、资源核销及归档继续实施。
+凭证从真实批准金额派生、持久执行与原操作恢复已完成，见 [凭证持久执行](voucher-operations.md)。85 项范围测试和 10 项 PostgreSQL 测试通过（范围重叠）；最终批准后的自动准备已完成，见 [准备链路](voucher-preparation.md)；财务状态与操作页面已完成，见 [凭证工作区](voucher-workspace.md)。付款账户端口、授权及执行领域模型和 V45 持久状态已完成，见 [付款持久状态](payment-persistence.md)；实际批准来源与后台执行器已通过本地和回环 HTTP 验证，见 [付款执行](payment-execution.md)；V46 已接入出纳选择的事务外复查及原子执行登记，见 [执行请求](payment-execution-requests.md)。财务／出纳办理入口与页面已完成，见 [付款工作区](payment-workspace.md)；借款到账结算已完成，见 [实际余额生成](advance-disbursement.md)；报销资源核销、零应付结算、付款凭证、归档和真实资金联调继续实施。

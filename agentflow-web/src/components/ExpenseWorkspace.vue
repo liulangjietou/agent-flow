@@ -13,7 +13,7 @@ const editing = ref(false)
 const reports = reactive(new ExpensePageQuery(api.expenseReports)), requests = reactive(new ExpensePageQuery(api.expenseRequests)), advances = reactive(new ExpensePageQuery(api.employeeAdvances))
 const current = computed(() => tab.value === 'reports' ? reports : tab.value === 'requests' ? requests : advances)
 const tabs = [{ id: 'borrowings' as const, label: '我的借款申请' }, { id: 'plans' as const, label: '我的事前申请' }, { id: 'reports' as const, label: '我的报销' }, { id: 'invoices' as const, label: '个人票夹' }, { id: 'requests' as const, label: '事前批准额度' }, { id: 'advances' as const, label: '已放款借款' }]
-const advanceStatus: Record<string, string> = { PAID_OUT: '已放款', PARTIALLY_SETTLED: '部分冲销', SETTLED: '已结清' }
+const advanceStatus: Record<string, string> = { PAID_OUT: '已放款', PARTIALLY_SETTLED: '部分冲销', SETTLED: '已结清', PAYMENT_REVIEW: '付款待核对，暂停使用' }
 function clear() { reports.clear(); requests.clear(); advances.clear() }
 function load(more = false) { if (!['invoices', 'plans', 'borrowings'].includes(tab.value)) return current.value.load(props.scopeKey, tab.value === 'reports' ? status.value || undefined : undefined, more) }
 watch(() => [props.scopeKey, props.refreshVersion, tab.value, status.value], () => { clear(); void load() }, { immediate: true, flush: 'sync' })

@@ -5,6 +5,7 @@ import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,20 @@ class FinancialResourceRepositoryTest {
     @Autowired ExpenseReportRepository reports;
     @Autowired ApplicationRepository applications;
     @Autowired JdbcTemplate jdbc;
+    @Autowired JsonUtil json;
+
+    @Test
+    void preSettlementStoredAdvanceLoadsWithoutReviewFlagAndRetainsBalances() {
+        var advance = advance("demo", "legacy-payment-" + UUID.randomUUID()); advances.create(advance, "fixture");
+        var state = json.read(json.write(advance.state()), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        state.remove("paymentReviewRequired");
+        jdbc.update("UPDATE finance_resource SET state_json=? WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", json.write(state), advance.id().toString());
+        var restored = advances.find("demo", advance.id()).orElseThrow();
+        assertThat(restored.state()).isEqualTo(advance.state());
+        restored.requirePaymentReview(1); advances.update(restored, 1, "payment-settlement", "PAYMENT_REVIEW");
+        assertThat(advances.find("demo", advance.id()).orElseThrow().available()).isEqualTo(money("0"));
+        assertThat(revisions("ADVANCE", "demo", advance.id())).isEqualTo(2);
+    }
 
     @Test
     void distinctFilesOfTheSameInvoiceRaceForOneCanonicalClaim() throws Exception {
@@ -132,7 +147,7 @@ class FinancialResourceRepositoryTest {
         fails("FINANCIAL_RESOURCE_EXISTS", () -> advances.create(advance("demo", source), "gateway"));
         var state = advance.state();
         var forged = EmployeeAdvance.restore(new EmployeeAdvance.State(state.id(), state.tenantId(), state.legalEntityId(), state.employeeId(), state.paymentReference(),
-                state.paidOn(), state.dueOn(), ReservedAmount.available(money("1000")), state.version()));
+                state.paidOn(), state.dueOn(), ReservedAmount.available(money("1000")), state.version(), state.paymentReviewRequired()));
         forged.reserve(1, new ExpenseUse(report("demo").id(), 1, 0), money("200"));
         fails("CONCURRENCY_CONFLICT", () -> advances.update(forged, 1, "alice", "RESERVE"));
         assertThat(advances.find("demo", advance.id()).orElseThrow().balance().limit()).isEqualTo(money("100"));

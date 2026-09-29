@@ -132,6 +132,34 @@ class ExpenseResourcesTest {
     }
 
     @Test
+    void delayedDisbursementRetainsOriginalDueDateAndIsOverdueOnlyAfterItActuallyArrives() {
+        var paidOn = DUE.plusDays(2);
+        var advance = new EmployeeAdvance(UUID.randomUUID(), "demo", ENTITY, "alice", money("100"), "delayed-payment", paidOn, DUE);
+        assertThat(advance.paidOn()).isEqualTo(paidOn);
+        assertThat(advance.dueOn()).isEqualTo(DUE);
+        assertThat(advance.overdue(DUE.plusDays(1))).isFalse();
+        assertThat(advance.overdue(paidOn)).isTrue();
+        assertThat(EmployeeAdvance.restore(advance.state()).state()).isEqualTo(advance.state());
+    }
+
+    @Test
+    void disputedPaymentPreservesLedgerAndOnlyAllowsReservationReductionOrRelease() {
+        var advance = advance(); var retained = use(0); var consumed = use(0);
+        advance.reserve(1, retained, money("40")); advance.reserve(2, consumed, money("30")); advance.settle(3, consumed);
+        advance.requirePaymentReview(4);
+        assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.PAYMENT_REVIEW);
+        assertThat(advance.available()).isEqualTo(money("0"));
+        assertThat(advance.balance().available()).isEqualTo(money("30"));
+        assertThat(advance.balance().consumed()).isEqualTo(money("30"));
+        fails("ADVANCE_PAYMENT_REVIEW_REQUIRED", () -> advance.reserve(5, use(0), money("1")));
+        fails("ADVANCE_PAYMENT_REVIEW_REQUIRED", () -> advance.move(5, retained, new ExpenseUse(retained.reportId(), 2, 0), money("40")));
+        fails("ADVANCE_PAYMENT_REVIEW_REQUIRED", () -> advance.settle(5, retained));
+        advance.reserve(5, retained, money("20")); advance.reserve(6, retained, money("0"));
+        assertThat(EmployeeAdvance.restore(advance.state()).paymentReviewRequired()).isTrue();
+        advance.requirePaymentReview(7); assertThat(advance.version()).isEqualTo(7);
+    }
+
+    @Test
     void advanceRequiresWholeReportReferencesAndRetainsItsBalanceAfterRejectedChanges() {
         var advance = advance(); var use = use(0); advance.reserve(1, use, money("80"));
         fails("INVALID_ADVANCE_OFFSET", () -> advance.reserve(2, use(1), money("1")));

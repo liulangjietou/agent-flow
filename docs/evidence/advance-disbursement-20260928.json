@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-28",
+  "status": "LOCAL_ADVANCE_DISBURSEMENT_ACCEPTANCE_PASSED",
+  "syntheticFinance": true,
+  "enterpriseAcceptance": false,
+  "tests": {
+    "h2Domain": 23,
+    "h2ServerBeforeFinalCompatibilityAndProjectionAssertions": 63,
+    "finalPostgresqlScope": 59,
+    "frontendScope": 53,
+    "scopesOverlap": true,
+    "build": "PASS",
+    "openapi": {"operations": 156, "schemas": 269, "requestExamples": 51},
+    "javaAuthors": {"files": 631, "namedTypes": 1125, "missing": 0, "parseErrors": 0}
+  },
+  "regressions": [
+    {"case": "Delayed arrival retains original due date", "previousGap": "Existing fixtures always paid before the due date", "red": "advance-delayed-disbursement-red.log", "green": "advance-disbursement-scope.log"},
+    {"case": "Successful payment creates real balance", "previousGap": "Previous stage exercised payment facts without an actual settlement consumer", "red": "advance-disbursement-red.log", "green": "advance-disbursement-scope.log"}
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": ["advance-disbursement-scope.log", "advance-disbursement-postgres.log", "advance-disbursement-ui.log", "advance-disbursement-ui-build.log", "advance-disbursement-package.log"],
+  "httpEvidence": "advance-disbursement-ui-http-evidence.json",
+  "httpChecks": 11,
+  "browser": {
+    "result": "PASS",
+    "screenshot": "advance-disbursement-ui-paid.png",
+    "applicationId": "fbd0c472-4a8f-40f3-8c72-142b0a64ea41",
+    "advanceId": "15b71173-0aef-4d0f-a89e-292e9951dc71",
+    "paymentReference": "UI-PAYMENT-25b50dd7",
+    "paid": {"value": "300.00", "currency": "CNY"},
+    "available": {"value": "300.00", "currency": "CNY"},
+    "paidOn": "2026-09-29",
+    "dueOn": "2026-10-12",
+    "frozenLegalEntityTimeZone": "UTC",
+    "balanceCount": 1,
+    "balanceRevisionCount": 1,
+    "originalPaymentStateUnchanged": true
+  },
+  "remaining": ["Expense resource consumption and zero-payable closure", "Payment voucher and archive", "Manual dispute resolution", "Enterprise finance acceptance"]
+}

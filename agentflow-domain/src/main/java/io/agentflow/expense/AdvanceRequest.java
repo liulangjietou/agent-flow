@@ -3,9 +3,13 @@ package io.agentflow.expense;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.EmployeeAccountPort;
 import io.agentflow.finance.FinanceCatalog;
+import io.agentflow.finance.PaymentCommand;
+import io.agentflow.finance.PaymentOperation;
 import io.agentflow.organization.InitiatorContext;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -73,6 +77,22 @@ public final class AdvanceRequest {
     public AdvanceRequestRound currentRound() {
         if (rounds.isEmpty()) throw new DomainException("ADVANCE_NOT_SUBMITTED", "Advance request has not been submitted");
         return rounds.get(rounds.size() - 1);
+    }
+
+    /** 以原批准和无矛盾的成功回执生成固定借款身份；迟到资金不能被当前审批状态抹掉。 */
+    public EmployeeAdvance paidAdvance(PaymentOperation payment) {
+        var command = payment.input().command(); var binding = command.binding();
+        if (!payment.settleable() || command.purpose() != PaymentCommand.Purpose.EMPLOYEE_ADVANCE || approval == null
+                || !tenantId.equals(command.tenantId()) || !id.equals(binding.businessId()) || !applicationId.equals(binding.applicationId())
+                || binding.roundNo() != approval.roundNo() || binding.applicationVersion() != approval.applicationVersion()
+                || binding.businessVersion() != version || !employeeId.equals(command.payee().employeeId())
+                || !currentRound().account().equals(command.payee()) || !currentRound().content().amount().equals(command.amount())
+                || command.authorization().authorizedAt().isBefore(approval.approvedAt())) {
+            throw new DomainException("ADVANCE_PAYMENT_MISMATCH", "Successful payment must match original approved advance terms");
+        }
+        var receipt = payment.observation();
+        var paidOn = LocalDate.ofInstant(receipt.completedAt(), ZoneId.of(currentRound().legalEntity().timeZone()));
+        return new EmployeeAdvance(id, tenantId, content.legalEntityId(), employeeId, receipt.paidAmount(), receipt.paymentReference(), paidOn, content.dueOn());
     }
 
     /** 完整恢复时核对连续轮次、身份、内容与批准版本，损坏的事实不能进入结算。 */

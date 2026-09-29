@@ -85,7 +85,7 @@ public class ExpenseWorkspaceQuery {
         for (var id : ids.stream().limit(page.limit()).toList()) {
             var value = values.get(id); var balance = value.balance();
             items.add(new AdvanceItem(id, value.legalEntityId(), value.version(), value.status(), value.paidOn(), value.dueOn(),
-                    balance.limit(), balance.available(), balance.reserved(), balance.consumed()));
+                    balance.limit(), value.available(), balance.reserved(), balance.consumed()));
         }
         return new AdvancePage(items, ids.size() > page.limit() ? items.get(items.size() - 1).id() : null);
     }

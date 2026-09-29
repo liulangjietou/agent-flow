@@ -70,6 +70,7 @@ class PaymentOperationIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
     @Autowired ApplicationRepository applications;
     @Autowired AdvanceRequestRepository advances;
+    @Autowired EmployeeAdvanceRepository balances;
     @Autowired OrganizationRepository organization;
     @Autowired PaymentPersonnel personnel;
     @Autowired JdbcVoucherOperationRepository vouchers;
@@ -79,6 +80,7 @@ class PaymentOperationIntegrationTest {
     @Autowired JdbcPaymentOperationRepository operations;
     @Autowired PaymentOperationService execution;
     @Autowired PaymentOperationWorker worker;
+    @Autowired AdvanceDisbursementService disbursements;
     @Autowired JdbcPaymentExecutionRequestRepository executionRequests;
     @Autowired PaymentExecutionRequestService requestService;
     @Autowired PaymentExecutionRequestWorker requestWorker;
@@ -120,6 +122,20 @@ class PaymentOperationIntegrationTest {
         assertThat(jdbc.queryForList("SELECT version FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=? ORDER BY version", Long.class, job.input().command().id().toString())).containsExactly(1L, 2L, 3L, 4L);
         assertThat(operations.find("foreign", job.input().command().id())).isEmpty();
     }
+    @Test void successfulPaymentCreatesOneActualBalanceAndQueriesCannotResetIt() {
+        var job = job(); var id = job.input().command().binding().businessId();
+        assertThat(balances.find("demo", id)).isEmpty();
+        worker.poll();
+        var advance = balances.find("demo", id).orElseThrow();
+        assertThat(advance.balance().limit()).isEqualTo(job.input().command().amount());
+        assertThat(advance.paymentReference()).isEqualTo(reload(job).observation().paymentReference());
+        assertThat(advance.dueOn()).isEqualTo(advances.find("demo", id).orElseThrow().currentRound().content().dueOn());
+        recheck(job); worker.poll();
+        assertThat(balances.find("demo", id).orElseThrow().state()).isEqualTo(advance.state());
+        assertThat(balances.find("foreign", id)).isEmpty();
+        assertThat(WRITES.get()).isEqualTo(1);
+    }
+
     @Test void rollbackAndTransactionGuardPreventAnyExternalRequest() {
         var authorization = authorized();
         assertThatThrownBy(() -> tx().executeWithoutResult(status -> { register(authorization); throw new IllegalStateException("Synthetic rollback"); })).isInstanceOf(IllegalStateException.class);
@@ -181,12 +197,48 @@ class PaymentOperationIntegrationTest {
         var sending = execution.readyToSend(checking, directory(at), account(at), at); assertThat(sending).isNotNull(); revoke(job);
         worker.poll(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.UNKNOWN); worker.poll();
         var done = reload(job); assertThat(done.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isZero();
+        assertThat(balances.find("demo", job.input().command().binding().businessId())).isPresent();
         execution.finish(sending, new FinanceResult.Success<>(paid(job.input().command(), 1)), now()); assertThat(reload(job)).isEqualTo(done);
     }
     @Test void localSettlementFailureRollsBackThenOnlyQueriesOriginalPayment() {
         var job = job(); listener.reject.set(true); worker.poll(); var unknown = reload(job);
         assertThat(unknown.status()).isEqualTo(PaymentOperation.Status.UNKNOWN); assertThat(unknown.observation()).isNull(); assertThat(WRITES.get()).isEqualTo(1);
+        assertThat(balances.find("demo", job.input().command().binding().businessId())).isEmpty();
         recheck(job); worker.poll(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1);
+        assertThat(balances.find("demo", job.input().command().binding().businessId())).isPresent();
+    }
+
+    @Test void oldSuccessfulPaymentIsRecoveredWithoutAnotherSendOrQuery() {
+        var job = job(); worker.poll(); var id = job.input().command().binding().businessId();
+        jdbc.update("DELETE FROM finance_resource_revision WHERE tenant_id='demo' AND resource_type='ADVANCE' AND resource_id=?", id.toString());
+        jdbc.update("DELETE FROM finance_resource WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", id.toString());
+        assertThat(operations.missingAdvanceBalances()).extracting(JdbcPaymentOperationRepository.Candidate::id).contains(job.input().command().id());
+        worker.poll(); disbursements.recover("demo", job.input().command().id());
+        assertThat(balances.find("demo", id).orElseThrow().version()).isEqualTo(1);
+        assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero();
+    }
+
+    @Test void reversalFreezesThePaidBalanceAndRepeatedReceiptDoesNotEraseIt() {
+        var job = job(); worker.poll(); var id = job.input().command().binding().businessId(); var original = balances.find("demo", id).orElseThrow();
+        var success = reload(job).observation(); var returnedAt = now(); var reversed = new PaymentObservation(success.authorizationId(), success.commandDigest(), PaymentObservation.Status.REVERSED,
+                2L, returnedAt, success.paymentReference(), success.paidAmount(), success.accountDigest(), returnedAt, "returned-" + job.input().command().id(), null);
+        RESPONDER.set((path, data) -> path.endsWith("payment-query") ? reversed : response(path, data));
+        recheck(job); worker.poll();
+        var held = balances.find("demo", id).orElseThrow(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.REVERSED);
+        assertThat(held.paymentReviewRequired()).isTrue(); assertThat(held.balance()).isEqualTo(original.balance());
+        assertThat(held.available()).isEqualTo(Money.zero("CNY")); assertThat(held.version()).isEqualTo(2);
+        recheck(job); worker.poll(); assertThat(balances.find("demo", id).orElseThrow().state()).isEqualTo(held.state());
+    }
+
+    @Test void conflictingReceiptFreezesTheOriginalBalanceWithoutReplacingItsPaymentReference() {
+        var job = job(); worker.poll(); var success = reload(job).observation();
+        var conflict = new PaymentObservation(success.authorizationId(), success.commandDigest(), PaymentObservation.Status.SUCCEEDED, 1L, now(),
+                "different-bank-reference", success.paidAmount(), success.accountDigest(), success.completedAt(), success.receiptReference(), null);
+        RESPONDER.set((path, data) -> path.endsWith("payment-query") ? conflict : response(path, data)); recheck(job); worker.poll();
+        assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.RECONCILING);
+        var held = balances.find("demo", job.input().command().binding().businessId()).orElseThrow();
+        assertThat(held.paymentReviewRequired()).isTrue(); assertThat(held.paymentReference()).isEqualTo(success.paymentReference());
+        assertThat(held.balance().limit()).isEqualTo(success.paidAmount());
     }
     @Test void missingAfterUncertainSendRequiresExplicitOriginalResendAndFreshAccountReads() {
         var job = job(); RESPONDER.set((path, request) -> path.endsWith("payment-command") ? Map.of("invalid", true) : response(path, request)); worker.poll();
@@ -322,7 +374,7 @@ class PaymentOperationIntegrationTest {
                 List.of(new PaymentAccountsPort.DebitAccount("debit-1", "业务账户", "****5678", "CNY", "v1")));
     }
     private static EmployeeAccountPort.Account account(Instant at) { return new EmployeeAccountPort.Account(new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1"), at.plusSeconds(600)); }
-    private static PaymentObservation paid(PaymentCommand command, long revision) { return new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, revision, now(), "bank-1", command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "receipt-1", null); }
+    private static PaymentObservation paid(PaymentCommand command, long revision) { return new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.SUCCEEDED, revision, now(), "bank-" + command.id(), command.amount(), command.payee().accountDigest(), command.authorization().authorizedAt(), "receipt-" + command.id(), null); }
     private static PaymentObservation missing(PaymentCommand command) { return new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.NOT_FOUND, 0L, now(), null, null, null, null, null, null); }
     private static Object response(String path, JsonNode request) {
         if (path.endsWith("debit-accounts")) return directory(now());

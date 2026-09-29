@@ -678,6 +678,13 @@ class ExpenseSubmissionIntegrationTest {
         var loansResponse = read("/api/v1/employee-advances?limit=100", "alice");
         assertThat(loansResponse.getHeader("Cache-Control")).isEqualTo("no-store");
         assertThat(loansResponse.getContentAsString()).doesNotContain("synthetic-payment", "paymentReference", "account", "reservations");
+        var held = advances.find("demo", first.advance()).orElseThrow(); long oldVersion = held.version();
+        held.requirePaymentReview(oldVersion); advances.update(held, oldVersion, "payment-settlement", "PAYMENT_REVIEW");
+        var heldView = java.util.stream.StreamSupport.stream(ok(read("/api/v1/employee-advances?limit=100", "alice"), 200).path("items").spliterator(), false)
+                .filter(item -> item.path("id").asText().equals(first.advance().toString())).findFirst().orElseThrow();
+        assertThat(heldView.path("status").asText()).isEqualTo("PAYMENT_REVIEW");
+        assertThat(heldView.path("available").path("value").asText()).isEqualTo("0.00");
+        assertThat(heldView.path("paid").path("value").asText()).isEqualTo("200.00");
         assertThat(ok(read("/api/v1/employee-advances", "bob"), 200).path("items")).isEmpty();
         assertThat(read("/api/v1/expense-reports?beforeId=" + first.report().id(), "bob").getStatus()).isEqualTo(400);
         assertThat(read("/api/v1/employee-advances?beforeId=" + first.advance(), "bob").getStatus()).isEqualTo(400);

@@ -203,13 +203,13 @@ test('实际资源选择器过滤法人、失效发票和他单占用，单据�
 
 test('实际资源选择器仅引用当前法人的开放批准行与本位币借款', async () => {
   api.expenseRequests = async () => ({ items: [{ id: 'prior', legalEntityId: 'legal', closed: false, lines: [{ lineNo: 5 }] }, { id: 'closed', legalEntityId: 'legal', closed: true, lines: [{ lineNo: 6 }] }] })
-  api.employeeAdvances = async () => ({ items: [{ id: 'advance', legalEntityId: 'legal', paid: money('80.00'), status: 'PAID_OUT' }, { id: 'foreign', legalEntityId: 'legal', paid: money('90.00', 'USD'), status: 'PAID_OUT' }] })
+  api.employeeAdvances = async () => ({ items: [{ id: 'advance', legalEntityId: 'legal', paid: money('80.00'), status: 'PAID_OUT' }, { id: 'foreign', legalEntityId: 'legal', paid: money('90.00', 'USD'), status: 'PAID_OUT' }, { id: 'held', legalEntityId: 'legal', paid: money('80.00'), status: 'PAYMENT_REVIEW' }] })
   const p = panel(Funding, { scopeKey: 'alice', reportId: 'report', baseCurrency: 'CNY', locked: false, modelValue: content() })
   try {
     p.state.kind = 'requests'; p.state.open = true; await settle(); p.state.lineNo = 3
     p.state.addPrior('closed', 6); assert.equal(p.props.modelValue.lines[0].priorRequest, null)
     p.state.addPrior('prior', 5); assert.deepEqual(p.props.modelValue.lines[0].priorRequest, { requestId: 'prior', lineNo: 5 })
-    p.state.kind = 'advances'; await settle(); p.state.addAdvance('foreign'); assert.equal(p.props.modelValue.advanceOffsets.length, 0)
+    p.state.kind = 'advances'; await settle(); p.state.addAdvance('foreign'); p.state.addAdvance('held'); assert.equal(p.props.modelValue.advanceOffsets.length, 0)
     p.state.addAdvance('advance'); p.state.addAdvance('advance'); assert.deepEqual(p.props.modelValue.advanceOffsets, [{ advanceId: 'advance', amount: money('') }])
   } finally { p.close() }
 })

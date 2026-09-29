@@ -27717,7 +27717,8 @@
             "enum": [
               "PAID_OUT",
               "PARTIALLY_SETTLED",
-              "SETTLED"
+              "SETTLED",
+              "PAYMENT_REVIEW"
             ]
           },
           "paidOn": {

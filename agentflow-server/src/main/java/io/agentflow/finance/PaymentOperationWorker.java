@@ -1,6 +1,7 @@
 package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.expense.AdvanceDisbursementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,9 +19,12 @@ public class PaymentOperationWorker {
     private final PaymentOperationService execution;
     private final PaymentAccountsPort accounts;
     private final PaymentSystemPort payments;
+    private final AdvanceDisbursementService disbursements;
     /** 数据库事务只在独立服务代理中领取和确认，不跨网络等待。 */
-    public PaymentOperationWorker(JdbcPaymentOperationRepository operations, PaymentOperationService execution, PaymentAccountsPort accounts, PaymentSystemPort payments) {
+    public PaymentOperationWorker(JdbcPaymentOperationRepository operations, PaymentOperationService execution, PaymentAccountsPort accounts, PaymentSystemPort payments,
+                                  AdvanceDisbursementService disbursements) {
         this.operations = operations; this.execution = execution; this.accounts = accounts; this.payments = payments;
+        this.disbursements = disbursements;
     }
     /** 每批最多十笔，恢复使用持久原输入，不根据当前配置重建命令。 */
     public void poll() {
@@ -44,6 +48,14 @@ public class PaymentOperationWorker {
                     LOG.error("Payment dispatch failed, errorCode={}, authorizationId={}", reason, candidate.id());
                 }
             } catch (RuntimeException failed) { LOG.error("Payment worker failed, errorCode={}, authorizationId={}", "WORKER_FAILURE", candidate.id()); }
+        }
+        for (var candidate : operations.missingAdvanceBalances()) {
+            if (Thread.currentThread().isInterrupted()) return;
+            try { disbursements.recover(candidate.tenantId(), candidate.id()); }
+            catch (RuntimeException failed) {
+                LOG.error("Advance disbursement recovery failed, errorCode={}, authorizationId={}",
+                        failed instanceof DomainException domain ? domain.code() : "SETTLEMENT_FAILURE", candidate.id());
+            }
         }
     }
     private PaymentOperation checkAccounts(PaymentOperation checking) {
