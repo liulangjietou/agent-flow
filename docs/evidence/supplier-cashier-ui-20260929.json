@@ -1,0 +1,106 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier cashier UI, original transaction recovery, and backed-up V70 to V72 upgrade",
+  "syntheticFinanceOnly": true,
+  "uiTests": {
+    "command": "node scripts/test-requests.mjs supplier-cashier.test.mjs supplier-finance.test.mjs payments.test.mjs",
+    "total": 48,
+    "passed": 48,
+    "supplierCashierNewTests": 13,
+    "checks": [
+      "exact decimal money",
+      "masked account and current hold binding",
+      "manual account selection",
+      "confirmation-time expiry",
+      "duplicate submit suppression",
+      "wrong receipt requires refresh",
+      "actor and authorization switch clears state",
+      "late reads ignored",
+      "read timeout",
+      "parent refresh during write",
+      "duplicate cursor rejection",
+      "unknown write retains original idempotency key and body",
+      "actual API no-store paths"
+    ]
+  },
+  "frontendBuild": {
+    "command": "npm run build",
+    "passed": true,
+    "existingChunkSizeWarning": true
+  },
+  "backendPackage": {
+    "command": "mvn -B -pl agentflow-server -am -DskipTests package",
+    "passed": true,
+    "java": 17
+  },
+  "upgrade": {
+    "fromVersion": 70,
+    "toVersion": 72,
+    "unchangedBusinessTables": 121,
+    "unchangedBusinessRows": 1444,
+    "unchangedAttachments": 5,
+    "unchangedCommandFiles": 13,
+    "newTablesEmpty": [
+      "supplier_payment_execution_request",
+      "supplier_payment_execution_revision",
+      "supplier_payment_operation",
+      "supplier_payment_revision"
+    ],
+    "backupBytes": 829196,
+    "backupSha256": "afc934b0d60f89442e22e65a5905154e88e8461da19c162971efbc9ad1fc9aaf"
+  },
+  "browserAndDatabase": {
+    "syntheticFinanceOnly": true,
+    "fromVersion": 70,
+    "toVersion": 72,
+    "authorizationId": "09ce297b-0811-4015-a135-eae7ed1cc2d1",
+    "preparationId": "7eca2408-355d-4c8c-9a87-278757e47d3c",
+    "amount": {
+      "value": "65.00",
+      "currency": "CNY"
+    },
+    "holdStatus": "HELD",
+    "bankStatus": "SUCCEEDED",
+    "acceptedSyntheticBankTransactions": 1,
+    "registeredBankCommands": 1,
+    "sendAttempts": 2,
+    "initialAttempt": "Fixture rejected equivalent ISO timestamp strings before accepting a bank transaction; fixed fixture, authoritative NOT_FOUND, explicit original-number retry",
+    "lostResponseAfterAcceptance": true,
+    "originalCommandUnchanged": true,
+    "exactQuantity": "999999999999999.123456",
+    "unchangedOldTables": 119,
+    "appendOnlyTables": {
+      "audit_event": {
+        "oldRows": 191,
+        "newRows": 195,
+        "appendedRows": 4
+      },
+      "request_idempotency": {
+        "oldRows": 241,
+        "newRows": 245,
+        "appendedRows": 4
+      }
+    },
+    "preservedAllOldRows": true,
+    "unchangedAttachments": 5,
+    "unchangedOldCommandFiles": 13,
+    "newTableRows": {
+      "supplier_payment_execution_request": 1,
+      "supplier_payment_execution_revision": 3,
+      "supplier_payment_operation": 1,
+      "supplier_payment_revision": 22
+    },
+    "scopedReadChecks": 6,
+    "erpSettlementCompleted": false
+  },
+  "screenshots": {
+    "supplier-cashier-ui-confirm.png": "72a37dd384fddc3c055806a78c4b8f2bddebfcccd44a46a59a0e7ae761e7c46c",
+    "supplier-cashier-ui-accepted-unknown.png": "6417b71e190613dfa60ac9aa8afac94762442b28ad29d99a8e4b418f566c0786",
+    "supplier-cashier-ui-succeeded.png": "fa66a16de5db7b24422460fa106af53dd87515ae8402cf65c44a09e23a7d9b6f"
+  },
+  "limitations": [
+    "Enterprise ERP and real bank integrations remain unverified",
+    "ERP payable settlement is not implemented in this UI change",
+    "Git remote remains unconfigured; changes are preserved locally"
+  ]
+}

@@ -1,3 +1,4 @@
+import type { SupplierCashierView, SupplierCashierPage, SupplierCashierAccounts, SupplierCashierInput, SupplierCashierReceipt } from './supplierCashier'
 import type { SupplierFinanceView, SupplierReviewInput, SupplierAuthorizeInput, SupplierHoldInput, SupplierFinanceReceipt } from './supplierFinance'
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
@@ -344,6 +345,10 @@ export const api = {
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
+  supplierCashierPayments: (beforeId: string | undefined, signal: AbortSignal) => request<SupplierCashierPage>('/cashier/supplier-payments' + historyQuery({ beforeId, limit: 25 }), { signal, cache: 'no-store' }),
+  supplierCashierPayment: (id: string, signal: AbortSignal) => request<SupplierCashierView>(`/cashier/supplier-payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
+  supplierCashierAccounts: (id: string, signal: AbortSignal) => request<SupplierCashierAccounts>(`/cashier/supplier-payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
+  supplierCashierAction: (id: string, input: SupplierCashierInput) => write<SupplierCashierReceipt>(`/cashier/supplier-payments/${encodeURIComponent(id)}/actions`, 'POST', '办理供应商原付款', input),
   supplierFinance: (id: string, roundNo: number, signal: AbortSignal) => request<SupplierFinanceView>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   reviewSupplierPayable: (id: string, input: SupplierReviewInput) => write<SupplierFinanceReceipt>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment/reviews`, 'POST', '复核供应商原应付', input),
   authorizeSupplierPayment: (id: string, input: SupplierAuthorizeInput) => write<SupplierFinanceReceipt>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment/authorizations`, 'POST', '确认供应商付款授权', input),
