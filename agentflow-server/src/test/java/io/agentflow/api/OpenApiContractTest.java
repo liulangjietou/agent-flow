@@ -73,6 +73,20 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("ProcurementPaymentContent", io.agentflow.procurement.ProcurementPaymentContent.class),
+                java.util.Map.entry("ProcurementPaymentRound", io.agentflow.procurement.ProcurementPaymentRoundView.class),
+                java.util.Map.entry("ProcurementPaymentPayable", io.agentflow.procurement.ProcurementPaymentRoundView.PayableView.class),
+                java.util.Map.entry("ProcurementPaymentLine", io.agentflow.procurement.ProcurementPaymentRoundView.LineView.class),
+                java.util.Map.entry("ProcurementPaymentView", io.agentflow.procurement.ProcurementPaymentService.View.class),
+                java.util.Map.entry("ProcurementPaymentReceipt", io.agentflow.procurement.ProcurementPaymentService.Receipt.class),
+                java.util.Map.entry("ProcurementPaymentItem", io.agentflow.procurement.ProcurementPaymentQuery.Item.class),
+                java.util.Map.entry("ProcurementPaymentPage", io.agentflow.procurement.ProcurementPaymentQuery.Page.class),
+                java.util.Map.entry("ProcurementPaymentApproval", io.agentflow.procurement.ProcurementPaymentRequest.Approval.class),
+                java.util.Map.entry("ProcurementPaymentCheckOptions", io.agentflow.procurement.ProcurementPaymentCheckService.Options.class),
+                java.util.Map.entry("ProcurementPaymentCheckSummary", io.agentflow.procurement.ProcurementPaymentCheckService.Summary.class),
+                java.util.Map.entry("ProcurementPaymentCheckPage", io.agentflow.procurement.ProcurementPaymentCheckService.Page.class),
+                java.util.Map.entry("ProcurementPaymentCheckReceipt", io.agentflow.procurement.ProcurementPaymentCheckService.Receipt.class),
+                java.util.Map.entry("ProcurementPaymentCheckView", io.agentflow.procurement.ProcurementPaymentCheckService.View.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentWorkspace", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.View.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentOriginal", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Original.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentPreparation", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Preparation.class),

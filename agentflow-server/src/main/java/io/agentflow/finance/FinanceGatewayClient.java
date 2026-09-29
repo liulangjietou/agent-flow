@@ -44,9 +44,10 @@ public class FinanceGatewayClient {
     @SuppressWarnings("deprecation")
     public FinanceGatewayClient(FinanceGatewayConfiguration configuration, ObjectMapper mapper) {
         this.configuration = configuration;
+        // 信封先读 JSON 树再映射领域类型；中间树也必须精确保留数量、汇率等十进制事实。
         this.json = new JsonUtil(mapper.copy().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
                         DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS,
-                        DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                        DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
                 .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION).disable(MapperFeature.ALLOW_COERCION_OF_SCALARS));
     }
 

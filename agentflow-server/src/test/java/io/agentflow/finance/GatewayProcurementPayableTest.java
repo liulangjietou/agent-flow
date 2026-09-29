@@ -101,6 +101,25 @@ class GatewayProcurementPayableTest {
         }
     }
 
+    @Test void intermediateEnvelopeMustPreserveExactQuantitiesAndRejectExcessPrecision() {
+        String exact = "999999999999999.123456";
+        responder.set(input -> {
+            var body = success(input, source()); var line = (ObjectNode) body.at("/data/lines/0");
+            for (String field : List.of("orderedQuantity", "acceptedQuantity", "invoicedQuantity")) line.put(field, new BigDecimal(exact));
+            return json.write(body);
+        });
+        var observed = payable.payable("tenant-a", target, request).requireValue().lines().get(0);
+        assertThat(observed.orderedQuantity()).isEqualByComparingTo(exact);
+        assertThat(observed.acceptedQuantity()).isEqualByComparingTo(exact);
+        assertThat(observed.invoicedQuantity()).isEqualByComparingTo(exact);
+        responder.set(input -> {
+            var body = success(input, source()); var line = (ObjectNode) body.at("/data/lines/0");
+            for (String field : List.of("orderedQuantity", "acceptedQuantity", "invoicedQuantity")) line.put(field, new BigDecimal(exact + "7"));
+            return json.write(body);
+        });
+        assertThat(payable.payable("tenant-a", target, request)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
+    }
+
     @Test void readDoesNotBypassMissingConfigurationTargetChangeOrTransactionBoundary() {
         configuration.setEnabled(false); assertThat(payable.payable("tenant-a", target, request)).isEqualTo(unavailable(FinanceResult.Failure.NOT_CONFIGURED));
         configuration.setEnabled(true); assertThat(payable.payable("tenant-b", target, request)).isEqualTo(unavailable(FinanceResult.Failure.NOT_CONFIGURED));

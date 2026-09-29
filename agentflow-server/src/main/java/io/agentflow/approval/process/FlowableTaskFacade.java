@@ -20,6 +20,8 @@ import io.agentflow.expense.ExpenseApprovalService;
 import io.agentflow.expense.ExpenseReleaseService;
 import io.agentflow.expense.ExpensePlanApprovalService;
 import io.agentflow.expense.AdvanceRequestApprovalService;
+import io.agentflow.procurement.ProcurementPaymentApprovalService;
+import io.agentflow.procurement.ProcurementPayableReservations;
 import io.agentflow.finance.VoucherPreparationService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
@@ -49,6 +51,8 @@ public class FlowableTaskFacade {
     private final ExpenseReleaseService expenseReleases;
     private final ExpensePlanApprovalService expensePlans;
     private final AdvanceRequestApprovalService advanceRequests;
+    private final ProcurementPaymentApprovalService procurementPayments;
+    private final ProcurementPayableReservations procurementReservations;
     private final VoucherPreparationService voucherPreparation;
 
     /** 创建任务服务。 */
@@ -57,7 +61,8 @@ public class FlowableTaskFacade {
                               TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients,
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
                               ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases, ExpensePlanApprovalService expensePlans,
-                              AdvanceRequestApprovalService advanceRequests, VoucherPreparationService voucherPreparation) {
+                              AdvanceRequestApprovalService advanceRequests, VoucherPreparationService voucherPreparation,
+                              ProcurementPaymentApprovalService procurementPayments, ProcurementPayableReservations procurementReservations) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -69,6 +74,8 @@ public class FlowableTaskFacade {
         this.authorization = authorization; this.expenses = expenses; this.expenseReleases = expenseReleases;
         this.expensePlans = expensePlans;
         this.advanceRequests = advanceRequests;
+        this.procurementPayments = procurementPayments;
+        this.procurementReservations = procurementReservations;
         this.voucherPreparation = voucherPreparation;
     }
 
@@ -132,6 +139,7 @@ public class FlowableTaskFacade {
         expenses.lock(application);
         expensePlans.lock(application);
         advanceRequests.lock(application);
+        procurementPayments.lock(application);
         task = authorization.require(taskId, actor);
         application = authorization.application(actor, task);
         ApplicationStatus previousStatus = application.status();
@@ -211,12 +219,16 @@ public class FlowableTaskFacade {
                 applicationRepository.update(application, expectedVersion);
                 expensePlans.approved(application, actor.userId());
                 advanceRequests.approved(application, actor.userId());
+                procurementPayments.approved(application, actor.userId());
                 voucherPreparation.approved(application, actor.userId());
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }
-        if (normalized == TaskAction.REJECT) expenseReleases.release(application, actor.userId(), Instant.now());
+        if (normalized == TaskAction.REJECT) {
+            expenseReleases.release(application, actor.userId(), Instant.now());
+            procurementReservations.releaseStopped(application, actor.userId(), Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        }
         notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds);
         return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }
