@@ -6,6 +6,7 @@ import io.agentflow.finance.ReservedAmount;
 import org.apache.commons.lang3.StringUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,12 @@ public final class ExpenseRequest {
     /** 核销只转移已占用额，不扩大原事前申请授权。 */
     public void consume(long expectedVersion, int requestLine, ExpenseUse use) {
         requireVersion(expectedVersion); requireLineUse(use); replace(requestLine, balance(requestLine).consume(use));
+    }
+
+    /** 独立取消原报销只冲回对应行核销，原批准额度和关闭状态保持。 */
+    public void reverseConsumption(long expectedVersion, int requestLine, ExpenseUse use, UUID adjustmentId, Instant at) {
+        requireVersion(expectedVersion); requireLineUse(use);
+        replace(requestLine, balance(requestLine).reverseConsumption(use, adjustmentId, at));
     }
 
     /** 显式关闭停止新增核销计划，保留仍未结算的全部占用。 */

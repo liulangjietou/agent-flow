@@ -252,6 +252,60 @@ class ExpenseSubmissionResourcesTest {
                 new ExpenseSubmissionResources.Resources(reserved.invoices(), input.requests(), reserved.advances()), NOW.plusSeconds(1)));
     }
 
+    @Test
+    void independentResourceReversalPreservesOriginalConsumptionAndEachSharedSourceVersion() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("250"); var advance = advance("180");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id()), line(2, "100", List.of(), prior.id())), List.of(new AdvanceOffset(advance.id(), money("150"))));
+        var input = resources(List.of(invoice), List.of(prior), List.of(advance)); var reserved = applied(input, planner.plan(report, input, NOW));
+        var settled = applied(reserved, new ExpenseSettlementResources().plan(report, reserved, NOW.plusSeconds(1)));
+        var id = UUID.randomUUID(); var plan = new ExpenseResourceReversal().plan(report, settled, id, NOW.plusSeconds(2)); var reversed = applied(settled, plan);
+        assertThat(plan.requests()).extracting(value -> value.after().version()).containsExactly(6L, 7L);
+        assertThat(plan.invoices()).extracting(ExpenseSubmissionResources.InvoiceChange::operation).containsOnly(ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION);
+        assertThat(reversed.invoices().get(invoice.id()).verification()).isEqualTo(Invoice.Verification.PENDING);
+        assertThat(reversed.invoices().get(invoice.id()).reversals().get(0).adjustmentId()).isEqualTo(id);
+        var balance = reversed.requests().get(prior.id()).balances().get(1);
+        assertThat(balance.grossConsumed()).isEqualTo(money("200")); assertThat(balance.available()).isEqualTo(money("250"));
+        assertThat(balance.reversals()).hasSize(2); assertThat(balance.reversals()).allSatisfy(value -> assertThat(value.adjustmentId()).isEqualTo(id));
+        assertThat(balance.consumptions()).isEqualTo(settled.requests().get(prior.id()).balances().get(1).consumptions());
+        assertThat(EmployeeAdvance.restore(reversed.advances().get(advance.id())).outstanding()).isEqualTo(money("180"));
+        assertThat(settled.invoices().get(invoice.id()).occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+        fails("CONSUMPTION_REVERSAL_CONFLICT", () -> new ExpenseResourceReversal().plan(report, reversed, UUID.randomUUID(), NOW.plusSeconds(3)));
+    }
+
+    @Test
+    void resourceReversalSkipsReducedZeroLinesEvenWhenTheirInvoiceHasBeenReused() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var advance = advance("100");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), null), line(2, "100", List.of(), null)), List.of(new AdvanceOffset(advance.id(), money("100"))));
+        var input = resources(List.of(invoice), List.of(), List.of(advance)); var reserved = applied(input, planner.plan(report, input, NOW));
+        var reduced = ExpenseReport.restore(report.state()); reduced.reduce(reduced.version(), List.of(new ExpenseReport.Reduction(1, money("0"), money("0"))), "finance", "INELIGIBLE_COST", "归零释放", NOW.plusSeconds(1));
+        var released = applied(reserved, new ExpenseReductionResources().plan(report, reduced, reserved));
+        var reused = Invoice.restore(released.invoices().get(invoice.id())); reused.occupy(reused.version(), new ExpenseUse(UUID.randomUUID(), 1, 1), "alice", ENTITY, NOW.plusSeconds(2));
+        var current = new ExpenseSubmissionResources.Resources(Map.of(invoice.id(), reused.state()), released.requests(), released.advances());
+        var settled = applied(current, new ExpenseSettlementResources().plan(reduced, current, NOW.plusSeconds(3)));
+        var reversed = new ExpenseResourceReversal().plan(reduced, settled, UUID.randomUUID(), NOW.plusSeconds(4));
+        assertThat(reversed.invoices()).isEmpty(); assertThat(reversed.requests()).isEmpty();
+        assertThat(reversed.advances().get(0).after().balance().consumed()).isEqualTo(money("0"));
+        assertThat(current.invoices().get(invoice.id()).use()).isEqualTo(reused.use());
+    }
+
+    @Test
+    void resourceReversalRejectsWrongConsumedAmountOrMissingSourceWithoutChangingEarlierResources() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("100"); var advance = advance("50");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id())), List.of(new AdvanceOffset(advance.id(), money("50"))));
+        var input = resources(List.of(invoice), List.of(prior), List.of(advance)); var reserved = applied(input, planner.plan(report, input, NOW));
+        var settled = applied(reserved, new ExpenseSettlementResources().plan(report, reserved, NOW.plusSeconds(1)));
+        var id = UUID.randomUUID();
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> new ExpenseResourceReversal().plan(report,
+                new ExpenseSubmissionResources.Resources(settled.invoices(), settled.requests(), Map.of()), id, NOW.plusSeconds(2)));
+        var wrong = EmployeeAdvance.restore(input.advances().get(advance.id())); var use = new ExpenseUse(report.id(), 1, 0);
+        wrong.reserve(wrong.version(), use, money("49")); wrong.settle(wrong.version(), use);
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> new ExpenseResourceReversal().plan(report,
+                new ExpenseSubmissionResources.Resources(settled.invoices(), settled.requests(), Map.of(wrong.id(), wrong.state())), id, NOW.plusSeconds(2)));
+        assertThat(settled.invoices().get(invoice.id()).occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+        assertThat(settled.requests().get(prior.id()).balances().get(1).consumed()).isEqualTo(money("100"));
+        assertThat(settled.requests().get(prior.id()).balances().get(1).reversals()).isEmpty();
+    }
+
     private ExpenseReport frozen(List<ExpenseLine> lines, List<AdvanceOffset> offsets) {
         var report = ExpenseReport.draft(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", content(lines, offsets)); freeze(report, NOW); return report;
     }

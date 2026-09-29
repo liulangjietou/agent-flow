@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
 import org.apache.commons.lang3.StringUtils;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +62,12 @@ public final class EmployeeAdvance {
         requireVersion(expectedVersion); requireWholeReport(use);
         if (reviewRequired()) throw review();
         var changed = balance.consume(use); balance = changed; version++;
+    }
+
+    /** 取消已核销报销增加原借款未还额，原放款、还款、其他预留和独立冻结全部保留。 */
+    public void reverseOffset(long expectedVersion, ExpenseUse use, UUID adjustmentId, Instant at) {
+        requireVersion(expectedVersion); requireWholeReport(use);
+        balance = balance.reverseConsumption(use, adjustmentId, at); version++;
     }
 
     /** 逾期是日期和剩余未冲销额派生的提醒事实，不自动拒绝费用审批。 */

@@ -5,6 +5,8 @@ import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -25,6 +27,7 @@ public final class Invoice {
     private String failureCode;
     private Instant checkedAt;
     private ExpenseUse use;
+    private List<ConsumptionReversal> reversals = List.of();
 
     /** 原件由存储服务验证后建立票夹记录，此时尚无已查验事实。 */
     public static Invoice uploaded(UUID id, String tenantId, String ownerId, UUID originalFileId, String originalDigest) {
@@ -64,6 +67,7 @@ public final class Invoice {
         if (!ownerId.equals(employeeId)) throw new DomainException("INVOICE_OWNER_MISMATCH", "Invoice belongs to another employee");
         if (!facts.legalEntityId().equals(legalEntityId)) throw new DomainException("INVOICE_TITLE_MISMATCH", "Invoice buyer does not match the legal entity");
         if (occupation != Occupation.AVAILABLE) throw new DomainException("INVOICE_OCCUPIED", "Invoice already has an active occupation");
+        if (reversals.stream().anyMatch(value -> value.use().equals(target))) throw reversalConflict();
         occupation = Occupation.OCCUPIED; use = target; version++;
     }
 
@@ -72,6 +76,7 @@ public final class Invoice {
         requireVersion(expectedVersion); requireUse(previous); requireVerified(at);
         if (next == null || next.lineNo() < 1 || !previous.reportId().equals(next.reportId()) || next.roundNo() != previous.roundNo() + 1
                 || !facts.legalEntityId().equals(legalEntityId)) throw invalid();
+        if (reversals.stream().anyMatch(value -> value.use().equals(next))) throw reversalConflict();
         use = next; version++;
     }
 
@@ -85,6 +90,16 @@ public final class Invoice {
     public void consume(long expectedVersion, ExpenseUse expectedUse, Instant at) {
         requireVersion(expectedVersion); requireUse(expectedUse); requireVerified(at);
         occupation = Occupation.CONSUMED; version++;
+    }
+
+    /** 独立调整释放已核销原件并保留原归属；再次使用必须取得调整后的真实查验结果。 */
+    public void reverseConsumption(long expectedVersion, ExpenseUse expectedUse, UUID adjustmentId, Instant at) {
+        requireVersion(expectedVersion); requireCheckTime(at);
+        if (occupation != Occupation.CONSUMED || !Objects.equals(use, expectedUse)
+                || reversals.stream().anyMatch(value -> value.use().equals(expectedUse))) throw reversalConflict();
+        var updated = new ArrayList<>(reversals); updated.add(new ConsumptionReversal(adjustmentId, expectedUse, at));
+        reversals = List.copyOf(updated); occupation = Occupation.AVAILABLE; use = null;
+        verification = Verification.PENDING; failureCode = null; version++;
     }
 
     /** 返回当前有效查验事实，过期边界为右开区间。 */
@@ -102,8 +117,10 @@ public final class Invoice {
     }
     private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Invoice version has changed"); }
     private void requireCheckTime(Instant at) {
-        if (at == null || checkedAt != null && at.isBefore(checkedAt)) throw new DomainException("INVALID_INVOICE_TIME", "Invoice verification time is out of order");
+        if (at == null || checkedAt != null && at.isBefore(checkedAt)
+                || reversals.stream().anyMatch(value -> at.isBefore(value.reversedAt()))) throw new DomainException("INVALID_INVOICE_TIME", "Invoice verification time is out of order");
     }
+    private static DomainException reversalConflict() { return new DomainException("CONSUMPTION_REVERSAL_CONFLICT", "Invoice adjustment must retain the original consumed report round"); }
     private static DomainException invalid() { return new DomainException("INVALID_INVOICE", "Invoice identity, original file or verified facts are invalid"); }
 
     /** 恢复时核对查验与占用维度的一致性，原件身份始终不可变。 */
@@ -115,13 +132,21 @@ public final class Invoice {
                 || state.verification() == Verification.VERIFIED && (state.facts() == null || state.checkedAt() == null || state.failureCode() != null)
                 || state.verification() == Verification.FAILED && (state.failureCode() == null || state.checkedAt() == null)
                 || state.facts() != null && !state.originalDigest().equals(state.facts().originalDigest())) throw invalid();
+        var reversals = state.reversals() == null ? List.<ConsumptionReversal>of() : List.copyOf(state.reversals());
+        if (reversals.stream().map(ConsumptionReversal::use).distinct().count() != reversals.size()
+                || !reversals.isEmpty() && state.facts() == null || reversals.stream().anyMatch(value -> value.use().equals(state.use()))) throw invalid();
+        for (int index = 1; index < reversals.size(); index++) {
+            if (reversals.get(index).reversedAt().isBefore(reversals.get(index - 1).reversedAt())) throw invalid();
+        }
+        if (state.verification() == Verification.VERIFIED && reversals.stream().anyMatch(value -> state.facts().verifiedAt().isBefore(value.reversedAt()))) throw invalid();
         result.version = state.version(); result.verification = state.verification(); result.occupation = state.occupation();
         result.facts = state.facts(); result.failureCode = state.failureCode(); result.checkedAt = state.checkedAt(); result.use = state.use();
+        result.reversals = reversals;
         return result;
     }
 
     /** 保存当前发票状态及完整原件绑定，由仓储追加版本证据。 */
-    public State state() { return new State(id, tenantId, ownerId, originalFileId, originalDigest, version, verification, occupation, facts, failureCode, checkedAt, use); }
+    public State state() { return new State(id, tenantId, ownerId, originalFileId, originalDigest, version, verification, occupation, facts, failureCode, checkedAt, use, reversals); }
 
     public UUID id() { return id; }
     public String tenantId() { return tenantId; }
@@ -135,6 +160,7 @@ public final class Invoice {
     public String failureCode() { return failureCode; }
     public Instant checkedAt() { return checkedAt; }
     public ExpenseUse use() { return use; }
+    public List<ConsumptionReversal> reversals() { return reversals; }
 
     /**
      * 发票可恢复状态，不把票面确认或占用归属暴露为客户端更新字段。
@@ -142,7 +168,26 @@ public final class Invoice {
      */
     public record State(UUID id, String tenantId, String ownerId, UUID originalFileId, String originalDigest, long version,
                          Verification verification, Occupation occupation, VerifiedFacts facts, String failureCode,
-                         Instant checkedAt, ExpenseUse use) { }
+                         Instant checkedAt, ExpenseUse use, List<ConsumptionReversal> reversals) {
+        /** 兼容旧发票快照；历史没有调整时不制造核销冲回。 */
+        public State(UUID id, String tenantId, String ownerId, UUID originalFileId, String originalDigest, long version,
+                Verification verification, Occupation occupation, VerifiedFacts facts, String failureCode, Instant checkedAt, ExpenseUse use) {
+            this(id, tenantId, ownerId, originalFileId, originalDigest, version, verification, occupation, facts, failureCode, checkedAt, use, List.of());
+        }
+        /** 快照不共享调用方可变集合，缺失字段只用于旧版本兼容。 */
+        public State { reversals = reversals == null ? List.of() : List.copyOf(reversals); }
+    }
+
+    /**
+     * 原件退出一笔已核销报销的独立事实，与原件身份及后续占用分别保存。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ConsumptionReversal(UUID adjustmentId, ExpenseUse use, Instant reversedAt) {
+        /** 发票核销归属必须指向实际报销行。 */
+        public ConsumptionReversal {
+            if (adjustmentId == null || use == null || use.lineNo() < 1 || reversedAt == null) throw invalid();
+        }
+    }
 
     /**
      * 发票查验状态不等同于可报销状态。

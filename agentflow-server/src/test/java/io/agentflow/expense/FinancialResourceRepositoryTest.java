@@ -59,6 +59,41 @@ class FinancialResourceRepositoryTest {
     }
 
     @Test
+    void legacyConsumedResourcesLoadWithoutReversalFieldsAndKeepTheirOriginalClaims() {
+        var report = report("demo"); var use = new ExpenseUse(report.id(), 1, 0);
+        var advance = advance("demo", "pre-adjustment-" + UUID.randomUUID()); advances.create(advance, "fixture");
+        advance.reserve(1, use, money("70")); advances.update(advance, 1, "fixture", "RESERVE");
+        advance.settle(2, use); advances.update(advance, 2, "fixture", "CONSUME");
+        var oldAdvance = json.read(json.write(advance.state()), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) oldAdvance.get("balance")).remove("reversals");
+        jdbc.update("UPDATE finance_resource SET state_json=? WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", json.write(oldAdvance), advance.id().toString());
+        assertThat(advances.find("demo", advance.id()).orElseThrow().state()).isEqualTo(advance.state());
+        assertThat(advances.find("demo", advance.id()).orElseThrow().outstanding()).isEqualTo(money("30"));
+        var invoice = verified("demo", canonicalNumber()); var invoiceUse = new ExpenseUse(report.id(), 1, 1);
+        invoice.occupy(2, invoiceUse, "alice", ENTITY, AT); invoices.update(invoice, 2, "fixture", "RESERVE");
+        invoice.consume(3, invoiceUse, AT); invoices.update(invoice, 3, "fixture", "CONSUME");
+        var oldInvoice = json.read(json.write(invoice.state()), com.fasterxml.jackson.databind.node.ObjectNode.class); oldInvoice.remove("reversals");
+        jdbc.update("UPDATE finance_resource SET state_json=? WHERE tenant_id='demo' AND resource_type='INVOICE' AND id=?", json.write(oldInvoice), invoice.id().toString());
+        assertThat(invoices.find("demo", invoice.id()).orElseThrow().state()).isEqualTo(invoice.state());
+        assertThat(jdbc.queryForObject("SELECT status FROM invoice_active_claim WHERE tenant_id='demo' AND invoice_id=?", String.class, invoice.id().toString())).isEqualTo("CONSUMED");
+    }
+
+    @Test
+    void legacyClosedPriorRequestPreservesConsumedAmountsWithoutSynthesizingReversals() {
+        var source = sourceApplication(ApplicationStatus.APPROVED); var request = request(source.id()); requests.create(request, "approval");
+        var use = new ExpenseUse(report("demo").id(), 1, 1);
+        request.reserve(1, 1, use, money("40")); requests.update(request, 1, "fixture", "RESERVE");
+        request.consume(2, 1, use); requests.update(request, 2, "fixture", "CONSUME");
+        request.close(3); requests.update(request, 3, "fixture", "CLOSE");
+        var old = json.read(json.write(request.state()), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) old.get("balances").get("1")).remove("reversals");
+        jdbc.update("UPDATE finance_resource SET state_json=? WHERE tenant_id='demo' AND resource_type='PRIOR_REQUEST' AND id=?", json.write(old), request.id().toString());
+        var restored = requests.find("demo", request.id()).orElseThrow();
+        assertThat(restored.state()).isEqualTo(request.state()); assertThat(restored.balance(1).reversals()).isEmpty();
+        assertThat(restored.balance(1).available()).isEqualTo(money("60")); assertThat(restored.closed()).isTrue();
+    }
+
+    @Test
     void distinctFilesOfTheSameInvoiceRaceForOneCanonicalClaim() throws Exception {
         String number = canonicalNumber();
         var first = verified("demo", number); var second = verified("demo", number);
