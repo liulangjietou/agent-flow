@@ -208,3 +208,27 @@ V73 新增准备及修订、结算及修订、安全结束、完成凭据六张�
 本阶段完成内部领域与数据库链路；公开财务结算入口、后台自动执行和页面继续接入。现有浏览器验收服务仍运行 V72，V73 的数据库验证使用独立测试库。
 
 2026-09-29：领域 39 项、H2 与回环 HTTP 75 项、PostgreSQL 58 项全部通过，范围有重叠。新增准备领域 6 项及持久化 14 项；完成时间早于银行证据的边界先复现 1 项失败再修复。931 份 Java 文件、1,729 个命名类型作者检查通过。见[持久化证据](evidence/supplier-settlement-persistence-20260929.json)。
+
+
+## 原结算后台执行与补全
+
+财务明确原成功银行修订和记账日期后，准备执行器在数据库事务外读取原 HELD、原银行成功回单和指定会计期间。锁后再次核对当前批准、原占用、原银行、原预留及当前结算财务资格；复核成功自动登记固定结算，无需再次发起同一授权。期间关闭终止该次准备，暂时不可用保留原意图退避。原付款授权到期和原出纳离职不撤销已付款后的核销职责。
+
+结算执行器先持久保存 `CHECKING`，三项新鲜读取通过后再保存 `SETTLING` 和发送次数，提交事务后才向网关发送固定命令。未知结果直接查询原结算，不重新读取期间或调用银行付款。原批准和人员失效不阻断已发送命令的查询；权威查无仍须明确重试同一命令，不能换日期。安全结束会停止原只读领取，迟到复查无法再发送。
+
+ERP 实际结算成功与本地完成在条件允许时同事务提交。如果银行正在复查，先保留 ERP 成功和原本地占用；独立有界扫描等待银行重新确认，仅补本地完成，不再次外发。真正的数据库完成失败会回滚该次结算结果保存，执行器转为原号查询恢复。已经完成的原凭据不会因后来重新查询而消失。
+
+网关启用后，两阶段各自使用独立调度线程。可通过以下 Spring 配置分别控制，关闭消费会保留所有持久意图、命令和修订：
+
+| 配置 | 默认值 | 用途 |
+| --- | --- | --- |
+| `agentflow.supplier-payments.settlement-preparation-worker-enabled` | `true` | 准备消费 |
+| `agentflow.supplier-payments.settlement-worker-enabled` | `true` | 结算、原号查询及本地补全 |
+| `agentflow.supplier-payments.settlement-preparation-lease-seconds` | `90` | 准备租约，允许 15–300 秒 |
+| `agentflow.supplier-payments.settlement-lease-seconds` | `90` | 结算租约，允许 15–300 秒 |
+| `agentflow.supplier-payments.settlement-preparation-poll-delay-ms` | `1000` | 准备扫描间隔 |
+| `agentflow.supplier-payments.settlement-poll-delay-ms` | `1000` | 结算扫描间隔 |
+
+本阶段仅接通后台与内部登记服务，公开财务结算 API、页面及实际浏览器验收继续实施。
+
+2026-09-29：新增 9 项后台执行测试；H2、工作流与回环 HTTP 65 项，以及 PostgreSQL 23 项通过，范围有重叠。真实事务代理验证三项读取、发送和查询均在事务外，固定结算发送一次后丢失响应可用一次原查询恢复。938 份 Java 文件、1,739 个命名类型作者检查通过。见[后台执行证据](evidence/supplier-settlement-execution-20260929.json)。

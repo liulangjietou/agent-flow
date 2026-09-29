@@ -123,6 +123,17 @@ public class JdbcSupplierPayableSettlementRepository {
                 OR (status IN ('CHECKING','SETTLING','QUERYING') AND lease_until<=?)) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
     }
+
+    /** ERP 已确认但本地暂等银行复核时，只补原占用完成，不再调用任何结算写入。 */
+    public List<Candidate> awaitingLocalCompletion() {
+        return jdbc.query("""
+                SELECT o.tenant_id,o.id FROM supplier_payable_settlement_operation o
+                JOIN procurement_payable_reservation r ON r.tenant_id=o.tenant_id AND r.id=o.reservation_id
+                JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
+                WHERE o.status='SETTLED' AND o.retired_version IS NULL AND r.version=1 AND b.status='SUCCEEDED'
+                ORDER BY o.updated_at,o.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))));
+    }
     private SupplierPayableSettlementOperation restore(ResultSet row, int index) throws SQLException {
         var value = json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class); var command = value.command();
         if (!command.equals(json.read(row.getString("command_json"), SupplierPayableSettlementCommand.class)) || !command.digest().equals(row.getString("command_digest"))
