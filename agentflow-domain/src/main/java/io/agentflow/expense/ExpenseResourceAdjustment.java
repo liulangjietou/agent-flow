@@ -74,6 +74,11 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
     }
 
     public UUID id() { return input.budget().command().adjustmentId(); }
+    /** 本地资源写入必须仍有原已接受预算成功，后续查询时间可以变化，账务内容不能变化。 */
+    public void requireAcceptedBudget(BudgetConsumptionReversalOperation operation) {
+        if (budgetReversal == null || operation == null || !input.budget().equals(operation.input())
+                || operation.status() != BudgetConsumptionReversalOperation.Status.APPLIED || !sameApplied(budgetReversal, operation.observation())) throw conflict();
+    }
     private static boolean sameApplied(BudgetConsumptionReversalObservation original, BudgetConsumptionReversalObservation current) {
         return original.operationId().equals(current.operationId()) && original.commandDigest().equals(current.commandDigest())
                 && original.ledgerRevision().equals(current.ledgerRevision()) && original.reference().equals(current.reference())

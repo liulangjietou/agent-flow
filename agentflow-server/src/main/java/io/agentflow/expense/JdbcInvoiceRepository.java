@@ -57,7 +57,15 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
                 invoice.tenantId(), invoice.id().toString()).stream().findFirst().orElse(null);
         if (previous != null && "CONSUMED".equals(previous.status())
                 && (invoice.occupation() != Invoice.Occupation.CONSUMED || !previous.use().equals(invoice.use()))) {
-            throw new DomainException("INVOICE_OCCUPATION_CHANGED", "Consumed invoice occupation cannot be released or reassigned");
+            if (invoice.occupation() != Invoice.Occupation.AVAILABLE || invoice.verification() != Invoice.Verification.PENDING
+                    || jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM finance_consumption_reversal WHERE tenant_id=? AND resource_type='INVOICE' AND resource_id=? AND after_version=?
+                    AND report_id=? AND round_no=? AND report_line=?
+                    """, Integer.class, invoice.tenantId(), invoice.id().toString(), invoice.version(), previous.use().reportId().toString(), previous.use().roundNo(), previous.use().lineNo()) != 1) {
+                throw new DomainException("INVOICE_OCCUPATION_CHANGED", "Consumed invoice occupation requires an authorized reversal before release");
+            }
+            jdbc.update("DELETE FROM invoice_active_claim WHERE tenant_id=? AND invoice_id=? AND status='CONSUMED'", invoice.tenantId(), invoice.id().toString());
+            return;
         }
         if (invoice.occupation() == Invoice.Occupation.AVAILABLE) {
             jdbc.update("DELETE FROM invoice_active_claim WHERE tenant_id=? AND invoice_id=? AND status='OCCUPIED'", invoice.tenantId(), invoice.id().toString());

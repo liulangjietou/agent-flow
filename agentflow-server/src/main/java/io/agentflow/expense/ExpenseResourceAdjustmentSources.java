@@ -73,5 +73,22 @@ public class ExpenseResourceAdjustmentSources {
     public void requireCurrent(ExpenseResourceAdjustmentBasis expected) {
         if (!find(expected.tenantId(), expected.reportId()).equals(expected)) throw changed();
     }
+    /** 预算已冲正后的本地恢复可接受同一原件的较新确认，不能借此替换原授权金额或会计事实。 */
+    public void requireSupported(ExpenseResourceAdjustmentBasis expected) {
+        var current = find(expected.tenantId(), expected.reportId());
+        if (current.settlement().version() < expected.settlement().version() || !current.settlement().input().equals(expected.settlement().input())
+                || !current.settlement().budgetOperationId().equals(expected.settlement().budgetOperationId())
+                || current.consumption().version() < expected.consumption().version() || !current.consumption().input().equals(expected.consumption().input())
+                || !current.consumption().observation().equals(expected.consumption().observation()) || !current.accrualReversal().equals(expected.accrualReversal())) throw changed();
+        var returnsBefore = expected.paymentReturns(); var returnsNow = current.paymentReturns();
+        if ((returnsBefore == null) != (returnsNow == null)) throw changed();
+        if (returnsBefore != null && (returnsNow.version() < returnsBefore.version() || !returnsNow.request().equals(returnsBefore.request())
+                || !returnsNow.entries().equals(returnsBefore.entries()))) throw changed();
+        var voucherBefore = expected.paymentVoucher(); var voucherNow = current.paymentVoucher();
+        if ((voucherBefore == null) != (voucherNow == null)) throw changed();
+        if (voucherBefore != null && (voucherNow.version() < voucherBefore.version() || !voucherNow.input().equals(voucherBefore.input())
+                || !new VoucherReversalPort.Request(voucherBefore.input().command(), voucherBefore.observation()).matchesOriginal(voucherNow.observation()))) throw changed();
+        if (expected.paymentVoucherReversal() != null && !expected.paymentVoucherReversal().equals(current.paymentVoucherReversal())) throw changed();
+    }
     private static DomainException changed() { return new DomainException("EXPENSE_ADJUSTMENT_SOURCE_CHANGED", "Original expense, budget, accrual reversal or full payment return changed before resource adjustment"); }
 }

@@ -21,15 +21,17 @@ import java.util.UUID;
 @Repository
 public class FinancialResourceStore {
     private final JdbcTemplate jdbc;
+    private final FinancialResourceReversalJournal reversals;
 
     /** 与发票互斥键、金额使用明细及审批编排共用同一事务。 */
-    public FinancialResourceStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public FinancialResourceStore(JdbcTemplate jdbc, FinancialResourceReversalJournal reversals) { this.jdbc = jdbc; this.reversals = reversals; }
 
     /** 仓储创建必须已处于外层业务事务，初始身份和来源只写一次。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void create(Kind kind, Stored value, String actor) {
         requireAudit(actor, "CREATE");
         if (value.version() != 1) throw conflict();
+        reversals.requireInitial(kind, value);
         try {
             jdbc.update("INSERT INTO finance_resource(tenant_id,resource_type,id,owner_id,source_reference,version,context_json,state_json) VALUES(?,?,?,?,?,1,?,?)",
                     value.tenantId(), kind.name(), value.id().toString(), value.ownerId(), value.sourceReference(), value.context(), value.state());
@@ -42,6 +44,9 @@ public class FinancialResourceStore {
     public void update(Kind kind, Stored value, long expectedVersion, String actor, String operation) {
         requireAudit(actor, operation);
         if (value.version() != expectedVersion + 1) throw conflict();
+        var before = find(kind, value.tenantId(), value.id()).orElseThrow(FinancialResourceStore::conflict);
+        if (before.version() != expectedVersion) throw conflict();
+        var reversal = reversals.prepare(kind, before, value, operation);
         int updated = jdbc.update("""
                 UPDATE finance_resource SET version=?,state_json=?,updated_at=CURRENT_TIMESTAMP
                 WHERE tenant_id=? AND resource_type=? AND id=? AND owner_id=? AND source_reference=? AND context_json=? AND version=?
@@ -49,6 +54,7 @@ public class FinancialResourceStore {
                 value.sourceReference(), value.context(), expectedVersion);
         if (updated != 1) throw conflict();
         append(kind, value, actor, operation);
+        reversals.append(kind, value, reversal);
     }
 
     /** 不从 JSON 中推断查询租户，所有定位都使用独立身份列。 */
