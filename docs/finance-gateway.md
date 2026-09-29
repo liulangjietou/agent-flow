@@ -114,3 +114,8 @@ V55 已实现独立财务明确采用原操作最新终态、保留连续修订�
 V56 增加 `advance-repayment-adjustment` 固定原目标只读端口。请求只含已确认还款编号及完整原收款；`CONFIRMED` 证明原收款仍有效，`RETURNED` 同时要求原收款撤销、全额实际退款和 ERP 原借款借方调整，`UNRESOLVED` 不能形成裁决。汇总版本、原收款版本和五分钟时效分别核验，禁止把原入款流水或原贷方分录作为退款。传输不带支付幂等写入键，不发起资金或凭证命令。逐笔冻结、不可变历史及净余额见 [原还款复核与退回](advance-repayment-review.md)。
 
 V58 扩展上述原还款调整端口：`PARTIALLY_RETURNED` 要求原收款仍为 `CONFIRMED` 且累计退回严格小于原款，`RETURNED` 要求累计相等且原收款为 `REVERSED`。保留首笔字段，新增 `additionalReturns` 列表；每笔资金与独立借方分录配对，累计最多 100 笔。新快照必须完整保留已见条目，金额或条目变化必须提高汇总修订。客户端只确认服务端已保存的证据，不提交金额；详见 [部分退回](partial-repayment-returns.md)。
+
+
+## 供应商原应付与银行指令
+
+供应商采购使用独立的 `procurement-payable` 读取、`supplier-payable-hold-command` 预留和 `supplier-payable-hold-query` 查询，以及 `supplier-payment-command` 银行执行和 `supplier-payment-query` 原交易查询。命令固定原授权及财务目标，普通 `read` 入口不能绕过持久身份要求；银行查询不携带完整付款指令。原采购挂账和预算确认沿用，不能转成员工费用重复计账。原预留持续保留、出纳三方分离、短期复查、未知恢复与后续 ERP 结算边界见 [供应商付款](supplier-payments.md)。

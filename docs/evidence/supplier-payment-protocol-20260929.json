@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier bank command, original hold and account preflight, recovery state machine and fixed HTTP ports",
+  "domainTests": {
+    "SupplierPaymentOperationTest": 14,
+    "SupplierPaymentAuthorizationTest": 6,
+    "SupplierPayableHoldTest": 13,
+    "PaymentOperationTest": 18
+  },
+  "httpTests": {
+    "GatewaySupplierPaymentTest": 6,
+    "GatewaySupplierPayableHoldTest": 5,
+    "FinanceGatewayClientTest": 14
+  },
+  "total": 76,
+  "failures": 0,
+  "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-protocol-tests.log",
+  "restorationRegression": {
+    "redTests": 1,
+    "redFailures": 1,
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-restore-red.log",
+    "cause": "Validation rejected unsupported sending and terminal states but did not reject a zero-dispatch queued record carrying a NOT_FOUND bank observation",
+    "fix": "Any bank observation requires a persisted possible dispatch",
+    "green": "Included in the 76 test regression"
+  },
+  "authors": {
+    "javaFiles": 900,
+    "namedTypes": 1665,
+    "missing": 0
+  },
+  "boundaries": [
+    "confirmed original hold and independent cashier",
+    "fixed approved amount and original supplier account",
+    "fresh current payable, hold and selected debit account before every new send",
+    "exclusive authorization and evidence deadlines",
+    "query only after possible send including authorization expiry",
+    "explicit same-command retry only after authoritative NOT_FOUND",
+    "sticky contradictory bank evidence and separate reversal status",
+    "immutable bytes, precise decimal quantity and NON_NULL persistence round trips",
+    "fixed destination and transaction-free transport"
+  ],
+  "testData": "synthetic loopback HTTP only; no actual bank transaction",
+  "liveAcceptanceSchema": 70,
+  "pending": [
+    "persisted cashier execution intent",
+    "persistent supplier bank queue and worker",
+    "cashier public API and UI",
+    "original ERP payable settlement",
+    "real enterprise integration"
+  ]
+}

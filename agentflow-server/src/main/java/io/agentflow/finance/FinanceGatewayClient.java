@@ -57,6 +57,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_QUERY
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYABLE_HOLD_QUERY
+                || operation == Operation.SUPPLIER_PAYMENT_COMMAND || operation == Operation.SUPPLIER_PAYMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
@@ -117,6 +118,19 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> querySupplierPayableHold(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYABLE_HOLD_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 供应商银行指令固定原财务授权号，预留命令与付款命令由独立操作类型区分。 */
+    public <T> FinanceResult<T> executeSupplierPayment(String tenantId, String targetDigest, UUID authorizationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (authorizationId == null) throw new IllegalArgumentException("A supplier payment authorization identity is required");
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYMENT_COMMAND, authorizationId, data, resultType, matchesRequest);
+    }
+
+    /** 银行结果未知或授权到期后，只能向原目标查询原供应商付款。 */
+    public <T> FinanceResult<T> querySupplierPayment(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 付款前账户复查绑定原目标，只允许员工账户及出纳出款目录两个只读操作。 */
@@ -207,7 +221,7 @@ public class FinanceGatewayClient {
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
                 || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND
-                || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND) request.header("Idempotency-Key", requestId.toString());
+                || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -284,6 +298,8 @@ public class FinanceGatewayClient {
                 FinanceResult.Reason.PROCUREMENT_PAYABLE_UNAVAILABLE, FinanceResult.Reason.PROCUREMENT_MATCH_REQUIRED)),
         SUPPLIER_PAYABLE_HOLD_COMMAND("supplier-payable-hold-command", Set.of()),
         SUPPLIER_PAYABLE_HOLD_QUERY("supplier-payable-hold-query", Set.of()),
+        SUPPLIER_PAYMENT_COMMAND("supplier-payment-command", Set.of()),
+        SUPPLIER_PAYMENT_QUERY("supplier-payment-query", Set.of()),
         VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         VOUCHER_REVERSAL_COMMAND("voucher-reversal-command", Set.of()),
         VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of());
