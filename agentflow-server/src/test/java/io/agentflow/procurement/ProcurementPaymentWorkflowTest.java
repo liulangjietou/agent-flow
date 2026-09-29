@@ -160,6 +160,31 @@ class ProcurementPaymentWorkflowTest {
         assertThat(send(path(id) + "/cancel", "alice", lifecycle(id)).getStatus()).isBetween(400, 499);
     }
 
+    @Test void copiedTemplateUsesTheChosenAppointmentsSupervisorThenFinancialReview() throws Exception {
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "主管与财务部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成审批岗位", entity, null, true);
+        var supervisor = organization.createAppointment(admin, manager, department.id(), position.id(), true);
+        organization.createAppointment(admin, person("finance", true), department.id(), position.id(), true);
+        organization.setSupervisor(admin, appointment, supervisor.id(), 1);
+        var copied = ok(send("/api/v1/process-templates/procurement-payment/copy", "admin",
+                Map.of("key", "procurement-copy-" + UUID.randomUUID(), "name", "复制的已验收采购付款", "templateVersion", 1)), 200);
+        var draft = definitions.get("demo", id(copied));
+        assertThat(definitions.inspect("demo", draft.graph(), draft.formSchema()).errors()).contains("ASSIGNEE_NOT_AVAILABLE:finance");
+        var finance = person("finance", true);
+        var assigned = new Graph(draft.graph().nodes().stream().map(node -> node.id().equals("finance")
+                ? new Node(node.id(), node.name(), node.type(), Map.of("assigneeRule", "role:ORG_PERSON_" + finance)) : node).toList(), draft.graph().edges());
+        draft = definitions.update("demo", draft.id(), draft.name(), assigned, draft.formSchema(), draft.revision());
+        var definition = definitions.publish(admin, draft.id(), draft.revision(), "采购模板联动验收");
+        UUID id = id(ok(send("/api/v1/procurement-payments", "alice", createBody(definition, content("70"))), 201)); submit(id);
+        assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app(id).id().toString()).singleResult().getTaskDefinitionKey()).isEqualTo("supervisor");
+        ok(act(id, "APPROVE"), 200);
+        assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app(id).id().toString()).singleResult().getTaskDefinitionKey()).isEqualTo("finance");
+        assertPrivateFactsAbsent(ok(read(path(id), "finance"), 200));
+        ok(send(actionPath(id), "finance", decision(id, "APPROVE")), 200);
+        assertThat(current(id).approval().approvedBy()).isEqualTo("finance"); assertThat(app(id).status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertNoFinancialWrites(id);
+    }
+
     @Test void returnedRevisionKeepsOriginalEvidenceAndReplacesTheHoldOnlyAtResubmission() throws Exception {
         UUID id = create(); submit(id); var original = current(id).currentRound(); var originalHold = reservations.active("demo", id).orElseThrow();
         ok(act(id, "RETURN"), 200); ok(send(path(id) + "/revise", "alice", revision(id, content("40"))), 200);

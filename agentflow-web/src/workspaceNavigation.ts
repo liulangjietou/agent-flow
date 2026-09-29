@@ -18,7 +18,7 @@ export const workspaceMenu: { label: string; items: WorkspaceMenuItem[] }[] = [
     { page: 'designer', label: '流程管理', icon: '⌘' },
     { page: 'templates', label: '模板中心', icon: '▤', access: 'manage' },
     { page: 'assist', label: 'Agent 助理', icon: '✦' },
-    { page: 'expense', label: '费用报销', icon: '▣' },
+    { page: 'expense', label: '财务申请', icon: '▣' },
     { page: 'cashier', label: '出纳付款', icon: '↗', access: 'cashier' }
   ] },
   { label: '管理与集成', items: [

@@ -1,6 +1,6 @@
 # 流程模板中心
 
-本阶段提供请假、用印、合同审批三个官方模板。每个模板包含可编辑的流程图、版本化表单、审批策略说明、示例输入和期望结果；复制后进入当前租户的私有流程草稿，再使用现有设计器校验、模拟和发布。模板全部为 `businessType=FORM`，不创建费用报销、采购付款、预算占用或其他结构化财务单据。
+当前目录提供请假、用印、合同审批三个通用表单模板，以及已验收采购付款模板。每个模板包含可编辑的流程图、版本化表单、审批策略说明、示例输入和期望结果；复制后进入当前租户的私有流程草稿，再使用现有设计器校验、模拟和发布。前三个模板为 `businessType=FORM`；采购模板为 `PROCUREMENT_PAYMENT`，发布后从独立采购入口填报和预检，普通申请接口不能绕过财务依据。
 
 本文说明资源与接口契约，不作为本地测试、HTTP 或浏览器验收已通过的证明；实际运行结果以本阶段测试日志和验收记录为准。
 
@@ -11,16 +11,23 @@
 | `leave-request` | 请假申请 | `durationDays > 3` | 经理审批后结束 |
 | `seal-application` | 用印申请 | `urgent == true` | 经理审批后结束 |
 | `contract-review` | 合同审批 | `contractAmount >= 100000` | 经理审批后结束 |
+| `procurement-payment` | 已验收采购付款 | 每笔均需人工复核 | 本次任职直属主管 → 财务复核 |
 
-三个模板使用相同的受限图结构，节点标识为 `start`、`manager`、`route`、`review`、`end`。短路径为 `start → manager → route → end`；条件满足时为 `start → manager → route → review → end`。网关有显式默认分支，条件分支按图中的顺序保存。各节点的 `properties.x` / `properties.y` 为画布坐标字符串，不影响路由。
+三个通用表单模板使用相同的受限图结构，节点标识为 `start`、`manager`、`route`、`review`、`end`。短路径为 `start → manager → route → end`；条件满足时为 `start → manager → route → review → end`。网关有显式默认分支，条件分支按图中的顺序保存。各节点的 `properties.x` / `properties.y` 为画布坐标字符串，不影响路由。
 
 `manager` 配置 `role:MANAGER`，`review` 配置 `role:ADMIN`。这些是演示角色，不自动映射为直属上级、部门负责人或法务。`ADMIN` 在这里仅演示额外复核；模板复制后应按本租户制度修改审批人和阈值。复制后的草稿可配置[本地组织及动态任职规则](organization-context-and-field-permissions.md)。原模板保留演示规则，复制后的静态规则在发布时检查有效成员，动态规则在实际节点激活时检查；自审批控制和代理有效期管理仍未接入。
 
-通知文案保存在 `notificationTexts`，事件名为 `SUBMITTED`、`RETURNED`、`APPROVED`。三个内置模板的版本 2 将 `notificationsAvailable` 设为 `true`：复制时转为流程定义的申请人站内文案，可在设计器修改后发布。文案随申请创建冻结，不替换申请字段；邮件和 IM 尚未接入。详见[版本通知文案](definition-notification-texts.md)。
+通知文案保存在 `notificationTexts`，事件名为 `SUBMITTED`、`RETURNED`、`APPROVED`。三个通用表单模板的版本 2 将 `notificationsAvailable` 设为 `true`：复制时转为流程定义的申请人站内文案，可在设计器修改后发布。文案随申请创建冻结，不替换申请字段；邮件和 IM 尚未接入。详见[版本通知文案](definition-notification-texts.md)。
+
+## 采购模板的独立入口
+
+`procurement-payment` 为版本 1、财务分类。`supervisor` 使用 `role:ORG_SUPERVISOR_1`；`finance` 的 `role:FINANCE` 为占位配置，复制后必须绑定本租户具有审批资格的实际人员或岗位，空角色会被发布校验拒绝。两个节点均只读完整的采购敏感组。三个场景验证正额、最小正额及零额拒绝，不能代替实际原应付预检。
+
+当前目录合计 4 个模板、18 个场景。`check-process-templates.py` 的真实通用表单审批仅覆盖前三个 FORM 模板；采购另由 `ProcurementPaymentWorkflowTest` 和采购 HTTP/浏览器证据覆盖。
 
 ## 字段
 
-表单采用现有 `schemaVersion=1` 格式。标题、业务单号、流程版本由申请本身管理，不重复放入业务字段。数字使用十进制字符串，日期使用 `YYYY-MM-DD`，布尔值使用 JSON `true` / `false`；`false` 是已填写的有效值。具体类型和校验规则见 [版本化申请表单](./versioned-forms.md)。
+三个通用模板采用 `schemaVersion=1` 格式；采购模板使用 `schemaVersion=2` 的敏感明细与节点权限。标题、业务单号、流程版本由申请本身管理，不重复放入业务字段。数字使用十进制字符串，日期使用 `YYYY-MM-DD`，布尔值使用 JSON `true` / `false`；`false` 是已填写的有效值。具体类型和校验规则见 [版本化申请表单](./versioned-forms.md)。
 
 ### 请假申请
 
@@ -59,7 +66,7 @@
 
 ## 资源与版本
 
-官方资源位于 `agentflow-server/src/main/resources/process-templates/`，文件名与模板 key 相同。当前三份资源的 `templateVersion` 均为 `2`，`category` 为 `OA`。模板版本、表单格式版本和租户流程发布版本是不同概念：复制模板 v2 会创建租户流程草稿，发布后由流程定义服务分配该租户流程的业务版本。原 v1 副本保持原配置，不自动启用文案。
+官方资源位于 `agentflow-server/src/main/resources/process-templates/`，文件名与模板 key 相同。三份通用表单资源的 `templateVersion` 均为 `2`，`category` 为 `OA`。模板版本、表单格式版本和租户流程发布版本是不同概念：复制模板 v2 会创建租户流程草稿，发布后由流程定义服务分配该租户流程的业务版本。原 v1 副本保持原配置，不自动启用文案。
 
 资源只使用以下顶层属性：
 
@@ -127,7 +134,7 @@
 
 本阶段验收应另行验证：复制后编辑不改变官方资源或其他副本；跨租户不能读取、改动对方草稿；相同幂等键重放只产生一个草稿；模板版本不被静默切换；复制后可发布并完成真实申请审批；后续模板更新不改变已发布定义与旧实例。这些要求不能用资源静态检查代替。
 
-模板目录管理、模板升级差异合并、代理及附件尚不属于模板中心交付。动态组织与节点字段权限已在后续[任职上下文与字段权限](organization-context-and-field-permissions.md)中实现，复制后的草稿可配置，原模板不自动改写。站内文案、开始使用引导和重复明细的后续能力分别见相应功能文档；邮件和 IM 尚未接入。费用报销、采购付款与预算调整须继续按各自结构化领域设计实现，不以 FORM 占位补齐模板数量。
+模板目录管理、模板升级差异合并、代理及附件尚不属于模板中心交付。动态组织与节点字段权限已在后续[任职上下文与字段权限](organization-context-and-field-permissions.md)中实现，复制后的草稿可配置，原模板不自动改写。站内文案、开始使用引导和重复明细的后续能力分别见相应功能文档；邮件和 IM 尚未接入。费用报销、采购付款与预算调整按各自结构化领域实现。已验收采购付款的模板、独立页面和本地审批验收见[采购付款](procurement-payments.md)。
 
 ## 模板文件复用
 

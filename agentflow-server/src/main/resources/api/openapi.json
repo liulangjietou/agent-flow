@@ -1772,7 +1772,7 @@
           "模板"
         ],
         "summary": "模板目录",
-        "description": "仅已交付的 FORM 模板：请假、用印、合同。目录带场景及本租户复制记录。",
+        "description": "已交付的请假、用印、合同通用表单模板及已验收采购付款结构化模板；目录带场景与本租户复制记录。采购必须从独立业务入口办理。",
         "x-access": "ADMIN 或 PROCESS_ADMIN",
         "x-idempotency": false,
         "responses": {
@@ -27352,7 +27352,8 @@
           "businessType": {
             "type": "string",
             "enum": [
-              "FORM"
+              "FORM",
+              "PROCUREMENT_PAYMENT"
             ]
           },
           "dependencies": {

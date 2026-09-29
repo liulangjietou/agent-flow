@@ -7,6 +7,7 @@ import io.agentflow.definition.DefinitionValidator;
 import io.agentflow.form.FormSchema;
 import io.agentflow.form.FormValidationException;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.procurement.ProcurementPaymentFormContract;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +26,8 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
                               Map<String, String> fieldDescriptions, List<String> risks, String upgradePolicy,
                               Map<String, String> notificationTexts, boolean notificationsAvailable,
                               Graph graph, FormSchema formSchema, List<Scenario> scenarios) {
-    private static final String SUPPORTED_BUSINESS_TYPE = "FORM";
+    private static final String FORM = "FORM";
+    private static final String PROCUREMENT_PAYMENT = "PROCUREMENT_PAYMENT";
 
     /** 冻结目录说明与业务图；启用通知的模板仅支持已实现的三类站内文案。 */
     public ProcessTemplate {
@@ -35,7 +37,7 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
         for (String value : new String[]{name, category, description, scope, businessType, upgradePolicy}) {
             if (value == null || value.isBlank()) throw new IllegalArgumentException("Template description is required");
         }
-        if (!SUPPORTED_BUSINESS_TYPE.equals(businessType)) {
+        if (!java.util.Set.of(FORM, PROCUREMENT_PAYMENT).contains(businessType)) {
             throw new IllegalArgumentException("Template business type is not supported");
         }
         dependencies = List.copyOf(dependencies);
@@ -62,6 +64,8 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
     public void verifyScenarios() {
         List<String> errors = new DefinitionValidator().validate(graph, formSchema);
         if (!errors.isEmpty()) throw new IllegalArgumentException("Template graph is invalid: " + key + ": " + String.join(", ", errors));
+        if (PROCUREMENT_PAYMENT.equals(businessType)) ProcurementPaymentFormContract.requireReview(graph, formSchema);
+        else if (ProcurementPaymentFormContract.structured(formSchema)) throw new IllegalArgumentException("Procurement template must declare its actual business type");
         if (scenarios.stream().map(Scenario::id).distinct().count() != scenarios.size()) {
             throw new IllegalArgumentException("Template scenario ids are duplicated: " + key);
         }

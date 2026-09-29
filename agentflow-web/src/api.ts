@@ -22,6 +22,7 @@ import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseF
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
+import type { ProcurementPaymentItem, ProcurementDetail, ProcurementCreate, ProcurementRevise, ProcurementReceipt, ProcurementVersions, ProcurementCheckOptions, ProcurementCheckInput, ProcurementCheckView } from './procurementPayment'
 import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
 import type { DisbursementReturnView, DisbursementReturnQueryInput, DisbursementResolutionInput, DisbursementReturnActionReceipt } from './disbursementReturn'
 import type { RepaymentReviewView, RepaymentReviewQueryInput, RepaymentResolutionInput, RepaymentReviewActionReceipt } from './repaymentReview'
@@ -96,7 +97,7 @@ export interface DefinitionAvailabilityInput { startEnabled: boolean; expectedRe
 export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
 export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
 export interface ProcessTemplate {
-  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM'
+  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT'
   dependencies: string[]; defaultRoles: string[]; fieldDescriptions: Record<string, string>; risks: string[]; upgradePolicy: string
   notificationTexts: Record<string, string>; notificationsAvailable: boolean; graph: Graph; formSchema: FormSchema
   scenarios: TemplateScenario[]; copies: TemplateCopy[]
@@ -342,6 +343,16 @@ export const api = {
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
+  procurementPayments: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ProcurementPaymentItem>>('/procurement-payments' + historyQuery(filter), { signal, cache: 'no-store' }),
+  procurementPayment: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ProcurementDetail>(`/procurement-payments/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  createProcurementPayment: (input: ProcurementCreate) => write<ProcurementReceipt>('/procurement-payments', 'POST', '保存采购付款申请', input),
+  reviseProcurementPayment: (id: string, input: ProcurementRevise) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/revise`, 'POST', '保存采购付款申请修改', input),
+  procurementCheckOptions: (id: string, signal: AbortSignal) => request<ProcurementCheckOptions>(`/procurement-payments/${encodeURIComponent(id)}/prechecks/options`, { signal, cache: 'no-store' }),
+  queueProcurementCheck: (id: string, input: ProcurementCheckInput) => write<{ id: string }>(`/procurement-payments/${encodeURIComponent(id)}/prechecks`, 'POST', '查询采购付款申请财务依据', input),
+  procurementCheck: (id: string, jobId: string, signal: AbortSignal) => request<ProcurementCheckView>(`/procurement-payments/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  submitProcurementPayment: (id: string, input: ProcurementVersions & { precheckId: string }) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/submit`, 'POST', '正式提交采购付款申请', input),
+  withdrawProcurementPayment: (id: string, input: ProcurementVersions & { comment: string }) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回采购付款申请', input),
+  cancelProcurementPayment: (id: string, input: ProcurementVersions & { comment: string }) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/cancel`, 'POST', '作废采购付款申请', input),
   advanceRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceRequestItem>>('/advance-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   advanceRequest: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<AdvanceDetail>(`/advance-requests/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   advanceDisbursementReview: (id: string, roundNo: number, signal: AbortSignal) => request<DisbursementReturnView>(`/advance-requests/${encodeURIComponent(id)}/disbursement-review` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

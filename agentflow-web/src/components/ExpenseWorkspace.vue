@@ -5,18 +5,19 @@ import { ExpensePageQuery, expenseStatuses, moneyLabel } from '../expenses'
 import ExpenseEditor from './ExpenseEditor.vue'
 import ExpensePlanWorkspace from './ExpensePlanWorkspace.vue'
 import AdvanceRequestWorkspace from './AdvanceRequestWorkspace.vue'
+import ProcurementPaymentWorkspace from './ProcurementPaymentWorkspace.vue'
 import { advanceBalanceLabels } from '../advanceRepayment'
 import InvoiceWallet from './InvoiceWallet.vue'
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean }>()
 const emit = defineEmits<{ open: [applicationId: string] }>()
-const tab = ref<'reports' | 'requests' | 'advances' | 'invoices' | 'plans' | 'borrowings'>('reports'), status = ref('')
+const tab = ref<'reports' | 'requests' | 'advances' | 'invoices' | 'plans' | 'borrowings' | 'procurement'>('reports'), status = ref('')
 const editing = ref(false)
 const reports = reactive(new ExpensePageQuery(api.expenseReports)), requests = reactive(new ExpensePageQuery(api.expenseRequests)), advances = reactive(new ExpensePageQuery(api.employeeAdvances))
 const current = computed(() => tab.value === 'reports' ? reports : tab.value === 'requests' ? requests : advances)
-const tabs = [{ id: 'borrowings' as const, label: '我的借款申请' }, { id: 'plans' as const, label: '我的事前申请' }, { id: 'reports' as const, label: '我的报销' }, { id: 'invoices' as const, label: '个人票夹' }, { id: 'requests' as const, label: '事前批准额度' }, { id: 'advances' as const, label: '已放款借款' }]
+const tabs = [{ id: 'procurement' as const, label: '我的采购付款' }, { id: 'borrowings' as const, label: '我的借款申请' }, { id: 'plans' as const, label: '我的事前申请' }, { id: 'reports' as const, label: '我的报销' }, { id: 'invoices' as const, label: '个人票夹' }, { id: 'requests' as const, label: '事前批准额度' }, { id: 'advances' as const, label: '已放款借款' }]
 const advanceStatus: Record<string, string> = advanceBalanceLabels
 function clear() { reports.clear(); requests.clear(); advances.clear() }
-function load(more = false) { if (!['invoices', 'plans', 'borrowings'].includes(tab.value)) return current.value.load(props.scopeKey, tab.value === 'reports' ? status.value || undefined : undefined, more) }
+function load(more = false) { if (!['invoices', 'plans', 'borrowings', 'procurement'].includes(tab.value)) return current.value.load(props.scopeKey, tab.value === 'reports' ? status.value || undefined : undefined, more) }
 watch(() => [props.scopeKey, props.refreshVersion, tab.value, status.value], () => { clear(); void load() }, { immediate: true, flush: 'sync' })
 onUnmounted(clear)
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -26,11 +27,12 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { y
   <section class="content expense-workspace">
     <ExpenseEditor v-if="editing" :scope-key="scopeKey" :locked="locked" @close="editing = false; load()" @submitted="editing = false; load(); emit('open', $event)" />
     <template v-else>
-    <div class="page-heading"><div><p class="eyebrow">EXPENSE CONTROL</p><h2>费用报销</h2><p class="subhead">查看报销进度，核对本人可用额度与借款余额。</p></div><div class="workspace-actions"><button v-if="!['invoices', 'plans', 'borrowings'].includes(tab)" class="secondary" :disabled="current.loading" @click="load()">刷新记录</button><button class="primary" :disabled="locked" @click="editing = true">＋ 填写报销</button></div></div>
-    <div class="expense-navigation" role="group" aria-label="费用工作区视图"><button v-for="item in tabs" :key="item.id" :aria-pressed="tab === item.id" @click="tab = item.id">{{ item.label }}</button></div>
+    <div class="page-heading"><div><p class="eyebrow">FINANCE WORKSPACE</p><h2>财务申请</h2><p class="subhead">办理报销、借款与采购付款，核对本人财务记录。</p></div><div class="workspace-actions"><button v-if="!['invoices', 'plans', 'borrowings', 'procurement'].includes(tab)" class="secondary" :disabled="current.loading" @click="load()">刷新记录</button><button class="primary" :disabled="locked" @click="editing = true">＋ 填写报销</button></div></div>
+    <div class="expense-navigation" role="group" aria-label="财务工作区视图"><button v-for="item in tabs" :key="item.id" :aria-pressed="tab === item.id" @click="tab = item.id">{{ item.label }}</button></div>
     <InvoiceWallet v-if="tab === 'invoices'" :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
     <ExpensePlanWorkspace v-else-if="tab === 'plans'" :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" @open="emit('open', $event)" />
     <AdvanceRequestWorkspace v-else-if="tab === 'borrowings'" :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" @open="emit('open', $event)" />
+    <ProcurementPaymentWorkspace v-else-if="tab === 'procurement'" :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" @open="emit('open', $event)" />
     <template v-else>
     <div class="ledger-toolbar"><label v-if="tab === 'reports'">报销状态<select v-model="status"><option value="">全部状态</option><option v-for="(label, value) in expenseStatuses" :key="value" :value="value">{{ label }}</option></select></label><p v-else>{{ tab === 'requests' ? '批准额度包含当前预留；已关闭的额度不能增加占用。' : '只显示实际放款的借款，预留金额仍未完成冲销。' }}</p><span>已加载 {{ current.items.length }} 条</span></div>
     <p v-if="current.error" class="expense-error" role="alert">{{ current.error }}<button :disabled="current.loading" @click="load(!!current.nextBeforeId)">重新读取</button></p>

@@ -22,7 +22,7 @@ const copyInput = computed<TemplateCopyInput>(() => ({ key: targetKey.value.trim
 const copyErrors = computed(() => attempted.value ? validateTemplateCopy(copyInput.value) : {})
 const statusLabels: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', ARCHIVED: '已归档' }
 const notificationLabels: Record<string, string> = { SUBMITTED: '提交后', RETURNED: '退回后', APPROVED: '批准后' }
-const roleLabels: Record<string, string> = { MANAGER: '经理审批组（示例）', ADMIN: '额外复核组（示例）' }
+const roleLabels: Record<string, string> = { MANAGER: '经理审批组（示例）', ADMIN: '额外复核组（示例）', FINANCE: '财务复核（复制后绑定实际人员或岗位）', ORG_SUPERVISOR_1: '本次任职直属主管' }
 const nodeName = (id: string) => selected.value?.graph.nodes.find(node => node.id === id)?.name ?? id
 const fieldName = (key: string) => selected.value?.formSchema.fields.find(field => field.key === key)?.label ?? key
 const fieldTypeName = (type: string) => fieldTypes.find(item => item.value === type)?.label ?? type
@@ -64,11 +64,11 @@ onUnmounted(() => catalog.clear())
         <div class="template-catalog" aria-label="模板目录">
           <p v-if="!visibleTemplates.length" class="unavailable">{{ catalog.templates.length ? '没有匹配的模板，请调整搜索词。' : '当前没有可用模板。' }}</p>
           <button v-for="item in visibleTemplates" :key="item.key" class="template-card" :class="{ selected: selectedKey === item.key }" :aria-pressed="selectedKey === item.key" :disabled="locked" @click="choose(item.key)">
-            <span class="template-card-meta">{{ item.category }} · 表单审批 <span>V{{ item.templateVersion }}</span></span><strong>{{ item.name }}</strong><p>{{ item.description }}</p><span class="template-card-footer">{{ item.formSchema.fields.length }} 个字段 · {{ item.scenarios.length }} 个样例 <span>{{ item.copies.length ? `${item.copies.length} 份租户副本` : '查看详情 →' }}</span></span>
+            <span class="template-card-meta">{{ item.category }} · {{ item.businessType === 'PROCUREMENT_PAYMENT' ? '采购付款' : '表单审批' }} <span>V{{ item.templateVersion }}</span></span><strong>{{ item.name }}</strong><p>{{ item.description }}</p><span class="template-card-footer">{{ item.formSchema.fields.length }} 个字段 · {{ item.scenarios.length }} 个样例 <span>{{ item.copies.length ? `${item.copies.length} 份租户副本` : '查看详情 →' }}</span></span>
           </button>
         </div>
         <article v-if="selected" :key="selected.key" class="panel template-detail">
-          <div class="template-detail-heading"><div><p class="eyebrow">{{ selected.key }} / V{{ selected.templateVersion }}</p><h3>{{ selected.name }}</h3><p>{{ selected.description }}</p></div><span class="status-chip">通用表单</span></div>
+          <div class="template-detail-heading"><div><p class="eyebrow">{{ selected.key }} / V{{ selected.templateVersion }}</p><h3>{{ selected.name }}</h3><p>{{ selected.description }}</p></div><span class="status-chip">{{ selected.businessType === 'PROCUREMENT_PAYMENT' ? '采购付款' : '通用表单' }}</span></div>
           <section class="template-section"><h4>适用范围</h4><p>{{ selected.scope }}</p></section>
           <form v-if="!examplesOnly" class="template-copy-form" novalidate @submit.prevent="copy">
             <h4>复制为我的流程草稿</h4><p>复制后进入设计器；审批角色与示例阈值需核对，发布由你决定。</p>

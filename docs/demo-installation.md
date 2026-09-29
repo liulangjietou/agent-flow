@@ -76,7 +76,7 @@ python3 scripts/check-system.py http://127.0.0.1:8180
 python3 scripts/check-process-templates.py http://127.0.0.1:8180
 ```
 
-第一个脚本只读业务数据并验证权限、来源、探针及自检；第二个脚本会保留带随机前缀的演示流程与申请，完成三个模板的真实审批路径。容器构建执行作者检查与编译，测试门禁仍使用 README 中的后端 `mvn verify`、前端测试与构建命令。
+第一个脚本只读业务数据并验证权限、来源、探针及自检；第二个脚本会保留带随机前缀的演示流程与申请，完成三个通用表单模板的真实审批路径。容器构建执行作者检查与编译，测试门禁仍使用 README 中的后端 `mvn verify`、前端测试与构建命令。
 
 实现依据：[Docker Compose 启动依赖与健康检查](https://docs.docker.com/compose/how-tos/startup-order/)、[Spring Boot 3.5 Actuator 健康与探针](https://docs.spring.io/spring-boot/3.5/reference/actuator/endpoints.html)。
 
