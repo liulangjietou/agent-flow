@@ -24,7 +24,7 @@ import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, Invoice
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
 import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
 import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
-import type { VoucherActionInput, VoucherReceipt, VoucherView } from './vouchers'
+import type { VoucherActionInput, VoucherReceipt, VoucherView, VoucherDisputeInput, VoucherDisputeReceipt } from './vouchers'
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
 import type { ExpenseArchiveView } from './expenseArchive'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
@@ -305,6 +305,7 @@ export const api = {
   voucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/actions`, 'POST', '办理本轮凭证操作', input),
   paymentVouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers/payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   paymentVoucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/payment/actions`, 'POST', '办理本轮付款凭证操作', input),
+  resolveVoucherDispute: (id: string, operationId: string, input: VoucherDisputeInput) => write<VoucherDisputeReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/dispute-resolutions`, 'POST', '确认原凭证对账结果', input),
   expenseSettlement: (id: string, roundNo: number, signal: AbortSignal) => request<SettlementView>(`/expense-reports/${encodeURIComponent(id)}/settlement` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<ExpenseArchiveView>(`/expense-reports/${encodeURIComponent(id)}/archive` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   downloadExpenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<Blob>(`/expense-reports/${encodeURIComponent(id)}/archive/content` + historyQuery({ roundNo }), { signal, cache: 'no-store' }, 'zip'),

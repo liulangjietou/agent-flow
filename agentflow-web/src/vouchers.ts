@@ -7,12 +7,16 @@ export interface VoucherView extends VoucherBinding {
   preparation: null | { id: string; status: keyof typeof preparationLabels; attempt: number; createdAt: string; completedAt: string | null; issue: string | null }
   operation: null | { id: string; version: number; kind: VoucherKind; status: keyof typeof operationLabels; attempts: number; accountingDate: string; updatedAt: string; sendExpiresAt: string; observedStatus: 'PENDING' | 'POSTED' | 'FAILED' | 'REVERSED' | 'NOT_FOUND' | null; voucherReference: string | null; postedAt: string | null; disputed: boolean; issue: string | null }
   actions: { prepare: boolean; query: boolean; resendOriginal: boolean }
+  dispute?: null | { candidate: null | { outcome: 'PENDING' | 'POSTED' | 'FAILED' | 'REVERSED' | 'NOT_FOUND'; revision: number; observedAt: string; validUntil: string; postingReference: string | null; voucherReference: string | null; postedAt: string | null; failure: string | null }; issue: string | null; canResolve: boolean; latest: null | { id: string; operationVersion: number; outcome: VoucherDisputeInput['outcome']; resolvedBy: string; resolvedAt: string; evidenceReference: string } }
 }
+export interface VoucherDisputeInput { roundNo: number; applicationVersion: number; businessVersion: number; operationVersion: number; outcome: 'POSTED' | 'FAILED' | 'REVERSED'; evidenceReference: string; comment: string }
+export interface VoucherDisputeReceipt { applicationId: string; operationId: string; roundNo: number; kind: VoucherKind; resolutionId: string; operationVersion: number; outcome: VoucherDisputeInput['outcome']; auditEventId: string }
 export interface VoucherActionInput { action: VoucherAction; roundNo: number; applicationVersion: number; businessVersion: number; operationId?: string; operationVersion?: number; comment: string }
 export interface VoucherReceipt { applicationId: string; businessId: string; roundNo: number; action: VoucherAction; preparationId: string | null; operationId: string | null; operationVersion: number | null; auditEventId: string; kind: VoucherKind }
 
 export const preparationLabels = { QUEUED: '等待准备凭证', RUNNING: '正在核对会计依据', READY: '凭证已准备', BLOCKED: '准备条件未满足', UNAVAILABLE: '准备服务暂不可用', VOIDED: '本次准备已停止', NOT_REQUIRED: '本轮无需金额凭证' }
 export const operationLabels = { QUEUED: '等待发送 ERP', POSTING: '正在请求过账', QUERYING: '正在核对 ERP 结果', UNKNOWN: '过账结果待确认', POSTED: '已过账', FAILED: '过账未通过', NOT_FOUND: 'ERP 确认原操作不存在', EXPIRED: '原发送期限已过', VOIDED: '原凭证命令已停止', RECONCILING: '凭证结果存在冲突', REVERSED: '凭证已冲销' }
+export const voucherOutcomeLabels = { PENDING: 'ERP 处理中', POSTED: '已过账', FAILED: '过账未通过', REVERSED: '凭证已冲销', NOT_FOUND: 'ERP 确认原操作不存在' }
 export const voucherActionLabels: Record<VoucherAction, string> = { PREPARE: '重新准备凭证', QUERY: '查询 ERP 结果', RESEND_ORIGINAL: '按原编号重发' }
 const actionKeys = { PREPARE: 'prepare', QUERY: 'query', RESEND_ORIGINAL: 'resendOriginal' } as const
 const positive = (value: number) => Number.isSafeInteger(value) && value > 0
@@ -31,8 +35,41 @@ export function validateVoucherView(view: VoucherView, expected: VoucherBinding)
         || !Number.isFinite(Date.parse(operation.sendExpiresAt)) || typeof operation.disputed !== 'boolean'
         || operation.status === 'POSTED' && (operation.disputed || operation.observedStatus !== 'POSTED' || !operation.voucherReference || !operation.postedAt))
       || preparation?.status === 'READY' && preparation.id !== operation?.id) throw new Error('凭证状态未通过校验，请刷新核对。')
+  const dispute = view.dispute, candidate = dispute?.candidate
+  if (dispute && (!operation || typeof dispute.canResolve !== 'boolean'
+      || candidate && (!Object.prototype.hasOwnProperty.call(voucherOutcomeLabels, candidate.outcome) || !Number.isSafeInteger(candidate.revision) || candidate.revision < 0
+        || !Number.isFinite(Date.parse(candidate.observedAt)) || !Number.isFinite(Date.parse(candidate.validUntil)))
+      || dispute.canResolve && (!candidate || dispute.issue !== null || operation.status !== 'RECONCILING' || !operation.disputed)
+      || dispute.latest && (!dispute.latest.id || !positive(dispute.latest.operationVersion) || dispute.latest.operationVersion > operation.version
+        || !['POSTED', 'FAILED', 'REVERSED'].includes(dispute.latest.outcome)))) throw new Error('凭证裁决状态未通过核对，请刷新。')
   return view
 }
+
+/** 裁决只采用页面已展示的近期原查询终态，不接收可编辑的 ERP 事实。 */
+export function voucherDisputeInput(view: VoucherView, evidenceReference: string, comment: string, now = Date.now()): VoucherDisputeInput {
+  validateVoucherView(view, view)
+  const dispute = view.dispute, candidate = dispute?.candidate
+  if (!view.operation || view.operation.status !== 'RECONCILING' || !view.operation.disputed || !dispute?.canResolve || dispute.issue || !candidate
+      || !['POSTED', 'FAILED', 'REVERSED'].includes(candidate.outcome) || !positive(candidate.revision) || !candidate.postingReference
+      || !Number.isFinite(Date.parse(candidate.observedAt)) || !Number.isFinite(Date.parse(candidate.validUntil))
+      || Date.parse(candidate.observedAt) > now || Date.parse(candidate.validUntil) <= now
+      || Date.parse(candidate.validUntil) - Date.parse(candidate.observedAt) !== 300_000
+      || candidate.outcome !== 'FAILED' && (!candidate.voucherReference || !candidate.postedAt)) throw new Error('凭证裁决依据已变化或过期，请先重新查询 ERP 结果。')
+  if (!evidenceReference.trim() || evidenceReference.length > 128 || /[\u0000-\u001f\u007f-\u009f]/u.test(evidenceReference)) throw new Error('请填写 128 字以内、不含控制字符的核对凭据编号。')
+  if (!comment.trim() || comment.length > 2000) throw new Error('请填写 2000 字以内的裁决说明。')
+  return { roundNo: view.roundNo, applicationVersion: view.applicationVersion, businessVersion: view.businessVersion, operationVersion: view.operation.version,
+    outcome: candidate.outcome as VoucherDisputeInput['outcome'], evidenceReference: evidenceReference.trim(), comment: comment.trim() }
+}
+
+/** 幂等结果必须精确匹配当前凭证、终态及连续修订。 */
+export function validateVoucherDisputeReceipt(receipt: VoucherDisputeReceipt, view: VoucherView, input: VoucherDisputeInput) {
+  if (!receipt || receipt.applicationId !== view.applicationId || receipt.operationId !== view.operation?.id || receipt.roundNo !== input.roundNo
+      || receipt.kind !== view.kind || receipt.outcome !== input.outcome || receipt.operationVersion !== input.operationVersion + 1 || !receipt.resolutionId || !receipt.auditEventId) {
+    throw new Error('凭证裁决回执未通过核对，请刷新状态后确认。')
+  }
+}
+const disputeIssues: Record<string, string> = { NOT_DISPUTED: '原凭证正在查询或已经发生变化', NON_TERMINAL: 'ERP 尚未提供可采用的终态', STALE_OBSERVATION: '查询结果早于已知会计版本', EVIDENCE_EXPIRED: '核对依据已过期，请重新查询 ERP', DIFFERENT_POSTING: '查询结果与原凭证身份不一致', POSTING_ALREADY_OBSERVED: '历史存在过账记录，不能采用失败结论删除该事实' }
+export function voucherDisputeIssue(code: string | null) { return code ? disputeIssues[code] ?? '原凭证裁决条件尚未满足' : '' }
 
 /** 确认时再核对发送期限，永远只传原编号和已展示版本。 */
 export function voucherActionInput(view: VoucherView, action: VoucherAction, comment: string, now = Date.now()): VoucherActionInput {
@@ -72,6 +109,7 @@ export function voucherError(cause: unknown) {
   const failure = cause as { status?: number; code?: string; message?: string }
   if (failure.status === 403 || failure.status === 404) return '当前身份无权查看或操作这轮凭证。'
   if (failure.code === 'CONCURRENCY_CONFLICT') return '审批、财务或凭证版本已变化，请刷新业务明细后重新核对。'
+  if (failure.code === 'VOUCHER_DISPUTE_UNRESOLVABLE') return '凭证裁决依据已过期或不满足条件，请重新查询 ERP 后核对。'
   if (failure.code && issues[failure.code]) return issues[failure.code]!
   if (failure.code === 'VOUCHER_OPERATION_EXISTS') return '本轮已有原凭证，请核对原操作状态。'
   if (failure.code === 'PENDING_REQUEST_CHANGED' || failure.status === 0) return '操作结果尚未确认，请在未确认操作中恢复原请求后刷新状态。'

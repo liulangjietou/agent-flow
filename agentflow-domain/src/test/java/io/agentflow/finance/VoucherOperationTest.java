@@ -113,6 +113,66 @@ class VoucherOperationTest {
         assertThatThrownBy(() -> new VoucherOperation(initial.input(), 4, VoucherOperation.Status.POSTING, 2, NOW, NOW, null, NOW.plus(LEASE), null, null, 0, null)).isInstanceOf(DomainException.class);
     }
 
+    @Test void explicitDecisionAcceptsFreshOriginalPostingWithoutChangingCommandOrHistory() {
+        var original = posted(); var pending = observe(original, VoucherObservation.Status.PENDING, 3, null);
+        var corrected = observe(pending, VoucherObservation.Status.POSTED, 4, "voucher-1"); var at = corrected.updatedAt().plusSeconds(1);
+        assertThat(corrected.status()).isEqualTo(VoucherOperation.Status.RECONCILING);
+        assertThat(corrected.resolutionIssue(at, original.observation(), true)).isNull();
+        var result = corrected.resolveDispute(VoucherObservation.Status.POSTED, original.observation(), true, at);
+        assertThat(result.usablePosted()).isTrue(); assertThat(result.input()).isEqualTo(original.input());
+        assertThat(result.version()).isEqualTo(corrected.version() + 1); assertThat(result.observation()).isEqualTo(corrected.conflictingObservation());
+        assertThat(result.conflictingObservation()).isNull(); assertThat(corrected.observation()).isEqualTo(original.observation());
+        var decision = new VoucherDisputeResolution(java.util.UUID.randomUUID(), result.input().command().tenantId(), result.input().command().id(),
+                corrected.version(), result.version(), result.observation(), "independent-finance", at, "review-1", "已核对原凭证");
+        assertThat(decision.matches(corrected, result)).isTrue();
+        var self = new VoucherDisputeResolution(decision.id(), decision.tenantId(), decision.operationId(), decision.disputedVersion(), decision.resolvedVersion(),
+                decision.observation(), result.input().command().employeeId(), at, "review-1", "本人不能裁决");
+        assertThat(self.matches(corrected, result)).isFalse();
+        assertThatThrownBy(() -> result.resolveDispute(VoucherObservation.Status.POSTED, original.observation(), true, at)).isInstanceOf(DomainException.class);
+    }
+
+    @Test void decisionRejectsPendingOldExpiredOrDifferentTerminalIntent() {
+        var original = posted(); var pending = observe(original, VoucherObservation.Status.PENDING, 5, null);
+        assertThat(pending.resolutionIssue(pending.updatedAt(), original.observation(), true)).isEqualTo(VoucherOperation.ResolutionIssue.NON_TERMINAL);
+        var old = observe(pending, VoucherObservation.Status.POSTED, 4, "voucher-1");
+        assertThat(old.resolutionIssue(old.updatedAt(), original.observation(), true)).isEqualTo(VoucherOperation.ResolutionIssue.STALE_OBSERVATION);
+        var current = observe(old, VoucherObservation.Status.POSTED, 6, "voucher-1");
+        assertThat(current.resolutionIssue(current.updatedAt().plusSeconds(300), original.observation(), true)).isEqualTo(VoucherOperation.ResolutionIssue.EVIDENCE_EXPIRED);
+        assertThatThrownBy(() -> current.resolveDispute(VoucherObservation.Status.FAILED, original.observation(), true, current.updatedAt())).isInstanceOf(DomainException.class);
+    }
+
+    @Test void knownPostingCannotBeErasedByFailureOrReplacedWithAnotherVoucher() {
+        var original = posted(); var failed = observe(original, VoucherObservation.Status.FAILED, 3, null);
+        assertThat(failed.resolutionIssue(failed.updatedAt(), original.observation(), true)).isEqualTo(VoucherOperation.ResolutionIssue.POSTING_ALREADY_OBSERVED);
+        var changed = observe(original, VoucherObservation.Status.POSTED, 3, "other-voucher");
+        assertThat(changed.resolutionIssue(changed.updatedAt(), original.observation(), true)).isEqualTo(VoucherOperation.ResolutionIssue.DIFFERENT_POSTING);
+        var priorPending = queued().claim(NOW, LEASE).complete(success(fact(queued(), VoucherObservation.Status.PENDING, 5, NOW.plusSeconds(1), null)), NOW.plusSeconds(1));
+        var staleFailure = observe(priorPending, VoucherObservation.Status.FAILED, 4, null);
+        var latestFailure = observe(staleFailure, VoucherObservation.Status.FAILED, 6, null);
+        assertThat(latestFailure.resolutionIssue(latestFailure.updatedAt(), null, true)).isEqualTo(VoucherOperation.ResolutionIssue.POSTING_ALREADY_OBSERVED);
+        assertThat(latestFailure.resolveDispute(VoucherObservation.Status.FAILED, null, false, latestFailure.updatedAt()).status()).isEqualTo(VoucherOperation.Status.FAILED);
+    }
+
+    @Test void acceptedOriginalReversalRemainsUnusableForNewPayments() {
+        var original = posted(); var disputed = observe(original, VoucherObservation.Status.PENDING, 3, null);
+        var reversed = observe(disputed, VoucherObservation.Status.REVERSED, 4, "voucher-1");
+        var done = reversed.resolveDispute(VoucherObservation.Status.REVERSED, original.observation(), true, reversed.updatedAt());
+        assertThat(done.status()).isEqualTo(VoucherOperation.Status.REVERSED); assertThat(done.usablePosted()).isFalse();
+        assertThat(done.input()).isEqualTo(original.input());
+    }
+
+    @Test void decisionCannotReplacePostingReferenceEvenBeforeAnyAcceptedPosting() {
+        var first = queued().claim(NOW, LEASE); var failed = first.complete(success(fact(first, VoucherObservation.Status.FAILED, 1, NOW.plusSeconds(1), null)), NOW.plusSeconds(1));
+        var query = query(failed); var fact = fact(query, VoucherObservation.Status.POSTED, 2, query.updatedAt().plusSeconds(1), "voucher-1");
+        var changed = new VoucherObservation(fact.operationId(), fact.commandDigest(), fact.status(), fact.revision(), fact.observedAt(), "different-posting",
+                fact.voucherReference(), fact.periodReference(), fact.accountingDate(), fact.debitTotal(), fact.creditTotal(), fact.postedAt(), fact.failure());
+        var disputed = query.complete(success(changed), changed.observedAt());
+        assertThat(disputed.resolutionIssue(disputed.updatedAt(), null, true)).isEqualTo(VoucherOperation.ResolutionIssue.DIFFERENT_POSTING);
+    }
+
+    private static VoucherOperation observe(VoucherOperation original, VoucherObservation.Status status, long revision, String voucher) {
+        var query = query(original); var at = query.updatedAt().plusSeconds(1); return query.complete(success(fact(query, status, revision, at, voucher)), at);
+    }
     private static VoucherOperation queued() { return VoucherOperation.queue(new VoucherOperation.Input(VoucherCommandTest.advanceCommand(), "a".repeat(64)), NOW); }
     private static VoucherOperation posted() {
         var claim = queued().claim(NOW, LEASE); return claim.complete(success(fact(claim, VoucherObservation.Status.POSTED, 2, NOW.plusSeconds(1), "voucher-1")), NOW.plusSeconds(1));

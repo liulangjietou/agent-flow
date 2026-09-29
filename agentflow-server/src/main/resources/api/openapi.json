@@ -21252,6 +21252,175 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/vouchers/{operationId}/dispute-resolutions": {
+      "post": {
+        "operationId": "resolveVoucherDispute",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "明确裁决原凭证争议",
+        "description": "采用五分钟内最高持久版本的原凭证终态。保留原过账身份及前后修订；历史存在过账时不能采用失败删除该事实。独立财务复核当前法人任职和当轮完整字段，申请人及付款凭证的原出纳不可裁决。原挂账恢复后重新核验原付款、预算和结算依据，既有还款、核销及归档保持。冲销继续等待独立会计调整。本操作不发送付款或新凭证。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非申请人及原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "凭证裁决、审计及适用结算复核已在本地事务保存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherDisputeReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherDisputeInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 7,
+                "businessVersion": 3,
+                "operationVersion": 10,
+                "outcome": "POSTED",
+                "evidenceReference": "ERP-RECONCILIATION-001",
+                "comment": "已核对原凭证及最高版本对账结果"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -31175,7 +31344,8 @@
           "preparation",
           "operation",
           "actions",
-          "kind"
+          "kind",
+          "dispute"
         ],
         "properties": {
           "applicationId": {
@@ -31234,6 +31404,16 @@
               "EMPLOYEE_ADVANCE",
               "EXPENSE_ACCRUAL",
               "PAYMENT"
+            ]
+          },
+          "dispute": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherDisputeView"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         }
@@ -33593,6 +33773,292 @@
               {
                 "type": "string",
                 "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherDisputeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationVersion",
+          "outcome",
+          "evidenceReference",
+          "comment",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion"
+        ],
+        "properties": {
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "POSTED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "VoucherDisputeReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "resolutionId",
+          "operationVersion",
+          "outcome",
+          "auditEventId",
+          "operationId",
+          "roundNo",
+          "kind"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resolutionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "POSTED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_ACCRUAL",
+              "PAYMENT"
+            ]
+          }
+        }
+      },
+      "VoucherDisputeCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "failure",
+          "postingReference",
+          "voucherReference",
+          "postedAt"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "NOT_FOUND",
+              "POSTED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACCOUNTING_PERIOD_CLOSED",
+                  "ACCOUNT_MAPPING_CHANGED",
+                  "APPROVAL_CHANGED",
+                  "COST_OBJECT_UNAVAILABLE",
+                  "VOUCHER_REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postingReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voucherReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherDisputeDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "outcome",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "POSTED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "resolvedBy": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string"
+          }
+        }
+      },
+      "VoucherDisputeView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate",
+          "issue",
+          "canResolve",
+          "latest"
+        ],
+        "properties": {
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherDisputeCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_DISPUTED",
+                  "NON_TERMINAL",
+                  "STALE_OBSERVATION",
+                  "EVIDENCE_EXPIRED",
+                  "DIFFERENT_POSTING",
+                  "POSTING_ALREADY_OBSERVED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherDisputeDecision"
               },
               {
                 "type": "null"

@@ -28,10 +28,12 @@ public class VoucherController {
     private final VoucherAccess access;
     private final PaymentAccess payments;
     private final IdempotencyExecutor idempotency;
+    private final VoucherDisputeService disputes;
     /** 查询与幂等回放都复核实时字段权限。 */
-    public VoucherController(VoucherWorkspace workspace, VoucherActions actions, VoucherAccess access, PaymentAccess payments, IdempotencyExecutor idempotency) {
+    public VoucherController(VoucherWorkspace workspace, VoucherActions actions, VoucherAccess access, PaymentAccess payments, IdempotencyExecutor idempotency, VoucherDisputeService disputes) {
         this.workspace = workspace; this.actions = actions; this.access = access; this.idempotency = idempotency;
         this.payments = payments;
+        this.disputes = disputes;
     }
     /** 可读状态不包含账户、财务目标或完整命令。 */
     @GetMapping
@@ -55,6 +57,14 @@ public class VoucherController {
     public ResponseEntity<String> paymentAction(@PathVariable UUID id, @Valid @RequestBody VoucherActions.Input input, HttpServletRequest request) {
         payments.requireFinance(id, input.roundNo());
         var result = idempotency.execute(request, HttpStatus.ACCEPTED, () -> actions.payment(id, input));
+        return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders()).cacheControl(CacheControl.noStore()).body(result.getBody());
+    }
+
+    /** 明确采用原查询终态，回放前重新核验当前敏感字段和独立财务权限。 */
+    @PostMapping("/{operationId}/dispute-resolutions")
+    public ResponseEntity<String> resolve(@PathVariable UUID id, @PathVariable UUID operationId, @Valid @RequestBody VoucherDisputeService.Input input, HttpServletRequest request) {
+        disputes.requireFinance(id, operationId, input.roundNo());
+        var result = idempotency.execute(request, HttpStatus.ACCEPTED, () -> disputes.resolve(id, operationId, input));
         return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders()).cacheControl(CacheControl.noStore()).body(result.getBody());
     }
 }

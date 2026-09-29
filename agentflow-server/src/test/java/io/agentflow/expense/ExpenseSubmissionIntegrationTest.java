@@ -126,6 +126,9 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcVoucherOperationRepository voucherOperations;
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired VoucherPreparationService voucherPreparationService;
+    @Autowired VoucherOperationService voucherExecution;
+    @Autowired VoucherDisputeService voucherDisputes;
+    @Autowired JdbcVoucherDisputeResolutionRepository voucherDecisions;
     @Autowired JdbcPaymentAuthorizationRepository paymentAuthorizations;
     @Autowired JdbcPaymentExecutionRequestRepository paymentRequests;
     @Autowired JdbcPaymentOperationRepository paymentOperations;
@@ -186,6 +189,7 @@ class ExpenseSubmissionIntegrationTest {
             jdbc.update("DELETE FROM payment_operation WHERE tenant_id='demo' AND id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id IN (" + authorizations + ")", report.toString());
             jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", report.toString());
+            jdbc.update("DELETE FROM voucher_dispute_resolution WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?)", report.toString());
             jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?)", report.toString());
             jdbc.update("DELETE FROM voucher_operation WHERE tenant_id='demo' AND business_id=?", report.toString());
         }
@@ -1386,6 +1390,120 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(archives.find("demo", report.id(), 1).orElseThrow()).isEqualTo(entry); assertThat(archiveDownload(report, "finance")).isEqualTo(before);
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
     }
+
+    @Test void voucherDecisionRestoresSettledResourcesAndSealedArchiveWithoutReposting() throws Exception {
+        var report = archiveReadyExpense(); pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow();
+        var bytes = archiveDownload(report, "finance"); var versions = resourceVersions(report); var settled = settlements.find("demo", report.id()).orElseThrow();
+        var disputed = correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(ok(read(voucherPath(report), "finance"), 200).at("/dispute/canResolve").asBoolean()).isTrue();
+        ok(send(voucherDecisionPath(disputed), "finance", voucherDecisionInput(report, disputed)), 202);
+        var restored = settlements.find("demo", report.id()).orElseThrow(); assertThat(restored.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(restored.input()).isEqualTo(settled.input()); assertThat(restored.budgetOperationId()).isEqualTo(settled.budgetOperationId());
+        assertThat(resourceVersions(report)).isEqualTo(versions); pollArchive();
+        assertThat(archives.find("demo", report.id(), 1)).contains(archive); assertThat(archiveDownload(report, "finance")).isEqualTo(bytes);
+        assertThat(voucherOperations.find("demo", disputed.input().command().id()).orElseThrow().input()).isEqualTo(disputed.input());
+        assertThat(voucherOperations.revision("demo", disputed.input().command().id(), disputed.version())).contains(disputed);
+        assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void voucherDecisionKeepsIndependentPaymentHoldUntilBothOriginalFactsAreResolved() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); var budget = settlements.find("demo", report.id()).orElseThrow().budgetOperationId(); var versions = resourceVersions(report);
+        var voucher = correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var payment = correctedExpensePayment(report);
+        ok(send(voucherDecisionPath(voucher), "finance", voucherDecisionInput(report, voucher)), 202);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        ok(send("/api/v1/payments/" + payment.input().command().id() + "/dispute-resolutions", "finance", disputeInput(payment)), 202);
+        var restored = settlements.find("demo", report.id()).orElseThrow(); assertThat(restored.status()).isEqualTo(ExpenseSettlement.Status.BUDGET_PENDING);
+        assertThat(restored.budgetOperationId()).isEqualTo(budget); budgetWorker.poll(); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    @Test void voucherDecisionRequiresStrictVersionsCurrentFinanceAndAuthorityEvenForReplay() throws Exception {
+        var report = paidExpense(); var disputed = correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var input = voucherDecisionInput(report, disputed);
+        String route = voucherDecisionPath(disputed), key = UUID.randomUUID().toString();
+        for (String user : List.of("alice", "admin", "cashier", "manager")) assertThat(send(route, user, input).getStatus()).isIn(403,404);
+        assertThat(ok(read(voucherPath(report), "alice"), 200).path("dispute").isNull()).isTrue();
+        var forged = new HashMap<>(input); forged.put("voucherReference", "CLIENT-VOUCHER"); assertThat(send(route, "finance", forged).getStatus()).isEqualTo(400);
+        for (String outcome : List.of("PENDING", "NOT_FOUND")) { var invalid = new HashMap<>(input); invalid.put("outcome", outcome); assertThat(send(route, "finance", invalid).getStatus()).isEqualTo(400); }
+        for (String version : List.of("applicationVersion", "businessVersion", "operationVersion")) {
+            var stale = new HashMap<>(input); stale.put(version, ((Number) input.get(version)).longValue() + 1); assertCode(send(route, "finance", stale), "CONCURRENCY_CONFLICT");
+        }
+        var first = send(route, "finance", key, input); ok(first, 202); assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(route, "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        assertCode(send(route, "finance", input), "CONCURRENCY_CONFLICT");
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(route, "finance", key, input).getStatus()).isIn(403,404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(voucherDecisions.latest("foreign", disputed.input().command().id())).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_DISPUTE_RESOLVE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.QUEUED);
+    }
+
+    @Test void concurrentVoucherDecisionsAndRollbackPreserveAtomicSettlementAndAudit() throws Exception {
+        var report = paidExpense(); var disputed = correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var id = disputed.input().command().id();
+        var input = json.read(json.write(voucherDecisionInput(report, disputed)), VoucherDisputeService.Input.class); var held = settlements.find("demo", report.id()).orElseThrow();
+        actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { assertThatThrownBy(() -> tx().execute(status -> { voucherDisputes.resolve(report.applicationId(), id, input); throw new IllegalStateException("Synthetic decision rollback"); })).isInstanceOf(IllegalStateException.class); }
+        finally { actors.clear(); }
+        assertThat(voucherOperations.find("demo", id)).contains(disputed); assertThat(voucherDecisions.latest("demo", id)).isEmpty(); assertThat(settlements.find("demo", report.id())).contains(held);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2); var gate = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.Callable<VoucherDisputeService.Receipt> decide = () -> { actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"))); try { gate.await(); return voucherDisputes.resolve(report.applicationId(), id, input); } finally { actors.clear(); } };
+        int succeeded = 0, rejected = 0;
+        try { var first = pool.submit(decide); var second = pool.submit(decide); gate.countDown();
+            for (var future : List.of(first, second)) { try { future.get(10, java.util.concurrent.TimeUnit.SECONDS); succeeded++; }
+                catch (java.util.concurrent.ExecutionException failure) { assertThat(failure.getCause()).isInstanceOf(io.agentflow.common.DomainException.class); rejected++; } }
+        } finally { pool.shutdownNow(); }
+        assertThat(succeeded).isEqualTo(1); assertThat(rejected).isEqualTo(1);
+        assertThat(voucherOperations.find("demo", id).orElseThrow().version()).isEqualTo(disputed.version() + 1);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().version()).isEqualTo(held.version() + 1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_DISPUTE_RESOLVE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+    }
+
+    @Test void voucherFailureCannotEraseEarlierPostingAndAcceptedReversalKeepsConsumptionFrozen() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); var versions = resourceVersions(report);
+        var current = correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var original = current.observation();
+        var failed = observeVoucher(current, new VoucherObservation(original.operationId(), original.commandDigest(), VoucherObservation.Status.FAILED, current.highestRevision() + 1,
+                Instant.now(), original.postingReference(), null, null, null, null, null, null, VoucherObservation.Failure.VOUCHER_REJECTED));
+        assertCode(send(voucherDecisionPath(failed), "finance", voucherDecisionInput(report, failed)), "VOUCHER_DISPUTE_UNRESOLVABLE");
+        assertThat(ok(read(voucherPath(report), "finance"), 200).at("/dispute/issue").asText()).isEqualTo("POSTING_ALREADY_OBSERVED");
+        var reversed = observeVoucher(failed, voucherFact(failed, VoucherObservation.Status.REVERSED, failed.highestRevision() + 1));
+        ok(send(voucherDecisionPath(reversed), "finance", voucherDecisionInput(report, reversed)), 202);
+        assertThat(voucherOperations.find("demo", original.operationId()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.REVERSED);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void paymentVoucherDecisionDoesNotAllowOriginalCashierOrRecreateFundingAndArchive() throws Exception {
+        var report = archiveReadyExpense(); pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow(); var settled = settlements.find("demo", report.id()).orElseThrow();
+        var disputed = correctedVoucher(report, VoucherCommand.Kind.PAYMENT); var input = json.read(json.write(voucherDecisionInput(report, disputed)), VoucherDisputeService.Input.class);
+        actors.set(new Actor("demo", "cashier", Set.of("EMPLOYEE", "APPROVER", "CASHIER", "FINANCE")));
+        try { assertThatThrownBy(() -> voucherDisputes.resolve(report.applicationId(), disputed.input().command().id(), input)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, e -> assertThat(e.code()).isIn("FORBIDDEN", "NOT_FOUND")); }
+        finally { actors.clear(); }
+        assertThat(VoucherDisputeResolution.independent(disputed.input().command(), "cashier")).isFalse();
+        ok(send(voucherDecisionPath(disputed), "finance", voucherDecisionInput(report, disputed)), 202); pollArchive();
+        assertThat(settlements.find("demo", report.id())).contains(settled); assertThat(archives.find("demo", report.id(), 1)).contains(archive);
+        assertThat(ok(read(path(report) + "/archive", "finance"), 200).path("issue").isNull()).isTrue(); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    private VoucherOperation correctedVoucher(ExpenseReport report, VoucherCommand.Kind kind) {
+        var original = voucherOperations.forRound("demo", report.applicationId(), 1, kind).orElseThrow(); var fact = original.observation();
+        var disputed = observeVoucher(original, new VoucherObservation(fact.operationId(), fact.commandDigest(), VoucherObservation.Status.PENDING, original.highestRevision() + 1,
+                Instant.now(), fact.postingReference(), null, null, null, null, null, null, null));
+        return observeVoucher(disputed, voucherFact(disputed, VoucherObservation.Status.POSTED, disputed.highestRevision() + 1));
+    }
+    private VoucherObservation voucherFact(VoucherOperation value, VoucherObservation.Status status, long revision) {
+        var fact = value.observation(); return new VoucherObservation(fact.operationId(), fact.commandDigest(), status, revision, Instant.now().plusNanos(123), fact.postingReference(), fact.voucherReference(),
+                fact.periodReference(), fact.accountingDate(), fact.debitTotal(), fact.creditTotal(), fact.postedAt(), null);
+    }
+    private VoucherOperation observeVoucher(VoucherOperation current, VoucherObservation fact) {
+        var id = current.input().command().id(); tx().executeWithoutResult(status -> voucherExecution.query("demo", id, current.version(), Instant.now()));
+        var claimed = voucherExecution.claim("demo", id, Instant.now()); voucherExecution.finish(claimed, new FinanceResult.Success<>(fact), Instant.now());
+        return voucherOperations.find("demo", id).orElseThrow();
+    }
+    private Map<String, Object> voucherDecisionInput(ExpenseReport report, VoucherOperation value) {
+        return Map.of("roundNo", 1, "applicationVersion", app(report).version(), "businessVersion", current(report).version(), "operationVersion", value.version(),
+                "outcome", value.conflictingObservation().status().name(), "evidenceReference", "ERP-REVIEW-001", "comment", "核对原凭证和最高对账版本");
+    }
+    private String voucherDecisionPath(VoucherOperation value) { return "/api/v1/applications/" + value.input().command().binding().applicationId() + "/vouchers/" + value.input().command().id() + "/dispute-resolutions"; }
 
     private PaymentOperation correctedExpensePayment(ExpenseReport report) {
         var id = settlements.find("demo", report.id()).orElseThrow().input().payment().operationId(); var original = paymentOperations.find("demo", id).orElseThrow();

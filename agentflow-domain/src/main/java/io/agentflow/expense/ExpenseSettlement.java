@@ -65,8 +65,8 @@ public record ExpenseSettlement(Input input, long version, Status status, boolea
         return changed(Status.REVIEW_REQUIRED, resourcesConsumed, budgetOperationId, code, at);
     }
 
-    /** 原资金争议解除后接续实际预算阶段，已消费资源绝不退回可用或再次消费。 */
-    public ExpenseSettlement resolvePaymentReview(BudgetOperation budget, Instant at) {
+    /** 原资金及会计依据复核后接续实际预算阶段，已消费资源绝不退回可用或再次消费。 */
+    public ExpenseSettlement resolveFinancialReview(BudgetOperation budget, Instant at) {
         requireStatus(Status.REVIEW_REQUIRED);
         if (budgetOperationId == null) {
             if (budget != null) throw conflict();

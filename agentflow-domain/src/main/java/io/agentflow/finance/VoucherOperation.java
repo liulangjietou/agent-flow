@@ -14,6 +14,7 @@ public record VoucherOperation(Input input, long version, Status status, int att
                                VoucherObservation conflictingObservation, long highestRevision, Failure failure) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
 
     /** 重启不能把曾经发送或已过账的操作还原成可再次首次发送。 */
     public VoucherOperation {
@@ -117,6 +118,31 @@ public record VoucherOperation(Input input, long version, Status status, int att
     /** 待对账、冲销和读取中的既有凭证不能作为新的付款授权依据。 */
     public boolean usablePosted() { return status == Status.POSTED; }
 
+    /** 人工裁决只接受近期最高版本终态；原凭证身份和曾出现的过账事实不能被删除。 */
+    public ResolutionIssue resolutionIssue(Instant now, VoucherObservation originalPosting, boolean postingObserved) {
+        var candidate = conflictingObservation;
+        if (status != Status.RECONCILING || candidate == null) return ResolutionIssue.NOT_DISPUTED;
+        if (candidate.status() != VoucherObservation.Status.POSTED && candidate.status() != VoucherObservation.Status.FAILED
+                && candidate.status() != VoucherObservation.Status.REVERSED) return ResolutionIssue.NON_TERMINAL;
+        if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())) return ResolutionIssue.STALE_OBSERVATION;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EVIDENCE_EXPIRED;
+        if (observation != null && observation.postingReference() != null && !observation.postingReference().equals(candidate.postingReference())) return ResolutionIssue.DIFFERENT_POSTING;
+        if (candidate.status() == VoucherObservation.Status.FAILED && (postingObserved || posted(observation))) return ResolutionIssue.POSTING_ALREADY_OBSERVED;
+        var original = originalPosting != null ? originalPosting : posted(observation) ? observation : null;
+        if (original != null && !samePosting(original, candidate)) return ResolutionIssue.DIFFERENT_POSTING;
+        return null;
+    }
+
+    /** 采用已持久化候选并保留原命令；普通查询仍不能解除争议。 */
+    public VoucherOperation resolveDispute(VoucherObservation.Status outcome, VoucherObservation originalPosting, boolean postingObserved, Instant now) {
+        if (resolutionIssue(now, originalPosting, postingObserved) != null || outcome != conflictingObservation.status()) {
+            throw new DomainException("VOUCHER_DISPUTE_UNRESOLVABLE", "Dispute requires recent terminal evidence for the original posting");
+        }
+        return changed(Status.valueOf(outcome.name()), now, null, conflictingObservation, null, highestRevision, null);
+    }
+
+    private static boolean posted(VoucherObservation value) { return value != null && (value.status() == VoucherObservation.Status.POSTED || value.status() == VoucherObservation.Status.REVERSED); }
+
     private VoucherOperation reconcile(VoucherObservation incoming, long highest, Failure problem, Instant now) {
         return changed(Status.RECONCILING, now, null, observation, incoming, highest, problem);
     }
@@ -162,6 +188,11 @@ public record VoucherOperation(Input input, long version, Status status, int att
      * @author owlzhangfq@gmail.com
      */
     public enum Status { QUEUED, POSTING, QUERYING, UNKNOWN, POSTED, FAILED, NOT_FOUND, EXPIRED, VOIDED, RECONCILING, REVERSED }
+    /**
+     * 页面展示未满足的裁决条件，不接收客户端豁免。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_OBSERVATION, EVIDENCE_EXPIRED, DIFFERENT_POSTING, POSTING_ALREADY_OBSERVED }
     /**
      * 只存封闭错误码，不存远端响应正文或账户信息。
      * @author owlzhangfq@gmail.com

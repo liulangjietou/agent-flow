@@ -26,11 +26,13 @@ public class VoucherWorkspace {
     private final VoucherSources sources;
     private final PaymentPersonnel personnel;
     private final CurrentActor actors;
+    private final VoucherDisputeService disputes;
     /** 查询仅投影状态、凭证号和时间，不返回外部目标、账户、科目或原始响应。 */
     public VoucherWorkspace(VoucherAccess access, JdbcVoucherPreparationRepository preparations, JdbcVoucherOperationRepository operations,
-                            VoucherSources sources, PaymentPersonnel personnel, CurrentActor actors) {
+                            VoucherSources sources, PaymentPersonnel personnel, CurrentActor actors, VoucherDisputeService disputes) {
         this.access = access; this.preparations = preparations; this.operations = operations;
         this.sources = sources; this.personnel = personnel; this.actors = actors;
+        this.disputes = disputes;
     }
     /** 一个数据库快照内读取当轮事实和操作提示；写入仍会重新检查权限和状态。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -68,7 +70,7 @@ public class VoucherWorkspace {
                     && operation.input().command().binding().businessVersion() == context.businessVersion());
         return new View(applicationId, application.businessReference().type(), application.businessReference().id(), context.roundNo(), application.version(), context.businessVersion(),
                 preparation == null ? null : new Preparation(preparation.input().id(), preparation.status(), preparation.input().attempt(), preparation.createdAt(), preparation.completedAt(), preparation.result() == null ? null : preparation.result().code()),
-                operation == null ? null : operation(operation), new Actions(prepare, query, resend), kind);
+                operation == null ? null : operation(operation), new Actions(prepare, query, resend), kind, disputes.view(context, operation, Instant.now()));
     }
     private boolean paymentSourceMatches(VoucherOperation operation) {
         try { return sources.derive(sources.reference(operation.input().command())).matches(operation.input().command()); }
@@ -88,7 +90,7 @@ public class VoucherWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID applicationId, BusinessReference.Type businessType, UUID businessId, int roundNo, long applicationVersion, long businessVersion,
-                       Preparation preparation, Operation operation, Actions actions, VoucherCommand.Kind kind) { }
+                       Preparation preparation, Operation operation, Actions actions, VoucherCommand.Kind kind, VoucherDisputeService.View dispute) { }
     /**
      * 不公开准备的财务目标或完整输入。
      * @author owlzhangfq@gmail.com

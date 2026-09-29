@@ -57,6 +57,39 @@ public class JdbcVoucherOperationRepository {
     /** 按租户读取，并检查关系列、摘要和领域快照一致。 */
     public Optional<VoucherOperation> find(String tenant, UUID id) { return jdbc.query("SELECT * FROM voucher_operation WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst(); }
 
+    /** 裁决关联不可变修订，历史身份也必须匹配租户和原操作。 */
+    public Optional<VoucherOperation> revision(String tenant, UUID id, long version) {
+        return jdbc.query("SELECT state_json FROM voucher_operation_revision WHERE tenant_id=? AND operation_id=? AND version=?", (row, index) -> {
+            var value = json.read(row.getString("state_json"), VoucherOperation.class);
+            requireRevision(value, tenant, id, version); return value;
+        }, tenant, id.toString(), version).stream().findFirst();
+    }
+
+    /** 扫描保留的修订以防后续失败覆盖历史过账，最初被接受的凭证身份保持不变。 */
+    public DisputeEvidence disputeEvidence(String tenant, UUID id) {
+        return jdbc.query("SELECT version,state_json FROM voucher_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", rows -> {
+            VoucherObservation originalPosting = null; boolean postingObserved = false;
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), VoucherOperation.class);
+                requireRevision(value, tenant, id, rows.getLong("version"));
+                if (originalPosting == null && posted(value.observation())) originalPosting = value.observation();
+                postingObserved |= posted(value.observation()) || posted(value.conflictingObservation());
+            }
+            return new DisputeEvidence(originalPosting, postingObserved);
+        }, tenant, id.toString());
+    }
+    private static void requireRevision(VoucherOperation value, String tenant, UUID id, long version) {
+        if (!value.input().command().tenantId().equals(tenant) || !value.input().command().id().equals(id) || value.version() != version) {
+            throw new IllegalStateException("Persisted voucher revision identity is inconsistent");
+        }
+    }
+    private static boolean posted(VoucherObservation value) { return value != null && (value.status() == VoucherObservation.Status.POSTED || value.status() == VoucherObservation.Status.REVERSED); }
+    /**
+     * 只把裁决所需的历史过账边界交给领域模型。
+     * @author owlzhangfq@gmail.com
+     */
+    public record DisputeEvidence(VoucherObservation originalPosting, boolean postingObserved) { }
+
     /** 相同业务轮次不允许通过重试另建一个凭证命令。 */
     public Optional<VoucherOperation> forRound(String tenant, UUID applicationId, int round, VoucherCommand.Kind kind) {
         return jdbc.query("SELECT * FROM voucher_operation WHERE tenant_id=? AND application_id=? AND round_no=? AND kind=?", row(), tenant, applicationId.toString(), round, kind.name()).stream().findFirst();

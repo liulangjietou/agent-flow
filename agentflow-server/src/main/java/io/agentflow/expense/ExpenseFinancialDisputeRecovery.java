@@ -4,23 +4,28 @@ import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcBudgetOperationRepository;
 import io.agentflow.finance.PaymentCommand;
 import io.agentflow.finance.PaymentDisputeResolved;
+import io.agentflow.finance.VoucherCommand;
+import io.agentflow.finance.VoucherDisputeResolved;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.function.Predicate;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 人工资金裁决后重新核验原报销及会计依据，独立凭证问题仍保持冻结。
+ * 人工资金或挂账裁决后统一复核原报销，独立资金、会计及批准问题仍保持冻结。
  * @author owlzhangfq@gmail.com
  */
 @Service
-public class ExpensePaymentDisputeRecovery {
+public class ExpenseFinancialDisputeRecovery {
     private final ExpenseReportRepository reports;
     private final JdbcExpenseSettlementRepository settlements;
     private final ExpenseSettlementSources sources;
     private final JdbcBudgetOperationRepository budgets;
     /** 只读当前原预算操作，不新建资金、预算或资源消费命令。 */
-    public ExpensePaymentDisputeRecovery(ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, ExpenseSettlementSources sources, JdbcBudgetOperationRepository budgets) {
+    public ExpenseFinancialDisputeRecovery(ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, ExpenseSettlementSources sources, JdbcBudgetOperationRepository budgets) {
         this.reports = reports; this.settlements = settlements; this.sources = sources; this.budgets = budgets;
     }
     /** 裁决、恢复及审计共用事务，预算迟到成功在锁内重新读取。 */
@@ -29,16 +34,28 @@ public class ExpensePaymentDisputeRecovery {
     public void resolved(PaymentDisputeResolved event) {
         var payment = event.payment(); var command = payment.input().command();
         if (!payment.settleable() || command.purpose() != PaymentCommand.Purpose.EXPENSE_REIMBURSEMENT) return;
-        String tenant = command.tenantId(); var id = command.binding().businessId(); reports.lock(tenant, id);
+        recover(command.tenantId(), command.binding().businessId(), event.resolution().resolvedAt(),
+                current -> current.input().payment() != null && current.input().payment().operationId().equals(command.id()));
+    }
+    /** 原挂账裁决为有效过账后，资金与预算仍须共同满足；付款凭证只影响归档。 */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void resolved(VoucherDisputeResolved event) {
+        var voucher = event.voucher(); var command = voucher.input().command();
+        if (!voucher.usablePosted() || command.kind() != VoucherCommand.Kind.EXPENSE_ACCRUAL) return;
+        recover(command.tenantId(), command.binding().businessId(), event.resolution().resolvedAt(),
+                current -> command.id().equals(current.input().voucherOperationId()));
+    }
+    private void recover(String tenant, UUID id, Instant at, Predicate<ExpenseSettlement> matches) {
+        reports.lock(tenant, id);
         var current = settlements.find(tenant, id).orElse(null);
-        if (current == null || current.status() != ExpenseSettlement.Status.REVIEW_REQUIRED || current.input().payment() == null
-                || !current.input().payment().operationId().equals(command.id())) return;
+        if (current == null || current.status() != ExpenseSettlement.Status.REVIEW_REQUIRED || !matches.test(current)) return;
         var report = reports.find(tenant, id).orElseThrow(() -> new DomainException("NOT_FOUND", "Original expense report not found"));
-        // 银行裁决不能替其他凭证或批准争议作决定，原问题继续由受控工作区展示。
+        // 任一裁决不能替其他资金、凭证或批准争议作决定，完整原来源须重新成立。
         try { sources.requireCurrent(current, report); }
         catch (DomainException unavailable) { return; }
         var budget = current.budgetOperationId() == null ? null : budgets.find(tenant, current.budgetOperationId()).orElseThrow(
                 () -> new DomainException("EXPENSE_BUDGET_SOURCE_CHANGED", "Original consumption operation not found"));
-        settlements.update(current.resolvePaymentReview(budget, event.resolution().resolvedAt()));
+        settlements.update(current.resolveFinancialReview(budget, at));
     }
 }

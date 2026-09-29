@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
-import { operationLabels, preparationLabels, validateVoucherReceipt, validateVoucherView, voucherActionInput, voucherActionLabels, voucherError, voucherIssue, type VoucherAction, type VoucherBinding, type VoucherView } from '../vouchers'
+import { voucherOutcomeLabels, operationLabels, preparationLabels, validateVoucherReceipt, validateVoucherView, voucherActionInput, voucherActionLabels, voucherDisputeInput, validateVoucherDisputeReceipt, voucherDisputeIssue, voucherError, voucherIssue, type VoucherAction, type VoucherBinding, type VoucherView } from '../vouchers'
 
 const props = defineProps<{ applicationId: string; businessId: string; businessType: 'EXPENSE' | 'ADVANCE_REQUEST'; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; payment?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<VoucherView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
-const error = ref(''), notice = ref(''), pending = ref<VoucherAction | null>(null), comment = ref(''), form = ref<HTMLFormElement | null>(null)
+type Action = VoucherAction | 'RESOLVE_DISPUTE'
+const error = ref(''), notice = ref(''), pending = ref<Action | null>(null), comment = ref(''), evidenceReference = ref(''), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
 const path = () => `/applications/${encodeURIComponent(props.applicationId)}/vouchers${props.payment ? '/payment' : ''}/actions`
 const title = computed(() => props.payment ? '付款凭证' : '挂账凭证')
 function syncPending() {
-  const current = writeRequests.pending().some(entry => entry.path === path())
+  const current = writeRequests.pending().some(entry => entry.path === path() || entry.path.startsWith(`/applications/${encodeURIComponent(props.applicationId)}/vouchers/`) && entry.path.endsWith('/dispute-resolutions'))
   if (unconfirmed.value && !current) requiresRefresh.value = true
   unconfirmed.value = current
 }
@@ -22,7 +23,7 @@ function stop() { epoch++; controller?.abort(); controller = null }
 async function load() {
   if (saving.value || !props.scopeKey) return
   stop(); const version = epoch, request = new AbortController(); controller = request
-  view.value = null; pending.value = null; comment.value = ''; error.value = ''; loading.value = true
+  view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''; error.value = ''; loading.value = true
   const binding: VoucherBinding = { applicationId: props.applicationId, businessId: props.businessId, businessType: props.businessType, roundNo: props.roundNo, applicationVersion: props.applicationVersion, businessVersion: props.businessVersion,
     kind: props.payment ? 'PAYMENT' : props.businessType === 'EXPENSE' ? 'EXPENSE_ACCRUAL' : 'EMPLOYEE_ADVANCE' }
   const timeout = setTimeout(() => { if (version === epoch) { stop(); loading.value = false; error.value = '凭证状态读取超时，请重试。' } }, 12_000)
@@ -33,10 +34,11 @@ async function load() {
   } catch (cause) { if (version === epoch) error.value = voucherError(cause) }
   finally { clearTimeout(timeout); if (version === epoch) { loading.value = false; controller = null } }
 }
-function allowed(action: VoucherAction) { return !!view.value?.actions[({ PREPARE: 'prepare', QUERY: 'query', RESEND_ORIGINAL: 'resendOriginal' } as const)[action]] }
-function prepare(action: VoucherAction) {
+function allowed(action: Action) { return action === 'RESOLVE_DISPUTE' ? !!view.value?.dispute?.canResolve : !!view.value?.actions[({ PREPARE: 'prepare', QUERY: 'query', RESEND_ORIGINAL: 'resendOriginal' } as const)[action]] }
+const actionLabel = (action: Action) => action === 'RESOLVE_DISPUTE' ? '采用原凭证对账结果' : voucherActionLabels[action]
+function prepare(action: Action) {
   if (blocked.value || !allowed(action)) return
-  pending.value = action; comment.value = ''; error.value = ''; notice.value = ''
+  pending.value = action; comment.value = ''; evidenceReference.value = ''; error.value = ''; notice.value = ''
   const version = epoch
   void nextTick(() => { if (version === epoch && pending.value === action) form.value?.querySelector('textarea')?.focus() })
 }
@@ -44,22 +46,36 @@ function prepare(action: VoucherAction) {
 async function execute() {
   const value = view.value, action = pending.value
   if (!value || !action || blocked.value || !allowed(action)) return
-  let input
-  try { input = voucherActionInput(value, action, comment.value) } catch (cause) { error.value = voucherError(cause); return }
+  let submit: () => Promise<void>
+  try {
+    if (action === 'RESOLVE_DISPUTE') {
+      const input = voucherDisputeInput(value, evidenceReference.value, comment.value)
+      submit = async () => validateVoucherDisputeReceipt(await api.resolveVoucherDispute(value.applicationId, value.operation!.id, input), value, input)
+    } else {
+      const input = voucherActionInput(value, action, comment.value)
+      submit = async () => validateVoucherReceipt(await (value.kind === 'PAYMENT' ? api.paymentVoucherAction : api.voucherAction)(value.applicationId, input), value, input)
+    }
+  } catch (cause) { error.value = voucherError(cause); return }
   const version = epoch
   saving.value = true; error.value = ''; emit('busy', true)
   try {
-    const receipt = await (value.kind === 'PAYMENT' ? api.paymentVoucherAction : api.voucherAction)(value.applicationId, input)
+    await submit()
     if (version !== epoch) return
-    validateVoucherReceipt(receipt, value, input)
     pending.value = null; saving.value = false; emit('busy', false)
-    notice.value = '操作已登记，请刷新查看实际处理结果。'; await load()
-  } catch (cause) { if (version === epoch) { error.value = voucherError(cause); requiresRefresh.value = true } }
+    notice.value = action === 'RESOLVE_DISPUTE' ? '凭证裁决已记录，结算与归档仍按各自依据核验。' : '操作已登记，请刷新查看实际处理结果。'; await load()
+  } catch (cause) {
+    if (version === epoch) {
+      error.value = voucherError(cause); requiresRefresh.value = true
+      if ([403, 404].includes((cause as { status?: number }).status ?? 0)) {
+        view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''
+      }
+    }
+  }
   finally { if (version === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
 }
 const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 watch(() => JSON.stringify([props.scopeKey, props.applicationId, props.businessId, props.businessType, props.roundNo, props.applicationVersion, props.businessVersion, props.payment]), () => {
-  stop(); view.value = null; pending.value = null; comment.value = ''; error.value = ''; notice.value = ''; saving.value = false; loading.value = false; requiresRefresh.value = false
+  stop(); view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''; error.value = ''; notice.value = ''; saving.value = false; loading.value = false; requiresRefresh.value = false
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
@@ -79,17 +95,24 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
         <article :class="{ posted: view.operation?.status === 'POSTED' }"><small>ERP 过账</small><strong>{{ view.operation ? operationLabels[view.operation.status] : '尚无过账记录' }}</strong><p v-if="view.operation">会计日期 {{ view.operation.accountingDate }} · 尝试处理 {{ view.operation.attempts }} 次</p><p v-if="view.operation?.issue">{{ voucherIssue(view.operation.issue) }}</p></article></div>
       <p v-if="view.operation?.disputed" class="voucher-error">{{ payment ? '付款凭证结果存在冲突，需要核对原会计记录。以下保留的是此前已接受的凭证信息。' : '外部结果存在冲突，当前凭证不能作为后续付款依据。以下保留的是此前已接受的凭证信息。' }}</p>
       <dl v-if="view.operation?.voucherReference" class="voucher-reference"><div><dt>{{ view.operation.status === 'POSTED' ? '已过账凭证号' : '此前确认的凭证号' }}</dt><dd>{{ view.operation.voucherReference }}</dd></div><div v-if="view.operation.postedAt"><dt>ERP 过账时间</dt><dd>{{ timeLabel(view.operation.postedAt) }}</dd></div></dl>
+      <div v-if="view.dispute?.candidate" class="voucher-dispute"><h4>本次 ERP 对账候选</h4><p>查询结果：{{ voucherOutcomeLabels[view.dispute.candidate.outcome] }} · 外部版本 {{ view.dispute.candidate.revision }}</p>
+        <dl class="voucher-reference"><div><dt>原过账操作号</dt><dd>{{ view.dispute.candidate.postingReference || '尚未确认' }}</dd></div><div><dt>候选凭证号</dt><dd>{{ view.dispute.candidate.voucherReference || '无' }}</dd></div><div><dt>查询时间</dt><dd>{{ timeLabel(view.dispute.candidate.observedAt) }}</dd></div><div><dt>裁决依据有效至</dt><dd>{{ timeLabel(view.dispute.candidate.validUntil) }}</dd></div></dl>
+        <p v-if="view.dispute.issue" class="voucher-error">{{ voucherDisputeIssue(view.dispute.issue) }}</p><p class="voucher-help">确认后采用这次查询终态，原命令与历史修订保留。已冲销凭证仍需另行处理会计调整；既有还款、核销和归档不会重做。</p>
+      </div>
+      <p v-if="view.dispute?.latest" class="voucher-help">上次裁决：{{ voucherOutcomeLabels[view.dispute.latest.outcome] }} · {{ view.dispute.latest.resolvedBy }} · {{ timeLabel(view.dispute.latest.resolvedAt) }} · 凭据 {{ view.dispute.latest.evidenceReference }}</p>
+      <div v-if="!pending && allowed('RESOLVE_DISPUTE')" class="voucher-actions"><button type="button" class="primary" :disabled="blocked" @click="prepare('RESOLVE_DISPUTE')">采用原凭证对账结果</button></div>
       <div v-if="!pending" class="voucher-actions"><button v-if="allowed('PREPARE')" type="button" class="primary" :disabled="blocked" @click="prepare('PREPARE')">重新准备凭证</button><button v-if="allowed('QUERY')" type="button" class="secondary" :disabled="blocked" @click="prepare('QUERY')">查询 ERP 结果</button><button v-if="allowed('RESEND_ORIGINAL')" type="button" class="secondary" :disabled="blocked" @click="prepare('RESEND_ORIGINAL')">按原编号重发</button></div>
-      <form v-else ref="form" class="voucher-confirm" @submit.prevent="execute"><h4>{{ voucherActionLabels[pending] }}</h4>
+      <form v-else ref="form" class="voucher-confirm" @submit.prevent="execute"><h4>{{ actionLabel(pending) }}</h4>
         <p v-if="pending === 'PREPARE'">{{ payment ? '沿用原支付命令、成功回单和会计日期重新查询会计期间及科目映射，准备完成后办理过账。' : '根据本轮已批准内容重新查询会计期间和科目映射，准备完成后再办理过账。' }}</p>
         <p v-else-if="pending === 'QUERY'">核对原凭证在 ERP 中的实际结果，查询本身不会发起新过账。</p>
+        <template v-else-if="pending === 'RESOLVE_DISPUTE'"><p>采用已展示的 {{ voucherOutcomeLabels[view.dispute!.candidate!.outcome] }} 结果。裁决不会发起付款或新过账；独立资金或会计争议仍须分别处理。</p><label>核对凭据编号<input v-model="evidenceReference" maxlength="128" required :disabled="blocked" autocomplete="off" /></label></template>
         <p v-else>ERP 已明确确认原操作不存在。本次仍使用原编号、原金额和原会计日期，发送期限为 {{ timeLabel(view.operation!.sendExpiresAt) }}。</p>
-        <label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="blocked" /></label><div class="voucher-actions"><button type="button" class="secondary" :disabled="saving" @click="pending = null">返回核对</button><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : `确认${voucherActionLabels[pending]}` }}</button></div>
+        <label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="blocked" /></label><div class="voucher-actions"><button type="button" class="secondary" :disabled="saving" @click="pending = null">返回核对</button><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : `确认${actionLabel(pending)}` }}</button></div>
       </form>
     </template>
   </section>
 </template>
 
 <style scoped>
-.voucher-status{margin-top:26px;padding-top:20px;border-top:2px solid var(--teal)}.voucher-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.voucher-heading h3{font-size:16px;margin:0}.voucher-heading button{font-size:12px}.voucher-help{font-size:12px;line-height:1.9;color:var(--muted)}.voucher-stages{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.voucher-stages article{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:16px;min-width:0}.voucher-stages .posted{background:var(--soft);border-color:var(--teal)}.voucher-stages small{display:block;font-size:11px;color:var(--muted);margin-bottom:10px}.voucher-stages strong{font-size:14px;line-height:1.6}.voucher-stages p{font-size:11px;line-height:1.8;color:var(--muted);margin:9px 0 0}.voucher-error{font-size:12px;line-height:1.8;color:var(--red);background:#fff0ed;padding:12px;border-radius:8px}.voucher-reference{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.voucher-reference dt{font-size:11px;color:var(--muted);margin-bottom:8px}.voucher-reference dd{margin:0;font-size:12px;overflow-wrap:anywhere}.voucher-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.voucher-confirm{margin-top:18px;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:10px;font-size:12px;line-height:1.8}.voucher-confirm h4{font-size:14px;margin:0}.voucher-confirm label{display:grid;gap:8px}.voucher-confirm textarea{font:inherit;width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;resize:vertical}@media(max-width:600px){.voucher-heading{flex-wrap:wrap}.voucher-stages,.voucher-reference{grid-template-columns:1fr}}
+.voucher-status{margin-top:26px;padding-top:20px;border-top:2px solid var(--teal)}.voucher-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.voucher-heading h3{font-size:16px;margin:0}.voucher-heading button{font-size:12px}.voucher-help{font-size:12px;line-height:1.9;color:var(--muted)}.voucher-stages{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.voucher-stages article{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:16px;min-width:0}.voucher-stages .posted{background:var(--soft);border-color:var(--teal)}.voucher-stages small{display:block;font-size:11px;color:var(--muted);margin-bottom:10px}.voucher-stages strong{font-size:14px;line-height:1.6}.voucher-stages p{font-size:11px;line-height:1.8;color:var(--muted);margin:9px 0 0}.voucher-error{font-size:12px;line-height:1.8;color:var(--red);background:#fff0ed;padding:12px;border-radius:8px}.voucher-reference{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.voucher-reference dt{font-size:11px;color:var(--muted);margin-bottom:8px}.voucher-reference dd{margin:0;font-size:12px;overflow-wrap:anywhere}.voucher-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.voucher-confirm{margin-top:18px;padding:18px;background:var(--paper);border:1px solid var(--line);border-radius:10px;font-size:12px;line-height:1.8}.voucher-confirm h4{font-size:14px;margin:0}.voucher-confirm label{display:grid;gap:8px}.voucher-dispute{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:10px;font-size:12px;line-height:1.8}.voucher-dispute h4{margin:0;font-size:14px}.voucher-confirm input,.voucher-confirm textarea{font:inherit;width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;resize:vertical}@media(max-width:600px){.voucher-heading{flex-wrap:wrap}.voucher-stages,.voucher-reference{grid-template-columns:1fr}}
 </style>

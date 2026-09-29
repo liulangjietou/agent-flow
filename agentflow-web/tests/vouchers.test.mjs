@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRenderer, reactive } from 'vue'
-const { validateVoucherView, voucherActionInput, validateVoucherReceipt } = await import(process.env.AGENTFLOW_TEST_VOUCHERS)
+const { validateVoucherView, voucherActionInput, validateVoucherReceipt, voucherDisputeInput, validateVoucherDisputeReceipt } = await import(process.env.AGENTFLOW_TEST_VOUCHERS)
 const { default: Component } = await import(process.env.AGENTFLOW_TEST_VOUCHERSTATUS)
 const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
 const originals = { ...api }, originalFetch = global.fetch
@@ -13,12 +13,80 @@ const view = () => ({ ...binding(), kind: 'EXPENSE_ACCRUAL', preparation: { id: 
   operation: { id: 'operation', version: 3, kind: 'EXPENSE_ACCRUAL', status: 'NOT_FOUND', attempts: 1, accountingDate: '2026-09-28', updatedAt: new Date().toISOString(), sendExpiresAt: new Date(Date.now() + 60000).toISOString(), observedStatus: 'NOT_FOUND', voucherReference: null, postedAt: null, disputed: false, issue: null }, actions: { prepare: false, query: true, resendOriginal: true } })
 const receipt = input => ({ applicationId: 'app', businessId: 'report', roundNo: 2, kind: 'EXPENSE_ACCRUAL', action: input.action, preparationId: input.action === 'PREPARE' ? 'preparation' : null, operationId: input.operationId ?? null, operationVersion: input.operationVersion ? input.operationVersion + 1 : null, auditEventId: 'audit' })
 let scope = 0
+const disputedView = () => {
+  const value = view(), observedAt = Date.now() - 1000
+  value.operation.status = 'RECONCILING'; value.operation.observedStatus = 'POSTED'; value.operation.disputed = true; value.operation.voucherReference = 'ERP-ORIGINAL'; value.operation.postedAt = new Date(observedAt - 1000).toISOString()
+  value.actions.resendOriginal = false
+  value.dispute = { candidate: { outcome: 'POSTED', revision: 3, observedAt: new Date(observedAt).toISOString(), validUntil: new Date(observedAt + 300000).toISOString(), postingReference: 'ERP-POSTING', voucherReference: 'ERP-ORIGINAL', postedAt: value.operation.postedAt, failure: null }, issue: null, canResolve: true, latest: null }
+  return value
+}
+const decisionReceipt = input => ({ applicationId: 'app', operationId: 'operation', roundNo: 2, kind: 'EXPENSE_ACCRUAL', resolutionId: 'decision', operationVersion: input.operationVersion + 1, outcome: input.outcome, auditEventId: 'audit' })
 function panel(overrides = {}) {
   const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false, ...overrides }), events = []
   const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onBusy: value => events.push(value) })
   const mounted = app.mount({})
   return { props, events, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); global.fetch = originalFetch; bindAuthenticationActor(null) } }
 }
+
+test('凭证裁决只传展示版本与终态，过期、非终态和不同意图的回执均拒绝', () => {
+  const value = disputedView(), input = voucherDisputeInput(value, ' ERP-REVIEW ', ' 核对原凭证 ')
+  assert.deepEqual(input, { roundNo: 2, applicationVersion: 10, businessVersion: 6, operationVersion: 3, outcome: 'POSTED', evidenceReference: 'ERP-REVIEW', comment: '核对原凭证' })
+  assert.doesNotThrow(() => validateVoucherDisputeReceipt(decisionReceipt(input), value, input))
+  for (const change of [{ applicationId: 'foreign' }, { operationId: 'foreign' }, { roundNo: 1 }, { kind: 'PAYMENT' }, { outcome: 'REVERSED' }, { operationVersion: 5 }, { resolutionId: '' }, { auditEventId: '' }]) {
+    assert.throws(() => validateVoucherDisputeReceipt({ ...decisionReceipt(input), ...change }, value, input))
+  }
+  for (const mutate of [v => v.dispute.canResolve = false, v => v.dispute.issue = 'DIFFERENT_POSTING', v => v.dispute.candidate.outcome = 'PENDING', v => v.dispute.candidate.validUntil = new Date(0).toISOString(), v => v.operation.disputed = false, v => v.dispute.candidate.voucherReference = '', v => v.dispute.candidate.validUntil = 'bad']) {
+    const invalid = copy(value); mutate(invalid); assert.throws(() => voucherDisputeInput(invalid, 'ERP-REVIEW', '核对'))
+  }
+  assert.throws(() => voucherDisputeInput(value, 'ERP\nFAKE', '核对')); assert.throws(() => voucherDisputeInput(value, '   ', '核对'))
+  assert.throws(() => voucherDisputeInput(value, 'ERP', '   ')); assert.throws(() => voucherDisputeInput(value, 'ERP', '核对', Date.parse(value.dispute.candidate.validUntil)))
+})
+
+test('实际凭证裁决面板双击只提交一次，完成后重新读取实际状态', async () => {
+  api.vouchers = async () => disputedView(); let complete, input, writes = 0
+  api.resolveVoucherDispute = async (app, id, body) => { assert.equal(app, 'app'); assert.equal(id, 'operation'); input = body; writes++; return new Promise(resolve => complete = resolve) }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('RESOLVE_DISPUTE'); assert.equal(writes, 0)
+    p.state.comment = '原凭证仍有效'; p.state.evidenceReference = 'ERP-CHECK'
+    const first = p.state.execute(); await settle(); await p.state.execute(); assert.equal(writes, 1)
+    complete(decisionReceipt(input)); await first; assert.match(p.state.notice, /裁决已记录/); assert.equal(p.state.pending, null)
+  } finally { p.close() }
+})
+
+test('确认凭证裁决时权限已撤销则立即清空原敏感状态与输入', async () => {
+  api.vouchers = async () => disputedView(); api.resolveVoucherDispute = async () => { throw Object.assign(new Error('forbidden'), { status: 403 }) }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('RESOLVE_DISPUTE'); p.state.comment = '核对'; p.state.evidenceReference = 'ERP-CHECK'; await p.state.execute()
+    assert.equal(p.state.view, null); assert.equal(p.state.pending, null); assert.equal(p.state.comment, ''); assert.equal(p.state.evidenceReference, ''); assert.match(p.state.error, /无权/)
+  } finally { p.close() }
+})
+
+test('凭证裁决未知写入保留原路径和幂等字节，恢复后必须重新读取', async () => {
+  bindAuthenticationActor({ tenantId: 'demo', userId: 'voucher-decision-' + ++scope, roles: ['FINANCE'] }); api.vouchers = async () => disputedView()
+  const requests = []; let fail = true
+  global.fetch = async (url, init) => { requests.push({ url, init }); if (fail) throw new Error('connection lost'); return new Response(JSON.stringify(decisionReceipt(JSON.parse(init.body))), { status: 202, headers: { 'Content-Type': 'application/json' } }) }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('RESOLVE_DISPUTE'); p.state.comment = '核对'; p.state.evidenceReference = 'ERP-CHECK'; await p.state.execute()
+    assert.equal(p.state.unconfirmed, true); const entry = writeRequests.pending()[0]; assert.equal(entry.path, '/applications/app/vouchers/operation/dispute-resolutions')
+    fail = false; await writeRequests.recover(entry.id)
+    assert.equal(requests[0].init.body, requests[1].init.body); assert.equal(requests[0].init.headers.get('Idempotency-Key'), requests[1].init.headers.get('Idempotency-Key'))
+    assert.equal(p.state.requiresRefresh, true); await p.state.load(); assert.equal(p.state.unconfirmed, false)
+  } finally { p.close() }
+})
+
+test('裁决响应迟到及身份切换不能恢复上一身份的凭证或材料', async () => {
+  api.vouchers = async () => disputedView(); let complete, input
+  api.resolveVoucherDispute = async (app, id, body) => { input = body; return new Promise(resolve => complete = resolve) }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('RESOLVE_DISPUTE'); p.state.comment = '核对'; p.state.evidenceReference = 'ERP-CHECK'; const executing = p.state.execute(); await settle()
+    p.props.scopeKey = ''; complete(decisionReceipt(input)); await executing; await settle()
+    assert.equal(p.state.view, null); assert.equal(p.state.comment, ''); assert.equal(p.state.evidenceReference, ''); assert.equal(p.state.notice, '')
+  } finally { p.close() }
+})
 
 test('凭证响应必须绑定同一业务、轮次、双版本和准备编号，不能显示不完整的成功事实', () => {
   const value = view(); assert.equal(validateVoucherView(value, binding()), value)
