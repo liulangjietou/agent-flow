@@ -23585,6 +23585,438 @@
           }
         }
       }
+    },
+    "/api/v1/expense-reports/{id}/payment-return": {
+      "get": {
+        "operationId": "expensePaymentReturn",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取原报销银行退回",
+        "description": "固定首次成功报销付款、原财务目标与原挂账应付科目。查询只保存证据并冻结疑点；独立财务明确登记只追加新增银行入款。累计原件不得遗漏或改写，入款及贷方分录与借款还款、退票共用法人内防重。实际退回保持待独立调整，原发票、预算、借款冲销和归档均保留；没有退回的明确复核仅在其他资金、会计和批准依据仍成立时接续结算。",
+        "x-access": "原报销轮次完整财务字段可读；查询及登记另须当前法人 FINANCE 任职、非申请人且非原出纳。幂等回放前重新授权。",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePaymentReturnWorkspace"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expense-reports/{id}/payment-return/checks": {
+      "post": {
+        "operationId": "queryExpensePaymentReturn",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "查询原报销付款和累计银行退回",
+        "description": "固定首次成功报销付款、原财务目标与原挂账应付科目。查询只保存证据并冻结疑点；独立财务明确登记只追加新增银行入款。累计原件不得遗漏或改写，入款及贷方分录与借款还款、退票共用法人内防重。实际退回保持待独立调整，原发票、预算、借款冲销和归档均保留；没有退回的明确复核仅在其他资金、会计和批准依据仍成立时接续结算。",
+        "x-access": "原报销轮次完整财务字段可读；查询及登记另须当前法人 FINANCE 任职、非申请人且非原出纳。幂等回放前重新授权。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "查询或明确登记已保存；registrationId 为 null 表示仅排队查询。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePaymentReturnActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePaymentReturnQueryInput"
+              },
+              "example": {
+                "settlementVersion": 3,
+                "returnVersion": 0,
+                "comment": "核对原报销付款及累计银行退回"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/payment-return/registrations": {
+      "post": {
+        "operationId": "registerExpensePaymentReturn",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "明确登记报销银行退回原件",
+        "description": "固定首次成功报销付款、原财务目标与原挂账应付科目。查询只保存证据并冻结疑点；独立财务明确登记只追加新增银行入款。累计原件不得遗漏或改写，入款及贷方分录与借款还款、退票共用法人内防重。实际退回保持待独立调整，原发票、预算、借款冲销和归档均保留；没有退回的明确复核仅在其他资金、会计和批准依据仍成立时接续结算。",
+        "x-access": "原报销轮次完整财务字段可读；查询及登记另须当前法人 FINANCE 任职、非申请人且非原出纳。幂等回放前重新授权。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "查询或明确登记已保存；registrationId 为 null 表示仅排队查询。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePaymentReturnActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePaymentReturnRegisterInput"
+              },
+              "example": {
+                "settlementVersion": 4,
+                "returnVersion": 2,
+                "checkId": "55555555-5555-4555-8555-555555555555",
+                "checkVersion": 3,
+                "outcome": "PARTIALLY_RETURNED",
+                "evidenceReference": "EXPENSE-RETURN-20260929",
+                "comment": "核对银行实际入款和原员工应付科目贷方"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -38734,6 +39166,547 @@
               "NEVER_DISPATCHED",
               "CONFIRMED_FAILED"
             ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ExpensePaymentReturnBankReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transactionReference",
+          "amount",
+          "receivedAt"
+        ],
+        "properties": {
+          "transactionReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePaymentReturnPayableCredit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "voucherReference",
+          "entryReference",
+          "accountCode",
+          "amount",
+          "accountingDate",
+          "postedAt"
+        ],
+        "properties": {
+          "voucherReference": {
+            "type": "string"
+          },
+          "entryReference": {
+            "type": "string"
+          },
+          "accountCode": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePaymentReturnProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "funding",
+          "posting"
+        ],
+        "properties": {
+          "funding": {
+            "$ref": "#/components/schemas/ExpensePaymentReturnBankReceipt"
+          },
+          "posting": {
+            "$ref": "#/components/schemas/ExpensePaymentReturnPayableCredit"
+          }
+        }
+      },
+      "ExpensePaymentReturnEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "registrationId",
+          "proof"
+        ],
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proof": {
+            "$ref": "#/components/schemas/ExpensePaymentReturnProof"
+          }
+        }
+      },
+      "ExpensePaymentReturnOriginal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paymentId",
+          "paymentReference",
+          "amount",
+          "paidAt"
+        ],
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentReference": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePaymentReturnEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "originalRevision",
+          "originalStatus",
+          "returns",
+          "totalReturned",
+          "newReturned"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED",
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ],
+            "description": "CONFIRMED 需原付款保持成功；部分或全额退回必须有银行入款及原员工应付科目的独立贷方，UNRESOLVED 不可登记。"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originalStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "SUCCEEDED",
+                  "FAILED",
+                  "REVERSED",
+                  "NOT_FOUND"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePaymentReturnProof"
+            },
+            "maxItems": 100
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "newReturned": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "ExpensePaymentReturnCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue",
+          "evidence",
+          "canRegister",
+          "registrationIssue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "CHECKED",
+              "RESOLVED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePaymentReturnEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canRegister": {
+            "type": "boolean"
+          },
+          "registrationIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePaymentReturnRegistration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "outcome",
+          "totalReturned",
+          "registeredBy",
+          "registeredAt",
+          "evidenceReference",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "registeredBy": {
+            "type": "string"
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "ExpensePaymentReturnWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "settlementVersion",
+          "settlementStatus",
+          "returnVersion",
+          "reviewRequired",
+          "original",
+          "totalReturned",
+          "netPaid",
+          "returns",
+          "canQuery",
+          "latestCheck",
+          "registrations"
+        ],
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementStatus": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "BLOCKED",
+              "BUDGET_PENDING",
+              "BUDGET_REJECTED",
+              "SETTLED",
+              "REVIEW_REQUIRED"
+            ]
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reviewRequired": {
+            "type": "boolean"
+          },
+          "original": {
+            "$ref": "#/components/schemas/ExpensePaymentReturnOriginal"
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "netPaid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePaymentReturnEntry"
+            },
+            "maxItems": 100
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "latestCheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePaymentReturnCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePaymentReturnRegistration"
+            }
+          }
+        }
+      },
+      "ExpensePaymentReturnQueryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settlementVersion",
+          "returnVersion",
+          "comment"
+        ],
+        "properties": {
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "ExpensePaymentReturnRegisterInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settlementVersion",
+          "returnVersion",
+          "checkId",
+          "checkVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED",
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ],
+            "description": "CONFIRMED 需原付款保持成功；部分或全额退回必须有银行入款及原员工应付科目的独立贷方，UNRESOLVED 不可登记。"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "ExpensePaymentReturnActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reportId",
+          "checkId",
+          "checkVersion",
+          "registrationId",
+          "returnVersion",
+          "settlementVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "registrationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
           },
           "auditEventId": {
             "type": "string",

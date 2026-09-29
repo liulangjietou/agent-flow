@@ -51,6 +51,15 @@ public class ExpenseFinancialDisputeRecovery {
     public void retired(VoucherReversalRetired event) {
         recoverVoucher(event.voucher(), event.retirement().retiredAt());
     }
+    /** 确认未发生退回只解除本来源疑点；实际退回必须继续独立办理。 */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registered(ExpensePaymentReturnRegistered event) {
+        if (event.ledger().reviewRequired()) return;
+        var command = event.ledger().request().command();
+        recover(command.tenantId(), command.binding().businessId(), event.registration().registeredAt(),
+                current -> current.input().payment() != null && current.input().payment().operationId().equals(command.id()));
+    }
     private void recoverVoucher(VoucherOperation voucher, Instant at) {
         var command = voucher.input().command();
         if (!voucher.usablePosted() || command.kind() != VoucherCommand.Kind.EXPENSE_ACCRUAL) return;

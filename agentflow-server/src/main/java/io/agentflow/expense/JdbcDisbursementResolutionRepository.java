@@ -41,7 +41,7 @@ public class JdbcDisbursementResolutionRepository {
                 decision.receipt().status().name(), decision.resolvedBy(), Timestamp.from(decision.receipt().observedAt()), Timestamp.from(decision.resolvedAt()), json.write(decision));
         try {
             for (var entry : after.disbursementReturns()) if (entry.resolutionId().equals(decision.id())) credits.record(decision, entry);
-        } catch (DuplicateKeyException duplicate) { throw new DomainException("DISBURSEMENT_RETURN_ALREADY_RECORDED", "Received funds or receivable credit already belongs to another repayment or disbursement adjustment"); }
+        } catch (DuplicateKeyException duplicate) { throw new DomainException("DISBURSEMENT_RETURN_ALREADY_RECORDED", "Received funds or credit already belongs to another repayment, disbursement adjustment or expense return"); }
     }
     /** 最近人工决定用于展示和约束后续查询，读取不修改原件或续期。 */
     public Optional<AdvanceDisbursementReturn> latest(String tenant, UUID advanceId) {

@@ -74,5 +74,23 @@ class DisbursementReturnMigrationTest {
         assertThatThrownBy(() -> jdbc.update("DELETE FROM advance_disbursement_resolution WHERE tenant_id=? AND id=?", tenant, decision)).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("DELETE FROM disbursement_return_check_revision WHERE tenant_id=? AND check_id=?", tenant, review)).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(upgrade.migrate().migrationsExecuted).isZero(); assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
+        // 后续报销入口复用新的总入款防重索引，旧借款原文及关联不能丢失。
+        Flyway.configure().dataSource(source).target("63").load().migrate();
+        var legacyCredits = jdbc.queryForList("SELECT * FROM advance_receipt_credit");
+        var legacyRepayments = jdbc.queryForList("SELECT * FROM advance_repayment");
+        var legacyReturns = jdbc.queryForList("SELECT * FROM advance_disbursement_resolution");
+        var next = Flyway.configure().dataSource(source).target("64").load(); assertThat(next.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.queryForList("SELECT * FROM advance_receipt_credit")).containsExactlyInAnyOrderElementsOf(legacyCredits);
+        assertThat(jdbc.queryForList("SELECT * FROM advance_repayment")).containsExactlyInAnyOrderElementsOf(legacyRepayments);
+        assertThat(jdbc.queryForList("SELECT * FROM advance_disbursement_resolution")).containsExactlyInAnyOrderElementsOf(legacyReturns);
+        assertThat(jdbc.queryForList("SELECT tenant_id,legal_entity_id,business_id,channel,transaction_reference,voucher_reference,entry_reference,amount,currency,repayment_id,disbursement_resolution_id FROM finance_receipt_credit"))
+                .containsExactlyInAnyOrderElementsOf(jdbc.queryForList("SELECT tenant_id,legal_entity_id,advance_id AS business_id,channel,transaction_reference,voucher_reference,entry_reference,amount,currency,repayment_id,disbursement_resolution_id FROM advance_receipt_credit"));
+        String sharedCredit = credit.replace("advance_receipt_credit", "finance_receipt_credit").replace("advance_id", "business_id");
+        assertThatThrownBy(() -> jdbc.update(sharedCredit, tenant, entity, business, "new-bank-funds", "unique-voucher", "row-1", decision)).isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        assertThatThrownBy(() -> jdbc.update(sharedCredit, tenant, entity, business, "unique-bank", "original-voucher", "credit", decision)).isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        jdbc.update(sharedCredit, tenant, entity, business, "new-shared-bank", "new-shared-voucher", "credit", decision);
+        assertThatThrownBy(() -> jdbc.update("UPDATE finance_receipt_credit SET expense_registration_id=? WHERE tenant_id=? AND transaction_reference='new-shared-bank'", UUID.randomUUID().toString(), tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM advance_disbursement_resolution WHERE tenant_id=? AND id=?", tenant, decision)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(next.migrate().migrationsExecuted).isZero(); assertThat(next.validateWithResult().validationSuccessful).isTrue();
     }
 }

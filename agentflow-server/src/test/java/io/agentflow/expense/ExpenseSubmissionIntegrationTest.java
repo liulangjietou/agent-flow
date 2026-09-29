@@ -52,7 +52,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
-        "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
+        "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.payment-return-worker-enabled=false",
         "agentflow.budgets.worker-enabled=false", "agentflow.expenses.settlement-worker-enabled=false", "agentflow.expenses.archive-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpenseSubmissionIntegrationTest {
@@ -97,6 +97,9 @@ class ExpenseSubmissionIntegrationTest {
     private volatile EmployeeAccountSnapshot currentPayee;
     private volatile boolean invalidPayee;
     private UUID cashierAppointment;
+    private ExpensePaymentReturnPort.Status expenseReturnStatus = ExpensePaymentReturnPort.Status.CONFIRMED;
+    private long expenseReturnRevision = 1;
+    private List<ExpensePaymentReturnPort.ReturnItem> expenseReturnRows = List.of();
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
@@ -177,6 +180,13 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcBudgetOperationRepository operations;
     @Autowired JdbcBudgetOccupationRepository occupations;
     @Autowired BudgetSystemPort budgetPort;
+    @Autowired ExpensePaymentReturnService expenseReturns;
+    @Autowired ExpensePaymentReturnSources expenseReturnSources;
+    @Autowired ExpensePaymentReturnWorker expenseReturnWorker;
+    @Autowired JdbcExpensePaymentReturnCheckRepository expenseReturnChecks;
+    @Autowired JdbcExpensePaymentReturnsRepository expenseReturnLedgers;
+    @Autowired JdbcExpensePaymentReturnRepository expenseReturnRegistrations;
+    @Autowired ExpenseSettlementSources settlementSources;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
@@ -190,6 +200,12 @@ class ExpenseSubmissionIntegrationTest {
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
+            jdbc.update("DELETE FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_payment_return_registration WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_payment_return_check_revision WHERE tenant_id='demo' AND check_id IN (SELECT id FROM expense_payment_return_check WHERE tenant_id='demo' AND report_id=?)", report.toString());
+            jdbc.update("DELETE FROM expense_payment_return_check WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_payment_returns_revision WHERE tenant_id='demo' AND report_id=?", report.toString());
+            jdbc.update("DELETE FROM expense_payment_returns WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_archive_original WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_archive WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=?", report.toString());
@@ -1133,6 +1149,181 @@ class ExpenseSubmissionIntegrationTest {
             for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) entries.put(entry.getName(), zip.readAllBytes());
         }
         return entries;
+    }
+
+    @Test void expensePaymentReturnCumulativelyRegistersBankFundsAndPreservesConsumedResourcesAndArchive() throws Exception {
+        var report = archiveReadyExpense(); pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow();
+        var bytes = archiveDownload(report, "finance"); var resources = resourceVersions(report); var original = settlements.find("demo", report.id()).orElseThrow();
+        var payment = paymentOperations.find("demo", original.input().payment().operationId()).orElseThrow(); var command = payment.input();
+        var first = expenseReturnItem(report, "partial-one", "20"); expenseReturnRows = List.of(first); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        var checked = queryExpenseReturn(report);
+        assertThat(checked.status()).isEqualTo(ExpensePaymentReturnCheck.Status.CHECKED);
+        assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries()).isEmpty();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        var firstAction = registerExpenseReturn(report, checked);
+        var recorded = expenseReturnLedgers.find("demo", report.id()).orElseThrow(); assertThat(recorded.totalReturned()).isEqualTo(money("20"));
+        assertThat(recorded.entries().get(0).registrationId()).isEqualTo(firstAction.registrationId());
+        expenseReturnRevision++; expenseReturnRows = List.of(expenseReturnItem(report, "partial-two", "10"), first);
+        registerExpenseReturn(report, queryExpenseReturn(report));
+        assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().totalReturned()).isEqualTo(money("30"));
+        paymentMode = "REVERSED"; tx().executeWithoutResult(status -> paymentExecution.query("demo", payment.input().command().id(), payment.version(), Instant.now())); paymentWorker.poll();
+        assertThat(paymentOperations.find("demo", payment.input().command().id()).orElseThrow().status()).isEqualTo(PaymentOperation.Status.REVERSED);
+        expenseReturnRevision++; expenseReturnStatus = ExpensePaymentReturnPort.Status.RETURNED;
+        expenseReturnRows = List.of(first, expenseReturnRows.get(0), expenseReturnItem(report, "full-final", "20"));
+        registerExpenseReturn(report, queryExpenseReturn(report));
+        recorded = expenseReturnLedgers.find("demo", report.id()).orElseThrow(); assertThat(recorded.totalReturned()).isEqualTo(money("50")); assertThat(recorded.entries()).hasSize(3);
+        assertThat(recorded.reviewRequired()).isTrue(); assertThat(expenseReturnRegistrations.history("demo", report.id())).hasSize(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isEqualTo(3);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().input()).isEqualTo(original.input());
+        assertThat(settlements.find("demo", report.id()).orElseThrow().resourcesConsumed()).isTrue(); assertThat(resourceVersions(report)).isEqualTo(resources);
+        assertThat(paymentOperations.find("demo", payment.input().command().id()).orElseThrow().input()).isEqualTo(command);
+        assertThat(archives.find("demo", report.id(), 1)).contains(archive); assertThat(archiveDownload(report, "finance")).isEqualTo(bytes); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void expensePaymentReturnUnknownEvidenceNeedsExplicitFreshConfirmationBeforeSettlementResumes() throws Exception {
+        var report = archiveReadyExpense(); var original = settlements.find("demo", report.id()).orElseThrow(); var resources = resourceVersions(report);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.UNRESOLVED; var unresolved = queryExpenseReturn(report);
+        assertThat(asFinance(() -> expenseReturns.registrationIssue(expenseReturnSources.find("demo", report.id()), expenseReturnLedgers.find("demo", report.id()).orElseThrow(), unresolved, Instant.now())))
+                .isEqualTo("EXPENSE_PAYMENT_RETURN_EVIDENCE_UNAVAILABLE");
+        assertThatThrownBy(() -> settlementSources.requireCurrent(settlements.find("demo", report.id()).orElseThrow(), current(report)))
+                .isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("EXPENSE_PAYMENT_RETURN_REVIEW_REQUIRED"));
+        expenseReturnRevision++; expenseReturnStatus = ExpensePaymentReturnPort.Status.CONFIRMED; var confirmed = queryExpenseReturn(report);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        registerExpenseReturn(report, confirmed);
+        var recovered = settlements.find("demo", report.id()).orElseThrow(); assertThat(recovered.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(recovered.input()).isEqualTo(original.input()); assertThat(recovered.budgetOperationId()).isEqualTo(original.budgetOperationId()); assertThat(resourceVersions(report)).isEqualTo(resources);
+        assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().reviewRequired()).isFalse();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isZero();
+    }
+
+    @Test void expensePaymentReturnHoldSurvivesAnOtherwiseValidOriginalVoucherResolution() throws Exception {
+        var report = archiveReadyExpense(); var resources = resourceVersions(report);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "retained", "20"));
+        registerExpenseReturn(report, queryExpenseReturn(report));
+        var disputed = correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var input = json.read(json.write(voucherDecisionInput(report, disputed)), VoucherDisputeService.Input.class);
+        asFinance(() -> voucherDisputes.resolve(report.applicationId(), disputed.input().command().id(), input));
+        assertThat(voucherOperations.find("demo", disputed.input().command().id()).orElseThrow().usablePosted()).isTrue();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().totalReturned()).isEqualTo(money("20")); assertThat(resourceVersions(report)).isEqualTo(resources);
+    }
+
+    @Test void expensePaymentReturnCannotOmitAnyObservedBankReceiptEvenBeforeRegistration() throws Exception {
+        var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        expenseReturnRows = List.of(expenseReturnItem(report, "known-one", "20")); queryExpenseReturn(report);
+        expenseReturnRevision++; expenseReturnRows = List.of(expenseReturnItem(report, "replacement", "20")); var changed = queryExpenseReturn(report);
+        assertThatThrownBy(() -> registerExpenseReturn(report, changed)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                failure -> assertThat(failure.code()).isEqualTo("EXPENSE_PAYMENT_RETURN_EVIDENCE_CHANGED"));
+        assertThat(expenseReturnRegistrations.history("demo", report.id())).isEmpty(); assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries()).isEmpty();
+    }
+
+    @Test void expensePaymentReturnRegistrationRollsBackEveryRowAndConsumesItsCheckOnlyOnce() throws Exception {
+        var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        expenseReturnRows = List.of(expenseReturnItem(report, "atomic-one", "10"), expenseReturnItem(report, "atomic-two", "10")); var checked = queryExpenseReturn(report);
+        var before = expenseReturnLedgers.find("demo", report.id()).orElseThrow(); var settlement = settlements.find("demo", report.id()).orElseThrow();
+        var input = expenseReturnInput(report, checked);
+        assertThatThrownBy(() -> asFinance(() -> tx().execute(status -> { expenseReturns.register(report.id(), input); throw new IllegalStateException("Synthetic registration rollback"); }))).isInstanceOf(IllegalStateException.class);
+        assertThat(expenseReturnLedgers.find("demo", report.id())).contains(before); assertThat(expenseReturnChecks.find("demo", checked.input().id())).contains(checked);
+        assertThat(settlements.find("demo", report.id())).contains(settlement); assertThat(expenseReturnRegistrations.history("demo", report.id())).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isZero();
+        registerExpenseReturn(report, checked);
+        assertThatThrownBy(() -> asFinance(() -> expenseReturns.register(report.id(), input))).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("CONCURRENCY_CONFLICT"));
+        assertThat(expenseReturnRegistrations.history("demo", report.id())).hasSize(1);
+    }
+
+    @Test void expensePaymentReturnExpiredLeaseAndRevokedFinanceCannotConsumeOrOverwriteEvidence() throws Exception {
+        var report = archiveReadyExpense(); var queued = queueExpenseReturn(report); var claimed = expenseReturns.claim("demo", queued.input().id(), Instant.now());
+        assertThat(claimed.status()).isEqualTo(ExpensePaymentReturnCheck.Status.RUNNING);
+        assertThat(expenseReturns.claim("demo", claimed.input().id(), claimed.leaseUntil())).isNull();
+        assertThat(expenseReturnChecks.find("demo", claimed.input().id()).orElseThrow().issue()).isEqualTo(ExpensePaymentReturnCheck.Issue.TIMEOUT);
+        expenseReturns.finish(claimed, new FinanceResult.Success<>(expenseReturnReceipt(claimed.input().request())), claimed.leaseUntil().plusSeconds(1));
+        assertThat(expenseReturnChecks.find("demo", claimed.input().id()).orElseThrow().issue()).isEqualTo(ExpensePaymentReturnCheck.Issue.TIMEOUT);
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThatThrownBy(() -> queueExpenseReturn(report)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("FORBIDDEN")); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void expensePaymentReturnApiRechecksFieldsAndPersonnelBeforeIdempotentReplay() throws Exception {
+        hideBusinessDetails = true; var report = archiveReadyExpense(); String path = path(report) + "/payment-return";
+        var initial = read(path, "finance"); assertThat(initial.getHeader("Cache-Control")).isEqualTo("no-store");
+        var view = ok(initial, 200); assertThat(view.path("returnVersion").asLong()).isZero(); assertThat(view.path("canQuery").asBoolean()).isTrue();
+        assertThat(ok(read(path, "alice"), 200).path("canQuery").asBoolean()).isFalse();
+        for (String user : List.of("bob", "cashier", "admin", "manager")) assertThat(read(path, user).getStatus()).isIn(403, 404);
+        assertThat(read(path + "?tenantId=foreign", "finance").getStatus()).isEqualTo(400);
+        assertThat(read(path + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
+        var query = new ExpensePaymentReturnService.QueryInput(view.path("settlementVersion").asLong(), 0, "核对银行实收与员工应付");
+        var injected = json.read(json.write(query), com.fasterxml.jackson.databind.node.ObjectNode.class).put("amount", "999");
+        assertThat(send(path + "/checks", "finance", injected).getStatus()).isEqualTo(400);
+        for (String user : List.of("alice", "cashier", "admin")) assertThat(send(path + "/checks", user, query).getStatus()).isIn(403, 404);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "api-bank", "20"));
+        String queryKey = UUID.randomUUID().toString(); var queued = ok(send(path + "/checks", "finance", queryKey, query), 202);
+        var replay = send(path + "/checks", "finance", queryKey, query); assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true"); assertThat(ok(replay, 202)).isEqualTo(queued);
+        expenseReturnWorker.poll(); view = ok(read(path, "finance"), 200); assertThat(view.path("latestCheck").path("canRegister").asBoolean()).isTrue();
+        assertThat(ok(read(path, "alice"), 200).path("latestCheck").isNull()).isTrue();
+        var check = expenseReturnChecks.find("demo", UUID.fromString(queued.path("checkId").asText())).orElseThrow(); var input = expenseReturnInput(report, check);
+        String registerKey = UUID.randomUUID().toString(); var saved = ok(send(path + "/registrations", "finance", registerKey, input), 202);
+        assertThat(ok(send(path + "/registrations", "finance", registerKey, input), 202)).isEqualTo(saved);
+        var applicant = read(path, "alice"); var accepted = ok(applicant, 200); assertThat(accepted.path("totalReturned").path("value").asText()).isEqualTo("20.00");
+        assertThat(accepted.path("netPaid").path("value").asText()).isEqualTo("30.00"); assertThat(accepted.path("registrations")).hasSize(1);
+        assertThat(applicant.getContentAsString()).doesNotContain("commandDigest", "targetDigest", "accountDigest", "debitAccountReference", "synthetic-private-account");
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(path + "/registrations", "finance", registerKey, input).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void expensePaymentReturnBankUniquenessRollsBackAllItemsAcrossDifferentExpenses() throws Exception {
+        var first = paidExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(first, "colliding", "10"));
+        registerExpenseReturn(first, queryExpenseReturn(first));
+        var second = paymentReport(false); UUID id = authorizePayment(second);
+        ok(send("/api/v1/cashier/payments/" + id + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202); paymentRequestWorker.poll(); paymentWorker.poll();
+        expenseReturnRevision++; expenseReturnRows = List.of(expenseReturnItem(second, "would-be-new", "10"), expenseReturnItem(second, "colliding", "10"));
+        var check = queryExpenseReturn(second); var before = expenseReturnLedgers.find("demo", second.id()).orElseThrow();
+        assertThatThrownBy(() -> registerExpenseReturn(second, check)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                failure -> assertThat(failure.code()).isEqualTo("EXPENSE_PAYMENT_RETURN_ALREADY_RECORDED"));
+        assertThat(expenseReturnLedgers.find("demo", second.id())).contains(before); assertThat(expenseReturnChecks.find("demo", check.input().id())).contains(check);
+        assertThat(expenseReturnRegistrations.history("demo", second.id())).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, second.id().toString())).isZero();
+        assertThat(expenseReturnLedgers.find("demo", first.id()).orElseThrow().totalReturned()).isEqualTo(money("10"));
+    }
+
+    @Test void expensePaymentReturnConcurrentFinanceRegistrationsHaveExactlyOneWinner() throws Exception {
+        var report = paidExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "concurrent", "20"));
+        var checked = queryExpenseReturn(report); var input = expenseReturnInput(report, checked); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var jobs = java.util.stream.IntStream.range(0, 2).mapToObj(index -> pool.submit(() -> {
+                try { asFinance(() -> expenseReturns.register(report.id(), input)); return "SAVED"; }
+                catch (io.agentflow.common.DomainException failure) { return failure.code(); }
+            })).toList();
+            assertThat(List.of(jobs.get(0).get(20, java.util.concurrent.TimeUnit.SECONDS), jobs.get(1).get(20, java.util.concurrent.TimeUnit.SECONDS))).containsExactlyInAnyOrder("SAVED", "CONCURRENCY_CONFLICT");
+        } finally { pool.shutdownNow(); }
+        assertThat(expenseReturnRegistrations.history("demo", report.id())).hasSize(1); assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries()).hasSize(1);
+    }
+
+    private ExpensePaymentReturnCheck queueExpenseReturn(ExpenseReport report) {
+        var ledger = expenseReturnLedgers.find("demo", report.id()).orElse(null); var settlement = settlements.find("demo", report.id()).orElseThrow();
+        var action = asFinance(() -> expenseReturns.queue(report.id(), new ExpensePaymentReturnService.QueryInput(settlement.version(), ledger == null ? 0 : ledger.version(), "核对原报销银行退回")));
+        return expenseReturnChecks.find("demo", action.checkId()).orElseThrow();
+    }
+    private ExpensePaymentReturnCheck queryExpenseReturn(ExpenseReport report) {
+        var queued = queueExpenseReturn(report); expenseReturnWorker.poll(); return expenseReturnChecks.find("demo", queued.input().id()).orElseThrow();
+    }
+    private ExpensePaymentReturnService.RegisterInput expenseReturnInput(ExpenseReport report, ExpensePaymentReturnCheck check) {
+        return new ExpensePaymentReturnService.RegisterInput(settlements.find("demo", report.id()).orElseThrow().version(), expenseReturnLedgers.find("demo", report.id()).orElseThrow().version(),
+                check.input().id(), check.version(), check.receipt().status(), "EXPENSE-BANK-RETURN", "核对独立入款和员工应付贷方");
+    }
+    private ExpensePaymentReturnService.ActionReceipt registerExpenseReturn(ExpenseReport report, ExpensePaymentReturnCheck check) {
+        var input = expenseReturnInput(report, check); return asFinance(() -> expenseReturns.register(report.id(), input));
+    }
+    private ExpensePaymentReturnPort.ReturnItem expenseReturnItem(ExpenseReport report, String id, String amount) {
+        var request = expenseReturnSources.find("demo", report.id()).request(); var at = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        return new ExpensePaymentReturnPort.ReturnItem(new ExpensePaymentReturnPort.BankReceipt("expense-bank-" + id, money(amount), at),
+                new ExpensePaymentReturnPort.PayableCredit("expense-return-voucher-" + id, "credit", request.payableAccountCode(), money(amount), LocalDate.now(), at));
+    }
+    private ExpensePaymentReturnPort.Receipt expenseReturnReceipt(ExpensePaymentReturnPort.Request request) {
+        var current = paymentOperations.find("demo", request.command().id()).orElseThrow().observation(); var now = Instant.now();
+        var observed = new PaymentObservation(current.authorizationId(), current.commandDigest(), current.status(), current.revision(), now,
+                current.paymentReference(), current.paidAmount(), current.accountDigest(), current.completedAt(), current.receiptReference(), current.failure());
+        return new ExpensePaymentReturnPort.Receipt(request, expenseReturnStatus, expenseReturnRevision, now, now.plusSeconds(300), observed, expenseReturnRows);
     }
 
     @Test void confirmedExpensePaymentRegistersSettlementWithoutConsumingResourcesInsideTheBankCallback() throws Exception {
@@ -2226,6 +2417,7 @@ class ExpenseSubmissionIntegrationTest {
     }
     private Object data(String operation, JsonNode data) {
         return switch (operation) {
+            case "expense-payment-return" -> expenseReturnReceipt(json.read(data.toString(), ExpensePaymentReturnPort.Request.class));
             case "catalog" -> new FinanceCatalog("alice", "synthetic-v1", Instant.now().plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", paperRequired, "v1", legalTimeZone)),
                     List.of(new FinanceCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM))), List.of(new FinanceCatalog.CostCenter(entity, "IT", "研发")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
             case "employee-account" -> {

@@ -18,7 +18,7 @@ const issues: Record<string, string> = {
   DISBURSEMENT_RETURN_EVIDENCE_UNAVAILABLE: '尚无完整有效的原放款、银行回款及入账依据，请重新查询。', DISBURSEMENT_RETURN_NOT_REQUIRED: '原放款当前没有待解除的冻结。',
   DISBURSEMENT_RETURN_PAYMENT_UNRESOLVED: '原付款结果尚未核清，请先在付款明细完成原交易核对。', DISBURSEMENT_RETURN_EVIDENCE_CHANGED: '原件已变化或遗漏此前回款，请核对累计完整依据后重新查询。',
   DISBURSEMENT_RETURN_SOURCE_CHANGED: '原放款或已确认退回与当前材料不一致，请核对原件。', DISBURSEMENT_RETURN_CONFLICTS_WITH_USAGE: '退回金额与已有报销冲销、还款或预留冲突，请先核清相关占用。',
-  DISBURSEMENT_RETURN_ALREADY_RECORDED: '回款流水或贷方分录已用于还款或其他放款退回，不能重复减少欠款。', DISBURSEMENT_RETURN_OUTCOME_CHANGED: '结论与当前展示依据不一致，请刷新核对。',
+  DISBURSEMENT_RETURN_ALREADY_RECORDED: '回款流水或贷方分录已用于还款、放款退回或报销退回，不能重复减少欠款。', DISBURSEMENT_RETURN_OUTCOME_CHANGED: '结论与当前展示依据不一致，请刷新核对。',
   DISBURSEMENT_RETURN_PENDING: '复核查询正在处理，请刷新查看。', PAYMENT_ACTOR_UNAVAILABLE: '当前财务任职已变化，暂时不能确认。',
   TIMEOUT: '复核查询超时，请重新查询。', TARGET_CHANGED: '原资金服务配置已变化，请联系财务管理员。', SOURCE_CHANGED: '原放款来源或当前财务身份已变化。'
 }

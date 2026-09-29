@@ -1,0 +1,120 @@
+{
+  "date": "2026-09-29",
+  "stage": "expense-payment-returns",
+  "result": "PASS",
+  "schemaVersion": 64,
+  "scope": "Local PostgreSQL, real application HTTP and browser; bank and ERP endpoints are synthetic loopback only",
+  "tests": {
+    "postgresDomain": 19,
+    "postgresServer": 158,
+    "postgresExpenseSubmission": 104,
+    "postgresAdvanceRepayment": 38,
+    "postgresMigration": 1,
+    "h2FocusedApiAndContract": 14,
+    "frontendExpenseAndArchive": 33,
+    "scopeOverlap": true,
+    "productionBuild": true,
+    "package": true
+  },
+  "openApi": {
+    "operations": 185,
+    "schemas": 356,
+    "requestExamples": 69,
+    "addedOperations": 3,
+    "addedSchemas": 12
+  },
+  "authors": {
+    "javaFiles": 795,
+    "namedTypes": 1464,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "httpRequestsIncludingLogins": 159,
+  "businessJsonResponsesValidated": 117,
+  "binaryDownloadChecks": 6,
+  "upgrade": {
+    "from": 63,
+    "to": 64,
+    "preservedExistingTables": 27,
+    "preservedOriginalFiles": 4,
+    "backupBytes": 634108,
+    "oldReceiptCreditRowsBackfilled": 4,
+    "restorePerformed": false
+  },
+  "acceptance": {
+    "reportId": "a54bcbf6-c8f0-451e-9394-5789968781ce",
+    "applicationId": "e24bfe29-6084-4ddb-8df9-306152c9e106",
+    "businessNo": "UI-EXPENSE-RETURN-12f2738b",
+    "paymentId": "0c4d3bea-b575-4ce4-a0bf-a1d5df68322d",
+    "originalPayment": "100.00",
+    "registeredReturns": [
+      "20.00",
+      "30.00",
+      "50.00"
+    ],
+    "cumulativeReturned": "100.00",
+    "netOriginalPayment": "0.00",
+    "settlementStillRequiresReview": true,
+    "initialUnresolvedFreezesAndFreshExplicitConfirmationRestores": true,
+    "bankReversalObservedBeforeFullRegistration": true,
+    "sharedLedgerCredits": 3,
+    "oldLoanCreditsPreserved": true,
+    "consumedResourcesAndOriginalCommandBodiesPreserved": true,
+    "originalPaymentRevisionsPreserved": true,
+    "originalArchiveZipUnchanged": true,
+    "originalArchiveSha256": "6f1c9131c5e032c661bffc3de8c265fc4ee6c0716e07aac39eee275af207aeca",
+    "noNewPaymentOrVoucherCommandsFromReturns": true
+  },
+  "browser": {
+    "partialQueryAndRegistration": true,
+    "showsCumulativeAndNewAmountsSeparately": true,
+    "confirmationRequired": true,
+    "saved20Then30": true,
+    "finalFullReturnVisible": true,
+    "settlementAndArchiveRefresh": true,
+    "narrowLayout": {
+      "cards": [
+        {
+          "left": 50.66666793823242,
+          "width": 358.66668701171875
+        },
+        {
+          "left": 50.66666793823242,
+          "width": 358.66668701171875
+        },
+        {
+          "left": 50.66666793823242,
+          "width": 358.66668701171875
+        }
+      ],
+      "document": 480,
+      "regionClient": 391,
+      "regionScroll": 391,
+      "viewport": 500
+    },
+    "viewportReset": true,
+    "screenshots": [
+      "expense-payment-return-browser-partial.png",
+      "expense-payment-return-browser-final.png",
+      "expense-payment-return-browser-narrow.png"
+    ]
+  },
+  "manualReview": {
+    "scope": "Domain accounting invariants, original source binding, field and personnel access, idempotent replay, shared credit uniqueness, atomic persistence, cumulative history, worker leases, UI identity changes and receipt validation",
+    "unresolvedFindings": []
+  },
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "delivery": {
+    "localOnly": true,
+    "remoteConfigured": false,
+    "remoteCiRun": false,
+    "mainChanged": false
+  },
+  "remaining": [
+    "Independent expense resource and accounting adjustments",
+    "Procurement payments and budget adjustments",
+    "Batch payments and verified callbacks",
+    "Advanced workflow, notifications and collaboration",
+    "Real enterprise and production acceptance and remote delivery"
+  ]
+}

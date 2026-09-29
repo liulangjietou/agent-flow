@@ -17,11 +17,14 @@ public class ExpenseSettlementSources {
     private final JdbcPaymentAuthorizationRepository authorizations;
     private final JdbcPaymentOperationRepository payments;
     private final PaymentPayeeEvidence payeeEvidence;
+    private final JdbcExpensePaymentReturnsRepository returns;
 
     /** 跨财务聚合读取集中在应用层，不让领域模型依赖 JDBC 或外部网关。 */
     public ExpenseSettlementSources(ApprovedVoucherSources approved, JdbcVoucherOperationRepository vouchers,
-            JdbcVoucherPreparationRepository preparations, JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentOperationRepository payments, PaymentPayeeEvidence payeeEvidence) {
+            JdbcVoucherPreparationRepository preparations, JdbcPaymentAuthorizationRepository authorizations, JdbcPaymentOperationRepository payments, PaymentPayeeEvidence payeeEvidence,
+            JdbcExpensePaymentReturnsRepository returns) {
         this.approved = approved; this.vouchers = vouchers; this.preparations = preparations; this.authorizations = authorizations; this.payments = payments; this.payeeEvidence = payeeEvidence;
+        this.returns = returns;
     }
 
     /** 实际到账仍属于原授权；当前审批撤销不能把已经发生的银行事实抹去。 */
@@ -68,6 +71,9 @@ public class ExpenseSettlementSources {
     /** 核销前重读当前原凭据；已失效的资金或会计依据只暂停核销，不重写到账状态。 */
     public void requireCurrent(ExpenseSettlement settlement, ExpenseReport report) {
         settlement.requireReport(report); var input = settlement.input(); var source = input.source();
+        if (returns.find(source.tenantId(), source.businessId()).map(ExpensePaymentReturns::reviewRequired).orElse(false)) {
+            throw new DomainException("EXPENSE_PAYMENT_RETURN_REVIEW_REQUIRED", "Expense payment return requires independent review or adjustment before settlement");
+        }
         requireApproved(source, input.gross().value().signum() == 0, settlement.resourcesConsumed());
         if (input.voucherOperationId() == null) {
             var preparation = preparations.latest(source).orElseThrow(ExpenseSettlementSources::mismatch);

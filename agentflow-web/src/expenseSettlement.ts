@@ -48,6 +48,7 @@ const issues: Record<string, string> = {
   ADVANCE_VOUCHER_REVIEW_REQUIRED: '本次冲销的借款凭证存在争议，请由财务先核对原借款凭证。', ADVANCE_PAYMENT_REVIEW_REQUIRED: '本次冲销的借款付款存在争议，请由财务先核对原借款。', INVOICE_VERIFICATION_REQUIRED: '发票存在新的未完成或未通过查验，请重新取得成功验票结果。', INVOICE_VERIFICATION_EXPIRED: '发票查验已过期，请重新验票。',
   VOUCHER_SOURCE_CHANGED: '原批准或财务版本已变化，需要核对本次结算依据。', VOUCHER_BUDGET_NOT_FROZEN: '原核定金额的预算冻结尚未确认。', EXPENSE_RESERVATION_CHANGED: '本轮发票、额度或借款预留发生变化，需要核对原占用。',
   EXPENSE_PAYMENT_NOT_CONFIRMED: '原付款正在核对，请先确认银行结果。', EXPENSE_VOUCHER_NOT_CONFIRMED: '原挂账凭证正在核对，请先确认 ERP 结果。', EXPENSE_PAYMENT_REVIEW: '原付款发生退回或结果冲突，已暂停结算自动处理。', EXPENSE_VOUCHER_REVIEW: '原挂账凭证发生冲回或结果冲突，已暂停结算自动处理。',
+  EXPENSE_PAYMENT_RETURN_REVIEW_REQUIRED: '报销银行退回需要独立复核或后续办理，已核销资源保持原记录。', EXPENSE_PAYMENT_RETURNED: '已登记报销银行退回，等待独立后续办理；原发票、预算与借款冲销保留。',
   BUDGET_ACCOUNTING_PERIOD_CLOSED: '预算会计期间已关闭，请由财务核对后重试。', BUDGET_LEDGER_VERSION_CONFLICT: '外部预算版本不一致，请先核对预算台账。', EXPENSE_FUNDING_CONFLICT: '结算资金依据与已登记事实不一致，需要人工核对。'
 }
 export function settlementIssue(code: string | null) { return code ? issues[code] ?? '结算依据需要核对，请联系财务处理后再决定是否重试。' : '' }
