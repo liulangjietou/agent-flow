@@ -30,7 +30,8 @@ function version(value: number) { requireValue(Number.isSafeInteger(value) && va
 function instant(value: string) { requireValue(typeof value === 'string' && Number.isFinite(Date.parse(value))); return Date.parse(value) }
 function date(value: string) { requireValue(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value) }
 function note(value: string) { if (!value.trim() || value.length > 2000) throw new Error('请填写 2000 字以内的核对说明。'); return value.trim() }
-function posting(value: ReversePosting, original: ReversalOriginal, observedAt: number) {
+/** 核验实际独立凭证身份、日期和完整平衡分录，供登记与执行结果共用。 */
+export function validateReversePosting(value: ReversePosting, original: ReversalOriginal, observedAt: number) {
   requireValue(value); identifier(value.postingReference); identifier(value.voucherReference); identifier(value.periodReference); date(value.accountingDate)
   requireValue(value.postingReference !== original.postingReference && value.voucherReference !== original.voucherReference && value.accountingDate >= original.accountingDate
     && instant(value.postedAt) >= instant(original.postedAt) && instant(value.postedAt) <= observedAt && Array.isArray(value.lines) && value.lines.length >= 2)
@@ -64,7 +65,7 @@ export function validateVoucherReversal(value: VoucherReversalView, expected: Vo
       requireValue(at <= instant(check.updatedAt) && until > at && until - at <= 300_000 && ['UNRESOLVED', 'VERIFIED'].includes(evidence.status))
       if (evidence.originalRevision !== null) requireValue(Number.isSafeInteger(evidence.originalRevision) && evidence.originalRevision >= 0)
       requireValue(evidence.originalStatus === null || ['NOT_FOUND', 'PENDING', 'POSTED', 'FAILED', 'REVERSED'].includes(evidence.originalStatus))
-      if (evidence.status === 'VERIFIED') { requireValue(evidence.reversal && evidence.originalStatus === 'REVERSED' && evidence.originalRevision !== null); version(evidence.originalRevision); posting(evidence.reversal, original, at) }
+      if (evidence.status === 'VERIFIED') { requireValue(evidence.reversal && evidence.originalStatus === 'REVERSED' && evidence.originalRevision !== null); version(evidence.originalRevision); validateReversePosting(evidence.reversal, original, at) }
       else requireValue(evidence.reversal === null)
       if (check.canRecord) requireValue(check.status === 'CHECKED' && evidence.status === 'VERIFIED' && value.originalStatus === 'REVERSED' && check.confirmationIssue === null && value.record === null)
     }
@@ -72,7 +73,7 @@ export function validateVoucherReversal(value: VoucherReversalView, expected: Vo
   if (value.record !== null) {
     requireValue(value.record); identifier(value.record.id); version(value.record.operationVersion); identifier(value.record.recordedBy); identifier(value.record.evidenceReference); note(value.record.comment)
     requireValue(value.record.operationVersion <= value.operationVersion && !value.canQuery && !check?.canRecord)
-    posting(value.record.reversal, original, instant(value.record.recordedAt))
+    validateReversePosting(value.record.reversal, original, instant(value.record.recordedAt))
     if (check?.status === 'RECORDED') requireValue(check.evidence?.status === 'VERIFIED' && JSON.stringify(check.evidence.reversal) === JSON.stringify(value.record.reversal))
   } else requireValue(check?.status !== 'RECORDED')
   if (value.canQuery) requireValue(value.originalStatus === 'REVERSED' && value.record === null && (!check || !['QUEUED', 'RUNNING'].includes(check.status)))

@@ -84,6 +84,13 @@ public class VoucherReversalExecutionService {
         requireAvailable(preparations.find(tenant, id).orElseThrow(), source, true);
         var next = value.retryNotFound(time(at)); operations.update(next); return next;
     }
+    /** 页面只提示当前能否重发，实际写入仍在锁内复核相同条件。 */
+    public String resendIssue(VoucherReversalOperation value, VoucherReversalSources.Source source, Instant now) {
+        try {
+            var command = value.input().command(); requireAvailable(preparations.find(command.source().command().tenantId(), command.id()).orElseThrow(), source, true);
+            value.retryNotFound(now); return null;
+        } catch (DomainException issue) { return issue.code(); }
+    }
     private void requireAvailable(VoucherReversalPreparation prepared, VoucherReversalSources.Source source, boolean held) {
         var input = prepared.input(); var command = input.source().command(); var original = source.current();
         if (prepared.status() != VoucherReversalPreparation.Status.AUTHORIZED || !source.request().equals(input.source()) || source.originalVersion() != input.originalVersion()

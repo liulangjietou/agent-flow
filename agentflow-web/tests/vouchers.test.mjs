@@ -28,6 +28,17 @@ function panel(overrides = {}) {
   return { props, events, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); global.fetch = originalFetch; bindAuthenticationActor(null) } }
 }
 
+test('两个冲销子面板分别锁定父级，切换身份不被旧子操作阻止刷新', async () => {
+  let reads = 0; api.vouchers = async () => { reads++; return disputedView() }
+  const p = panel()
+  try {
+    await settle(); p.state.reversalBusyChanged(true); p.state.executionBusyChanged(true); p.state.reversalBusyChanged(false)
+    assert.equal(p.state.blocked, true); assert.equal(p.events.at(-1), true)
+    p.props.scopeKey = 'another-current-finance'; await settle()
+    assert.equal(reads, 2); assert.equal(p.state.view.applicationId, 'app'); assert.equal(p.state.executionBusy, false); assert.equal(p.state.reversalBusy, false)
+  } finally { p.close() }
+})
+
 test('凭证裁决只传展示版本与终态，过期、非终态和不同意图的回执均拒绝', () => {
   const value = disputedView(), input = voucherDisputeInput(value, ' ERP-REVIEW ', ' 核对原凭证 ')
   assert.deepEqual(input, { roundNo: 2, applicationVersion: 10, businessVersion: 6, operationVersion: 3, outcome: 'POSTED', evidenceReference: 'ERP-REVIEW', comment: '核对原凭证' })

@@ -28,6 +28,7 @@ import type { RepaymentReviewView, RepaymentReviewQueryInput, RepaymentResolutio
 import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView, VoucherDisputeInput, VoucherDisputeReceipt } from './vouchers'
 import type { VoucherReversalView, ReversalQueryInput, ReversalRecordInput, ReversalActionReceipt } from './voucherReversal'
+import type { VoucherReversalExecutionView, ReversalPrepareInput, ReversalAuthorizeInput, ReversalOperationInput, ReversalExecutionReceipt } from './voucherReversalExecution'
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
 import type { ExpenseArchiveView } from './expenseArchive'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
@@ -312,6 +313,10 @@ export const api = {
   voucherReversal: (id: string, operationId: string, roundNo: number, signal: AbortSignal) => request<VoucherReversalView>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   queryVoucherReversal: (id: string, operationId: string, input: ReversalQueryInput) => write<ReversalActionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal/checks`, 'POST', '核验独立冲销凭证', input),
   recordVoucherReversal: (id: string, operationId: string, input: ReversalRecordInput) => write<ReversalActionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal/records`, 'POST', '登记独立冲销凭证', input),
+  voucherReversalExecution: (id: string, operationId: string, roundNo: number, signal: AbortSignal) => request<VoucherReversalExecutionView>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  prepareVoucherReversal: (id: string, operationId: string, input: ReversalPrepareInput) => write<ReversalExecutionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution/preparations`, 'POST', '准备独立冲销', input),
+  authorizeVoucherReversal: (id: string, operationId: string, input: ReversalAuthorizeInput) => write<ReversalExecutionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution/authorizations`, 'POST', '授权执行独立冲销', input),
+  voucherReversalOperationAction: (id: string, operationId: string, input: ReversalOperationInput) => write<ReversalExecutionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution/actions`, 'POST', '办理原冲销命令', input),
   expenseSettlement: (id: string, roundNo: number, signal: AbortSignal) => request<SettlementView>(`/expense-reports/${encodeURIComponent(id)}/settlement` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<ExpenseArchiveView>(`/expense-reports/${encodeURIComponent(id)}/archive` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   downloadExpenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<Blob>(`/expense-reports/${encodeURIComponent(id)}/archive/content` + historyQuery({ roundNo }), { signal, cache: 'no-store' }, 'zip'),

@@ -22770,6 +22770,645 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/vouchers/{operationId}/reversal-execution": {
+      "get": {
+        "operationId": "voucherReversalExecution",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取独立冲销准备与执行",
+        "description": "在原轮次完整字段权限内读取已授权操作；待授权候选只供原查询财务且须当前有效法人任职。原件停用与 ERP 原状态分别展示，读取不自动准备、授权或发送。",
+        "x-access": "原轮次完整财务字段可读；候选须原查询财务、当前法人任职、非申请人及原出纳",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherReversalExecutionWorkspace"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/vouchers/{operationId}/reversal-execution/preparations": {
+      "post": {
+        "operationId": "prepareVoucherReversal",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "准备独立冲销的原件与会计期间",
+        "description": "只读核验原凭证仍有效过账以及财务指定日期的开放期间。保留历史科目及全部辅助核算，不重新映射。准备完成后需本人独立财务明确授权。原凭证已有独立冲销记录或命令时拒绝。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非申请人及原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "页面版本、原意图、准备消费或冲销命令唯一性冲突。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原件、人员、期间、发送有效期或执行状态不满足操作条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "本地意图及审计已保存，不代表 ERP 已过账或冲销已登记。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherReversalExecutionActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherReversalPrepareInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 7,
+                "businessVersion": 3,
+                "operationVersion": 6,
+                "accountingDate": "2026-09-29",
+                "evidenceReference": "ERP-REVERSAL-REVIEW-001",
+                "comment": "核对原凭证并准备完整反向分录"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/vouchers/{operationId}/reversal-execution/authorizations": {
+      "post": {
+        "operationId": "authorizeVoucherReversal",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "明确授权实际 ERP 独立冲销",
+        "description": "明确授权本人最新、五分钟内的已保存候选，不接受金额、科目或 ERP 目标。消费准备、登记唯一命令、停用原凭证及冻结借款/适用报销同事务完成。后台事务外发送，未知结果查询原编号；付款、还款、资源与档案保持。幂等回放前重新核对权限。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非申请人及原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "页面版本、原意图、准备消费或冲销命令唯一性冲突。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原件、人员、期间、发送有效期或执行状态不满足操作条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "本地意图及审计已保存，不代表 ERP 已过账或冲销已登记。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherReversalExecutionActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherReversalAuthorizeInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 7,
+                "businessVersion": 3,
+                "operationVersion": 6,
+                "preparationId": "00000000-0000-0000-0000-000000000061",
+                "preparationVersion": 3,
+                "comment": "已审阅完整分录，明确授权 ERP 冲销"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/vouchers/{operationId}/reversal-execution/actions": {
+      "post": {
+        "operationId": "voucherReversalOperationAction",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "查询或明确重发原冲销命令",
+        "description": "QUERY 沿原编号与摘要读取，结果未知不新建命令。RESEND_ORIGINAL 仅供当前仍具资格的原授权财务，在从未观察到受理版本、权威查无且原证据仍有效时明确重发。过期、未知、已受理或争议均不能自动重发。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非申请人及原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "页面版本、原意图、准备消费或冲销命令唯一性冲突。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原件、人员、期间、发送有效期或执行状态不满足操作条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "本地意图及审计已保存，不代表 ERP 已过账或冲销已登记。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherReversalExecutionActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherReversalOperationInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 7,
+                "businessVersion": 3,
+                "operationVersion": 6,
+                "reversalId": "00000000-0000-0000-0000-000000000061",
+                "reversalVersion": 3,
+                "action": "QUERY",
+                "comment": "查询原冲销命令的实际执行结果"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -36948,6 +37587,732 @@
               {
                 "type": "string",
                 "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VoucherReversalCommandLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "originalLineNo",
+          "accountCode",
+          "side",
+          "amount",
+          "sourceLineNo"
+        ],
+        "properties": {
+          "originalLineNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accountCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "sourceLineNo": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "costCenter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "advanceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherReversalExecutionCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "createdAt",
+          "expiresAt",
+          "originalRevision",
+          "originalObservedAt",
+          "periodReference",
+          "periodSourceVersion",
+          "lines"
+        ],
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "originalObservedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "periodSourceVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/VoucherReversalCommandLine"
+            }
+          }
+        }
+      },
+      "VoucherReversalExecutionPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue",
+          "accountingDate",
+          "evidenceReference",
+          "reason",
+          "candidate",
+          "canAuthorize",
+          "authorizationIssue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "AUTHORIZED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversalExecutionCandidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canAuthorize": {
+            "type": "boolean"
+          },
+          "authorizationIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherReversalExecutionObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "revision",
+          "observedAt",
+          "acceptanceReference",
+          "posting",
+          "rejection"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND",
+              "PENDING",
+              "POSTED",
+              "FAILED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acceptanceReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversePosting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherReversalExecutionOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "attempts",
+          "highestRevision",
+          "failure",
+          "createdAt",
+          "sendExpiresAt",
+          "updatedAt",
+          "nextAttemptAt",
+          "authorizedBy",
+          "accountingDate",
+          "evidenceReference",
+          "reason",
+          "lines",
+          "observation",
+          "conflictingObservation",
+          "canQuery",
+          "canResendOriginal"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "highestRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sendExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "authorizedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/VoucherReversalCommandLine"
+            }
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversalExecutionObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflictingObservation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversalExecutionObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "canResendOriginal": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VoucherReversalExecutionWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "operationId",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "operationVersion",
+          "kind",
+          "originalStatus",
+          "originalHeld",
+          "original",
+          "canPrepare",
+          "latestPreparation",
+          "operation"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_ACCRUAL",
+              "PAYMENT"
+            ]
+          },
+          "originalStatus": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED"
+            ]
+          },
+          "originalHeld": {
+            "type": "boolean"
+          },
+          "original": {
+            "$ref": "#/components/schemas/VoucherReversalOriginal"
+          },
+          "canPrepare": {
+            "type": "boolean"
+          },
+          "latestPreparation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversalExecutionPreparation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversalExecutionOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "VoucherReversalPrepareInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "operationVersion",
+          "accountingDate",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "VoucherReversalAuthorizeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "operationVersion",
+          "preparationId",
+          "preparationVersion",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "preparationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preparationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "VoucherReversalOperationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "operationVersion",
+          "reversalId",
+          "reversalVersion",
+          "action",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reversalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "QUERY",
+              "RESEND_ORIGINAL"
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "VoucherReversalExecutionActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "operationId",
+          "roundNo",
+          "preparationId",
+          "preparationVersion",
+          "reversalId",
+          "reversalVersion",
+          "operationVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "preparationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preparationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reversalId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reversalVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
               },
               {
                 "type": "null"

@@ -1811,6 +1811,92 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(reversalPreparations.find("demo", queued.preparationId()).orElseThrow().issue()).isEqualTo("TIMEOUT"); assertThat(reversalWrites).isZero();
     }
 
+    @Test void reversalExecutionHttpSeparatesPreparationAuthorizationAndPostingWithIdempotentReceipts() throws Exception {
+        var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var route = executionPath(report, original); var initial = ok(read(route, "finance"), 200);
+        assertThat(initial.path("canPrepare").asBoolean()).isTrue(); assertThat(initial.path("originalHeld").asBoolean()).isFalse();
+        var input = executionPreparation(report, original); var key = UUID.randomUUID().toString();
+        var preparedResponse = send(route + "/preparations", "finance", key, input); var queued = ok(preparedResponse, 202);
+        assertThat(preparedResponse.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(ok(send(route + "/preparations", "finance", key, input), 202)).isEqualTo(queued);
+        assertThat(queued.path("preparationVersion").asLong()).isEqualTo(1); assertThat(queued.path("reversalId").isNull()).isTrue();
+        assertThat(reversalOperations.forOriginal("demo", original.input().command().id())).isEmpty(); assertThat(reversalWrites).isZero();
+        reversalExecutionWorker.poll(); var ready = reversalPreparations.find("demo", UUID.fromString(queued.path("preparationId").asText())).orElseThrow();
+        var candidate = ok(read(route, "finance"), 200);
+        assertThat(candidate.at("/latestPreparation/canAuthorize").asBoolean()).isTrue();
+        assertThat(candidate.at("/latestPreparation/candidate/lines").size()).isEqualTo(original.input().command().lines().size());
+        assertThat(candidate.toString()).doesNotContain("targetDigest", "commandDigest", "accountReference", "accountDigest", "payee");
+        assertThat(ok(read(route, "alice"), 200).path("latestPreparation").isNull()).isTrue();
+        var authorization = executionAuthorization(report, ready); var authorizationKey = UUID.randomUUID().toString();
+        var receipt = ok(send(route + "/authorizations", "finance", authorizationKey, authorization), 202);
+        assertThat(ok(send(route + "/authorizations", "finance", authorizationKey, authorization), 202)).isEqualTo(receipt);
+        assertThat(receipt.path("operationVersion").asLong()).isEqualTo(original.version() + 1);
+        assertThat(receipt.path("reversalId").asText()).isEqualTo(ready.input().id().toString());
+        var held = ok(read(route, "finance"), 200); assertThat(held.path("originalHeld").asBoolean()).isTrue();
+        assertThat(held.path("canPrepare").asBoolean()).isFalse(); assertThat(held.at("/operation/status").asText()).isEqualTo("QUEUED");
+        assertThat(held.at("/latestPreparation/canAuthorize").asBoolean()).isFalse(); assertThat(held.at("/operation/canQuery").asBoolean()).isFalse();
+        assertThat(ok(read(route, "alice"), 200).at("/operation/canQuery").asBoolean()).isFalse(); assertThat(reversalWrites).isZero();
+        assertCode(send(route + "/authorizations", "finance", authorization), "CONCURRENCY_CONFLICT");
+        reversalExecutionWorker.poll(); voucherWorker.poll(); var posted = ok(read(route, "finance"), 200);
+        assertThat(posted.path("originalStatus").asText()).isEqualTo("REVERSED"); assertThat(posted.path("originalHeld").asBoolean()).isTrue();
+        assertThat(posted.at("/operation/status").asText()).isEqualTo("POSTED"); assertThat(posted.at("/operation/observation/posting/lines").size()).isEqualTo(original.input().command().lines().size());
+        assertThat(reversalWrites).isEqualTo(1);
+    }
+
+    @Test void reversalExecutionHttpRejectsStaleForgedCrossSourceAndRevokedReplay() throws Exception {
+        var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var route = executionPath(report, original); var input = executionPreparation(report, original);
+        for (String user : List.of("alice", "admin", "cashier", "manager")) assertThat(send(route + "/preparations", user, input).getStatus()).isIn(403, 404);
+        assertThat(read(route + "?amount=1", "finance").getStatus()).isEqualTo(400);
+        assertThat(read(route.replace(report.applicationId().toString(), UUID.randomUUID().toString()), "finance").getStatus()).isEqualTo(404);
+        var forged = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(json.write(input), JsonNode.class); forged.put("commandDigest", "a".repeat(64));
+        assertThat(send(route + "/preparations", "finance", forged).getStatus()).isEqualTo(400);
+        for (String field : List.of("applicationVersion", "businessVersion", "operationVersion")) {
+            var stale = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(json.write(input), JsonNode.class); stale.put(field, stale.path(field).asLong() + 1);
+            assertCode(send(route + "/preparations", "finance", stale), "CONCURRENCY_CONFLICT");
+        }
+        var key = UUID.randomUUID().toString(); ok(send(route + "/preparations", "finance", key, input), 202);
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try {
+            assertThat(send(route + "/preparations", "finance", key, input).getStatus()).isIn(403, 404);
+            assertThat(read(route, "finance").getStatus()).isEqualTo(403);
+        } finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(reversalOperations.forOriginal("demo", original.input().command().id())).isEmpty(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalExecutionHttpRetainsOriginalRoundFieldPermissionsAndAdminCannotBypass() throws Exception {
+        hideBusinessDetails = true; var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var route = executionPath(report, original);
+        ok(read(route, "finance"), 200);
+        for (String user : List.of("manager", "admin")) {
+            assertThat(read(route, user).getStatus()).isEqualTo(403);
+            assertThat(send(route + "/preparations", user, executionPreparation(report, original)).getStatus()).isEqualTo(403);
+        }
+        assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalExecutionHttpRequiresExplicitOriginalQueryAndResendAfterAuthoritativeNotFound() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var receipt = authorizeExecution(report, prepared);
+        var original = voucherOperations.find("demo", prepared.input().source().command().id()).orElseThrow(); var route = executionPath(report, original);
+        var sending = reversalExecution.claim("demo", receipt.reversalId(), Instant.now());
+        reversalExecution.fail(sending, VoucherReversalOperation.Failure.CONNECTION, Instant.now());
+        var unknown = reversalOperations.find("demo", receipt.reversalId()).orElseThrow();
+        var query = new VoucherReversalPreparationService.OperationInput(1, app(report).version(), current(report).version(), original.version(), receipt.reversalId(), unknown.version(), VoucherReversalPreparationService.Action.QUERY, "读取原冲销编号结果");
+        var key = UUID.randomUUID().toString(); var queued = ok(send(route + "/actions", "finance", key, query), 202);
+        assertThat(ok(send(route + "/actions", "finance", key, query), 202)).isEqualTo(queued);
+        assertCode(send(route + "/actions", "finance", query), "CONCURRENCY_CONFLICT");
+        var reading = reversalExecution.claim("demo", receipt.reversalId(), Instant.now()); var at = Instant.now();
+        reversalExecution.finish(reading, new FinanceResult.Success<>(new VoucherReversalObservation(receipt.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at);
+        var notFound = ok(read(route, "finance"), 200); assertThat(notFound.at("/operation/canResendOriginal").asBoolean()).isTrue();
+        var resend = new VoucherReversalPreparationService.OperationInput(1, app(report).version(), current(report).version(), original.version(), receipt.reversalId(), notFound.at("/operation/version").asLong(), VoucherReversalPreparationService.Action.RESEND_ORIGINAL, "查无受理后明确按原编号重发");
+        assertThat(send(route + "/actions", "cashier", resend).getStatus()).isIn(403, 404);
+        var resent = ok(send(route + "/actions", "finance", resend), 202); assertThat(resent.path("reversalId").asText()).isEqualTo(receipt.reversalId().toString());
+        reversalExecutionWorker.poll(); assertThat(reversalWrites).isEqualTo(1);
+        assertThat(reversalOperations.find("demo", receipt.reversalId()).orElseThrow().status()).isEqualTo(VoucherReversalOperation.Status.POSTED);
+    }
+
+    private String executionPath(ExpenseReport report, VoucherOperation original) { return "/api/v1/applications/" + report.applicationId() + "/vouchers/" + original.input().command().id() + "/reversal-execution"; }
     private VoucherReversalPreparation prepareExecution(ExpenseReport report) {
         var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
         var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), original.input().command().id(), executionPreparation(report, original)));
