@@ -142,6 +142,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcVoucherReversalOperationRepository reversalOperations;
     @Autowired VoucherReversalExecutionService reversalExecution;
     @Autowired VoucherReversalExecutionWorker reversalExecutionWorker;
+    @Autowired VoucherReversalRetirementService reversalRetirement;
     @Autowired AccountingReversalPort reversalPort;
     @Autowired VoucherDisputeService voucherDisputes;
     @Autowired JdbcVoucherDisputeResolutionRepository voucherDecisions;
@@ -208,6 +209,7 @@ class ExpenseSubmissionIntegrationTest {
             jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", report.toString());
             String voucherIds = "SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?";
             jdbc.update("UPDATE voucher_operation SET reversal_id=NULL WHERE tenant_id='demo' AND business_id=?", report.toString());
+            jdbc.update("DELETE FROM voucher_reversal_retirement WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + ")", report.toString());
             jdbc.update("DELETE FROM voucher_reversal_operation_revision WHERE tenant_id='demo' AND reversal_id IN (SELECT id FROM voucher_reversal_operation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + "))", report.toString());
             jdbc.update("DELETE FROM voucher_reversal_operation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + ")", report.toString());
             jdbc.update("DELETE FROM voucher_reversal_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_reversal_preparation WHERE tenant_id='demo' AND operation_id IN (" + voucherIds + "))", report.toString());
@@ -1897,6 +1899,125 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     private String executionPath(ExpenseReport report, VoucherOperation original) { return "/api/v1/applications/" + report.applicationId() + "/vouchers/" + original.input().command().id() + "/reversal-execution"; }
+    @Test void reversalRetirementStopsNeverSentCommandRestoresOnlyOriginalAndAllowsNewExplicitPreparation() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); var resources = resourceVersions(report);
+        var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared); var id = authorized.operationId();
+        var before = reversalOperations.find("demo", authorized.reversalId()).orElseThrow(); var original = refreshRetirementOriginal(id);
+        var receipt = asFinance(() -> reversalRetirement.retire(report.applicationId(), id, retirementInput(report, original, before)));
+        var restored = voucherOperations.find("demo", id).orElseThrow(); var stopped = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        assertThat(restored.usablePosted()).isTrue(); assertThat(restored.input()).isEqualTo(original.input()); assertThat(restored.observation()).isEqualTo(original.observation());
+        assertThat(stopped.status()).isEqualTo(VoucherReversalOperation.Status.VOIDED); assertThat(stopped.failure()).isEqualTo(VoucherReversalOperation.Failure.FINANCE_RETIRED);
+        assertThat(stopped.input()).isEqualTo(before.input()); assertThat(reversalOperations.revision("demo", authorized.reversalId(), before.version())).contains(before);
+        assertThat(reversalOperations.retirement("demo", authorized.reversalId()).orElseThrow().id()).isEqualTo(receipt.retirementId());
+        assertThat(reversalOperations.forOriginal("demo", id)).isEmpty(); assertThat(reversalExecution.claim("demo", authorized.reversalId(), Instant.now())).isNull();
+        assertThatThrownBy(() -> tx().execute(status -> reversalExecution.query("demo", authorized.reversalId(), stopped.version(), Instant.now()))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(reversalWrites).isZero(); assertThat(paymentWrites).isEqualTo(1);
+        var next = prepareExecution(report); assertThat(next.input().id()).isNotEqualTo(authorized.reversalId());
+        authorizeExecution(report, next); assertThat(reversalOperations.forOriginal("demo", id).orElseThrow().input().command().id()).isEqualTo(next.input().id());
+        assertThat(reversalOperations.retirements("demo", id)).hasSize(1); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalRetirementPreservesConfirmedFailureAndIndependentPaymentDispute() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); var resources = resourceVersions(report);
+        var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var at = Instant.now();
+        var rejected = new VoucherReversalObservation(authorized.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.FAILED, 1, at,
+                "ERP-REJECTED-BEFORE-POSTING", null, VoucherReversalObservation.Rejection.ACCOUNTING_PERIOD_CLOSED);
+        reversalExecution.finish(claimed, new FinanceResult.Success<>(rejected), at);
+        var failed = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        var oldOriginal = voucherOperations.find("demo", authorized.operationId()).orElseThrow();
+        assertThatThrownBy(() -> asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, oldOriginal, failed))))
+                .isInstanceOf(io.agentflow.common.DomainException.class).hasMessageContaining("rechecked");
+        var original = refreshRetirementOriginal(authorized.operationId()); correctedExpensePayment(report);
+        var receipt = asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, original, failed)));
+        assertThat(receipt.basis()).isEqualTo(VoucherReversalOperation.RetirementBasis.CONFIRMED_FAILED);
+        assertThat(reversalOperations.find("demo", authorized.reversalId())).contains(failed);
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
+        assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalRetirementRollsBackAllVersionsAndFreezesWhenAuditTransactionFails() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var original = refreshRetirementOriginal(authorized.operationId()); var reversal = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        var settlement = settlements.find("demo", report.id()).orElseThrow(); var input = retirementInput(report, original, reversal);
+        assertThatThrownBy(() -> asFinance(() -> tx().execute(status -> { reversalRetirement.retire(report.applicationId(), authorized.operationId(), input); throw new IllegalStateException("Synthetic retirement rollback"); })))
+                .hasMessageContaining("Synthetic retirement rollback");
+        assertThat(voucherOperations.find("demo", authorized.operationId())).contains(original); assertThat(reversalOperations.find("demo", authorized.reversalId())).contains(reversal);
+        assertThat(reversalOperations.retirements("demo", authorized.operationId())).isEmpty(); assertThat(settlements.find("demo", report.id())).contains(settlement);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_REVERSAL_RETIRED'", Integer.class, report.applicationId().toString())).isZero();
+    }
+
+    @Test void reversalRetirementCannotRaceSendingOrReleaseUnknownCommand() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var original = refreshRetirementOriginal(authorized.operationId()); var reverse = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        var input = retirementInput(report, original, reverse); var pool = java.util.concurrent.Executors.newFixedThreadPool(2); var gate = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var retire = pool.submit(() -> { gate.await(); try { return asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), input)); }
+                catch (io.agentflow.common.DomainException conflict) { return null; } });
+            var send = pool.submit(() -> { gate.await(); return reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); }); gate.countDown();
+            var retired = retire.get(10, java.util.concurrent.TimeUnit.SECONDS); var claimed = send.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat((retired != null) ^ (claimed != null)).isTrue();
+            if (claimed != null) {
+                reversalExecution.fail(claimed, VoucherReversalOperation.Failure.CONNECTION, Instant.now()); var fresh = refreshRetirementOriginal(authorized.operationId());
+                var unknown = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+                assertThatThrownBy(() -> asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, fresh, unknown))))
+                        .isInstanceOf(io.agentflow.common.DomainException.class).hasMessageContaining("cannot be retired");
+                assertThat(voucherOperations.find("demo", authorized.operationId()).orElseThrow().reversalId()).isEqualTo(authorized.reversalId());
+            }
+        } finally { pool.shutdownNow(); }
+        assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalRetirementHttpRequiresFreshOriginalAndPreservesHistoryAndIdempotentDecision() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var original = voucherOperations.find("demo", authorized.operationId()).orElseThrow(); var route = executionPath(report, original);
+        var reversal = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        var held = ok(read(route, "finance"), 200); assertThat(held.at("/operation/canRetire").asBoolean()).isFalse();
+        assertThat(held.at("/operation/retirementIssue").asText()).isEqualTo("VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED");
+        assertThat(send(route + "/retirements", "finance", retirementInput(report, original, reversal)).getStatus()).isEqualTo(409);
+        original = refreshRetirementOriginal(authorized.operationId()); var input = retirementInput(report, original, reversal);
+        var ready = ok(read(route, "finance"), 200); assertThat(ready.at("/operation/canRetire").asBoolean()).isTrue();
+        assertThat(ready.at("/operation/retirementCheck/basis").asText()).isEqualTo("NEVER_DISPATCHED");
+        assertThat(ok(read(route, "alice"), 200).at("/operation/canRetire").asBoolean()).isFalse();
+        var key = UUID.randomUUID().toString(); var response = send(route + "/retirements", "finance", key, input); var result = ok(response, 202);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(result.path("operationVersion").asLong()).isEqualTo(original.version() + 1);
+        assertThat(ok(send(route + "/retirements", "finance", key, input), 202)).isEqualTo(result);
+        var after = ok(read(route, "finance"), 200); assertThat(after.path("operation").isNull()).isTrue(); assertThat(after.path("latestPreparation").isNull()).isTrue();
+        assertThat(after.path("canPrepare").asBoolean()).isTrue(); assertThat(after.path("originalHeld").asBoolean()).isFalse();
+        assertThat(after.path("retirements")).hasSize(1); assertThat(after.at("/retirements/0/reversalId").asText()).isEqualTo(authorized.reversalId().toString());
+        assertThat(after.toString()).doesNotContain("commandDigest", "targetDigest", "accountReference", "accountDigest");
+        var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(send(route + "/retirements", "finance", key, input).getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
+        assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalRetirementHttpRejectsStaleForgedForeignAndUnauthorizedDecisions() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var original = refreshRetirementOriginal(authorized.operationId()); var reversal = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        var route = executionPath(report, original) + "/retirements"; var input = retirementInput(report, original, reversal);
+        for (String user : List.of("alice", "admin", "cashier", "manager")) assertThat(send(route, user, input).getStatus()).isIn(403, 404);
+        for (String field : List.of("applicationVersion", "businessVersion", "operationVersion", "reversalVersion")) {
+            var stale = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(json.write(input), JsonNode.class); stale.put(field, stale.path(field).asLong() + 1);
+            assertCode(send(route, "finance", stale), "CONCURRENCY_CONFLICT");
+        }
+        var forged = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(json.write(input), JsonNode.class); forged.put("basis", "NEVER_DISPATCHED");
+        assertThat(send(route, "finance", forged).getStatus()).isEqualTo(400);
+        assertThat(send(route.replace(report.applicationId().toString(), UUID.randomUUID().toString()), "finance", input).getStatus()).isEqualTo(404);
+        var incorrect = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(json.write(input), JsonNode.class); incorrect.put("reversalId", UUID.randomUUID().toString());
+        assertCode(send(route, "finance", incorrect), "CONCURRENCY_CONFLICT");
+        assertThat(reversalOperations.retirements("demo", authorized.operationId())).isEmpty(); assertThat(voucherOperations.find("demo", authorized.operationId())).contains(original);
+    }
+
+    private VoucherOperation refreshRetirementOriginal(UUID id) {
+        var original = voucherOperations.find("demo", id).orElseThrow();
+        return observeVoucher(original, voucherFact(original, VoucherObservation.Status.POSTED, original.highestRevision()));
+    }
+    private VoucherReversalRetirementService.Input retirementInput(ExpenseReport report, VoucherOperation original, VoucherReversalOperation reverse) {
+        return new VoucherReversalRetirementService.Input(1, app(report).version(), current(report).version(), original.version(), reverse.input().command().id(), reverse.version(), "SAFE-REVERSE-END-001", "核对原过账及未执行依据后结束本次冲销");
+    }
+
     private VoucherReversalPreparation prepareExecution(ExpenseReport report) {
         var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
         var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), original.input().command().id(), executionPreparation(report, original)));

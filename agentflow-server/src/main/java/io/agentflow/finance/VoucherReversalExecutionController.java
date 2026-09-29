@@ -25,10 +25,11 @@ import java.util.UUID;
 public class VoucherReversalExecutionController {
     private final VoucherReversalExecutionWorkspace workspace;
     private final VoucherReversalPreparationService service;
+    private final VoucherReversalRetirementService retirement;
     private final IdempotencyExecutor idempotency;
     /** HTTP 只持久本地意图，后台提交后再执行 ERP 网络调用。 */
-    public VoucherReversalExecutionController(VoucherReversalExecutionWorkspace workspace, VoucherReversalPreparationService service, IdempotencyExecutor idempotency) {
-        this.workspace = workspace; this.service = service; this.idempotency = idempotency;
+    public VoucherReversalExecutionController(VoucherReversalExecutionWorkspace workspace, VoucherReversalPreparationService service, VoucherReversalRetirementService retirement, IdempotencyExecutor idempotency) {
+        this.workspace = workspace; this.service = service; this.retirement = retirement; this.idempotency = idempotency;
     }
     /** 敏感财务状态禁止共享缓存，读取不会开始准备或写操作。 */
     @GetMapping
@@ -54,6 +55,13 @@ public class VoucherReversalExecutionController {
     public ResponseEntity<String> action(@PathVariable UUID id, @PathVariable UUID operationId, @Valid @RequestBody VoucherReversalPreparationService.OperationInput input, HttpServletRequest request) {
         service.authorizeAccess(id, operationId, input.roundNo());
         var result = idempotency.execute(request, HttpStatus.ACCEPTED, () -> service.act(id, operationId, input));
+        return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders()).cacheControl(CacheControl.noStore()).body(result.getBody());
+    }
+    /** 结束必须有不可执行的依据和新鲜原件，幂等回放仍重新核对当前财务权限。 */
+    @PostMapping("/retirements")
+    public ResponseEntity<String> retire(@PathVariable UUID id, @PathVariable UUID operationId, @Valid @RequestBody VoucherReversalRetirementService.Input input, HttpServletRequest request) {
+        service.authorizeAccess(id, operationId, input.roundNo());
+        var result = idempotency.execute(request, HttpStatus.ACCEPTED, () -> retirement.retire(id, operationId, input));
         return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders()).cacheControl(CacheControl.noStore()).body(result.getBody());
     }
 }

@@ -111,8 +111,10 @@ public class JdbcVoucherOperationRepository {
     public boolean requiresAdvanceReview(String tenant, UUID id) {
         return jdbc.query("""
                 SELECT r.state_json FROM voucher_operation_revision r WHERE r.tenant_id=? AND r.operation_id=?
-                AND r.version>COALESCE((SELECT MAX(d.resolved_version) FROM voucher_dispute_resolution d
-                    WHERE d.tenant_id=r.tenant_id AND d.operation_id=r.operation_id AND d.outcome='POSTED'),0)
+                AND r.version>GREATEST(COALESCE((SELECT MAX(d.resolved_version) FROM voucher_dispute_resolution d
+                    WHERE d.tenant_id=r.tenant_id AND d.operation_id=r.operation_id AND d.outcome='POSTED'),0),
+                    COALESCE((SELECT MAX(t.released_version) FROM voucher_reversal_retirement t
+                    WHERE t.tenant_id=r.tenant_id AND t.operation_id=r.operation_id),0))
                 """, (row, index) -> json.read(row.getString("state_json"), VoucherOperation.class), tenant, id.toString())
                 .stream().anyMatch(value -> value.reversalId() != null || value.status() == VoucherOperation.Status.REVERSED || value.status() == VoucherOperation.Status.RECONCILING);
     }

@@ -108,7 +108,8 @@ public class VoucherReversalExecutionService {
     }
     private VoucherReversalOperation version(String tenant, UUID id, long version) {
         var initial = operations.find(tenant, id).orElseThrow(VoucherReversalExecutionService::conflict); sources.locked(tenant, initial.input().command().source().command().id());
-        var current = operations.find(tenant, id).orElseThrow(); if (current.version() != version) throw conflict(); return current;
+        var current = operations.find(tenant, id).orElseThrow();
+        if (current.version() != version || operations.retirement(tenant, id).isPresent()) throw conflict(); return current;
     }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Reversal operation or displayed version changed"); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }

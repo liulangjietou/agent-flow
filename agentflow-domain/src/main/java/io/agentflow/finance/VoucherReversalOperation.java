@@ -35,7 +35,8 @@ public record VoucherReversalOperation(Input input, long version, Status status,
         }
         if (status == Status.UNKNOWN && failure == null && (observation == null || observation.status() != VoucherReversalObservation.Status.PENDING)
                 || status == Status.RECONCILING && (conflictingObservation == null || failure == null)
-                || status == Status.EXPIRED && failure != Failure.EVIDENCE_EXPIRED || status == Status.VOIDED && failure != Failure.SOURCE_CHANGED) throw invalid();
+                || status == Status.EXPIRED && failure != Failure.EVIDENCE_EXPIRED || status == Status.VOIDED && failure != Failure.SOURCE_CHANGED && failure != Failure.FINANCE_RETIRED
+                || failure == Failure.FINANCE_RETIRED && (status != Status.VOIDED || attempts != 0 || observation != null)) throw invalid();
         if ((status == Status.EXPIRED || status == Status.VOIDED) && (highestRevision != 0 || conflictingObservation != null
                 || observation != null && observation.status() != VoucherReversalObservation.Status.NOT_FOUND)) throw invalid();
     }
@@ -95,6 +96,21 @@ public record VoucherReversalOperation(Input input, long version, Status status,
         requireTime(now); if (status != Status.QUEUED) throw conflict();
         return changed(Status.VOIDED, now, null, observation, null, highestRevision, Failure.SOURCE_CHANGED);
     }
+    /** 只允许结束从未领取发送的命令，或原件未发生变化且 ERP 在过账前明确拒绝的命令。 */
+    public RetirementBasis retirementBasis() {
+        if (status == Status.FAILED && switch (observation.rejection()) {
+            case ACCOUNTING_PERIOD_CLOSED, LEGAL_ENTITY_UNAVAILABLE, ACCOUNT_UNAVAILABLE, AUTHORIZATION_REJECTED -> true;
+            case ORIGINAL_NOT_POSTED, ORIGINAL_CHANGED, REVERSAL_ALREADY_EXISTS -> false;
+        }) return RetirementBasis.CONFIRMED_FAILED;
+        if (attempts == 0 && highestRevision == 0 && observation == null && conflictingObservation == null
+                && (status == Status.QUEUED || status == Status.VOIDED || status == Status.EXPIRED)) return RetirementBasis.NEVER_DISPATCHED;
+        return null;
+    }
+    /** 财务明确结束使原排队命令失效，既有终态失败回执和原命令字节保持。 */
+    public VoucherReversalOperation stopForRetirement(Instant now) {
+        requireTime(now); if (retirementBasis() == null) throw new DomainException("VOUCHER_REVERSAL_RETIREMENT_UNSAFE", "Reversal is not proven safely finished");
+        return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
+    }
     public boolean running() { return status == Status.POSTING || status == Status.QUERYING; }
     public boolean expired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     private VoucherReversalOperation changed(Status next, Instant at, Instant nextAt, VoucherReversalObservation accepted, VoucherReversalObservation disputed, long highest, Failure issue) {
@@ -143,5 +159,10 @@ public record VoucherReversalOperation(Input input, long version, Status status,
      * @author owlzhangfq@gmail.com
      */
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE, INVALID_RESPONSE,
-        RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, EVIDENCE_EXPIRED, SOURCE_CHANGED, STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED }
+        RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR, EVIDENCE_EXPIRED, SOURCE_CHANGED, STALE_OBSERVATION, INCONSISTENT_OBSERVATION, RECHECK_REQUESTED, FINANCE_RETIRED }
+    /**
+     * 查无和原件变化都不是可以重新创建命令的依据。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum RetirementBasis { NEVER_DISPATCHED, CONFIRMED_FAILED }
 }

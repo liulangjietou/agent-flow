@@ -107,6 +107,8 @@ class AdvanceRepaymentIntegrationTest {
     @Autowired VoucherOperationService voucherExecution;
     @Autowired JdbcVoucherOperationRepository vouchers;
     @Autowired VoucherReversalPreparationService reversalPreparing;
+    @Autowired VoucherReversalRetirementService reversalRetirement;
+    @Autowired JdbcVoucherReversalOperationRepository reversalOperations;
     @Autowired JdbcVoucherReversalPreparationRepository reversalPreparations;
     @Autowired PaymentExecutionRequestWorker executionWorker;
     @Autowired PaymentOperationWorker paymentWorker;
@@ -152,6 +154,29 @@ class AdvanceRepaymentIntegrationTest {
     @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})
     void authorizedReversalImmediatelyFreezesExistingLoanWithoutChangingRepaymentsOrReservations(VoucherCommand.Kind kind) throws Exception {
         var loan = paidLoan(); repay(loan, "before-reversal-authorization"); reserve(loan, "20"); var before = balance(loan);
+        var command = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow().input().command();
+        authorizeLoanReversal(loan, kind);
+        var held = balance(loan); assertThat(held.voucherReviews()).containsExactly(command.id()); assertThat(held.available()).isEqualTo(money("0"));
+        assertThat(held.outstanding()).isEqualTo(before.outstanding()); assertThat(held.balance()).isEqualTo(before.balance()); assertThat(held.repayments()).isEqualTo(before.repayments());
+        queryVoucher(loan, kind); assertThat(balance(loan).voucherReviews()).containsExactly(command.id()); assertThat(balance(loan).available()).isEqualTo(money("0"));
+    }
+
+    @Test void reversalRetirementReleasesOnlyItsLoanVoucherAndPreservesMoneyAndOtherHold() throws Exception {
+        var loan = paidLoan(); repay(loan, "before-safe-retirement"); reserve(loan, "20"); var before = balance(loan);
+        authorizeLoanReversal(loan, VoucherCommand.Kind.EMPLOYEE_ADVANCE); authorizeLoanReversal(loan, VoucherCommand.Kind.PAYMENT);
+        var accrual = vouchers.forRound("demo", app(loan).id(), 1, VoucherCommand.Kind.EMPLOYEE_ADVANCE).orElseThrow().input().command().id();
+        var payment = vouchers.forRound("demo", app(loan).id(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow().input().command().id();
+        assertThat(balance(loan).voucherReviews()).containsExactlyInAnyOrder(accrual, payment);
+        retireLoanReversal(loan, VoucherCommand.Kind.EMPLOYEE_ADVANCE);
+        assertThat(balance(loan).voucherReviews()).containsExactly(payment); assertThat(balance(loan).available()).isEqualTo(money("0"));
+        assertThat(vouchers.requiresAdvanceReview("demo", accrual)).isFalse(); assertThat(vouchers.requiresAdvanceReview("demo", payment)).isTrue();
+        retireLoanReversal(loan, VoucherCommand.Kind.PAYMENT);
+        queryVoucher(loan, VoucherCommand.Kind.EMPLOYEE_ADVANCE); queryVoucher(loan, VoucherCommand.Kind.PAYMENT);
+        var after = balance(loan); assertThat(after.voucherReviews()).isEmpty(); assertThat(after.available()).isEqualTo(before.available());
+        assertThat(after.outstanding()).isEqualTo(before.outstanding()); assertThat(after.balance()).isEqualTo(before.balance()); assertThat(after.repayments()).isEqualTo(before.repayments());
+        assertThat(vouchers.requiresAdvanceReview("demo", payment)).isFalse(); assertThat(reversalOperations.retirements("demo", payment)).hasSize(1);
+    }
+    private void authorizeLoanReversal(UUID loan, VoucherCommand.Kind kind) {
         var original = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow(); var command = original.input().command();
         UUID id;
         actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
@@ -165,9 +190,14 @@ class AdvanceRepaymentIntegrationTest {
         actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
         try { reversalPreparing.authorize(app(loan).id(), command.id(), new VoucherReversalPreparationService.AuthorizeInput(1, app(loan).version(), request(loan).version(), original.version(), id, prepared.version(), "确认完整冲销，原资金另行办理")); }
         finally { actors.clear(); }
-        var held = balance(loan); assertThat(held.voucherReviews()).containsExactly(command.id()); assertThat(held.available()).isEqualTo(money("0"));
-        assertThat(held.outstanding()).isEqualTo(before.outstanding()); assertThat(held.balance()).isEqualTo(before.balance()); assertThat(held.repayments()).isEqualTo(before.repayments());
-        queryVoucher(loan, kind); assertThat(balance(loan).voucherReviews()).containsExactly(command.id()); assertThat(balance(loan).available()).isEqualTo(money("0"));
+    }
+    private void retireLoanReversal(UUID loan, VoucherCommand.Kind kind) throws Exception {
+        queryVoucher(loan, kind); var original = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow();
+        var reversal = reversalOperations.forOriginal("demo", original.input().command().id()).orElseThrow();
+        actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { reversalRetirement.retire(app(loan).id(), original.input().command().id(), new VoucherReversalRetirementService.Input(1, app(loan).version(), request(loan).version(), original.version(),
+                reversal.input().command().id(), reversal.version(), "LOAN-RETIRE-PROOF", "核对原件后只结束本次未发送冲销")); }
+        finally { actors.clear(); }
     }
 
     @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})

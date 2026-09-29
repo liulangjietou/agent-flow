@@ -3,7 +3,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
 import { moneyLabel } from '../expenses'
 import type { VoucherReversalBinding } from '../voucherReversal'
-import { reversalPreparationLabels, reversalExecutionLabels, reversalExecutionActions, reversalExecutionIssue, reversalExecutionError, validateReversalExecution, reversalPrepareInput, reversalAuthorizeInput, reversalOperationInput, validateReversalExecutionReceipt, type VoucherReversalExecutionView, type ReversalExecutionInput, type ReversalExecutionAction } from '../voucherReversalExecution'
+import { reversalRetirementBasisLabels, reversalPreparationLabels, reversalExecutionLabels, reversalExecutionActions, reversalExecutionIssue, reversalExecutionError, validateReversalExecution, reversalPrepareInput, reversalAuthorizeInput, reversalOperationInput, reversalRetirementInput, validateReversalExecutionReceipt, type VoucherReversalExecutionView, type ReversalExecutionInput, type ReversalExecutionAction } from '../voucherReversalExecution'
 
 const props = defineProps<{ applicationId: string; operationId: string; roundNo: number; applicationVersion: number; businessVersion: number; operationVersion: number; kind: 'EMPLOYEE_ADVANCE' | 'EXPENSE_ACCRUAL' | 'PAYMENT'; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; changed: [] }>()
@@ -20,7 +20,7 @@ function clearForm() { pending.value = null; accountingDate.value = ''; referenc
 function clearMaterials() { view.value = null; clearForm() }
 function syncPending() {
   const prefix = `/applications/${encodeURIComponent(props.applicationId)}/vouchers/${encodeURIComponent(props.operationId)}/reversal-execution/`
-  const current = writeRequests.pending().some(entry => ['preparations', 'authorizations', 'actions'].some(suffix => entry.path === prefix + suffix))
+  const current = writeRequests.pending().some(entry => ['preparations', 'authorizations', 'actions', 'retirements'].some(suffix => entry.path === prefix + suffix))
   if (unconfirmed.value && !current) requiresRefresh.value = true
   unconfirmed.value = current
 }
@@ -41,7 +41,7 @@ async function load() {
 }
 function allowed(action: ReversalExecutionAction) {
   return action === 'PREPARE' ? !!view.value?.canPrepare : action === 'AUTHORIZE' ? !!view.value?.latestPreparation?.canAuthorize
-    : action === 'QUERY' ? !!view.value?.operation?.canQuery : !!view.value?.operation?.canResendOriginal
+    : action === 'RETIRE' ? !!view.value?.operation?.canRetire : action === 'QUERY' ? !!view.value?.operation?.canQuery : !!view.value?.operation?.canResendOriginal
 }
 function prepare(action: ReversalExecutionAction) {
   if (blocked.value || !allowed(action)) return
@@ -51,18 +51,18 @@ function prepare(action: ReversalExecutionAction) {
 /** 准备只核对，授权和重发必须再次确认；写入不明时保留原请求供统一恢复。 */
 async function execute() {
   const value = view.value, action = pending.value; if (!value || !action || blocked.value || !allowed(action)) return
-  if ((action === 'AUTHORIZE' || action === 'RESEND_ORIGINAL') && !acknowledged.value) { error.value = '请先确认已核对全部反向分录和办理影响。'; return }
+  if ((action === 'AUTHORIZE' || action === 'RESEND_ORIGINAL' || action === 'RETIRE') && !acknowledged.value) { error.value = action === 'RETIRE' ? '请先确认已核对安全结束依据和原凭证。' : '请先确认已核对全部反向分录和办理影响。'; return }
   let input: ReversalExecutionInput
-  try { input = action === 'PREPARE' ? reversalPrepareInput(value, accountingDate.value, reference.value, comment.value) : action === 'AUTHORIZE' ? reversalAuthorizeInput(value, comment.value) : reversalOperationInput(value, action, comment.value) }
+  try { input = action === 'PREPARE' ? reversalPrepareInput(value, accountingDate.value, reference.value, comment.value) : action === 'AUTHORIZE' ? reversalAuthorizeInput(value, comment.value) : action === 'RETIRE' ? reversalRetirementInput(value, reference.value, comment.value) : reversalOperationInput(value, action, comment.value) }
   catch (cause) { error.value = reversalExecutionError(cause); return }
   const current = epoch; saving.value = true; error.value = ''; emit('busy', true)
   try {
     const result = 'accountingDate' in input ? await api.prepareVoucherReversal(value.applicationId, value.operationId, input)
       : 'preparationId' in input ? await api.authorizeVoucherReversal(value.applicationId, value.operationId, input)
-        : await api.voucherReversalOperationAction(value.applicationId, value.operationId, input)
+        : 'evidenceReference' in input ? await api.retireVoucherReversal(value.applicationId, value.operationId, input) : await api.voucherReversalOperationAction(value.applicationId, value.operationId, input)
     if (current !== epoch) return
     validateReversalExecutionReceipt(result, value, input); clearForm(); saving.value = false; emit('busy', false)
-    if (action === 'AUTHORIZE') { clearMaterials(); requiresRefresh.value = true; emit('changed') }
+    if (action === 'AUTHORIZE' || action === 'RETIRE') { clearMaterials(); requiresRefresh.value = true; emit('changed') }
     else {
       notice.value = action === 'PREPARE' ? '原件与期间核验已排队，刷新后审阅全部分录，再明确授权。' : '原冲销操作已登记，请刷新查看实际处理结果。'
       await load()
@@ -90,7 +90,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
     <template v-if="view">
       <p>原凭证 {{ view.original.voucherReference }} · 原日期 {{ view.original.accountingDate }} · 单边合计 {{ moneyLabel(view.original.total) }}</p>
       <p v-if="view.originalHeld" class="held"><strong>原凭证已停用</strong><br />冲销已获授权，原凭证停止作为后续付款、结算和归档依据。银行资金、借款欠款及业务占用仍需分别核对处理。</p>
-      <p v-else-if="!view.latestPreparation">尚未发起本次 ERP 冲销办理。</p>
+      <p v-else-if="!view.latestPreparation && !view.operation">尚未发起本次 ERP 冲销办理。</p>
       <article v-if="view.operation" class="evidence">
         <strong>{{ reversalExecutionLabels[view.operation.status] }}</strong>
         <p>{{ view.operation.authorizedBy }} 于 {{ time(view.operation.createdAt) }} 授权 · 最近更新 {{ time(view.operation.updatedAt) }}</p>
@@ -99,6 +99,8 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
         <p v-if="view.operation.observation?.rejection">{{ reversalExecutionIssue(view.operation.observation.rejection) }}</p>
         <p v-if="view.operation.status === 'UNKNOWN' || view.operation.status === 'QUERYING'">当前无法确认实际结果，正在按原冲销编号核对。</p>
         <p v-if="view.operation.conflictingObservation" class="error">已保留冲突回执。继续查询不会自动消除会计争议。</p>
+        <p v-if="view.operation.retirementCheck">可结束依据：{{ reversalRetirementBasisLabels[view.operation.retirementCheck.basis] }}<br />原凭证复核版本 {{ view.operation.retirementCheck.originalRevision }} · {{ time(view.operation.retirementCheck.originalObservedAt) }}</p>
+        <p v-else-if="view.operation.retirementIssue === 'VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED'">{{ reversalExecutionIssue(view.operation.retirementIssue) }}</p>
         <dl v-if="view.operation.observation?.posting"><div><dt>实际反向凭证</dt><dd>{{ view.operation.observation.posting.voucherReference }}</dd></div><div><dt>实际期间 / 日期</dt><dd>{{ view.operation.observation.posting.periodReference }} / {{ view.operation.observation.posting.accountingDate }}</dd></div></dl>
       </article>
       <article v-else-if="view.latestPreparation" class="evidence">
@@ -109,17 +111,20 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
       </article>
       <dl v-if="details"><div><dt>冲销会计日期</dt><dd>{{ details.accountingDate }}</dd></div><div><dt>核对材料</dt><dd>{{ details.evidenceReference }}</dd></div><div class="wide"><dt>冲销原因</dt><dd>{{ details.reason }}</dd></div></dl>
       <ol v-if="lines.length" class="lines" aria-label="本次拟执行的完整反向分录"><li v-for="line in lines" :key="line.originalLineNo"><strong>原第 {{ line.originalLineNo }} 行 · {{ line.side === 'DEBIT' ? '借方' : '贷方' }} {{ moneyLabel(line.amount) }}</strong><span>科目 {{ line.accountCode }}</span><span v-if="line.sourceLineNo">业务行 {{ line.sourceLineNo }}</span><span v-if="line.costCenter">成本中心 {{ line.costCenter }}</span><span v-if="line.projectCode">项目 {{ line.projectCode }}</span><span v-if="line.advanceId">借款 {{ line.advanceId }}</span></li></ol>
-      <div v-if="!pending" class="buttons"><button v-for="action in (['PREPARE', 'AUTHORIZE', 'QUERY', 'RESEND_ORIGINAL'] as const).filter(allowed)" :key="action" type="button" :class="action === 'AUTHORIZE' ? 'primary' : 'quiet'" :disabled="blocked" @click="prepare(action)">{{ reversalExecutionActions[action] }}</button></div>
+      <div v-if="!pending" class="buttons"><button v-for="action in (['PREPARE', 'AUTHORIZE', 'QUERY', 'RESEND_ORIGINAL', 'RETIRE'] as const).filter(allowed)" :key="action" type="button" :class="action === 'AUTHORIZE' ? 'primary' : 'quiet'" :disabled="blocked" @click="prepare(action)">{{ reversalExecutionActions[action] }}</button></div>
       <form v-else ref="form" @submit.prevent="execute">
         <h4>{{ reversalExecutionActions[pending] }}</h4>
         <template v-if="pending === 'PREPARE'"><p>本步仅核验原件和期间。准备完成后，需要再次确认才能发送冲销。</p><label>冲销会计日期<input v-model="accountingDate" type="date" :min="view.original.accountingDate" required :disabled="saving" /></label><label>核对材料编号<input v-model="reference" maxlength="128" required :disabled="saving" /></label></template>
         <p v-else-if="pending === 'AUTHORIZE'">确认后按上方日期和全部分录办理 ERP 冲销，并立即停用原凭证。授权不会自动撤回银行付款、释放业务占用或删除封存档案。</p>
         <p v-else-if="pending === 'RESEND_ORIGINAL'">ERP 已明确查无原操作。本次保留原编号、日期和全部分录，按原授权重发。</p>
+        <template v-else-if="pending === 'RETIRE'"><p>确认后结束本次冲销，并恢复刚复核的有效原凭证。历史命令和财务记录继续保留，其他资金及会计争议仍需分别办理。后续冲销需要重新准备和授权。</p><label>安全结束材料编号<input v-model="reference" maxlength="128" required :disabled="saving" /></label></template>
         <p v-else>按已授权的原冲销编号查询实际结果，保留已知回执与争议。</p>
         <label>办理说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="saving" /></label>
         <label v-if="pending === 'AUTHORIZE' || pending === 'RESEND_ORIGINAL'" class="confirmation"><input v-model="acknowledged" type="checkbox" required :disabled="saving" /><span>已核对全部反向分录、会计日期和办理影响，确认{{ pending === 'AUTHORIZE' ? '授权执行' : '按原编号重发' }}。</span></label>
+        <label v-if="pending === 'RETIRE'" class="confirmation"><input v-model="acknowledged" type="checkbox" required :disabled="saving" /><span>已核对本次未执行依据和原凭证，确认安全结束。</span></label>
         <div class="buttons"><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : `确认${reversalExecutionActions[pending]}` }}</button><button type="button" class="quiet" :disabled="saving" @click="clearForm">返回核对</button></div>
       </form>
+      <section v-if="view.retirements.length" class="evidence" aria-label="冲销安全结束记录"><h4>冲销安全结束记录</h4><article v-for="retired in view.retirements" :key="retired.id"><p><strong>{{ reversalRetirementBasisLabels[retired.basis] }}</strong><br />{{ retired.retiredBy }} · {{ time(retired.retiredAt) }}<br />原冲销编号 {{ retired.reversalId }}<br />原凭证复核版本 {{ retired.originalRevision }} · {{ time(retired.originalObservedAt) }}<br />材料 {{ retired.evidenceReference }}<br />{{ retired.comment }}</p></article></section>
     </template>
   </section>
 </template>

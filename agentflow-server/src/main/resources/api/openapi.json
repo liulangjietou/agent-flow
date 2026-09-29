@@ -23409,6 +23409,182 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/vouchers/{operationId}/reversal-execution/retirements": {
+      "post": {
+        "operationId": "retireVoucherReversal",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "明确安全结束未执行冲销并复核恢复原凭证",
+        "description": "仅允许从未发送，或 ERP 明确在过账前因期间、法人、科目、授权拒绝的命令。必须在该状态之后重新核对同一原凭证仍有效过账，观察不超过五分钟。未知、查无、已受理、已过账、回执争议及原件变化均不能释放占用。当前独立财务明确确认后，停止命令、保存双侧历史修订、释放唯一占用、解除对应冻结及审计同事务完成；其他争议、银行事实、资源与档案保持。后续冲销必须重新准备并明确授权，幂等回放前重新核对权限。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非申请人及原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "显示版本或当前原件已变化，冲销缺少安全结束依据，或必须重新查询原凭证。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原件、人员、期间、发送有效期或执行状态不满足操作条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "安全结束依据、原凭证恢复和审计已原子保存，不代表银行退款或新的会计过账。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherReversalRetirementReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoucherReversalRetirementInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 7,
+                "businessVersion": 3,
+                "operationVersion": 9,
+                "reversalId": "00000000-0000-0000-0000-000000000061",
+                "reversalVersion": 1,
+                "evidenceReference": "ERP-REVERSAL-END-001",
+                "comment": "核对原件仍有效过账，结束本次从未发送的冲销"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -37901,7 +38077,10 @@
           "observation",
           "conflictingObservation",
           "canQuery",
-          "canResendOriginal"
+          "canResendOriginal",
+          "canRetire",
+          "retirementIssue",
+          "retirementCheck"
         ],
         "properties": {
           "id": {
@@ -38019,6 +38198,25 @@
           },
           "canResendOriginal": {
             "type": "boolean"
+          },
+          "canRetire": {
+            "type": "boolean"
+          },
+          "retirementIssue": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retirementCheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherReversalRetirementCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -38038,7 +38236,8 @@
           "original",
           "canPrepare",
           "latestPreparation",
-          "operation"
+          "operation",
+          "retirements"
         ],
         "properties": {
           "applicationId": {
@@ -38117,6 +38316,12 @@
                 "type": "null"
               }
             ]
+          },
+          "retirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoucherReversalRetired"
+            }
           }
         }
       },
@@ -38322,6 +38527,213 @@
           "operationVersion": {
             "type": "integer",
             "minimum": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VoucherReversalRetirementCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "basis",
+          "originalRevision",
+          "originalObservedAt"
+        ],
+        "properties": {
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_FAILED"
+            ]
+          },
+          "originalRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "originalObservedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VoucherReversalRetired": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "reversalId",
+          "reversalVersion",
+          "originalVersion",
+          "releasedVersion",
+          "basis",
+          "retiredBy",
+          "evidenceReference",
+          "comment",
+          "retiredAt",
+          "originalRevision",
+          "originalObservedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "originalVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "releasedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_FAILED"
+            ]
+          },
+          "retiredBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "originalObservedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VoucherReversalRetirementInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "operationVersion",
+          "reversalId",
+          "reversalVersion",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reversalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "VoucherReversalRetirementReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "operationId",
+          "roundNo",
+          "retirementId",
+          "reversalId",
+          "reversalVersion",
+          "operationVersion",
+          "basis",
+          "auditEventId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retirementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_FAILED"
+            ]
           },
           "auditEventId": {
             "type": "string",

@@ -6,7 +6,7 @@ import VoucherReversalExecution from './VoucherReversalExecution.vue'
 import { voucherOutcomeLabels, operationLabels, preparationLabels, validateVoucherReceipt, validateVoucherView, voucherActionInput, voucherActionLabels, voucherDisputeInput, validateVoucherDisputeReceipt, voucherDisputeIssue, voucherError, voucherIssue, type VoucherAction, type VoucherBinding, type VoucherView } from '../vouchers'
 
 const props = defineProps<{ applicationId: string; businessId: string; businessType: 'EXPENSE' | 'ADVANCE_REQUEST'; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; payment?: boolean }>()
-const emit = defineEmits<{ busy: [value: boolean] }>()
+const emit = defineEmits<{ busy: [value: boolean]; changed: [] }>()
 const view = ref<VoucherView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
 const reversalBusy = ref(false), executionBusy = ref(false)
 type Action = VoucherAction | 'RESOLVE_DISPUTE'
@@ -27,6 +27,7 @@ function stop() { epoch++; controller?.abort(); controller = null }
 /** 切换身份、轮次和版本后清空旧状态，查询超时或迟到也不能恢复旧内容。 */
 async function load() {
   if (saving.value || reversalBusy.value || executionBusy.value || !props.scopeKey) return
+  const previous = view.value
   stop(); const version = epoch, request = new AbortController(); controller = request
   view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''; error.value = ''; loading.value = true
   const binding: VoucherBinding = { applicationId: props.applicationId, businessId: props.businessId, businessType: props.businessType, roundNo: props.roundNo, applicationVersion: props.applicationVersion, businessVersion: props.businessVersion,
@@ -36,6 +37,8 @@ async function load() {
     const result = await (binding.kind === 'PAYMENT' ? api.paymentVouchers : api.vouchers)(binding.applicationId, binding.roundNo, request.signal)
     if (version !== epoch) return
     view.value = validateVoucherView(result, binding); requiresRefresh.value = false; syncPending()
+    // 冲销授权、结束和对账都可能改变资金冻结；父明细统一重读相关资金与结算。
+    if (previous && (previous.operation?.id !== view.value.operation?.id || previous.operation?.version !== view.value.operation?.version)) emit('changed')
   } catch (cause) { if (version === epoch) error.value = voucherError(cause) }
   finally { clearTimeout(timeout); if (version === epoch) { loading.value = false; controller = null } }
 }

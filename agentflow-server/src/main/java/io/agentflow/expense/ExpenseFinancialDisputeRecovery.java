@@ -6,6 +6,8 @@ import io.agentflow.finance.PaymentCommand;
 import io.agentflow.finance.PaymentDisputeResolved;
 import io.agentflow.finance.VoucherCommand;
 import io.agentflow.finance.VoucherDisputeResolved;
+import io.agentflow.finance.VoucherOperation;
+import io.agentflow.finance.VoucherReversalRetired;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -41,9 +43,18 @@ public class ExpenseFinancialDisputeRecovery {
     @EventListener
     @Transactional(propagation = Propagation.MANDATORY)
     public void resolved(VoucherDisputeResolved event) {
-        var voucher = event.voucher(); var command = voucher.input().command();
+        recoverVoucher(event.voucher(), event.resolution().resolvedAt());
+    }
+    /** 冲销安全结束后的恢复仍复核资金、预算和批准来源，不重复核销资源。 */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void retired(VoucherReversalRetired event) {
+        recoverVoucher(event.voucher(), event.retirement().retiredAt());
+    }
+    private void recoverVoucher(VoucherOperation voucher, Instant at) {
+        var command = voucher.input().command();
         if (!voucher.usablePosted() || command.kind() != VoucherCommand.Kind.EXPENSE_ACCRUAL) return;
-        recover(command.tenantId(), command.binding().businessId(), event.resolution().resolvedAt(),
+        recover(command.tenantId(), command.binding().businessId(), at,
                 current -> command.id().equals(current.input().voucherOperationId()));
     }
     private void recover(String tenant, UUID id, Instant at, Predicate<ExpenseSettlement> matches) {

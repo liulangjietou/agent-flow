@@ -22,10 +22,10 @@ const disputedView = () => {
 }
 const decisionReceipt = input => ({ applicationId: 'app', operationId: 'operation', roundNo: 2, kind: 'EXPENSE_ACCRUAL', resolutionId: 'decision', operationVersion: input.operationVersion + 1, outcome: input.outcome, auditEventId: 'audit' })
 function panel(overrides = {}) {
-  const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false, ...overrides }), events = []
-  const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onBusy: value => events.push(value) })
+  const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false, ...overrides }), events = [], changes = []
+  const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onBusy: value => events.push(value), onChanged: () => changes.push(true) })
   const mounted = app.mount({})
-  return { props, events, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); global.fetch = originalFetch; bindAuthenticationActor(null) } }
+  return { props, events, changes, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); global.fetch = originalFetch; bindAuthenticationActor(null) } }
 }
 
 test('两个冲销子面板分别锁定父级，切换身份不被旧子操作阻止刷新', async () => {
@@ -281,4 +281,17 @@ test('接口读取显式带轮次且禁用缓存，路径正确转义', async ()
     await api.vouchers('app/other', 2, new AbortController().signal)
     assert.match(calls[0].url, /applications\/app%2Fother\/vouchers\?roundNo=2$/); assert.equal(calls[0].init.cache, 'no-store')
   } finally { global.fetch = originalFetch }
+})
+
+test('冲销或原凭证修订变化后通知资金区域重读，同版本刷新和旧身份结果不触发联动', async () => {
+  let current = view(); api.vouchers = async () => copy(current)
+  const p = panel()
+  try {
+    await settle(); assert.equal(p.changes.length, 0); await p.state.load(); assert.equal(p.changes.length, 0)
+    current.operation.version++; await p.state.load(); assert.equal(p.changes.length, 1)
+    let finish; api.vouchers = async () => new Promise(resolve => finish = resolve)
+    const loading = p.state.load(); await settle(); api.vouchers = async () => copy(current); p.props.scopeKey = 'new-finance'; await settle()
+    const old = copy(current); old.operation.version++; finish(old); await loading
+    assert.equal(p.changes.length, 1)
+  } finally { p.close() }
 })

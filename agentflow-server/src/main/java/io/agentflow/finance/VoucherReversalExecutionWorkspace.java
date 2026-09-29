@@ -28,12 +28,13 @@ public class VoucherReversalExecutionWorkspace {
     private final JdbcVoucherReversalRecordRepository records;
     private final VoucherReversalPreparationService preparing;
     private final VoucherReversalExecutionService execution;
+    private final VoucherReversalRetirementService retirement;
     /** 准备候选只供原财务读取，已授权操作沿原轮次完整字段权限投影。 */
     public VoucherReversalExecutionWorkspace(CurrentActor actors, VoucherAccess access, VoucherReversalSources sources, PaymentPersonnel personnel,
             JdbcVoucherReversalPreparationRepository preparations, JdbcVoucherReversalOperationRepository operations, JdbcVoucherReversalRecordRepository records,
-            VoucherReversalPreparationService preparing, VoucherReversalExecutionService execution) {
+            VoucherReversalPreparationService preparing, VoucherReversalExecutionService execution, VoucherReversalRetirementService retirement) {
         this.actors = actors; this.access = access; this.sources = sources; this.personnel = personnel; this.preparations = preparations;
-        this.operations = operations; this.records = records; this.preparing = preparing; this.execution = execution;
+        this.operations = operations; this.records = records; this.preparing = preparing; this.execution = execution; this.retirement = retirement;
     }
     /** 读取不排队、不延长准备时效，也不自动授权发送。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -44,12 +45,14 @@ public class VoucherReversalExecutionWorkspace {
         var context = access.read(applicationId, round); var source = sources.find(context, operationId); var original = source.request().original(); var command = source.request().command(); var actor = actors.actor();
         boolean finance = context.finance() && VoucherDisputeResolution.independent(command, actor.userId()) && personnel.eligible(actor.tenantId(), actor.userId(), command.legalEntityId());
         var prepared = finance ? preparations.latest(actor.tenantId(), operationId, actor.userId()).orElse(null) : null;
+        if (prepared != null && operations.retirement(actor.tenantId(), prepared.input().id()).isPresent()) prepared = null;
         var operation = operations.forOriginal(actor.tenantId(), operationId).orElse(null);
         boolean recorded = records.forOperation(actor.tenantId(), operationId).isPresent();
         return new View(applicationId, operationId, context.roundNo(), context.application().version(), context.businessVersion(), source.current().version(), command.kind(),
                 source.current().status(), source.current().reversalId() != null, new VoucherReversalWorkspace.Original(original.postingReference(), original.voucherReference(), original.periodReference(), original.accountingDate(), original.debitTotal(), original.postedAt()),
                 finance && source.current().usablePosted() && operation == null && !recorded && (prepared == null || !prepared.active()),
-                prepared == null ? null : preparation(prepared, source), operation == null ? null : operation(operation, source, finance));
+                prepared == null ? null : preparation(prepared, source), operation == null ? null : operation(operation, source, finance),
+                operations.retirements(actor.tenantId(), operationId).stream().map(this::retired).toList());
     }
     private Preparation preparation(VoucherReversalPreparation value, VoucherReversalSources.Source source) {
         var input = value.input(); var command = value.command(); var issue = preparing.authorizationIssue(value, source, Instant.now());
@@ -61,9 +64,16 @@ public class VoucherReversalExecutionWorkspace {
         var command = value.input().command();
         boolean resend = finance && actors.actor().userId().equals(command.authorizedBy()) && value.status() == VoucherReversalOperation.Status.NOT_FOUND
                 && execution.resendIssue(value, source, Instant.now()) == null;
+        String issue = finance ? retirement.issue(value, source, actors.actor().userId(), Instant.now()) : null;
+        boolean canRetire = finance && issue == null;
         return new Execution(command.id(), value.version(), value.status(), value.attempts(), value.highestRevision(), value.failure() == null ? null : value.failure().name(),
                 value.createdAt(), command.expiresAt(), value.updatedAt(), value.nextAttemptAt(), command.authorizedBy(), command.period().request().accountingDate(), command.evidenceReference(), command.reason(), command.lines(),
-                observation(value.observation()), observation(value.conflictingObservation()), finance && !value.running() && value.status() != VoucherReversalOperation.Status.QUEUED, resend);
+                observation(value.observation()), observation(value.conflictingObservation()), finance && !value.running() && value.status() != VoucherReversalOperation.Status.QUEUED, resend,
+                canRetire, issue, canRetire ? new RetirementCheck(value.retirementBasis(), source.current().observation().revision(), source.current().observation().observedAt()) : null);
+    }
+    private Retired retired(VoucherReversalRetirement value) {
+        return new Retired(value.id(), value.reversalId(), value.stoppedVersion(), value.originalVersion(), value.releasedVersion(), value.basis(), value.retiredBy(),
+                value.evidenceReference(), value.comment(), value.retiredAt(), value.original().revision(), value.original().observedAt());
     }
     private Observation observation(VoucherReversalObservation value) {
         return value == null ? null : new Observation(value.status(), value.revision(), value.observedAt(), value.acceptanceReference(), value.posting() == null ? null : value.posting().reversal(), value.rejection() == null ? null : value.rejection().name());
@@ -75,7 +85,7 @@ public class VoucherReversalExecutionWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID applicationId, UUID operationId, int roundNo, long applicationVersion, long businessVersion, long operationVersion, VoucherCommand.Kind kind,
-            VoucherOperation.Status originalStatus, boolean originalHeld, VoucherReversalWorkspace.Original original, boolean canPrepare, Preparation latestPreparation, Execution operation) { }
+            VoucherOperation.Status originalStatus, boolean originalHeld, VoucherReversalWorkspace.Original original, boolean canPrepare, Preparation latestPreparation, Execution operation, List<Retired> retirements) { }
     /**
      * 本人最新准备及当前实际可授权条件，候选不含完整原支付命令。
      * @author owlzhangfq@gmail.com
@@ -95,7 +105,19 @@ public class VoucherReversalExecutionWorkspace {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Execution(UUID id, long version, VoucherReversalOperation.Status status, int attempts, long highestRevision, String failure,
             Instant createdAt, Instant sendExpiresAt, Instant updatedAt, Instant nextAttemptAt, String authorizedBy, LocalDate accountingDate, String evidenceReference, String reason,
-            List<VoucherReversalCommand.Line> lines, Observation observation, Observation conflictingObservation, boolean canQuery, boolean canResendOriginal) { }
+            List<VoucherReversalCommand.Line> lines, Observation observation, Observation conflictingObservation, boolean canQuery, boolean canResendOriginal,
+            boolean canRetire, String retirementIssue, RetirementCheck retirementCheck) { }
+    /**
+     * 当前允许结束的依据与最近原件核对时间一起展示，实际提交仍复核版本及时效。
+     * @author owlzhangfq@gmail.com
+     */
+    public record RetirementCheck(VoucherReversalOperation.RetirementBasis basis, long originalRevision, Instant originalObservedAt) { }
+    /**
+     * 历次安全结束保留原编号和财务说明，后续新命令不会覆盖历史。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Retired(UUID id, UUID reversalId, long reversalVersion, long originalVersion, long releasedVersion, VoucherReversalOperation.RetirementBasis basis,
+            String retiredBy, String evidenceReference, String comment, Instant retiredAt, long originalRevision, Instant originalObservedAt) { }
     /**
      * ERP 回执只投影执行状态和实际独立分录，不回显原命令及账户。
      * @author owlzhangfq@gmail.com

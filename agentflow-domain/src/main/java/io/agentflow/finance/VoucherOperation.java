@@ -134,6 +134,17 @@ public record VoucherOperation(Input input, long version, Status status, int att
                 observation, conflictingObservation, highestRevision, failure, id);
     }
 
+    /** 只解除指定冲销的原件停用，当前原过账仍须无争议且具备五分钟内的有效观察。 */
+    public VoucherOperation releaseReversal(UUID id, Instant now) {
+        requireTime(now);
+        if (id == null || !id.equals(reversalId) || status != Status.POSTED || observation == null || observation.observedAt().isAfter(now)
+                || !now.isBefore(observation.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) {
+            throw new DomainException("VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED", "Original posted voucher must be freshly confirmed before releasing its reversal hold");
+        }
+        return new VoucherOperation(input, Math.incrementExact(version), status, attempts, createdAt, now, null, null,
+                observation, conflictingObservation, highestRevision, failure, null);
+    }
+
     /** 人工裁决只接受近期最高版本终态；原凭证身份和曾出现的过账事实不能被删除。 */
     public ResolutionIssue resolutionIssue(Instant now, VoucherObservation originalPosting, boolean postingObserved) {
         var candidate = conflictingObservation;

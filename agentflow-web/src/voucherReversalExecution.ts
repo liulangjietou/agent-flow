@@ -10,25 +10,35 @@ export interface ReversalPreparation {
   accountingDate: string; evidenceReference: string; reason: string; candidate: ReversalCandidate | null; canAuthorize: boolean; authorizationIssue: string | null
 }
 export interface ReversalExecutionObservation { status: 'NOT_FOUND' | 'PENDING' | 'POSTED' | 'FAILED'; revision: number; observedAt: string; acceptanceReference: string | null; posting: ReversePosting | null; rejection: string | null }
+export type ReversalRetirementBasis = 'NEVER_DISPATCHED' | 'CONFIRMED_FAILED'
+export interface ReversalRetirementCheck { basis: ReversalRetirementBasis; originalRevision: number; originalObservedAt: string }
+export interface ReversalRetired extends ReversalRetirementCheck { id: string; reversalId: string; reversalVersion: number; originalVersion: number; releasedVersion: number; retiredBy: string; evidenceReference: string; comment: string; retiredAt: string }
 export interface ReversalExecution {
   id: string; version: number; status: keyof typeof reversalExecutionLabels; attempts: number; highestRevision: number; failure: string | null
   createdAt: string; sendExpiresAt: string; updatedAt: string; nextAttemptAt: string | null; authorizedBy: string; accountingDate: string; evidenceReference: string; reason: string
   lines: ReversalCommandLine[]; observation: ReversalExecutionObservation | null; conflictingObservation: ReversalExecutionObservation | null; canQuery: boolean; canResendOriginal: boolean
+  canRetire: boolean; retirementIssue: string | null; retirementCheck: ReversalRetirementCheck | null
 }
 export interface VoucherReversalExecutionView extends VoucherReversalBinding {
-  originalStatus: keyof typeof operationLabels; originalHeld: boolean; original: ReversalOriginal; canPrepare: boolean; latestPreparation: ReversalPreparation | null; operation: ReversalExecution | null
+  originalStatus: keyof typeof operationLabels; originalHeld: boolean; original: ReversalOriginal; canPrepare: boolean; latestPreparation: ReversalPreparation | null; operation: ReversalExecution | null; retirements: ReversalRetired[]
 }
 interface ReversalVersions { roundNo: number; applicationVersion: number; businessVersion: number; operationVersion: number; comment: string }
 export interface ReversalPrepareInput extends ReversalVersions { accountingDate: string; evidenceReference: string }
 export interface ReversalAuthorizeInput extends ReversalVersions { preparationId: string; preparationVersion: number }
 export interface ReversalOperationInput extends ReversalVersions { reversalId: string; reversalVersion: number; action: 'QUERY' | 'RESEND_ORIGINAL' }
-export type ReversalExecutionInput = ReversalPrepareInput | ReversalAuthorizeInput | ReversalOperationInput
+export interface ReversalRetirementInput extends ReversalVersions { reversalId: string; reversalVersion: number; evidenceReference: string }
+export interface ReversalRetirementReceipt { applicationId: string; operationId: string; roundNo: number; retirementId: string; reversalId: string; reversalVersion: number; operationVersion: number; basis: ReversalRetirementBasis; auditEventId: string }
+export type ReversalExecutionInput = ReversalPrepareInput | ReversalAuthorizeInput | ReversalOperationInput | ReversalRetirementInput
 export interface ReversalExecutionReceipt { applicationId: string; operationId: string; roundNo: number; preparationId: string; preparationVersion: number; reversalId: string | null; reversalVersion: number | null; operationVersion: number; auditEventId: string }
-export type ReversalExecutionAction = 'PREPARE' | 'AUTHORIZE' | 'QUERY' | 'RESEND_ORIGINAL'
+export type ReversalExecutionAction = 'PREPARE' | 'AUTHORIZE' | 'QUERY' | 'RESEND_ORIGINAL' | 'RETIRE'
 export const reversalPreparationLabels = { QUEUED: '等待核对原凭证与期间', RUNNING: '正在读取会计依据', READY: '分录已准备，等待财务授权', AUTHORIZED: '财务已授权', UNAVAILABLE: '会计依据暂不可用', VOIDED: '原件或财务资格已变化' }
 export const reversalExecutionLabels = { QUEUED: '已授权，等待发送 ERP', POSTING: '正在请求独立冲销', QUERYING: '正在核对原冲销结果', UNKNOWN: '冲销结果待确认', POSTED: '反向凭证已过账', FAILED: 'ERP 已明确拒绝冲销', NOT_FOUND: 'ERP 确认原冲销不存在', EXPIRED: '发送依据已过期', VOIDED: '原冲销发送已停止', RECONCILING: '冲销回执存在争议' }
-export const reversalExecutionActions: Record<ReversalExecutionAction, string> = { PREPARE: '准备独立冲销', AUTHORIZE: '授权执行独立冲销', QUERY: '查询原冲销结果', RESEND_ORIGINAL: '按原冲销编号重发' }
+export const reversalExecutionActions: Record<ReversalExecutionAction, string> = { PREPARE: '准备独立冲销', AUTHORIZE: '授权执行独立冲销', QUERY: '查询原冲销结果', RESEND_ORIGINAL: '按原冲销编号重发', RETIRE: '安全结束本次冲销' }
+export const reversalRetirementBasisLabels = { NEVER_DISPATCHED: '本次冲销从未发送', CONFIRMED_FAILED: 'ERP 明确在过账前拒绝本次冲销' }
 const issues: Record<string, string> = {
+  VOUCHER_REVERSAL_RETIREMENT_UNSAFE: '本次冲销尚无安全结束依据，原凭证继续停用。',
+  VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED: '请先查询上方原凭证，确认原过账仍有效，再刷新冲销办理状态。',
+  FINANCE_RETIRED: '财务已安全结束本次未发送冲销。',
   VOUCHER_REVERSAL_NOT_READY: '准备尚未就绪，暂不能授权执行。', VOUCHER_REVERSAL_PENDING: '准备正在处理，请刷新查看。',
   VOUCHER_REVERSAL_EXPIRED: '准备依据已过期，请重新选择日期并核对。', VOUCHER_REVERSAL_EVIDENCE_EXPIRED: '准备依据已过期，请重新选择日期并核对。',
   VOUCHER_REVERSAL_SOURCE_CHANGED: '原凭证或业务版本已变化，请刷新核对。', VOUCHER_REVERSAL_OPERATION_EXISTS: '原凭证已经有冲销命令，请核对原操作。',
@@ -117,8 +127,25 @@ export function validateReversalExecution(value: VoucherReversalExecutionView, e
     if (operation.highestRevision > 0) check(operation.observation !== null || operation.conflictingObservation !== null)
     if (['POSTED', 'FAILED', 'NOT_FOUND'].includes(operation.status)) check(operation.observation?.status === operation.status && operation.observation.revision === operation.highestRevision && operation.conflictingObservation === null && operation.failure === null)
     if (operation.status === 'RECONCILING') check(operation.conflictingObservation && operation.failure)
+    check(typeof operation.canRetire === 'boolean'); optionalCode(operation.retirementIssue)
+    check(operation.canRetire === (operation.retirementCheck !== null))
+    if (operation.canRetire) {
+      const proof = operation.retirementCheck!; check(proof && operation.retirementIssue === null && value.originalStatus === 'POSTED' && operation.conflictingObservation === null)
+      positive(proof.originalRevision); check(instant(proof.originalObservedAt) >= instant(operation.updatedAt))
+      if (proof.basis === 'NEVER_DISPATCHED') check(['QUEUED', 'VOIDED', 'EXPIRED'].includes(operation.status) && operation.attempts === 0 && operation.highestRevision === 0 && operation.observation === null)
+      else check(proof.basis === 'CONFIRMED_FAILED' && operation.status === 'FAILED' && ['ACCOUNTING_PERIOD_CLOSED', 'LEGAL_ENTITY_UNAVAILABLE', 'ACCOUNT_UNAVAILABLE', 'AUTHORIZATION_REJECTED'].includes(operation.observation?.rejection ?? ''))
+    }
     if (operation.canQuery) check(!['QUEUED', 'POSTING', 'QUERYING'].includes(operation.status))
     if (operation.canResendOriginal) check(operation.status === 'NOT_FOUND' && operation.highestRevision === 0 && operation.conflictingObservation === null && operation.canQuery)
+  }
+  check(Array.isArray(value.retirements)); const ended = new Set<string>(), proofs = new Set<string>()
+  for (const retired of value.retirements) {
+    check(retired); id(retired.id); id(retired.reversalId); id(retired.retiredBy); reference(retired.evidenceReference); note(retired.comment)
+    ;[retired.reversalVersion, retired.originalVersion, retired.releasedVersion, retired.originalRevision].forEach(positive)
+    check(retired.releasedVersion === retired.originalVersion + 1 && retired.releasedVersion <= value.operationVersion && retired.reversalId !== value.operationId && retired.reversalId !== operation?.id)
+    check(Object.prototype.hasOwnProperty.call(reversalRetirementBasisLabels, retired.basis) && !ended.has(retired.reversalId) && !proofs.has(retired.id))
+    const at = instant(retired.retiredAt), observed = instant(retired.originalObservedAt); check(observed <= at && at - observed < 300_000)
+    ended.add(retired.reversalId); proofs.add(retired.id)
   }
   return value
 }
@@ -141,9 +168,22 @@ export function reversalOperationInput(value: VoucherReversalExecutionView, acti
   check(action === 'QUERY' ? operation.canQuery : operation.canResendOriginal && instant(operation.sendExpiresAt) > now)
   return { ...versions(value, comment), reversalId: operation.id, reversalVersion: operation.version, action }
 }
+/** 安全结束必须再次核对原件时效；客户端不能声明未执行或覆盖真实回执。 */
+export function reversalRetirementInput(value: VoucherReversalExecutionView, evidenceReference: string, comment: string, now = Date.now()): ReversalRetirementInput {
+  validateReversalExecution(value, value); const operation = value.operation; check(operation?.canRetire && operation.retirementCheck)
+  const observed = instant(operation.retirementCheck.originalObservedAt); check(observed <= now && now - observed < 300_000)
+  return { ...versions(value, comment), reversalId: operation.id, reversalVersion: operation.version, evidenceReference: reference(evidenceReference) }
+}
 /** 授权会增加原凭证版本，父面板必须刷新；准备和查询都保持原凭证版本。 */
-export function validateReversalExecutionReceipt(receipt: ReversalExecutionReceipt, value: VoucherReversalExecutionView, input: ReversalExecutionInput) {
+export function validateReversalExecutionReceipt(receipt: ReversalExecutionReceipt | ReversalRetirementReceipt, value: VoucherReversalExecutionView, input: ReversalExecutionInput) {
   check(receipt && receipt.applicationId === value.applicationId && receipt.operationId === value.operationId && receipt.roundNo === input.roundNo)
+  if ('reversalId' in input && 'evidenceReference' in input) {
+    check('retirementId' in receipt); id(receipt.retirementId); id(receipt.auditEventId)
+    check(receipt.reversalId === input.reversalId && receipt.operationVersion === input.operationVersion + 1 && receipt.basis === value.operation?.retirementCheck?.basis
+      && receipt.reversalVersion === input.reversalVersion + (value.operation?.status === 'QUEUED' ? 1 : 0))
+    return
+  }
+  check('preparationId' in receipt)
   id(receipt.preparationId); positive(receipt.preparationVersion); id(receipt.auditEventId)
   if ('preparationId' in input) check(receipt.preparationId === input.preparationId && receipt.preparationVersion === input.preparationVersion + 1 && receipt.reversalId === input.preparationId && receipt.reversalVersion === 1 && receipt.operationVersion === input.operationVersion + 1)
   else if ('reversalId' in input) {

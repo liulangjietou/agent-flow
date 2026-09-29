@@ -68,6 +68,7 @@ jobs:
             'AGENTFLOW_ADVANCE_VOUCHER_MIGRATION:advance_voucher_migration'
             'AGENTFLOW_VOUCHER_REVERSAL_MIGRATION:voucher_reversal_migration'
             'AGENTFLOW_REVERSAL_EXECUTION_MIGRATION:reversal_execution_migration'
+            'AGENTFLOW_REVERSAL_RETIREMENT_MIGRATION:reversal_retirement_migration'
           )
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"

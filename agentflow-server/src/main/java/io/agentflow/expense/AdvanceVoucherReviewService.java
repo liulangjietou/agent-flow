@@ -9,6 +9,7 @@ import io.agentflow.finance.VoucherCommand;
 import io.agentflow.finance.VoucherDisputeResolved;
 import io.agentflow.finance.VoucherOperation;
 import io.agentflow.finance.VoucherOperationChanged;
+import io.agentflow.finance.VoucherReversalRetired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -49,7 +50,18 @@ public class AdvanceVoucherReviewService {
     @EventListener
     @Transactional(propagation = Propagation.MANDATORY)
     public void resolved(VoucherDisputeResolved event) {
-        var voucher = event.voucher(); var command = voucher.input().command();
+        restore(event.voucher(), event.resolution().resolvedBy(), "VOUCHER_DISPUTE_RESOLVED");
+    }
+
+    /** 明确结束未执行冲销并复核有效原件后，只解除该张凭证的冻结。 */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void retired(VoucherReversalRetired event) {
+        restore(event.voucher(), event.retirement().retiredBy(), "VOUCHER_REVERSAL_RETIRED");
+    }
+
+    private void restore(VoucherOperation voucher, String actor, String action) {
+        var command = voucher.input().command();
         if (!loanVoucher(command) || !voucher.usablePosted()) return;
         requests.lock(command.tenantId(), command.binding().businessId());
         var advance = balances.find(command.tenantId(), command.binding().businessId()).orElse(null);
@@ -57,7 +69,7 @@ public class AdvanceVoucherReviewService {
         authorizations.active(command.tenantId(), BusinessReference.Type.ADVANCE_REQUEST, advance.id())
                 .filter(value -> original(command, advance, value.terms())).ifPresent(value -> {
                     long version = advance.version(); advance.resolveVoucherReview(version, command.id());
-                    balances.update(advance, version, event.resolution().resolvedBy(), "VOUCHER_DISPUTE_RESOLVED");
+                    balances.update(advance, version, actor, action);
                 });
     }
 
