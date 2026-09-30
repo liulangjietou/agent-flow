@@ -21,11 +21,15 @@ public class JdbcSupplierAdjustmentSources {
     private final JdbcSupplierPaymentReturnsRepository returns;
     private final JdbcProcurementPayableReservationRepository reservations;
     private final JdbcSupplierPaymentOperationRepository payments;
+    private final JdbcSupplierAdjustmentCompletions completions;
+    private final JdbcSupplierPaymentReturnCheckRepository checks;
 
     /** 历史原件从各自的持久修订恢复，输入中的合法领域对象不能代替实际业务记录。 */
     public JdbcSupplierAdjustmentSources(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests,
-            JdbcSupplierPaymentReturnsRepository returns, JdbcProcurementPayableReservationRepository reservations, JdbcSupplierPaymentOperationRepository payments) {
+            JdbcSupplierPaymentReturnsRepository returns, JdbcProcurementPayableReservationRepository reservations, JdbcSupplierPaymentOperationRepository payments,
+            JdbcSupplierAdjustmentCompletions completions, JdbcSupplierPaymentReturnCheckRepository checks) {
         this.jdbc = jdbc; this.json = json; this.requests = requests; this.returns = returns; this.reservations = reservations; this.payments = payments;
+        this.completions = completions; this.checks = checks;
     }
 
     /** 原申请优先、同应付银行其次，和原付款、核销及回款登记保持一致的加锁顺序。 */
@@ -34,6 +38,44 @@ public class JdbcSupplierAdjustmentSources {
         var ledger = returns.find(tenant, paymentId).orElseThrow(JdbcSupplierAdjustmentSources::changed);
         requests.lock(tenant, ledger.request().command().holdCommand().authorization().source().reservation().source().requestId());
         return returns.locked(tenant, paymentId);
+    }
+
+    /** 财务只选择当前银行和回款版本；原核销首次成功、前次完成及累计资金全部从实际修订派生。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierPayableAdjustmentSource current(String tenant, UUID paymentId, long paymentVersion, long returnVersion) {
+        var ledger = lock(tenant, paymentId); var bank = payments.find(tenant, paymentId).orElseThrow(JdbcSupplierAdjustmentSources::changed);
+        if (bank.version() != paymentVersion || ledger.version() != returnVersion) throw changed();
+        var original = activeSettlement(tenant, paymentId);
+        var settlement = original == null ? null : firstSettlement(original);
+        SupplierPayableAdjustmentSource.Previous previous = null;
+        if (ledger.accounting() != null) {
+            var completed = completions.find(tenant, ledger.accounting().operationId()).orElseThrow(JdbcSupplierAdjustmentSources::changed).operation();
+            previous = new SupplierPayableAdjustmentSource.Previous(paymentId, bank.command().digest(), settlement == null ? null : settlement.command().id(),
+                    completed.version(), completed.command().source().returns().entries(), completed.observation());
+        }
+        var source = new SupplierPayableAdjustmentSource(ledger, settlement, previous); requireFinancialState(source); return source;
+    }
+
+    /** 读取结束后保留所有已知银行和当前 ERP 修订，旧的成功快照不能越过更新的本地事实。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void requireEvidence(SupplierPayableAdjustmentSource source, SupplierPayableAdjustmentEvidence evidence) {
+        var payment = source.returns().request().command(); var tenant = payment.tenantId();
+        var current = payments.find(tenant, payment.id()).orElseThrow(JdbcSupplierAdjustmentSources::changed);
+        if (!evidence.bank().matchesCurrentBank(current)
+                || checks.history(tenant, payment.id()).stream().anyMatch(check -> !evidence.bank().continues(check.receipt()))
+                || returns.accountingReceipts(source.returns()).stream().anyMatch(prior -> !evidence.bank().continues(prior))) throw changed();
+        if (source.settlement() != null) {
+            var settled = activeSettlement(tenant, payment.id()); var observed = evidence.settlement();
+            if (settled == null || !settled.settled() || observed == null || observed.revision() < settled.observation().revision()
+                    || observed.observedAt().isBefore(settled.observation().observedAt()) || !observed.posting().equals(settled.observation().posting())) throw changed();
+        }
+        if (source.previous() != null) {
+            var previous = jdbc.query("SELECT state_json FROM supplier_payable_adjustment_operation WHERE tenant_id=? AND id=?",
+                    (row, index) -> json.read(row.getString("state_json"), SupplierPayableAdjustmentOperation.class), tenant, source.previous().observation().operationId().toString());
+            var observed = evidence.previous();
+            if (previous.size() != 1 || !previous.get(0).adjusted() || observed == null || observed.revision() < previous.get(0).observation().revision()
+                    || observed.observedAt().isBefore(previous.get(0).observation().observedAt()) || !observed.posting().equals(previous.get(0).observation().posting())) throw changed();
+        }
     }
 
     /** 已保存准备恢复只核对当时原件，不能因之后追加回款或进入查询而改写旧输入。 */
@@ -84,11 +126,10 @@ public class JdbcSupplierAdjustmentSources {
         if (!currentBank.command().equals(bank) || currentBank.conflictingObservation() != null
                 || !currentBank.settleable() && currentBank.status() != SupplierPaymentOperation.Status.REVERSED) throw changed();
         if (jdbc.queryForObject("SELECT COUNT(*) FROM supplier_settlement_preparation WHERE tenant_id=? AND active_payment_id=?", Integer.class, tenant, bank.id().toString()) != 0) throw changed();
-        var activeSettlements = jdbc.query("SELECT state_json FROM supplier_payable_settlement_operation WHERE tenant_id=? AND active_payment_id=?",
-                (row, index) -> json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class), tenant, bank.id().toString());
-        if (source.settlement() == null ? !activeSettlements.isEmpty() : activeSettlements.size() != 1) throw changed();
+        var activeSettlement = activeSettlement(tenant, bank.id());
+        if (source.settlement() == null ? activeSettlement != null : activeSettlement == null) throw changed();
         if (source.settlement() != null) {
-            var current = activeSettlements.get(0); var original = source.settlement();
+            var current = activeSettlement; var original = source.settlement();
             if (!current.settled() || !current.command().equals(original.command()) || current.version() < original.version()
                     || current.observation().revision() < original.observation().revision()
                     || !current.observation().posting().equals(original.observation().posting())) throw changed();
@@ -113,6 +154,19 @@ public class JdbcSupplierAdjustmentSources {
         if (saved.size() != 1) throw changed(); var value = saved.get(0);
         if (!value.command().tenantId().equals(tenant) || !value.command().id().equals(id) || value.version() != version) throw changed();
         return value;
+    }
+    private SupplierPayableSettlementOperation activeSettlement(String tenant, UUID paymentId) {
+        var values = jdbc.query("SELECT state_json FROM supplier_payable_settlement_operation WHERE tenant_id=? AND active_payment_id=?",
+                (row, index) -> json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class), tenant, paymentId.toString());
+        if (values.size() > 1) throw changed(); return values.isEmpty() ? null : values.get(0);
+    }
+    private SupplierPayableAdjustmentSource.OriginalSettlement firstSettlement(SupplierPayableSettlementOperation current) {
+        var command = current.command();
+        return jdbc.query("SELECT version,state_json FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", (row, index) -> {
+            var value = json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class);
+            if (value.version() != row.getLong("version") || !value.command().equals(command)) throw changed(); return value;
+        }, command.tenantId(), command.id().toString()).stream().filter(SupplierPayableSettlementOperation::settled).findFirst()
+                .map(value -> new SupplierPayableAdjustmentSource.OriginalSettlement(value.version(), value.command(), value.observation())).orElse(null);
     }
     private static DomainException changed() { return new DomainException("SUPPLIER_ADJUSTMENT_SOURCE_CHANGED", "Registered supplier returns, original settlement or previous adjustment changed"); }
 }

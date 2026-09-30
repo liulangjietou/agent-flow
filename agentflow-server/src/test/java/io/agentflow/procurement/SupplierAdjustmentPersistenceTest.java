@@ -71,6 +71,7 @@ class SupplierAdjustmentPersistenceTest {
     private JdbcSupplierPaymentOperationRepository payments;
     private SupplierPaymentExecutionService preparation;
     private SupplierPaymentService bank;
+    private PaymentPersonnel personnel;
     private JdbcSupplierPaymentReturnsRepository returnLedgers;
     private JdbcSupplierPaymentReturnCheckRepository returnChecks;
     private JdbcSupplierPaymentReturnRepository returnRegistrations;
@@ -86,6 +87,12 @@ class SupplierAdjustmentPersistenceTest {
     private SupplierPayableSettlementPort readSettlements;
     private SupplierPayableAdjustmentPort readAdjustments;
     private AccountingPeriodPort readPeriods;
+    private SupplierAdjustmentPreparationService adjustmentPreparation;
+    private SupplierAdjustmentService adjustmentExecution;
+    private SupplierAdjustmentPreparationWorker intentWorker;
+    private SupplierAdjustmentWorker adjustmentWorker;
+    private SupplierAdjustmentEvidenceReader workerReader;
+    private SupplierPayableAdjustmentObservation remoteAdjustment;
 
     @BeforeEach void database() { database(null); }
 
@@ -101,7 +108,7 @@ class SupplierAdjustmentPersistenceTest {
         reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
         approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
-        var personnel = mock(PaymentPersonnel.class);
+        personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
             return null;
@@ -114,12 +121,16 @@ class SupplierAdjustmentPersistenceTest {
         returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
         returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
         returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
-        adjustmentSources = new JdbcSupplierAdjustmentSources(jdbc, json, procurements, returnLedgers, reservations, payments);
+        adjustmentSources = new JdbcSupplierAdjustmentSources(jdbc, json, procurements, returnLedgers, reservations, payments, new JdbcSupplierAdjustmentCompletions(jdbc, json), returnChecks);
         adjustmentIntents = new JdbcSupplierAdjustmentPreparationRepository(jdbc, json, adjustmentSources);
         adjustments = new JdbcSupplierPayableAdjustmentRepository(jdbc, json, adjustmentIntents, adjustmentSources);
         completions = new JdbcSupplierAdjustmentCompletions(jdbc, json);
         completion = proxy(new SupplierAdjustmentCompletionService(adjustmentSources, adjustments, payments, returnLedgers, returnChecks, completions,
                 new JdbcFinanceReceiptCreditRepository(jdbc), reservations));
+        var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
+        var eligibility = new SupplierAdjustmentSources(adjustmentSources, settlementSources, sources);
+        adjustmentPreparation = proxy(new SupplierAdjustmentPreparationService(adjustmentSources, eligibility, adjustmentIntents, adjustments, 30));
+        adjustmentExecution = proxy(new SupplierAdjustmentService(adjustmentSources, eligibility, settlementSources, adjustments, 30));
     }
 
 
@@ -467,6 +478,224 @@ class SupplierAdjustmentPersistenceTest {
         verifyNoInteractions(readReturns, readHolds, readSettlements, readAdjustments, readPeriods);
     }
 
+    @Test void currentAdjustmentSourceIsDerivedFromActualVersionsAndPreviousCompletedReceipts() {
+        var source = source(); var payment = payments.find(tenant, source.returns().request().command().id()).orElseThrow();
+        var originalSource = tx.execute(status -> adjustmentSources.current(tenant, payment.command().id(), payment.version(), source.returns().version()));
+        assertThat(originalSource).isEqualTo(source);
+        assertThatThrownBy(() -> tx.execute(status -> adjustmentSources.current(tenant, payment.command().id(), payment.version() - 1, source.returns().version()))).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> tx.execute(status -> adjustmentSources.current(tenant, payment.command().id(), payment.version(), source.returns().version() - 1))).isInstanceOf(DomainException.class);
+        var done = adjusted(adjustment(intent(source)), "derived-first"); var proof = finish(done, 20);
+        var check = returnCheck(payment, "finance", 21, source.returns().entries().get(0).proof(), returnFunds("derived-next", "10", clock()));
+        var ledger = registerReturn(check, returnDecision(check));
+        var derived = tx.execute(status -> adjustmentSources.current(tenant, payment.command().id(), payment.version(), ledger.version()));
+        assertThat(derived.returns()).isEqualTo(ledger); assertThat(derived.previous().version()).isEqualTo(done.version());
+        assertThat(derived.previous().observation()).isEqualTo(done.observation()); assertThat(derived.previous().entries()).isEqualTo(source.returns().entries());
+        assertThat(derived.newReturned()).isEqualTo(money("10")); assertThat(completions.find(tenant, done.command().id())).contains(proof);
+    }
+
+    @Test void currentAdjustmentSourceKeepsFirstSettlementWhileSendEvidenceMustReachItsLatestRevision() {
+        var source = source(true); var payment = payments.find(tenant, source.returns().request().command().id()).orElseThrow();
+        var oldIntents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
+        var oldOperations = new JdbcSupplierPayableSettlementRepository(jdbc, json, oldIntents, payments, reservations);
+        var first = oldOperations.find(tenant, source.settlement().command().id()).orElseThrow(); var pending = first.requestQuery(clock());
+        tx.executeWithoutResult(status -> oldOperations.update(pending)); var querying = pending.claim(clock(), Duration.ofSeconds(30));
+        tx.executeWithoutResult(status -> oldOperations.update(querying)); var at = clock();
+        var currentObservation = new SupplierPayableSettlementObservation(first.command().id(), first.command().digest(), SupplierPayableSettlementObservation.Status.SETTLED, 5L, at, first.observation().posting(), null);
+        var current = querying.complete(new FinanceResult.Success<>(currentObservation), at); tx.executeWithoutResult(status -> oldOperations.update(current));
+        var derived = tx.execute(status -> adjustmentSources.current(tenant, payment.command().id(), payment.version(), source.returns().version()));
+        assertThat(derived).isEqualTo(source);
+        var stale = adjustmentEvidence(derived, clock());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> adjustmentSources.requireEvidence(derived, stale))).isInstanceOf(DomainException.class);
+        var fresh = new SupplierPayableAdjustmentEvidence(stale.bank(), stale.hold(), currentObservation, stale.previous(), stale.period(), stale.checkedAt());
+        tx.executeWithoutResult(status -> adjustmentSources.requireEvidence(derived, fresh));
+    }
+
+    @Test void adjustmentSendEvidencePreservesHigherKnownBankReadsAndLatestPreviousAccounting() {
+        var source = source(); var payment = payments.find(tenant, source.returns().request().command().id()).orElseThrow();
+        returnCheck(payment, "finance", 11, source.returns().entries().get(0).proof());
+        var staleBank = adjustmentEvidence(source, clock());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> adjustmentSources.requireEvidence(source, staleBank))).isInstanceOf(DomainException.class);
+        var done = adjusted(adjustment(intent(source)), "derived-prior"); var proof = finish(done, 20);
+        var check = returnCheck(payment, "finance", 21, source.returns().entries().get(0).proof(), returnFunds("evidence-next", "10", clock()));
+        var ledger = registerReturn(check, returnDecision(check));
+        var next = tx.execute(status -> adjustmentSources.current(tenant, payment.command().id(), payment.version(), ledger.version()));
+        var pending = done.requestQuery(clock()); tx.executeWithoutResult(status -> adjustments.update(pending));
+        var querying = pending.claim(clock(), Duration.ofSeconds(30)); tx.executeWithoutResult(status -> adjustments.update(querying)); var at = clock();
+        var observed = new SupplierPayableAdjustmentObservation(done.command().id(), done.command().digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED, 5, at, done.observation().posting(), null);
+        var current = querying.complete(new FinanceResult.Success<>(observed), at); tx.executeWithoutResult(status -> adjustments.update(current));
+        var stalePrevious = adjustmentEvidence(next, clock());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> adjustmentSources.requireEvidence(next, stalePrevious))).isInstanceOf(DomainException.class);
+        var fresh = new SupplierPayableAdjustmentEvidence(stalePrevious.bank(), stalePrevious.hold(), stalePrevious.settlement(), observed, stalePrevious.period(), stalePrevious.checkedAt());
+        tx.executeWithoutResult(status -> adjustmentSources.requireEvidence(next, fresh));
+        assertThat(completions.find(tenant, done.command().id())).contains(proof);
+    }
+
+    @Test void adjustmentWorkersPrepareSendAndCompleteOnceFromPersistedIntent() {
+        var source = source(); workers(source); var intent = submitted(source);
+        intentWorker.poll(); var queued = adjustments.find(tenant, intent.input().id()).orElseThrow();
+        assertThat(queued.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.QUEUED);
+        verify(readAdjustments, never()).adjust(any(), any());
+        adjustmentWorker.poll(); adjustmentWorker.poll(); intentWorker.poll();
+        var done = adjustments.find(tenant, queued.command().id()).orElseThrow(); assertThat(done.adjusted()).isTrue();
+        assertThat(completions.find(tenant, done.command().id())).isPresent();
+        assertThat(returnLedgers.find(tenant, source.returns().request().command().id()).orElseThrow().reviewRequired()).isFalse();
+        verify(readAdjustments, times(1)).adjust(eq(queued.command()), any()); verify(readAdjustments, never()).query(any());
+        assertThat(count("supplier_payment_operation")).isEqualTo(1); assertThat(count("supplier_adjustment_completion")).isEqualTo(1);
+    }
+
+    @Test void adjustmentWorkersRecoverLostResponseByOriginalQueryAfterFinanceLeavesAndPeriodCloses() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        var command = adjustments.find(tenant, intent.input().id()).orElseThrow().command();
+        doAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            remoteAdjustment = adjustmentObservation(call.getArgument(0), "worker-lost", clock()); return new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT);
+        }).when(readAdjustments).adjust(any(), any());
+        adjustmentWorker.poll(); var unknown = adjustments.find(tenant, command.id()).orElseThrow();
+        assertThat(unknown.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.UNKNOWN); assertThat(completions.find(tenant, command.id())).isEmpty();
+        doThrow(new DomainException("FINANCE_UNAVAILABLE", "Finance actor left")).when(personnel).requireEligible(tenant, "finance", entity);
+        doReturn(new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED)).when(readPeriods).period(anyString(), anyString(), any());
+        tx.executeWithoutResult(status -> adjustmentExecution.query(tenant, command.id(), unknown.version(), clock()));
+        clearInvocations(readPeriods, readHolds, readSettlements); adjustmentWorker.poll();
+        var done = adjustments.find(tenant, command.id()).orElseThrow(); assertThat(done.adjusted()).isTrue(); assertThat(done.command()).isEqualTo(command);
+        assertThat(completions.find(tenant, command.id())).isPresent(); verify(readAdjustments, times(1)).adjust(eq(command), any()); verify(readAdjustments).query(command);
+        verifyNoInteractions(readPeriods, readHolds, readSettlements);
+    }
+
+    @Test void adjustmentWorkersKeepErpSuccessWhenCompletionBankReadFailsAndOnlyRetryLocalWork() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(call -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            if (reads.incrementAndGet() == 2) return new FinanceResult.Unavailable<>(FinanceResult.Failure.CONNECTION);
+            return new FinanceResult.Success<>(completionReceipt(returnLedgers.find(tenant, source.returns().request().command().id()).orElseThrow(), 100, clock()));
+        }).when(readReturns).query(any());
+        adjustmentWorker.poll(); var done = adjustments.find(tenant, intent.input().id()).orElseThrow();
+        assertThat(done.adjusted()).isTrue(); assertThat(completions.find(tenant, done.command().id())).isEmpty();
+        assertThat(returnLedgers.find(tenant, source.returns().request().command().id()).orElseThrow().reviewRequired()).isTrue();
+        adjustmentWorker.poll(); assertThat(completions.find(tenant, done.command().id())).isPresent();
+        assertThat(adjustments.find(tenant, done.command().id())).contains(done); verify(readAdjustments, times(1)).adjust(any(), any()); verify(readAdjustments, never()).query(any());
+    }
+
+    @Test void adjustmentWorkersKeepErpSuccessWhenLocalTransactionFailsAndResumeWithoutRedispatch() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        var failedCompletion = mock(SupplierAdjustmentCompletionService.class);
+        doThrow(new DomainException("CONCURRENCY_CONFLICT", "Simulated local completion failure")).when(failedCompletion).complete(any(), any(), any());
+        var interrupted = new SupplierAdjustmentWorker(adjustments, adjustmentExecution, workerReader, readAdjustments, readReturns, failedCompletion);
+        interrupted.poll(); var done = adjustments.find(tenant, intent.input().id()).orElseThrow();
+        assertThat(done.adjusted()).isTrue(); assertThat(completions.find(tenant, done.command().id())).isEmpty();
+        adjustmentWorker.poll(); assertThat(completions.find(tenant, done.command().id())).isPresent();
+        assertThat(adjustments.find(tenant, done.command().id())).contains(done); verify(readAdjustments, times(1)).adjust(any(), any()); verify(readAdjustments, never()).query(any());
+    }
+
+    @Test void adjustmentWorkersRequireCurrentFinanceForPreparationAndAgainBeforeDispatch() {
+        var source = source(); workers(source); var intent = submitted(source);
+        doThrow(new DomainException("FINANCE_UNAVAILABLE", "Finance actor left")).when(personnel).requireEligible(tenant, "finance", entity);
+        intentWorker.poll(); assertThat(adjustmentIntents.find(tenant, intent.input().id()).orElseThrow().status()).isEqualTo(SupplierAdjustmentPreparation.Status.VOIDED);
+        verifyNoInteractions(readReturns, readAdjustments);
+        doNothing().when(personnel).requireEligible(tenant, "finance", entity);
+        var next = submitted(source); intentWorker.poll(); var checking = adjustmentExecution.claim(tenant, next.input().id(), clock());
+        var evidence = workerReader.read(source, next.input().accountingDate());
+        doThrow(new DomainException("FINANCE_UNAVAILABLE", "Finance actor left")).when(personnel).requireEligible(tenant, "finance", entity);
+        assertThat(adjustmentExecution.ready(checking, evidence, clock())).isNull();
+        var stopped = adjustments.find(tenant, next.input().id()).orElseThrow(); assertThat(stopped.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.VOIDED);
+        assertThat(stopped.dispatches()).isZero(); verify(readAdjustments, never()).adjust(any(), any());
+    }
+
+    @Test void adjustmentWorkersDiscardLateReadsAfterLeaseExpiryAndAfterSafeRetirement() {
+        var source = source(); workers(source); var intent = submitted(source); var claimed = adjustmentPreparation.claim(tenant, intent.input().id(), clock());
+        var evidence = workerReader.read(source, intent.input().accountingDate());
+        assertThat(adjustmentPreparation.claim(tenant, intent.input().id(), claimed.leaseUntil())).isNull();
+        adjustmentPreparation.finish(claimed, evidence, clock()); assertThat(adjustments.find(tenant, intent.input().id())).isEmpty();
+        // 终止过期意图后重新准备，验证安全结束与迟到发送；保留上一份意图的未来租约时刻。
+        var pending = adjustmentIntents.find(tenant, intent.input().id()).orElseThrow();
+        tx.executeWithoutResult(status -> adjustmentIntents.update(pending.voidSource(pending.updatedAt())));
+        var queued = adjustment(intent(source)); var checking = adjustmentExecution.claim(tenant, queued.command().id(), clock());
+        var checked = workerReader.read(source, queued.command().period().request().accountingDate());
+        tx.executeWithoutResult(status -> adjustmentExecution.retire(tenant, queued.command().id(), checking.version(), "another-finance", clock()));
+        assertThat(adjustmentExecution.ready(checking, checked, clock())).isNull();
+        assertThat(adjustments.retirement(tenant, queued.command().id())).isPresent(); verify(readAdjustments, never()).adjust(any(), any());
+    }
+
+    @Test void adjustmentWorkersRequireExplicitRetryAfterNotFoundAndPreserveOriginalCommand() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        doReturn(new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT)).when(readAdjustments).adjust(any(), any());
+        adjustmentWorker.poll(); var unknown = adjustments.find(tenant, intent.input().id()).orElseThrow(); var command = unknown.command();
+        doAnswer(call -> new FinanceResult.Success<>(new SupplierPayableAdjustmentObservation(command.id(), command.digest(), SupplierPayableAdjustmentObservation.Status.NOT_FOUND, 0, clock(), null, null))).when(readAdjustments).query(any());
+        tx.executeWithoutResult(status -> adjustmentExecution.query(tenant, command.id(), unknown.version(), clock())); adjustmentWorker.poll(); adjustmentWorker.poll();
+        var missing = adjustments.find(tenant, command.id()).orElseThrow(); assertThat(missing.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.NOT_FOUND);
+        verify(readAdjustments, times(1)).adjust(any(), any()); assertThat(completions.find(tenant, command.id())).isEmpty();
+        tx.executeWithoutResult(status -> adjustmentExecution.resend(tenant, command.id(), missing.version(), clock()));
+        doAnswer(call -> { remoteAdjustment = adjustmentObservation(call.getArgument(0), "worker-retry", clock()); return new FinanceResult.Success<>(remoteAdjustment); }).when(readAdjustments).adjust(any(), any());
+        adjustmentWorker.poll(); var done = adjustments.find(tenant, command.id()).orElseThrow();
+        assertThat(done.adjusted()).isTrue(); assertThat(done.command()).isEqualTo(command); assertThat(done.dispatches()).isEqualTo(2);
+        assertThat(completions.find(tenant, command.id())).isPresent(); verify(readAdjustments, times(2)).adjust(eq(command), any());
+    }
+
+    @Test void adjustmentWorkersBlockClosedPreparationWithoutRegisteringAnErpCommand() {
+        var source = source(); workers(source); var intent = submitted(source);
+        doReturn(new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED)).when(readPeriods).period(anyString(), anyString(), any());
+        intentWorker.poll(); intentWorker.poll();
+        var blocked = adjustmentIntents.find(tenant, intent.input().id()).orElseThrow();
+        assertThat(blocked.status()).isEqualTo(SupplierAdjustmentPreparation.Status.BLOCKED);
+        assertThat(blocked.issue()).isEqualTo(SupplierAdjustmentPreparation.Issue.ACCOUNTING_PERIOD_REJECTED);
+        assertThat(blocked.input().accountingDate()).isEqualTo(intent.input().accountingDate());
+        assertThat(adjustments.find(tenant, intent.input().id())).isEmpty(); verify(readAdjustments, never()).adjust(any(), any());
+    }
+
+    @Test void adjustmentWorkersTreatUnexpectedReadFailureAsUnsentAndKeepTheOriginalCommand() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        var command = adjustments.find(tenant, intent.input().id()).orElseThrow().command();
+        doThrow(new IllegalStateException("Simulated read transport failure")).when(readReturns).query(any());
+        adjustmentWorker.poll(); var current = adjustments.find(tenant, command.id()).orElseThrow();
+        assertThat(current.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.QUEUED); assertThat(current.dispatches()).isZero();
+        assertThat(current.failure()).isEqualTo(SupplierPayableAdjustmentOperation.Failure.INTERNAL_ERROR); assertThat(current.command()).isEqualTo(command);
+        assertThat(current.nextAttemptAt()).isAfter(current.updatedAt()); verify(readAdjustments, never()).adjust(any(), any());
+    }
+
+    @Test void adjustmentWorkersTreatUnexpectedWriteFailureAsPossiblySentAndOnlyKeepQueryRecovery() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        var command = adjustments.find(tenant, intent.input().id()).orElseThrow().command();
+        doThrow(new IllegalStateException("Simulated write transport failure")).when(readAdjustments).adjust(any(), any());
+        adjustmentWorker.poll(); var current = adjustments.find(tenant, command.id()).orElseThrow();
+        assertThat(current.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.UNKNOWN); assertThat(current.dispatches()).isEqualTo(1);
+        assertThat(current.failure()).isEqualTo(SupplierPayableAdjustmentOperation.Failure.INTERNAL_ERROR); assertThat(current.command()).isEqualTo(command);
+        assertThat(completions.find(tenant, command.id())).isEmpty(); verify(readAdjustments, times(1)).adjust(eq(command), any());
+    }
+
+    @Test void adjustmentWorkersExpirePossibleSendLeaseIntoQueryAndIgnoreItsLateSuccess() {
+        var source = source(); workers(source); var intent = submitted(source); intentWorker.poll();
+        var checking = adjustmentExecution.claim(tenant, intent.input().id(), clock());
+        var sent = adjustmentExecution.ready(checking, workerReader.read(source, intent.input().accountingDate()), clock());
+        assertThat(sent.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.ADJUSTING);
+        assertThat(adjustmentExecution.claim(tenant, sent.command().id(), sent.leaseUntil())).isNull();
+        var expired = adjustments.find(tenant, sent.command().id()).orElseThrow(); assertThat(expired.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.UNKNOWN);
+        adjustmentExecution.finish(sent, new FinanceResult.Success<>(adjustmentObservation(sent.command(), "late-lease", clock())), clock());
+        assertThat(adjustments.find(tenant, sent.command().id())).contains(expired);
+        var querying = adjustmentExecution.claim(tenant, sent.command().id(), expired.nextAttemptAt());
+        assertThat(querying.status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.QUERYING); assertThat(querying.command()).isEqualTo(sent.command());
+        assertThat(querying.dispatches()).isEqualTo(1); assertThat(completions.find(tenant, sent.command().id())).isEmpty();
+    }
+
+    private SupplierAdjustmentPreparation submitted(SupplierPayableAdjustmentSource source) {
+        var payment = payments.find(tenant, source.returns().request().command().id()).orElseThrow(); var at = clock();
+        return tx.execute(status -> adjustmentPreparation.register(tenant, payment.command().id(), payment.version(), source.returns().version(), "finance", at.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate(), at));
+    }
+    private void workers(SupplierPayableAdjustmentSource source) {
+        workerReader = reader(adjustmentEvidence(source, clock()));
+        doAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return new FinanceResult.Success<>(completionReceipt(returnLedgers.find(tenant, source.returns().request().command().id()).orElseThrow(), 100, clock()));
+        }).when(readReturns).query(any());
+        doAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            remoteAdjustment = adjustmentObservation(call.getArgument(0), "worker-return", clock()); return new FinanceResult.Success<>(remoteAdjustment);
+        }).when(readAdjustments).adjust(any(), any());
+        doAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            SupplierPayableAdjustmentCommand command = call.getArgument(0); assertThat(remoteAdjustment.operationId()).isEqualTo(command.id());
+            return new FinanceResult.Success<>(new SupplierPayableAdjustmentObservation(command.id(), command.digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED,
+                    remoteAdjustment.revision(), clock(), remoteAdjustment.posting(), null));
+        }).when(readAdjustments).query(any());
+        intentWorker = new SupplierAdjustmentPreparationWorker(adjustmentIntents, adjustmentPreparation, workerReader);
+        adjustmentWorker = new SupplierAdjustmentWorker(adjustments, adjustmentExecution, workerReader, readAdjustments, readReturns, completion);
+    }
+
     private SupplierAdjustmentEvidenceReader reader(SupplierPayableAdjustmentEvidence evidence) {
         readReturns = mock(SupplierPaymentReturnPort.class); readHolds = mock(SupplierPayableHoldPort.class);
         readSettlements = mock(SupplierPayableSettlementPort.class); readAdjustments = mock(SupplierPayableAdjustmentPort.class); readPeriods = mock(AccountingPeriodPort.class);
@@ -487,7 +716,12 @@ class SupplierAdjustmentPersistenceTest {
     }
 
     private SupplierPayableAdjustmentOperation adjusted(SupplierPayableAdjustmentOperation queued, String voucher) {
-        var sent = dispatch(queued); var command = sent.command(); var source = command.source(); var at = clock();
+        var sent = dispatch(queued); var at = clock();
+        var result = sent.complete(new FinanceResult.Success<>(adjustmentObservation(sent.command(), voucher, at)), at);
+        assertThat(result.adjusted()).isTrue(); tx.executeWithoutResult(status -> adjustments.update(result)); return result;
+    }
+    private SupplierPayableAdjustmentObservation adjustmentObservation(SupplierPayableAdjustmentCommand command, String voucher, Instant at) {
+        var source = command.source();
         var payment = source.returns().request().command();
         var before = source.previous() != null ? source.previous().observation().posting().payableSettledAfter()
                 : source.settlement() != null ? source.settlement().observation().posting().settledAfter() : payment.holdCommand().authorization().payable().settled();
@@ -498,8 +732,7 @@ class SupplierAdjustmentPersistenceTest {
                 source.newReturned(), source.returns().totalReturned(), source.netPaid(), before, after,
                 java.util.stream.IntStream.range(0, source.newReturns().size()).mapToObj(index -> { var entry = source.newReturns().get(index); return new SupplierPayableAdjustmentObservation.ReturnEntry(entry.proof().transactionReference(), entry.proof().amount(), voucher, "return-entry-" + index); }).toList(),
                 command.period().periodReference(), command.period().request().accountingDate(), at);
-        var result = sent.complete(new FinanceResult.Success<>(new SupplierPayableAdjustmentObservation(command.id(), command.digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED, 1, at, posting, null)), at);
-        assertThat(result.adjusted()).isTrue(); tx.executeWithoutResult(status -> adjustments.update(result)); return result;
+        return new SupplierPayableAdjustmentObservation(command.id(), command.digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED, 1, at, posting, null);
     }
     private SupplierAdjustmentCompletion finish(SupplierPayableAdjustmentOperation done, long revision) {
         var ledger = returnLedgers.find(tenant, done.command().source().returns().request().command().id()).orElseThrow(); var at = clock();
