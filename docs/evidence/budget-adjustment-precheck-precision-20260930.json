@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-30",
+  "scope": "预算预检外部纳秒时间与数据库微秒精度的先后顺序",
+  "rootCause": "核对与完成时间向下截成毫秒，可能早于已收到的外部台账或待保存的预览；旧夹具只返回毫秒，未覆盖这个边界。",
+  "reproduction": {
+    "test": "BudgetAdjustmentCheckPrecisionTest",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-precheck-precision-red.log",
+    "beforeFix": {
+      "tests": 2,
+      "failures": 1,
+      "errors": 1
+    },
+    "fixedClock": "2026-09-30T05:00:00.123456900Z",
+    "ledgerObservedAt": "2026-09-30T05:00:00.123456789Z"
+  },
+  "change": "预览和任务时间统一向上收敛到数据库支持的微秒，保留原台账时间不改写。",
+  "validation": {
+    "h2Log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-finance-api-h2-final.log",
+    "h2PrecisionTests": 2,
+    "postgresLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-finance-api-postgres.log",
+    "postgresApprovalWorkflowTests": 16,
+    "postgresFinanceWorkflowTests": 11
+  },
+  "liveRuntime": "仍为 V76，本次测试没有更换服务或改写原业务数据。"
+}

@@ -17,6 +17,7 @@ import static io.agentflow.budget.BudgetAdjustmentCheck.*;
  */
 @Service
 public class BudgetAdjustmentCheckEvaluator {
+    private static final long MICROSECOND_ROUNDING_NANOS = 999;
     private final BudgetAdjustmentRepository requests;
     private final FinanceMasterDataPort catalogs;
     private final BudgetLedgerPort ledgers;
@@ -43,7 +44,8 @@ public class BudgetAdjustmentCheckEvaluator {
         var catalog = value(catalogs.catalog(input.tenantId(), input.employeeId()));
         catalog.legalEntity(input.initiator().legalEntityId()); ensureLive(job);
         var ledger = value(ledgers.read(input.tenantId(), input.targetDigest(), input.content().ledgerRequest(input.employeeId())));
-        ensureLive(job); Instant checkedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        // 数据库保留微秒，向上收敛以免核对时间早于刚收到的纳秒台账。
+        ensureLive(job); Instant checkedAt = Instant.now().plusNanos(MICROSECOND_ROUNDING_NANOS).truncatedTo(ChronoUnit.MICROS);
         request.freeze(input.requestVersion(), input.roundNo(), catalog, input.targetDigest(), ledger, input.initiator(), checkedAt);
         Instant validUntil = Stream.of(catalog.validUntil(), ledger.validUntil(), ledger.observedAt().plus(BudgetLedgerPort.MAX_EVIDENCE_AGE))
                 .min(Instant::compareTo).orElseThrow();

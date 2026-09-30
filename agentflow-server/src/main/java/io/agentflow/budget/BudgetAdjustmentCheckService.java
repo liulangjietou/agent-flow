@@ -28,6 +28,7 @@ import static io.agentflow.budget.BudgetAdjustmentCheck.*;
  */
 @Service
 public class BudgetAdjustmentCheckService {
+    private static final long MICROSECOND_ROUNDING_NANOS = 999;
     private static final int DEFAULT_LIMIT = 25;
     private static final int MAX_LIMIT = 100;
     private final CurrentActor actors;
@@ -158,7 +159,8 @@ public class BudgetAdjustmentCheckService {
     }
     private BudgetAdjustmentRequest owned(UUID id) { return requests.find(actors.actor().tenantId(), id).filter(value -> value.employeeId().equals(actors.actor().userId())).orElseThrow(BudgetAdjustmentCheckService::notFound); }
     private static Summary summary(BudgetAdjustmentCheck job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().requestVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }
-    private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MILLIS); }
+    // 与预览采用同一精度和方向，完成时间不能被截断到其证据之前。
+    private static Instant time(Instant value) { return value.plusNanos(MICROSECOND_ROUNDING_NANOS).truncatedTo(ChronoUnit.MICROS); }
     private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment or application version changed"); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget adjustment check context not found"); }
     private static DomainException invalidQuery() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_QUERY", "Budget adjustment check query is invalid"); }
