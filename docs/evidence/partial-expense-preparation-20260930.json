@@ -1,0 +1,84 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_EXISTING_ADJUSTMENT_PREPARATION_AND_EXPLICIT_AUTHORIZATION",
+  "baseCommit": "72925b7bac8b83da96ef623898d27b60a9c62103",
+  "scope": "Durable per-side preparation and explicit single-use authorization for an already persisted partial expense adjustment",
+  "schema": {
+    "newMigration": "V85__expense_partial_adjustment_preparation.sql",
+    "testSchema": 85,
+    "longLivedRuntimeSchema": 82,
+    "runtimeUpgradeVerifiedThisStage": false,
+    "nonemptyUpgradeStages": ["82-to-83", "83-to-84", "84-to-85"],
+    "originalFinanceTablesPreserved": 10,
+    "additionalPartialTablesComparedAtV85": 6,
+    "nonemptyCompletionProofPreserved": true,
+    "repeatMigrateAndValidate": "PASS_H2_AND_POSTGRESQL"
+  },
+  "validation": {
+    "newDomainTests": 7,
+    "newIntegrationTests": 12,
+    "domainTests": 42,
+    "h2ServerTests": 89,
+    "h2WorkflowTests": 87,
+    "h2StartupTests": 1,
+    "h2MigrationTests": 1,
+    "postgresServerTests": 88,
+    "postgresWorkflowTests": 87,
+    "postgresMigrationTests": 1,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlap": true
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-preparation-final-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-preparation-postgres.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-preparation-authors.log",
+    "postgresDatabases": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-preparation-postgres-databases.json"
+  },
+  "checks": [
+    "Reads execute outside database transactions, along fixed original finance destinations",
+    "Claim does not mark original payment or vouchers unknown while another side is legitimately queued",
+    "Ready evidence never creates a command until its original independent finance actor explicitly authorizes",
+    "Authorization preserves the successful peer and creates a permanent distinct command for the selected side",
+    "Earliest original bank, accrual, payment-voucher and period expiry limits authorization to at most five minutes",
+    "Changed original facts, revoked finance, old candidate, wrong actor and expired evidence block authorization",
+    "Concurrent authorization permits one consumer; failed final proof insertion rolls back preparation, root, revision and command",
+    "Original read failures preserve the actual unknown state and separately accepted original observations",
+    "Closed accounting period retains actual original observations but creates no authorized command",
+    "Expired lease and late finish cannot overwrite original facts or a newer preparation state",
+    "Zero-payable adjustments complete both sides and restore advance offsets without a bank transaction",
+    "Authorized history replays both preparation and adjustment adjacent revisions",
+    "Migration retains old finance facts and partial completion proofs; database constraints bind actual revisions and single-use identity"
+  ],
+  "historyProofRegression": {
+    "test": "partialPreparationHistoricalAuthorizationRejectsAlteredReadyRevision",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-preparation-boundaries-first.log",
+    "redTests": 12,
+    "redFailures": 1,
+    "redErrors": 0,
+    "testGap": "Earlier tests covered normal history and repeat consumption but did not alter the referenced ready preparation revision",
+    "rootCause": "Authorized-history restoration checked adjustment before/after states but did not replay the referenced preparation revisions",
+    "fix": "Read both actual preparation revisions, validate tenant/id/version, replay ready-to-authorized and require equality with the root and authorized history"
+  },
+  "authorCheck": {
+    "javaFiles": 1117,
+    "namedTypes": 2134,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "acceptanceBoundary": {
+    "syntheticFinanceHttp": true,
+    "realEnterpriseFinance": false,
+    "existingIntentRequired": true,
+    "initialPublicIntentCreation": false,
+    "publicRoleAndFieldEntry": false,
+    "publicWorkflowComplete": false,
+    "actualBrowserAcceptance": false
+  },
+  "remaining": [
+    "Public initial intent creation and original-fact refresh entry before first adjustment",
+    "Explicit dispute decisions, public role/field access, idempotency/audit and API/UI",
+    "Nonempty long-lived runtime upgrade, HTTP/browser/restart and file preservation acceptance",
+    "Real enterprise budget/ERP integration"
+  ]
+}

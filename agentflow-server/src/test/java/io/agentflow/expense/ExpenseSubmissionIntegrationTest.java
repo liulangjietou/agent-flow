@@ -206,6 +206,9 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcExpensePartialAdjustmentRepository partialAdjustments;
     @Autowired ExpensePartialAdjustmentExecution partialAdjustmentExecution;
     @Autowired ExpensePartialAdjustmentFinance partialFinance;
+    @Autowired JdbcExpensePartialPreparationRepository partialPreparations;
+    @Autowired ExpensePartialPreparationService partialPreparing;
+    @Autowired ExpensePartialPreparationReader partialReader;
     @Autowired ExpensePartialAdjustmentWorker partialWorker;
     @Autowired BudgetConsumptionReductionPort partialBudgetPort;
     @Autowired ExpenseAccrualReductionPort partialAccrualPort;
@@ -234,6 +237,9 @@ class ExpenseSubmissionIntegrationTest {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
             for (var partial : jdbc.queryForList("SELECT id FROM expense_partial_adjustment WHERE tenant_id='demo' AND report_id=? ORDER BY sequence_no DESC,created_at DESC,id DESC", String.class, report.toString())) {
+                jdbc.update("DELETE FROM expense_partial_adjustment_authorization WHERE tenant_id='demo' AND adjustment_id=?", partial);
+                jdbc.update("DELETE FROM expense_partial_adjustment_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM expense_partial_adjustment_preparation WHERE tenant_id='demo' AND adjustment_id=?)", partial);
+                jdbc.update("DELETE FROM expense_partial_adjustment_preparation WHERE tenant_id='demo' AND adjustment_id=?", partial);
                 jdbc.update("DELETE FROM finance_consumption_reduction WHERE tenant_id='demo' AND adjustment_id=?", partial);
                 jdbc.update("DELETE FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND adjustment_id=?", partial);
                 jdbc.update("DELETE FROM expense_partial_adjustment_completion WHERE tenant_id='demo' AND adjustment_id=?", partial);
@@ -2219,6 +2225,193 @@ class ExpenseSubmissionIntegrationTest {
         tx().executeWithoutResult(status -> partialAdjustments.update(held.confirmCurrent(adjustmentTime())));
         partialWorker.poll(); assertThat(partialAdjustments.find("demo", ready.id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustment.Status.APPLIED);
         assertThat(partialBudgetWrites + partialAccrualWrites + partialBudgetQueries + partialAccrualQueries).isZero();
+    }
+
+    @Test void partialPreparationActualHttpWaitsForExplicitEachSideAndPreservesOriginalCommands() throws Exception {
+        var initial = persistedPartialIntent(); var original = initial.input().basis().funding();
+        var budget = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET);
+        assertThatThrownBy(() -> authorizePartialPreparation(initial, budget)).isInstanceOf(io.agentflow.common.DomainException.class);
+        partialWorker.poll(); var readyBudget = partialPreparations.find("demo", budget.input().id()).orElseThrow();
+        assertThat(readyBudget.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.READY);
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial); assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+        assertThat(readyBudget.evidence().source().financial().accrual().version()).isGreaterThan(original.financial().accrual().version());
+        assertThat(readyBudget.evidence().source().financial().accrual().input()).isEqualTo(original.financial().accrual().input());
+        var budgetQueued = authorizePartialPreparation(initial, readyBudget); partialWorker.poll();
+        var oneSide = partialAdjustments.find("demo", initial.id()).orElseThrow();
+        assertThat(oneSide.budget().status()).isEqualTo(BudgetConsumptionReductionOperation.Status.APPLIED); assertThat(oneSide.accrual()).isNull();
+        var accrual = registerPartialPreparation(oneSide, ExpensePartialAdjustmentPreparation.Side.ACCRUAL); partialWorker.poll();
+        var readyAccrual = partialPreparations.find("demo", accrual.input().id()).orElseThrow();
+        assertThat(readyAccrual.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.READY);
+        var both = authorizePartialPreparation(oneSide, readyAccrual); partialWorker.poll();
+        var completed = partialAdjustments.find("demo", initial.id()).orElseThrow();
+        assertThat(completed.status()).isEqualTo(ExpensePartialAdjustment.Status.APPLIED);
+        assertThat(completed.budget().input()).isEqualTo(budgetQueued.budget().input()); assertThat(completed.accrual().input()).isEqualTo(both.accrual().input());
+        assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+        assertThat(partialPreparations.find("demo", readyBudget.input().id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.AUTHORIZED);
+        assertThat(partialPreparations.find("demo", readyAccrual.input().id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.AUTHORIZED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_authorization WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isEqualTo(2);
+    }
+
+    @Test void partialPreparationConsumptionRollbackAndConcurrentAuthorizationRemainSingleUse() throws Exception {
+        var initial = persistedPartialIntent(); var value = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", value.input().id()).orElseThrow();
+        assertThatThrownBy(() -> tx().execute(status -> { authorizePartialPreparation(initial, ready); throw new IllegalStateException("Synthetic partial authorization rollback"); }))
+                .hasMessageContaining("Synthetic partial authorization rollback");
+        assertThat(partialPreparations.find("demo", ready.input().id())).contains(ready); assertThat(partialAdjustments.find("demo", initial.id())).contains(initial);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isZero();
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2); var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var calls = java.util.stream.IntStream.range(0, 2).mapToObj(index -> pool.submit(() -> { start.await(); try { authorizePartialPreparation(initial, ready); return true; }
+                catch (io.agentflow.common.DomainException conflict) { return false; } })).toList();
+            start.countDown(); int accepted = 0; for (var call : calls) if (call.get(10, java.util.concurrent.TimeUnit.SECONDS)) accepted++;
+            assertThat(accepted).isEqualTo(1);
+        } finally { pool.shutdownNow(); }
+        assertThat(partialPreparations.find("demo", ready.input().id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.AUTHORIZED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_authorization WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isEqualTo(1);
+    }
+
+    @Test void partialPreparationWhilePeerQueuedDoesNotStopThePeerAndAcceptsItsLaterVersion() throws Exception {
+        var initial = persistedPartialIntent(); var at = adjustmentTime(); var queued = initial.authorizeBudget(partialBudget(initial, at), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(queued));
+        var preparation = registerPartialPreparation(queued, ExpensePartialAdjustmentPreparation.Side.ACCRUAL); partialWorker.poll();
+        var peerApplied = partialAdjustments.find("demo", initial.id()).orElseThrow();
+        assertThat(peerApplied.budget().status()).isEqualTo(BudgetConsumptionReductionOperation.Status.APPLIED);
+        var ready = partialPreparations.find("demo", preparation.input().id()).orElseThrow(); assertThat(ready.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.READY);
+        var authorized = authorizePartialPreparation(peerApplied, ready); assertThat(authorized.budget()).isEqualTo(peerApplied.budget());
+        partialWorker.poll(); assertThat(partialAdjustments.find("demo", initial.id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustment.Status.APPLIED);
+    }
+
+    @Test void partialPreparationRevokedFinanceAndChangedOriginalDiscardLateReadWithoutOverwritingFacts() throws Exception {
+        var initial = persistedPartialIntent(); var value = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET);
+        var claimed = partialPreparing.claim("demo", value.input().id(), adjustmentTime()); var read = partialReader.read(claimed);
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND person_id=?", finance.toString());
+        try { partialPreparing.finish(claimed, read, adjustmentTime()); } finally { jdbc.update("UPDATE organization_appointment SET active=true WHERE tenant_id='demo' AND person_id=?", finance.toString()); }
+        assertThat(partialPreparations.find("demo", value.input().id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.VOIDED);
+        assertThat(partialAdjustmentSources.current(initial.input().basis().funding())).isEqualTo(initial.input().basis().funding());
+        var next = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); var nextClaimed = partialPreparing.claim("demo", next.input().id(), adjustmentTime()); var oldRead = partialReader.read(nextClaimed);
+        var payment = initial.input().basis().funding().payment();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", payment.input().command().id(), payment.version(), Instant.now())); paymentWorker.poll();
+        var newer = paymentOperations.find("demo", payment.input().command().id()).orElseThrow();
+        partialPreparing.finish(nextClaimed, oldRead, adjustmentTime());
+        assertThat(partialPreparations.find("demo", next.input().id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.VOIDED);
+        assertThat(paymentOperations.find("demo", payment.input().command().id())).contains(newer); assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialPreparationRejectedPeriodPreservesActualOriginalObservationsAndCreatesNoCommand() throws Exception {
+        var initial = persistedPartialIntent(); var value = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.ACCRUAL);
+        var claimed = partialPreparing.claim("demo", value.input().id(), adjustmentTime());
+        assertThatThrownBy(() -> tx().execute(status -> partialReader.read(claimed))).isInstanceOf(IllegalStateException.class).hasMessageContaining("outside");
+        var read = partialReader.read(claimed);
+        partialPreparing.finish(claimed, new ExpensePartialPreparationReader.Snapshot(read.bank(), read.accrual(), read.paymentVoucher(), new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED)), adjustmentTime());
+        var failed = partialPreparations.find("demo", value.input().id()).orElseThrow();
+        assertThat(failed.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.UNAVAILABLE); assertThat(failed.issue()).isEqualTo("ACCOUNTING_PERIOD_CLOSED");
+        assertThat(partialAdjustmentSources.current(initial.input().basis().funding()).financial().accrual().version()).isGreaterThan(initial.input().basis().funding().financial().accrual().version());
+        assertThatThrownBy(() -> authorizePartialPreparation(initial, failed)).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial);
+    }
+
+    @Test void partialPreparationExpiryLatestOwnerAndRealOriginalRevisionGuardAuthorization() throws Exception {
+        var initial = persistedPartialIntent(); var first = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var oldReady = partialPreparations.find("demo", first.input().id()).orElseThrow();
+        assertThatThrownBy(() -> tx().execute(status -> partialPreparing.authorize("demo", initial.id(), initial.version(), oldReady.input().id(), oldReady.version(), "cashier", adjustmentTime()))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThatThrownBy(() -> tx().execute(status -> partialPreparing.authorize("demo", initial.id(), initial.version(), oldReady.input().id(), oldReady.version(), "finance", oldReady.evidence().expiresAt()))).isInstanceOf(io.agentflow.common.DomainException.class);
+        var next = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", next.input().id()).orElseThrow();
+        assertThatThrownBy(() -> authorizePartialPreparation(initial, oldReady)).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> partialPreparations.update(ready.authorize(initial, adjustmentTime())))).isInstanceOf(io.agentflow.common.DomainException.class);
+        var voucher = ready.evidence().source().financial().accrual();
+        tx().executeWithoutResult(status -> voucherExecution.query("demo", voucher.input().command().id(), voucher.version(), Instant.now())); voucherWorker.poll();
+        assertThatThrownBy(() -> authorizePartialPreparation(initial, ready)).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial); assertThat(partialPreparations.find("demo", ready.input().id())).contains(ready);
+    }
+
+    @Test void partialPreparationZeroPayableReadsOnlyAccountingAndCompletesBothSides() throws Exception {
+        advanceOffset = "100"; var report = paymentReport(true); settlementWorker.poll(); budgetWorker.poll(); report = current(report);
+        var before = ExpenseAdjustmentAmounts.from(report); var line = before.lines().get(0);
+        var change = before.reduce(List.of(new ExpenseReport.Reduction(line.lineNo(), money("80"), line.tax())));
+        var funding = partialAdjustmentSources.find("demo", change, List.of(), List.of());
+        var initial = ExpensePartialAdjustment.begin(new ExpensePartialAdjustment.Input(UUID.randomUUID(), ExpensePartialAdjustmentBasis.from(funding, null), "finance", "zero-payable", "仅恢复借款抵扣", adjustmentTime()));
+        tx().executeWithoutResult(status -> partialAdjustments.create(initial));
+        var budget = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var readyBudget = partialPreparations.find("demo", budget.input().id()).orElseThrow();
+        assertThat(readyBudget.evidence().bank()).isNull(); assertThat(readyBudget.evidence().source().paymentVoucher()).isNull();
+        authorizePartialPreparation(initial, readyBudget); partialWorker.poll();
+        var oneSide = partialAdjustments.find("demo", initial.id()).orElseThrow();
+        var accrual = registerPartialPreparation(oneSide, ExpensePartialAdjustmentPreparation.Side.ACCRUAL); partialWorker.poll();
+        authorizePartialPreparation(oneSide, partialPreparations.find("demo", accrual.input().id()).orElseThrow()); partialWorker.poll();
+        assertThat(partialAdjustments.find("demo", initial.id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustment.Status.APPLIED);
+        var advance = EmployeeAdvance.restore(financialResources.loadReserved(report).advances().values().iterator().next());
+        assertThat(advance.balance().consumed()).isEqualTo(money("80")); assertThat(paymentWrites).isZero();
+        assertThat(expenseReturnLedgers.find("demo", report.id())).isEmpty();
+        assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+    }
+
+    @Test void partialPreparationUnavailableBankPreservesUnknownAndSuccessfulAccountingReads() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET);
+        var claimed = partialPreparing.claim("demo", preparation.input().id(), adjustmentTime()); var read = partialReader.read(claimed);
+        partialPreparing.finish(claimed, new ExpensePartialPreparationReader.Snapshot(new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT), read.accrual(), read.paymentVoucher(), read.period()), adjustmentTime());
+        var unavailable = partialPreparations.find("demo", preparation.input().id()).orElseThrow();
+        assertThat(unavailable.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.UNAVAILABLE);
+        var source = initial.input().basis().funding();
+        assertThat(paymentOperations.find("demo", source.payment().input().command().id()).orElseThrow().status()).isEqualTo(PaymentOperation.Status.UNKNOWN);
+        assertThat(voucherOperations.find("demo", source.financial().accrual().input().command().id()).orElseThrow().version()).isGreaterThan(source.financial().accrual().version());
+        assertThatThrownBy(() -> authorizePartialPreparation(initial, unavailable)).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial); assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialPreparationUnavailableAccrualKeepsActualBankAndBlocksAuthorization() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.ACCRUAL);
+        var claimed = partialPreparing.claim("demo", preparation.input().id(), adjustmentTime()); var read = partialReader.read(claimed);
+        partialPreparing.finish(claimed, new ExpensePartialPreparationReader.Snapshot(read.bank(), new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT), read.paymentVoucher(), read.period()), adjustmentTime());
+        var unavailable = partialPreparations.find("demo", preparation.input().id()).orElseThrow(); var source = initial.input().basis().funding();
+        assertThat(unavailable.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.UNAVAILABLE);
+        assertThat(voucherOperations.find("demo", source.financial().accrual().input().command().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.UNKNOWN);
+        assertThat(paymentOperations.find("demo", source.payment().input().command().id()).orElseThrow().version()).isGreaterThan(source.payment().version());
+        assertThatThrownBy(() -> authorizePartialPreparation(initial, unavailable)).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial); assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialPreparationExpiredReadCannotAcceptLateOriginalObservations() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET);
+        var claimed = partialPreparing.claim("demo", preparation.input().id(), adjustmentTime()); var read = partialReader.read(claimed);
+        partialPreparing.finish(claimed, read, claimed.leaseUntil());
+        var expired = partialPreparations.find("demo", preparation.input().id()).orElseThrow();
+        assertThat(expired.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.UNAVAILABLE); assertThat(expired.issue()).isEqualTo("TIMEOUT");
+        partialPreparing.finish(claimed, read, claimed.leaseUntil().plusSeconds(1)); partialPreparing.fail(claimed, claimed.leaseUntil().plusSeconds(2));
+        assertThat(partialPreparations.find("demo", preparation.input().id())).contains(expired);
+        assertThat(partialAdjustmentSources.current(initial.input().basis().funding())).isEqualTo(initial.input().basis().funding());
+        assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialPreparationProofFailureRollsBackRootCommandAndConsumption() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", preparation.input().id()).orElseThrow();
+        jdbc.execute("ALTER TABLE expense_partial_adjustment_authorization ADD CONSTRAINT ck_partial_authorization_test_failure CHECK(operation_id<>'" + ready.input().id() + "')");
+        try { assertThatThrownBy(() -> authorizePartialPreparation(initial, ready)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE expense_partial_adjustment_authorization DROP CONSTRAINT ck_partial_authorization_test_failure"); }
+        assertThat(partialPreparations.find("demo", preparation.input().id())).contains(ready); assertThat(partialAdjustments.find("demo", initial.id())).contains(initial);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT MAX(version) FROM expense_partial_adjustment_preparation_revision WHERE tenant_id='demo' AND preparation_id=?", Long.class, ready.input().id().toString())).isEqualTo(ready.version());
+        assertThat(authorizePartialPreparation(initial, ready).budget().input().command().id()).isEqualTo(ready.input().id());
+    }
+
+    @Test void partialPreparationHistoricalAuthorizationRejectsAlteredReadyRevision() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", preparation.input().id()).orElseThrow(); authorizePartialPreparation(initial, ready);
+        jdbc.update("UPDATE expense_partial_adjustment_preparation_revision SET state_json=? WHERE tenant_id='demo' AND preparation_id=? AND version=?",
+                json.write(preparation), ready.input().id().toString(), ready.version());
+        try { assertThatThrownBy(() -> partialPreparations.find("demo", preparation.input().id())).isInstanceOf(IllegalStateException.class); }
+        finally { jdbc.update("UPDATE expense_partial_adjustment_preparation_revision SET state_json=? WHERE tenant_id='demo' AND preparation_id=? AND version=?", json.write(ready), ready.input().id().toString(), ready.version()); }
+    }
+
+    private ExpensePartialAdjustment persistedPartialIntent() throws Exception {
+        var initial = partialAdjustment(); tx().executeWithoutResult(status -> partialAdjustments.create(initial)); return initial;
+    }
+    private ExpensePartialAdjustmentPreparation registerPartialPreparation(ExpensePartialAdjustment value, ExpensePartialAdjustmentPreparation.Side side) {
+        return tx().execute(status -> partialPreparing.register("demo", value.id(), value.version(), side, LocalDate.now(), "finance", "prepare-proof", "独立核对所选侧", adjustmentTime()));
+    }
+    private ExpensePartialAdjustment authorizePartialPreparation(ExpensePartialAdjustment current, ExpensePartialAdjustmentPreparation prepared) {
+        return tx().execute(status -> partialPreparing.authorize("demo", current.id(), current.version(), prepared.input().id(), prepared.version(), "finance", adjustmentTime()));
     }
 
     private ExpensePartialAdjustment queuedPartialAdjustment(ExpensePartialAdjustment value) {

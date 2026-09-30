@@ -24,17 +24,32 @@ public class ExpensePartialAdjustmentWorker {
     private final BudgetConsumptionReductionPort budgets;
     private final ExpenseAccrualReductionPort accruals;
     private final ExpensePartialAdjustmentExecution resources;
+    private final JdbcExpensePartialPreparationRepository preparations;
+    private final ExpensePartialPreparationService preparing;
+    private final ExpensePartialPreparationReader reader;
 
     /** 事务代理先提交领取，再外发，最后提交回执；本地完成另开事务。 */
     public ExpensePartialAdjustmentWorker(JdbcExpensePartialAdjustmentRepository adjustments, ExpensePartialAdjustmentFinance finance,
-            BudgetConsumptionReductionPort budgets, ExpenseAccrualReductionPort accruals, ExpensePartialAdjustmentExecution resources) {
+            BudgetConsumptionReductionPort budgets, ExpenseAccrualReductionPort accruals, ExpensePartialAdjustmentExecution resources,
+            JdbcExpensePartialPreparationRepository preparations, ExpensePartialPreparationService preparing, ExpensePartialPreparationReader reader) {
         this.adjustments = adjustments; this.finance = finance; this.budgets = budgets; this.accruals = accruals; this.resources = resources;
+        this.preparations = preparations; this.preparing = preparing; this.reader = reader;
     }
 
     /** 每侧最多十笔，准备和财务授权不由调度器自动补建。 */
     public void poll() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Partial adjustment worker must run outside a database transaction");
-        budget(); accrual(); completeResources();
+        prepare(); budget(); accrual(); completeResources();
+    }
+    private void prepare() {
+        for (var candidate : preparations.due(Instant.now())) {
+            if (Thread.currentThread().isInterrupted()) return;
+            try {
+                var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                try { preparing.finish(claimed, reader.read(claimed), Instant.now()); }
+                catch (RuntimeException failed) { preparing.fail(claimed, Instant.now()); log("PARTIAL_PREPARATION_READ_FAILURE", candidate.id(), failed); }
+            } catch (RuntimeException failed) { log("PARTIAL_PREPARATION_WORKER_FAILURE", candidate.id(), failed); }
+        }
     }
     private void budget() {
         for (var candidate : adjustments.dueBudget(Instant.now())) {

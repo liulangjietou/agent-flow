@@ -54,6 +54,23 @@ public record ExpenseAdjustmentFundingSource(ExpenseAdjustmentFinancialSource fi
                 || paymentVoucherReversal != null && at.isBefore(paymentVoucherReversal.recordedAt())) throw changed();
     }
 
+    /** 同一调整后续只接受较新且身份、已登记回款和原会计保持的实际来源。 */
+    public void requireContinuation(ExpenseAdjustmentFundingSource value) {
+        var financial = this.financial();
+        var latest = value.financial();
+        if (!latest.change().equals(financial.change()) || !value.previousReturns().equals(this.previousReturns()) || !value.selectedReturns().equals(this.selectedReturns())
+                || latest.settlement().version() < financial.settlement().version() || !latest.settlement().input().equals(financial.settlement().input())
+                || latest.consumption().version() < financial.consumption().version() || !latest.consumption().input().equals(financial.consumption().input())
+                || !latest.consumption().observation().equals(financial.consumption().observation())
+                || latest.accrual().version() < financial.accrual().version() || !latest.accrual().input().equals(financial.accrual().input())
+                || !new VoucherReversalPort.Request(financial.accrual().input().command(), financial.accrual().observation()).matchesOriginal(latest.accrual().observation())) throw changed();
+        if (this.payment() != null && (!value.payment().input().equals(this.payment().input()) || value.payment().version() < this.payment().version()
+                || !value.returns().request().equals(this.returns().request()) || value.returns().version() < this.returns().version()
+                || !value.returns().entries().containsAll(this.returns().entries()) || !value.paymentVoucher().input().equals(this.paymentVoucher().input())
+                || value.paymentVoucher().version() < this.paymentVoucher().version()
+                || this.paymentVoucherReversal() != null && !this.paymentVoucherReversal().equals(value.paymentVoucherReversal()))) throw changed();
+    }
+
     private static void requirePayment(ExpenseAdjustmentFinancialSource financial, ExpensePaymentReturns returns,
                                        ExpensePaymentReturn registration, PaymentOperation payment) {
         if (returns == null || registration == null || payment == null || payment.status() != PaymentOperation.Status.SUCCEEDED && payment.status() != PaymentOperation.Status.REVERSED) throw changed();

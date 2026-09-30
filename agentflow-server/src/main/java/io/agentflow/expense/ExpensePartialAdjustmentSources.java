@@ -70,19 +70,7 @@ public class ExpensePartialAdjustmentSources {
 
     /** 完成时保存的新来源仍须承接原固定意图，读取历史证明不依赖当前外部状态。 */
     public static void requireContinuation(ExpenseAdjustmentFundingSource expected, ExpenseAdjustmentFundingSource value) {
-        var financial = expected.financial();
-        var latest = value.financial();
-        if (!latest.change().equals(financial.change()) || !value.previousReturns().equals(expected.previousReturns()) || !value.selectedReturns().equals(expected.selectedReturns())
-                || latest.settlement().version() < financial.settlement().version() || !latest.settlement().input().equals(financial.settlement().input())
-                || latest.consumption().version() < financial.consumption().version() || !latest.consumption().input().equals(financial.consumption().input())
-                || !latest.consumption().observation().equals(financial.consumption().observation())
-                || latest.accrual().version() < financial.accrual().version() || !latest.accrual().input().equals(financial.accrual().input())
-                || !new VoucherReversalPort.Request(financial.accrual().input().command(), financial.accrual().observation()).matchesOriginal(latest.accrual().observation())) throw changed();
-        if (expected.payment() != null && (!value.payment().input().equals(expected.payment().input()) || value.payment().version() < expected.payment().version()
-                || !value.returns().request().equals(expected.returns().request()) || value.returns().version() < expected.returns().version()
-                || !value.returns().entries().containsAll(expected.returns().entries()) || !value.paymentVoucher().input().equals(expected.paymentVoucher().input())
-                || value.paymentVoucher().version() < expected.paymentVoucher().version()
-                || expected.paymentVoucherReversal() != null && !expected.paymentVoucherReversal().equals(value.paymentVoucherReversal()))) throw changed();
+        expected.requireContinuation(value);
     }
     private static DomainException changed() { return new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_SOURCE_CHANGED", "Current persisted expense, settlement, budget, accounting or registered bank evidence changed"); }
 }

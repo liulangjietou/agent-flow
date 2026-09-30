@@ -12,7 +12,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * 非空 V82、V83 的原财务修订不被迁移改写；新部分调整与完成必须引用实际同租户修订。
+ * 非空 V82 到 V85 的原财务修订不被改写；调整、完成与授权必须引用实际同租户修订。
  * @author owlzhangfq@gmail.com
  */
 class ExpensePartialAdjustmentMigrationTest {
@@ -79,5 +79,42 @@ class ExpensePartialAdjustmentMigrationTest {
         assertThatThrownBy(() -> jdbc.update("INSERT INTO expense_partial_adjustment_completion(tenant_id,adjustment_id,before_version,after_version,source_json,completed_at) VALUES(?,?,1,2,'{}',CURRENT_TIMESTAMP)", tenant, id))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(completed.migrate().migrationsExecuted).isZero(); assertThat(completed.validateWithResult().validationSuccessful).isTrue();
+
+        jdbc.update("INSERT INTO expense_partial_adjustment_revision(tenant_id,adjustment_id,version,state_json) VALUES(?,?,2,'{\"originalCompletion\":true}')", tenant, id);
+        jdbc.update("INSERT INTO expense_partial_adjustment_completion(tenant_id,adjustment_id,before_version,after_version,source_json,completed_at) VALUES(?,?,1,2,'{\"originalSource\":true}',CURRENT_TIMESTAMP)", tenant, id);
+        for (String table : List.of("expense_partial_adjustment", "expense_partial_adjustment_revision", "expense_partial_adjustment_operation",
+                "expense_partial_adjustment_return", "finance_consumption_reduction", "expense_partial_adjustment_completion")) before.put(table, jdbc.queryForList("SELECT * FROM " + table));
+        var prepared = Flyway.configure().dataSource(source).target("85").load(); assertThat(prepared.migrate().migrationsExecuted).isEqualTo(1);
+        before.forEach((table, rows) -> assertThat(jdbc.queryForList("SELECT * FROM " + table)).as(table).containsExactlyInAnyOrderElementsOf(rows));
+        String preparation = """
+                INSERT INTO expense_partial_adjustment_preparation(tenant_id,id,adjustment_id,adjustment_version,report_id,side,requested_by,input_json,state_json,version,status,active_slot,created_at,updated_at)
+                VALUES(?,?,?,?,?,'BUDGET','finance','{}','{}',1,'QUEUED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """;
+        assertThatThrownBy(() -> jdbc.update(preparation, "foreign", operation, id, 1, report)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(preparation, tenant, operation, id, 999, report)).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update(preparation, tenant, operation, id, 1, report);
+        assertThatThrownBy(() -> jdbc.update(preparation, tenant, UUID.randomUUID().toString(), id, 1, report)).isInstanceOf(DataIntegrityViolationException.class);
+        for (String mutation : List.of("active_slot=NULL", "status='RUNNING'", "lease_until=CURRENT_TIMESTAMP", "status='READY'",
+                "status='RUNNING',lease_until=updated_at", "adjustment_version=999", "side='UNKNOWN'")) {
+            assertThatThrownBy(() -> jdbc.update("UPDATE expense_partial_adjustment_preparation SET " + mutation + " WHERE tenant_id=? AND id=?", tenant, operation))
+                    .as(mutation).isInstanceOf(DataIntegrityViolationException.class);
+        }
+        jdbc.update("UPDATE expense_partial_adjustment_preparation SET status='READY',active_slot=NULL,version=2 WHERE tenant_id=? AND id=?", tenant, operation);
+        String revision = "INSERT INTO expense_partial_adjustment_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES(?,?,?,'{}')";
+        jdbc.update(revision, tenant, operation, 1);
+        String authorization = """
+                INSERT INTO expense_partial_adjustment_authorization(tenant_id,preparation_id,adjustment_id,preparation_before,preparation_after,adjustment_before,adjustment_after,operation_id,authorized_at)
+                VALUES(?,?,?,1,2,?,?,?,CURRENT_TIMESTAMP)
+                """;
+        assertThatThrownBy(() -> jdbc.update(authorization, tenant, operation, id, 1, 2, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update(revision, tenant, operation, 2);
+        assertThatThrownBy(() -> jdbc.update(authorization, tenant, operation, id, 2, 3, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(authorization, tenant, operation, id, 1, 1, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(authorization, tenant, operation, id, 1, 2, UUID.randomUUID().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update(authorization, tenant, operation, id, 1, 2, operation);
+        assertThatThrownBy(() -> jdbc.update(authorization, tenant, operation, id, 1, 2, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM expense_partial_adjustment_preparation_revision WHERE tenant_id=? AND preparation_id=?", tenant, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM expense_partial_adjustment_operation WHERE tenant_id=? AND id=?", tenant, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(prepared.migrate().migrationsExecuted).isZero(); assertThat(prepared.validateWithResult().validationSuccessful).isTrue();
     }
 }
