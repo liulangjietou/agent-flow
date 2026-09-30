@@ -162,7 +162,7 @@ class ExpenseAdjustmentFundingSourceTest {
                 NOW.plusSeconds(1), "reverse-proof", "核对实际付款反向凭证");
     }
 
-    private static Fixture fixture(List<String> returned) {
+    static Fixture fixture(List<String> returned) {
         var original = ExpenseAdjustmentFinancialSourceTest.fixture("30"); var accrual = original.accrual().input().command(); var binding = accrual.binding(); var amount = original.settlement().input().payable();
         var command = new PaymentCommand(original.settlement().input().payment().operationId(), "demo", PaymentCommand.Purpose.EXPENSE_REIMBURSEMENT,
                 new PaymentCommand.Binding(binding.businessId(), binding.applicationId(), binding.roundNo(), binding.applicationVersion(), binding.businessVersion()), amount, "original-debit", original.report().currentRound().account(), "voucher",
@@ -197,10 +197,10 @@ class ExpenseAdjustmentFundingSourceTest {
                 .complete(new FinanceResult.Success<>(new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, at, "payment-posting", "payment-voucher", "2026-09", DATE, command.totals().gross(), command.totals().gross(), at, null)), at);
     }
     private static ExpenseAdjustmentFinancialSource financial(Fixture fixture, ExpenseAdjustmentAmounts.Change change) { return new ExpenseAdjustmentFinancialSource(change, fixture.settlement(), fixture.original().budget(), fixture.original().accrual()); }
-    private static ExpenseAdjustmentFundingSource source(Fixture fixture, ExpenseAdjustmentAmounts.Change change, List<ExpensePaymentReturns.Entry> previous, List<ExpensePaymentReturns.Entry> selected) {
+    static ExpenseAdjustmentFundingSource source(Fixture fixture, ExpenseAdjustmentAmounts.Change change, List<ExpensePaymentReturns.Entry> previous, List<ExpensePaymentReturns.Entry> selected) {
         return new ExpenseAdjustmentFundingSource(financial(fixture, change), fixture.returns(), fixture.registration(), fixture.payment(), fixture.voucher(), null, previous, selected);
     }
-    private static ExpenseAdjustmentAmounts.Change change(Fixture fixture, String gross, String tax) { return ExpenseAdjustmentAmounts.from(fixture.original().report()).reduce(List.of(target(gross, tax))); }
+    static ExpenseAdjustmentAmounts.Change change(Fixture fixture, String gross, String tax) { return ExpenseAdjustmentAmounts.from(fixture.original().report()).reduce(List.of(target(gross, tax))); }
     private static ExpenseReport.Reduction target(String gross, String tax) { return new ExpenseReport.Reduction(1, money(gross), money(tax)); }
     private static Money money(String value) { return new Money(new BigDecimal(value), "CNY"); }
     private static void invalid(Runnable action) { assertThatThrownBy(action::run).isInstanceOf(DomainException.class); }
@@ -208,6 +208,6 @@ class ExpenseAdjustmentFundingSourceTest {
      * 真实形状的原付款、付款凭证与累计回款，独立选择部分用于调整。
      * @author owlzhangfq@gmail.com
      */
-    private record Fixture(ExpenseAdjustmentFinancialSourceTest.Fixture original, ExpenseSettlement settlement, ExpensePaymentReturns returns,
+    record Fixture(ExpenseAdjustmentFinancialSourceTest.Fixture original, ExpenseSettlement settlement, ExpensePaymentReturns returns,
                            ExpensePaymentReturn registration, PaymentOperation payment, VoucherOperation voucher) { }
 }

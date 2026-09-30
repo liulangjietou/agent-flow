@@ -112,6 +112,29 @@ public record ExpenseAccrualReductionOperation(Input input, long version, Status
         requireTime(now); if (retirementBasis() == null) throw new DomainException("EXPENSE_ACCRUAL_REDUCTION_RETIREMENT_UNSAFE", "Accrual reduction is not proven safely finished");
         return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
+
+    /** 所属调整按实际领域事件校验相邻修订，不能由传入快照直接制造成功或抹除冲突。 */
+    public boolean acceptsSuccessor(ExpenseAccrualReductionOperation next) {
+        if (next == null || version == Long.MAX_VALUE || next.version() != version + 1 || !input.equals(next.input())) return false;
+        try {
+            var at = next.updatedAt();
+            var expected = switch (next.status()) {
+                case POSTING, QUERYING -> claim(at, Duration.between(at, next.leaseUntil()));
+                case EXPIRED -> claim(at, Duration.ofSeconds(1));
+                case VOIDED -> next.failure() == Failure.FINANCE_RETIRED ? stopForRetirement(at) : voidBeforeSend(at);
+                case QUEUED -> retryNotFound(at);
+                case UNKNOWN -> {
+                    if (!running()) yield requestQuery(at);
+                    if (next.failure() == Failure.LEASE_EXPIRED) yield expire(at);
+                    if (next.failure() != null) yield unavailable(next.failure(), at);
+                    yield complete(new FinanceResult.Success<>(next.observation()), at);
+                }
+                case POSTED, FAILED, NOT_FOUND, RECONCILING -> complete(new FinanceResult.Success<>(
+                        next.conflictingObservation() == null ? next.observation() : next.conflictingObservation()), at);
+            };
+            return expected.equals(next);
+        } catch (DomainException invalidTransition) { return false; }
+    }
     public boolean running() { return status == Status.POSTING || status == Status.QUERYING; }
     public boolean expired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     private ExpenseAccrualReductionOperation changed(Status next, Instant at, Instant nextAt, ExpenseAccrualReductionObservation accepted, ExpenseAccrualReductionObservation disputed, long highest, Failure issue) {

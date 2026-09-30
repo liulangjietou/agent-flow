@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.expense.ExpensePartialAdjustmentGuard;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -25,14 +26,17 @@ public class JdbcVoucherReversalOperationRepository {
     private final JsonUtil json;
     private final JdbcVoucherReversalPreparationRepository preparations;
     private final JdbcVoucherOperationRepository originals;
+    private final ExpensePartialAdjustmentGuard partialAdjustments;
     /** 仓储核对被消费的准备和原修订，不信任调用方传入的过账声明。 */
-    public JdbcVoucherReversalOperationRepository(JdbcTemplate jdbc, JsonUtil json, JdbcVoucherReversalPreparationRepository preparations, JdbcVoucherOperationRepository originals) {
-        this.jdbc = jdbc; this.json = json; this.preparations = preparations; this.originals = originals;
+    public JdbcVoucherReversalOperationRepository(JdbcTemplate jdbc, JsonUtil json, JdbcVoucherReversalPreparationRepository preparations,
+            JdbcVoucherOperationRepository originals, ExpensePartialAdjustmentGuard partialAdjustments) {
+        this.jdbc = jdbc; this.json = json; this.preparations = preparations; this.originals = originals; this.partialAdjustments = partialAdjustments;
     }
     /** 原件冻结与命令登记由同一事务完成；同一原件的并发授权只能成功一次。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void create(VoucherReversalOperation value) {
         var input = value.input(); var command = input.command(); var original = command.source().command();
+        if (original.kind() == VoucherCommand.Kind.EXPENSE_ACCRUAL) partialAdjustments.requireWholeAllowed(original.tenantId(), original.binding().businessId());
         if (value.version() != 1 || value.status() != VoucherReversalOperation.Status.QUEUED || value.attempts() != 0) throw conflict();
         var prepared = preparations.find(original.tenantId(), command.id()).orElseThrow(JdbcVoucherReversalOperationRepository::conflict);
         var source = originals.revision(original.tenantId(), original.id(), input.originalVersion()).orElseThrow(JdbcVoucherReversalOperationRepository::conflict);

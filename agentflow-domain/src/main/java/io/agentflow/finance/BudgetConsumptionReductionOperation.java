@@ -107,6 +107,29 @@ public record BudgetConsumptionReductionOperation(Input input, long version, Sta
         return attempts == 0 && observation == null && (status == Status.QUEUED || status == Status.EXPIRED || status == Status.VOIDED)
                 || status == Status.REJECTED;
     }
+
+    /** 所属调整保存状态前回放一次领域转换，禁止快照跳过发送或替换已接受事实。 */
+    public boolean acceptsSuccessor(BudgetConsumptionReductionOperation next) {
+        if (next == null || version == Long.MAX_VALUE || next.version() != version + 1 || !input.equals(next.input())) return false;
+        try {
+            var at = next.updatedAt();
+            var expected = switch (next.status()) {
+                case EXECUTING, QUERYING -> claim(at, Duration.between(at, next.leaseUntil()));
+                case EXPIRED -> claim(at, Duration.ofSeconds(1));
+                case VOIDED -> voidBeforeSend(at);
+                case QUEUED -> retryNotFound(at);
+                case UNKNOWN -> {
+                    if (!running()) yield requestQuery(at);
+                    if (next.failure() == Failure.LEASE_EXPIRED) yield expire(at);
+                    if (next.failure() != null) yield unavailable(next.failure(), at);
+                    yield complete(new FinanceResult.Success<>(next.observation()), at);
+                }
+                case APPLIED, REJECTED, NOT_FOUND, RECONCILING -> complete(new FinanceResult.Success<>(
+                        next.conflictingObservation() == null ? next.observation() : next.conflictingObservation()), at);
+            };
+            return expected.equals(next);
+        } catch (DomainException invalidTransition) { return false; }
+    }
     private BudgetConsumptionReductionOperation changed(Status next, Instant at, Instant nextAt, BudgetConsumptionReductionObservation accepted,
             BudgetConsumptionReductionObservation disputed, Failure issue) {
         requireTime(at);

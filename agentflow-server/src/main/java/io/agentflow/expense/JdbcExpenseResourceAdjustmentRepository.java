@@ -28,18 +28,20 @@ public class JdbcExpenseResourceAdjustmentRepository {
     private final JdbcExpenseResourceAdjustmentPreparationRepository preparations;
     private final JdbcBudgetConsumptionReversalRepository budgets;
     private final ExpenseReportRepository reports;
+    private final ExpensePartialAdjustmentGuard partialAdjustments;
     private final ExpenseResourceReversal resourceRules = new ExpenseResourceReversal();
 
     /** 原授权、预算和报销修订均从本地持久来源核对，不请求外部系统。 */
     public JdbcExpenseResourceAdjustmentRepository(JdbcTemplate jdbc, JsonUtil json, JdbcExpenseResourceAdjustmentPreparationRepository preparations,
-            JdbcBudgetConsumptionReversalRepository budgets, ExpenseReportRepository reports) {
-        this.jdbc = jdbc; this.json = json; this.preparations = preparations; this.budgets = budgets; this.reports = reports;
+            JdbcBudgetConsumptionReversalRepository budgets, ExpenseReportRepository reports, ExpensePartialAdjustmentGuard partialAdjustments) {
+        this.jdbc = jdbc; this.json = json; this.preparations = preparations; this.budgets = budgets; this.reports = reports; this.partialAdjustments = partialAdjustments;
     }
 
     /** 调整与预算 outbox 共用授权事务，同一报销只能有一笔未安全结束的调整。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void create(ExpenseResourceAdjustment value, long preparationVersion) {
-        var basis = value.input().basis(); var prepared = preparations.find(basis.tenantId(), value.id()).orElseThrow(JdbcExpenseResourceAdjustmentRepository::conflict);
+        var basis = value.input().basis(); partialAdjustments.requireWholeAllowed(basis.tenantId(), basis.reportId());
+        var prepared = preparations.find(basis.tenantId(), value.id()).orElseThrow(JdbcExpenseResourceAdjustmentRepository::conflict);
         if (!value.equals(ExpenseResourceAdjustment.begin(value.input())) || prepared.version() != preparationVersion
                 || !prepared.authorizedInput().equals(value.input())) throw conflict();
         jdbc.update("""

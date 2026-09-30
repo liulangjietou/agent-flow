@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.expense.ExpensePartialAdjustmentGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -22,13 +23,19 @@ import java.util.UUID;
 public class JdbcVoucherReversalPreparationRepository {
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
+    private final ExpensePartialAdjustmentGuard partialAdjustments;
     /** 仓储只处理本地事实，不执行外部资金或会计操作。 */
-    public JdbcVoucherReversalPreparationRepository(JdbcTemplate jdbc, JsonUtil json) { this.jdbc = jdbc; this.json = json; }
+    public JdbcVoucherReversalPreparationRepository(JdbcTemplate jdbc, JsonUtil json, ExpensePartialAdjustmentGuard partialAdjustments) {
+        this.jdbc = jdbc; this.json = json; this.partialAdjustments = partialAdjustments;
+    }
     /** 意图先加入原申请事务，后台只处理已提交的原凭证。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void create(VoucherReversalPreparation value) {
         if (value.version() != 1 || value.status() != VoucherReversalPreparation.Status.QUEUED) throw conflict();
         var input = value.input();
+        if (input.source().command().kind() == VoucherCommand.Kind.EXPENSE_ACCRUAL) {
+            partialAdjustments.requireWholeAllowed(input.source().command().tenantId(), input.source().command().binding().businessId());
+        }
         jdbc.update("""
                 INSERT INTO voucher_reversal_preparation(tenant_id,id,operation_id,original_version,requested_by,input_json,state_json,version,status,created_at,updated_at)
                 VALUES(?,?,?,?,?,?,?,1,'QUEUED',?,?)

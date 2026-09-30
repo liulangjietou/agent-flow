@@ -1,0 +1,82 @@
+{
+  "status": "PASS_DOMAIN_AND_V83_PERSISTENCE",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "testSchema": 83,
+  "publicPartialExpenseWorkflowComplete": false,
+  "atomicResourceCompletionImplemented": false,
+  "backgroundExecutionImplemented": false,
+  "tests": {
+    "newAdjustmentDomain": 11,
+    "newPersistenceIntegration": 6,
+    "newNonemptyMigration": 1,
+    "finalRelatedDomain": 35,
+    "finalH2Server": 42,
+    "finalPostgreSqlServer": 42,
+    "earlierRelatedDomain": 57,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlap": true
+  },
+  "red": [
+    "expense-partial-adjustment-state-red.log",
+    "expense-partial-adjustment-first-send-red.log",
+    "expense-partial-adjustment-review-hold-red.log"
+  ],
+  "green": [
+    "expense-partial-adjustment-state-green.log",
+    "expense-partial-adjustment-persistence-final-h2.log",
+    "expense-partial-adjustment-v83-postgres.log"
+  ],
+  "migration": {
+    "from": 82,
+    "to": 83,
+    "newTables": 4,
+    "oldFinancialTablesCompared": 10,
+    "oldRowsPreserved": true,
+    "repeatMigrationNoOp": true,
+    "flywayValidationPass": true,
+    "h2AndPostgreSql": true,
+    "longLivedRuntimeUpgradePerformed": false
+  },
+  "regressions": [
+    {
+      "whyTestsMissed": "Earlier cases verified authorization and did not change bank state between authorization and first dispatch",
+      "red": "Queued budget write could be claimed after the original bank became unknown",
+      "fix": "Re-read current original financial sources and the immutable completed predecessor under the report lock before either first write claim",
+      "preserved": "Unknown budget and accrual operations can still query their original commands while current bank state is unknown"
+    },
+    {
+      "whyTestsMissed": "Explicit review was tested only after resource completion, not with already authorized queued writes",
+      "red": "An explicitly held partial adjustment could dispatch a queued write",
+      "fix": "Aggregate rejects first-write transitions while a review issue exists for either operation",
+      "preserved": "Queries for both already dispatched operations remain possible and do not clear the review issue"
+    }
+  ],
+  "checks": [
+    "Independent budget and accrual authorization, expiry and proven-unexecuted renewal preserve the successful other side",
+    "Previous basis uses exact completed projection, immutable accepted receipts and full registered bank entries",
+    "Every adjacent operation state is replayed through its domain transition; direct queued-to-success forgery is rejected",
+    "Same-report concurrent creation has one owner and transaction rollback removes root, revision and bank claims",
+    "Command registration references the authorizing root revision and records actual current financial sources",
+    "Generic repository update cannot introduce a resource completion marker",
+    "Explicit safe retirement releases only current unused bank claims and retains command and revision history",
+    "Old full accrual reversal and full resource adjustment share the original report lock and reject active partial adjustments",
+    "All original reports, resource versions, budget commands, vouchers and existing reversal flows remain intact",
+    "Tenant, actual source revision, active-owner uniqueness, completion checks and permanent command identity constraints are enforced"
+  ],
+  "authorCheck": {
+    "files": 1107,
+    "namedTypes": 2116,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Dedicated atomic partial-resource journal, actual local completion and persisted consecutive adjustments",
+    "Durable preparation with fresh original bank/accounting evidence and independent finance authorization services",
+    "Background writes, original-id recovery and explicit post-completion dispute handling",
+    "Current personnel and field access, public APIs, audit, contracts and UI",
+    "Long-lived nonempty runtime upgrade, actual HTTP, browser, restart and archive/file preservation acceptance",
+    "Real enterprise accounting and budget integration"
+  ]
+}

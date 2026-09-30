@@ -23,15 +23,17 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     private final ExpenseResourceAdjustmentSources sources;
+    private final ExpensePartialAdjustmentGuard partialAdjustments;
     /** 完整快照与规范化原修订引用在同一个事务登记。 */
-    public JdbcExpenseResourceAdjustmentPreparationRepository(JdbcTemplate jdbc, JsonUtil json, ExpenseResourceAdjustmentSources sources) {
-        this.jdbc = jdbc; this.json = json; this.sources = sources;
+    public JdbcExpenseResourceAdjustmentPreparationRepository(JdbcTemplate jdbc, JsonUtil json, ExpenseResourceAdjustmentSources sources, ExpensePartialAdjustmentGuard partialAdjustments) {
+        this.jdbc = jdbc; this.json = json; this.sources = sources; this.partialAdjustments = partialAdjustments;
     }
     /** 新建只能是无期间、无命令的排队意图，来源内容必须等于实际原记录。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void create(ExpenseResourceAdjustmentPreparation value) {
         if (!value.equals(ExpenseResourceAdjustmentPreparation.queue(value.input()))) throw conflict();
-        var input = value.input(); var basis = input.basis(); sources.requireCurrent(basis); var payment = basis.paymentVoucher();
+        var input = value.input(); var basis = input.basis(); partialAdjustments.requireWholeAllowed(basis.tenantId(), basis.reportId());
+        sources.requireCurrent(basis); var payment = basis.paymentVoucher();
         jdbc.update("""
                 INSERT INTO expense_resource_adjustment_preparation(tenant_id,id,report_id,settlement_version,consumption_id,consumed_version,
                 accrual_reversal_id,payment_returns_version,payment_voucher_id,payment_voucher_version,payment_voucher_reversal_id,requested_by,

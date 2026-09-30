@@ -194,6 +194,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcExpensePaymentReturnRepository expenseReturnRegistrations;
     @Autowired ExpenseSettlementSources settlementSources;
     @Autowired ExpenseResourceAdjustmentSources resourceAdjustmentSources;
+    @Autowired ExpensePartialAdjustmentSources partialAdjustmentSources;
+    @Autowired JdbcExpensePartialAdjustmentRepository partialAdjustments;
     @Autowired JdbcExpenseResourceAdjustmentPreparationRepository resourcePreparations;
     @Autowired JdbcExpenseResourceAdjustmentRepository resourceAdjustments;
     @Autowired JdbcBudgetConsumptionReversalRepository budgetReversals;
@@ -218,6 +220,12 @@ class ExpenseSubmissionIntegrationTest {
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
         for (UUID report : created) {
+            for (var partial : jdbc.queryForList("SELECT id FROM expense_partial_adjustment WHERE tenant_id='demo' AND report_id=? ORDER BY sequence_no DESC,created_at DESC,id DESC", String.class, report.toString())) {
+                jdbc.update("DELETE FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND adjustment_id=?", partial);
+                jdbc.update("DELETE FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", partial);
+                jdbc.update("DELETE FROM expense_partial_adjustment_revision WHERE tenant_id='demo' AND adjustment_id=?", partial);
+                jdbc.update("DELETE FROM expense_partial_adjustment WHERE tenant_id='demo' AND id=?", partial);
+            }
             String adjustments = "SELECT id FROM expense_resource_adjustment WHERE tenant_id='demo' AND report_id=?";
             jdbc.update("DELETE FROM finance_consumption_reversal WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM expense_resource_adjustment_retirement WHERE tenant_id='demo' AND adjustment_id IN (" + adjustments + ")", report.toString());
@@ -1746,6 +1754,165 @@ class ExpenseSubmissionIntegrationTest {
     private JdbcExpenseResourceAdjustmentRepository.Candidate resourceCandidate(ExpenseResourceAdjustment value) {
         return new JdbcExpenseResourceAdjustmentRepository.Candidate(value.input().basis().tenantId(), value.id(), value.input().basis().reportId(), value.version());
     }
+    @Test void partialAdjustmentPersistsActualSourcesClaimsAndEveryRevision() throws Exception {
+        var value = partialAdjustment(); var report = reports.find("demo", value.input().basis().reportId()).orElseThrow();
+        var versions = resourceVersions(report); var original = settlements.find("demo", report.id()).orElseThrow();
+        tx().executeWithoutResult(status -> partialAdjustments.create(value));
+        assertThat(partialAdjustments.find("demo", value.id())).contains(value);
+        assertThat(partialAdjustments.find("foreign", value.id())).isEmpty();
+        assertThat(partialAdjustments.revision("demo", value.id(), 1)).contains(value);
+        assertThat(partialAdjustments.active("demo", report.id())).contains(value);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND adjustment_id=? AND active_funds_identity IS NOT NULL", Integer.class, value.id().toString())).isEqualTo(1);
+        var at = adjustmentTime(); var queued = value.authorizeBudget(partialBudget(value, at), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(queued));
+        assertThat(partialAdjustments.find("demo", value.id())).contains(queued);
+        assertThat(partialAdjustments.dueBudget(adjustmentTime())).extracting(JdbcExpensePartialAdjustmentRepository.Candidate::id).contains(value.id());
+        assertThat(partialAdjustments.dueAccrual(adjustmentTime())).extracting(JdbcExpensePartialAdjustmentRepository.Candidate::id).doesNotContain(value.id());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, value.id().toString())).isEqualTo(1);
+        assertThat(settlements.find("demo", report.id())).contains(original); assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> partialAdjustments.update(queued))).isInstanceOf(io.agentflow.common.DomainException.class);
+    }
+
+    @Test void partialAdjustmentConcurrentCreationHasOneOwnerAndRollbackReleasesEveryClaim() throws Exception {
+        var first = partialAdjustment(); var input = first.input();
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> { partialAdjustments.create(first); throw new IllegalStateException("Synthetic partial adjustment rollback"); }))
+                .hasMessageContaining("Synthetic partial adjustment rollback");
+        assertThat(partialAdjustments.find("demo", first.id())).isEmpty();
+        var second = ExpensePartialAdjustment.begin(new ExpensePartialAdjustment.Input(UUID.randomUUID(), input.basis(), input.requestedBy(), input.evidenceReference(), input.reason(), input.createdAt()));
+        var start = new java.util.concurrent.CountDownLatch(1); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var jobs = List.of(first, second).stream().map(value -> pool.submit(() -> {
+                start.await();
+                try { tx().executeWithoutResult(status -> partialAdjustments.create(value)); return "SAVED"; }
+                catch (io.agentflow.common.DomainException conflict) { return conflict.code(); }
+            })).toList();
+            start.countDown();
+            assertThat(List.of(jobs.get(0).get(20, java.util.concurrent.TimeUnit.SECONDS), jobs.get(1).get(20, java.util.concurrent.TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("SAVED", "EXPENSE_PARTIAL_ADJUSTMENT_PENDING");
+        } finally { pool.shutdownNow(); }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND report_id=? AND active_funds_identity IS NOT NULL", Integer.class, input.basis().reportId().toString())).isEqualTo(1);
+    }
+
+    @Test void partialAdjustmentBlocksWholeAccrualReversalUntilExplicitSafeRetirement() throws Exception {
+        var value = partialAdjustment(); tx().executeWithoutResult(status -> partialAdjustments.create(value));
+        var report = reports.find("demo", value.input().basis().reportId()).orElseThrow(); var accrual = value.input().basis().funding().financial().accrual();
+        var response = send(executionPath(report, accrual) + "/preparations", "finance", executionPreparation(report, accrual));
+        assertThat(response.getStatus()).isEqualTo(409);
+        var stopped = value.retire("finance", "no-effects", "确认未发送后结束", adjustmentTime());
+        tx().executeWithoutResult(status -> partialAdjustments.update(stopped));
+        assertThat(partialAdjustments.active("demo", report.id())).isEmpty();
+        assertThat(partialAdjustments.find("demo", value.id())).contains(stopped);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND adjustment_id=? AND active_funds_identity IS NOT NULL", Integer.class, value.id().toString())).isZero();
+        var replacement = ExpensePartialAdjustment.begin(new ExpensePartialAdjustment.Input(UUID.randomUUID(), value.input().basis(), "finance", "new-evidence", "重新建立独立调整", adjustmentTime()));
+        tx().executeWithoutResult(status -> partialAdjustments.create(replacement));
+        assertThat(partialAdjustments.active("demo", report.id())).contains(replacement);
+    }
+
+    @Test void partialAdjustmentOperationRevisionFailureRollsBackAuthorizationAndClaims() throws Exception {
+        var value = partialAdjustment(); tx().executeWithoutResult(status -> partialAdjustments.create(value));
+        var at = adjustmentTime(); var queued = value.authorizeBudget(partialBudget(value, at), at);
+        jdbc.update("INSERT INTO expense_partial_adjustment_revision(tenant_id,adjustment_id,version,state_json) VALUES('demo',?,2,'{}')", value.id().toString());
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> partialAdjustments.update(queued))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(partialAdjustments.find("demo", value.id())).contains(value);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, value.id().toString())).isZero();
+    }
+
+    @Test void partialAdjustmentPersistsBothExternalSuccessesButCannotForgeResourceCompletion() throws Exception {
+        var value = partialAdjustment(); var report = reports.find("demo", value.input().basis().reportId()).orElseThrow(); var versions = resourceVersions(report);
+        tx().executeWithoutResult(status -> partialAdjustments.create(value));
+        var at = adjustmentTime(); var budgetQueued = value.authorizeBudget(partialBudget(value, at), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(budgetQueued));
+        var financial = value.input().basis().funding().financial(); var period = budgetQueued.budget().input().command().period();
+        var command = ExpenseAccrualReductionCommand.forExpense(UUID.randomUUID(), value.id(), financial, null, period, "finance", "accrual-proof", "本次独立挂账差额", at, at.plusSeconds(120));
+        var operation = ExpenseAccrualReductionOperation.queue(new ExpenseAccrualReductionOperation.Input(financial.accrual().version(), command, financial.accrual().input().targetDigest()), at);
+        var both = budgetQueued.authorizeAccrual(operation, at); tx().executeWithoutResult(status -> partialAdjustments.update(both));
+        var budgetRunning = both.withBudget(both.budget().claim(at, java.time.Duration.ofSeconds(30)), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(budgetRunning));
+        var budgetCommand = both.budget().input().command();
+        var budgetProof = new BudgetConsumptionReductionObservation.Posting(budgetCommand.source().id(), budgetCommand.source().digest(), budgetCommand.consumed().reference(), budgetCommand.expected().revision()+1,
+                "partial-budget-" + value.id(), budgetCommand.beforeDigest(), budgetCommand.afterDigest(), budgetCommand.reducedAmount(), period.periodReference(), period.request().accountingDate(), at);
+        var budgetResult = new BudgetConsumptionReductionObservation(budgetCommand.id(), value.id(), budgetCommand.digest(), BudgetConsumptionReductionObservation.Status.APPLIED, at, budgetProof, null);
+        var budgetApplied = budgetRunning.withBudget(budgetRunning.budget().complete(new FinanceResult.Success<>(budgetResult), at), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(budgetApplied));
+        var accrualRunning = budgetApplied.withAccrual(budgetApplied.accrual().claim(at, java.time.Duration.ofSeconds(30)), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(accrualRunning));
+        var original = command.source().original();
+        var currentOriginal = new VoucherObservation(original.operationId(), original.commandDigest(), original.status(), original.revision(), at,
+                original.postingReference(), original.voucherReference(), original.periodReference(), original.accountingDate(), original.debitTotal(), original.creditTotal(), original.postedAt(), null);
+        var lines = command.lines().stream().map(line -> new VoucherReversalPort.Line("partial-entry-"+line.originalLineNo(), line.originalLineNo(), line.accountCode(), line.side(), line.amount(), line.sourceLineNo(), line.costCenter(), line.projectCode(), line.advanceId())).toList();
+        var voucher = new VoucherReversalPort.Posting("partial-posting-"+value.id(), "partial-voucher-"+value.id(), period.periodReference(), period.request().accountingDate(), at, lines);
+        var proof = new ExpenseAccrualReductionObservation.Posting(currentOriginal, 1, command.beforeDigest(), command.afterDigest(), voucher);
+        var result = new ExpenseAccrualReductionObservation(command.id(), value.id(), command.digest(), ExpenseAccrualReductionObservation.Status.POSTED, 1, at, "partial-acceptance", proof, null);
+        var ready = accrualRunning.withAccrual(accrualRunning.accrual().complete(new FinanceResult.Success<>(result), at), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(ready));
+        assertThat(partialAdjustments.find("demo", value.id())).contains(ready); assertThat(ready.status()).isEqualTo(ExpensePartialAdjustment.Status.READY);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> partialAdjustments.update(ready.completeResources(at)))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialAdjustments.latestCompleted("demo", report.id())).isEmpty(); assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND adjustment_id=? AND completed_at IS NOT NULL", Integer.class, value.id().toString())).isZero();
+    }
+
+    @Test void partialAdjustmentChangedBankBlocksNewSendingButNotOriginalResultQueries() throws Exception {
+        var value = partialAdjustment(); tx().executeWithoutResult(status -> partialAdjustments.create(value));
+        var at = adjustmentTime(); var budgetQueued = value.authorizeBudget(partialBudget(value, at), at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(budgetQueued));
+        var financial = value.input().basis().funding().financial();
+        var command = ExpenseAccrualReductionCommand.forExpense(UUID.randomUUID(), value.id(), financial, null, budgetQueued.budget().input().command().period(),
+                "finance", "accrual-proof", "独立挂账差额", at, at.plusSeconds(120));
+        var accrual = ExpenseAccrualReductionOperation.queue(new ExpenseAccrualReductionOperation.Input(financial.accrual().version(), command, financial.accrual().input().targetDigest()), at);
+        var queued = budgetQueued.authorizeAccrual(accrual, at);
+        tx().executeWithoutResult(status -> partialAdjustments.update(queued));
+        var bankId = value.input().basis().funding().payment().input().command().id();
+        var bank = paymentOperations.find("demo", bankId).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", bankId, bank.version(), Instant.now()));
+        var blockedAt = adjustmentTime(); var candidate = queued.withBudget(queued.budget().claim(blockedAt, java.time.Duration.ofSeconds(30)), blockedAt);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> partialAdjustments.update(candidate))).isInstanceOf(io.agentflow.common.DomainException.class);
+        var blockedAccrual = queued.withAccrual(queued.accrual().claim(blockedAt, java.time.Duration.ofSeconds(30)), blockedAt);
+        assertThatThrownBy(() -> tx().executeWithoutResult(status -> partialAdjustments.update(blockedAccrual))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialAdjustments.find("demo", value.id())).contains(queued);
+        paymentWorker.poll();
+        var sendAt = adjustmentTime(); var running = queued.withBudget(queued.budget().claim(sendAt, java.time.Duration.ofSeconds(30)), sendAt);
+        tx().executeWithoutResult(status -> partialAdjustments.update(running));
+        var unknown = running.withBudget(running.budget().unavailable(BudgetConsumptionReductionOperation.Failure.TIMEOUT, sendAt), sendAt);
+        tx().executeWithoutResult(status -> partialAdjustments.update(unknown));
+        var accrualRunning = unknown.withAccrual(unknown.accrual().claim(sendAt, java.time.Duration.ofSeconds(30)), sendAt);
+        tx().executeWithoutResult(status -> partialAdjustments.update(accrualRunning));
+        var bothUnknown = accrualRunning.withAccrual(accrualRunning.accrual().unavailable(ExpenseAccrualReductionOperation.Failure.TIMEOUT, sendAt), sendAt);
+        tx().executeWithoutResult(status -> partialAdjustments.update(bothUnknown));
+        var refreshed = paymentOperations.find("demo", bankId).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", bankId, refreshed.version(), Instant.now()));
+        var queryAt = bothUnknown.budget().nextAttemptAt(); var querying = bothUnknown.withBudget(bothUnknown.budget().claim(queryAt, java.time.Duration.ofSeconds(30)), queryAt);
+        tx().executeWithoutResult(status -> partialAdjustments.update(querying));
+        var queryingBoth = querying.withAccrual(querying.accrual().claim(queryAt, java.time.Duration.ofSeconds(30)), queryAt);
+        tx().executeWithoutResult(status -> partialAdjustments.update(queryingBoth));
+        assertThat(partialAdjustments.find("demo", value.id())).contains(queryingBoth);
+        assertThat(queryingBoth.budget().status()).isEqualTo(BudgetConsumptionReductionOperation.Status.QUERYING);
+        assertThat(queryingBoth.accrual().status()).isEqualTo(ExpenseAccrualReductionOperation.Status.QUERYING);
+        assertThat(queryingBoth.budget().input()).isEqualTo(queued.budget().input());
+        assertThat(queryingBoth.accrual().input()).isEqualTo(queued.accrual().input());
+    }
+
+    private ExpensePartialAdjustment partialAdjustment() throws Exception {
+        var report = archiveReadyExpense();
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        expenseReturnRows = List.of(expenseReturnItem(report, UUID.randomUUID().toString(), "20"));
+        registerExpenseReturn(report, queryExpenseReturn(report)); report = current(report);
+        var paymentId = settlements.find("demo", report.id()).orElseThrow().input().payment().operationId();
+        var payment = paymentOperations.find("demo", paymentId).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", paymentId, payment.version(), Instant.now())); paymentWorker.poll();
+        var before = ExpenseAdjustmentAmounts.from(report); var first = before.lines().get(0);
+        var change = before.reduce(List.of(new ExpenseReport.Reduction(first.lineNo(), first.gross().minus(money("20")), first.tax())));
+        var selected = expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries();
+        var funding = partialAdjustmentSources.find("demo", change, List.of(), selected);
+        return ExpensePartialAdjustment.begin(new ExpensePartialAdjustment.Input(UUID.randomUUID(), ExpensePartialAdjustmentBasis.from(funding, null), "finance", "partial-return-proof", "独立部分取消原报销", adjustmentTime()));
+    }
+    private BudgetConsumptionReductionOperation partialBudget(ExpensePartialAdjustment value, Instant at) {
+        var financial = value.input().basis().funding().financial(); var original = financial.consumption(); var date = LocalDate.now();
+        var period = new AccountingPeriodPort.OpenPeriod(new AccountingPeriodPort.Request(financial.accrual().input().command().legalEntityId(), "CNY", date), "partial-period", "v1", date, date, at, at.plusSeconds(300));
+        var command = BudgetConsumptionReductionCommand.forExpense(UUID.randomUUID(), value.id(), financial, value.input().basis().previous() == null ? null : value.input().basis().previous().budget(), period,
+                "finance", "budget-proof", "独立释放本次差额", at, at.plusSeconds(120));
+        return BudgetConsumptionReductionOperation.queue(new BudgetConsumptionReductionOperation.Input(original.version(), command, original.input().targetDigest()), at);
+    }
+
     private ExpenseReport resourceAdjustmentReport() throws Exception { var report = archiveReadyExpense(); prepareResourceAdjustmentSources(report); return current(report); }
     private void prepareResourceAdjustmentSources(ExpenseReport report) throws Exception {
         var payment = paymentOperations.find("demo", settlements.find("demo", report.id()).orElseThrow().input().payment().operationId()).orElseThrow();
