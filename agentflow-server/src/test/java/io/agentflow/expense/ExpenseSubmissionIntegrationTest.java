@@ -80,6 +80,7 @@ class ExpenseSubmissionIntegrationTest {
     private int writes;
     private int queries;
     private String voucherMode = "POSTED";
+    private int voucherWrites;
     private final Map<UUID, VoucherCommand> voucherCommands = new ConcurrentHashMap<>();
     private final Map<UUID, PaymentCommand> paymentCommands = new ConcurrentHashMap<>();
     private String paymentMode = "SUCCEEDED";
@@ -2404,6 +2405,172 @@ class ExpenseSubmissionIntegrationTest {
         finally { jdbc.update("UPDATE expense_partial_adjustment_preparation_revision SET state_json=? WHERE tenant_id='demo' AND preparation_id=? AND version=?", json.write(ready), ready.input().id().toString(), ready.version()); }
     }
 
+    @Test void partialEntryRefreshCreatesIntentThenExplicitlyAuthorizesEachSide() throws Exception {
+        var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        expenseReturnRows = List.of(expenseReturnItem(report, UUID.randomUUID().toString(), "20")); registerExpenseReturn(report, queryExpenseReturn(report));
+        var endpoint = path(report) + "/partial-adjustments"; var originalReport = current(report).state();
+        assertThat(send(endpoint, "finance", partialCreateInput(report, "80")).getStatus()).isEqualTo(409);
+        var writes = paymentWrites + voucherWrites;
+        ok(send(endpoint + "/original-queries", "finance", partialRefreshInput(report)), 202); paymentWorker.poll(); voucherWorker.poll();
+        assertThat(paymentWrites + voucherWrites).isEqualTo(writes);
+        var input = partialCreateInput(report, "80"); var key = UUID.randomUUID().toString(); var created = ok(send(endpoint, "finance", key, input), 202);
+        var replay = send(endpoint, "finance", key, input); assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true"); assertThat(ok(replay, 202)).isEqualTo(created);
+        var id = UUID.fromString(created.path("adjustmentId").asText()); var initial = partialAdjustments.find("demo", id).orElseThrow();
+        assertThat(send(endpoint + "/original-queries", "finance", partialRefreshInput(report)).getStatus()).isEqualTo(409);
+        for (var side : ExpensePartialAdjustmentPreparation.Side.values()) {
+            var current = partialAdjustments.find("demo", id).orElseThrow(); var prepare = partialSourceInput(report);
+            prepare.put("adjustmentId", id); prepare.put("adjustmentVersion", current.version()); prepare.put("side", side.name()); prepare.put("accountingDate", LocalDate.now());
+            prepare.put("evidenceReference", "partial-api-proof"); prepare.put("reason", "明确准备所选侧");
+            var queued = ok(send(endpoint + "/preparations", "finance", prepare), 202); partialWorker.poll();
+            var ready = partialPreparations.find("demo", UUID.fromString(queued.path("preparationId").asText())).orElseThrow();
+            assertThat(ready.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.READY);
+            var authorize = partialSourceInput(report); authorize.put("adjustmentId", id); authorize.put("adjustmentVersion", current.version());
+            authorize.put("preparationId", ready.input().id()); authorize.put("preparationVersion", ready.version()); authorize.put("comment", "明确确认原件和本次差额");
+            String authorizationKey = UUID.randomUUID().toString(); var accepted = ok(send(endpoint + "/authorizations", "finance", authorizationKey, authorize), 202);
+            assertThat(ok(send(endpoint + "/authorizations", "finance", authorizationKey, authorize), 202)).isEqualTo(accepted); partialWorker.poll();
+        }
+        var completed = partialAdjustments.find("demo", id).orElseThrow();
+        assertThat(completed.status()).isEqualTo(ExpensePartialAdjustment.Status.APPLIED); assertThat(current(report).state()).isEqualTo(originalReport);
+        assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+        assertThat(created.toString()).doesNotContain("accountNumber", "targetDigest", "commandDigest", "source_json");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE aggregate_type='ExpensePartialAdjustment' AND aggregate_id=? AND action='EXPENSE_PARTIAL_CREATE'", Integer.class, initial.id().toString())).isEqualTo(1);
+    }
+
+    @Test void partialEntryRequiresCurrentFieldsAndFinanceBeforeIdempotentReplay() throws Exception {
+        hideBusinessDetails = true; var initial = partialAdjustment(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        var endpoint = path(report) + "/partial-adjustments"; var input = partialCreateInput(report, "80");
+        for (var user : List.of("alice", "bob", "cashier", "admin", "manager")) {
+            assertThat(send(endpoint, user, input).getStatus()).as(user).isIn(403, 404);
+            assertThat(send(endpoint + "/original-queries", user, partialRefreshInput(report)).getStatus()).as(user).isIn(403, 404);
+        }
+        String key = UUID.randomUUID().toString(); var created = ok(send(endpoint, "finance", key, input), 202);
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND person_id=?", finance.toString());
+        try { assertThat(send(endpoint, "finance", key, input).getStatus()).isEqualTo(403); }
+        finally { jdbc.update("UPDATE organization_appointment SET active=true WHERE tenant_id='demo' AND person_id=?", finance.toString()); }
+        assertThat(ok(send(endpoint, "finance", key, input), 202)).isEqualTo(created);
+        assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+        var preparation = partialSourceInput(report); preparation.put("adjustmentId", created.path("adjustmentId").asText()); preparation.put("adjustmentVersion", 1);
+        preparation.put("side", "BUDGET"); preparation.put("accountingDate", LocalDate.now()); preparation.put("evidenceReference", "proof"); preparation.put("reason", "准备");
+        var authorization = partialSourceInput(report); authorization.put("adjustmentId", created.path("adjustmentId").asText()); authorization.put("adjustmentVersion", 1);
+        authorization.put("preparationId", UUID.randomUUID()); authorization.put("preparationVersion", 3); authorization.put("comment", "确认");
+        for (var user : List.of("alice", "cashier", "admin", "manager")) {
+            assertThat(send(endpoint + "/preparations", user, preparation).getStatus()).as(user).isIn(403, 404);
+            assertThat(send(endpoint + "/authorizations", user, authorization).getStatus()).as(user).isIn(403, 404);
+        }
+    }
+
+    @Test void partialEntryRequiresExplicitZeroHistoryVersion() throws Exception {
+        var initial = partialAdjustment(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow(); var input = partialCreateInput(report, "80");
+        input.remove("previousVersion");
+        assertThat(send(path(report) + "/partial-adjustments", "finance", input).getStatus()).isEqualTo(400);
+        assertThat(partialAdjustments.active("demo", report.id())).isEmpty();
+    }
+
+    @Test void partialEntryRejectsInjectedFieldsInvalidAmountsAndForeignOrReusedReturnIdentity() throws Exception {
+        var initial = partialAdjustment(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments";
+        var valid = partialCreateInput(report, "80");
+        for (var name : List.of("tenantId", "authorizedBy", "targetDigest", "source", "completion")) {
+            var injected = new java.util.LinkedHashMap<>(valid); injected.put(name, "injected"); assertThat(send(endpoint, "finance", injected).getStatus()).as(name).isEqualTo(400);
+        }
+        var invalidLine = new java.util.LinkedHashMap<>(valid); invalidLine.put("lines", List.of(Map.of("lineNo", 1, "remainingGross", "80", "remainingTax", "6", "currency", "USD")));
+        assertThat(send(endpoint, "finance", invalidLine).getStatus()).isEqualTo(400);
+        for (Object amount : List.of(80.00, "8e1", "80.001", "-1")) {
+            var invalid = new java.util.LinkedHashMap<>(valid); invalid.put("lines", List.of(Map.of("lineNo", 1, "remainingGross", amount, "remainingTax", "6")));
+            assertThat(send(endpoint, "finance", invalid).getStatus()).as(amount.toString()).isIn(400, 422);
+        }
+        var unknown = new java.util.LinkedHashMap<>(valid); unknown.put("returnIds", List.of("foreign-bank-transaction")); assertThat(send(endpoint, "finance", unknown).getStatus()).isEqualTo(422);
+        var repeated = new java.util.LinkedHashMap<>(valid); var bankId = expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries().get(0).proof().fundsIdentity();
+        repeated.put("returnIds", List.of(bankId, bankId)); assertThat(send(endpoint, "finance", repeated).getStatus()).isEqualTo(422);
+        for (var field : List.of("settlementVersion", "returnsVersion", "previousVersion")) {
+            var stale = new java.util.LinkedHashMap<>(valid); stale.put(field, 999); assertThat(send(endpoint, "finance", stale).getStatus()).as(field).isEqualTo(409);
+        }
+        var forgedPrevious = new java.util.LinkedHashMap<>(valid); forgedPrevious.put("previousId", UUID.randomUUID()); assertThat(send(endpoint, "finance", forgedPrevious).getStatus()).isEqualTo(409);
+        assertThat(partialAdjustments.active("demo", report.id())).isEmpty(); assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialEntryConcurrentCreatesShareOneReportLockAndDoNotSendCommands() throws Exception {
+        var initial = partialAdjustment(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow(); var input = partialCreateInput(report, "80");
+        var gate = new java.util.concurrent.CountDownLatch(1); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var calls = java.util.stream.IntStream.range(0, 2).mapToObj(index -> pool.submit(() -> { gate.await(); return send(path(report) + "/partial-adjustments", "finance", input).getStatus(); })).toList();
+            gate.countDown(); var statuses = new java.util.ArrayList<Integer>(); for (var call : calls) statuses.add(call.get(15, java.util.concurrent.TimeUnit.SECONDS));
+            assertThat(statuses).containsExactlyInAnyOrder(202, 409);
+        } finally { pool.shutdownNow(); }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+        assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialEntryZeroPayableRefreshNeverCreatesPaymentAndRequiresOriginalVersions() throws Exception {
+        advanceOffset = "100"; var report = paymentReport(true); settlementWorker.poll(); budgetWorker.poll(); report = current(report);
+        var endpoint = path(report) + "/partial-adjustments"; var input = partialRefreshInput(report);
+        assertThat(input.get("paymentVersion")).isEqualTo(0L); assertThat(input.get("paymentVoucherVersion")).isEqualTo(0L);
+        for (String field : List.of("paymentVersion", "paymentVoucherVersion")) {
+            var missing = new java.util.LinkedHashMap<>(input); missing.remove(field); assertThat(send(endpoint + "/original-queries", "finance", missing).getStatus()).as(field).isEqualTo(400);
+        }
+        var stale = new java.util.LinkedHashMap<>(input); stale.put("paymentVersion", 1); assertThat(send(endpoint + "/original-queries", "finance", stale).getStatus()).isEqualTo(409);
+        int originalWrites = voucherWrites; var query = ok(send(endpoint + "/original-queries", "finance", input), 202); voucherWorker.poll();
+        assertThat(query.path("adjustmentId").isNull()).isTrue(); assertThat(voucherWrites).isEqualTo(originalWrites); assertThat(paymentWrites).isZero();
+        var created = ok(send(endpoint, "finance", partialCreateInput(report, "80")), 202);
+        var value = partialAdjustments.find("demo", UUID.fromString(created.path("adjustmentId").asText())).orElseThrow();
+        assertThat(value.input().basis().funding().payment()).isNull(); assertThat(value.input().basis().funding().financial().change().bankReturn()).isEqualTo(money("0"));
+        assertThat(value.budget()).isNull(); assertThat(value.accrual()).isNull();
+    }
+
+    @Test void partialEntryUsesActualCompletedNetAndRejectsUnresolvedHistoricalAdjustment() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); partialAdjustmentExecution.apply(partialCandidate(ready));
+        var completed = partialAdjustments.find("demo", ready.id()).orElseThrow(); var next = nextPartialAdjustment(completed, "60", "20");
+        var report = reports.find("demo", completed.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments";
+        var input = partialCreateInput(report, "60"); var disputed = completed.requireReview("MANUAL_HOLD", adjustmentTime()); tx().executeWithoutResult(status -> partialAdjustments.update(disputed));
+        assertThat(send(endpoint, "finance", partialCreateInput(report, "60")).getStatus()).isEqualTo(409);
+        var confirmed = disputed.confirmCurrent(adjustmentTime()); tx().executeWithoutResult(status -> partialAdjustments.update(confirmed));
+        assertThat(send(endpoint, "finance", input).getStatus()).isEqualTo(409);
+        var created = ok(send(endpoint, "finance", partialCreateInput(report, "60")), 202);
+        var second = partialAdjustments.find("demo", UUID.fromString(created.path("adjustmentId").asText())).orElseThrow();
+        assertThat(second.input().basis().funding().financial().change()).isEqualTo(next.input().basis().funding().financial().change());
+        assertThat(second.input().basis().previous().id()).isEqualTo(completed.id());
+        assertThat(second.input().basis().funding().selectedReturns()).doesNotContainAnyElementsOf(completed.input().basis().usedReturns());
+        assertThat(second.input().basis().funding().financial().change().before().gross()).isEqualTo(money("80"));
+    }
+
+    @Test void partialEntryAuthorizationAuditFailureRollsBackIdempotencyAndAllFinancialState() throws Exception {
+        var initial = persistedPartialIntent(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        var prep = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", prep.input().id()).orElseThrow(); var input = partialSourceInput(report);
+        input.put("adjustmentId", initial.id()); input.put("adjustmentVersion", initial.version()); input.put("preparationId", prep.input().id()); input.put("preparationVersion", ready.version()); input.put("comment", "明确采用最新原件");
+        String endpoint = path(report) + "/partial-adjustments/authorizations", key = UUID.randomUUID().toString();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT ck_partial_audit_test_failure CHECK(application_id<>'" + report.applicationId() + "' OR action<>'EXPENSE_PARTIAL_AUTHORIZE')");
+        try { assertThatThrownBy(() -> send(endpoint, "finance", key, input)).isInstanceOf(jakarta.servlet.ServletException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT ck_partial_audit_test_failure"); }
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial); assertThat(partialPreparations.find("demo", prep.input().id())).contains(ready);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_authorization WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isZero();
+        var accepted = send(endpoint, "finance", key, input); assertThat(accepted.getHeader("Idempotency-Replayed")).isEqualTo("false"); ok(accepted, 202);
+        assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    private Map<String, Object> partialSourceInput(ExpenseReport report) {
+        var result = new java.util.LinkedHashMap<String, Object>(); var current = current(report);
+        result.put("roundNo", app(current).roundNo()); result.put("applicationVersion", app(current).version()); result.put("businessVersion", current.version());
+        result.put("settlementVersion", settlements.find("demo", report.id()).orElseThrow().version()); return result;
+    }
+    private Map<String, Object> partialCreateInput(ExpenseReport report, String remaining) {
+        var result = partialSourceInput(report); var previous = partialAdjustments.latestCompleted("demo", report.id()).orElse(null);
+        var ledger = expenseReturnLedgers.find("demo", report.id()).orElse(null);
+        result.put("previousId", previous == null ? null : previous.id()); result.put("previousVersion", previous == null ? 0 : previous.version());
+        result.put("returnsVersion", ledger == null ? 0 : ledger.version());
+        result.put("returnIds", ledger == null ? List.of() : ledger.entries().stream().filter(value -> previous == null || !previous.input().basis().usedReturns().contains(value)).map(value -> value.proof().fundsIdentity()).toList());
+        var line = current(report).requireFrozenRound().approvedLines().get(0);
+        result.put("lines", List.of(Map.of("lineNo", line.lineNo(), "remainingGross", remaining, "remainingTax", remaining.equals("0") ? "0" : line.tax().value().toPlainString())));
+        result.put("evidenceReference", "partial-intent-proof"); result.put("reason", "创建独立部分调整"); return result;
+    }
+    private Map<String, Object> partialRefreshInput(ExpenseReport report) {
+        var result = partialSourceInput(report); var settlement = settlements.find("demo", report.id()).orElseThrow();
+        var bank = settlement.input().payment() == null ? null : paymentOperations.find("demo", settlement.input().payment().operationId()).orElseThrow();
+        var paymentVoucher = voucherOperations.forRound("demo", report.applicationId(), app(report).roundNo(), VoucherCommand.Kind.PAYMENT).orElse(null);
+        result.put("paymentVersion", bank == null ? 0 : bank.version()); result.put("paymentVoucherVersion", paymentVoucher == null ? 0 : paymentVoucher.version());
+        result.put("accrualVersion", voucherOperations.find("demo", settlement.input().voucherOperationId()).orElseThrow().version()); result.put("comment", "只读刷新原财务事实"); return result;
+    }
+
     private ExpensePartialAdjustment persistedPartialIntent() throws Exception {
         var initial = partialAdjustment(); tx().executeWithoutResult(status -> partialAdjustments.create(initial)); return initial;
     }
@@ -3711,7 +3878,7 @@ class ExpenseSubmissionIntegrationTest {
             }
             case "voucher-command", "voucher-query" -> {
                 VoucherCommand command;
-                if (operation.equals("voucher-command")) { command = json.read(data.path("command").toString(), VoucherCommand.class); voucherCommands.put(command.id(), command); }
+                if (operation.equals("voucher-command")) { voucherWrites++; command = json.read(data.path("command").toString(), VoucherCommand.class); voucherCommands.put(command.id(), command); }
                 else command = voucherCommands.get(UUID.fromString(data.path("operationId").asText()));
                 if (voucherMode.equals("INVALID")) yield Map.of("invalidFixture", true);
                 if (voucherMode.equals("NOT_FOUND")) yield new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.NOT_FOUND, 0L, Instant.now(), null, null, null, null, null, null, null, null);

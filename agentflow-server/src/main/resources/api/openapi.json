@@ -32586,6 +32586,688 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/partial-adjustments/original-queries": {
+      "post": {
+        "operationId": "refreshExpensePartialOriginals",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "只读刷新部分调整的原财务事实",
+        "description": "固定原报销和真实前次完成净额；只采用未使用的完整已登记入款，不拆分银行流水。原件刷新只查询原命令，创建意图和读取准备不自动授权。预算和挂账分别由原准备财务明确确认；已成功的一侧保留。网络未知查询原号，原批准、付款、凭证及核销记录保留。",
+        "x-access": "写入及幂等回放均要求原轮次完整财务字段权限和当前同法人独立 FINANCE；申请人和原出纳不可办理，管理员不能绕过敏感字段。只消费本人最新就绪准备。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "明确意图或所选侧授权已保存；不代表两侧财务及本地资源已经完成。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePartialRefreshInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 8,
+                "businessVersion": 4,
+                "settlementVersion": 6,
+                "accrualVersion": 4,
+                "paymentVersion": 5,
+                "paymentVoucherVersion": 4,
+                "comment": "核对原付款和会计事实"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/partial-adjustments": {
+      "post": {
+        "operationId": "createExpensePartialAdjustment",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "创建独立部分报销调整意图",
+        "description": "固定原报销和真实前次完成净额；只采用未使用的完整已登记入款，不拆分银行流水。原件刷新只查询原命令，创建意图和读取准备不自动授权。预算和挂账分别由原准备财务明确确认；已成功的一侧保留。网络未知查询原号，原批准、付款、凭证及核销记录保留。",
+        "x-access": "写入及幂等回放均要求原轮次完整财务字段权限和当前同法人独立 FINANCE；申请人和原出纳不可办理，管理员不能绕过敏感字段。只消费本人最新就绪准备。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "明确意图或所选侧授权已保存；不代表两侧财务及本地资源已经完成。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePartialCreateInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 8,
+                "businessVersion": 4,
+                "settlementVersion": 6,
+                "previousId": null,
+                "previousVersion": 0,
+                "returnsVersion": 2,
+                "lines": [
+                  {
+                    "lineNo": 1,
+                    "remainingGross": "80.00",
+                    "remainingTax": "6.00"
+                  }
+                ],
+                "returnIds": [
+                  "bank-return-20"
+                ],
+                "evidenceReference": "PARTIAL-20260930",
+                "reason": "采用已登记完整回款取消部分费用"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/partial-adjustments/preparations": {
+      "post": {
+        "operationId": "prepareExpensePartialAdjustment",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "准备部分调整的一侧原件和期间",
+        "description": "固定原报销和真实前次完成净额；只采用未使用的完整已登记入款，不拆分银行流水。原件刷新只查询原命令，创建意图和读取准备不自动授权。预算和挂账分别由原准备财务明确确认；已成功的一侧保留。网络未知查询原号，原批准、付款、凭证及核销记录保留。",
+        "x-access": "写入及幂等回放均要求原轮次完整财务字段权限和当前同法人独立 FINANCE；申请人和原出纳不可办理，管理员不能绕过敏感字段。只消费本人最新就绪准备。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "明确意图或所选侧授权已保存；不代表两侧财务及本地资源已经完成。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePartialPrepareInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 8,
+                "businessVersion": 4,
+                "settlementVersion": 6,
+                "adjustmentId": "90000000-0000-0000-0000-000000000001",
+                "adjustmentVersion": 1,
+                "side": "BUDGET",
+                "accountingDate": "2026-09-30",
+                "evidenceReference": "BUDGET-20260930",
+                "reason": "核对本次预算差额"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/partial-adjustments/authorizations": {
+      "post": {
+        "operationId": "authorizeExpensePartialAdjustment",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "明确授权部分调整所选一侧",
+        "description": "固定原报销和真实前次完成净额；只采用未使用的完整已登记入款，不拆分银行流水。原件刷新只查询原命令，创建意图和读取准备不自动授权。预算和挂账分别由原准备财务明确确认；已成功的一侧保留。网络未知查询原号，原批准、付款、凭证及核销记录保留。",
+        "x-access": "写入及幂等回放均要求原轮次完整财务字段权限和当前同法人独立 FINANCE；申请人和原出纳不可办理，管理员不能绕过敏感字段。只消费本人最新就绪准备。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "明确意图或所选侧授权已保存；不代表两侧财务及本地资源已经完成。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePartialAuthorizeInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 8,
+                "businessVersion": 4,
+                "settlementVersion": 6,
+                "adjustmentId": "90000000-0000-0000-0000-000000000001",
+                "adjustmentVersion": 1,
+                "preparationId": "90000000-0000-0000-0000-000000000002",
+                "preparationVersion": 3,
+                "comment": "明确采用本人最新就绪准备"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -56138,6 +56820,357 @@
           "proposedLimit"
         ],
         "additionalProperties": false
+      },
+      "ExpensePartialRefreshInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "settlementVersion",
+          "accrualVersion",
+          "paymentVersion",
+          "paymentVoucherVersion",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accrualVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "paymentVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paymentVoucherVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "ExpensePartialAmountInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lineNo",
+          "remainingGross",
+          "remainingTax"
+        ],
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "remainingGross": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?$",
+            "description": "非负、至多两位小数，响应固定两位。禁止 JSON 浮点数和科学计数法。"
+          },
+          "remainingTax": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?$",
+            "description": "非负、至多两位小数，响应固定两位。禁止 JSON 浮点数和科学计数法。"
+          }
+        }
+      },
+      "ExpensePartialCreateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "settlementVersion",
+          "previousVersion",
+          "returnsVersion",
+          "lines",
+          "returnIds",
+          "evidenceReference",
+          "reason"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "previousId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previousVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returnsVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/ExpensePartialAmountInput"
+            }
+          },
+          "returnIds": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+            }
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "ExpensePartialPrepareInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "settlementVersion",
+          "adjustmentId",
+          "adjustmentVersion",
+          "side",
+          "accountingDate",
+          "evidenceReference",
+          "reason"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUDGET",
+              "ACCRUAL"
+            ]
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "ExpensePartialAuthorizeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "settlementVersion",
+          "adjustmentId",
+          "adjustmentVersion",
+          "preparationId",
+          "preparationVersion",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "preparationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preparationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "ExpensePartialActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reportId",
+          "roundNo",
+          "adjustmentId",
+          "adjustmentVersion",
+          "preparationId",
+          "preparationVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustmentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adjustmentVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preparationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preparationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       }
     }
   }

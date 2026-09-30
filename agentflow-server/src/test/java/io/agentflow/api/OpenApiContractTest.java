@@ -175,6 +175,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("ProcurementPaymentCheckReceipt", io.agentflow.procurement.ProcurementPaymentCheckService.Receipt.class),
                 java.util.Map.entry("ProcurementPaymentCheckView", io.agentflow.procurement.ProcurementPaymentCheckService.View.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentWorkspace", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.View.class),
+                java.util.Map.entry("ExpensePartialActionReceipt", io.agentflow.expense.ExpensePartialAdjustmentAudit.Receipt.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentOriginal", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Original.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentPreparation", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Preparation.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentBudget", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Budget.class),

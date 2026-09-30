@@ -25,6 +25,12 @@
 
 业务错误为 `{code,message,traceId,path,details?}`；表单错误在 `details.fieldErrors`，图错误在 `details.definitionErrors`。进入控制器前的 UUID 转换等失败，当前仍是 Spring `{timestamp,status,error,path}` 响应，契约使用 RequestError 联合类型表达。本文没有把所有既有异常重写为统一模型。网关也可能返回非 JSON/空正文，调用方应先按 HTTP 状态保留结果未知的写请求，再走原键恢复。
 
+## 部分报销调整入口
+
+部分报销调整已提供 `/expense-reports/{id}/partial-adjustments` 下的创建、`original-queries`、`preparations` 和 `authorizations` 四个 POST。先按原号只读刷新原件，再从真实前次完成净额和完整未使用入款创建意图；两侧分别准备和明确授权。所有入口及幂等回放要求当前独立财务和原轮次完整字段权限，回执仅携带定位与版本。可为零的原件／历史版本也必须明确传值，不能通过缺省值假定没有原记录。
+
+这些写接口已通过 H2/PostgreSQL 和契约验证；部分调整工作台 GET、后续恢复／裁决动作及页面仍在实施，详见[部分报销调整](partial-expense-adjustments.md)。
+
 ## 分页与兼容
 
 待办、我发起、草稿、已办、消息默认 30、最多 100；轨迹与审计默认 50、最多 100。nextCursor 是不透明值，分页沿用同一账号与筛选条件，不自行构造。待办末页省略 nextCursor；历史页末页明确为 null。总数和续页不是冻结快照，任务流转后可刷新首页。

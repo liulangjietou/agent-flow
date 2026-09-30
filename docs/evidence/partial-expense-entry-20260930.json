@@ -1,0 +1,78 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_PUBLIC_INITIAL_QUERIES_CREATION_PREPARATION_AND_AUTHORIZATION_WRITES",
+  "baseCommit": "7f5cd272f3d5edf2b3a98b24f25a0939eac0a282",
+  "scope": "Four public POST entry points with current original-field and independent-finance access, idempotency, audit and documented contracts",
+  "schema": {"newMigration": false, "testSchema": 85, "longLivedRuntimeSchema": 82, "runtimeUpgradeVerifiedThisStage": false},
+  "routes": [
+    "POST /api/v1/expense-reports/{id}/partial-adjustments/original-queries",
+    "POST /api/v1/expense-reports/{id}/partial-adjustments",
+    "POST /api/v1/expense-reports/{id}/partial-adjustments/preparations",
+    "POST /api/v1/expense-reports/{id}/partial-adjustments/authorizations"
+  ],
+  "validation": {
+    "newIntegrationTests": 8,
+    "domainTests": 27,
+    "h2ServerTests": 102,
+    "h2WorkflowTests": 95,
+    "h2StartupTests": 1,
+    "h2ContractTests": 6,
+    "postgresServerTests": 95,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlap": true
+  },
+  "openapi": {"operations": 252, "schemas": 504, "requestExamples": 96, "newOperations": 4, "newSchemas": 6, "allPreviousParsedContractsUnchanged": true},
+  "authorCheck": {"javaFiles": 1121, "namedTypes": 2145, "missing": 0, "parseErrors": 0},
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-final-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-postgres.log",
+    "postgresDatabase": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-postgres-database.json",
+    "openapi": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-openapi.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-authors.log"
+  },
+  "checks": [
+    "Original observations older than the registered bank return cannot create an intent; explicit original-id queries make actual observations current",
+    "Original refresh never resends bank or voucher commands, rejects changed displayed originals and is blocked by an active partial adjustment",
+    "Applicant, unrelated user, original cashier and hidden-field manager/admin cannot write; revoked finance also cannot replay an old idempotent success",
+    "Create accepts only exact remaining line amounts and distinct whole unused registered returns; tenant, actor, source, target, completion and line currency injection are rejected",
+    "Concurrent creates serialize under the report lock and save one active intent without sending financial commands",
+    "Actual completed net amounts and used returns form the successor; historical review and changed completed versions block creation",
+    "Each side is independently prepared and explicitly authorized via HTTP handlers; accepted original facts and completed peer operations remain unchanged",
+    "Zero-payable original refresh queries only accounting and creates no bank transaction",
+    "Authorization audit insertion failure rolls back preparation consumption, root revision, command, adjacent proof and idempotency claim; the original key can then execute once",
+    "Response contains identifiers and versions only, with no complete command, account or destination digest"
+  ],
+  "missingVersionRegression": {
+    "test": "partialEntryRequiresExplicitZeroHistoryVersion",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-boundaries-first.log",
+    "redTests": 8,
+    "redFailures": 1,
+    "redErrors": 0,
+    "testGap": "Initial happy-path requests supplied every version and did not omit a legitimately zero history version",
+    "rootCause": "Primitive long request fields defaulted absent versions to zero, unintentionally accepting an undisplayed empty-history state",
+    "fix": "Require non-null boxed Long for previous, returns, bank and payment-voucher versions; explicit zero retains the no-record meaning"
+  },
+  "initialFeatureCheck": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-entry-missing-routes.log",
+    "tests": 2,
+    "expectedFailures": 2,
+    "result": "Missing public routes returned 404 before implementation"
+  },
+  "acceptanceBoundary": {
+    "publicSpringHandlersViaMockMvc": true,
+    "syntheticFinanceHttp": true,
+    "realEnterpriseFinance": false,
+    "publicWriteRoleAndFieldEntry": true,
+    "publicWorkspaceGet": false,
+    "publicRecoveryAndDisputeActions": false,
+    "publicWorkflowComplete": false,
+    "actualBrowserAcceptance": false
+  },
+  "remaining": [
+    "Workspace read projection and current original versions, remaining amounts, unused whole returns and personal preparation visibility",
+    "Public original-id recovery, explicit resend, safe retirement, current-fact confirmation and financial dispute decisions",
+    "Frontend workflow and nonempty runtime upgrade, HTTP/browser/restart and old-file/data preservation acceptance",
+    "Real enterprise budget/ERP integration and the other three remaining work packages"
+  ]
+}
