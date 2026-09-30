@@ -6,6 +6,7 @@ import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.auth.AuthService;
+import io.agentflow.budget.BudgetAdjustmentFormContract;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
@@ -249,6 +250,19 @@ class ProcurementPaymentWorkflowTest {
             assertThat(response.getStatus()).isEqualTo(422); assertThat(current(id).rounds()).isEmpty();
             assertThat(reservations.active("demo", id)).isEmpty(); assertThat(app(id).status()).isEqualTo(ApplicationStatus.DRAFT);
         }
+    }
+
+    @Test void genericFormCannotCreateAnIndependentBudgetAdjustmentWithoutItsBusinessBinding() throws Exception {
+        var source = published(false, false);
+        var schema = new FormSchema(2, List.of(new FormSchema.Field(BudgetAdjustmentFormContract.DETAILS, "预算额度与占用", FormSchema.FieldType.TEXT, true,
+                null, null, null, null, null, null, null, true, Map.of("review", FieldVisibility.READ_ONLY, "finalReview", FieldVisibility.READ_ONLY)),
+                new FormSchema.Field("amount", "调整金额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
+                new FormSchema.Field("currency", "本位币", FormSchema.FieldType.TEXT, true, null, null, null, null, null)));
+        var draft = definitions.create("demo", "budget-boundary-" + UUID.randomUUID(), "预算独立入口", source.graph(), schema, null);
+        var published = definitions.publish(admin, draft.id(), draft.revision(), "预算入口保护验证");
+        code(send("/api/v1/applications", "alice", Map.of("businessNo", "BUDGET-FORGE-" + UUID.randomUUID(), "processKey", published.key(),
+                "definitionVersion", published.version(), "title", "预算入口保护", "payload", BudgetAdjustmentFormContract.draftPayload())), "USE_BUSINESS_ENDPOINT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_adjustment WHERE tenant_id='demo'", Integer.class)).isZero();
     }
 
     @Test void doubleVersionsAndNewestAttemptAreRequiredAndQueueReplayDoesNotDuplicate() throws Exception {

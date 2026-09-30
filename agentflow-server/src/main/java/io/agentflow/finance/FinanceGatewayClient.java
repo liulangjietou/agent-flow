@@ -62,7 +62,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
-                || operation == Operation.EXPENSE_PAYMENT_RETURN || operation == Operation.PROCUREMENT_PAYABLE
+                || operation == Operation.EXPENSE_PAYMENT_RETURN || operation == Operation.PROCUREMENT_PAYABLE || operation == Operation.BUDGET_LEDGER
                 || operation == Operation.VOUCHER_REVERSAL || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.VOUCHER_REVERSAL_QUERY) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
@@ -204,6 +204,12 @@ public class FinanceGatewayClient {
         return exchange(tenantId, targetDigest, Operation.PROCUREMENT_PAYABLE, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
+    /** 独立预算读取原额度与占用，不向报销预算冻结接口发送调整意图。 */
+    public <T> FinanceResult<T> readBudgetLedger(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.BUDGET_LEDGER, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
     /** 独立反向凭证只读核验，不以查询请求触发 ERP 冲销或新的资金动作。 */
     public <T> FinanceResult<T> queryVoucherReversal(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
@@ -293,6 +299,8 @@ public class FinanceGatewayClient {
         BUDGET_PRECHECK("budget-precheck", Set.of(FinanceResult.Reason.BUDGET_INSUFFICIENT, FinanceResult.Reason.BUDGET_POLICY_UNAVAILABLE,
                 FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED, FinanceResult.Reason.COST_OBJECT_UNAVAILABLE,
                 FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
+        BUDGET_LEDGER("budget-ledger", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE,
+                FinanceResult.Reason.BUDGET_POSITION_UNAVAILABLE, FinanceResult.Reason.BUDGET_POLICY_UNAVAILABLE, FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED)),
         BUDGET_COMMAND("budget-command", Set.of()),
         BUDGET_QUERY("budget-query", Set.of()),
         BUDGET_REVERSAL_COMMAND("budget-consumption-reversal-command", Set.of()),

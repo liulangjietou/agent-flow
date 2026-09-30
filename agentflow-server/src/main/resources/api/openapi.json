@@ -34733,7 +34733,8 @@
               "EXPENSE",
               "EXPENSE_PLAN",
               "ADVANCE_REQUEST",
-              "PROCUREMENT_PAYMENT"
+              "PROCUREMENT_PAYMENT",
+              "BUDGET_ADJUSTMENT"
             ]
           },
           "id": {

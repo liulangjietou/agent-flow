@@ -1,0 +1,84 @@
+{
+  "date": "2026-09-29",
+  "stage": "budget-adjustment-domain-ledger-and-persistence",
+  "status": "LOCAL_FOUNDATION_VERIFIED_WORKFLOW_PENDING",
+  "rules": [
+    "INCREASE, DECREASE and same-entity same-period TRANSFER with exact base-currency amounts",
+    "Reduction cannot consume committed or consumed balances; transfer conserves total limit",
+    "Independent immutable rounds and approval; approval does not imply external application",
+    "Original destination, applicant, position versions and five-minute ledger evidence",
+    "V76 request revisions and durable precheck leases; previous rounds cannot be rewritten"
+  ],
+  "validation": {
+    "domain": {
+      "tests": 17,
+      "result": "PASS"
+    },
+    "loopbackGateway": {
+      "tests": 31,
+      "newBudgetLedgerTests": 5,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-ledger.log"
+    },
+    "h2PersistenceInitial": {
+      "serverTests": 21,
+      "result": "PASS"
+    },
+    "h2SourceIdentityFixAndWorkflow": {
+      "serverTests": 35,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-persistence-green.log"
+    },
+    "postgresql": {
+      "databaseAndApprovalTests": 37,
+      "h2ContractTestsInSameRun": 6,
+      "domainTests": 17,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-postgres.log"
+    },
+    "sourceIdentityRegression": {
+      "red": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-source-identity-red.log",
+      "cause": "Precheck directly deserialized source JSON without verifying the identity columns",
+      "fix": "Read through the budget application repository and compare exact input ownership/version"
+    },
+    "authors": {
+      "javaFiles": 978,
+      "namedTypes": 1829,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "openApi": {
+      "operations": 219,
+      "schemas": 429,
+      "examples": 80,
+      "result": "PASS"
+    },
+    "overlappingScopes": true
+  },
+  "migration": {
+    "from": 75,
+    "to": 76,
+    "isolatedH2AndPostgreSQL": true,
+    "preservesExistingApplicationAndExpenseRows": true,
+    "repeatMigrationNoop": true,
+    "runtimeUpgraded": false
+  },
+  "pending": [
+    "Precheck application orchestration and worker",
+    "Submission and actual human approval integration",
+    "Financial execution authorization and durable external adjustment/query protocol",
+    "Public API, template and pages",
+    "Existing acceptance database upgrade and actual browser acceptance",
+    "Real enterprise budget system acceptance"
+  ],
+  "existingRuntime": {
+    "version": 75,
+    "port": 18214,
+    "readiness": "UP"
+  },
+  "remoteDelivery": {
+    "remoteConfigured": false,
+    "prCreated": false
+  },
+  "remainingLargeWorkPackages": 4
+}
