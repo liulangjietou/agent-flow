@@ -10,12 +10,19 @@ import org.apache.commons.lang3.StringUtils;
  * 同一供应商应付的一张在途申请占用；只保护本地办理顺序，不代表外部已预留或已付款。
  * @author owlzhangfq@gmail.com
  */
-public record ProcurementPayableReservation(UUID id, Source source, long version, Instant heldAt, Release release, Settlement settlement) {
-    /** 释放或结算只追加第二版，二者互斥；原申请、金额和三单依据不能改写。 */
+public record ProcurementPayableReservation(UUID id, Source source, long version, Instant heldAt, Release release, Settlement settlement, Adjustment adjustment) {
+    /** 释放、结算或独立调整只追加第二版，三者互斥；原申请、金额和三单依据不能改写。 */
     public ProcurementPayableReservation {
+        int endings = (release == null ? 0 : 1) + (settlement == null ? 0 : 1) + (adjustment == null ? 0 : 1);
         if (id == null || source == null || heldAt == null || heldAt.isBefore(source.round().submittedAt())
-                || (release == null && settlement == null ? version != 1 : version != 2) || release != null && settlement != null
-                || release != null && release.releasedAt().isBefore(heldAt) || settlement != null && settlement.completedAt().isBefore(heldAt)) throw invalid();
+                || (endings == 0 ? version != 1 : version != 2) || endings > 1
+                || release != null && release.releasedAt().isBefore(heldAt) || settlement != null && settlement.completedAt().isBefore(heldAt)
+                || adjustment != null && adjustment.completedAt().isBefore(heldAt)) throw invalid();
+    }
+
+    /** 旧占用和原核销保持原有结构，缺少调整引用不会产生新的结束事实。 */
+    public ProcurementPayableReservation(UUID id, Source source, long version, Instant heldAt, Release release, Settlement settlement) {
+        this(id, source, version, heldAt, release, settlement, null);
     }
 
     /** 只接收刚冻结、尚未批准的申请轮次，不能对旧已批准版本另行占用。 */
@@ -38,7 +45,26 @@ public record ProcurementPayableReservation(UUID id, Source source, long version
         var command = operation.command();
         return new ProcurementPayableReservation(id, source, 2, heldAt, null, new Settlement(command.id(), operation.version(), command.payment().id(), now));
     }
-    public boolean held() { return release == null && settlement == null; }
+    /** 独立回款账务已确认后结束仍在途的本地占用，已结算的旧占用保留原完成凭据。 */
+    public ProcurementPayableReservation adjust(SupplierPayableAdjustmentOperation operation, Instant now) {
+        if (!held() || operation == null || !operation.adjusted() || now == null || now.isBefore(operation.updatedAt())
+                || !operation.command().source().returns().request().command().holdCommand().authorization().source().reservation().equals(this)) {
+            throw new DomainException("PROCUREMENT_ADJUSTMENT_SOURCE_CHANGED", "Confirmed supplier adjustment must match the original held payable reservation");
+        }
+        return new ProcurementPayableReservation(id, source, 2, heldAt, null, null,
+                new Adjustment(operation.command().id(), operation.version(), operation.command().source().returns().request().command().id(), now));
+    }
+    public boolean held() { return release == null && settlement == null && adjustment == null; }
+
+    /**
+     * 独立调整结束本地占用，不伪装成旧核销或未付款取消。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Adjustment(UUID operationId, long operationVersion, UUID paymentId, Instant completedAt) {
+        public Adjustment {
+            if (operationId == null || operationVersion < 1 || paymentId == null || completedAt == null) throw invalid();
+        }
+    }
 
     /**
      * 结算完成引用实际 ERP 终态修订，保留原银行身份，不把已付事实伪装为取消释放。
@@ -51,7 +77,7 @@ public record ProcurementPayableReservation(UUID id, Source source, long version
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_PROCUREMENT_RESERVATION", "Payable reservation must preserve a submitted request and a single explicit release or confirmed settlement"); }
+    private static DomainException invalid() { return new DomainException("INVALID_PROCUREMENT_RESERVATION", "Payable reservation must preserve a submitted request and a single explicit release, settlement or adjustment"); }
 
     /**
      * 关联真实申请版本和冻结轮次，原应付币种、金额和身份从轮次取得。

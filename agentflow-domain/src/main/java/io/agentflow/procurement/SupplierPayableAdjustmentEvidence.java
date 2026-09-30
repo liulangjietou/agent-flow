@@ -28,12 +28,16 @@ public record SupplierPayableAdjustmentEvidence(SupplierPaymentReturnPort.Receip
     }
     /** 只有未变更的原件及原会计日期可以越过发送门槛，过期后仍允许查询已发送命令。 */
     public boolean matches(SupplierPayableAdjustmentCommand command, Instant now) {
-        if (command == null || now == null || now.isBefore(checkedAt) || checkedAt.isBefore(command.registeredAt()) || !now.isBefore(validUntil())) return false;
-        var source = command.source(); var request = source.returns().request();
+        return command != null && !checkedAt.isBefore(command.registeredAt()) && matchesSource(command.source(), command.period(), now);
+    }
+    // 准备读取先于正式命令登记；来源核对相同，发送阶段另要求登记后的新复查。
+    boolean matchesSource(SupplierPayableAdjustmentSource source, AccountingPeriodPort.OpenPeriod intendedPeriod, Instant now) {
+        if (now == null || now.isBefore(checkedAt) || !now.isBefore(validUntil())) return false;
+        var request = source.returns().request();
         if (!bank.matches(request, now) || bank.observedAt().isBefore(source.returns().updatedAt()) || bank.returns().size() != source.returns().entries().size()
                 || !bank.returns().containsAll(source.returns().entries().stream().map(SupplierPaymentReturns.Entry::proof).toList())
-                || !period.matches(command.period().request(), now) || !period.periodReference().equals(command.period().periodReference())
-                || period.observedAt().isBefore(command.period().observedAt()) || (hold != null) != source.recognizesOriginalPayment()
+                || !period.matches(intendedPeriod.request(), now) || !period.periodReference().equals(intendedPeriod.periodReference())
+                || period.observedAt().isBefore(intendedPeriod.observedAt()) || (hold != null) != source.recognizesOriginalPayment()
                 || (settlement != null) != (source.settlement() != null) || (previous != null) != (source.previous() != null)) return false;
         if (hold != null && !request.command().matchesHold(hold, now)) return false;
         if (settlement != null) {

@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.UUID;
 
@@ -18,19 +17,11 @@ import java.util.UUID;
 public record SupplierPayableAdjustmentCommand(UUID id, SupplierPayableAdjustmentSource source,
         AccountingPeriodPort.OpenPeriod period, String financeActor, Instant registeredAt) {
     public SupplierPayableAdjustmentCommand {
-        if (id == null || source == null || period == null || registeredAt == null || registeredAt.isBefore(source.latestFactAt())
-                || !SupplierPayableAdjustmentObservation.reference(financeActor)) throw invalid();
-        var payment = source.returns().request().command(); var original = payment.holdCommand().authorization().source().reservation().source();
-        if (financeActor.equals(payment.cashier()) || financeActor.equals(original.employeeId())
-                || id.equals(payment.id()) || source.settlement() != null && id.equals(source.settlement().command().id())
-                || source.previous() != null && id.equals(source.previous().observation().operationId())
-                || !period.matches(new AccountingPeriodPort.Request(payment.payee().legalEntityId(), payment.amount().currency(), period.request().accountingDate()), registeredAt)
+        if (source == null || period == null) throw invalid();
+        source.requireIntent(id, financeActor, period.request().accountingDate(), registeredAt);
+        var payment = source.returns().request().command();
+        if (!period.matches(new AccountingPeriodPort.Request(payment.payee().legalEntityId(), payment.amount().currency(), period.request().accountingDate()), registeredAt)
                 || !period.observedAt().plus(ProcurementPayablePort.MAX_EVIDENCE_AGE).isAfter(registeredAt)) throw invalid();
-        var zone = ZoneId.of(original.round().legalEntity().timeZone());
-        var date = period.request().accountingDate();
-        if (source.newReturns().stream().anyMatch(entry -> date.isBefore(entry.proof().receivedAt().atZone(zone).toLocalDate()))
-                || source.settlement() != null && date.isBefore(source.settlement().observation().posting().accountingDate())
-                || source.previous() != null && date.isBefore(source.previous().observation().posting().accountingDate())) throw invalid();
     }
     public String tenantId() { return source.returns().request().command().tenantId(); }
     public String targetDigest() { return source.returns().request().command().targetDigest(); }
@@ -42,6 +33,7 @@ public record SupplierPayableAdjustmentCommand(UUID id, SupplierPayableAdjustmen
             add(digest, "agentflow-supplier-payable-adjustment-1", id, ledger.request().command().digest(), ledger.version(), ledger.reviewRequired(), ledger.createdAt(), ledger.updatedAt(), ledger.entries().size(),
                     original.revision(), original.observedAt(), original.paymentReference(), original.receiptReference(), original.completedAt(), original.accountDigest(), original.paidAmount());
             for (var entry : ledger.entries()) addReturn(digest, entry);
+            if (ledger.accounting() != null) add(digest, "accounted", ledger.accounting().operationId(), ledger.accounting().operationVersion(), ledger.accounting().entryCount(), ledger.accounting().accountedAt());
             var settlement = source.settlement(); add(digest, settlement != null);
             if (settlement != null) {
                 var observed = settlement.observation(); var posting = observed.posting();

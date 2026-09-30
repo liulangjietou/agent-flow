@@ -191,7 +191,7 @@ class SupplierPayableAdjustmentTest {
         var source = original.source(); var observed = adjusted(original, 1, NOW, source.recognizesOriginalPayment() ? "30" : "100", "80");
         var previous = new SupplierPayableAdjustmentSource.Previous(source.returns().request().command().id(), source.returns().request().command().digest(), source.settlement() == null ? null : source.settlement().command().id(), 4, source.returns().entries(), observed);
         var entries = new ArrayList<>(source.returns().entries()); entries.add(new SupplierPaymentReturns.Entry(UUID.randomUUID(), bankReceipt(source.returns().request(), "return-2", "10", NOW.plusSeconds(20))));
-        var at = NOW.plusSeconds(30); var ledger = new SupplierPaymentReturns(source.returns().request(), 4, entries, true, source.returns().createdAt(), at);
+        var at = NOW.plusSeconds(30); var ledger = new SupplierPaymentReturns(source.returns().request(), 4, entries, true, source.returns().createdAt(), at, new SupplierPaymentReturns.Accounting(original.id(), previous.version(), previous.entries().size(), observed.observedAt()));
         return new SupplierPayableAdjustmentCommand(UUID.randomUUID(), new SupplierPayableAdjustmentSource(ledger, source.settlement(), previous), period(ledger.request().command(), at), "finance-2", at);
     }
     static SupplierPayableAdjustmentEvidence evidence(SupplierPayableAdjustmentCommand command, Instant at) {

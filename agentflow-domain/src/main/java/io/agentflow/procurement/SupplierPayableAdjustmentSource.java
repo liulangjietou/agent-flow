@@ -3,6 +3,8 @@ package io.agentflow.procurement;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,14 +18,19 @@ public record SupplierPayableAdjustmentSource(SupplierPaymentReturns returns, Or
     public SupplierPayableAdjustmentSource {
         if (returns == null || returns.entries().isEmpty()) throw invalid();
         var payment = returns.request().command();
+        if ((returns.accounting() == null) != (previous == null)) throw invalid();
         if (settlement != null && (!settlement.command().payment().equals(payment)
                 || !settlement.command().paid().paymentReference().equals(returns.request().original().paymentReference())
                 || !settlement.command().paid().receiptReference().equals(returns.request().original().receiptReference())
                 || !settlement.command().paid().completedAt().equals(returns.request().original().completedAt()))) throw invalid();
         if (previous != null) {
             if (!previous.paymentId().equals(payment.id()) || !previous.paymentDigest().equals(payment.digest())
+                    || !returns.accounting().operationId().equals(previous.observation().operationId())
+                    || returns.accounting().operationVersion() != previous.version() || returns.accountedEntryCount() != previous.entries().size()
+                    || returns.accounting().accountedAt().isBefore(previous.observation().observedAt())
                     || !Objects.equals(previous.originalSettlementId(), settlement == null ? null : settlement.command().id())
-                    || !returns.entries().containsAll(previous.entries()) || returns.entries().size() <= previous.entries().size()
+                    || returns.entries().size() <= previous.entries().size()
+                    || !previous.entries().equals(returns.entries().subList(0, previous.entries().size()))
                     || !previous.observation().posting().holdReference().equals(payment.held().holdReference())
                     || !previous.observation().posting().netPaid().plus(previous.observation().posting().totalReturned()).equals(payment.amount())
                     || settlement != null && !previous.observation().posting().recognitionVoucherReference().equals(settlement.observation().posting().voucherReference())) throw invalid();
@@ -34,7 +41,7 @@ public record SupplierPayableAdjustmentSource(SupplierPaymentReturns returns, Or
     public boolean recognizesOriginalPayment() { return settlement == null && previous == null; }
     /** 每笔真实入款只允许在一次独立 ERP 调整中出现。 */
     public List<SupplierPaymentReturns.Entry> newReturns() {
-        return previous == null ? returns.entries() : returns.entries().stream().filter(entry -> !previous.entries().contains(entry)).toList();
+        return returns.entries().subList(returns.accountedEntryCount(), returns.entries().size());
     }
     public Money newReturned() { return total(newReturns(), returns.request().command().amount().currency()); }
     public Money netPaid() { return returns.request().command().amount().minus(returns.totalReturned()); }
@@ -45,10 +52,22 @@ public record SupplierPayableAdjustmentSource(SupplierPaymentReturns returns, Or
         if (previous != null && previous.observation().observedAt().isAfter(latest)) latest = previous.observation().observedAt();
         return latest;
     }
+    /** 准备与固定命令共用同一授权边界，日期、办理人和原会计事实不能在两个入口产生分歧。 */
+    public void requireIntent(UUID id, String finance, LocalDate date, Instant now) {
+        var payment = returns.request().command(); var original = payment.holdCommand().authorization().source().reservation().source();
+        if (id == null || date == null || now == null || now.isBefore(latestFactAt()) || !SupplierPayableAdjustmentObservation.reference(finance)
+                || finance.equals(payment.cashier()) || finance.equals(original.employeeId()) || id.equals(payment.id())
+                || settlement != null && id.equals(settlement.command().id()) || previous != null && id.equals(previous.observation().operationId())) throw invalidIntent();
+        var zone = ZoneId.of(original.round().legalEntity().timeZone());
+        if (newReturns().stream().anyMatch(entry -> date.isBefore(entry.proof().receivedAt().atZone(zone).toLocalDate()))
+                || settlement != null && date.isBefore(settlement.observation().posting().accountingDate())
+                || previous != null && date.isBefore(previous.observation().posting().accountingDate())) throw invalidIntent();
+    }
     private static Money total(List<SupplierPaymentReturns.Entry> entries, String currency) {
         return entries.stream().map(entry -> entry.proof().amount()).reduce(Money.zero(currency), Money::plus);
     }
     private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_SOURCE", "Supplier adjustment must preserve the original payment, settlement and previously accounted bank receipts"); }
+    private static DomainException invalidIntent() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND", "Independent finance and an accounting date preserving original payment and return facts are required"); }
     @Override public String toString() { return "SupplierPayableAdjustmentSource[paymentId=" + returns.request().command().id() + "]"; }
 
     /**

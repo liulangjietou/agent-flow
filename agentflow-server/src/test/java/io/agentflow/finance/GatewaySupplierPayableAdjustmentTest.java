@@ -159,7 +159,7 @@ class GatewaySupplierPayableAdjustmentTest {
         var ledger = command.source().returns(); var payment = ledger.request().command();
         var previous = new SupplierPayableAdjustmentSource.Previous(payment.id(), payment.digest(), command.source().settlement().command().id(), done.version(), ledger.entries(), done.observation());
         var entries = new ArrayList<>(ledger.entries()); entries.add(new SupplierPaymentReturns.Entry(UUID.randomUUID(), new SupplierPaymentReturnPort.BankReceipt("return-2", payment.debitAccount().reference(), money("10"), Instant.now())));
-        var at = Instant.now(); var updated = new SupplierPaymentReturns(ledger.request(), 4, entries, true, ledger.createdAt(), at);
+        var at = Instant.now(); var updated = new SupplierPaymentReturns(ledger.request(), 4, entries, true, ledger.createdAt(), at, new SupplierPaymentReturns.Accounting(command.id(), done.version(), ledger.entries().size(), done.updatedAt()));
         var next = new SupplierPayableAdjustmentCommand(UUID.randomUUID(), new SupplierPayableAdjustmentSource(updated, command.source().settlement(), previous), period(payment, at, null), "finance-2", at);
         assertThat(json.read(json.write(next), SupplierPayableAdjustmentCommand.class)).isEqualTo(next);
         assertThat(json.read(json.write(next), SupplierPayableAdjustmentCommand.class).digest()).isEqualTo(next.digest());
