@@ -83,6 +83,16 @@ public class JdbcSupplierPayableSettlementRepository {
         return jdbc.query("SELECT * FROM supplier_payable_settlement_operation WHERE tenant_id=? AND payment_id=? ORDER BY created_at,id", this::restore, tenant, paymentId.toString());
     }
 
+    /** 对外历史有界分页，游标先由应用层验证属于同一原银行。 */
+    public List<SupplierPayableSettlementOperation> page(String tenant, UUID paymentId, SupplierPayableSettlementOperation before, int limit) {
+        if (before == null) return jdbc.query("SELECT * FROM supplier_payable_settlement_operation WHERE tenant_id=? AND payment_id=? ORDER BY created_at DESC,id DESC LIMIT ?",
+                this::restore, tenant, paymentId.toString(), limit + 1);
+        return jdbc.query("""
+                SELECT * FROM supplier_payable_settlement_operation WHERE tenant_id=? AND payment_id=? AND (created_at<? OR (created_at=? AND id<?))
+                ORDER BY created_at DESC,id DESC LIMIT ?
+                """, this::restore, tenant, paymentId.toString(), timestamp(before.createdAt()), timestamp(before.createdAt()), before.command().id().toString(), limit + 1);
+    }
+
     /** 完成和结束决定都引用已经落库的精确修订。 */
     public Optional<SupplierPayableSettlementOperation> revision(String tenant, UUID id, long version) {
         return jdbc.query("SELECT state_json FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? AND version=?", (row, index) -> {

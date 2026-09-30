@@ -12,6 +12,7 @@ import io.agentflow.definition.DefinitionApplicationService;
 import io.agentflow.expense.ExpenseLine;
 import io.agentflow.expense.InvoiceKey;
 import io.agentflow.finance.FinanceCatalog;
+import io.agentflow.finance.AccountingPeriodPort;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.PaymentAccountsPort;
@@ -61,6 +62,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.expense-plans.precheck-worker-enabled=false",
         "agentflow.supplier-payments.execution-worker-enabled=false", "agentflow.supplier-payments.payment-worker-enabled=false",
+        "agentflow.supplier-payments.settlement-preparation-worker-enabled=false", "agentflow.supplier-payments.settlement-worker-enabled=false",
         "agentflow.supplier-payments.hold-worker-enabled=false", "agentflow.supplier-payments.review-worker-enabled=false",
         "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -118,6 +120,13 @@ class SupplierFinanceWorkflowTest {
     @Autowired SupplierPaymentEvidenceReader bankReader;
     @Autowired SupplierPaymentPort bankPort;
     @Autowired SupplierCashierAccess cashierAccess;
+    @Autowired SupplierSettlementAccess settlementAccess;
+    @Autowired JdbcSupplierSettlementPreparationRepository settlementPreparations;
+    @Autowired JdbcSupplierPayableSettlementRepository settlements;
+    @Autowired SupplierSettlementPreparationService settlementPreparation;
+    @Autowired SupplierSettlementService settlementExecution;
+    @Autowired SupplierSettlementEvidenceReader settlementReader;
+    @Autowired SupplierPayableSettlementPort settlementPort;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -382,6 +391,119 @@ class SupplierFinanceWorkflowTest {
         assertThat(bankPayments.find("demo", id).orElseThrow().dispatches()).isZero();
     }
 
+    @Test void financeExplicitlyConfirmsPaidBankAndDateThenReadsActualErpAndLocalCompletion() throws Exception {
+        UUID payment = paidBank(); var initial = settlementView(payment); assertThat(initial.path("canPrepare").asBoolean()).isTrue();
+        assertThat(initial.at("/bank/status").asText()).isEqualTo("SUCCEEDED"); assertThat(initial.path("completion").isNull()).isTrue();
+        var input = settlementInput(initial); String key = UUID.randomUUID().toString(); var response = send(settlementPreparePath(payment), "finance", key, input);
+        var receipt = ok(response, 202); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(send(settlementPreparePath(payment), "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        okError(send(settlementPreparePath(payment), "finance", input), 409, "SUPPLIER_SETTLEMENT_PENDING");
+        assertThat(receipt.toString()).doesNotContain("amount", "account", "command", "periodReference");
+        assertThat(calls.keySet()).doesNotContain("supplier-payable-settlement-command");
+        UUID id = UUID.fromString(receipt.path("preparationId").asText()); pollSettlementPreparation(id);
+        var queued = settlementView(payment); assertThat(queued.at("/preparation/status").asText()).isEqualTo("READY"); assertThat(queued.at("/items/0/status").asText()).isEqualTo("QUEUED");
+        assertThat(queued.path("canPrepare").asBoolean()).isFalse(); pollSettlement(id);
+        var done = settlementView(payment); assertThat(done.at("/items/0/status").asText()).isEqualTo("SETTLED"); assertThat(done.at("/items/0/posting/voucherReference").asText()).isEqualTo("SUPPLIER-VOUCHER-1");
+        assertThat(done.at("/completion/settlementId").asText()).isEqualTo(id.toString()); assertThat(done.at("/items/0/actions/retire").asBoolean()).isFalse();
+        var applicant = ok(read(settlementPath(payment), "alice"), 200); assertThat(applicant.path("canPrepare").asBoolean()).isFalse(); assertThat(applicant.at("/items/0/actions/query").asBoolean()).isFalse();
+        assertCashierPrivateFactsAbsent(done); assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE aggregate_id=? AND action='SUPPLIER_SETTLEMENT_PREPARE'", Integer.class, id.toString())).isEqualTo(1);
+    }
+
+    @Test void settlementPreparationRejectsStaleBankUnknownFactsAndUnauthorizedUsers() throws Exception {
+        UUID payment = paidBank(); var displayed = settlementView(payment); var input = settlementInput(displayed);
+        for (String user : List.of("alice", "cashier", "admin", "manager", "bob")) assertThat(send(settlementPreparePath(payment), user, input).getStatus()).isBetween(400, 499);
+        assertThat(read(settlementPath(payment), "admin").getStatus()).isBetween(400, 499);
+        var wrong = new java.util.HashMap<>(input); wrong.put("paymentVersion", displayed.at("/bank/version").asLong() - 1);
+        okError(send(settlementPreparePath(payment), "finance", wrong), 409, "CONCURRENCY_CONFLICT");
+        wrong.put("paymentVersion", input.get("paymentVersion")); wrong.put("amount", Map.of("value", "1", "currency", "CNY"));
+        okError(send(settlementPreparePath(payment), "finance", wrong), 400, "INVALID_REQUEST");
+        for (String query : List.of("limit=0", "limit=101", "beforeId=bad", "tenantId=other")) okError(read(settlementPath(payment) + "?" + query, "finance"), 400, "INVALID_SUPPLIER_SETTLEMENT_QUERY");
+        assertThat(settlementPreparations.active("demo", payment)).isEmpty();
+        actors.set(new Actor("other", "finance", Set.of("FINANCE")));
+        try { assertThatThrownBy(() -> settlementAccess.requireFinance(payment)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, e -> assertThat(e.code()).isEqualTo("NOT_FOUND")); }
+        finally { actors.clear(); }
+    }
+
+    @Test void settlementWriteReplaysRecheckCurrentAppointmentAndSensitiveRoundPermissions() throws Exception {
+        UUID payment = paidBank(); var input = settlementInput(settlementView(payment)); String key = UUID.randomUUID().toString();
+        var first = send(settlementPreparePath(payment), "finance", key, input); ok(first, 202);
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        try { okError(send(settlementPreparePath(payment), "finance", key, input), 403, "FORBIDDEN"); }
+        finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString()); }
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try { okError(send(settlementPreparePath(payment), "finance", key, input), 403, "FORBIDDEN"); assertThat(read(settlementPath(payment), "finance").getStatus()).isBetween(400, 499); }
+        finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+        assertThat(send(settlementPreparePath(payment), "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+    }
+
+    @Test void settlementAuditFailureRollsBackIntentAndIdempotencyThenOriginalKeyCanRetry() throws Exception {
+        UUID payment = paidBank(); var input = settlementInput(settlementView(payment)); String key = UUID.randomUUID().toString();
+        var application = authorizations.find("demo", payment).orElseThrow().source().reservation().source().applicationId();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_settlement_audit CHECK(action<>'SUPPLIER_SETTLEMENT_PREPARE' OR application_id<>'" + application + "')");
+        try { assertThatThrownBy(() -> send(settlementPreparePath(payment), "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_settlement_audit"); }
+        assertThat(settlementPreparations.latest("demo", payment)).isEmpty(); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?", Integer.class, key)).isZero();
+        ok(send(settlementPreparePath(payment), "finance", key, input), 202); assertThat(settlementPreparations.active("demo", payment)).isPresent();
+    }
+
+    @Test void retiredSettlementRemainsInBoundedHistoryAndCursorCannotCrossOriginalBank() throws Exception {
+        UUID payment = paidBank(); UUID first = queueSettlement(payment); var old = settlementView(payment).at("/items/0");
+        var input = settlementAction(old, "RETIRE"); String key = UUID.randomUUID().toString(); var response = send(settlementActionPath(first), "finance", key, input); ok(response, 202);
+        assertThat(send(settlementActionPath(first), "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        var retired = settlementView(payment); assertThat(retired.at("/items/0/retirement/basis").asText()).isEqualTo("NEVER_DISPATCHED"); assertThat(retired.path("canPrepare").asBoolean()).isTrue();
+        UUID second = queueSettlement(payment); var page = ok(read(settlementPath(payment) + "?limit=1", "finance"), 200);
+        assertThat(page.path("items").size()).isEqualTo(1); assertThat(page.at("/items/0/id").asText()).isEqualTo(second.toString()); assertThat(page.path("nextBeforeId").asText()).isEqualTo(second.toString());
+        var next = ok(read(settlementPath(payment) + "?limit=1&beforeId=" + second, "finance"), 200); assertThat(next.at("/items/0/id").asText()).isEqualTo(first.toString()); assertThat(next.path("nextBeforeId").isNull()).isTrue();
+        UUID another = paidBank(); okError(read(settlementPath(another) + "?beforeId=" + first, "finance"), 400, "INVALID_SUPPLIER_SETTLEMENT_QUERY");
+        assertThat(bankPayments.find("demo", payment).orElseThrow().dispatches()).isEqualTo(1);
+    }
+
+    @Test void unknownSettlementOnlyAllowsOriginalQueryAndReplayCannotBypassCurrentScope() throws Exception {
+        UUID payment = paidBank(); UUID id = queueSettlement(payment); var claimed = settlementExecution.claim("demo", id, Instant.now());
+        var result = settlementReader.read(claimed.command().payment(), claimed.command().period().request().accountingDate());
+        var sending = settlementExecution.ready(claimed, result, Instant.now()); settlementExecution.fail(sending, Instant.now());
+        var unknown = settlementView(payment).at("/items/0"); assertThat(unknown.path("status").asText()).isEqualTo("UNKNOWN");
+        assertThat(unknown.at("/actions/retire").asBoolean()).isFalse(); assertThat(unknown.at("/actions/retryOriginal").asBoolean()).isFalse();
+        okError(send(settlementActionPath(id), "finance", settlementAction(unknown, "RETIRE")), 409, "SUPPLIER_SETTLEMENT_RETIREMENT_UNSAFE");
+        var input = settlementAction(unknown, "QUERY"); String key = UUID.randomUUID().toString(); var receipt = send(settlementActionPath(id), "finance", key, input); ok(receipt, 202);
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        try { okError(send(settlementActionPath(id), "finance", key, input), 403, "FORBIDDEN"); }
+        finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString()); }
+        assertThat(send(settlementActionPath(id), "finance", key, input).getContentAsString()).isEqualTo(receipt.getContentAsString());
+        pollSettlement(id); assertThat(settlementView(payment).at("/items/0/status").asText()).isEqualTo("SETTLED");
+        assertThat(calls.keySet()).doesNotContain("supplier-payable-settlement-command"); assertThat(calls.get("supplier-payable-settlement-query").get()).isEqualTo(1);
+    }
+
+    private UUID paidBank() throws Exception {
+        UUID id = authorizedHold(approved()); var receipt = ok(send(cashierPath(id) + "/actions", "cashier", executeInput(cashierView(id))), 202);
+        pollPreparation(UUID.fromString(receipt.path("preparationId").asText())); pollBank(id); assertThat(bankPayments.find("demo", id).orElseThrow().settleable()).isTrue(); return id;
+    }
+    private String settlementPath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/settlements"; }
+    private String settlementPreparePath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/settlement-preparations"; }
+    private String settlementActionPath(UUID id) { return "/api/v1/supplier-settlements/" + id + "/finance-actions"; }
+    private JsonNode settlementView(UUID payment) throws Exception { var response = read(settlementPath(payment), "finance"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200); }
+    private Map<String, Object> settlementInput(JsonNode view) { return Map.of("paymentVersion", view.at("/bank/version").asLong(), "accountingDate", view.path("minimumAccountingDate").asText(), "comment", "已核对原银行到账、固定金额和本次记账日期"); }
+    private Map<String, Object> settlementAction(JsonNode operation, String action) { return Map.of("action", action, "settlementVersion", operation.path("version").asLong(), "comment", "按原编号核对结算状态"); }
+    private UUID queueSettlement(UUID payment) throws Exception {
+        var receipt = ok(send(settlementPreparePath(payment), "finance", settlementInput(settlementView(payment))), 202); UUID id = UUID.fromString(receipt.path("preparationId").asText()); pollSettlementPreparation(id); return id;
+    }
+    private void pollSettlementPreparation(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierSettlementPreparationRepository.class);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(new JdbcSupplierSettlementPreparationRepository.Candidate("demo", id)));
+        new SupplierSettlementPreparationWorker(candidates, settlementPreparation, settlementReader).poll();
+    }
+    private void pollSettlement(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierPayableSettlementRepository.class);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(new JdbcSupplierPayableSettlementRepository.Candidate("demo", id)));
+        new SupplierSettlementWorker(candidates, settlementExecution, settlementReader, settlementPort).poll();
+    }
+    private SupplierPayableSettlementObservation settlementObservation(SupplierPayableSettlementCommand command) {
+        var posting = new SupplierPayableSettlementObservation.Posting("SUPPLIER-SETTLEMENT-1", command.payment().held().holdReference(), "private-ledger-settled", command.payment().amount(), money("30"), money("100"),
+                command.paid().paymentReference(), command.paid().receiptReference(), "SUPPLIER-VOUCHER-1", command.period().periodReference(), command.period().request().accountingDate(), command.registeredAt());
+        return new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.SETTLED, 1L, Instant.now(), posting, null);
+    }
+
     private UUID authorizedHold(UUID request) throws Exception {
         queueAndRead(request); var receipt = ok(send(financePath(request) + "/authorizations", "finance", authorizeInput(request, view(request, "finance"))), 202);
         UUID id = UUID.fromString(receipt.path("authorizationId").asText()); pollHold(id); return id;
@@ -493,6 +615,12 @@ class SupplierFinanceWorkflowTest {
             case "debit-accounts" -> directory(json.read(request.path("data").toString(), PaymentAccountsPort.Request.class), Instant.now());
             case "supplier-payment-command" -> bankObservation(json.read(request.at("/data/command").toString(), SupplierPaymentCommand.class), PaymentObservation.Status.SUCCEEDED);
             case "supplier-payment-query" -> bankObservation(bankPayments.find("demo", UUID.fromString(request.at("/data/authorizationId").asText())).orElseThrow().command(), PaymentObservation.Status.SUCCEEDED);
+            case "accounting-period" -> {
+                var period = json.read(request.path("data").toString(), AccountingPeriodPort.Request.class); var date = period.accountingDate(); var now = Instant.now();
+                yield new AccountingPeriodPort.OpenPeriod(period, "PERIOD-" + date.getMonthValue(), "v1", date.withDayOfMonth(1), date.withDayOfMonth(date.lengthOfMonth()), now, now.plusSeconds(600));
+            }
+            case "supplier-payable-settlement-command" -> settlementObservation(json.read(request.at("/data/command").toString(), SupplierPayableSettlementCommand.class));
+            case "supplier-payable-settlement-query" -> settlementObservation(settlements.find("demo", UUID.fromString(request.at("/data/operationId").asText())).orElseThrow().command());
             default -> throw new IllegalArgumentException("Unexpected finance operation from supplier finance");
         };
         return json.write(Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", result));

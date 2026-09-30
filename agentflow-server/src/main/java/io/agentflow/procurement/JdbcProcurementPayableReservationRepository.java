@@ -108,7 +108,8 @@ public class JdbcProcurementPayableReservationRepository {
         return jdbc.query("SELECT * FROM procurement_payable_reservation WHERE tenant_id=? AND request_id=? ORDER BY round_no", this::restore, tenant, requestId.toString());
     }
 
-    private Optional<ProcurementPayableReservation> find(String tenant, UUID id) {
+    /** 按原占用身份恢复完成凭据，后续新轮次不能替换旧付款引用的占用。 */
+    public Optional<ProcurementPayableReservation> find(String tenant, UUID id) {
         return jdbc.query("SELECT * FROM procurement_payable_reservation WHERE tenant_id=? AND id=?", this::restore, tenant, id.toString()).stream().findFirst();
     }
     private ProcurementPayableReservation restore(ResultSet row, int index) throws SQLException {

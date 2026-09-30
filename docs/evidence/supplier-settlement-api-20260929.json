@@ -1,0 +1,68 @@
+{
+  "date": "2026-09-29",
+  "baseCommit": "d25775c7772578aaf3bbb4192821d4f94d82ee52",
+  "scope": "supplier settlement finance API and scoped projections",
+  "newRoutes": 3,
+  "newSchemas": 11,
+  "tests": {
+    "h2WorkflowPersistenceContractAccess": {
+      "tests": 53,
+      "failed": 0
+    },
+    "postgresqlWorkflow": {
+      "tests": 21,
+      "failed": 0,
+      "databases": {
+        "AGENTFLOW_SUPPLIER_FINANCE": {
+          "database": "supplier_settle_supplier_finance_0b755322",
+          "url": "jdbc:postgresql://127.0.0.1:55460/supplier_settle_supplier_finance_0b755322",
+          "user": "agentflow"
+        }
+      }
+    },
+    "newApiTests": 6,
+    "redBeforeStatusMapping": {
+      "tests": 21,
+      "failures": 3
+    },
+    "staticContract": {
+      "operations": 212,
+      "schemas": 416,
+      "requestExamples": 77
+    },
+    "authorCheck": {
+      "javaFiles": 942,
+      "namedTypes": 1757,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "verified": [
+    "real login and Flowable approval lead to explicit finance intent, ERP receipt and local completion",
+    "current original-round field access and legal-entity appointment checked before replay and again after lock",
+    "applicant and original cashier cannot act as settlement finance; admin has no sensitive-field bypass",
+    "fixed amount and original accounts derived on server; unknown monetary input rejected",
+    "same key replays once and new duplicate intent conflicts",
+    "audit failure rolls back preparation and idempotency response",
+    "history pagination bounded and cursor bound to original bank",
+    "unknown settlement cannot retire or replace date; explicit original query restores result",
+    "responses no-store and exclude raw commands, account references, digests and ERP ledger identifiers",
+    "prior raw contract preserved; new routes and schemas appended without rewriting duplicate existing keys"
+  ],
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-api-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-api-h2.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-api-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-api-openapi.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-api-authors.log"
+  ],
+  "countsOverlap": true,
+  "newMigration": false,
+  "runtimeMigration": 72,
+  "limitations": [
+    "UI and live browser acceptance are next",
+    "existing browser service remains V72 until backed-up upgrade",
+    "loopback synthetic financial data do not establish enterprise integration",
+    "no Git remote configured; no PR or remote CI"
+  ]
+}
