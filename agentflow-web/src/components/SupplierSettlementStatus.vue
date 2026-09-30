@@ -15,7 +15,7 @@ const blocked = computed(() => !!props.locked || loading.value || saving.value |
 const active = computed(() => view.value?.items.find(item => item.id === view.value?.activeSettlementId))
 const selected = computed(() => view.value?.items.find(item => item.id === pending.value?.id))
 function syncPending() {
-  const active = writeRequests.pending().some(entry => entry.path.startsWith('/supplier-payments/') || entry.path.startsWith('/supplier-settlements/') || entry.path.startsWith(`/procurement-payments/${encodeURIComponent(props.requestId)}/supplier-payment/`))
+  const active = writeRequests.pending().some(entry => entry.path.startsWith('/supplier-payments/') || entry.path.startsWith('/supplier-settlements/') || entry.path.startsWith('/supplier-adjustments/') || entry.path.startsWith(`/procurement-payments/${encodeURIComponent(props.requestId)}/supplier-payment/`))
   if (unconfirmed.value && !active) requiresRefresh.value = true
   unconfirmed.value = active
 }
@@ -74,7 +74,7 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
 <template>
   <section class="supplier-settlement" aria-label="供应商应付结算">
     <div class="settlement-heading"><div><p class="settlement-eyebrow">到账后 · 独立财务核销</p><h4>原应付结算</h4></div><button class="quiet" type="button" :disabled="loading || saving || disputeBusy || locked" @click="notice = ''; load()">{{ beforeId ? '返回最新状态' : '刷新结算状态' }}</button></div>
-    <p class="settlement-help">银行到账后，由财务选择会计日期。ERP 核销和本地应付完成分别确认。</p>
+    <p class="settlement-help">银行到账后，由财务选择会计日期。ERP 核销与完成凭据分别确认；发生实际回款时，请同时核对下方独立调整。</p>
     <p v-if="loading" role="status" class="settlement-help">正在读取原付款与结算记录…</p>
     <p v-if="error" role="alert" class="settlement-error">{{ error }}</p><p v-if="notice" role="status" class="settlement-help">{{ notice }}</p>
     <p v-if="unconfirmed && !saving" role="alert" class="settlement-error">上次办理结果未确认，请在未确认操作中恢复原请求后刷新。</p>
@@ -83,7 +83,7 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
       <div class="settlement-stages">
         <div><span>银行付款</span><strong>{{ view.bank ? paymentOperationLabels[view.bank.status] : '尚未登记银行付款' }}</strong><small v-if="view.bank?.disputed">银行回执存在争议</small></div>
         <div><span>ERP 核销</span><strong>{{ active ? supplierSettlementLabels[active.status] : view.activeSettlementId ? '原核销在其他历史页' : view.preparation ? settlementPreparationLabels[view.preparation.status] : '尚未登记结算' }}</strong><small v-if="active?.disputed">核销事实存在争议</small></div>
-        <div><span>本地应付完成</span><strong>{{ view.completion ? '已登记完成凭据' : '尚未完成' }}</strong><small v-if="view.completion">{{ date(view.completion.completedAt) }}</small></div>
+        <div><span>原核销完成凭据</span><strong>{{ view.completion ? '已登记完成凭据' : '尚未完成' }}</strong><small v-if="view.completion">{{ date(view.completion.completedAt) }}</small></div>
       </div>
       <p class="settlement-help">{{ view.supplierName }} · {{ view.amount.currency }} {{ view.amount.value }} · 收款账户 {{ view.maskedPayeeAccount }}</p>
       <p v-if="view.bank?.receiptReference" class="settlement-help">原银行回单 {{ view.bank.receiptReference }}</p>

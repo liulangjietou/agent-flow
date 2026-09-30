@@ -1,0 +1,96 @@
+{
+  "recordedAt": "2026-09-30T17:18:36.917881+00:00",
+  "scope": "Supplier adjustment finance access, durable decisions, audit, API contracts and local UI",
+  "result": "PASS",
+  "h2": {
+    "uniqueServerTests": 97,
+    "classes": {
+      "SupplierFinanceWorkflowTest": 49,
+      "SupplierAdjustmentPersistenceTest": 41,
+      "OpenApiContractTest": 6,
+      "StartupTest": 1
+    },
+    "newAuthenticatedWorkflowTests": 8
+  },
+  "postgresql": {
+    "version": "17.11",
+    "newAuthenticatedWorkflowTests": 8,
+    "sourceRegressionTests": 2,
+    "isolatedContainer": true,
+    "sharedMemoryBytes": 536870912,
+    "testContainersRemoved": true,
+    "longLivedAcceptanceDatabaseUnchanged": true
+  },
+  "frontend": {
+    "newTests": 17,
+    "relatedTests": 82,
+    "build": "PASS",
+    "staticContract": {
+      "operations": 246,
+      "schemas": 492,
+      "requestExamples": 91
+    },
+    "openapiExistingBytesPreserved": true
+  },
+  "red": {
+    "test": "adjustmentWorkspaceRequiresRegisteredReturnsAndDoesNotStartNetworkReads",
+    "expectedStatus": 200,
+    "actualStatus": 404
+  },
+  "verified": [
+    "Independent current finance and original-round field scope for writes and idempotent replay",
+    "Source snapshot never takes a write lock in PostgreSQL read-only transactions",
+    "Audit failure rolls back preparation or retirement and its idempotency receipt",
+    "Exact bank and return ledger versions, strict input and same-payment bounded history",
+    "Original settlement and bank facts preserved across first and subsequent adjustments",
+    "Completed adjustment queries keep original command and do not occupy another active position",
+    "Money totals, cumulative ledger and individual ERP entries checked without floating point",
+    "Explicit date and confirmation, identity changes, stale responses, bounded history and original-key recovery"
+  ],
+  "notYetAccepted": [
+    "V81 migration of the long-lived nonempty acceptance database",
+    "Actual browser and restart acceptance for the new adjustment feature",
+    "Explicit resolution of conflicting adjustment observations",
+    "Enterprise finance integration or production deployment"
+  ],
+  "authorCheck": {
+    "javaFiles": 1072,
+    "namedTypes": 2043,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "logs": {
+    "supplier-adjustment-api-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-api-red.log",
+      "sha256": "089bf9cada095f6380315e646586e4ad17dcdc3dd319b1a2013e63f51f6b8623"
+    },
+    "supplier-adjustment-api-h2.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-api-h2.log",
+      "sha256": "8c1174512d893c197905aefb4abf9039398d92c0e4c03b3041b6de9e0e1a75f7"
+    },
+    "supplier-adjustment-api-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-api-postgres.log",
+      "sha256": "fffc56b96076edda8edc075d2ca832d80f08fc37a2c754526fb694b471ec89db"
+    },
+    "supplier-adjustment-api-final-postgres-retry.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-api-final-postgres-retry.log",
+      "sha256": "fa008a6b5c1deae78cbb3d3e07845831b15e4f06d35a93a822a8f750b246e2a5"
+    },
+    "supplier-adjustment-ui-tests-green.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-ui-tests-green.log",
+      "sha256": "609dc07aafe87c4c67ab1cb3ff2252dbd2f33b059a42e732b95aca3531ae7501"
+    },
+    "supplier-adjustment-ui-build.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-ui-build.log",
+      "sha256": "3a07f3df1b006e9e957752b6ade8ce2995e5dae9e54af14239cb436422089791"
+    },
+    "supplier-adjustment-openapi.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-openapi.log",
+      "sha256": "b2346cd11d4ca10dce782bc59d7511df3d281b48afd746771fc8904ef16e1cba"
+    },
+    "supplier-adjustment-workspace-authors.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-workspace-authors.log",
+      "sha256": "85771955dbdff9d46f83b43b7f38e7340a1d49ef74545cafe99624a08eb3e84e"
+    }
+  }
+}

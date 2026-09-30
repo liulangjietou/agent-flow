@@ -45,6 +45,17 @@ public class JdbcSupplierAdjustmentSources {
     public SupplierPayableAdjustmentSource current(String tenant, UUID paymentId, long paymentVersion, long returnVersion) {
         var ledger = lock(tenant, paymentId); var bank = payments.find(tenant, paymentId).orElseThrow(JdbcSupplierAdjustmentSources::changed);
         if (bank.version() != paymentVersion || ledger.version() != returnVersion) throw changed();
+        return source(ledger, bank);
+    }
+
+    /** 页面快照不领取资金锁；写入入口仍须通过 current 锁定并复核精确版本。 */
+    public SupplierPayableAdjustmentSource snapshot(String tenant, UUID paymentId) {
+        return source(returns.find(tenant, paymentId).orElseThrow(JdbcSupplierAdjustmentSources::changed),
+                payments.find(tenant, paymentId).orElseThrow(JdbcSupplierAdjustmentSources::changed));
+    }
+
+    private SupplierPayableAdjustmentSource source(SupplierPaymentReturns ledger, SupplierPaymentOperation bank) {
+        var tenant = bank.command().tenantId(); var paymentId = bank.command().id();
         var original = activeSettlement(tenant, paymentId);
         var settlement = original == null ? null : firstSettlement(original);
         SupplierPayableAdjustmentSource.Previous previous = null;

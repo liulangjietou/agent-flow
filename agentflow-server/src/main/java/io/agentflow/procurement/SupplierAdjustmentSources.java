@@ -2,6 +2,7 @@ package io.agentflow.procurement;
 
 import io.agentflow.common.DomainException;
 import java.time.Instant;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
@@ -22,6 +23,11 @@ public class SupplierAdjustmentSources {
     /** 仍在任职的独立财务才可发出新调整；原申请人、出纳及已离职人员不能代办。 */
     public void requireCurrent(SupplierPayableAdjustmentSource source, String actor) {
         finance.requireFinance(source.returns().request().command(), actor); facts.requireCurrent(source);
+    }
+
+    /** 只读投影复用事实和人员规则，不在页面读取事务中取得写锁。 */
+    public SupplierPayableAdjustmentSource preview(String tenant, UUID paymentId, String actor) {
+        var source = facts.snapshot(tenant, paymentId); finance.requireFinance(source.returns().request().command(), actor); return source;
     }
 
     /** 网络复查不能回退本地银行、原预留、原核销或前次调整已经知道的事实。 */

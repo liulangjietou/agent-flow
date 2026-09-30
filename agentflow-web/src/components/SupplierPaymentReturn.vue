@@ -15,7 +15,7 @@ function stop() { epoch++; controller?.abort(); controller = null }
 function clearMaterials() { view.value = null; pending.value = null; reference.value = ''; comment.value = ''; acknowledged.value = false }
 function syncPending() {
   const prefix = `/supplier-payments/${encodeURIComponent(props.paymentId)}/returns/`
-  const current = writeRequests.pending().some(entry => entry.path === prefix + 'checks' || entry.path === prefix + 'registrations')
+  const current = writeRequests.pending().some(entry => entry.path === prefix + 'checks' || entry.path === prefix + 'registrations' || entry.path.startsWith('/supplier-adjustments/') || entry.path.endsWith('/adjustment-preparations'))
   if (unconfirmed.value && !current) requiresRefresh.value = true
   unconfirmed.value = current
 }

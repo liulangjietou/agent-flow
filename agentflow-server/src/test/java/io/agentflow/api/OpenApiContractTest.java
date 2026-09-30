@@ -73,6 +73,16 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("SupplierAdjustmentView", io.agentflow.procurement.SupplierAdjustmentWorkspace.View.class),
+                java.util.Map.entry("SupplierAdjustmentBank", io.agentflow.procurement.SupplierAdjustmentWorkspace.Bank.class),
+                java.util.Map.entry("SupplierAdjustmentPreparation", io.agentflow.procurement.SupplierAdjustmentWorkspace.Preparation.class),
+                java.util.Map.entry("SupplierAdjustmentOperation", io.agentflow.procurement.SupplierAdjustmentWorkspace.Operation.class),
+                java.util.Map.entry("SupplierAdjustmentPosting", io.agentflow.procurement.SupplierAdjustmentWorkspace.Posting.class),
+                java.util.Map.entry("SupplierAdjustmentEntry", io.agentflow.procurement.SupplierAdjustmentWorkspace.Entry.class),
+                java.util.Map.entry("SupplierAdjustmentRetirement", io.agentflow.procurement.SupplierAdjustmentWorkspace.Retirement.class),
+                java.util.Map.entry("SupplierAdjustmentCompletion", io.agentflow.procurement.SupplierAdjustmentWorkspace.Completion.class),
+                java.util.Map.entry("SupplierAdjustmentActions", io.agentflow.procurement.SupplierAdjustmentWorkspace.Actions.class),
+                java.util.Map.entry("SupplierAdjustmentReceipt", io.agentflow.procurement.SupplierAdjustmentActions.Receipt.class),
                 java.util.Map.entry("PaymentBatchSelection", io.agentflow.finance.PaymentBatchService.Selection.class),
                 java.util.Map.entry("PaymentBatchReceipt", io.agentflow.finance.PaymentBatchService.Receipt.class),
                 java.util.Map.entry("PaymentBatchSummary", io.agentflow.finance.PaymentBatchService.Summary.class),

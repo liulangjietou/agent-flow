@@ -12,7 +12,7 @@ const now = ref(Date.now()), ticker = setInterval(() => { now.value = Date.now()
 const blocked = computed(() => !!props.locked || loading.value || saving.value || unconfirmed.value || requiresRefresh.value)
 const facts = computed(() => [{ label: '原 ERP 事实', value: view.value?.observed }, { label: '本次待裁决回执', value: view.value?.candidate }])
 function syncPending() {
-  const active = writeRequests.pending().some(entry => entry.path.startsWith('/supplier-payments/') || entry.path.startsWith('/supplier-settlements/') || entry.path.startsWith(`/procurement-payments/${encodeURIComponent(props.requestId)}/supplier-payment/`))
+  const active = writeRequests.pending().some(entry => entry.path.startsWith('/supplier-payments/') || entry.path.startsWith('/supplier-settlements/') || entry.path.startsWith('/supplier-adjustments/') || entry.path.startsWith(`/procurement-payments/${encodeURIComponent(props.requestId)}/supplier-payment/`))
   if (unconfirmed.value && !active) requiresRefresh.value = true
   unconfirmed.value = active
 }

@@ -66,6 +66,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.supplier-payments.settlement-preparation-worker-enabled=false", "agentflow.supplier-payments.settlement-worker-enabled=false",
         "agentflow.supplier-payments.hold-worker-enabled=false", "agentflow.supplier-payments.review-worker-enabled=false",
         "agentflow.supplier-payments.return-worker-enabled=false",
+        "agentflow.supplier-payments.adjustment-preparation-worker-enabled=false", "agentflow.supplier-payments.adjustment-worker-enabled=false",
         "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false",
         "agentflow.budget-adjustments.precheck-worker-enabled=false", "agentflow.budget-adjustments.review-worker-enabled=false", "agentflow.budget-adjustments.execution-worker-enabled=false"})
@@ -139,6 +140,13 @@ class SupplierFinanceWorkflowTest {
     @Autowired JdbcSupplierPaymentReturnRepository returnRegistrations;
     @Autowired SupplierPaymentReturnService returnService;
     @Autowired SupplierPaymentReturnPort returnPort;
+    @Autowired JdbcSupplierAdjustmentPreparationRepository adjustmentPreparations;
+    @Autowired JdbcSupplierPayableAdjustmentRepository adjustments;
+    @Autowired SupplierAdjustmentPreparationService adjustmentPreparation;
+    @Autowired SupplierAdjustmentService adjustmentExecution;
+    @Autowired SupplierAdjustmentEvidenceReader adjustmentReader;
+    @Autowired SupplierPayableAdjustmentPort adjustmentPort;
+    @Autowired SupplierAdjustmentCompletionService adjustmentCompletion;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -846,6 +854,168 @@ class SupplierFinanceWorkflowTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND supplier_registration_id=?", Integer.class, result.path("registrationId").asText())).isEqualTo(1);
     }
 
+    @Test void adjustmentWorkspaceRequiresRegisteredReturnsAndDoesNotStartNetworkReads() throws Exception {
+        UUID payment = authorizedHold(approved()); var previousCalls = calls.values().stream().mapToInt(AtomicInteger::get).sum();
+        var response = read("/api/v1/supplier-payments/" + payment + "/adjustments", "finance"); var view = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(view.path("paymentId").asText()).isEqualTo(payment.toString()); assertThat(view.path("returnVersion").asLong()).isZero();
+        assertThat(view.path("canPrepare").asBoolean()).isFalse(); assertThat(view.path("items").isEmpty()).isTrue();
+        assertThat(view.path("completion").isNull()).isTrue(); assertThat(view.path("bank").isNull()).isTrue(); assertPrivateFactsAbsent(view);
+        assertThat(calls.values().stream().mapToInt(AtomicInteger::get).sum()).isEqualTo(previousCalls);
+    }
+
+    @Test void adjustmentFinishesOnlyAfterErpAndLocalPostingThenAccountsOnlyLaterNewFunds() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); var bank = bankPayments.find("demo", payment).orElseThrow();
+        var before = adjustmentView(payment); assertThat(before.path("canPrepare").asBoolean()).isTrue(); assertThat(before.at("/pendingReturned/value").asText()).isEqualTo("20.00");
+        String key = UUID.randomUUID().toString(); var input = adjustmentInput(before); var response = send(adjustmentPreparePath(payment), "finance", key, input); var receipt = ok(response, 202);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(send(adjustmentPreparePath(payment), "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(receipt.fieldNames()).toIterable().containsExactlyInAnyOrder("paymentId", "requestId", "applicationId", "roundNo", "action", "preparationId", "preparationVersion", "adjustmentId", "adjustmentVersion", "auditEventId");
+        assertThat(adjustmentView(payment).path("canPrepare").asBoolean()).isFalse(); assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command");
+        UUID first = UUID.fromString(receipt.path("preparationId").asText()); pollAdjustmentPreparation(first);
+        var queued = adjustmentView(payment); assertThat(queued.at("/items/0/status").asText()).isEqualTo("QUEUED"); assertThat(queued.path("completion").isNull()).isTrue();
+        pollAdjustment(first); var done = adjustmentView(payment);
+        assertThat(done.at("/items/0/status").asText()).isEqualTo("ADJUSTED"); assertThat(done.at("/items/0/recognizesOriginalPayment").asBoolean()).isTrue();
+        assertThat(done.at("/completion/adjustmentId").asText()).isEqualTo(first.toString()); assertThat(done.path("reviewRequired").asBoolean()).isFalse();
+        assertThat(done.at("/accountedReturned/value").asText()).isEqualTo("20.00"); assertThat(done.at("/pendingReturned/value").asText()).isEqualTo("0.00"); assertThat(done.path("activeAdjustmentId").isNull()).isTrue();
+        assertThat(done.path("canPrepare").asBoolean()).isFalse(); assertPrivateFactsAbsent(done); assertThat(done.toString()).doesNotContain("creditAccountReference", "targetDigest", "commandDigest", "private-ledger");
+        returnRevision = 2; registerFunds(payment); var later = adjustmentView(payment);
+        assertThat(later.at("/accountedReturned/value").asText()).isEqualTo("20.00"); assertThat(later.at("/pendingReturned/value").asText()).isEqualTo("10.00");
+        assertThat(later.path("completion")).isEqualTo(done.path("completion")); assertThat(later.path("reviewRequired").asBoolean()).isTrue();
+        UUID second = queueAdjustment(payment); pollAdjustment(second); var finalView = adjustmentView(payment);
+        assertThat(finalView.at("/accountedReturned/value").asText()).isEqualTo("30.00"); assertThat(finalView.at("/pendingReturned/value").asText()).isEqualTo("0.00");
+        assertThat(finalView.at("/items/0/returnedAmount/value").asText()).isEqualTo("10.00"); assertThat(finalView.at("/items/0/recognizesOriginalPayment").asBoolean()).isFalse();
+        assertThat(finalView.at("/items/1/completion/adjustmentId").asText()).isEqualTo(first.toString());
+        assertThat(bankPayments.find("demo", payment)).contains(bank); assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+        assertThat(calls.get("supplier-payable-adjustment-command").get()).isEqualTo(2); assertThat(calls).doesNotContainKey("supplier-payable-settlement-command");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit c JOIN supplier_payment_return_registration r ON r.tenant_id=c.tenant_id AND r.id=c.supplier_registration_id WHERE c.tenant_id='demo' AND r.payment_id=? AND c.supplier_adjustment_id IS NOT NULL", Integer.class, payment.toString())).isEqualTo(2);
+    }
+
+    @Test void adjustmentAfterOriginalSettlementPreservesOriginalCompletionAndVoucher() throws Exception {
+        UUID payment = paidBank(); UUID settlement = queueSettlement(payment); pollSettlement(settlement); var old = settlementView(payment);
+        var original = settlements.find("demo", settlement).orElseThrow(); registerFunds(payment); UUID id = queueAdjustment(payment); pollAdjustment(id);
+        var done = adjustmentView(payment); assertThat(done.at("/items/0/status").asText()).isEqualTo("ADJUSTED");
+        assertThat(done.at("/items/0/recognizesOriginalPayment").asBoolean()).isFalse(); assertThat(done.at("/items/0/posting/recognitionVoucherReference").asText()).isEqualTo(original.observation().posting().voucherReference());
+        assertThat(settlementView(payment).path("completion")).isEqualTo(old.path("completion")); assertThat(settlements.find("demo", settlement)).contains(original);
+        assertThat(done.at("/completion/adjustmentId").asText()).isEqualTo(id.toString());
+    }
+
+    @Test void adjustmentPreparationAndReplayAlwaysRecheckIndependentFinanceAndSensitiveFields() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); var input = adjustmentInput(adjustmentView(payment)); String key = UUID.randomUUID().toString();
+        var initial = send(adjustmentPreparePath(payment), "finance", key, input); ok(initial, 202);
+        assertThat(ok(read(adjustmentPath(payment), "alice"), 200).path("canPrepare").asBoolean()).isFalse();
+        okError(read(adjustmentPath(payment), "admin"), 403, "FORBIDDEN"); okError(read(adjustmentPath(payment), "bob"), 404, "NOT_FOUND");
+        for (String user : List.of("alice", "cashier", "admin")) assertThat(send(adjustmentPreparePath(payment), user, input).getStatus()).isBetween(400, 499);
+        organization.updateAppointment(admin, financeAppointment, false, 1);
+        okError(send(adjustmentPreparePath(payment), "finance", key, input), 403, "FORBIDDEN"); organization.updateAppointment(admin, financeAppointment, true, 2);
+        assertThat(send(adjustmentPreparePath(payment), "finance", key, input).getContentAsString()).isEqualTo(initial.getContentAsString());
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try { okError(read(adjustmentPath(payment), "finance"), 403, "FORBIDDEN"); okError(send(adjustmentPreparePath(payment), "finance", key, input), 403, "FORBIDDEN"); }
+        finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+        assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command");
+    }
+
+    @Test void adjustmentInputsRejectForgedFactsStaleVersionsAndUnboundedOrForeignHistory() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); var displayed = adjustmentView(payment); var input = adjustmentInput(displayed);
+        for (String field : List.of("amount", "financeActor", "source", "targetDigest", "posting")) {
+            var forged = new java.util.HashMap<>(input); forged.put(field, "forged"); okError(send(adjustmentPreparePath(payment), "finance", forged), 400, "INVALID_REQUEST");
+        }
+        for (String field : List.of("paymentVersion", "returnVersion")) {
+            var stale = new java.util.HashMap<>(input); stale.put(field, ((Number) input.get(field)).longValue() + 1); okError(send(adjustmentPreparePath(payment), "finance", stale), 409, "SUPPLIER_ADJUSTMENT_SOURCE_CHANGED");
+        }
+        var invalidDate = new java.util.HashMap<>(input); invalidDate.put("accountingDate", "2000-01-01");
+        okError(send(adjustmentPreparePath(payment), "finance", invalidDate), 422, "INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND");
+        for (String parameters : List.of("limit=0", "limit=101", "limit=01", "limit=-1", "beforeId=x", "tenantId=foreign", "sort=created_at"))
+            okError(read(adjustmentPath(payment) + "?" + parameters, "finance"), 400, "INVALID_SUPPLIER_ADJUSTMENT_QUERY");
+        okError(send(adjustmentPreparePath(payment) + "?tenantId=foreign", "finance", input), 400, "INVALID_SUPPLIER_ADJUSTMENT_QUERY");
+        UUID id = queueAdjustment(payment); UUID another = paidBank();
+        okError(read(adjustmentPath(another) + "?beforeId=" + id, "finance"), 400, "INVALID_SUPPLIER_ADJUSTMENT_QUERY");
+        okError(send(adjustmentActionPath(id), "finance", Map.of("action", "RETIRE", "adjustmentVersion", 99, "comment", "旧页面")), 409, "CONCURRENCY_CONFLICT");
+        okError(send(adjustmentActionPath(id) + "?date=other", "finance", adjustmentAction(adjustmentView(payment).at("/items/0"), "RETIRE")), 400, "INVALID_SUPPLIER_ADJUSTMENT_QUERY");
+        assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command");
+    }
+
+    @Test void adjustmentAuditFailureRollsBackPreparationAndSafeRetirementIncludingReplayReceipt() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); var view = adjustmentView(payment); var input = adjustmentInput(view); String key = UUID.randomUUID().toString();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_adjustment_prepare_audit CHECK(action<>'SUPPLIER_ADJUSTMENT_PREPARE' OR application_id<>'" + view.path("applicationId").asText() + "')");
+        try { assertThatThrownBy(() -> send(adjustmentPreparePath(payment), "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_adjustment_prepare_audit"); }
+        assertThat(adjustmentPreparations.latest("demo", payment)).isEmpty(); assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?", Integer.class, key)).isZero();
+        UUID id = UUID.fromString(ok(send(adjustmentPreparePath(payment), "finance", key, input), 202).path("preparationId").asText()); pollAdjustmentPreparation(id);
+        var before = adjustments.find("demo", id).orElseThrow(); var retire = adjustmentAction(adjustmentView(payment).at("/items/0"), "RETIRE"); String retireKey = UUID.randomUUID().toString();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_adjustment_retire_audit CHECK(action<>'SUPPLIER_ADJUSTMENT_RETIRE' OR aggregate_id<>'" + id + "')");
+        try { assertThatThrownBy(() -> send(adjustmentActionPath(id), "finance", retireKey, retire)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_adjustment_retire_audit"); }
+        assertThat(adjustments.find("demo", id)).contains(before); assertThat(adjustments.retirement("demo", id)).isEmpty();
+        var retired = send(adjustmentActionPath(id), "finance", retireKey, retire); ok(retired, 202);
+        assertThat(send(adjustmentActionPath(id), "finance", retireKey, retire).getContentAsString()).isEqualTo(retired.getContentAsString());
+        assertThat(adjustmentView(payment).path("canPrepare").asBoolean()).isTrue();
+    }
+
+    @Test void unknownAdjustmentOnlyQueriesOriginalAndCompletedQueryDoesNotReoccupyPayment() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID id = queueAdjustment(payment);
+        var claimed = adjustmentExecution.claim("demo", id, Instant.now()); var sending = adjustmentExecution.ready(claimed, adjustmentReader.read(claimed.command().source(), claimed.command().period().request().accountingDate()), Instant.now());
+        adjustmentExecution.fail(sending, Instant.now()); var view = adjustmentView(payment); var unknown = view.at("/items/0");
+        assertThat(unknown.path("status").asText()).isEqualTo("UNKNOWN"); assertThat(unknown.at("/actions/retire").asBoolean()).isFalse();
+        okError(send(adjustmentActionPath(id), "finance", adjustmentAction(unknown, "RETIRE")), 409, "SUPPLIER_ADJUSTMENT_RETIREMENT_UNSAFE");
+        okError(send(adjustmentPreparePath(payment), "finance", adjustmentInput(view)), 409, "SUPPLIER_ADJUSTMENT_PENDING");
+        var input = adjustmentAction(unknown, "QUERY"); String key = UUID.randomUUID().toString(); var response = send(adjustmentActionPath(id), "finance", key, input); ok(response, 202);
+        organization.updateAppointment(admin, financeAppointment, false, 1); okError(send(adjustmentActionPath(id), "finance", key, input), 403, "FORBIDDEN"); organization.updateAppointment(admin, financeAppointment, true, 2);
+        assertThat(send(adjustmentActionPath(id), "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        pollAdjustment(id); var done = adjustmentView(payment); assertThat(done.at("/items/0/status").asText()).isEqualTo("ADJUSTED");
+        assertThat(done.at("/items/0/actions/query").asBoolean()).isTrue(); assertThat(done.path("activeAdjustmentId").isNull()).isTrue();
+        ok(send(adjustmentActionPath(id), "finance", adjustmentAction(done.at("/items/0"), "QUERY")), 202);
+        assertThat(adjustmentView(payment).path("completion")).isEqualTo(done.path("completion")); assertThat(adjustments.active("demo", payment)).isEmpty();
+        pollAdjustment(id); assertThat(adjustmentView(payment).at("/items/0/status").asText()).isEqualTo("ADJUSTED");
+        assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command"); assertThat(calls.get("supplier-payable-adjustment-query").get()).isEqualTo(2);
+    }
+
+    @Test void retiredAdjustmentHistoryIsBoundedAndKeepsTheSameRegisteredFunds() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID first = queueAdjustment(payment); var firstView = adjustmentView(payment);
+        ok(send(adjustmentActionPath(first), "finance", adjustmentAction(firstView.at("/items/0"), "RETIRE")), 202); UUID second = queueAdjustment(payment);
+        var firstPage = ok(read(adjustmentPath(payment) + "?limit=1", "finance"), 200); assertThat(firstPage.at("/items/0/id").asText()).isEqualTo(second.toString());
+        assertThat(firstPage.path("nextBeforeId").asText()).isEqualTo(second.toString()); var secondPage = ok(read(adjustmentPath(payment) + "?limit=1&beforeId=" + second, "finance"), 200);
+        assertThat(secondPage.at("/items/0/id").asText()).isEqualTo(first.toString()); assertThat(secondPage.at("/items/0/retirement/basis").asText()).isEqualTo("NEVER_DISPATCHED");
+        assertThat(secondPage.path("activeAdjustmentId").asText()).isEqualTo(second.toString()); assertThat(secondPage.path("nextBeforeId").isNull()).isTrue();
+        assertThat(secondPage.path("returnVersion")).isEqualTo(firstView.path("returnVersion")); assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command");
+    }
+
+    private String adjustmentPath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/adjustments"; }
+    private String adjustmentPreparePath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/adjustment-preparations"; }
+    private String adjustmentActionPath(UUID id) { return "/api/v1/supplier-adjustments/" + id + "/finance-actions"; }
+    private JsonNode adjustmentView(UUID payment) throws Exception { var response = read(adjustmentPath(payment), "finance"); var view = ok(response, 200); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return view; }
+    private Map<String, Object> adjustmentInput(JsonNode view) { return Map.of("paymentVersion", view.at("/bank/version").asLong(), "returnVersion", view.path("returnVersion").asLong(), "accountingDate", view.path("minimumAccountingDate").asText(), "comment", "确认已登记资金和本次记账日期"); }
+    private Map<String, Object> adjustmentAction(JsonNode view, String action) { return Map.of("action", action, "adjustmentVersion", view.path("version").asLong(), "comment", "按原调整编号核对"); }
+    private void registerFunds(UUID payment) throws Exception { queueReturn(payment); ok(send(returnPath(payment) + "/registrations", "finance", returnRegistration(returnView(payment))), 202); }
+    private UUID queueAdjustment(UUID payment) throws Exception {
+        UUID id = UUID.fromString(ok(send(adjustmentPreparePath(payment), "finance", adjustmentInput(adjustmentView(payment))), 202).path("preparationId").asText()); pollAdjustmentPreparation(id); return id;
+    }
+    private void pollAdjustmentPreparation(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierAdjustmentPreparationRepository.class);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(new JdbcSupplierAdjustmentPreparationRepository.Candidate("demo", id)));
+        new SupplierAdjustmentPreparationWorker(candidates, adjustmentPreparation, adjustmentReader).poll();
+        assertThat(adjustmentPreparations.find("demo", id).orElseThrow().status()).isEqualTo(SupplierAdjustmentPreparation.Status.READY);
+    }
+    private void pollAdjustment(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierPayableAdjustmentRepository.class); var candidate = new JdbcSupplierPayableAdjustmentRepository.Candidate("demo", id);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(candidate));
+        org.mockito.Mockito.when(candidates.awaitingLocalCompletion()).thenAnswer(invocation -> adjustments.awaitingLocalCompletion().stream().filter(value -> value.id().equals(id)).toList());
+        org.mockito.Mockito.when(candidates.find("demo", id)).thenAnswer(invocation -> adjustments.find("demo", id));
+        new SupplierAdjustmentWorker(candidates, adjustmentExecution, adjustmentReader, adjustmentPort, returnPort, adjustmentCompletion).poll();
+    }
+    private SupplierPayableAdjustmentObservation adjustmentObservation(SupplierPayableAdjustmentCommand command) {
+        var source = command.source(); var payment = source.returns().request().command();
+        var before = source.previous() != null ? source.previous().observation().posting().payableSettledAfter()
+                : source.settlement() != null ? source.settlement().observation().posting().settledAfter() : payment.holdCommand().authorization().payable().settled();
+        var after = (source.recognizesOriginalPayment() ? before.plus(payment.amount()) : before).minus(source.newReturned());
+        var recognition = source.previous() != null ? source.previous().observation().posting().recognitionVoucherReference()
+                : source.settlement() != null ? source.settlement().observation().posting().voucherReference() : "recognized-" + payment.id();
+        var posting = new SupplierPayableAdjustmentObservation.Posting("adjust-" + command.id(), payment.held().holdReference(), "private-ledger-adjusted", recognition,
+                source.newReturned(), source.returns().totalReturned(), source.netPaid(), before, after, java.util.stream.IntStream.range(0, source.newReturns().size())
+                .mapToObj(index -> { var entry = source.newReturns().get(index); return new SupplierPayableAdjustmentObservation.ReturnEntry(entry.proof().transactionReference(), entry.proof().amount(), "voucher-" + command.id(), "entry-" + index); }).toList(),
+                command.period().periodReference(), command.period().request().accountingDate(), command.registeredAt());
+        return new SupplierPayableAdjustmentObservation(command.id(), command.digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED, 1, Instant.now(), posting, null);
+    }
+
     private String returnPath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/returns"; }
     private JsonNode returnView(UUID payment) throws Exception { var response = read(returnPath(payment), "finance"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200); }
     private Map<String, Object> returnQuery(JsonNode view) { return Map.of("operationVersion", view.path("operationVersion").asLong(), "returnVersion", view.path("returnVersion").asLong(), "comment", "读取原供应商付款实际回款"); }
@@ -1013,6 +1183,8 @@ class SupplierFinanceWorkflowTest {
             }
             case "supplier-payable-settlement-command" -> settlementObservation(json.read(request.at("/data/command").toString(), SupplierPayableSettlementCommand.class));
             case "supplier-payable-settlement-query" -> settlementObservation(settlements.find("demo", UUID.fromString(request.at("/data/operationId").asText())).orElseThrow().command());
+            case "supplier-payable-adjustment-command" -> adjustmentObservation(json.read(request.at("/data/command").toString(), SupplierPayableAdjustmentCommand.class));
+            case "supplier-payable-adjustment-query" -> adjustmentObservation(adjustments.find("demo", UUID.fromString(request.at("/data/operationId").asText())).orElseThrow().command());
             default -> throw new IllegalArgumentException("Unexpected finance operation from supplier finance");
         };
         return json.write(Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", result));
