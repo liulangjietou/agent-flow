@@ -1,0 +1,100 @@
+{
+  "result": "PASS_SYNTHETIC_SUPPLIER_ADJUSTMENT_RUNTIME",
+  "schema": 81,
+  "verifiedOldTables": 151,
+  "verifiedOldRows": 2765,
+  "expectedUpdatedOldRows": {
+    "finance_receipt_credit": 4,
+    "procurement_payable_reservation": 1,
+    "supplier_payment_returns": 2
+  },
+  "preservedAttachments": 7,
+  "preservedFinancialFiles": 16,
+  "newIndependentAdjustmentCommands": 3,
+  "accountedReceiptEntries": 5,
+  "beforeErpAccounted": "30.00",
+  "beforeErpNetPaid": "35.00",
+  "afterErpAccounted": "65.00",
+  "afterErpNetPaid": "0.00",
+  "lostResponseRecoveredByOriginalQuery": true,
+  "originalBankAndErpPreserved": true,
+  "priorCompletedAdjustmentPreserved": true,
+  "browserCancellationVerified": true,
+  "restartAndReplayVerified": true,
+  "browserAfterRestartVerified": true,
+  "narrow": {
+    "innerWidth": 500,
+    "pageClientWidth": 480,
+    "pageScrollWidth": 480,
+    "adjustmentClientWidth": 359,
+    "adjustmentScrollWidth": 359
+  },
+  "recordedResponses": 67,
+  "remaining": [
+    "Adjustment dispute resolution",
+    "Other finance adjustments",
+    "Real enterprise integration"
+  ],
+  "recordedAt": "2026-09-30T17:37:51.765695+00:00",
+  "upgrade": {
+    "fromVersion": 80,
+    "toVersion": 81,
+    "unchangedBusinessTables": 151,
+    "unchangedBusinessRows": 2765,
+    "unchangedAttachments": 7,
+    "unchangedFinancialFiles": 16,
+    "newAdjustmentTablesEmpty": true,
+    "preservedReceiptCredits": 11,
+    "backupBytes": 1187517,
+    "backupSha256": "8b147e365e2bf2b6a2c704f5754a1fe1c320ec6618e26b46dfd0e82746af50a4"
+  },
+  "contract": {
+    "result": "PASS",
+    "responses": 67
+  },
+  "frontendResponses": {
+    "result": "PASS",
+    "actualViews": 38,
+    "actualReceipts": 6
+  },
+  "implementationCommit": "8a6f9f7",
+  "syntheticExternalFinance": true,
+  "localEvidence": {
+    "supplier-adjustment-upgrade-before.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-upgrade-before.log",
+      "sha256": "c45fe608cbd1354efdea3d1e50a29585eb4cd4b2f7427db3a69ed428e76c67b9"
+    },
+    "supplier-adjustment-upgrade-after.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-upgrade-after.log",
+      "sha256": "8b5eb6244a0742187fdedc12c43f1c11966299096b72022771c9f573a56ab547"
+    },
+    "supplier-adjustment-ui-http.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-ui-http.log",
+      "sha256": "14394df2095f2d1a87898fa5bfa82c121f213b3b75b899f47a5822c255c35383"
+    },
+    "supplier-adjustment-additional.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-additional.log",
+      "sha256": "575e431b4adf51d5a6f670479bcb7ed48131100d5c910d4bd1cbad96420323b3"
+    },
+    "supplier-adjustment-preservation.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-preservation.log",
+      "sha256": "f95f3ed25c4caee2e22d82775ccb8c86eeb28aca3cb62bd7e17bf19023261459"
+    },
+    "supplier-adjustment-browser-confirm.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-browser-confirm.jpg",
+      "sha256": "242a86cd1f5ae231a3841ddd4303ed4e87442faeddf182538d353698aff39242"
+    },
+    "supplier-adjustment-browser-result.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-browser-result.jpg",
+      "sha256": "e9567dd8b1bf20bbaedbb6357d24edebf44f9dc66f9c45f5debdf1f7a70cb661"
+    },
+    "supplier-adjustment-browser-500.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-browser-500.jpg",
+      "sha256": "0c565bafb886171ea67af0093c970c7a9ac712b2575eba83b1b1b8ca78308949"
+    },
+    "supplier-adjustment-browser-after-restart.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-browser-after-restart.jpg",
+      "sha256": "a52cf518b95306a6bc4be26730cbb7d314d09d5259b3ff2f7ffeca8631a63d7e"
+    }
+  }
+}
