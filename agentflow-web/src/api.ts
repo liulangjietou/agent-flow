@@ -28,6 +28,7 @@ import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, Pre
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
 import type { ProcurementPaymentItem, ProcurementDetail, ProcurementCreate, ProcurementRevise, ProcurementReceipt, ProcurementVersions, ProcurementCheckOptions, ProcurementCheckInput, ProcurementCheckView } from './procurementPayment'
+import type { BudgetAdjustmentItem, BudgetAdjustmentDetail, BudgetAdjustmentCreate, BudgetAdjustmentRevise, BudgetAdjustmentReceipt, BudgetAdjustmentVersions, BudgetAdjustmentCheckOptions, BudgetAdjustmentCheckInput, BudgetAdjustmentCheckView } from './budgetAdjustment'
 import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
 import type { DisbursementReturnView, DisbursementReturnQueryInput, DisbursementResolutionInput, DisbursementReturnActionReceipt } from './disbursementReturn'
 import type { RepaymentReviewView, RepaymentReviewQueryInput, RepaymentResolutionInput, RepaymentReviewActionReceipt } from './repaymentReview'
@@ -102,7 +103,7 @@ export interface DefinitionAvailabilityInput { startEnabled: boolean; expectedRe
 export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
 export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
 export interface ProcessTemplate {
-  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT'
+  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT' | 'BUDGET_ADJUSTMENT'
   dependencies: string[]; defaultRoles: string[]; fieldDescriptions: Record<string, string>; risks: string[]; upgradePolicy: string
   notificationTexts: Record<string, string>; notificationsAvailable: boolean; graph: Graph; formSchema: FormSchema
   scenarios: TemplateScenario[]; copies: TemplateCopy[]
@@ -372,6 +373,16 @@ export const api = {
   submitProcurementPayment: (id: string, input: ProcurementVersions & { precheckId: string }) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/submit`, 'POST', '正式提交采购付款申请', input),
   withdrawProcurementPayment: (id: string, input: ProcurementVersions & { comment: string }) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回采购付款申请', input),
   cancelProcurementPayment: (id: string, input: ProcurementVersions & { comment: string }) => write<ProcurementReceipt>(`/procurement-payments/${encodeURIComponent(id)}/cancel`, 'POST', '作废采购付款申请', input),
+  budgetAdjustments: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<BudgetAdjustmentItem>>('/budget-adjustments' + historyQuery(filter), { signal, cache: 'no-store' }),
+  budgetAdjustment: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<BudgetAdjustmentDetail>(`/budget-adjustments/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  createBudgetAdjustment: (input: BudgetAdjustmentCreate) => write<BudgetAdjustmentReceipt>('/budget-adjustments', 'POST', '保存预算调整申请', input),
+  reviseBudgetAdjustment: (id: string, input: BudgetAdjustmentRevise) => write<BudgetAdjustmentReceipt>(`/budget-adjustments/${encodeURIComponent(id)}/revise`, 'POST', '保存预算调整申请修改', input),
+  budgetAdjustmentCheckOptions: (id: string, signal: AbortSignal) => request<BudgetAdjustmentCheckOptions>(`/budget-adjustments/${encodeURIComponent(id)}/prechecks/options`, { signal, cache: 'no-store' }),
+  queueBudgetAdjustmentCheck: (id: string, input: BudgetAdjustmentCheckInput) => write<{ id: string }>(`/budget-adjustments/${encodeURIComponent(id)}/prechecks`, 'POST', '查询预算调整申请财务依据', input),
+  budgetAdjustmentCheck: (id: string, jobId: string, signal: AbortSignal) => request<BudgetAdjustmentCheckView>(`/budget-adjustments/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  submitBudgetAdjustment: (id: string, input: BudgetAdjustmentVersions & { precheckId: string }) => write<BudgetAdjustmentReceipt>(`/budget-adjustments/${encodeURIComponent(id)}/submit`, 'POST', '正式提交预算调整申请', input),
+  withdrawBudgetAdjustment: (id: string, input: BudgetAdjustmentVersions & { comment: string }) => write<BudgetAdjustmentReceipt>(`/budget-adjustments/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回预算调整申请', input),
+  cancelBudgetAdjustment: (id: string, input: BudgetAdjustmentVersions & { comment: string }) => write<BudgetAdjustmentReceipt>(`/budget-adjustments/${encodeURIComponent(id)}/cancel`, 'POST', '作废预算调整申请', input),
   advanceRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceRequestItem>>('/advance-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
   advanceRequest: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<AdvanceDetail>(`/advance-requests/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   advanceDisbursementReview: (id: string, roundNo: number, signal: AbortSignal) => request<DisbursementReturnView>(`/advance-requests/${encodeURIComponent(id)}/disbursement-review` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

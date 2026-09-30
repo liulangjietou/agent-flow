@@ -71,7 +71,7 @@ class ProcessTemplateIntegrationTest {
         mvc.perform(get("/api/v1/process-templates")
                         .header("Authorization", "Bearer " + auth.login("demo", "admin", "demo").token()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$.length()").value(5))
                 .andExpect(jsonPath("$[0].templateVersion").value(2))
                 .andExpect(jsonPath("$[0].copies").isArray());
     }

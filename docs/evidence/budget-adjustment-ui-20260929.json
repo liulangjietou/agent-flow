@@ -1,0 +1,103 @@
+{
+  "date": "2026-09-29",
+  "stage": "budget-adjustment-template-and-ui",
+  "status": "LOCAL_HTTP_AND_COMPONENTS_VERIFIED_BROWSER_AND_EXECUTION_PENDING",
+  "apiCommit": "6bd736b839cfdf02ccd1f74876ffb708d43a85e0",
+  "behavior": [
+    "Copied budget template freezes selected appointment supervisor then requires actual finance reviewer",
+    "Applicant workspace, current detail, task detail and historical rounds use the dedicated sensitive budget API",
+    "Increase, decrease and transfer preserve decimal money, scope, directions and original round evidence",
+    "Unknown saved requests recover original receipt before refreshing; expired or stale checks cannot submit"
+  ],
+  "validation": {
+    "h2": {
+      "tests": 69,
+      "logs": [
+        "budget-adjustment-template-h2.log",
+        "budget-adjustment-template-h2-final.log"
+      ],
+      "result": "PASS",
+      "note": "Initial total had one old template count assertion; corrected integration subset 29 passed. Other 40 were already green."
+    },
+    "postgresql": {
+      "tests": 16,
+      "log": "budget-adjustment-template-postgres.log",
+      "result": "PASS"
+    },
+    "frontend": {
+      "newBudgetTests": 32,
+      "relatedTests": 66,
+      "finalRelatedTests": 52,
+      "overlappingScopes": true,
+      "build": "PASS",
+      "logs": [
+        "budget-adjustment-ui-tests.log",
+        "budget-adjustment-ui-final-tests.log",
+        "budget-adjustment-ui-build.log"
+      ]
+    },
+    "contract": {
+      "operations": 230,
+      "schemas": 447,
+      "requestExamples": 81,
+      "actualHttpResponses": 129,
+      "actualReadyResponsesUsedByFrontend": 6,
+      "actualPublishedDefinitionsUsedByFrontend": 1
+    },
+    "http": {
+      "businessResponses": 129,
+      "logins": 12,
+      "typesApproved": [
+        "INCREASE",
+        "DECREASE",
+        "TRANSFER"
+      ],
+      "returnedTransferOriginalAmount": "70.00",
+      "resubmittedTransferAmount": "60.00",
+      "originalRoundPreserved": true,
+      "withdrawAndResubmit": true,
+      "insufficientAndClosedPeriodBlocked": true,
+      "adminSensitiveAccessDenied": true,
+      "unchangedPriorFinanceTables": 95,
+      "unchangedFinancialCommandFiles": 15,
+      "unchangedAttachments": 6,
+      "budgetExecuted": false,
+      "syntheticFinanceOnly": true,
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-ui-http.json"
+    },
+    "browser": "PENDING_BROWSER_POLICY_UNAVAILABLE"
+  },
+  "upgrade": {
+    "fromVersion": 75,
+    "toVersion": 76,
+    "unchangedBusinessTables": 135,
+    "unchangedBusinessRows": 1694,
+    "unchangedAttachments": 6,
+    "unchangedCommandFiles": 15,
+    "newTablesEmpty": [
+      "budget_adjustment",
+      "budget_adjustment_revision",
+      "budget_adjustment_check_job",
+      "budget_adjustment_check_revision"
+    ],
+    "backupBytes": 940545,
+    "backupSha256": "eb0cf9282e0db7678ff602bfee62f2034b2c95ba02876f6a1be4049240ed8baf"
+  },
+  "runtime": {
+    "version": 76,
+    "backendPort": 18214,
+    "frontendPort": 15314,
+    "financePort": 18222,
+    "runner": "/fyoung/tmp/agentflow-remaining-20260928/run-budget-adjustment-ui-server.py",
+    "backendPid": 84362
+  },
+  "pending": [
+    "Independent finance execution authorization and atomic budget command/query protocol",
+    "Actual browser interactions and narrow viewport verification after browser security policy is available",
+    "Real enterprise budget system acceptance"
+  ],
+  "mainChanged": false,
+  "remoteConfigured": false,
+  "prCreated": false,
+  "remainingLargeWorkPackages": 4
+}

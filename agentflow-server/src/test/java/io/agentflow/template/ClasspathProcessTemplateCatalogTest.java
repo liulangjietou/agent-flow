@@ -9,6 +9,7 @@ import io.agentflow.form.FormSchemaJsonDeserializer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
@@ -33,16 +34,17 @@ class ClasspathProcessTemplateCatalogTest {
     @Test
     void loadsDeliveredTemplatesAndVerifiesEveryScenario() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
-        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment");
-        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(18);
+        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment");
+        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(21);
         catalog.list().forEach(ProcessTemplate::verifyScenarios);
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"business-type", "masked", "missing-sensitive"})
-    void procurementTemplateCannotMislabelItsBusinessOrHideEvidenceFromApprovers(String corruption) throws Exception {
-        String location = "classpath:process-templates/procurement-payment.json";
+    @CsvSource({"procurement-payment,business-type", "procurement-payment,masked", "procurement-payment,missing-sensitive",
+            "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive"})
+    void structuredTemplateCannotMislabelItsBusinessOrHideEvidenceFromApprovers(String templateKey, String corruption) throws Exception {
+        String location = "classpath:process-templates/" + templateKey + ".json";
         ObjectNode template;
         try (var input = resources.getResource(location).getInputStream()) { template = json.read(new String(input.readAllBytes(), StandardCharsets.UTF_8), ObjectNode.class); }
         var field = (ObjectNode) template.at("/formSchema/fields/0");

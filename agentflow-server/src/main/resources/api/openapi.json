@@ -31638,7 +31638,8 @@
             "type": "string",
             "enum": [
               "FORM",
-              "PROCUREMENT_PAYMENT"
+              "PROCUREMENT_PAYMENT",
+              "BUDGET_ADJUSTMENT"
             ]
           },
           "dependencies": {

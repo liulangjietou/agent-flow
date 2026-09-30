@@ -360,6 +360,31 @@ class BudgetAdjustmentWorkflowTest {
         }
     }
 
+    @Test void copiedTemplateUsesTheChosenAppointmentsSupervisorThenFinancialReview() throws Exception {
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "主管与财务部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成审批岗位", entity, null, true);
+        var supervisor = organization.createAppointment(admin, manager, department.id(), position.id(), true);
+        organization.createAppointment(admin, person("finance", true), department.id(), position.id(), true);
+        organization.setSupervisor(admin, appointment, supervisor.id(), 1);
+        var copied = ok(send("/api/v1/process-templates/budget-adjustment/copy", "admin",
+                Map.of("key", "budget-copy-" + UUID.randomUUID(), "name", "复制的已验收预算调整", "templateVersion", 1)), 200);
+        var draft = definitions.get("demo", id(copied));
+        assertThat(definitions.inspect("demo", draft.graph(), draft.formSchema()).errors()).contains("ASSIGNEE_NOT_AVAILABLE:finance");
+        var finance = person("finance", true);
+        var assigned = new Graph(draft.graph().nodes().stream().map(node -> node.id().equals("finance")
+                ? new Node(node.id(), node.name(), node.type(), Map.of("assigneeRule", "role:ORG_PERSON_" + finance)) : node).toList(), draft.graph().edges());
+        draft = definitions.update("demo", draft.id(), draft.name(), assigned, draft.formSchema(), draft.revision());
+        var definition = definitions.publish(admin, draft.id(), draft.revision(), "预算模板联动验收");
+        UUID id = id(ok(send("/api/v1/budget-adjustments", "alice", createBody(definition, content("70"))), 201)); submit(id);
+        assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app(id).id().toString()).singleResult().getTaskDefinitionKey()).isEqualTo("supervisor");
+        ok(act(id, "APPROVE"), 200);
+        assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app(id).id().toString()).singleResult().getTaskDefinitionKey()).isEqualTo("finance");
+        assertPrivateFactsAbsent(ok(read(path(id), "finance"), 200));
+        ok(send(actionPath(id), "finance", decision(id, "APPROVE")), 200);
+        assertThat(current(id).approval().approvedBy()).isEqualTo("finance"); assertThat(app(id).status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertNoFinancialWrites(id);
+    }
+
     private UUID create() throws Exception { return id(ok(send("/api/v1/budget-adjustments", "alice", createBody(published(false, false), content("70"))), 201)); }
     private Map<String, Object> createBody(DefinitionDraft definition, BudgetAdjustmentContent content) { return Map.of("businessNo", "PROCUREMENT-" + UUID.randomUUID(), "processKey", definition.key(), "definitionVersion", definition.version(), "content", content); }
     private BudgetAdjustmentContent content(String amount) { return new BudgetAdjustmentContent(entity, "合成预算调拨", "按业务需要调整额度", BudgetAdjustmentContent.Type.TRANSFER, LocalDate.parse("2026-09-29"), "budget-source", "budget-target", money(amount)); }

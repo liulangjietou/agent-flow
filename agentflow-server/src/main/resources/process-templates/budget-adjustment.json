@@ -1,0 +1,59 @@
+{
+  "key": "budget-adjustment",
+  "templateVersion": 1,
+  "name": "预算追加与调拨",
+  "category": "财务",
+  "description": "基于原预算台账申请追加、调减或同期间调拨，由本次任职的直属主管与财务复核。",
+  "scope": "同一法人本位币预算的独立额度调整；调拨两端属于同一期间，调减保留已占用和已使用金额。",
+  "businessType": "BUDGET_ADJUSTMENT",
+  "dependencies": [
+    "维护申请人本次任职及直属主管，主管须具有审批资格",
+    "复制后把财务复核占位角色 FINANCE 绑定为本租户具有审批资格的实际人员或岗位，再发布",
+    "配置按申请人授权读取财务目录和原预算台账的连接"
+  ],
+  "defaultRoles": ["FINANCE"],
+  "fieldDescriptions": {
+    "budgetAdjustmentDetails": "独立预算页面显示原额度、已占用、已使用及拟调整额度，人工节点需完整读取该敏感组。",
+    "amount": "由本轮独立调整金额派生；调拨使用单边转移金额，不把两端重复相加。",
+    "currency": "由申请法人和原预算台账共同确认的本位币。"
+  },
+  "risks": [
+    "不支持跨法人、跨币种或跨期间调拨；调减不能侵占已用和已占用预算。",
+    "从预算调整专用入口填报，普通表单不能绕过原台账预检。",
+    "审批通过只固定本轮依据，实际额度以独立财务执行和外部预算系统的确认结果为准。",
+    "下面的样例只验证派生字段和审批路径，不代表预算额度已改变。"
+  ],
+  "upgradePolicy": "复制后是租户独立草稿；目录升级不会覆盖既有定义、任职快照或预算申请轮次。",
+  "notificationTexts": {
+    "SUBMITTED": "预算调整申请已提交，请等待主管与财务复核。",
+    "RETURNED": "预算调整申请已退回，请核对意见，补正后重新读取预算台账。",
+    "APPROVED": "预算调整申请已批准，额度是否生效请查看后续财务执行记录。"
+  },
+  "notificationsAvailable": true,
+  "graph": {
+    "nodes": [
+      {"id": "start", "name": "开始", "type": "START", "properties": {"x": "40", "y": "180"}},
+      {"id": "supervisor", "name": "本次任职直属主管", "type": "USER_TASK", "properties": {"x": "260", "y": "180", "assigneeRule": "role:ORG_SUPERVISOR_1"}},
+      {"id": "finance", "name": "预算额度财务复核", "type": "USER_TASK", "properties": {"x": "520", "y": "180", "assigneeRule": "role:FINANCE"}},
+      {"id": "end", "name": "结束", "type": "END", "properties": {"x": "780", "y": "180"}}
+    ],
+    "edges": [
+      {"id": "start_supervisor", "source": "start", "target": "supervisor", "condition": "", "defaultBranch": false},
+      {"id": "supervisor_finance", "source": "supervisor", "target": "finance", "condition": "", "defaultBranch": false},
+      {"id": "finance_end", "source": "finance", "target": "end", "condition": "", "defaultBranch": false}
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 2,
+    "fields": [
+      {"key": "budgetAdjustmentDetails", "label": "原预算与调整明细", "type": "TEXT", "required": true, "sensitive": true, "nodeAccess": {"supervisor": "READ_ONLY", "finance": "READ_ONLY"}},
+      {"key": "amount", "label": "本次调整额", "type": "NUMBER", "required": true, "minimum": "0.01"},
+      {"key": "currency", "label": "本位币", "type": "TEXT", "required": true}
+    ]
+  },
+  "scenarios": [
+    {"id": "positive-adjustment", "name": "正额预算调整", "description": "派生金额经过主管与财务两个人工节点。", "payload": {"budgetAdjustmentDetails": "原预算依据见独立调整明细", "amount": "70.00", "currency": "CNY"}, "expectedPath": ["start", "supervisor", "finance", "end"], "expectedFieldErrors": {}},
+    {"id": "minimum-adjustment", "name": "最小正金额", "description": "0.01 元仍经过完整人工复核路径。", "payload": {"budgetAdjustmentDetails": "原预算依据见独立调整明细", "amount": "0.01", "currency": "CNY"}, "expectedPath": ["start", "supervisor", "finance", "end"], "expectedFieldErrors": {}},
+    {"id": "zero-adjustment", "name": "拒绝零调整", "description": "零金额不能通过派生表单边界，实际业务金额也须大于零。", "payload": {"budgetAdjustmentDetails": "原预算依据见独立调整明细", "amount": "0.00", "currency": "CNY"}, "expectedPath": [], "expectedFieldErrors": {"amount": "BELOW_MINIMUM"}}
+  ]
+}
