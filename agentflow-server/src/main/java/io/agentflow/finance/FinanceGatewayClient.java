@@ -34,6 +34,8 @@ import java.util.function.Predicate;
 @Component
 public class FinanceGatewayClient {
     static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+    // 部分挂账最多保留 20,052 条实际分录；四个 128 字符字段经 JSON 转义后仍须有界接收。
+    private static final int MAX_ACCRUAL_REDUCTION_RESPONSE_BYTES = 128 * 1024 * 1024;
     private static final int CONTRACT_VERSION = 1;
     private final FinanceGatewayConfiguration configuration;
     private final JsonUtil json;
@@ -63,6 +65,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_QUERY
                 || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
+                || operation == Operation.EXPENSE_ACCRUAL_REDUCTION_COMMAND || operation == Operation.EXPENSE_ACCRUAL_REDUCTION_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
                 || operation == Operation.EXPENSE_PAYMENT_RETURN || operation == Operation.SUPPLIER_PAYMENT_RETURN
@@ -278,6 +281,19 @@ public class FinanceGatewayClient {
         return exchange(tenantId, targetDigest, Operation.VOUCHER_REVERSAL_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
+    /** 挂账部分调整使用独立持久编号，不覆盖原凭证或复用完整冲销写入。 */
+    public <T> FinanceResult<T> postExpenseAccrualReduction(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("An expense accrual reduction identity is required");
+        return exchange(tenantId, targetDigest, Operation.EXPENSE_ACCRUAL_REDUCTION_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 未知的挂账差额继续查询原目的地、原编号与摘要，不触发新的过账。 */
+    public <T> FinanceResult<T> queryExpenseAccrualReduction(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.EXPENSE_ACCRUAL_REDUCTION_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
     private <T> FinanceResult<T> exchange(String tenantId, String targetDigest, Operation operation, UUID requestId,
                                         Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Finance gateway must run outside a transaction");
@@ -291,10 +307,11 @@ public class FinanceGatewayClient {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
                 || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_COMMAND
                 || operation == Operation.BUDGET_REDUCTION_COMMAND
+                || operation == Operation.EXPENSE_ACCRUAL_REDUCTION_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
-        var future = client.sendAsync(request.build(), response -> new BoundedBody());
+        var future = client.sendAsync(request.build(), response -> new BoundedBody(operation.maxResponseBytes));
         try {
             var response = future.get(destination.timeout().toMillis(), TimeUnit.MILLISECONDS);
             if (response.statusCode() == 401 || response.statusCode() == 403) return unavailable(FinanceResult.Failure.AUTHENTICATION);
@@ -384,10 +401,16 @@ public class FinanceGatewayClient {
         SUPPLIER_PAYABLE_ADJUSTMENT_QUERY("supplier-payable-adjustment-query", Set.of()),
         VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         VOUCHER_REVERSAL_COMMAND("voucher-reversal-command", Set.of()),
-        VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of());
+        VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of()),
+        EXPENSE_ACCRUAL_REDUCTION_COMMAND("expense-accrual-reduction-command", Set.of(), MAX_ACCRUAL_REDUCTION_RESPONSE_BYTES),
+        EXPENSE_ACCRUAL_REDUCTION_QUERY("expense-accrual-reduction-query", Set.of(), MAX_ACCRUAL_REDUCTION_RESPONSE_BYTES);
         private final String path;
         private final Set<FinanceResult.Reason> reasons;
-        Operation(String path, Set<FinanceResult.Reason> reasons) { this.path = path; this.reasons = reasons; }
+        private final int maxResponseBytes;
+        Operation(String path, Set<FinanceResult.Reason> reasons) { this(path, reasons, MAX_RESPONSE_BYTES); }
+        Operation(String path, Set<FinanceResult.Reason> reasons, int maxResponseBytes) {
+            this.path = path; this.reasons = reasons; this.maxResponseBytes = maxResponseBytes;
+        }
     }
 
     /**
@@ -401,14 +424,16 @@ public class FinanceGatewayClient {
      * @author owlzhangfq@gmail.com
      */
     private static final class BoundedBody implements HttpResponse.BodySubscriber<byte[]> {
+        private final int maxBytes;
         private final ByteArrayOutputStream body = new ByteArrayOutputStream();
         private final CompletableFuture<byte[]> result = new CompletableFuture<>();
         private Flow.Subscription subscription;
+        private BoundedBody(int maxBytes) { this.maxBytes = maxBytes; }
         @Override public CompletionStage<byte[]> getBody() { return result; }
         @Override public void onSubscribe(Flow.Subscription value) { subscription = value; subscription.request(1); }
         @Override public void onNext(List<ByteBuffer> values) {
             for (ByteBuffer value : values) {
-                if (value.remaining() > MAX_RESPONSE_BYTES - body.size()) {
+                if (value.remaining() > maxBytes - body.size()) {
                     subscription.cancel(); result.completeExceptionally(new ResponseTooLarge()); return;
                 }
                 byte[] bytes = new byte[value.remaining()]; value.get(bytes); body.writeBytes(bytes);

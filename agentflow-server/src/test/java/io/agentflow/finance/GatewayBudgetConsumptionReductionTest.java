@@ -95,6 +95,30 @@ class GatewayBudgetConsumptionReductionTest {
     }
 
     @Test
+    void supportedLargeExpenseKeepsEveryCostPositionThroughActualHttp() {
+        var before = new java.util.ArrayList<BudgetPrecheckPort.Allocation>();
+        var after = new java.util.ArrayList<BudgetPrecheckPort.Allocation>();
+        for (int line = 1; line <= 200; line++) {
+            for (int position = 1; position <= 25; position++) {
+                before.add(new BudgetPrecheckPort.Allocation(line, position, "TRAVEL", new CostAllocation("中心".repeat(50), "项目".repeat(50), new Money(new BigDecimal("1"), "CNY"))));
+                after.add(new BudgetPrecheckPort.Allocation(line, position, "TRAVEL", new CostAllocation("中心".repeat(50), "项目".repeat(50), new Money(new BigDecimal("0.80"), "CNY"))));
+            }
+        }
+        var old = command.source().position();
+        var position = new BudgetPrecheckPort.Request(old.reportId(), old.roundNo(), old.financialVersion(), old.employeeId(), old.legalEntityId(), old.baseCurrency(), old.accountingDate(), before);
+        var source = new BudgetCommand(UUID.randomUUID(), "tenant-a", BudgetCommand.Action.CONSUME, position, command.source().expected());
+        var consumed = new BudgetObservation(source.id(), source.digest(), BudgetObservation.Status.APPLIED, 2L, "large-consumption", command.consumed().appliedAt(), null);
+        var large = new BudgetConsumptionReductionCommand(UUID.randomUUID(), UUID.randomUUID(), source, consumed, null, before, after,
+                command.period(), command.authorizedBy(), command.evidenceReference(), command.reason(), command.createdAt(), command.expiresAt());
+        var response = applied(large, 3);
+        assertThat(json.write(response).getBytes(StandardCharsets.UTF_8).length).isLessThan(4096);
+        answer(response);
+        assertThat(budgets.execute(target, large).requireValue()).isEqualTo(response);
+        assertThat(requests.get()).isEqualTo(1);
+        assertThat(large.reducedAmount()).isEqualTo(new Money(new BigDecimal("1000"), "CNY"));
+    }
+
+    @Test
     void queriesAreReadOnlyAndUseOriginalIdentityWithFreshCorrelationIds() {
         var missing = new BudgetConsumptionReductionObservation(command.id(), command.adjustmentId(), command.digest(), BudgetConsumptionReductionObservation.Status.NOT_FOUND, Instant.now(), null, null);
         answer(missing); assertThat(budgets.execute(target, command)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
@@ -137,12 +161,9 @@ class GatewayBudgetConsumptionReductionTest {
                 body -> posting(body).put("reference", command.consumed().reference()), body -> posting(body).put("periodReference", "other"),
                 body -> posting(body).put("accountingDate", "2026-09-28"), body -> posting(body).put("consumptionId", UUID.randomUUID().toString()),
                 body -> posting(body).put("consumptionReference", "foreign-consumption"),
-                body -> ((ObjectNode) body.at("/posting/after/0/cost")).put("costCenter", "other"),
-                body -> {
-                    ((ObjectNode) body.at("/posting/after/0/cost/amount")).put("value", "47.00");
-                    ((ObjectNode) body.at("/posting/after/1/cost/amount")).put("value", "33.00");
-                },
-                body -> ((ObjectNode) body.at("/posting/before/0/cost/amount")).put("value", "61.00"));
+                body -> posting(body).put("beforeDigest", "b".repeat(64)),
+                body -> posting(body).put("afterDigest", "c".repeat(64)),
+                body -> ((ObjectNode) body.at("/posting/reducedAmount")).put("value", "21.00"));
         for (var corrupt : corruptions) {
             responder.set(request -> { var body = success(request, applied(command, 3)); corrupt.accept((ObjectNode) body.path("data")); return json.write(body); });
             assertThat(budgets.execute(target, command)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
@@ -187,7 +208,7 @@ class GatewayBudgetConsumptionReductionTest {
     private BudgetConsumptionReductionObservation applied(BudgetConsumptionReductionCommand value, long revision) {
         var now = Instant.now();
         var posting = new BudgetConsumptionReductionObservation.Posting(value.source().id(), value.source().digest(), value.consumed().reference(), revision,
-                "synthetic-ledger-" + revision, value.before(), value.after(), value.period().periodReference(), value.period().request().accountingDate(), now.minusSeconds(1));
+                "synthetic-ledger-" + revision, value.beforeDigest(), value.afterDigest(), value.reducedAmount(), value.period().periodReference(), value.period().request().accountingDate(), now.minusSeconds(1));
         return new BudgetConsumptionReductionObservation(value.id(), value.adjustmentId(), value.digest(), BudgetConsumptionReductionObservation.Status.APPLIED, now, posting, null);
     }
     private static ObjectNode posting(ObjectNode body) { return (ObjectNode) body.path("posting"); }

@@ -52,6 +52,20 @@ public record ExpenseAdjustmentFinancialSource(ExpenseAdjustmentAmounts.Change c
         return List.copyOf(result);
     }
 
+    /** 按原分录顺序保留本次调整前的完整余额，原方向和零位置均不丢失。 */
+    public List<VoucherReversalCommand.Line> voucherBefore() { return voucherPositions(change.before()); }
+
+    /** 后续调整和 ERP 回执核对全部剩余位置，不能只比较本次借贷合计。 */
+    public List<VoucherReversalCommand.Line> voucherAfter() { return voucherPositions(change.after()); }
+
+    private List<VoucherReversalCommand.Line> voucherPositions(ExpenseAdjustmentAmounts amounts) {
+        var values = postings(amounts);
+        var original = accrual.input().command();
+        var zero = Money.zero(change.gross().currency());
+        return original.lines().stream().map(line -> new VoucherReversalCommand.Line(line.lineNo(), original.mapping().account(line.account()),
+                line.side(), values.getOrDefault(PostingKey.from(line), zero), line.sourceLineNo(), line.costCenter(), line.projectCode(), line.advanceId())).toList();
+    }
+
     /** 原预算位置保持完整，包含之前已减至零的位置；前置剩余额只能由真实完成记录提供。 */
     public List<BudgetPrecheckPort.Allocation> budgetBefore() { return budgetPositions(change.before()); }
 

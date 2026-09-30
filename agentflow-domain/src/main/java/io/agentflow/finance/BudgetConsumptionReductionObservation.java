@@ -35,26 +35,26 @@ public record BudgetConsumptionReductionObservation(UUID operationId, UUID adjus
                 && posting.consumptionReference().equals(command.consumed().reference())
                 && posting.ledgerRevision() == command.expected().revision() + 1
                 && !posting.reference().equals(command.expected().reference()) && !posting.reference().equals(command.consumed().reference())
-                && posting.before().equals(command.before()) && posting.after().equals(command.after())
+                && posting.beforeDigest().equals(command.beforeDigest()) && posting.afterDigest().equals(command.afterDigest())
+                && posting.reducedAmount().equals(command.reducedAmount())
                 && posting.periodReference().equals(command.period().periodReference())
                 && posting.accountingDate().equals(command.period().request().accountingDate())
                 && !posting.appliedAt().isBefore(command.createdAt());
     }
 
     /**
-     * 每次结果只保存本次前后位置，不递归携带所有历史命令。
+     * 原指令保存完整位置；结果绑定实际前后位置摘要与差额，避免大单重复返回整份分摊。
      * @author owlzhangfq@gmail.com
      */
     public record Posting(UUID consumptionId, String consumptionDigest, String consumptionReference, long ledgerRevision,
-            String reference, List<BudgetPrecheckPort.Allocation> before, List<BudgetPrecheckPort.Allocation> after,
+            String reference, String beforeDigest, String afterDigest, Money reducedAmount,
             String periodReference, LocalDate accountingDate, Instant appliedAt) {
-        /** 同一位置只能减少；零位置继续保留，不能借核减合并或更换费用对象。 */
+        /** 两份不同的完整位置摘要与正差额同时绑定，不能省略零位置或仅返回总额。 */
         public Posting {
             if (consumptionId == null || !digest(consumptionDigest) || !text(consumptionReference, 128) || ledgerRevision < 1
                     || !text(reference, 128) || !text(periodReference, 128) || accountingDate == null || appliedAt == null
-                    || !validReduction(before, after)) throw invalid();
-            before = List.copyOf(before);
-            after = List.copyOf(after);
+                    || !digest(beforeDigest) || !digest(afterDigest) || beforeDigest.equals(afterDigest)
+                    || reducedAmount == null || reducedAmount.value().signum() <= 0) throw invalid();
         }
         @Override public String toString() { return "BudgetConsumptionReductionPosting[consumptionId=" + consumptionId + ", ledgerRevision=" + ledgerRevision + "]"; }
     }

@@ -49,5 +49,7 @@
     "Durable preparation and operations, background workers and atomic resource completion",
     "Public API, permissions, audit, UI and runtime acceptance",
     "Real enterprise budget integration"
-  ]
+  ],
+  "followUpEvidence": "partial-expense-accrual-reduction-20260930.json",
+  "historicalProtocolNote": "This earlier evidence describes before/after arrays in receipts. Follow-up large HTTP reproduction changed them to complete position digests plus actual reduction amount; immutable commands still keep every position."
 }

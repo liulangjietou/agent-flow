@@ -145,7 +145,8 @@ class BudgetConsumptionReductionTest {
     private static BudgetConsumptionReductionObservation applied(BudgetConsumptionReductionCommand value, long revision, String reference,
             List<BudgetPrecheckPort.Allocation> before, List<BudgetPrecheckPort.Allocation> after, Instant at) {
         var posting = new BudgetConsumptionReductionObservation.Posting(value.source().id(), value.source().digest(), value.consumed().reference(), revision, reference,
-                before, after, value.period().periodReference(), value.period().request().accountingDate(), at);
+                BudgetConsumptionReductionCommand.positionsDigest(before), BudgetConsumptionReductionCommand.positionsDigest(after),
+                value.reducedAmount(), value.period().periodReference(), value.period().request().accountingDate(), at);
         return new BudgetConsumptionReductionObservation(value.id(), value.adjustmentId(), value.digest(), BudgetConsumptionReductionObservation.Status.APPLIED,
                 NOW.plusSeconds(1), posting, null);
     }

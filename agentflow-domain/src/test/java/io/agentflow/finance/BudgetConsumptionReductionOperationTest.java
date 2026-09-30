@@ -126,7 +126,7 @@ class BudgetConsumptionReductionOperationTest {
     private FinanceResult<BudgetConsumptionReductionObservation> applied(BudgetConsumptionReductionOperation op, Instant at, String reference) {
         var command = op.input().command();
         var posting = new BudgetConsumptionReductionObservation.Posting(command.source().id(), command.source().digest(), command.consumed().reference(), 3,
-                reference, command.before(), command.after(), "period", DATE, NOW);
+                reference, command.beforeDigest(), command.afterDigest(), command.reducedAmount(), "period", DATE, NOW);
         return new FinanceResult.Success<>(new BudgetConsumptionReductionObservation(command.id(), command.adjustmentId(), command.digest(),
                 BudgetConsumptionReductionObservation.Status.APPLIED, at, posting, null));
     }

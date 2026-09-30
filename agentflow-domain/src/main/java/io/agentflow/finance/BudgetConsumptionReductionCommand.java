@@ -50,7 +50,8 @@ public record BudgetConsumptionReductionCommand(UUID id, UUID adjustmentId, Budg
             if (!posting.consumptionId().equals(source.id()) || !posting.consumptionDigest().equals(source.digest())
                     || !posting.consumptionReference().equals(consumed.reference()) || posting.ledgerRevision() <= consumed.ledgerRevision()
                     || posting.ledgerRevision() == Long.MAX_VALUE || posting.reference().equals(consumed.reference())
-                    || posting.appliedAt().isBefore(consumed.appliedAt()) || !posting.after().equals(before)
+                    || posting.appliedAt().isBefore(consumed.appliedAt()) || !posting.afterDigest().equals(positionsDigest(before))
+                    || !posting.reducedAmount().currency().equals(original.baseCurrency()) || posting.reducedAmount().compareTo(original.total()) > 0
                     || posting.accountingDate().isBefore(original.accountingDate()) || request.accountingDate().isBefore(posting.accountingDate())) throw invalid();
         }
         before = List.copyOf(before);
@@ -79,6 +80,12 @@ public record BudgetConsumptionReductionCommand(UUID id, UUID adjustmentId, Budg
         return amount;
     }
 
+    /** 回执核对完整前值摘要；编码包括零位置、原次序、类别、成本对象、币种和整分金额。 */
+    public String beforeDigest() { return positionsDigest(before); }
+
+    /** 当前净额的固定摘要供此次回执及下次已完成依据使用，不以合计金额代替分摊身份。 */
+    public String afterDigest() { return positionsDigest(after); }
+
     /** 固定摘要包括原消费、完整前后位置、前次结果及本次人工决定，不依赖 JSON 字段顺序。 */
     public String digest() {
         try {
@@ -92,9 +99,8 @@ public record BudgetConsumptionReductionCommand(UUID id, UUID adjustmentId, Budg
                 var posting = previous.posting();
                 add(digest, previous.operationId(), previous.adjustmentId(), previous.commandDigest(), previous.status(), previous.observedAt(),
                         posting.consumptionId(), posting.consumptionDigest(), posting.consumptionReference(), posting.ledgerRevision(), posting.reference(),
+                        posting.beforeDigest(), posting.afterDigest(), posting.reducedAmount().currency(), posting.reducedAmount().value().toPlainString(),
                         posting.periodReference(), posting.accountingDate(), posting.appliedAt());
-                addPositions(digest, posting.before());
-                addPositions(digest, posting.after());
             }
             add(digest, period.request().legalEntityId(), period.request().currency(), period.request().accountingDate(), period.periodReference(), period.sourceVersion(),
                     period.startsOn(), period.endsOn(), period.observedAt(), period.validUntil(), authorizedBy, evidenceReference, reason, createdAt, expiresAt);
@@ -105,6 +111,15 @@ public record BudgetConsumptionReductionCommand(UUID id, UUID adjustmentId, Budg
     /** 授权过期只禁止发送，查询始终保留相同编号和摘要。 */
     public void requireSendAt(Instant now) {
         if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException("BUDGET_REDUCTION_AUTHORIZATION_EXPIRED", "Budget reduction authorization and accounting evidence have expired");
+    }
+
+    static String positionsDigest(List<BudgetPrecheckPort.Allocation> positions) {
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            add(digest, "agentflow-budget-consumption-position-1");
+            addPositions(digest, positions);
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }
 
     private static void addPositions(MessageDigest digest, List<BudgetPrecheckPort.Allocation> positions) {
