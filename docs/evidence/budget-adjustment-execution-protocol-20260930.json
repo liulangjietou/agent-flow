@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-30",
+  "scope": "独立预算调整的批准来源、具名财务命令、原子回执、执行恢复状态及回环 HTTP 适配器",
+  "localOnly": true,
+  "sourceCommit": "27412b38fa312b0ea84987b4ad54a122b2a84bcf",
+  "verification": {
+    "domain": { "tests": 32, "failures": 0, "errors": 0, "newTests": 15 },
+    "gateway": { "tests": 51, "failures": 0, "errors": 0, "newAdjustmentTests": 6 },
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-protocol.log",
+    "overlapsEarlierScopes": true,
+    "transport": "真实回环 HTTP，合成预算服务",
+    "cases": [
+      "实际批准版本、原预算期间和目标保持；批准后新台账及独立财务决定",
+      "0.01 元双端变化、完整命令序列化恢复、重复发送字节与幂等头一致",
+      "错额、单边、重复预算、错误版本或期间、修改占用和消费均不能判成功",
+      "未知字段、重复 JSON 键、数字型金额、通用拒绝和未来观察均拒绝",
+      "超时写入只发送一次，恢复查询原编号与摘要且不携带写入幂等头",
+      "授权过期阻止新写入，仍允许查询原操作",
+      "查无只允许明确重发原指令；已受理后查无或事实倒退保持核对",
+      "网关停用、目标变化、数据库事务及通用读取入口不能发送调整"
+    ]
+  },
+  "remaining": ["持久财务复核与授权", "数据库执行队列和后台调度", "公开财务办理及页面", "实际库升级与业务 HTTP 验收", "浏览器及窄屏验收", "真实企业预算系统联调"],
+  "preservation": {
+    "runtimeSchema": "V76",
+    "runtimeReplaced": false,
+    "migrationAdded": false,
+    "existingBudgetRequestsExecuted": false
+  }
+}

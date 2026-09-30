@@ -54,6 +54,7 @@ public class FinanceGatewayClient {
     /** 业务适配器核对结果与请求一致性，基础传输只认固定操作及封闭结果类型。 */
     public <T> FinanceResult<T> read(String tenantId, Operation operation, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.BUDGET_QUERY
+                || operation == Operation.BUDGET_ADJUSTMENT_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_QUERY
                 || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_QUERY
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYABLE_HOLD_QUERY
@@ -210,6 +211,19 @@ public class FinanceGatewayClient {
         return exchange(tenantId, targetDigest, Operation.BUDGET_LEDGER, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
+    /** 预算额度调整必须绑定持久授权，两端共用一个原子幂等编号。 */
+    public <T> FinanceResult<T> executeBudgetAdjustment(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A persisted budget adjustment identity is required");
+        return exchange(tenantId, targetDigest, Operation.BUDGET_ADJUSTMENT_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 调整恢复只读原目标和原编号，不通过新命令推断旧结果。 */
+    public <T> FinanceResult<T> queryBudgetAdjustment(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.BUDGET_ADJUSTMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
     /** 独立反向凭证只读核验，不以查询请求触发 ERP 冲销或新的资金动作。 */
     public <T> FinanceResult<T> queryVoucherReversal(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
@@ -240,7 +254,7 @@ public class FinanceGatewayClient {
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
-                || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND
+                || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
@@ -301,6 +315,8 @@ public class FinanceGatewayClient {
                 FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         BUDGET_LEDGER("budget-ledger", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE,
                 FinanceResult.Reason.BUDGET_POSITION_UNAVAILABLE, FinanceResult.Reason.BUDGET_POLICY_UNAVAILABLE, FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED)),
+        BUDGET_ADJUSTMENT_COMMAND("budget-adjustment-command", Set.of()),
+        BUDGET_ADJUSTMENT_QUERY("budget-adjustment-query", Set.of()),
         BUDGET_COMMAND("budget-command", Set.of()),
         BUDGET_QUERY("budget-query", Set.of()),
         BUDGET_REVERSAL_COMMAND("budget-consumption-reversal-command", Set.of()),

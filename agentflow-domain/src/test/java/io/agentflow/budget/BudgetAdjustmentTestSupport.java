@@ -53,6 +53,27 @@ final class BudgetAdjustmentTestSupport {
     static void freeze(BudgetAdjustmentRequest request, long expectedVersion, int round) {
         request.freeze(expectedVersion, round, catalog(), TARGET, ledger(request.content()), initiator(), NOW);
     }
+    static BudgetAdjustmentRequest approved() {
+        var request = draft(content(BudgetAdjustmentContent.Type.TRANSFER, "70"));
+        freeze(request, 1, 1); request.approve(2, 1, 4, "manager", NOW); return request;
+    }
+    static BudgetLedgerPort.Snapshot currentLedger(ApprovedBudgetAdjustment source) {
+        var ledger = source.round().ledger();
+        return new BudgetLedgerPort.Snapshot(ledger.request(), "ledger-v2", NOW.plusSeconds(1), NOW.plusSeconds(301), ledger.positions());
+    }
+    static BudgetAdjustmentCommand command() {
+        var source = ApprovedBudgetAdjustment.from(approved());
+        return BudgetAdjustmentCommand.authorize(UUID.randomUUID(), source, currentLedger(source), "finance", "复核原预算调整", NOW.plusSeconds(2));
+    }
+    static BudgetAdjustmentObservation applied(BudgetAdjustmentCommand command, long revision, Instant observedAt) {
+        var changes = command.changes().stream().map(change -> {
+            var position = command.ledger().position(change.budgetReference());
+            return new BudgetAdjustmentObservation.AppliedChange(change.budgetReference(), change.expectedVersion(), "applied-v2", position.periodReference(),
+                    command.source().round().content().accountingDate(), change.beforeLimit(), change.afterLimit(), position.committed(), position.consumed());
+        }).toList();
+        return new BudgetAdjustmentObservation(command.id(), command.digest(), BudgetAdjustmentObservation.Status.APPLIED, revision,
+                observedAt, "budget-adjustment-1", command.authorizedAt(), changes, null);
+    }
     static void fails(String code, Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo(code));
     }
