@@ -16,6 +16,7 @@ public record SupplierPaymentOperation(SupplierPaymentCommand command, long vers
         PaymentObservation observation, PaymentObservation conflictingObservation, long highestRevision, Failure failure) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
 
     /** 恢复原命令时保留发送记录与银行事实，不能把超时或查无改写成尚未发送。 */
     public SupplierPaymentOperation {
@@ -148,6 +149,62 @@ public record SupplierPaymentOperation(SupplierPaymentCommand command, long vers
     public boolean leaseExpired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     /** 仅无争议的精确到账结果可以支持后续原 ERP 应付结算。 */
     public boolean settleable() { return status == Status.SUCCEEDED; }
+
+    /** 裁决只采用近期原号查询的最高终态，已经确认的到账及退回必须继续保留。 */
+    public ResolutionIssue resolutionIssue(ResolutionHistory history, Instant now) {
+        if (status != Status.RECONCILING) return ResolutionIssue.NOT_DISPUTED;
+        var candidate = conflictingObservation;
+        if (!terminal(candidate)) return ResolutionIssue.NON_TERMINAL;
+        if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())) return ResolutionIssue.STALE_EVIDENCE;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EXPIRED_EVIDENCE;
+        if (history.firstSuccess() != null && !command.matches(history.firstSuccess(), true, now)
+                || history.firstReturn() != null && !command.matches(history.firstReturn(), true, now)) return ResolutionIssue.HISTORY_CHANGED;
+        if (observation != null && observation.paymentReference() != null && !observation.paymentReference().equals(candidate.paymentReference())) return ResolutionIssue.DIFFERENT_PAYMENT;
+        if (candidate.status() == PaymentObservation.Status.FAILED && (history.fundingObserved() || funding(observation))) return ResolutionIssue.FUNDING_ALREADY_OBSERVED;
+        var returned = history.firstReturn() != null ? history.firstReturn() : observation != null && observation.status() == PaymentObservation.Status.REVERSED ? observation : null;
+        if (returned != null && (candidate.status() != PaymentObservation.Status.REVERSED || !sameSettlement(returned, candidate))) return ResolutionIssue.RETURN_ALREADY_OBSERVED;
+        var paid = history.firstSuccess() != null ? history.firstSuccess() : observation != null && observation.status() == PaymentObservation.Status.SUCCEEDED ? observation : null;
+        if (paid != null && (candidate.status() == PaymentObservation.Status.SUCCEEDED && !sameSettlement(paid, candidate)
+                || candidate.status() == PaymentObservation.Status.REVERSED && (!paid.paymentReference().equals(candidate.paymentReference())
+                    || candidate.completedAt().isBefore(paid.completedAt())))) return ResolutionIssue.DIFFERENT_SETTLEMENT;
+        return null;
+    }
+
+    /** 仅改变原付款的当前核对状态，资金命令、ERP 预留及已保存的核销均不在此处重建。 */
+    public SupplierPaymentOperation resolveDispute(PaymentObservation.Status outcome, ResolutionHistory history, Instant now) {
+        requireTime(now);
+        if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome) {
+            throw new DomainException("SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE", "Recent terminal evidence must preserve the original supplier payment and historical funding");
+        }
+        return changed(Status.valueOf(outcome.name()), now, null, null, evidence, conflictingObservation, null, highestRevision, null);
+    }
+
+    private static boolean terminal(PaymentObservation value) {
+        return value.status() == PaymentObservation.Status.SUCCEEDED || value.status() == PaymentObservation.Status.FAILED || value.status() == PaymentObservation.Status.REVERSED;
+    }
+    private static boolean funding(PaymentObservation value) {
+        return value != null && (value.status() == PaymentObservation.Status.SUCCEEDED || value.status() == PaymentObservation.Status.REVERSED);
+    }
+
+    /**
+     * 仓储逐条读取历史后提供最小事实，冲突中曾出现的资金证据也禁止裁决成从未付款。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ResolutionHistory(PaymentObservation firstSuccess, PaymentObservation firstReturn, boolean fundingObserved) {
+        /** 首次确认的资金与退回须保持各自终态，不能用其他回执伪装历史。 */
+        public ResolutionHistory {
+            if (firstSuccess != null && firstSuccess.status() != PaymentObservation.Status.SUCCEEDED
+                    || firstReturn != null && firstReturn.status() != PaymentObservation.Status.REVERSED
+                    || !fundingObserved && (firstSuccess != null || firstReturn != null)) throw invalid();
+        }
+    }
+
+    /**
+     * 原交易仍不可裁决时给出业务原因，不泄露银行响应原文。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_EVIDENCE, EXPIRED_EVIDENCE, HISTORY_CHANGED,
+        DIFFERENT_PAYMENT, FUNDING_ALREADY_OBSERVED, DIFFERENT_SETTLEMENT, RETURN_ALREADY_OBSERVED }
 
     private SupplierPaymentOperation expireAuthorization(Instant now) {
         return changed(Status.EXPIRED, now, null, null, null, observation, conflictingObservation, highestRevision, Failure.AUTHORIZATION_EXPIRED);

@@ -2,10 +2,12 @@ package io.agentflow.procurement;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.finance.PaymentObservation;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,6 +59,75 @@ public class JdbcSupplierPaymentOperationRepository {
     /** 前版及原命令共同参与条件更新，迟到响应无法替换已保存的指令或新结果。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void update(SupplierPaymentOperation value) {
+        var before = find(value.command().tenantId(), value.command().id()).orElseThrow(JdbcSupplierPaymentOperationRepository::conflict);
+        if (before.version() != value.version() - 1 || before.conflictingObservation() != null && value.conflictingObservation() == null) {
+            throw conflict();
+        }
+        persist(value);
+    }
+
+    /** 裁决与清除争议只能原子保存，普通更新没有解除争议的权限。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierPaymentOperation resolve(SupplierPaymentDisputeResolution decision) {
+        var locked = jdbc.queryForList("SELECT id FROM supplier_payment_operation WHERE tenant_id=? AND id=? FOR UPDATE",
+                String.class, decision.tenantId(), decision.paymentId().toString());
+        if (locked.isEmpty()) throw conflict();
+        var before = find(decision.tenantId(), decision.paymentId()).orElseThrow(JdbcSupplierPaymentOperationRepository::conflict);
+        var after = decision.resolve(before, resolutionHistory(before));
+        persist(after);
+        jdbc.update("""
+                INSERT INTO supplier_payment_dispute_resolution(tenant_id,id,payment_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+                VALUES(?,?,?,?,?,?,?,?,?,?)
+                """, decision.tenantId(), decision.id().toString(), decision.paymentId().toString(), decision.disputedVersion(), decision.resolvedVersion(),
+                decision.observation().status().name(), decision.resolvedBy(), preciseTimestamp(decision.observation().observedAt()), preciseTimestamp(decision.resolvedAt()), json.write(decision));
+        return after;
+    }
+
+    /** 当前付款及完整连续历史共同决定是否曾到账或退回，后续回执不能覆盖这些事实。 */
+    public SupplierPaymentOperation.ResolutionHistory resolutionHistory(String tenant, UUID id) {
+        return resolutionHistory(find(tenant, id).orElseThrow(JdbcSupplierPaymentOperationRepository::conflict));
+    }
+
+    /** 最后裁决仍核对两端原修订及当时历史；后来新的查询不改写旧决定。 */
+    public Optional<SupplierPaymentDisputeResolution> latestResolution(String tenant, UUID id) {
+        return jdbc.query("SELECT * FROM supplier_payment_dispute_resolution WHERE tenant_id=? AND payment_id=? ORDER BY resolved_version DESC LIMIT 1", (row, index) -> {
+            var value = json.read(row.getString("state_json"), SupplierPaymentDisputeResolution.class);
+            if (!tenant.equals(value.tenantId()) || !id.equals(value.paymentId()) || !value.id().toString().equals(row.getString("id"))
+                    || value.disputedVersion() != row.getLong("disputed_version") || value.resolvedVersion() != row.getLong("resolved_version")
+                    || !value.observation().status().name().equals(row.getString("outcome")) || !value.resolvedBy().equals(row.getString("resolved_by"))
+                    || !value.observation().observedAt().truncatedTo(ChronoUnit.MICROS).equals(instant(row.getTimestamp("observed_at")))
+                    || !value.resolvedAt().truncatedTo(ChronoUnit.MICROS).equals(instant(row.getTimestamp("resolved_at")))) throw conflict();
+            var before = revision(tenant, id, value.disputedVersion()).orElseThrow(JdbcSupplierPaymentOperationRepository::conflict);
+            var after = revision(tenant, id, value.resolvedVersion()).orElseThrow(JdbcSupplierPaymentOperationRepository::conflict);
+            if (!value.resolve(before, resolutionHistory(before)).equals(after)) throw conflict();
+            return value;
+        }, tenant, id.toString()).stream().findFirst();
+    }
+
+    private SupplierPaymentOperation.ResolutionHistory resolutionHistory(SupplierPaymentOperation current) {
+        var command = current.command();
+        return jdbc.query("SELECT version,state_json FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? AND version<=? ORDER BY version", rows -> {
+            PaymentObservation firstSuccess = null, firstReturn = null; boolean fundingObserved = false;
+            long version = 0; SupplierPaymentOperation previous = null;
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), SupplierPaymentOperation.class);
+                if (++version != rows.getLong("version") || value.version() != version || !value.command().equals(command)) throw conflict();
+                if (firstSuccess == null && value.status() == SupplierPaymentOperation.Status.SUCCEEDED) firstSuccess = value.observation();
+                if (firstReturn == null && value.status() == SupplierPaymentOperation.Status.REVERSED) firstReturn = value.observation();
+                fundingObserved |= funding(value.observation()) || funding(value.conflictingObservation()); previous = value;
+            }
+            if (!current.equals(previous)) throw conflict();
+            return new SupplierPaymentOperation.ResolutionHistory(firstSuccess, firstReturn, fundingObserved);
+        }, command.tenantId(), command.id().toString(), current.version());
+    }
+
+    private static boolean funding(PaymentObservation value) {
+        return value != null && (value.status() == PaymentObservation.Status.SUCCEEDED || value.status() == PaymentObservation.Status.REVERSED);
+    }
+    // 外部回执保留原始纳秒；仅关系列主动截断，避免数据库四舍五入改写比较依据。
+    private static Timestamp preciseTimestamp(Instant value) { return Timestamp.from(value.truncatedTo(ChronoUnit.MICROS)); }
+
+    private void persist(SupplierPaymentOperation value) {
         var command = value.command();
         int changed = jdbc.update("""
                 UPDATE supplier_payment_operation SET state_json=?,version=?,status=?,attempts=?,dispatches=?,highest_revision=?,updated_at=?,next_attempt_at=?,lease_until=?

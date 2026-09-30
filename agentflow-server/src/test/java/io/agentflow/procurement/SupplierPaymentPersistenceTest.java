@@ -113,6 +113,79 @@ class SupplierPaymentPersistenceTest {
         assertThatThrownBy(() -> register(hold)).isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_ALREADY_REGISTERED"));
     }
 
+    @Test void directOperationUpdateCannotDropDisputeWithoutADecision() {
+        var disputed = disputedPayment(); var original = payments.revision(tenant, disputed.command().id(), 4).orElseThrow().observation();
+        var after = disputed.resolveDispute(PaymentObservation.Status.SUCCEEDED,
+                new SupplierPaymentOperation.ResolutionHistory(original, null, true), disputed.updatedAt());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> payments.update(after))).isInstanceOf(DomainException.class);
+        assertThat(payments.find(tenant, disputed.command().id())).contains(disputed);
+        assertThat(payments.revision(tenant, disputed.command().id(), after.version())).isEmpty();
+    }
+
+    @Test void disputeDecisionAndOriginalBankHistorySurviveRepositoryRecreation() {
+        var before = disputedPayment(); var command = before.command(); var id = command.id();
+        var original = payments.revision(tenant, id, 4).orElseThrow().observation(); var decision = decision(before);
+        assertThat(payments.resolutionHistory(tenant, id)).isEqualTo(new SupplierPaymentOperation.ResolutionHistory(original, null, true));
+        var after = tx.execute(status -> payments.resolve(decision));
+        var reopened = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
+        assertThat(reopened.latestResolution(tenant, id)).contains(decision); assertThat(reopened.latestResolution("other", id)).isEmpty();
+        assertThat(reopened.find(tenant, id)).contains(after); assertThat(after.settleable()).isTrue(); assertThat(after.command()).isEqualTo(command);
+        assertThat(after.dispatches()).isEqualTo(before.dispatches()); assertThat(reopened.revision(tenant, id, before.version())).contains(before);
+        assertThat(holds.find(tenant, id).orElseThrow().status()).isEqualTo(SupplierPayableHoldOperation.Status.HELD);
+        assertThat(authorizations.find(tenant, id)).contains(command.holdCommand().authorization());
+        assertThatThrownBy(() -> tx.execute(status -> payments.resolve(decision))).isInstanceOf(DomainException.class);
+        assertThat(count("supplier_payment_dispute_resolution")).isEqualTo(1);
+    }
+
+    @Test void decisionInsertFailureRollsBackClearedDisputeAndResultRevision() {
+        var before = disputedPayment(); var decision = decision(before);
+        jdbc.execute("ALTER TABLE supplier_payment_dispute_resolution ADD CONSTRAINT reject_test_supplier_resolution CHECK (outcome<>'SUCCEEDED')");
+        assertThatThrownBy(() -> tx.execute(status -> payments.resolve(decision))).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(payments.find(tenant, before.command().id())).contains(before);
+        assertThat(payments.revision(tenant, before.command().id(), decision.resolvedVersion())).isEmpty();
+        assertThat(count("supplier_payment_dispute_resolution")).isZero();
+        jdbc.execute("ALTER TABLE supplier_payment_dispute_resolution DROP CONSTRAINT reject_test_supplier_resolution");
+        assertThat(tx.execute(status -> payments.resolve(decision)).settleable()).isTrue();
+    }
+
+    @Test void concurrentDecisionsAcceptExactlyOneOriginalVersion() throws Exception {
+        var before = disputedPayment(); var first = decision(before); var second = decision(before);
+        var start = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(() -> { start.await(); return resolutionOutcome(first); });
+            var b = pool.submit(() -> { start.await(); return resolutionOutcome(second); }); start.countDown();
+            assertThat(List.of(a.get(15, TimeUnit.SECONDS), b.get(15, TimeUnit.SECONDS))).containsExactlyInAnyOrder("OK", "CONFLICT");
+        } finally { pool.shutdownNow(); }
+        assertThat(count("supplier_payment_dispute_resolution")).isEqualTo(1);
+        assertThat(payments.find(tenant, before.command().id()).orElseThrow().version()).isEqualTo(before.version() + 1);
+    }
+
+    @Test void missingHistoricalRevisionPreventsResolutionAndCorruptedDecisionIsRejected() {
+        var before = disputedPayment(); var decision = decision(before); var id = before.command().id();
+        var original = jdbc.queryForObject("SELECT state_json FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? AND version=4", String.class, tenant, id.toString());
+        jdbc.update("DELETE FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? AND version=4", tenant, id.toString());
+        assertThatThrownBy(() -> tx.execute(status -> payments.resolve(decision))).isInstanceOf(DomainException.class);
+        assertThat(payments.find(tenant, id)).contains(before);
+        jdbc.update("INSERT INTO supplier_payment_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,4,?)", tenant, id.toString(), original);
+        tx.executeWithoutResult(status -> payments.resolve(decision));
+        jdbc.update("UPDATE supplier_payment_dispute_resolution SET resolved_by='another-finance' WHERE tenant_id=?", tenant);
+        assertThatThrownBy(() -> payments.latestResolution(tenant, id)).isInstanceOf(DomainException.class);
+    }
+
+    @Test void v77UpgradePreservesExistingBankConflictAndPermitsOnlyARecordedResolution() {
+        database("77"); var before = disputedPayment();
+        var tables = List.of("approval_application", "procurement_payment", "procurement_payment_revision", "procurement_payable_reservation", "procurement_payable_reservation_revision",
+                "invoice_active_claim", "supplier_payment_authorization", "supplier_payable_hold_operation", "supplier_payable_hold_revision", "supplier_payment_execution_request",
+                "supplier_payment_execution_revision", "supplier_payment_operation", "supplier_payment_revision");
+        var original = tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList();
+        var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema).target("78").load();
+        assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList()).isEqualTo(original);
+        assertThat(migration.migrate().migrationsExecuted).isZero(); assertThat(migration.validateWithResult().validationSuccessful).isTrue();
+        var after = tx.execute(status -> payments.resolve(decision(before))); assertThat(after.settleable()).isTrue();
+        assertThat(payments.revision(tenant, before.command().id(), before.version())).contains(before);
+    }
+
     @Test void concurrentCashierSelectionsHaveOneOwnerAndOneImmutableBankCommand() throws Exception {
         var hold = confirmed(); var start = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
         try {
@@ -285,6 +358,28 @@ class SupplierPaymentPersistenceTest {
         var another = confirmed(); var queued = prepared(register(another));
         assertThat(bank.claim(tenant, queued.command().id(), deadline)).isNull(); assertThat(payments.find(tenant, queued.command().id()).orElseThrow().status()).isEqualTo(SupplierPaymentOperation.Status.EXPIRED);
         assertThat(holds.find(tenant, hold.command().id())).contains(hold); assertThat(holds.find(tenant, another.command().id())).contains(another);
+    }
+
+    private SupplierPaymentOperation disputedPayment() {
+        var sent = sending(prepared(register(confirmed()))); var original = paid(sent.command(), sent.updatedAt());
+        bank.finish(sent, new FinanceResult.Success<>(original), sent.updatedAt());
+        for (long revision : List.of(2L, 3L)) {
+            var before = payments.find(tenant, sent.command().id()).orElseThrow(); var observedAt = sent.updatedAt().plusSeconds(revision);
+            tx.executeWithoutResult(status -> bank.query(tenant, sent.command().id(), before.version(), observedAt));
+            var claim = bank.claim(tenant, sent.command().id(), observedAt);
+            var incoming = new PaymentObservation(original.authorizationId(), original.commandDigest(), original.status(), revision, observedAt,
+                    original.paymentReference(), original.paidAmount(), original.accountDigest(), original.completedAt(), revision == 2 ? "conflicting-receipt" : original.receiptReference(), null);
+            bank.finish(claim, new FinanceResult.Success<>(incoming), observedAt);
+        }
+        return payments.find(tenant, sent.command().id()).orElseThrow();
+    }
+
+    private SupplierPaymentDisputeResolution decision(SupplierPaymentOperation value) {
+        return new SupplierPaymentDisputeResolution(UUID.randomUUID(), tenant, value.command().id(), value.version(), value.version() + 1,
+                value.conflictingObservation(), "finance", value.updatedAt(), "bank-statement-1", "核对原付款终态");
+    }
+    private String resolutionOutcome(SupplierPaymentDisputeResolution value) {
+        try { tx.execute(status -> payments.resolve(value)); return "OK"; } catch (DomainException rejected) { return "CONFLICT"; }
     }
 
     private SupplierPaymentAuthorization approved() {
