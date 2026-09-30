@@ -77,6 +77,423 @@
     }
   ],
   "paths": {
+    "/api/v1/supplier-payments/{id}/dispute": {
+      "get": {
+        "operationId": "getSupplierPaymentDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "读取原供应商银行争议和裁决",
+        "description": "按原审批轮次完整字段权限读取当前银行事实、候选终态和最近决定。历史决定不覆盖后续争议；响应禁止缓存。",
+        "x-access": "原轮次具有完整字段读取权限的参与人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "原银行事实和当前可办理能力。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDisputeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/supplier-payments/{id}/dispute/queries": {
+      "post": {
+        "operationId": "querySupplierPaymentDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "登记原供应商银行只读查询",
+        "description": "独立财务按当前法人任职及原轮次字段权限办理，幂等回放前仍重查权限。客户端只提交展示版本和人工决定，不提交账号、金额或银行回执。查询不重发付款；裁决只采用保存的五分钟内最高版本原交易终态，保留原到账、退回、ERP 核销与本地完成事实。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前证据无法支持裁决，或不满足独立财务条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原查询或裁决及审计已保存，银行和核销状态需要重新读取。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDisputeReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierDisputeQueryInput"
+              },
+              "example": {
+                "operationVersion": 8,
+                "comment": "核对原银行实际处理结果"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier-payments/{id}/dispute/resolutions": {
+      "post": {
+        "operationId": "resolveSupplierPaymentDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "明确采用原银行近期终态",
+        "description": "独立财务按当前法人任职及原轮次字段权限办理，幂等回放前仍重查权限。客户端只提交展示版本和人工决定，不提交账号、金额或银行回执。查询不重发付款；裁决只采用保存的五分钟内最高版本原交易终态，保留原到账、退回、ERP 核销与本地完成事实。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前证据无法支持裁决，或不满足独立财务条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原查询或裁决及审计已保存，银行和核销状态需要重新读取。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDisputeReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierDisputeResolveInput"
+              },
+              "example": {
+                "operationVersion": 12,
+                "outcome": "SUCCEEDED",
+                "evidenceReference": "BANK-STATEMENT-1",
+                "comment": "核对原付款及回单后采用银行终态"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/budget-adjustments/{id}/execution": {
       "get": {
         "operationId": "getBudgetAdjustmentFinanceWorkspace",
@@ -30766,6 +31183,401 @@
       }
     },
     "schemas": {
+      "SupplierDisputeView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "operationVersion",
+          "status",
+          "observed",
+          "candidate",
+          "issue",
+          "canQuery",
+          "canResolve",
+          "latest"
+        ],
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "QUEUED",
+                  "CHECKING",
+                  "SENDING",
+                  "UNKNOWN",
+                  "QUERYING",
+                  "SUCCEEDED",
+                  "FAILED",
+                  "REVERSED",
+                  "NOT_FOUND",
+                  "RECONCILING",
+                  "EXPIRED",
+                  "VOIDED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierDisputeFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierDisputeFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_DISPUTED",
+                  "NON_TERMINAL",
+                  "STALE_EVIDENCE",
+                  "EXPIRED_EVIDENCE",
+                  "HISTORY_CHANGED",
+                  "DIFFERENT_PAYMENT",
+                  "FUNDING_ALREADY_OBSERVED",
+                  "DIFFERENT_SETTLEMENT",
+                  "RETURN_ALREADY_OBSERVED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierDisputeDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierDisputeFact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "paymentReference",
+          "receiptReference",
+          "completedAt",
+          "failure"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED",
+              "NOT_FOUND"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receiptReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACCOUNT_UNAVAILABLE",
+                  "DEBIT_ACCOUNT_UNAVAILABLE",
+                  "INSUFFICIENT_FUNDS",
+                  "AUTHORIZATION_EXPIRED",
+                  "APPROVAL_CHANGED",
+                  "ACCOUNT_CHANGED",
+                  "VOUCHER_UNAVAILABLE",
+                  "PAYMENT_REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierDisputeDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "outcome",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "resolvedBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          }
+        }
+      },
+      "SupplierDisputeReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "action",
+          "operationVersion",
+          "status",
+          "resolutionId",
+          "auditEventId"
+        ],
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "QUERY",
+              "RESOLVE"
+            ]
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CHECKING",
+              "SENDING",
+              "UNKNOWN",
+              "QUERYING",
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED",
+              "NOT_FOUND",
+              "RECONCILING",
+              "EXPIRED",
+              "VOIDED"
+            ]
+          },
+          "resolutionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SupplierDisputeQueryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationVersion",
+          "comment"
+        ],
+        "properties": {
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "SupplierDisputeResolveInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "REVERSED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
       "BudgetAdjustmentFinanceWorkspace": {
         "type": "object",
         "additionalProperties": false,

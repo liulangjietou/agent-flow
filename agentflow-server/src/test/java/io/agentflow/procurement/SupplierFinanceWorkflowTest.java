@@ -66,7 +66,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.supplier-payments.settlement-preparation-worker-enabled=false", "agentflow.supplier-payments.settlement-worker-enabled=false",
         "agentflow.supplier-payments.hold-worker-enabled=false", "agentflow.supplier-payments.review-worker-enabled=false",
         "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
-        "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false"})
+        "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false",
+        "agentflow.budget-adjustments.precheck-worker-enabled=false", "agentflow.budget-adjustments.review-worker-enabled=false", "agentflow.budget-adjustments.execution-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class SupplierFinanceWorkflowTest {
     private static final HttpServer SERVER = server();
@@ -511,6 +512,114 @@ class SupplierFinanceWorkflowTest {
         var tampered = body.substring(0, body.length() - 1) + ",\"status\":\"SUCCEEDED\"}";
         okError(mvc.perform(PaymentCallbackTestRequests.request(event, tampered)).andReturn().getResponse(), 400, "PAYMENT_CALLBACK_INVALID");
         assertThat(callbackRecords.byEvent("demo", event)).isEmpty(); assertThat(bankPayments.find("demo", payment)).contains(original);
+    }
+
+    @Test void financialBankDisputeRequiresExplicitOriginalTerminalDecisionAndNeverResendsPayment() throws Exception {
+        UUID payment = paidBank(); var original = bankPayments.find("demo", payment).orElseThrow(); var hold = holds.find("demo", payment).orElseThrow();
+        queryDispute(payment, "WRONG-RECEIPT", 2); var invalid = disputeView(payment);
+        assertThat(invalid.path("issue").asText()).isEqualTo("DIFFERENT_SETTLEMENT"); assertThat(invalid.path("canResolve").asBoolean()).isFalse();
+        okError(send(disputePath(payment) + "/resolutions", "finance", disputeInput(invalid)), 422, "SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE");
+        queryDispute(payment, "RECEIPT-1", 3); var ready = disputeView(payment); assertThat(ready.path("canResolve").asBoolean()).isTrue();
+        assertThat(ready.at("/observed/receiptReference").asText()).isEqualTo("RECEIPT-1"); assertCashierPrivateFactsAbsent(ready);
+        String key = UUID.randomUUID().toString(); var input = disputeInput(ready); var first = send(disputePath(payment) + "/resolutions", "finance", key, input);
+        var receipt = ok(first, 202); assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(receipt.path("status").asText()).isEqualTo("SUCCEEDED"); assertThat(receipt.path("operationVersion").asLong()).isEqualTo(ready.path("operationVersion").asLong() + 1);
+        assertThat(send(disputePath(payment) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        var done = disputeView(payment); assertThat(done.path("candidate").isNull()).isTrue(); assertThat(done.path("canResolve").asBoolean()).isFalse();
+        assertThat(done.at("/latest/id").asText()).isEqualTo(receipt.path("resolutionId").asText());
+        assertThat(bankPayments.find("demo", payment).orElseThrow().command()).isEqualTo(original.command()); assertThat(holds.find("demo", payment)).contains(hold);
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1); assertThat(calls).doesNotContainKey("supplier-payable-settlement-command");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM supplier_payment_dispute_resolution WHERE tenant_id='demo' AND payment_id=?", Integer.class, payment.toString())).isEqualTo(1);
+    }
+
+    @Test void disputeReplayRechecksFinancialAppointmentAndOriginalSensitiveFieldPermission() throws Exception {
+        UUID payment = paidBank(); queryDispute(payment, "WRONG-RECEIPT", 2); queryDispute(payment, "RECEIPT-1", 3);
+        var displayed = disputeView(payment); var input = disputeInput(displayed); String key = UUID.randomUUID().toString();
+        var first = send(disputePath(payment) + "/resolutions", "finance", key, input); ok(first, 202);
+        var applicant = ok(read(disputePath(payment), "alice"), 200); assertThat(applicant.path("canQuery").asBoolean()).isFalse(); assertThat(applicant.path("canResolve").asBoolean()).isFalse();
+        okError(read(disputePath(payment), "admin"), 403, "FORBIDDEN"); okError(read(disputePath(payment), "bob"), 404, "NOT_FOUND");
+        for (String user : List.of("alice", "cashier", "admin")) assertThat(send(disputePath(payment) + "/resolutions", user, input).getStatus()).isBetween(400, 499);
+        organization.updateAppointment(admin, financeAppointment, false, 1);
+        okError(send(disputePath(payment) + "/resolutions", "finance", key, input), 403, "FORBIDDEN");
+        assertThat(disputeView(payment).path("canQuery").asBoolean()).isFalse();
+        organization.updateAppointment(admin, financeAppointment, true, 2);
+        assertThat(send(disputePath(payment) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try { okError(send(disputePath(payment) + "/resolutions", "finance", key, input), 403, "FORBIDDEN"); okError(read(disputePath(payment), "finance"), 403, "FORBIDDEN"); }
+        finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+    }
+
+    @Test void disputeInputsRejectInjectedBankFactsWrongOutcomeAndStaleDisplayedVersion() throws Exception {
+        UUID payment = paidBank(); queryDispute(payment, "WRONG-RECEIPT", 2); queryDispute(payment, "RECEIPT-1", 3); var displayed = disputeView(payment);
+        var forged = new java.util.HashMap<>(disputeInput(displayed)); forged.put("receiptReference", "forged");
+        okError(send(disputePath(payment) + "/resolutions", "finance", forged), 400, "INVALID_REQUEST");
+        forged = new java.util.HashMap<>(disputeInput(displayed)); forged.put("operationVersion", displayed.path("operationVersion").asLong() - 1);
+        okError(send(disputePath(payment) + "/resolutions", "finance", forged), 409, "CONCURRENCY_CONFLICT");
+        forged = new java.util.HashMap<>(disputeInput(displayed)); forged.put("outcome", "FAILED");
+        okError(send(disputePath(payment) + "/resolutions", "finance", forged), 422, "SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE");
+        forged.put("outcome", "NOT_FOUND"); okError(send(disputePath(payment) + "/resolutions", "finance", forged), 400, "INVALID_REQUEST");
+        forged = new java.util.HashMap<>(disputeInput(displayed)); forged.put("evidenceReference", "invalid\nreference");
+        assertThat(send(disputePath(payment) + "/resolutions", "finance", forged).getStatus()).isEqualTo(400);
+        okError(read(disputePath(payment) + "?tenantId=other", "finance"), 400, "INVALID_SUPPLIER_DISPUTE_QUERY");
+        okError(read(disputePath(UUID.randomUUID()), "finance"), 404, "NOT_FOUND");
+        assertThat(bankPayments.find("demo", payment).orElseThrow().status()).isEqualTo(SupplierPaymentOperation.Status.RECONCILING);
+        assertThat(bankPayments.latestResolution("demo", payment)).isEmpty();
+    }
+
+    @Test void disputeAuditFailureRollsBackDecisionRevisionAndIdempotencyReceipt() throws Exception {
+        UUID payment = paidBank(); queryDispute(payment, "WRONG-RECEIPT", 2); queryDispute(payment, "RECEIPT-1", 3);
+        var before = bankPayments.find("demo", payment).orElseThrow(); var input = disputeInput(disputeView(payment)); String key = UUID.randomUUID().toString();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_supplier_dispute_audit CHECK(aggregate_id<>'%s' OR action<>'SUPPLIER_PAYMENT_DISPUTE_RESOLVE')".formatted(payment));
+        try { assertThatThrownBy(() -> send(disputePath(payment) + "/resolutions", "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_supplier_dispute_audit"); }
+        assertThat(bankPayments.find("demo", payment)).contains(before); assertThat(bankPayments.latestResolution("demo", payment)).isEmpty();
+        assertThat(bankPayments.revision("demo", payment, before.version() + 1)).isEmpty();
+        ok(send(disputePath(payment) + "/resolutions", "finance", key, input), 202);
+        assertThat(bankPayments.find("demo", payment).orElseThrow().settleable()).isTrue();
+    }
+
+    @Test void financialDisputeQueryReplaysNeedCurrentAccessAndAuditFailureDoesNotQueue() throws Exception {
+        UUID payment = paidBank(); var original = bankPayments.find("demo", payment).orElseThrow(); String key = UUID.randomUUID().toString();
+        var input = Map.of("operationVersion", original.version(), "comment", "核对原银行交易");
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_supplier_dispute_query CHECK(aggregate_id<>'%s' OR action<>'SUPPLIER_PAYMENT_DISPUTE_QUERY')".formatted(payment));
+        try { assertThatThrownBy(() -> send(disputePath(payment) + "/queries", "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_supplier_dispute_query"); }
+        assertThat(bankPayments.find("demo", payment)).contains(original);
+        var first = send(disputePath(payment) + "/queries", "finance", key, input); assertThat(ok(first, 202).path("status").asText()).isEqualTo("UNKNOWN");
+        pollBank(payment); organization.updateAppointment(admin, financeAppointment, false, 1);
+        okError(send(disputePath(payment) + "/queries", "finance", key, input), 403, "FORBIDDEN");
+        organization.updateAppointment(admin, financeAppointment, true, 2);
+        assertThat(send(disputePath(payment) + "/queries", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+        assertThat(calls.get("supplier-payment-query").get()).isEqualTo(1);
+    }
+
+    @Test void disputeResolutionPreservesPreviouslyCompletedErpSettlementAndNeverReposts() throws Exception {
+        UUID payment = paidBank(); UUID settlement = queueSettlement(payment); pollSettlement(settlement);
+        var before = settlementView(payment); var operation = settlements.find("demo", settlement).orElseThrow();
+        queryDispute(payment, "WRONG-RECEIPT", 2); queryDispute(payment, "RECEIPT-1", 3);
+        ok(send(disputePath(payment) + "/resolutions", "finance", disputeInput(disputeView(payment))), 202);
+        assertThat(settlementView(payment).path("completion")).isEqualTo(before.path("completion"));
+        assertThat(settlements.find("demo", settlement)).contains(operation);
+        assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+    }
+
+    private String disputePath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/dispute"; }
+    private JsonNode disputeView(UUID payment) throws Exception {
+        var response = read(disputePath(payment), "finance"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200);
+    }
+    private Map<String, Object> disputeInput(JsonNode view) {
+        return Map.of("operationVersion", view.path("operationVersion").asLong(), "outcome", view.at("/candidate/outcome").asText(), "evidenceReference", "BANK-STATEMENT-1", "comment", "核对原供应商银行交易及回单");
+    }
+    private void queryDispute(UUID payment, String receipt, long revision) throws Exception {
+        var command = bankPayments.find("demo", payment).orElseThrow().command();
+        responder = (operation, request) -> operation.equals("supplier-payment-query")
+                ? json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data",
+                    new PaymentObservation(payment, command.digest(), PaymentObservation.Status.SUCCEEDED, revision, Instant.now(), "BANK-1", command.amount(), command.payee().accountDigest(), command.registeredAt(), receipt, null)))
+                : normal(operation, request);
+        var current = disputeView(payment);
+        ok(send(disputePath(payment) + "/queries", "finance", Map.of("operationVersion", current.path("operationVersion").asLong(), "comment", "读取原银行最新事实")), 202);
+        pollBank(payment); assertThat(bankPayments.find("demo", payment).orElseThrow().status()).isEqualTo(SupplierPaymentOperation.Status.RECONCILING);
     }
 
     private UUID paidBank() throws Exception {
