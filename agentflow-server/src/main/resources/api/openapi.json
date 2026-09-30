@@ -32755,6 +32755,108 @@
       }
     },
     "/api/v1/expense-reports/{id}/partial-adjustments": {
+      "get": {
+        "operationId": "expensePartialAdjustmentWorkspace",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取部分报销调整工作台",
+        "description": "只读展示正额已核销报销的原财务版本、实际最后完成净额、逐行金额、回款占用与全部独立调整历史。未完成目标不改变剩余额；历史复核保留原完成及已用回款。available 仅表示整笔回款没有持久占用，创建仍核对本次差额及实际来源。读取不触发外部查询、写入或证据续期。零应付保留空银行及付款凭证，零核定金额不属于部分调整范围。",
+        "x-access": "须具备原轮次完整财务字段权限，管理员也受约束。当前同法人独立财务才能看到本人最新单侧准备及可授权预览；申请人可读已保存历史，其他财务不能查看本人的未授权准备。公开写入始终重新核对权限、版本及证据。",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialWorkspace"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      },
       "post": {
         "operationId": "createExpensePartialAdjustment",
         "tags": [
@@ -57169,6 +57271,934 @@
           "auditEventId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "ExpensePartialLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lineNo",
+          "gross",
+          "tax"
+        ],
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "ExpensePartialAmounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gross",
+          "tax",
+          "offsets",
+          "payable",
+          "lines"
+        ],
+        "properties": {
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "offsets": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "payable": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePartialLine"
+            }
+          }
+        }
+      },
+      "ExpensePartialSource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "updatedAt",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "UNKNOWN",
+              "QUERYING",
+              "APPLIED",
+              "REJECTED",
+              "CHECKING",
+              "SENDING",
+              "SUCCEEDED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED",
+              "POSTING",
+              "POSTED"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialOriginal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amounts",
+          "budget",
+          "accrual",
+          "payment",
+          "paymentVoucher"
+        ],
+        "properties": {
+          "amounts": {
+            "$ref": "#/components/schemas/ExpensePartialAmounts"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/ExpensePartialSource"
+          },
+          "accrual": {
+            "$ref": "#/components/schemas/ExpensePartialSource"
+          },
+          "payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paymentVoucher": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialReturnEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "registrationId",
+          "fundsIdentity",
+          "amount",
+          "receivedAt",
+          "available"
+        ],
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fundsIdentity": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExpensePartialPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "accountingDate",
+          "evidenceReference",
+          "reason",
+          "requestedAt",
+          "updatedAt",
+          "issue",
+          "periodReference",
+          "expiresAt",
+          "canAuthorize",
+          "authorizationIssue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "AUTHORIZED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "evidenceReference": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "periodReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canAuthorize": {
+            "type": "boolean"
+          },
+          "authorizationIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialBudgetFact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "observedAt",
+          "rejection",
+          "reference",
+          "reducedAmount",
+          "appliedAt"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "PENDING",
+              "NOT_FOUND"
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reducedAmount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appliedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialAccrualFact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "revision",
+          "observedAt",
+          "rejection",
+          "acceptanceReference",
+          "postingReference",
+          "voucherReference",
+          "postedAt"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND",
+              "PENDING",
+              "POSTED",
+              "FAILED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptanceReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postingReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voucherReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialBudget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "attempts",
+          "authorizedBy",
+          "authorizedAt",
+          "accountingDate",
+          "expiresAt",
+          "updatedAt",
+          "issue",
+          "accepted",
+          "conflicting"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "QUERYING",
+              "UNKNOWN",
+              "APPLIED",
+              "REJECTED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "authorizedBy": {
+            "type": "string"
+          },
+          "authorizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialBudgetFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflicting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialBudgetFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialAccrual": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "attempts",
+          "authorizedBy",
+          "authorizedAt",
+          "accountingDate",
+          "expiresAt",
+          "updatedAt",
+          "issue",
+          "accepted",
+          "conflicting"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "authorizedBy": {
+            "type": "string"
+          },
+          "authorizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAccrualFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflicting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAccrualFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialCompletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "budgetVersion",
+          "accrualVersion",
+          "budgetReference",
+          "postingReference",
+          "voucherReference",
+          "at"
+        ],
+        "properties": {
+          "budgetVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accrualVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budgetReference": {
+            "type": "string"
+          },
+          "postingReference": {
+            "type": "string"
+          },
+          "voucherReference": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePartialRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actor",
+          "evidenceReference",
+          "reason",
+          "at"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "evidenceReference": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePartialAdjustment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "issue",
+          "requestedBy",
+          "evidenceReference",
+          "reason",
+          "createdAt",
+          "updatedAt",
+          "before",
+          "after",
+          "returnIds",
+          "budget",
+          "accrual",
+          "completion",
+          "retirement",
+          "budgetPreparation",
+          "accrualPreparation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_FINANCE",
+              "READY",
+              "APPLIED",
+              "REVIEW_REQUIRED",
+              "RETIRED"
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "evidenceReference": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "before": {
+            "$ref": "#/components/schemas/ExpensePartialAmounts"
+          },
+          "after": {
+            "$ref": "#/components/schemas/ExpensePartialAmounts"
+          },
+          "returnIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialBudget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accrual": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAccrual"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialCompletion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "budgetPreparation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialPreparation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accrualPreparation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialPreparation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "settlementVersion",
+          "settlementStatus",
+          "original",
+          "remaining",
+          "previousId",
+          "previousVersion",
+          "returnsVersion",
+          "returns",
+          "finance",
+          "adjustments"
+        ],
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementStatus": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "BLOCKED",
+              "BUDGET_PENDING",
+              "BUDGET_REJECTED",
+              "SETTLED",
+              "REVIEW_REQUIRED"
+            ]
+          },
+          "original": {
+            "$ref": "#/components/schemas/ExpensePartialOriginal"
+          },
+          "remaining": {
+            "$ref": "#/components/schemas/ExpensePartialAmounts"
+          },
+          "previousId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previousVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returnsVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePartialReturnEntry"
+            }
+          },
+          "finance": {
+            "type": "boolean"
+          },
+          "adjustments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePartialAdjustment"
+            }
           }
         }
       }

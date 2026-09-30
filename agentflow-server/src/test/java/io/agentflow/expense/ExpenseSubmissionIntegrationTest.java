@@ -211,6 +211,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpensePartialPreparationService partialPreparing;
     @Autowired ExpensePartialPreparationReader partialReader;
     @Autowired ExpensePartialAdjustmentWorker partialWorker;
+    @Autowired ExpensePartialAdjustmentWorkspace partialWorkspace;
     @Autowired BudgetConsumptionReductionPort partialBudgetPort;
     @Autowired ExpenseAccrualReductionPort partialAccrualPort;
     @Autowired JdbcExpenseResourceAdjustmentPreparationRepository resourcePreparations;
@@ -2546,6 +2547,127 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, initial.id().toString())).isZero();
         var accepted = send(endpoint, "finance", key, input); assertThat(accepted.getHeader("Idempotency-Replayed")).isEqualTo("false"); ok(accepted, 202);
         assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialWorkspaceShowsActualOriginalVersionsAndKeepsPendingAmountsSeparate() throws Exception {
+        var initial = partialAdjustment(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        var endpoint = path(report) + "/partial-adjustments"; var response = read(endpoint, "finance"); var before = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(before.path("remaining").path("gross").path("value").asText()).isEqualTo("100.00");
+        assertThat(before.path("previousId").isNull()).isTrue(); assertThat(before.path("previousVersion").asLong()).isZero();
+        assertThat(before.path("returns").get(0).path("available").asBoolean()).isTrue();
+        var originals = partialRefreshInput(report);
+        assertThat(before.path("original").path("payment").path("version").asLong()).isEqualTo(originals.get("paymentVersion"));
+        assertThat(before.path("original").path("accrual").path("version").asLong()).isEqualTo(originals.get("accrualVersion"));
+        assertThat(before.path("original").path("paymentVoucher").path("version").asLong()).isEqualTo(originals.get("paymentVoucherVersion"));
+        tx().executeWithoutResult(status -> partialAdjustments.create(initial));
+        var writesBefore = paymentWrites + voucherWrites + partialBudgetWrites + partialAccrualWrites;
+        var view = ok(read(endpoint, "finance"), 200); var pending = view.path("adjustments").get(0);
+        assertThat(view.path("remaining").path("gross").path("value").asText()).isEqualTo("100.00");
+        assertThat(pending.path("after").path("gross").path("value").asText()).isEqualTo("80.00");
+        assertThat(pending.path("completion").isNull()).isTrue(); assertThat(view.path("returns").get(0).path("available").asBoolean()).isFalse();
+        assertThat(view.toString()).doesNotContain("accountNumber", "targetDigest", "commandDigest", "source_json", "payee");
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(initial); assertThat(partialRefreshInput(report)).isEqualTo(originals);
+        assertThat(paymentWrites + voucherWrites + partialBudgetWrites + partialAccrualWrites).isEqualTo(writesBefore);
+    }
+
+    @Test void partialWorkspacePreservesCompletedNetAndProofWhenHistoryNeedsReview() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); partialAdjustmentExecution.apply(partialCandidate(ready));
+        var completed = partialAdjustments.find("demo", ready.id()).orElseThrow(); var next = nextPartialAdjustment(completed, "60", "20");
+        var report = reports.find("demo", completed.input().basis().reportId()).orElseThrow();
+        var held = completed.requireReview("MANUAL_HOLD", adjustmentTime()); tx().executeWithoutResult(status -> partialAdjustments.update(held));
+        var view = ok(read(path(report) + "/partial-adjustments", "alice"), 200); var history = view.path("adjustments").get(0);
+        assertThat(view.path("finance").asBoolean()).isFalse(); assertThat(view.path("previousVersion").asLong()).isEqualTo(held.version());
+        assertThat(view.path("previousId").asText()).isEqualTo(completed.id().toString());
+        assertThat(view.path("remaining").path("gross").path("value").asText()).isEqualTo("80.00");
+        assertThat(history.path("status").asText()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(history.path("completion").path("at").asText()).isEqualTo(completed.completion().at().toString());
+        assertThat(history.path("budget").path("accepted").path("reference").asText()).isEqualTo(completed.budget().observation().posting().reference());
+        var selectable = new ArrayList<String>(); view.path("returns").forEach(entry -> { if (entry.path("available").asBoolean()) selectable.add(entry.path("fundsIdentity").asText()); });
+        assertThat(selectable).containsExactly(next.input().basis().funding().selectedReturns().get(0).proof().fundsIdentity());
+    }
+
+    @Test void partialWorkspaceRestrictsPrivatePreparationsAndOriginalFields() throws Exception {
+        hideBusinessDetails = true; var initial = persistedPartialIntent(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); var endpoint = path(report) + "/partial-adjustments";
+        var financeView = ok(read(endpoint, "finance"), 200); var own = financeView.path("adjustments").get(0).path("budgetPreparation");
+        assertThat(own.path("id").asText()).isEqualTo(preparation.input().id().toString()); assertThat(own.path("canAuthorize").asBoolean()).isFalse();
+        var applicant = ok(read(endpoint, "alice"), 200);
+        assertThat(applicant.path("adjustments").get(0).path("budgetPreparation").isNull()).isTrue();
+        for (var user : List.of("admin", "manager", "bob")) assertThat(read(endpoint, user).getStatus()).as(user).isIn(403, 404);
+        for (var query : List.of("?roundNo=0", "?roundNo=01", "?roundNo=-1", "?roundNo=x", "?tenantId=other")) {
+            assertThat(read(endpoint + query, "finance").getStatus()).as(query).isEqualTo(400);
+        }
+        assertThat(read(endpoint + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
+    }
+
+    @Test void partialWorkspaceRechecksLatestPreparationSourceExpiryAndCurrentPersonnel() throws Exception {
+        var initial = persistedPartialIntent(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        var endpoint = path(report) + "/partial-adjustments"; var queued = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", queued.input().id()).orElseThrow();
+        var view = ok(read(endpoint, "finance"), 200); var preparation = view.path("adjustments").get(0).path("budgetPreparation");
+        assertThat(preparation.path("canAuthorize").asBoolean()).isTrue();
+        assertThat(Instant.parse(preparation.path("expiresAt").asText())).isEqualTo(ready.evidence().expiresAt());
+        assertThat(partialPreparing.authorizationIssue(ready, ready.evidence().expiresAt())).isEqualTo("PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT");
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND person_id=?", finance.toString());
+        try {
+            var inactive = ok(read(endpoint, "finance"), 200); assertThat(inactive.path("finance").asBoolean()).isFalse();
+            assertThat(inactive.path("adjustments").get(0).path("budgetPreparation").isNull()).isTrue();
+        } finally { jdbc.update("UPDATE organization_appointment SET active=true WHERE tenant_id='demo' AND person_id=?", finance.toString()); }
+        var source = ready.evidence().source().financial().accrual();
+        tx().executeWithoutResult(status -> voucherExecution.query("demo", source.input().command().id(), source.version(), adjustmentTime()));
+        var changed = ok(read(endpoint, "finance"), 200);
+        assertThat(changed.path("adjustments").get(0).path("budgetPreparation").path("canAuthorize").asBoolean()).isFalse();
+        assertThat(changed.path("original").path("accrual").path("status").asText()).isEqualTo("UNKNOWN");
+        assertThat(partialPreparations.find("demo", ready.input().id())).contains(ready); voucherWorker.poll();
+        var newer = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET);
+        assertThat(ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("budgetPreparation").path("id").asText()).isEqualTo(newer.input().id().toString());
+        assertThat(partialPreparing.authorizationIssue(ready, adjustmentTime())).isEqualTo("CONCURRENCY_CONFLICT");
+    }
+
+    @Test void partialWorkspaceOtherFinanceAndOtherTenantCannotSeeOwnersPreparation() throws Exception {
+        var initial = persistedPartialIntent(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET);
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "第二财务部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "第二财务岗位", entity, null, true);
+        organization.createAppointment(admin, manager, department.id(), position.id(), true);
+        actors.set(new Actor("demo", "manager", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try {
+            var view = partialWorkspace.read(report.id(), Map.of()); assertThat(view.finance()).isTrue();
+            assertThat(view.adjustments().get(0).budgetPreparation()).isNull(); assertThat(view.adjustments().get(0).accrualPreparation()).isNull();
+        } finally { actors.clear(); }
+        actors.set(new Actor("other-tenant", "finance", Set.of("FINANCE", "ADMIN")));
+        try { assertThatThrownBy(() -> partialWorkspace.read(report.id(), Map.of())).isInstanceOf(io.agentflow.common.DomainException.class)
+                .extracting(error -> ((io.agentflow.common.DomainException) error).code()).isEqualTo("NOT_FOUND"); }
+        finally { actors.clear(); }
+    }
+
+    @Test void partialWorkspaceRetirementReleasesSelectionWithoutRemovingIntentOrDecision() throws Exception {
+        var initial = persistedPartialIntent(); var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow();
+        var retired = initial.retire("finance", "retire-proof", "不再执行未发送调整", adjustmentTime()); tx().executeWithoutResult(status -> partialAdjustments.update(retired));
+        var view = ok(read(path(report) + "/partial-adjustments", "finance"), 200);
+        assertThat(view.path("remaining").path("gross").path("value").asText()).isEqualTo("100.00");
+        assertThat(view.path("returns").get(0).path("available").asBoolean()).isTrue();
+        assertThat(view.path("adjustments").get(0).path("retirement").path("evidenceReference").asText()).isEqualTo("retire-proof");
+        assertThat(view.path("adjustments").get(0).path("status").asText()).isEqualTo("RETIRED");
+        assertThat(view.path("previousVersion").asLong()).isZero(); assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialWorkspaceZeroPayableOmitsBankAndUnsettledExpenseIsUnavailable() throws Exception {
+        var draft = fixture(true).report(); assertThat(read(path(draft) + "/partial-adjustments", "alice").getStatus()).isEqualTo(404);
+        advanceOffset = "100"; var report = paymentReport(true); settlementWorker.poll(); budgetWorker.poll();
+        var view = ok(read(path(report) + "/partial-adjustments", "finance"), 200);
+        assertThat(view.path("original").path("payment").isNull()).isTrue(); assertThat(view.path("original").path("paymentVoucher").isNull()).isTrue();
+        assertThat(view.path("remaining").path("payable").path("value").asText()).isEqualTo("0.00");
+        assertThat(view.path("returnsVersion").asLong()).isZero(); assertThat(view.path("returns").isEmpty()).isTrue(); assertThat(paymentWrites).isZero();
+    }
+
+    @Test void partialWorkspaceZeroApprovedAmountHasNoPartialAdjustmentScope() throws Exception {
+        var report = fixture(true).report(); enterFinance(report);
+        ok(send(reductionPath(report), "finance", reductionInput(report, "0", "0")), 200); budgetWorker.poll(); ok(act(report, "finance", "APPROVE"), 200);
+        voucherPreparationWorker.poll(); settlementWorker.poll(); budgetWorker.poll();
+        assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(read(path(report) + "/partial-adjustments", "finance").getStatus()).isEqualTo(404);
     }
 
     private Map<String, Object> partialSourceInput(ExpenseReport report) {

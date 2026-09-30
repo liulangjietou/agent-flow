@@ -57,6 +57,18 @@ public class ExpensePartialPreparationService {
         return preparations.consume(authorized);
     }
 
+    /** 页面只预览本人最新准备的当前能力，不消费证据，也不刷新有效期或财务状态。 */
+    public String authorizationIssue(ExpensePartialAdjustmentPreparation value, Instant at) {
+        if (!value.usable(at)) return "PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT";
+        var input = value.input(); var tenant = input.adjustment().input().basis().tenantId();
+        if (!preparations.latest(tenant, input.adjustment().id(), input.side(), input.requestedBy()).filter(value::equals).isPresent()) return "CONCURRENCY_CONFLICT";
+        try {
+            requireAvailable(value, at);
+            value.authorize(adjustments.find(tenant, input.adjustment().id()).orElseThrow(ExpensePartialPreparationService::conflict), at);
+            sources.requireCurrent(value.evidence().source()); return null;
+        } catch (DomainException unavailable) { return unavailable.code(); }
+    }
+
     /** 领取只固定读取来源，原付款和凭证在网络等待期间保持当前事实。 */
     @Transactional
     public ExpensePartialAdjustmentPreparation claim(String tenant, UUID id, Instant at) {

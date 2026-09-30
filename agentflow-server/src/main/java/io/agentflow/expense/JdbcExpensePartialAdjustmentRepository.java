@@ -175,6 +175,15 @@ public class JdbcExpensePartialAdjustmentRepository {
     public Optional<ExpensePartialAdjustment> latestCompleted(String tenant, UUID report) {
         return jdbc.query("SELECT * FROM expense_partial_adjustment WHERE tenant_id=? AND report_id=? AND completed_at IS NOT NULL ORDER BY completed_sequence DESC LIMIT 1", row(), tenant, report.toString()).stream().findFirst();
     }
+    /** 按实际办理顺序展示全部历史，复核和安全结束不会从页面消失。 */
+    public List<ExpensePartialAdjustment> history(String tenant, UUID report) {
+        return jdbc.query("SELECT * FROM expense_partial_adjustment WHERE tenant_id=? AND report_id=? ORDER BY sequence_no,created_at,id", row(), tenant, report.toString());
+    }
+    /** 活动占用和已完成消费都排除再选，只有持久安全结束才释放原入款。 */
+    public java.util.Set<String> claimedReturnIds(String tenant, UUID report) {
+        return java.util.Set.copyOf(jdbc.queryForList("SELECT funds_identity FROM expense_partial_adjustment_return WHERE tenant_id=? AND report_id=? AND active_funds_identity IS NOT NULL",
+                String.class, tenant, report.toString()));
+    }
     /** 精确修订作为后继和授权证据，不允许原号对应另一份状态。 */
     public Optional<ExpensePartialAdjustment> revision(String tenant, UUID id, long version) {
         return jdbc.query("SELECT state_json FROM expense_partial_adjustment_revision WHERE tenant_id=? AND adjustment_id=? AND version=?", (row, index) -> {
