@@ -2,9 +2,14 @@
   "status": "PASS_LOCAL_API_AND_UI_TESTS",
   "date": "2026-09-30",
   "schemaCode": 80,
-  "liveSchema": 79,
+  "liveSchema": 80,
   "syntheticFinanceOnly": true,
-  "h2": {"newIntegrationTests": 6, "failures": 0, "errors": 0, "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-api-h2.log"},
+  "h2": {
+    "newIntegrationTests": 6,
+    "failures": 0,
+    "errors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-api-h2.log"
+  },
   "postgresql": {
     "total": 85,
     "SupplierPaymentPersistenceTest": 38,
@@ -24,8 +29,21 @@
     "build": "PASS",
     "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-ui-build.log"
   },
-  "openapi": {"status": "PASS", "newOperations": 3, "newSchemas": 10, "operations": 243, "schemas": 480, "requestExamples": 89, "oldBytesPreservedByFragmentInsertion": true},
-  "javaAuthors": {"files": 1040, "namedTypes": 1976, "missing": 0, "parseErrors": 0},
+  "openapi": {
+    "status": "PASS",
+    "newOperations": 3,
+    "newSchemas": 10,
+    "operations": 243,
+    "schemas": 480,
+    "requestExamples": 89,
+    "oldBytesPreservedByFragmentInsertion": true
+  },
+  "javaAuthors": {
+    "files": 1040,
+    "namedTypes": 1976,
+    "missing": 0,
+    "parseErrors": 0
+  },
   "verified": [
     "Original round fields and current independent finance access are checked before idempotent replays",
     "No first success means null original amounts and no return query capability",
@@ -38,6 +56,17 @@
     "Unknown writes retain original body and idempotency key for recovery",
     "Changed bank or return evidence refreshes related finance components"
   ],
-  "redThenGreen": [{"scope": "Expiry message must remain actionable instead of becoming a generic expense error", "redFailures": 1, "redLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-ui-final.log", "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-ui-final-green.log"}],
-  "remaining": ["Upgrade existing nonempty V79 acceptance database", "Actual browser workflow and restart acceptance", "Independent ERP adjustment", "Real enterprise integration and production acceptance"]
+  "redThenGreen": [
+    {
+      "scope": "Expiry message must remain actionable instead of becoming a generic expense error",
+      "redFailures": 1,
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-ui-final.log",
+      "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-ui-final-green.log"
+    }
+  ],
+  "remaining": [
+    "Independent ERP adjustment",
+    "Real enterprise integration and production acceptance"
+  ],
+  "runtimeEvidence": "supplier-payment-return-runtime-20260930.json"
 }

@@ -1,0 +1,72 @@
+{
+  "status": "PASS_SYNTHETIC_SUPPLIER_RETURN_RUNTIME",
+  "schema": 80,
+  "preservedOldTables": 146,
+  "preservedOldRows": 2583,
+  "preservedAttachments": 7,
+  "preservedFinancialFiles": 16,
+  "preservedExistingReceiptCredits": 7,
+  "newPaymentCommands": 2,
+  "newErpCommands": 1,
+  "returnRegistrations": 4,
+  "independentBankReceipts": 4,
+  "beforeErpReturned": "20.00",
+  "afterErpReturned": "65.00",
+  "browserRegisteredTotal": "25.00",
+  "browserNewlyRegistered": "10.00",
+  "originalErpAndCompletionPreserved": true,
+  "restartVerified": true,
+  "browserCancellationVerified": true,
+  "narrow": {
+    "documentClientWidth": 480,
+    "documentScrollWidth": 480,
+    "innerWidth": 500,
+    "panelClientWidth": 357,
+    "panelScrollWidth": 357
+  },
+  "recordedResponses": 141,
+  "remaining": [
+    "Independent ERP adjustment",
+    "Real enterprise integration"
+  ],
+  "date": "2026-09-30",
+  "implementationCommit": "8d7b8ad",
+  "syntheticFinanceOnly": true,
+  "upgrade": {
+    "fromVersion": 79,
+    "toVersion": 80,
+    "unchangedBusinessTables": 146,
+    "unchangedBusinessRows": 2583,
+    "unchangedAttachments": 7,
+    "unchangedFinancialFiles": 16,
+    "newReturnTablesEmpty": true,
+    "preservedReceiptCredits": 7,
+    "backupBytes": 1129956,
+    "backupSha256": "82449a1d0bc73ef7e3738b2b6913f5f9a465e154f83a01ac6fc7113f742cacd4"
+  },
+  "httpSchema": {
+    "result": "PASS",
+    "responses": 141
+  },
+  "frontendResponses": {
+    "status": "PASS",
+    "actualViews": 30,
+    "actualDecisionReceipts": 17
+  },
+  "browserFullAfterRestart": true,
+  "screenshots": {
+    "confirmation": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-browser-confirm.jpg",
+    "partialResult": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-browser-result.jpg",
+    "narrow": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-browser-500.jpg",
+    "fullAfterRestart": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-browser-full-after-restart.jpg"
+  },
+  "verified": [
+    "Explicit query only reads facts; explicit registration consumes current finance evidence once",
+    "Browser cancellation leaves original amounts and history unchanged",
+    "Partial return before ERP blocks new original settlement",
+    "Returns after ERP preserve original posting and completion",
+    "Cumulative full return requires original bank reversal; only new receipts are appended",
+    "Original idempotency keys replay after process restart without new funds",
+    "Nonempty shared receipt credits and all original business rows and files preserved"
+  ]
+}
