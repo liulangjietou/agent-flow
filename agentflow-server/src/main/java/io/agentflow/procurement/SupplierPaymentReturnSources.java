@@ -2,6 +2,7 @@ package io.agentflow.procurement;
 
 import io.agentflow.common.DomainException;
 import java.util.UUID;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,14 +24,14 @@ public class SupplierPaymentReturnSources {
 
     /** 恢复查询不要求原授权未到期，也不要求原应付尚未核销。 */
     @Transactional(propagation = Propagation.MANDATORY)
-    public Source locked(String tenant, UUID paymentId) { payments.lock(tenant, paymentId); return find(tenant, paymentId); }
+    public Source locked(String tenant, UUID paymentId) { payments.lock(tenant, paymentId); return find(tenant, paymentId).orElseThrow(SupplierPaymentReturnSources::changed); }
 
     /** 首次成功和当前银行分开读取，后续争议不能替换原资金身份。 */
-    public Source find(String tenant, UUID paymentId) {
-        var current = operations.find(tenant, paymentId).orElseThrow(SupplierPaymentReturnSources::changed);
-        var original = operations.firstSuccessfulRevision(tenant, paymentId).orElseThrow(SupplierPaymentReturnSources::changed);
+    public Optional<Source> find(String tenant, UUID paymentId) {
+        var current = operations.find(tenant, paymentId).orElse(null); if (current == null) return Optional.empty();
+        var original = operations.firstSuccessfulRevision(tenant, paymentId).orElse(null); if (original == null) return Optional.empty();
         if (!current.command().equals(original.command())) throw changed();
-        return new Source(current, original.version(), new SupplierPaymentReturnPort.Request(original.command(), original.observation()));
+        return Optional.of(new Source(current, original.version(), new SupplierPaymentReturnPort.Request(original.command(), original.observation())));
     }
 
     /** 排队和领取都核对原首次成功，客户端不能另选修订或交易。 */

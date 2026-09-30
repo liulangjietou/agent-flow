@@ -3,6 +3,8 @@ package io.agentflow.procurement;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -60,21 +62,38 @@ public class JdbcSupplierPaymentReturnRepository {
 
     /** 恢复决定时回放原查询和账本修订，不以当前银行状态改写历史登记。 */
     public List<SupplierPaymentReturn> history(String tenant, UUID paymentId) {
-        return jdbc.query("SELECT * FROM supplier_payment_return_registration WHERE tenant_id=? AND payment_id=? ORDER BY return_version", (row, index) -> {
-            var value = json.read(row.getString("state_json"), SupplierPaymentReturn.class);
-            if (!value.tenantId().equals(tenant) || !value.id().toString().equals(row.getString("id"))
-                    || !value.receipt().request().command().id().equals(paymentId) || !value.checkId().toString().equals(row.getString("check_id"))
-                    || !value.registeredBy().equals(row.getString("registered_by")) || !value.receipt().status().name().equals(row.getString("outcome"))
-                    || !time(value.receipt().observedAt()).equals(row.getTimestamp("observed_at").toInstant())
-                    || !time(value.registeredAt()).equals(row.getTimestamp("registered_at").toInstant())) throw conflict();
-            var before = ledgers.revision(tenant, paymentId, row.getLong("before_version"));
-            var after = ledgers.revision(tenant, paymentId, row.getLong("return_version"));
-            var priorCheck = checks.revision(tenant, value.checkId(), row.getLong("check_version") - 1);
-            var resolved = checks.revision(tenant, value.checkId(), row.getLong("check_version"));
-            if (!before.register(value).equals(after) || !priorCheck.resolve(value, value.registeredAt()).equals(resolved)) throw conflict();
-            return value;
-        }, tenant, paymentId.toString());
+        return jdbc.query("SELECT * FROM supplier_payment_return_registration WHERE tenant_id=? AND payment_id=? ORDER BY return_version",
+                (row, index) -> restore(row, tenant, paymentId), tenant, paymentId.toString());
     }
+
+    /** 当前办理页面只取有界历史，游标使用同一原付款单调递增的账本版本。 */
+    public List<Registered> page(String tenant, UUID paymentId, Long beforeVersion, int limit) {
+        var sql = "SELECT * FROM supplier_payment_return_registration WHERE tenant_id=? AND payment_id=?"
+                + (beforeVersion == null ? "" : " AND return_version<?") + " ORDER BY return_version DESC LIMIT ?";
+        var parameters = beforeVersion == null ? new Object[] {tenant, paymentId.toString(), limit} : new Object[] {tenant, paymentId.toString(), beforeVersion, limit};
+        return jdbc.query(sql, (row, index) -> new Registered(row.getLong("return_version"), restore(row, tenant, paymentId)), parameters);
+    }
+
+    private SupplierPaymentReturn restore(ResultSet row, String tenant, UUID paymentId) throws SQLException {
+        var value = json.read(row.getString("state_json"), SupplierPaymentReturn.class);
+        if (!value.tenantId().equals(tenant) || !value.id().toString().equals(row.getString("id"))
+                || !value.receipt().request().command().id().equals(paymentId) || !value.checkId().toString().equals(row.getString("check_id"))
+                || !value.registeredBy().equals(row.getString("registered_by")) || !value.receipt().status().name().equals(row.getString("outcome"))
+                || !time(value.receipt().observedAt()).equals(row.getTimestamp("observed_at").toInstant())
+                || !time(value.registeredAt()).equals(row.getTimestamp("registered_at").toInstant())) throw conflict();
+        var before = ledgers.revision(tenant, paymentId, row.getLong("before_version"));
+        var after = ledgers.revision(tenant, paymentId, row.getLong("return_version"));
+        var priorCheck = checks.revision(tenant, value.checkId(), row.getLong("check_version") - 1);
+        var resolved = checks.revision(tenant, value.checkId(), row.getLong("check_version"));
+        if (!before.register(value).equals(after) || !priorCheck.resolve(value, value.registeredAt()).equals(resolved)) throw conflict();
+        return value;
+    }
+
+    /**
+     * 账本版本用于稳定分页，实际决定继续引用原不可变查询。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Registered(long returnVersion, SupplierPaymentReturn decision) { }
 
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
     private static Timestamp timestamp(Instant at) { return Timestamp.from(time(at)); }

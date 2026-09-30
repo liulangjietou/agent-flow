@@ -77,6 +77,448 @@
     }
   ],
   "paths": {
+    "/api/v1/supplier-payments/{id}/returns": {
+      "get": {
+        "operationId": "getSupplierPaymentReturns",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "读取原供应商付款的实际回款与登记历史",
+        "description": "按原轮次完整字段权限读取原付款、已登记实际入款及有界登记历史。仅当前独立财务可查看本人查询候选。无首次成功付款时金额为 null；读取不触发网关查询。响应禁止缓存。",
+        "x-access": "原轮次具有完整字段读取权限的参与人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "银行实收资金及独立登记，不表示 ERP 已调整或可以重新付款。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPaymentReturnView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "beforeVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "仅返回该账本版本之前的登记，按版本倒序。"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 25
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/supplier-payments/{id}/returns/checks": {
+      "post": {
+        "operationId": "querySupplierPaymentReturns",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "登记原付款累计实际回款查询",
+        "description": "幂等回放前重查当前独立财务任职及原轮次完整字段权限。查询只保存持久只读意图；登记只消费本人最新有效原件，金额、账号、外部修订均来自服务端。资金防重、登记与审计原子保存，原付款和 ERP 核销保持。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "批准来源、应付证据、授权或原预留状态不符合办理条件",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "读取意图或明确登记及审计已保存；独立 ERP 调整尚需办理。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPaymentReturnActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierPaymentReturnQueryInput"
+              },
+              "example": {
+                "operationVersion": 5,
+                "returnVersion": 0,
+                "comment": "读取原付款及公司实际入款"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier-payments/{id}/returns/registrations": {
+      "post": {
+        "operationId": "registerSupplierPaymentReturns",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "明确登记原付款实际回款",
+        "description": "幂等回放前重查当前独立财务任职及原轮次完整字段权限。查询只保存持久只读意图；登记只消费本人最新有效原件，金额、账号、外部修订均来自服务端。资金防重、登记与审计原子保存，原付款和 ERP 核销保持。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "批准来源、应付证据、授权或原预留状态不符合办理条件",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "读取意图或明确登记及审计已保存；独立 ERP 调整尚需办理。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPaymentReturnActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierPaymentReturnRegisterInput"
+              },
+              "example": {
+                "operationVersion": 5,
+                "returnVersion": 2,
+                "checkId": "123e4567-e89b-12d3-a456-426614174000",
+                "checkVersion": 3,
+                "outcome": "PARTIALLY_RETURNED",
+                "evidenceReference": "BANK-RETURN-1",
+                "comment": "核对原公司账户实际入款后登记"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/supplier-settlements/{id}/dispute": {
       "get": {
         "operationId": "getSupplierSettlementDispute",
@@ -31435,6 +31877,561 @@
       }
     },
     "schemas": {
+      "SupplierPaymentReturnView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "operationVersion",
+          "bankStatus",
+          "returnVersion",
+          "reviewRequired",
+          "original",
+          "totalReturned",
+          "netPaid",
+          "returns",
+          "canQuery",
+          "latestCheck",
+          "registrations",
+          "nextBeforeVersion"
+        ],
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bankStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "QUEUED",
+                  "CHECKING",
+                  "SENDING",
+                  "UNKNOWN",
+                  "QUERYING",
+                  "SUCCEEDED",
+                  "FAILED",
+                  "REVERSED",
+                  "NOT_FOUND",
+                  "RECONCILING",
+                  "EXPIRED",
+                  "VOIDED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reviewRequired": {
+            "type": "boolean"
+          },
+          "original": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPaymentReturnOriginal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalReturned": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "netPaid": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierPaymentReturnReturned"
+            },
+            "maxItems": 100
+          },
+          "canQuery": {
+            "type": "boolean"
+          },
+          "latestCheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPaymentReturnCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierPaymentReturnRegistration"
+            },
+            "maxItems": 50
+          },
+          "nextBeforeVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierPaymentReturnOriginal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paymentReference",
+          "receiptReference",
+          "amount",
+          "paidAt"
+        ],
+        "properties": {
+          "paymentReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receiptReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierPaymentReturnFunding": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transactionReference",
+          "amount",
+          "receivedAt"
+        ],
+        "properties": {
+          "transactionReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierPaymentReturnReturned": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "registrationId",
+          "funding"
+        ],
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "funding": {
+            "$ref": "#/components/schemas/SupplierPaymentReturnFunding"
+          }
+        }
+      },
+      "SupplierPaymentReturnCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue",
+          "evidence",
+          "canRegister",
+          "registrationIssue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "CHECKED",
+              "RESOLVED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPaymentReturnEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canRegister": {
+            "type": "boolean"
+          },
+          "registrationIssue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierPaymentReturnEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "bankRevision",
+          "bankStatus",
+          "returns",
+          "totalReturned",
+          "newReturned"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED",
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bankRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bankStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "SUCCEEDED",
+                  "FAILED",
+                  "REVERSED",
+                  "NOT_FOUND"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierPaymentReturnFunding"
+            },
+            "maxItems": 100
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "newReturned": {
+            "$ref": "#/components/schemas/Money"
+          }
+        }
+      },
+      "SupplierPaymentReturnRegistration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "returnVersion",
+          "outcome",
+          "totalReturned",
+          "registeredBy",
+          "registeredAt",
+          "evidenceReference",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "registeredBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "SupplierPaymentReturnActionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "paymentId",
+          "operationVersion",
+          "checkId",
+          "checkVersion",
+          "registrationId",
+          "returnVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "registrationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SupplierPaymentReturnQueryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationVersion",
+          "returnVersion",
+          "comment"
+        ],
+        "properties": {
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "SupplierPaymentReturnRegisterInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationVersion",
+          "returnVersion",
+          "checkId",
+          "checkVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
       "SupplierSettlementDisputeView": {
         "type": "object",
         "additionalProperties": false,

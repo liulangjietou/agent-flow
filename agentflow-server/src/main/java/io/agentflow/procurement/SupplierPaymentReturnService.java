@@ -180,6 +180,10 @@ public class SupplierPaymentReturnService {
     public record RegisterInput(@Positive long operationVersion, @Positive long returnVersion, @NotNull UUID checkId, @Positive long checkVersion,
             @NotNull SupplierPaymentReturnPort.Status outcome, @NotBlank @Size(max = 128) @Pattern(regexp = "[^\\p{Cntrl}]+") String evidenceReference,
             @NotBlank @Size(max = 2000) String comment) {
+        /** 未核清只能展示，不能被人工声明为已经登记的结论。 */
+        public RegisterInput {
+            if (outcome == SupplierPaymentReturnPort.Status.UNRESOLVED) throw new IllegalArgumentException("An explicit supplier return outcome is required");
+        }
         /** 客户端不能覆盖网关回款金额、修订或账号。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown supplier return registration field"); }
     }

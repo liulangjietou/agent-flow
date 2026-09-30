@@ -65,6 +65,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.supplier-payments.execution-worker-enabled=false", "agentflow.supplier-payments.payment-worker-enabled=false",
         "agentflow.supplier-payments.settlement-preparation-worker-enabled=false", "agentflow.supplier-payments.settlement-worker-enabled=false",
         "agentflow.supplier-payments.hold-worker-enabled=false", "agentflow.supplier-payments.review-worker-enabled=false",
+        "agentflow.supplier-payments.return-worker-enabled=false",
         "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false",
         "agentflow.budget-adjustments.precheck-worker-enabled=false", "agentflow.budget-adjustments.review-worker-enabled=false", "agentflow.budget-adjustments.execution-worker-enabled=false"})
@@ -83,6 +84,7 @@ class SupplierFinanceWorkflowTest {
     private UUID financeAppointment;
     private UUID cashierAppointment;
     private BiFunction<String, JsonNode, String> responder;
+    private int returnRevision = 1;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
@@ -133,6 +135,10 @@ class SupplierFinanceWorkflowTest {
     @Autowired SupplierPayableSettlementPort settlementPort;
     @Autowired PaymentCallbackService callbacks;
     @Autowired JdbcPaymentCallbackRepository callbackRecords;
+    @Autowired JdbcSupplierPaymentReturnCheckRepository returnChecks;
+    @Autowired JdbcSupplierPaymentReturnRepository returnRegistrations;
+    @Autowired SupplierPaymentReturnService returnService;
+    @Autowired SupplierPaymentReturnPort returnPort;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -745,6 +751,121 @@ class SupplierFinanceWorkflowTest {
         pollBank(payment); assertThat(bankPayments.find("demo", payment).orElseThrow().status()).isEqualTo(SupplierPaymentOperation.Status.RECONCILING);
     }
 
+    @Test void returnRegistrationRequiresExplicitDecisionAndPreservesCompletedOriginalAccounts() throws Exception {
+        UUID payment = paidBank(); UUID settlement = queueSettlement(payment); pollSettlement(settlement);
+        var bank = bankPayments.find("demo", payment).orElseThrow(); var erp = settlements.find("demo", settlement).orElseThrow();
+        var reservation = reservations.find("demo", bank.command().holdCommand().authorization().source().reservation().id()).orElseThrow();
+        var initial = returnView(payment); assertThat(initial.path("original").isObject()).isTrue(); assertThat(initial.path("returnVersion").asLong()).isZero();
+        var input = returnQuery(initial); String key = UUID.randomUUID().toString();
+        var queued = send(returnPath(payment) + "/checks", "finance", key, input); var receipt = ok(queued, 202);
+        assertThat(queued.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(send(returnPath(payment) + "/checks", "finance", key, input).getContentAsString()).isEqualTo(queued.getContentAsString());
+        assertThat(returnView(payment).path("canQuery").asBoolean()).isFalse(); assertThat(calls).doesNotContainKey("supplier-payment-return");
+        pollReturn(UUID.fromString(receipt.path("checkId").asText())); var checked = returnView(payment);
+        assertThat(checked.at("/latestCheck/canRegister").asBoolean()).isTrue(); assertThat(checked.at("/totalReturned/value").asText()).isEqualTo("0.00");
+        assertThat(checked.at("/latestCheck/evidence/newReturned/value").asText()).isEqualTo("20.00"); assertThat(returnRegistrations.history("demo", payment)).isEmpty();
+        String registerKey = UUID.randomUUID().toString(); var registration = returnRegistration(checked);
+        var registered = send(returnPath(payment) + "/registrations", "finance", registerKey, registration); ok(registered, 202);
+        assertThat(registered.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(send(returnPath(payment) + "/registrations", "finance", registerKey, registration).getContentAsString()).isEqualTo(registered.getContentAsString());
+        var result = returnView(payment); assertThat(result.at("/totalReturned/value").asText()).isEqualTo("20.00"); assertThat(result.at("/netPaid/value").asText()).isEqualTo("50.00");
+        assertThat(result.path("reviewRequired").asBoolean()).isTrue(); assertThat(result.path("registrations").size()).isEqualTo(1); assertThat(result.at("/latestCheck/status").asText()).isEqualTo("RESOLVED");
+        assertThat(bankPayments.find("demo", payment).orElseThrow()).isEqualTo(bank); assertThat(settlements.find("demo", settlement).orElseThrow()).isEqualTo(erp);
+        assertThat(reservations.find("demo", reservation.id()).orElseThrow()).isEqualTo(reservation);
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payment-return").get()).isEqualTo(1);
+        var applicant = ok(read(returnPath(payment), "alice"), 200); assertThat(applicant.path("latestCheck").isNull()).isTrue(); assertThat(applicant.path("canQuery").asBoolean()).isFalse();
+        assertCashierPrivateFactsAbsent(result); assertThat(result.toString()).doesNotContain("creditAccountReference", "targetDigest", "requestedBy");
+    }
+
+    @Test void returnQueryAndRegistrationReplaysRecheckCurrentAppointmentAndFieldPermissions() throws Exception {
+        UUID payment = paidBank(); var query = returnQuery(returnView(payment)); String queryKey = UUID.randomUUID().toString();
+        var queued = send(returnPath(payment) + "/checks", "finance", queryKey, query); var check = ok(queued, 202);
+        pollReturn(UUID.fromString(check.path("checkId").asText())); var input = returnRegistration(returnView(payment)); String key = UUID.randomUUID().toString();
+        var registered = send(returnPath(payment) + "/registrations", "finance", key, input); ok(registered, 202);
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        try {
+            okError(send(returnPath(payment) + "/checks", "finance", queryKey, query), 403, "FORBIDDEN");
+            okError(send(returnPath(payment) + "/registrations", "finance", key, input), 403, "FORBIDDEN");
+            assertThat(returnView(payment).path("latestCheck").isNull()).isTrue();
+        } finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString()); }
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try {
+            okError(send(returnPath(payment) + "/registrations", "finance", key, input), 403, "FORBIDDEN"); assertThat(read(returnPath(payment), "finance").getStatus()).isBetween(400, 499);
+        } finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+        assertThat(send(returnPath(payment) + "/registrations", "finance", key, input).getContentAsString()).isEqualTo(registered.getContentAsString());
+        for (String user : List.of("alice", "cashier", "admin")) {
+            assertThat(send(returnPath(payment) + "/checks", user, query).getStatus()).isBetween(400, 499);
+            assertThat(send(returnPath(payment) + "/registrations", user, input).getStatus()).isBetween(400, 499);
+        }
+        assertThat(read(returnPath(payment), "admin").getStatus()).isBetween(400, 499);
+    }
+
+    @Test void returnHistoryIsBoundedAndCumulativeEvidenceKeepsFirstReceiptOwnership() throws Exception {
+        UUID payment = paidBank(); queueReturn(payment); var first = ok(send(returnPath(payment) + "/registrations", "finance", returnRegistration(returnView(payment))), 202);
+        returnRevision = 2; queueReturn(payment); var second = returnView(payment);
+        assertThat(second.at("/latestCheck/evidence/newReturned/value").asText()).isEqualTo("10.00");
+        ok(send(returnPath(payment) + "/registrations", "finance", returnRegistration(second)), 202);
+        var page = ok(read(returnPath(payment) + "?limit=1", "finance"), 200); assertThat(page.path("registrations").size()).isEqualTo(1);
+        assertThat(page.at("/totalReturned/value").asText()).isEqualTo("30.00"); assertThat(page.path("returns").size()).isEqualTo(2);
+        assertThat(page.at("/returns/0/registrationId").asText()).isEqualTo(first.path("registrationId").asText());
+        var next = ok(read(returnPath(payment) + "?limit=1&beforeVersion=" + page.path("nextBeforeVersion").asLong(), "finance"), 200);
+        assertThat(next.at("/registrations/0/id").asText()).isEqualTo(first.path("registrationId").asText()); assertThat(next.path("nextBeforeVersion").isNull()).isTrue();
+    }
+
+    @Test void returnEndpointRejectsUnknownInputsStaleViewsAndAnotherPaymentsEvidence() throws Exception {
+        UUID payment = paidBank(); var oldQuery = returnQuery(returnView(payment)); queueReturn(payment); var current = returnView(payment);
+        okError(send(returnPath(payment) + "/checks", "finance", oldQuery), 409, "CONCURRENCY_CONFLICT");
+        for (String parameters : List.of("limit=0", "limit=51", "limit=x", "beforeVersion=-1", "beforeVersion=9999999999999999999", "amount=10"))
+            okError(read(returnPath(payment) + "?" + parameters, "finance"), 400, "INVALID_SUPPLIER_PAYMENT_RETURN_QUERY");
+        var input = new java.util.HashMap<String, Object>(returnRegistration(current)); input.put("amount", "1");
+        assertThat(send(returnPath(payment) + "/registrations", "finance", input).getStatus()).isEqualTo(400); input.remove("amount");
+        input.put("outcome", "UNRESOLVED"); assertThat(send(returnPath(payment) + "/registrations", "finance", input).getStatus()).isEqualTo(400);
+        input.put("outcome", "CONFIRMED"); okError(send(returnPath(payment) + "/registrations", "finance", input), 409, "SUPPLIER_PAYMENT_RETURN_OUTCOME_CHANGED");
+        okError(send(returnPath(payment) + "/checks?limit=1", "finance", returnQuery(current)), 400, "INVALID_SUPPLIER_PAYMENT_RETURN_QUERY");
+        UUID another = paidBank(); queueReturn(another); var wrong = new java.util.HashMap<String, Object>(returnRegistration(returnView(another)));
+        wrong.put("checkId", current.at("/latestCheck/id").asText()); wrong.put("checkVersion", current.at("/latestCheck/version").asLong());
+        okError(send(returnPath(another) + "/registrations", "finance", wrong), 409, "CONCURRENCY_CONFLICT");
+        assertThat(returnRegistrations.history("demo", payment)).isEmpty(); assertThat(returnRegistrations.history("demo", another)).isEmpty();
+    }
+
+    @Test void returnWorkspaceBeforeFirstSuccessfulPaymentDoesNotInventBankOrMoney() throws Exception {
+        UUID payment = authorizedHold(approved()); var view = returnView(payment);
+        for (String field : List.of("original", "totalReturned", "netPaid", "latestCheck", "operationVersion", "bankStatus")) assertThat(view.path(field).isNull()).as(field).isTrue();
+        assertThat(view.path("canQuery").asBoolean()).isFalse(); assertThat(view.path("returns").isEmpty()).isTrue();
+        okError(send(returnPath(payment) + "/checks", "finance", Map.of("operationVersion", 1, "returnVersion", 0, "comment", "没有原成功付款")), 409, "SUPPLIER_PAYMENT_RETURN_SOURCE_CHANGED");
+        assertThat(calls).doesNotContainKey("supplier-payment-return");
+    }
+
+    @Test void returnAuditFailureRollsBackFundsAndIdempotencyThenOriginalKeyRetries() throws Exception {
+        UUID payment = paidBank(); queueReturn(payment); var input = returnRegistration(returnView(payment)); String key = UUID.randomUUID().toString();
+        var application = authorizations.find("demo", payment).orElseThrow().source().reservation().source().applicationId();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_return_audit CHECK(action<>'SUPPLIER_PAYMENT_RETURN_REGISTER' OR application_id<>'" + application + "')");
+        try { assertThatThrownBy(() -> send(returnPath(payment) + "/registrations", "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_return_audit"); }
+        assertThat(returnRegistrations.history("demo", payment)).isEmpty(); assertThat(returnView(payment).at("/latestCheck/canRegister").asBoolean()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?", Integer.class, key)).isZero();
+        var result = ok(send(returnPath(payment) + "/registrations", "finance", key, input), 202);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND supplier_registration_id=?", Integer.class, result.path("registrationId").asText())).isEqualTo(1);
+    }
+
+    private String returnPath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/returns"; }
+    private JsonNode returnView(UUID payment) throws Exception { var response = read(returnPath(payment), "finance"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200); }
+    private Map<String, Object> returnQuery(JsonNode view) { return Map.of("operationVersion", view.path("operationVersion").asLong(), "returnVersion", view.path("returnVersion").asLong(), "comment", "读取原供应商付款实际回款"); }
+    private Map<String, Object> returnRegistration(JsonNode view) { return Map.of("operationVersion", view.path("operationVersion").asLong(), "returnVersion", view.path("returnVersion").asLong(), "checkId", view.at("/latestCheck/id").asText(), "checkVersion", view.at("/latestCheck/version").asLong(), "outcome", view.at("/latestCheck/evidence/outcome").asText(), "evidenceReference", "SUPPLIER-RETURN-REVIEW", "comment", "已核对本次实际入款，账务调整单独办理"); }
+    private void queueReturn(UUID payment) throws Exception { var response = ok(send(returnPath(payment) + "/checks", "finance", returnQuery(returnView(payment))), 202); pollReturn(UUID.fromString(response.path("checkId").asText())); }
+    private void pollReturn(UUID id) {
+        var candidates = org.mockito.Mockito.mock(JdbcSupplierPaymentReturnCheckRepository.class);
+        org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(new JdbcSupplierPaymentReturnCheckRepository.Candidate("demo", id)));
+        new SupplierPaymentReturnWorker(candidates, returnService, returnPort).poll();
+        assertThat(returnChecks.find("demo", id).orElseThrow().status()).isEqualTo(SupplierPaymentReturnCheck.Status.CHECKED);
+    }
+    private SupplierPaymentReturnPort.Receipt returned(SupplierPaymentReturnPort.Request request) {
+        var now = Instant.now().truncatedTo(ChronoUnit.MICROS); var original = request.original();
+        var current = new PaymentObservation(original.authorizationId(), original.commandDigest(), original.status(), original.revision(), now,
+                original.paymentReference(), original.paidAmount(), original.accountDigest(), original.completedAt(), original.receiptReference(), original.failure());
+        var first = new SupplierPaymentReturnPort.BankReceipt("RETURN-" + request.command().id() + "-1", request.command().debitAccount().reference(), money("20"), original.completedAt());
+        var entries = returnRevision == 1 ? List.of(first) : List.of(first, new SupplierPaymentReturnPort.BankReceipt("RETURN-" + request.command().id() + "-2", request.command().debitAccount().reference(), money("10"), original.completedAt()));
+        return new SupplierPaymentReturnPort.Receipt(request, SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED, returnRevision, now, now.plusSeconds(300), current, entries);
+    }
+
     private UUID paidBank() throws Exception {
         UUID id = authorizedHold(approved()); var receipt = ok(send(cashierPath(id) + "/actions", "cashier", executeInput(cashierView(id))), 202);
         pollPreparation(UUID.fromString(receipt.path("preparationId").asText())); pollBank(id); assertThat(bankPayments.find("demo", id).orElseThrow().settleable()).isTrue(); return id;
@@ -885,6 +1006,7 @@ class SupplierFinanceWorkflowTest {
             case "debit-accounts" -> directory(json.read(request.path("data").toString(), PaymentAccountsPort.Request.class), Instant.now());
             case "supplier-payment-command" -> bankObservation(json.read(request.at("/data/command").toString(), SupplierPaymentCommand.class), PaymentObservation.Status.SUCCEEDED);
             case "supplier-payment-query" -> bankObservation(bankPayments.find("demo", UUID.fromString(request.at("/data/authorizationId").asText())).orElseThrow().command(), PaymentObservation.Status.SUCCEEDED);
+            case "supplier-payment-return" -> returned(json.read(request.path("data").toString(), SupplierPaymentReturnPort.Request.class));
             case "accounting-period" -> {
                 var period = json.read(request.path("data").toString(), AccountingPeriodPort.Request.class); var date = period.accountingDate(); var now = Instant.now();
                 yield new AccountingPeriodPort.OpenPeriod(period, "PERIOD-" + date.getMonthValue(), "v1", date.withDayOfMonth(1), date.withDayOfMonth(date.lengthOfMonth()), now, now.plusSeconds(600));
