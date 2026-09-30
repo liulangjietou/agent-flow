@@ -8,8 +8,10 @@ import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.FinanceJsonConfiguration;
 import io.agentflow.finance.FinanceCatalog;
+import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
+import io.agentflow.finance.PaymentPersonnel;
 import io.agentflow.organization.InitiatorContext;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -21,23 +23,35 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * 真实 H2/PostgreSQL 验证预算授权的单次证据、并发独占、租约恢复和安全结束原子性。
  * @author owlzhangfq@gmail.com
  */
 class BudgetAdjustmentExecutionPersistenceTest {
-    private static final Instant NOW = Instant.parse("2026-09-30T12:00:00Z");
+    private final Instant now = Instant.now().minusSeconds(20).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     private final String tenant = "budget-execution-" + UUID.randomUUID();
     private final UUID entity = UUID.randomUUID();
     private final JsonUtil json = new JsonUtil(new ObjectMapper().registerModule(new JavaTimeModule())
@@ -46,10 +60,15 @@ class BudgetAdjustmentExecutionPersistenceTest {
     private String schema;
     private JdbcTemplate jdbc;
     private TransactionTemplate tx;
+    private DataSourceTransactionManager manager;
     private JdbcBudgetAdjustmentRepository requests;
     private ApprovedBudgetAdjustmentSources sources;
     private JdbcBudgetAdjustmentReviewRepository reviews;
     private JdbcBudgetAdjustmentOperationRepository operations;
+    private FinanceGatewayConfiguration configuration;
+    private final AtomicBoolean eligible = new AtomicBoolean(true);
+    private BudgetAdjustmentExecutionService execution;
+    private BudgetAdjustmentReviewService reviewService;
 
     @BeforeEach void database() { database(null); }
     private void database(String target) {
@@ -58,9 +77,19 @@ class BudgetAdjustmentExecutionPersistenceTest {
         schema = "budget_execution_" + UUID.randomUUID().toString().replace("-", "");
         new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var flyway = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) flyway.target(target);
-        flyway.load().migrate(); jdbc = new JdbcTemplate(dataSource); tx = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        flyway.load().migrate(); jdbc = new JdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
         requests = new JdbcBudgetAdjustmentRepository(jdbc, json); sources = new ApprovedBudgetAdjustmentSources(new JdbcApplicationRepository(jdbc, json), requests);
         reviews = new JdbcBudgetAdjustmentReviewRepository(jdbc, json, sources); operations = new JdbcBudgetAdjustmentOperationRepository(jdbc, json, sources, reviews);
+        configuration = new FinanceGatewayConfiguration(); configuration.setEnabled(true);
+        var financeTarget = new FinanceGatewayConfiguration.Target(); financeTarget.setEndpoint("https://budget-fixture.example/finance"); financeTarget.setToken("synthetic-token");
+        configuration.getTenants().put(tenant, financeTarget);
+        var personnel = mock(PaymentPersonnel.class);
+        doAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+            if (!eligible.get()) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Synthetic inactive finance appointment"); return null;
+        }).when(personnel).requireEligible(anyString(), anyString(), any());
+        execution = proxy(new BudgetAdjustmentExecutionService(sources, operations, personnel, configuration, 30));
+        reviewService = proxy(new BudgetAdjustmentReviewService(sources, reviews, operations, execution, 30));
     }
 
     @Test void originalApprovalReadyRevisionAndSingleConsumptionSurviveRepositoryReconstruction() {
@@ -84,7 +113,7 @@ class BudgetAdjustmentExecutionPersistenceTest {
         jdbc.update("UPDATE approval_application SET payload_json='{}' WHERE tenant_id=? AND id=?", tenant, source.applicationId().toString());
         assertThatThrownBy(() -> authorize(second)).isInstanceOf(DomainException.class);
         jdbc.update("UPDATE approval_application SET payload_json=? WHERE tenant_id=? AND id=?", json.write(BudgetAdjustmentFormContract.submittedPayload(source.round())), tenant, source.applicationId().toString());
-        jdbc.update("UPDATE budget_adjustment_review SET requested_at=? WHERE tenant_id=? AND id=?", java.sql.Timestamp.from(NOW), tenant, second.input().id().toString());
+        jdbc.update("UPDATE budget_adjustment_review SET requested_at=? WHERE tenant_id=? AND id=?", java.sql.Timestamp.from(now), tenant, second.input().id().toString());
         assertThatThrownBy(() -> reviews.find(tenant, second.input().id())).isInstanceOf(IllegalStateException.class);
         assertThat(count("budget_adjustment_operation")).isZero();
     }
@@ -105,22 +134,22 @@ class BudgetAdjustmentExecutionPersistenceTest {
     }
 
     @Test void competingClaimsPreserveOneLeaseAndCannotSkipExecutionIntoSuccess() throws Exception {
-        var queued = authorize(ready(approved(), "finance", 2)); var running = queued.claim(NOW.plusSeconds(6), Duration.ofSeconds(10));
+        var queued = authorize(ready(approved(), "finance", 2)); var running = queued.claim(now.plusSeconds(6), Duration.ofSeconds(10));
         assertThat(race(() -> save(running), () -> save(running))).containsExactlyInAnyOrder("SAVED", "CONCURRENCY_CONFLICT");
         assertThat(operations.find(tenant, queued.command().id())).contains(running);
-        var another = authorize(ready(approved(), "finance", 2)); var receipt = applied(another.command(), NOW.plusSeconds(7));
-        var forged = new BudgetAdjustmentOperation(another.command(), 2, BudgetAdjustmentOperation.Status.APPLIED, 1, another.createdAt(), NOW.plusSeconds(7), null, null, receipt, null, null);
+        var another = authorize(ready(approved(), "finance", 2)); var receipt = applied(another.command(), now.plusSeconds(7));
+        var forged = new BudgetAdjustmentOperation(another.command(), 2, BudgetAdjustmentOperation.Status.APPLIED, 1, another.createdAt(), now.plusSeconds(7), null, null, receipt, null, null);
         assertThatThrownBy(() -> save(forged)).isInstanceOf(DomainException.class);
         assertThat(operations.find(tenant, another.command().id())).contains(another);
     }
 
     @Test void lostLeaseAndLateReceiptRecoverOnlyThroughOriginalQuery() {
-        var queued = authorize(ready(approved(), "finance", 2)); var running = queued.claim(NOW.plusSeconds(6), Duration.ofSeconds(10)); save(running);
-        var expired = running.expire(NOW.plusSeconds(16)); save(expired);
-        assertThatThrownBy(() -> save(running.complete(new FinanceResult.Success<>(applied(running.command(), NOW.plusSeconds(7))), NOW.plusSeconds(7)))).isInstanceOf(DomainException.class);
-        var query = expired.claim(NOW.plusSeconds(400), Duration.ofSeconds(10)); save(query);
+        var queued = authorize(ready(approved(), "finance", 2)); var running = queued.claim(now.plusSeconds(6), Duration.ofSeconds(10)); save(running);
+        var expired = running.expire(now.plusSeconds(16)); save(expired);
+        assertThatThrownBy(() -> save(running.complete(new FinanceResult.Success<>(applied(running.command(), now.plusSeconds(7))), now.plusSeconds(7)))).isInstanceOf(DomainException.class);
+        var query = expired.claim(now.plusSeconds(400), Duration.ofSeconds(10)); save(query);
         assertThat(query.status()).isEqualTo(BudgetAdjustmentOperation.Status.QUERYING);
-        var done = query.complete(new FinanceResult.Success<>(applied(query.command(), NOW.plusSeconds(401))), NOW.plusSeconds(401)); save(done);
+        var done = query.complete(new FinanceResult.Success<>(applied(query.command(), now.plusSeconds(401))), now.plusSeconds(401)); save(done);
         assertThat(operations.find(tenant, query.command().id())).contains(done);
         assertThat(operations.revision(tenant, query.command().id(), running.version())).contains(running);
         assertThat(operations.activeForRequest(tenant, query.command().source().requestId())).contains(done);
@@ -138,13 +167,13 @@ class BudgetAdjustmentExecutionPersistenceTest {
     @Test void safeRetirementAndReplacementKeepOriginalCommandAndPreventResurrection() {
         var source = approved(); var queued = authorize(ready(source, "finance", 2));
         tx.executeWithoutResult(status -> {
-            var stopped = queued.voidBeforeSend(NOW.plusSeconds(6)); operations.update(stopped);
-            operations.retire(tenant, BudgetAdjustmentRetirement.from(stopped, "finance", NOW.plusSeconds(7)));
+            var stopped = queued.voidBeforeSend(now.plusSeconds(6)); operations.update(stopped);
+            operations.retire(tenant, BudgetAdjustmentRetirement.from(stopped, "finance", now.plusSeconds(7)));
         });
         assertThat(operations.activeForRequest(tenant, source.requestId())).isEmpty();
         var retired = operations.find(tenant, queued.command().id()).orElseThrow();
         assertThat(operations.retirement(tenant, queued.command().id()).orElseThrow().matches(retired)).isTrue();
-        assertThatThrownBy(() -> save(queued.claim(NOW.plusSeconds(6), Duration.ofSeconds(10)))).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> save(queued.claim(now.plusSeconds(6), Duration.ofSeconds(10)))).isInstanceOf(DomainException.class);
         var next = authorize(ready(source, "finance", 8));
         assertThat(operations.list(tenant, source.requestId(), null, 10)).containsExactlyInAnyOrder(retired, next);
         assertThat(operations.activeForRequest(tenant, source.requestId())).contains(next);
@@ -156,18 +185,18 @@ class BudgetAdjustmentExecutionPersistenceTest {
         var queued = authorize(ready(approved(), "finance", 2));
         Callable<Object> stop = () -> {
             tx.executeWithoutResult(status -> {
-                var stopped = queued.voidBeforeSend(NOW.plusSeconds(6)); operations.update(stopped);
-                operations.retire(tenant, BudgetAdjustmentRetirement.from(stopped, "finance", NOW.plusSeconds(7)));
+                var stopped = queued.voidBeforeSend(now.plusSeconds(6)); operations.update(stopped);
+                operations.retire(tenant, BudgetAdjustmentRetirement.from(stopped, "finance", now.plusSeconds(7)));
             }); return null;
         };
-        assertThat(race(stop, () -> save(queued.claim(NOW.plusSeconds(6), Duration.ofSeconds(10))))).containsExactlyInAnyOrder("SAVED", "CONCURRENCY_CONFLICT");
+        assertThat(race(stop, () -> save(queued.claim(now.plusSeconds(6), Duration.ofSeconds(10))))).containsExactlyInAnyOrder("SAVED", "CONCURRENCY_CONFLICT");
         var result = operations.find(tenant, queued.command().id()).orElseThrow();
         assertThat(result.status()).isIn(BudgetAdjustmentOperation.Status.VOIDED, BudgetAdjustmentOperation.Status.EXECUTING);
         assertThat(operations.retirement(tenant, queued.command().id()).isPresent()).isEqualTo(result.status() == BudgetAdjustmentOperation.Status.VOIDED);
         var second = authorize(ready(approved(), "finance", 2));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
-            var stopped = second.voidBeforeSend(NOW.plusSeconds(6)); operations.update(stopped);
-            operations.retire(tenant, BudgetAdjustmentRetirement.from(stopped, "finance", NOW.plusSeconds(7)));
+            var stopped = second.voidBeforeSend(now.plusSeconds(6)); operations.update(stopped);
+            operations.retire(tenant, BudgetAdjustmentRetirement.from(stopped, "finance", now.plusSeconds(7)));
             throw new IllegalStateException("Synthetic transaction failure");
         })).isInstanceOf(IllegalStateException.class);
         assertThat(operations.find(tenant, second.command().id())).contains(second);
@@ -189,32 +218,146 @@ class BudgetAdjustmentExecutionPersistenceTest {
         assertThat(upgrade.migrate().migrationsExecuted).isZero(); assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
     }
 
+    @Test void workersUseShortTransactionsAndReadNeverAutomaticallyAuthorizes() {
+        var source = approved(); var ledger = mock(BudgetLedgerPort.class); var gateway = mock(BudgetAdjustmentPort.class);
+        var reviewWorker = new BudgetAdjustmentReviewWorker(reviews, reviewService, ledger);
+        var worker = new BudgetAdjustmentExecutionWorker(operations, execution, gateway);
+        when(ledger.read(anyString(), anyString(), any())).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(invocation.<String>getArgument(1)).isEqualTo(source.round().targetDigest());
+            var observed = Instant.now().minusMillis(1);
+            return new FinanceResult.Success<>(new BudgetLedgerPort.Snapshot(source.round().ledger().request(), "fresh-v2", observed, observed.plusSeconds(300), source.round().ledger().positions()));
+        });
+        var queuedReview = tx.execute(status -> reviewService.register(source, "finance", Instant.now()));
+        reviewWorker.poll(); var ready = reviews.find(tenant, queuedReview.input().id()).orElseThrow();
+        assertThat(ready.status()).isEqualTo(BudgetAdjustmentReview.Status.READY); assertThat(count("budget_adjustment_operation")).isZero();
+        var queued = tx.execute(status -> reviewService.authorize(tenant, ready.input().id(), ready.version(), "finance", "独立复核", Instant.now()));
+        when(gateway.execute(any())).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            var command = invocation.<BudgetAdjustmentCommand>getArgument(0);
+            assertThat(command).isEqualTo(queued.command());
+            return new FinanceResult.Success<>(applied(command, Instant.now()));
+        });
+        worker.poll(); worker.poll(); reviewWorker.poll();
+        assertThat(operations.find(tenant, queued.command().id()).orElseThrow().status()).isEqualTo(BudgetAdjustmentOperation.Status.APPLIED);
+        verify(gateway).execute(queued.command()); verify(gateway, never()).query(any());
+        assertThat(sources.derive(tenant, source.requestId())).isEqualTo(source);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> reviewWorker.poll())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> worker.poll())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test void inactiveFinanceOrChangedDestinationStopsNewDispatchAndStillAllowsSafeRetirement() {
+        var first = authorize(ready(approved(), "finance", 2)); eligible.set(false);
+        assertThat(execution.claim(tenant, first.command().id(), now.plusSeconds(6))).isNull();
+        var stopped = operations.find(tenant, first.command().id()).orElseThrow();
+        assertThat(stopped.status()).isEqualTo(BudgetAdjustmentOperation.Status.VOIDED); assertThat(stopped.attempts()).isZero();
+        eligible.set(true); var second = authorize(ready(approved(), "finance", 2));
+        configuration.getTenants().get(tenant).setEndpoint("https://different-budget.example/finance");
+        assertThat(execution.claim(tenant, second.command().id(), now.plusSeconds(6))).isNull();
+        var changed = operations.find(tenant, second.command().id()).orElseThrow();
+        tx.executeWithoutResult(status -> execution.retire(tenant, second.command().id(), changed.version(), "finance", now.plusSeconds(7)));
+        assertThat(operations.activeForRequest(tenant, second.command().source().requestId())).isEmpty();
+    }
+
+    @Test void reviewFinishingAfterQualificationLossCannotBecomeAnAuthorizationBasis() {
+        var source = approved(); var queued = tx.execute(status -> reviewService.register(source, "finance", now.plusSeconds(2)));
+        var running = reviewService.claim(tenant, queued.input().id(), now.plusSeconds(3));
+        eligible.set(false); reviewService.finish(running, new FinanceResult.Success<>(fresh(source, 4)), now.plusSeconds(5));
+        assertThat(reviews.find(tenant, queued.input().id()).orElseThrow().status()).isEqualTo(BudgetAdjustmentReview.Status.VOIDED);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> reviewService.authorize(tenant, queued.input().id(), 3, "finance", "不应授权", now.plusSeconds(6)))).isInstanceOf(DomainException.class);
+        assertThat(count("budget_adjustment_operation")).isZero();
+    }
+
+    @Test void expiredReadLeaseIsNotRetriedAndLateCompletionCannotReopenIt() {
+        var source = approved(); var queued = tx.execute(status -> reviewService.register(source, "finance", now.plusSeconds(2)));
+        var running = reviewService.claim(tenant, queued.input().id(), now.plusSeconds(3));
+        assertThat(reviewService.claim(tenant, queued.input().id(), now.plusSeconds(33))).isNull();
+        var timeout = reviews.find(tenant, queued.input().id()).orElseThrow(); assertThat(timeout.issue()).isEqualTo(BudgetAdjustmentReview.Issue.TIMEOUT);
+        reviewService.finish(running, new FinanceResult.Success<>(fresh(source, 4)), now.plusSeconds(5));
+        assertThat(reviews.find(tenant, queued.input().id())).contains(timeout);
+        assertThat(reviewService.claim(tenant, queued.input().id(), now.plusSeconds(34))).isNull();
+    }
+
+    @Test void unknownOperationStillQueriesOriginalAfterSourceAndFinanceBecomeUnavailable() {
+        var queued = authorize(ready(approved(), "finance", 2)); var running = execution.claim(tenant, queued.command().id(), now.plusSeconds(6));
+        execution.finish(running, new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT), now.plusSeconds(7));
+        eligible.set(false); configuration.setEnabled(false);
+        jdbc.update("UPDATE approval_application SET status='CANCELLED' WHERE tenant_id=? AND id=?", tenant, queued.command().source().applicationId().toString());
+        var unknown = operations.find(tenant, queued.command().id()).orElseThrow();
+        tx.executeWithoutResult(status -> execution.query(tenant, queued.command().id(), unknown.version(), now.plusSeconds(8)));
+        var query = execution.claim(tenant, queued.command().id(), now.plusSeconds(400));
+        assertThat(query.status()).isEqualTo(BudgetAdjustmentOperation.Status.QUERYING); assertThat(query.command()).isEqualTo(queued.command());
+        execution.finish(query, new FinanceResult.Success<>(applied(query.command(), now.plusSeconds(401))), now.plusSeconds(401));
+        assertThat(operations.find(tenant, queued.command().id()).orElseThrow().status()).isEqualTo(BudgetAdjustmentOperation.Status.APPLIED);
+    }
+
+    @Test void authoritativeNotFoundNeedsOriginalAuthorizerAndUnexpiredOriginalCommand() {
+        var queued = authorize(ready(approved(), "finance", 2)); var running = execution.claim(tenant, queued.command().id(), now.plusSeconds(6));
+        execution.fail(running, now.plusSeconds(7)); var query = execution.claim(tenant, queued.command().id(), now.plusSeconds(12));
+        var missing = new BudgetAdjustmentObservation(queued.command().id(), queued.command().digest(), BudgetAdjustmentObservation.Status.NOT_FOUND, 0,
+                now.plusSeconds(13), null, null, List.of(), null);
+        execution.finish(query, new FinanceResult.Success<>(missing), now.plusSeconds(13));
+        var found = operations.find(tenant, queued.command().id()).orElseThrow();
+        assertThat(execution.claim(tenant, queued.command().id(), now.plusSeconds(14))).isNull();
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> execution.retire(tenant, queued.command().id(), found.version(), "finance", now.plusSeconds(14)))).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> execution.resend(tenant, queued.command().id(), found.version(), "finance-2", now.plusSeconds(14)))).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> execution.resend(tenant, queued.command().id(), found.version(), "finance", queued.command().expiresAt()))).isInstanceOf(DomainException.class);
+        var retry = tx.execute(status -> execution.resend(tenant, queued.command().id(), found.version(), "finance", now.plusSeconds(14)));
+        assertThat(retry.command()).isEqualTo(queued.command()); assertThat(retry.status()).isEqualTo(BudgetAdjustmentOperation.Status.QUEUED);
+    }
+
+    @Test void workerExceptionPersistsUnknownAndExplicitRecoveryCallsOnlyOriginalQuery() {
+        var queued = authorize(ready(approved(), "finance", 2)); var gateway = mock(BudgetAdjustmentPort.class);
+        var worker = new BudgetAdjustmentExecutionWorker(operations, execution, gateway);
+        when(gateway.execute(any())).thenThrow(new IllegalStateException("Synthetic lost response"));
+        worker.poll(); var unknown = operations.find(tenant, queued.command().id()).orElseThrow();
+        assertThat(unknown.status()).isEqualTo(BudgetAdjustmentOperation.Status.UNKNOWN);
+        assertThat(unknown.failure()).isEqualTo(BudgetAdjustmentOperation.Failure.INTERNAL_ERROR);
+        eligible.set(false);
+        tx.executeWithoutResult(status -> execution.query(tenant, queued.command().id(), unknown.version(), Instant.now()));
+        when(gateway.query(any())).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(invocation.<BudgetAdjustmentCommand>getArgument(0)).isEqualTo(queued.command());
+            return new FinanceResult.Success<>(applied(queued.command(), Instant.now()));
+        });
+        worker.poll(); worker.poll();
+        verify(gateway).execute(queued.command()); verify(gateway).query(queued.command());
+        assertThat(operations.find(tenant, queued.command().id()).orElseThrow().status()).isEqualTo(BudgetAdjustmentOperation.Status.APPLIED);
+    }
+
     private ApprovedBudgetAdjustment approved() {
         var content = new BudgetAdjustmentContent(entity, "预算调整", "同法人调拨", BudgetAdjustmentContent.Type.TRANSFER, LocalDate.of(2026, 9, 30), "source", "target", money("70"));
         var request = BudgetAdjustmentRequest.draft(UUID.randomUUID(), tenant, UUID.randomUUID(), "alice", content);
-        var catalog = new FinanceCatalog("alice", "v1", NOW.plusSeconds(300), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
+        var catalog = new FinanceCatalog("alice", "v1", now.plusSeconds(300), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
         var positions = content.ledgerRequest("alice").budgetReferences().stream().map(reference -> new BudgetLedgerPort.Position(entity, reference, "预算", "v1", "2026",
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), BudgetLedgerPort.PeriodStatus.OPEN, money("1000"), money("300"), money("450"))).toList();
-        var ledger = new BudgetLedgerPort.Snapshot(content.ledgerRequest("alice"), "ledger-v1", NOW, NOW.plusSeconds(300), positions);
+        var ledger = new BudgetLedgerPort.Snapshot(content.ledgerRequest("alice"), "ledger-v1", now, now.plusSeconds(300), positions);
         var initiator = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
         return tx.execute(status -> {
             jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','预算调整','{}','DRAFT',1,1,'BUDGET_ADJUSTMENT',?)",
                     request.applicationId().toString(), tenant, UUID.randomUUID().toString(), request.id().toString());
-            requests.create(request, "alice"); request.freeze(1, 1, catalog, "a".repeat(64), ledger, initiator, NOW); requests.update(request, 1, "alice", "SUBMIT");
-            request.approve(2, 1, 8, "manager", NOW.plusSeconds(1)); requests.update(request, 2, "manager", "APPROVE");
+            requests.create(request, "alice"); request.freeze(1, 1, catalog, configuration.destination(tenant).orElseThrow().digest(tenant), ledger, initiator, now); requests.update(request, 1, "alice", "SUBMIT");
+            request.approve(2, 1, 8, "manager", now.plusSeconds(1)); requests.update(request, 2, "manager", "APPROVE");
             jdbc.update("UPDATE approval_application SET status='APPROVED',version=8,payload_json=? WHERE tenant_id=? AND id=?", json.write(BudgetAdjustmentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
             return sources.derive(tenant, request.id());
         });
     }
     private BudgetAdjustmentReview ready(ApprovedBudgetAdjustment source, String actor, int at) {
-        var input = new BudgetAdjustmentReview.Input(UUID.randomUUID(), source, actor, reviews.latestAttempt(tenant, source.requestId(), actor) + 1, NOW.plusSeconds(at));
+        var input = new BudgetAdjustmentReview.Input(UUID.randomUUID(), source, actor, reviews.latestAttempt(tenant, source.requestId(), actor) + 1, now.plusSeconds(at));
         var queued = BudgetAdjustmentReview.queue(input); tx.executeWithoutResult(status -> reviews.create(queued));
         var running = queued.claim(input.requestedAt(), Duration.ofSeconds(30)); tx.executeWithoutResult(status -> reviews.update(running));
-        var ledger = new BudgetLedgerPort.Snapshot(source.round().ledger().request(), "latest-v2", NOW.plusSeconds(at + 1), NOW.plusSeconds(at + 301), source.round().ledger().positions());
-        var ready = running.complete(new FinanceResult.Success<>(ledger), NOW.plusSeconds(at + 2)); tx.executeWithoutResult(status -> reviews.update(ready)); return ready;
+        var ledger = new BudgetLedgerPort.Snapshot(source.round().ledger().request(), "latest-v2", now.plusSeconds(at + 1), now.plusSeconds(at + 301), source.round().ledger().positions());
+        var ready = running.complete(new FinanceResult.Success<>(ledger), now.plusSeconds(at + 2)); tx.executeWithoutResult(status -> reviews.update(ready)); return ready;
     }
     private BudgetAdjustmentCommand command(BudgetAdjustmentReview review) {
         return BudgetAdjustmentCommand.authorize(UUID.randomUUID(), review.input().source(), review.ledger(), review.input().requestedBy(), "确认最新台账", review.updatedAt().plusSeconds(1));
+    }
+    private BudgetLedgerPort.Snapshot fresh(ApprovedBudgetAdjustment source, int seconds) {
+        return new BudgetLedgerPort.Snapshot(source.round().ledger().request(), "fresh-v2", now.plusSeconds(seconds), now.plusSeconds(seconds + 300), source.round().ledger().positions());
+    }
+    @SuppressWarnings("unchecked") private <T> T proxy(T target) {
+        var factory = new ProxyFactory(target); factory.setProxyTargetClass(true);
+        factory.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource())); return (T) factory.getProxy();
     }
     private BudgetAdjustmentOperation authorize(BudgetAdjustmentReview review) {
         var command = command(review); var queued = BudgetAdjustmentOperation.queue(command, command.authorizedAt());
@@ -229,7 +372,7 @@ class BudgetAdjustmentExecutionPersistenceTest {
             return new BudgetAdjustmentObservation.AppliedChange(change.budgetReference(), change.expectedVersion(), "v2", position.periodReference(), command.source().round().content().accountingDate(),
                     change.beforeLimit(), change.afterLimit(), position.committed(), position.consumed());
         }).toList();
-        return new BudgetAdjustmentObservation(command.id(), command.digest(), BudgetAdjustmentObservation.Status.APPLIED, 1, at, "synthetic-adjustment", command.authorizedAt().plusSeconds(1), changes, null);
+        return new BudgetAdjustmentObservation(command.id(), command.digest(), BudgetAdjustmentObservation.Status.APPLIED, 1, at, "synthetic-adjustment", command.authorizedAt(), changes, null);
     }
     private List<String> race(Callable<?> first, Callable<?> second) throws Exception {
         var start = new CountDownLatch(1); var executor = Executors.newFixedThreadPool(2);
