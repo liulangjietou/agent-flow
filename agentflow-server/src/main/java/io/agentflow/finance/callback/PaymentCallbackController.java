@@ -1,5 +1,6 @@
 package io.agentflow.finance.callback;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -113,5 +114,8 @@ public class PaymentCallbackController {
      * 原事件的人工恢复不允许传入新的银行命令或业务数据。
      * @author owlzhangfq@gmail.com
      */
-    public record RetryInput(@NotNull @Min(1) Long expectedVersion, @NotBlank @Size(max = 500) String reason) { }
+    public record RetryInput(@NotNull @Min(1) Long expectedVersion, @NotBlank @Size(max = 500) String reason) {
+        /** 恢复只接受原版本与原因，不静默忽略客户端附加的资金声明。 */
+        @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown payment callback retry field"); }
+    }
 }

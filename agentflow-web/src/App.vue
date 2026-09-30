@@ -8,7 +8,7 @@ import type { WorkspacePage as Page } from './workspaceNavigation'
 import BranchDiagnostics from './components/BranchDiagnostics.vue'
 import { DesignerValidation } from './designerValidation'
 import ApplicationSearch from './components/ApplicationSearch.vue'
-import WebhookDeliveries from './components/WebhookDeliveries.vue'
+import IntegrationWorkspace from './components/IntegrationWorkspace.vue'
 import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
@@ -928,6 +928,9 @@ async function recoverOperation(id: string) {
         applyDefinition(result as Definition); page.value = 'designer'; templateRefresh.value++
         notice.value = request.path.endsWith('/availability') ? '已确认原版本治理操作，请刷新版本状态核对当前结果。'
           : request.path.includes('/publish?') ? '已确认原流程的发布结果。' : '已确认原流程草稿的保存结果，请核对后再发布。'
+      } else if (request.path.startsWith('/integrations/payment/callbacks/')) {
+        templateRefresh.value++
+        notice.value = '已确认原支付回调恢复请求，请刷新回调处理状态。'
       } else if (request.path.startsWith('/integrations/webhooks/deliveries/')) {
         templateRefresh.value++
         notice.value = '已确认原投递重试请求，请刷新投递状态查看发送结果。'
@@ -1146,7 +1149,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <div class="page-heading"><div><p class="eyebrow">APPROVAL ASSISTANT</p><h2>Agent 助理</h2><p class="subhead">从当前待办选择材料，生成摘要后逐条核对来源。</p></div><button class="primary" @click="page = 'workbench'; taskTab = 'assist'">打开待办摘要</button></div>
           <div class="panel queue-empty"><strong>由你决定发送哪些内容</strong><p>在待办的“Agent 摘要”中勾选可读字段，确认模型目的地后生成。敏感字段和附件不发送。服务未配置时，输入面板会显示具体原因。</p><p>生成结果可修改后采纳，也可记录未采纳意见。复核记录与原文分别保留，审批仍需单独办理。</p><button class="secondary" @click="page = 'applications'">查看申请中的历史摘要</button></div>
         </section>
-        <WebhookDeliveries v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
+        <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />

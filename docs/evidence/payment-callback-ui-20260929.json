@@ -1,0 +1,124 @@
+{
+  "date": "2026-09-29",
+  "scope": "Payment callback administration UI and preserved V74 local acceptance",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "sourceBackendCommit": "20de5a3bbf0d2bd2d9e67701e77de442c9361e6f",
+  "upgrade": {
+    "fromVersion": 73,
+    "toVersion": 74,
+    "unchangedBusinessTables": 131,
+    "unchangedBusinessRows": 1517,
+    "unchangedAttachments": 5,
+    "unchangedCommandFiles": 15,
+    "newTablesEmpty": [
+      "payment_callback",
+      "payment_callback_revision"
+    ],
+    "backupBytes": 897964,
+    "backupSha256": "d93e3b8861afa2cc59d83989b8ec674cffb6893f7f424a24b0d16ad8d6c6b868"
+  },
+  "validation": {
+    "frontendRelated": 24,
+    "backendPaymentAndContract": 49,
+    "scopesOverlap": true,
+    "frontendBuild": "PASS",
+    "backendPackage": "PASS",
+    "javaFiles": 955,
+    "namedTypes": 1783,
+    "missingAuthorTags": 0,
+    "javaParseErrors": 0,
+    "openapiOperations": 216,
+    "openapiSchemas": 422,
+    "requestExamples": 79,
+    "recordedProgrammaticHttp": 116,
+    "loginsIncluded": 42,
+    "actualBusinessResponseSchemas": 74
+  },
+  "liveAcceptance": {
+    "result": "PASS",
+    "callbackCount": 3,
+    "browserRetryCallbackId": "49b39e93-49e4-4e3c-8510-f7a309c801de",
+    "browserRetryHistory": [
+      "RECEIVED",
+      "REVIEW_REQUIRED",
+      "RECEIVED",
+      "QUERY_QUEUED"
+    ],
+    "targetChangeCausedNoNetwork": true,
+    "restoringConfigurationDidNotAutoRetry": true,
+    "browserExplicitRetryCausedOnlyOneOriginalQuery": true,
+    "changedTables": [
+      {
+        "table": "payment_operation",
+        "before": 5,
+        "after": 5
+      },
+      {
+        "table": "payment_operation_revision",
+        "before": 37,
+        "after": 40
+      },
+      {
+        "table": "request_idempotency",
+        "before": 249,
+        "after": 250
+      },
+      {
+        "table": "supplier_payment_operation",
+        "before": 1,
+        "after": 1
+      },
+      {
+        "table": "supplier_payment_revision",
+        "before": 22,
+        "after": 28
+      }
+    ],
+    "otherBusinessTablesUnchanged": 126,
+    "allOriginalRowsRetained": true,
+    "originalCommandFileHashesUnchanged": 15,
+    "attachmentsUnchanged": 5,
+    "syntheticFinanceOnly": true
+  },
+  "browser": {
+    "administratorListAndHistory": true,
+    "requiredReasonBeforeExplicitRetry": true,
+    "historyRetainsActorAndReason": true,
+    "completedQueryHasNoRetryButton": true,
+    "narrowClientWidth": 480,
+    "narrowScrollWidth": 480,
+    "screenshots": [
+      "payment-callback-ui-complete.png",
+      "payment-callback-ui-narrow.png"
+    ]
+  },
+  "redGreen": [
+    {
+      "test": "实际 HTTP 省略空字段时仍能读取列表、历史和恢复回执",
+      "red": "payment-callback-ui-null-red.log",
+      "green": "payment-callback-ui-tests.log"
+    },
+    {
+      "test": "callbackContractAllowsAbsentOptionalFieldsFromTheRealSerializer",
+      "red": "payment-callback-null-contract-red.log",
+      "green": "payment-callback-ui-backend-green.log"
+    },
+    {
+      "test": "callbackRetryRejectsUnknownFieldsBeforeChangingTheOriginalRecord",
+      "red": "payment-callback-retry-field-red.log",
+      "green": "payment-callback-ui-backend-green.log"
+    }
+  ],
+  "runtime": {
+    "backendPort": 18214,
+    "frontendPort": 15314,
+    "syntheticFinancePort": 18222,
+    "database": "expense_ui_b8e8e035f6",
+    "schemaVersion": 74
+  },
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "externalEnterpriseIntegration": false,
+  "mainUpdated": false,
+  "remoteConfigured": false,
+  "remainingWorkPackages": 4
+}

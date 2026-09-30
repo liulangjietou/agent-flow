@@ -19,6 +19,7 @@ import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
+import type { PaymentCallbackPage, PaymentCallbackDetail, PaymentCallbackView } from './paymentCallbacks'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
@@ -443,6 +444,9 @@ export const api = {
     return options
   },
   webhookTargets: (signal: AbortSignal) => request<WebhookTarget[]>('/integrations/webhooks', { signal }),
+  paymentCallbacks: (beforeId: string | undefined, signal: AbortSignal) => request<PaymentCallbackPage>('/integrations/payment/callbacks' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
+  paymentCallback: (id: string, signal: AbortSignal) => request<PaymentCallbackDetail>('/integrations/payment/callbacks/' + encodeURIComponent(id), { signal, cache: 'no-store' }),
+  retryPaymentCallback: (id: string, input: { expectedVersion: number; reason: string }) => write<PaymentCallbackView>('/integrations/payment/callbacks/' + encodeURIComponent(id) + '/retry', 'POST', '重新处理原支付回调', input),
   webhookOverview: (filters: WebhookOverviewFilters, signal: AbortSignal) => request<WebhookOverview>('/integrations/webhooks/overview' + historyQuery(filters), { signal }),
   webhookDeliveries: (filters: WebhookFilters, signal: AbortSignal) => request<WebhookPage>('/integrations/webhooks/deliveries' + historyQuery(filters), { signal }),
   webhookDelivery: (id: string, signal: AbortSignal) => request<WebhookDetail>('/integrations/webhooks/deliveries/' + encodeURIComponent(id), { signal }),

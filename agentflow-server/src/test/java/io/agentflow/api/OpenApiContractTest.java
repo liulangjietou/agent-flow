@@ -376,6 +376,24 @@ class OpenApiContractTest {
     }
 
     @Test
+    void callbackContractAllowsAbsentOptionalFieldsFromTheRealSerializer() throws Exception {
+        var schemas = document().path("components").path("schemas");
+        var token = auth.login("demo", "admin", "demo").token();
+        var response = mvc.perform(get("/api/v1/integrations/payment/callbacks").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var page = json.read(response, JsonNode.class);
+        schemas.path("PaymentCallbackPage").path("required").forEach(field ->
+                assertThat(page.has(field.asText())).as("actual callback page includes required %s", field.asText()).isTrue());
+        var now = java.time.Instant.parse("2026-09-29T10:00:00Z");
+        var value = new io.agentflow.finance.callback.PaymentCallbackController.View(java.util.UUID.randomUUID(), "event-original",
+                io.agentflow.finance.callback.PaymentCallbackVerifier.Kind.EMPLOYEE, java.util.UUID.randomUUID(), 1L, 1L,
+                io.agentflow.finance.callback.PaymentCallback.Status.RECEIVED, now, now, now, 0, null, null, null, null);
+        var wire = json.read(json.write(value), JsonNode.class);
+        schemas.path("PaymentCallbackView").path("required").forEach(field ->
+                assertThat(wire.has(field.asText())).as("serialized callback includes required %s", field.asText()).isTrue());
+    }
+
+    @Test
     void availabilityIsOptionalOnlyOnLegacyDefinitionWriteReplays() throws Exception {
         var schemas = document().path("components").path("schemas");
         assertThat(java.util.stream.StreamSupport.stream(schemas.path("Definition").path("required").spliterator(), false)

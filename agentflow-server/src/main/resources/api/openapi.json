@@ -28324,12 +28324,7 @@
           "status",
           "receivedAt",
           "updatedAt",
-          "nextAttemptAt",
-          "failures",
-          "queryVersion",
-          "reason",
-          "requestedBy",
-          "requestReason"
+          "failures"
         ],
         "properties": {
           "id": {
@@ -28470,8 +28465,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "items",
-          "nextBeforeId"
+          "items"
         ],
         "properties": {
           "items": {

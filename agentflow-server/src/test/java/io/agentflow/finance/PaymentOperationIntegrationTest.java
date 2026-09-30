@@ -241,6 +241,20 @@ class PaymentOperationIntegrationTest {
         assertThatThrownBy(() -> callbackRecords.get("foreign", callback.id())).isInstanceOf(DomainException.class);
     }
 
+    @Test void callbackRetryRejectsUnknownFieldsBeforeChangingTheOriginalRecord() throws Exception {
+        var payment = job(); var callback = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 1));
+        callbacks.process(candidate(callback), now()); var before = callbackRecords.get("demo", callback.id());
+        String admin = auth.login("demo", "admin", "demo").token();
+        var body = Map.of("expectedVersion", before.version(), "reason", "核对原交易", "status", "SUCCEEDED");
+        var response = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(PaymentCallbackVerifier.PATH + "/" + callback.id() + "/retry")
+                .header("Authorization", "Bearer " + admin).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType("application/json").content(json.write(body))).andReturn().getResponse();
+        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(callbackRecords.get("demo", callback.id())).isEqualTo(before);
+        assertThat(callbackRecords.history("demo", callback.id())).hasSize(2);
+        assertThat(reload(payment)).isEqualTo(payment);
+    }
+
     private String callbackBody(PaymentOperation value, long revision) {
         return json.write(new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.EMPLOYEE,
                 value.input().command().id(), value.input().command().digest(), revision));
