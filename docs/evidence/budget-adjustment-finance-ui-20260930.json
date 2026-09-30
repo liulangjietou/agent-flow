@@ -1,0 +1,55 @@
+{
+  "date": "2026-09-30",
+  "scope": "预算调整批准后的财务办理页面及真实 Vue 组件行为",
+  "changes": [
+    "按原申请、轮次及双版本读取，支持选中原指令和有界历史",
+    "最新台账与原授权两端额度分别展示，202 只确认决定保存",
+    "确认授权和查无重发时重验期限",
+    "独立财务明确办理，刷新不触发读取授权或预算重发",
+    "未知请求复用原幂等键和原正文，恢复后重新查询",
+    "权限失效撤下台账、历史与确认输入，迟到响应不跨身份回填",
+    "超预算可用额按零显示，允许批准追加或调入；调减仍保护已占用部分",
+    "金额保留精确字符串，预算名称使用 Vue 文本转义"
+  ],
+  "verification": {
+    "newBudgetFinanceTests": 20,
+    "relatedFrontendTests": 101,
+    "failures": 0,
+    "testLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-finance-ui-tests-final.log",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-finance-ui-build-final.log",
+    "openApiLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-finance-ui-openapi.log",
+    "openApi": {
+      "operations": 235,
+      "schemas": 458,
+      "requestExamples": 84
+    },
+    "build": "PASS with existing large bundle warning",
+    "componentMechanism": "实际 SFC setup 编译后在 Vue 自定义渲染器执行；实际额度表模板通过 SSR 检查。不是浏览器操作。"
+  },
+  "redGreen": [
+    {
+      "issue": "权限撤销只清主详情，历史保留；历史拒绝也未清旧台账",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-finance-ui-red.log",
+      "beforeFix": {
+        "tests": 18,
+        "pass": 16,
+        "fail": 2
+      }
+    },
+    {
+      "issue": "前端错误拒绝已经超预算项的追加或调入，原领域规则允许此类修复",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-finance-ui-overbudget-red.log",
+      "beforeFix": {
+        "tests": 20,
+        "pass": 19,
+        "fail": 1
+      }
+    }
+  ],
+  "pending": [
+    "V77 实际服务升级与原数据保留验证",
+    "预算原子执行实际应用 HTTP 验收和重启恢复",
+    "实际浏览器策略仍不可用，未进行真实页面交互或窄屏验收",
+    "无 Git remote，未推送或创建 PR"
+  ]
+}

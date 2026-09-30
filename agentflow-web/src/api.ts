@@ -1,6 +1,7 @@
 import type { PaymentBatchInput, PaymentBatchReceipt, PaymentBatchPage, PaymentBatchDetail } from './paymentBatches'
 import type { SupplierCashierView, SupplierCashierPage, SupplierCashierAccounts, SupplierCashierInput, SupplierCashierReceipt } from './supplierCashier'
 import type { SupplierFinanceView, SupplierReviewInput, SupplierAuthorizeInput, SupplierHoldInput, SupplierFinanceReceipt } from './supplierFinance'
+import type { BudgetFinanceView, BudgetFinancePage, BudgetFinanceReviewInput, BudgetFinanceAuthorizeInput, BudgetFinanceActionInput, BudgetFinanceReceipt } from './budgetFinance'
 import type { SupplierSettlementView, SupplierSettlementPrepareInput, SupplierSettlementActionInput, SupplierSettlementReceipt } from './supplierSettlement'
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
@@ -357,6 +358,11 @@ export const api = {
   supplierCashierAccounts: (id: string, signal: AbortSignal) => request<SupplierCashierAccounts>(`/cashier/supplier-payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
   supplierCashierAction: (id: string, input: SupplierCashierInput) => write<SupplierCashierReceipt>(`/cashier/supplier-payments/${encodeURIComponent(id)}/actions`, 'POST', '办理供应商原付款', input),
   supplierFinance: (id: string, roundNo: number, signal: AbortSignal) => request<SupplierFinanceView>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  budgetFinance: (id: string, roundNo: number, operationId: string | undefined, signal: AbortSignal) => request<BudgetFinanceView>(`/budget-adjustments/${encodeURIComponent(id)}/execution` + historyQuery({ roundNo, operationId }), { signal, cache: 'no-store' }),
+  budgetFinanceHistory: (id: string, roundNo: number, before: string | undefined, signal: AbortSignal) => request<BudgetFinancePage>(`/budget-adjustments/${encodeURIComponent(id)}/execution/history` + historyQuery({ roundNo, before, limit: 25 }), { signal, cache: 'no-store' }),
+  reviewBudgetLedger: (id: string, input: BudgetFinanceReviewInput) => write<BudgetFinanceReceipt>(`/budget-adjustments/${encodeURIComponent(id)}/execution/reviews`, 'POST', '读取最新预算台账', input),
+  authorizeBudgetAdjustment: (id: string, input: BudgetFinanceAuthorizeInput) => write<BudgetFinanceReceipt>(`/budget-adjustments/${encodeURIComponent(id)}/execution/authorizations`, 'POST', '确认预算调整授权', input),
+  budgetOperationAction: (id: string, input: BudgetFinanceActionInput) => write<BudgetFinanceReceipt>(`/budget-adjustment-operations/${encodeURIComponent(id)}/actions`, 'POST', '办理原预算调整指令', input),
   reviewSupplierPayable: (id: string, input: SupplierReviewInput) => write<SupplierFinanceReceipt>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment/reviews`, 'POST', '复核供应商原应付', input),
   authorizeSupplierPayment: (id: string, input: SupplierAuthorizeInput) => write<SupplierFinanceReceipt>(`/procurement-payments/${encodeURIComponent(id)}/supplier-payment/authorizations`, 'POST', '确认供应商付款授权', input),
   supplierHoldAction: (id: string, input: SupplierHoldInput) => write<SupplierFinanceReceipt>(`/supplier-payments/${encodeURIComponent(id)}/finance-actions`, 'POST', '办理供应商原预留', input),
