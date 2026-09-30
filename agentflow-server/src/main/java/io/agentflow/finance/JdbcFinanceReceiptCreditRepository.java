@@ -4,6 +4,8 @@ import io.agentflow.expense.AdvanceRepayment;
 import io.agentflow.expense.AdvanceDisbursementReturn;
 import io.agentflow.expense.ExpensePaymentReturn;
 import io.agentflow.expense.ExpensePaymentReturns;
+import io.agentflow.procurement.SupplierPaymentReturn;
+import io.agentflow.procurement.SupplierPaymentReturns;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -38,6 +40,16 @@ public class JdbcFinanceReceiptCreditRepository {
         var command = decision.receipt().request().command(); var funds = entry.proof().funding(); var posting = entry.proof().posting();
         insert(decision.tenantId(), command.payee().legalEntityId(), command.binding().businessId(), AdvanceRepaymentPort.Channel.BANK_TRANSFER.name(), funds.transactionReference(),
                 posting.voucherReference(), posting.entryReference(), funds.amount(), null, null, decision.id());
+    }
+    /** 供应商入款先占用同一资金防重键，ERP 尚未调整时不能伪造贷方分录。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void record(SupplierPaymentReturn decision, SupplierPaymentReturns.Entry entry) {
+        var command = decision.receipt().request().command(); var source = command.holdCommand().authorization().source().reservation().source(); var funds = entry.proof();
+        jdbc.update("""
+                INSERT INTO finance_receipt_credit(tenant_id,legal_entity_id,business_id,channel,transaction_reference,amount,currency,supplier_registration_id)
+                VALUES(?,?,?,?,?,?,?,?)
+                """, decision.tenantId(), source.round().content().legalEntityId().toString(), source.requestId().toString(), AdvanceRepaymentPort.Channel.BANK_TRANSFER.name(),
+                funds.transactionReference(), funds.amount().value(), funds.amount().currency(), decision.id().toString());
     }
     private void insert(String tenant, UUID entity, UUID business, String channel, String transaction, String voucher, String entry, Money amount, UUID repayment, UUID disbursement, UUID expense) {
         jdbc.update("""

@@ -150,6 +150,19 @@ public class JdbcSupplierPaymentOperationRepository {
         }, tenant, id.toString(), version).stream().findFirst();
     }
 
+    /** 回款固定首次实际成功修订，后续退回、查询或裁决不替换这一原始资金来源。 */
+    public Optional<SupplierPaymentOperation> firstSuccessfulRevision(String tenant, UUID id) {
+        var current = find(tenant, id).orElse(null);
+        if (current == null) return Optional.empty();
+        var history = resolutionHistory(current);
+        if (history.firstSuccess() == null) return Optional.empty();
+        return jdbc.query("SELECT version,state_json FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", (row, index) -> {
+            var value = json.read(row.getString("state_json"), SupplierPaymentOperation.class);
+            if (value.version() != row.getLong("version") || !value.command().equals(current.command())) throw conflict();
+            return value;
+        }, tenant, id.toString()).stream().filter(value -> value.status() == SupplierPaymentOperation.Status.SUCCEEDED).findFirst();
+    }
+
     /** 仅扫描到期队列或租约；已到账、查无和争议等待后续明确处理。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
