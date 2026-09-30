@@ -30,36 +30,25 @@ public class ExpensePartialAdjustmentInitiation {
     private final JdbcExpensePartialAdjustmentRepository adjustments;
     private final ExpensePartialAdjustmentSources sources;
     private final JdbcExpensePaymentReturnsRepository returns;
-    private final JdbcPaymentOperationRepository payments;
-    private final JdbcVoucherOperationRepository vouchers;
-    private final PaymentOperationService paymentQueries;
-    private final VoucherOperationService voucherQueries;
+    private final ExpensePartialOriginalQueries originals;
     private final ExpensePartialAdjustmentGuard guard;
     private final ExpensePartialAdjustmentAudit audit;
 
     /** 原财务查询复用既有持久队列，新意图和旧整单调整共用锁与互斥。 */
     public ExpensePartialAdjustmentInitiation(CurrentActor actors, ExpenseResourceAdjustmentAccess access, ExpenseReportRepository reports,
             JdbcExpenseSettlementRepository settlements, JdbcExpensePartialAdjustmentRepository adjustments, ExpensePartialAdjustmentSources sources,
-            JdbcExpensePaymentReturnsRepository returns, JdbcPaymentOperationRepository payments, JdbcVoucherOperationRepository vouchers,
-            PaymentOperationService paymentQueries, VoucherOperationService voucherQueries, ExpensePartialAdjustmentGuard guard, ExpensePartialAdjustmentAudit audit) {
+            JdbcExpensePaymentReturnsRepository returns, ExpensePartialOriginalQueries originals, ExpensePartialAdjustmentGuard guard, ExpensePartialAdjustmentAudit audit) {
         this.actors = actors; this.access = access; this.reports = reports; this.settlements = settlements; this.adjustments = adjustments; this.sources = sources;
-        this.returns = returns; this.payments = payments; this.vouchers = vouchers; this.paymentQueries = paymentQueries; this.voucherQueries = voucherQueries; this.guard = guard; this.audit = audit;
+        this.returns = returns; this.originals = originals; this.guard = guard; this.audit = audit;
     }
 
-    /** 只安排原号查询，不重发任何付款或凭证；有活动部分调整时必须采用其独立准备。 */
+    /** 只安排原号查询，不重发付款或凭证；已有活动调整须使用绑定它的恢复入口。 */
     @Transactional
     public ExpensePartialAdjustmentAudit.Receipt refresh(UUID id, RefreshInput input) {
         var report = locked(id, input.roundNo(), input.applicationVersion(), input.businessVersion());
         var settlement = settlement(report, input.settlementVersion()); requireNoActive(report);
-        var tenant = report.tenantId(); var accrual = vouchers.find(tenant, settlement.input().voucherOperationId()).orElseThrow(ExpensePartialAdjustmentInitiation::conflict);
-        var bank = settlement.input().payment() == null ? null : payments.find(tenant, settlement.input().payment().operationId()).orElseThrow(ExpensePartialAdjustmentInitiation::conflict);
-        var paymentVoucher = bank == null ? null : vouchers.forRound(tenant, report.applicationId(), input.roundNo(), VoucherCommand.Kind.PAYMENT).orElseThrow(ExpensePartialAdjustmentInitiation::conflict);
-        if (accrual.version() != input.accrualVersion() || (bank == null ? 0 : bank.version()) != input.paymentVersion()
-                || (paymentVoucher == null ? 0 : paymentVoucher.version()) != input.paymentVoucherVersion()) throw conflict();
         var now = now();
-        if (bank != null) paymentQueries.query(tenant, bank.input().command().id(), bank.version(), now);
-        voucherQueries.query(tenant, accrual.input().command().id(), accrual.version(), now);
-        if (paymentVoucher != null) voucherQueries.query(tenant, paymentVoucher.input().command().id(), paymentVoucher.version(), now);
+        originals.query(settlement, input.accrualVersion(), input.paymentVersion(), input.paymentVoucherVersion(), now);
         var event = audit.record(report, id, report.version(), ExpensePartialAdjustmentAudit.Action.ORIGINAL_QUERY, input.comment(), now);
         return new ExpensePartialAdjustmentAudit.Receipt(id, input.roundNo(), null, null, null, null, event);
     }

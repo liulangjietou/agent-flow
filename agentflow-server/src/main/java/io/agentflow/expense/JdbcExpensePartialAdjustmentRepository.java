@@ -110,7 +110,7 @@ public class JdbcExpensePartialAdjustmentRepository {
             }
         } else if (value.issue() != null) expected = before.requireReview(value.issue(), value.updatedAt());
         else {
-            sources.current(basis.funding());
+            confirmationSource(before);
             expected = before.confirmCurrent(value.updatedAt());
         }
         if (!expected.equals(value)) throw conflict();
@@ -205,6 +205,11 @@ public class JdbcExpensePartialAdjustmentRepository {
     public ExpenseAdjustmentFundingSource dispatchSource(ExpensePartialAdjustment value) {
         if (value.issue() != null || value.completion() != null || value.retirement() != null) throw conflict();
         requireCurrentPredecessor(value.input().basis());
+        return sources.current(value.input().basis().funding());
+    }
+    /** 未完成调整的恢复仍受前次完成约束；历史完成只确认原事实，不要求它仍是最新一笔。 */
+    public ExpenseAdjustmentFundingSource confirmationSource(ExpensePartialAdjustment value) {
+        if (value.completion() == null) requireCurrentPredecessor(value.input().basis());
         return sources.current(value.input().basis().funding());
     }
     private List<Candidate> due(String side, Instant at) {

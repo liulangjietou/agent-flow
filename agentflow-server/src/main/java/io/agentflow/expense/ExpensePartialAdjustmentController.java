@@ -21,11 +21,12 @@ public class ExpensePartialAdjustmentController {
     private final ExpenseResourceAdjustmentAccess access;
     private final ExpensePartialAdjustmentInitiation initiation;
     private final ExpensePartialAdjustmentDecisions decisions;
+    private final ExpensePartialAdjustmentActions actions;
     private final IdempotencyExecutor idempotency;
     /** 协议入口只做校验、当前权限与幂等响应，财务编排留在应用服务。 */
     public ExpensePartialAdjustmentController(ExpensePartialAdjustmentWorkspace workspace, ExpenseResourceAdjustmentAccess access, ExpensePartialAdjustmentInitiation initiation,
-            ExpensePartialAdjustmentDecisions decisions, IdempotencyExecutor idempotency) {
-        this.workspace = workspace; this.access = access; this.initiation = initiation; this.decisions = decisions; this.idempotency = idempotency;
+            ExpensePartialAdjustmentDecisions decisions, ExpensePartialAdjustmentActions actions, IdempotencyExecutor idempotency) {
+        this.workspace = workspace; this.access = access; this.initiation = initiation; this.decisions = decisions; this.actions = actions; this.idempotency = idempotency;
     }
     /** 原轮次读取独立于办理资格，敏感财务字段和个人准备分别控制。 */
     @GetMapping
@@ -51,6 +52,21 @@ public class ExpensePartialAdjustmentController {
     @PostMapping("/authorizations")
     public ResponseEntity<String> authorize(@PathVariable UUID id, @Valid @RequestBody ExpensePartialAdjustmentDecisions.AuthorizeInput input, HttpServletRequest request) {
         access.requireFinance(id, input.roundNo()); return response(idempotency.execute(request, HttpStatus.ACCEPTED, () -> decisions.authorize(id, input)));
+    }
+    /** 财务差额查询、原号重发及当前来源确认各自表达明确意图。 */
+    @PostMapping("/actions")
+    public ResponseEntity<String> act(@PathVariable UUID id, @Valid @RequestBody ExpensePartialAdjustmentActions.OperationInput input, HttpServletRequest request) {
+        access.requireFinance(id, input.roundNo()); return response(idempotency.execute(request, HttpStatus.ACCEPTED, () -> actions.act(id, input)));
+    }
+    /** 活动调整的原件恢复只查询实际原号，不放开初始意图的互斥。 */
+    @PostMapping("/source-queries")
+    public ResponseEntity<String> queryOriginals(@PathVariable UUID id, @Valid @RequestBody ExpensePartialAdjustmentActions.SourceQueryInput input, HttpServletRequest request) {
+        access.requireFinance(id, input.roundNo()); return response(idempotency.execute(request, HttpStatus.ACCEPTED, () -> actions.queryOriginals(id, input)));
+    }
+    /** 无效果的原调整才能明确结束，幂等回放前仍复核当前权限。 */
+    @PostMapping("/retirements")
+    public ResponseEntity<String> retire(@PathVariable UUID id, @Valid @RequestBody ExpensePartialAdjustmentActions.RetireInput input, HttpServletRequest request) {
+        access.requireFinance(id, input.roundNo()); return response(idempotency.execute(request, HttpStatus.ACCEPTED, () -> actions.retire(id, input)));
     }
     private static ResponseEntity<String> response(ResponseEntity<String> value) {
         return ResponseEntity.status(value.getStatusCode()).headers(value.getHeaders()).cacheControl(CacheControl.noStore()).body(value.getBody());

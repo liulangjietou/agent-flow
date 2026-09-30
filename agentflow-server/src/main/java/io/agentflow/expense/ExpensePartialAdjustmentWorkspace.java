@@ -32,15 +32,17 @@ public class ExpensePartialAdjustmentWorkspace {
     private final JdbcVoucherOperationRepository vouchers;
     private final JdbcExpensePartialPreparationRepository preparations;
     private final ExpensePartialPreparationService preparing;
+    private final ExpensePartialAdjustmentActions actions;
 
     /** 查询层组合真实账本与权限，金额和授权规则继续由原领域模型负责。 */
     public ExpensePartialAdjustmentWorkspace(CurrentActor actors, ExpenseSettlementAccess settlementAccess, ExpenseResourceAdjustmentAccess access,
             ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, JdbcExpensePartialAdjustmentRepository adjustments,
             JdbcExpensePaymentReturnsRepository returns, JdbcBudgetOperationRepository budgets, JdbcPaymentOperationRepository payments,
-            JdbcVoucherOperationRepository vouchers, JdbcExpensePartialPreparationRepository preparations, ExpensePartialPreparationService preparing) {
+            JdbcVoucherOperationRepository vouchers, JdbcExpensePartialPreparationRepository preparations, ExpensePartialPreparationService preparing,
+            ExpensePartialAdjustmentActions actions) {
         this.actors = actors; this.settlementAccess = settlementAccess; this.access = access; this.reports = reports; this.settlements = settlements;
         this.adjustments = adjustments; this.returns = returns; this.budgets = budgets; this.payments = payments; this.vouchers = vouchers;
-        this.preparations = preparations; this.preparing = preparing;
+        this.preparations = preparations; this.preparing = preparing; this.actions = actions;
     }
 
     /** 原轮次完整字段授权后，在同一数据库快照内读取显示版本与独立财务历史。 */
@@ -94,7 +96,8 @@ public class ExpensePartialAdjustmentWorkspace {
                         completed.budget().posting().reference(), completed.accrual().posting().voucher().postingReference(), completed.accrual().posting().voucher().voucherReference(), completed.at()),
                 retired == null ? null : new Retirement(retired.actor(), retired.evidenceReference(), retired.reason(), retired.at()),
                 finance ? preparation(value, ExpensePartialAdjustmentPreparation.Side.BUDGET, now) : null,
-                finance ? preparation(value, ExpensePartialAdjustmentPreparation.Side.ACCRUAL, now) : null);
+                finance ? preparation(value, ExpensePartialAdjustmentPreparation.Side.ACCRUAL, now) : null,
+                finance ? actions.availableActions(value, now) : List.of(), finance && actions.canRetire(value, now), finance && actions.canQueryOriginals(value, now));
     }
     private Preparation preparation(ExpensePartialAdjustment value, ExpensePartialAdjustmentPreparation.Side side, Instant now) {
         return preparations.latest(value.input().basis().tenantId(), value.id(), side, actors.actor().userId()).map(prepared -> {
@@ -168,7 +171,8 @@ public class ExpensePartialAdjustmentWorkspace {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Adjustment(UUID id, long version, ExpensePartialAdjustment.Status status, String issue, String requestedBy, String evidenceReference, String reason,
             Instant createdAt, Instant updatedAt, Amounts before, Amounts after, List<String> returnIds, Budget budget, Accrual accrual, Completion completion,
-            Retirement retirement, Preparation budgetPreparation, Preparation accrualPreparation) { }
+            Retirement retirement, Preparation budgetPreparation, Preparation accrualPreparation, List<ExpensePartialAdjustmentActions.Action> availableActions,
+            boolean canRetire, boolean canQueryOriginals) { }
     /**
      * 证据到期仍保留原日期，能力预览不延长有效期。
      * @author owlzhangfq@gmail.com

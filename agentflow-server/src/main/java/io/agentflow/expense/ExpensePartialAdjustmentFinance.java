@@ -118,7 +118,8 @@ public class ExpensePartialAdjustmentFinance {
         var next = current.withAccrual(operation.retryNotFound(now), now); adjustments.update(next); return next;
     }
 
-    private void requireSendSources(ExpensePartialAdjustment current, String actor, String target, Instant now) {
+    /** 包内动作预览复用发送前的当前来源、人员与目的地判断，不领取或保存操作。 */
+    void requireSendSources(ExpensePartialAdjustment current, String actor, String target, Instant now) {
         var basis = current.input().basis(); var source = adjustments.dispatchSource(current);
         source.requireAuthorization(actor, now);
         personnel.requireEligible(basis.tenantId(), actor, source.financial().accrual().input().command().legalEntityId());
