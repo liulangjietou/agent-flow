@@ -39,5 +39,15 @@ public class ExpensePartialAdjustmentExecution {
         var plan = rules.plan(current.input().basis().funding().financial().change(), resources.loadReserved(report), current.id(), now);
         changes.persist(plan, SYSTEM_ACTOR); adjustments.completeResources(current.completeResources(now));
     }
+    /** 可复现的来源冲突等待明确复核，已成功的两侧结果仍保留；迟到失败不冻结较新完成。 */
+    @Transactional
+    public void block(JdbcExpensePartialAdjustmentRepository.Candidate candidate, String code) {
+        reports.lock(candidate.tenantId(), candidate.reportId());
+        var current = adjustments.find(candidate.tenantId(), candidate.id()).orElseThrow(ExpensePartialAdjustmentExecution::conflict);
+        if (!current.input().basis().reportId().equals(candidate.reportId())) throw conflict();
+        if (current.version() == candidate.version() && current.status() == ExpensePartialAdjustment.Status.READY) {
+            adjustments.update(current.requireReview(code, Instant.now().truncatedTo(ChronoUnit.MICROS)));
+        }
+    }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment source or execution candidate changed"); }
 }

@@ -187,6 +187,17 @@ public class JdbcExpensePartialAdjustmentRepository {
     public List<Candidate> dueBudget(Instant at) { return due("budget", at); }
     /** 不以预算已经成功推断 ERP 已过账，单独领取会计操作。 */
     public List<Candidate> dueAccrual(Instant at) { return due("accrual", at); }
+    /** 两侧成功后独立扫描本地完成，数据库异常或重启不会再次发送已成功命令。 */
+    public List<Candidate> ready() {
+        return jdbc.query("SELECT tenant_id,id,report_id,version FROM expense_partial_adjustment WHERE status='READY' AND completed_at IS NULL AND retired_at IS NULL ORDER BY updated_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version")));
+    }
+    /** 调用方持有原报销锁；只读拒绝不标记事务回滚，使应用服务能够原子停止失效队列。 */
+    public ExpenseAdjustmentFundingSource dispatchSource(ExpensePartialAdjustment value) {
+        if (value.issue() != null || value.completion() != null || value.retirement() != null) throw conflict();
+        requireCurrentPredecessor(value.input().basis());
+        return sources.current(value.input().basis().funding());
+    }
     private List<Candidate> due(String side, Instant at) {
         return jdbc.query("SELECT tenant_id,id,report_id,version FROM expense_partial_adjustment WHERE retired_at IS NULL AND ((" + side + "_status IN ('QUEUED','UNKNOWN') AND " + side
                 + "_next_at<=?) OR (" + side + "_status IN ('EXECUTING','POSTING','QUERYING') AND " + side + "_lease_until<=?)) ORDER BY updated_at,id LIMIT 10",

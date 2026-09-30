@@ -1,0 +1,83 @@
+{
+  "recordedAt": "2026-09-30T21:42:14.282176+00:00",
+  "status": "PASS_AUTHORIZED_OPERATIONS_BACKGROUND_AND_RECOVERY",
+  "baseCommit": "ca7f62e3b3b8ec90612cd796456d6db0317c208a",
+  "scope": "Independent budget/accrual dispatch and original-id recovery of already authorized operations, plus atomic local completion retries",
+  "schema": {
+    "newMigration": false,
+    "testSchema": 84,
+    "longLivedRuntimeSchema": 82,
+    "runtimeUpgradeVerifiedThisStage": false
+  },
+  "newIntegrationTests": 13,
+  "validation": {
+    "domainTests": 26,
+    "h2ServerTests": 76,
+    "h2WorkflowTests": 75,
+    "h2StartupTests": 1,
+    "postgresServerTests": 75,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlap": true
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-worker-final-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-worker-postgres.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-worker-authors.log"
+  },
+  "checks": [
+    "No commands are created from a persisted intent or by the worker",
+    "Budget succeeds first; later independently authorized ERP succeeds without another budget write",
+    "Budget and ERP response-loss recoveries query each original command only",
+    "Completion revision failure rolls back all resource effects; subsequent poll retries local completion only",
+    "Current finance appointment revocation, changed original bank state and disabled target persist both unsent commands as stopped",
+    "Expired leases query original commands even after authorization expiry and source or personnel changes; late success and failure are ignored",
+    "Expired never-sent authorizations neither dispatch nor enter a public query operation",
+    "Completed-result query preserves the original completion and waits for explicit confirmation",
+    "Authoritative NOT_FOUND requires the original actor and explicit resend, retaining both original command identities",
+    "Local source conflict preserves both actual financial successes, waits for explicit confirmation and then applies resources without external redispatch"
+  ],
+  "clockRegression": {
+    "rootCause": "Caller timestamp captured before waiting for the report lock can precede the peer operation update; claim used that stale timestamp",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-worker-boundaries-red.log",
+    "redTests": 11,
+    "redErrors": 1,
+    "fix": "Re-read actual time after report lock acquisition before claim, expiry and state transition; preserve an explicit later test time"
+  },
+  "initialFeatureCheck": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-worker-missing-feature.log",
+    "result": "Compilation expected to fail before missing finance and worker services were implemented"
+  },
+  "fixtureCorrection": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-worker-first-h2.log",
+    "result": "Second scenario reused the same invoice number in one test instance and was correctly rejected as occupied; split into independent test instances"
+  },
+  "authorCheck": {
+    "javaFiles": 1112,
+    "namedTypes": 2123,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "execution": {
+    "transactionalClaimAndFinish": true,
+    "networkOutsideTransaction": true,
+    "leaseSeconds": 90,
+    "batchPerSide": 10,
+    "defaultPollDelayMs": 1000,
+    "enabledProperty": "agentflow.expenses.partial-adjustment-worker-enabled"
+  },
+  "acceptanceBoundary": {
+    "syntheticFinanceHttp": true,
+    "realEnterpriseFinance": false,
+    "publicPreparationAndAuthorization": false,
+    "publicWorkflowComplete": false,
+    "actualBrowserAcceptance": false
+  },
+  "remaining": [
+    "Durable preparation and fresh original bank, accrual and open-period evidence",
+    "Independent explicit finance authorization service and single-use preparation consumption",
+    "Explicit dispute decisions, public role/field access, idempotency/audit and API/UI",
+    "Nonempty long-lived runtime upgrade, HTTP/browser/restart and file preservation acceptance",
+    "Real enterprise budget/ERP integration"
+  ]
+}
