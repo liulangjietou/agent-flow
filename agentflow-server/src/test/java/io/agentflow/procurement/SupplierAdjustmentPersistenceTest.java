@@ -81,6 +81,11 @@ class SupplierAdjustmentPersistenceTest {
     private JdbcSupplierPayableAdjustmentRepository adjustments;
     private JdbcSupplierAdjustmentCompletions completions;
     private SupplierAdjustmentCompletionService completion;
+    private SupplierPaymentReturnPort readReturns;
+    private SupplierPayableHoldPort readHolds;
+    private SupplierPayableSettlementPort readSettlements;
+    private SupplierPayableAdjustmentPort readAdjustments;
+    private AccountingPeriodPort readPeriods;
 
     @BeforeEach void database() { database(null); }
 
@@ -409,6 +414,68 @@ class SupplierAdjustmentPersistenceTest {
         tx.executeWithoutResult(status -> oldOperations.update(original.requestQuery(clock())));
         var content = proof.bank().command().holdCommand().authorization().source().reservation().source().round().content();
         assertThat(new SupplierPayableReturnGuard(jdbc).blocked(tenant, content)).isTrue();
+    }
+
+    @Test void adjustmentReaderUsesFixedBankOriginalErpAndDateWithoutWritingOrHoldingATransaction() {
+        for (boolean settled : List.of(false, true)) {
+            var source = source(settled); var at = clock(); var evidence = adjustmentEvidence(source, at);
+            var input = SupplierAdjustmentPreparation.queue(UUID.randomUUID(), source, "finance", evidence.period().request().accountingDate(), at).input();
+            var reader = reader(evidence); var snapshot = reader.read(source, input.accountingDate()).requireValue();
+            var command = input.command(snapshot.evidence(), clock());
+            assertThat(command.source()).isEqualTo(source); assertThat(command.period().request().accountingDate()).isEqualTo(input.accountingDate());
+            verify(readReturns).query(source.returns().request());
+            if (settled) { verify(readSettlements).query(source.settlement().command()); verifyNoInteractions(readHolds); }
+            else { verify(readHolds).query(source.returns().request().command().holdCommand()); verifyNoInteractions(readSettlements); }
+            verifyNoInteractions(readAdjustments);
+            var payment = source.returns().request().command(); verify(readPeriods).period(tenant, payment.targetDigest(), evidence.period().request());
+            assertThat(count("supplier_payable_adjustment_operation")).isEqualTo(settled ? 1 : 0);
+            // 首份回款完成记账后，才能为同一应付建立下一份读取夹具。
+            if (!settled) finish(adjusted(adjustment(intent(source)), "reader-first-completed"), 20);
+        }
+    }
+
+    @Test void adjustmentReaderRestoresPreviousQueryCommandFromActualCompletionAndNeverReusesHeldEvidence() {
+        var firstSource = source(); var done = adjusted(adjustment(intent(firstSource)), "reader-previous"); var completed = finish(done, 20);
+        var payment = completed.bank(); var check = returnCheck(payment, "finance", 21, firstSource.returns().entries().get(0).proof(), returnFunds("reader-next", "10", clock()));
+        var ledger = registerReturn(check, returnDecision(check));
+        var previous = new SupplierPayableAdjustmentSource.Previous(payment.command().id(), payment.command().digest(), null, done.version(), firstSource.returns().entries(), done.observation());
+        var source = new SupplierPayableAdjustmentSource(ledger, null, previous); var at = clock(); var evidence = adjustmentEvidence(source, at);
+        var input = SupplierAdjustmentPreparation.queue(UUID.randomUUID(), source, "finance", evidence.period().request().accountingDate(), at).input();
+        var reader = reader(evidence); var snapshot = reader.read(source, input.accountingDate()).requireValue();
+        assertThat(input.command(snapshot.evidence(), clock()).source().previous()).isEqualTo(previous);
+        verify(readAdjustments).query(done.command()); verify(readAdjustments, never()).adjust(any(), any()); verifyNoInteractions(readHolds, readSettlements);
+        assertThat(completions.find(tenant, done.command().id())).contains(completed); assertThat(count("supplier_payable_adjustment_operation")).isEqualTo(1);
+    }
+
+    @Test void adjustmentReaderStopsOnUnavailableBankOrOriginalErpAndPreservesClosedPeriodRejection() {
+        var source = source(true); var evidence = adjustmentEvidence(source, clock()); var reader = reader(evidence); var date = evidence.period().request().accountingDate();
+        when(readReturns.query(any())).thenReturn(new FinanceResult.Unavailable<>(FinanceResult.Failure.TARGET_CHANGED));
+        assertThat(reader.read(source, date)).isEqualTo(new FinanceResult.Unavailable<>(FinanceResult.Failure.TARGET_CHANGED));
+        verifyNoInteractions(readHolds, readSettlements, readAdjustments, readPeriods);
+        when(readReturns.query(any())).thenReturn(new FinanceResult.Success<>(evidence.bank()));
+        when(readSettlements.query(any())).thenReturn(new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT));
+        assertThat(reader.read(source, date)).isEqualTo(new FinanceResult.Unavailable<>(FinanceResult.Failure.TIMEOUT)); verifyNoInteractions(readPeriods);
+        when(readSettlements.query(any())).thenReturn(new FinanceResult.Success<>(evidence.settlement()));
+        when(readPeriods.period(anyString(), anyString(), any())).thenReturn(new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED));
+        assertThat(reader.read(source, date)).isEqualTo(new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED));
+        assertThat(count("supplier_payable_adjustment_operation")).isZero();
+    }
+
+    @Test void adjustmentReaderRejectsTransactionsBeforeCallingAnyExternalSystem() {
+        var source = source(); var evidence = adjustmentEvidence(source, clock()); var reader = reader(evidence);
+        assertThatThrownBy(() -> tx.execute(status -> reader.read(source, evidence.period().request().accountingDate()))).isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(readReturns, readHolds, readSettlements, readAdjustments, readPeriods);
+    }
+
+    private SupplierAdjustmentEvidenceReader reader(SupplierPayableAdjustmentEvidence evidence) {
+        readReturns = mock(SupplierPaymentReturnPort.class); readHolds = mock(SupplierPayableHoldPort.class);
+        readSettlements = mock(SupplierPayableSettlementPort.class); readAdjustments = mock(SupplierPayableAdjustmentPort.class); readPeriods = mock(AccountingPeriodPort.class);
+        when(readReturns.query(any())).thenAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return new FinanceResult.Success<>(evidence.bank()); });
+        when(readHolds.query(any())).thenAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return new FinanceResult.Success<>(evidence.hold()); });
+        when(readSettlements.query(any())).thenAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return new FinanceResult.Success<>(evidence.settlement()); });
+        when(readAdjustments.query(any())).thenAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return new FinanceResult.Success<>(evidence.previous()); });
+        when(readPeriods.period(anyString(), anyString(), any())).thenAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return new FinanceResult.Success<>(evidence.period()); });
+        return new SupplierAdjustmentEvidenceReader(readReturns, readHolds, readSettlements, readAdjustments, readPeriods, completions);
     }
 
     private SupplierPaymentOperation reverseBank(SupplierPaymentOperation paid) {
