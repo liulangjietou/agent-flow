@@ -1,25 +1,29 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import SupplierSettlementStatus from './SupplierSettlementStatus.vue'
 import { supplierActionLabels, supplierActionAllowed, supplierFinanceInput, validateSupplierFinance, validateSupplierFinanceReceipt, supplierFinanceError, supplierIssueLabels, reviewLabels, holdLabels, type SupplierFinanceAction, type SupplierFinanceView } from '../supplierFinance'
 
 const props = defineProps<{ requestId: string; applicationId: string; roundNo: number; applicationVersion: number; requestVersion: number; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<SupplierFinanceView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
+const settlementBusy = ref(false)
 const error = ref(''), notice = ref(''), pending = ref<SupplierFinanceAction | null>(null), comment = ref(''), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
 const now = ref(Date.now()), ticker = setInterval(() => { now.value = Date.now() }, 1000)
 function syncPending() {
-  const active = writeRequests.pending().some(entry => entry.path.startsWith(`/procurement-payments/${encodeURIComponent(props.requestId)}/supplier-payment/`) || entry.path.startsWith('/supplier-payments/'))
+  const active = writeRequests.pending().some(entry => entry.path.startsWith(`/procurement-payments/${encodeURIComponent(props.requestId)}/supplier-payment/`) || entry.path.startsWith('/supplier-payments/') || entry.path.startsWith('/supplier-settlements/'))
   if (unconfirmed.value && !active) requiresRefresh.value = true
   unconfirmed.value = active
 }
 const unsubscribe = writeRequests.subscribe(syncPending)
-const blocked = computed(() => !!props.locked || loading.value || saving.value || requiresRefresh.value || unconfirmed.value)
+const blocked = computed(() => !!props.locked || loading.value || saving.value || settlementBusy.value || requiresRefresh.value || unconfirmed.value)
+function emitBusy() { emit('busy', saving.value || settlementBusy.value) }
+function settlementActivity(value: boolean) { settlementBusy.value = value; emitBusy() }
 function stop() { epoch++; controller?.abort(); controller = null }
 /** 身份、批准版本或业务绑定变化时，旧响应不能重新显示金融事实和按钮。 */
 async function load() {
-  if (saving.value || !props.scopeKey) return
+  if (saving.value || settlementBusy.value || !props.scopeKey) return
   stop(); const current = epoch, request = new AbortController(); controller = request; loading.value = true
   view.value = null; pending.value = null; comment.value = ''; error.value = ''
   const binding = { requestId: props.requestId, applicationId: props.applicationId, roundNo: props.roundNo, applicationVersion: props.applicationVersion, requestVersion: props.requestVersion }
@@ -41,19 +45,19 @@ async function execute() {
   const value = view.value, action = pending.value; if (!value || !action || blocked.value) return
   let input
   try { input = supplierFinanceInput(value, action, comment.value) } catch (cause) { error.value = supplierFinanceError(cause); return }
-  const current = epoch; saving.value = true; emit('busy', true); error.value = ''
+  const current = epoch; saving.value = true; emitBusy(); error.value = ''
   try {
     const receipt = 'reviewId' in input ? await api.authorizeSupplierPayment(value.requestId, input) : 'roundNo' in input ? await api.reviewSupplierPayable(value.requestId, input) : await api.supplierHoldAction(value.authorization!.id, input)
     if (current !== epoch) return
     validateSupplierFinanceReceipt(receipt, value, action)
-    saving.value = false; pending.value = null; emit('busy', false)
+    saving.value = false; pending.value = null; emitBusy()
     notice.value = action === 'REVIEW' ? '复核已登记，请刷新读取结果，核对后明确授权。' : action === 'AUTHORIZE' ? '财务授权已保存，请刷新原应付预留进度。' : action === 'RETIRE' ? '原授权已安全结束，需要重新复核后才能另行授权。' : '原预留处理已登记，请刷新核对结果。'
     await load()
   } catch (cause) { if (current === epoch) { requiresRefresh.value = true; error.value = supplierFinanceError(cause) } }
-  finally { if (current === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
+  finally { if (current === epoch) { saving.value = false; syncPending(); emitBusy() } }
 }
 watch(() => JSON.stringify([props.scopeKey, props.requestId, props.applicationId, props.roundNo, props.applicationVersion, props.requestVersion]), () => {
-  stop(); view.value = null; loading.value = false; saving.value = false; requiresRefresh.value = false; pending.value = null; comment.value = ''; error.value = ''; notice.value = ''
+  stop(); view.value = null; loading.value = false; saving.value = false; settlementBusy.value = false; requiresRefresh.value = false; pending.value = null; comment.value = ''; error.value = ''; notice.value = ''
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); clearInterval(ticker); unsubscribe(); emit('busy', false) })
@@ -62,12 +66,12 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
 
 <template>
   <section class="supplier-finance" aria-label="供应商原应付付款办理">
-    <div class="supplier-heading"><div><p class="supplier-eyebrow">原应付 · 独立财务办理</p><h3>供应商付款进度</h3></div><button class="quiet" type="button" :disabled="loading || saving || locked" @click="notice = ''; load()">刷新办理状态</button></div>
+    <div class="supplier-heading"><div><p class="supplier-eyebrow">原应付 · 独立财务办理</p><h3>供应商付款进度</h3></div><button class="quiet" type="button" :disabled="loading || saving || settlementBusy || locked" @click="notice = ''; load()">刷新办理状态</button></div>
     <p class="supplier-help">核对当前应付后授权预留。预留成功后仍需由独立出纳付款，到账与结算分别确认。</p>
     <p v-if="loading" role="status" class="supplier-help">正在核对本轮权限与办理状态…</p>
     <p v-if="error" role="alert" class="supplier-error">{{ error }}</p><p v-if="notice" role="status" class="supplier-help">{{ notice }}</p>
     <p v-if="unconfirmed && !saving" role="alert" class="supplier-error">上次操作结果未确认，请在未确认操作中恢复原请求后刷新。</p>
-    <p v-if="requiresRefresh && !unconfirmed && !error" role="status" class="supplier-help">请刷新核对恢复后的原操作。</p>
+    <p v-if="requiresRefresh && !unconfirmed && !error" role="status" class="supplier-help">办理记录已变化，请刷新核对原预留状态。</p>
     <template v-if="view">
       <div class="supplier-overview"><div><span>本轮批准金额</span><strong>{{ view.approvedAmount?.currency }} {{ view.approvedAmount?.value }}</strong></div><div><span>原应付预留</span><strong>{{ view.hold ? holdLabels[view.hold.status] : '尚未授权预留' }}</strong></div></div>
       <article v-if="view.review" class="supplier-evidence" aria-label="本人应付复核">
@@ -93,6 +97,7 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
         <label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" required :disabled="saving" /></label>
         <div class="supplier-buttons"><button type="button" class="quiet" :disabled="saving" @click="pending = null">返回核对</button><button type="submit" class="primary" :disabled="blocked || !allowed(pending)">{{ saving ? '正在保存…' : '确认并提交' }}</button></div>
       </form>
+      <SupplierSettlementStatus v-if="view.authorization" :payment-id="view.authorization.id" :request-id="requestId" :application-id="applicationId" :round-no="roundNo" :scope-key="scopeKey" :locked="locked || saving || loading" @busy="settlementActivity" />
     </template>
   </section>
 </template>
