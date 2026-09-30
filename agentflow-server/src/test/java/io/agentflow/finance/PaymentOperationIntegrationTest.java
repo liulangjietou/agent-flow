@@ -105,6 +105,9 @@ class PaymentOperationIntegrationTest {
     @Autowired PaymentCallbackService callbacks;
     @Autowired JdbcPaymentCallbackRepository callbackRecords;
     @Autowired io.agentflow.auth.AuthService auth;
+    @Autowired PaymentBatchService paymentBatches;
+    @Autowired JdbcPaymentBatchRepository batchRecords;
+    @Autowired io.agentflow.common.CurrentActor actors;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
         values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
@@ -122,6 +125,13 @@ class PaymentOperationIntegrationTest {
         RESPONDER.set(PaymentOperationIntegrationTest::response); setupOrganization();
     }
     @AfterEach void removeOnlyPaymentFixtures() {
+        for (var id : fixtures) {
+            var batchIds = jdbc.queryForList("SELECT batch_id FROM payment_batch_item WHERE tenant_id='demo' AND authorization_id=?", String.class, id.toString());
+            for (var batch : batchIds) {
+                jdbc.update("DELETE FROM payment_batch_item WHERE tenant_id='demo' AND batch_id=?", batch);
+                jdbc.update("DELETE FROM payment_batch WHERE tenant_id='demo' AND id=?", batch);
+            }
+        }
         for (var id : fixtures) {
             jdbc.update("DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id IN (SELECT id FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?))", id.toString(), id.toString());
             jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?)", id.toString(), id.toString());
@@ -672,6 +682,120 @@ class PaymentOperationIntegrationTest {
 
     private PaymentExecutionRequest request(PaymentAuthorization authorization, String accountVersion) {
         return tx().execute(status -> requestService.register(authorization, "cashier", "debit-1", accountVersion, now().minusSeconds(30)));
+    }
+
+    /**
+     * 复用同一真实批准、资金回环和事务夹具验证组批，不复制单笔支付守卫。
+     * @author owlzhangfq@gmail.com
+     */
+    @Nested
+    class PaymentBatches {
+        private static final String PATH = "/api/v1/payment-batches";
+
+        @Test void originalRequestsExecuteIndependentlyAndBatchReplayNeverCreatesNewPayments() throws Exception {
+            var first = authorized(); var second = authorized(); var values = List.of(first, second); String body = json.write(input(values)), key = UUID.randomUUID().toString();
+            var created = submit(body, key, "cashier"); assertThat(created.getStatus()).isEqualTo(202);
+            var receipt = json.read(created.getContentAsString(), PaymentBatchService.Receipt.class);
+            var batch = batchRecords.find("demo", receipt.batchId()).orElseThrow(); assertThat(batch.total()).isEqualTo("200.00");
+            assertThat(batch.items()).extracting(PaymentBatch.Item::authorizationId).containsExactly(first.terms().id(), second.terms().id());
+            assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero();
+            for (var value : values) assertThat(operations.find("demo", value.terms().id())).isEmpty();
+            requestWorker.poll(); worker.poll(); assertThat(WRITES.get()).isEqualTo(2);
+            for (var value : values) assertThat(operations.find("demo", value.terms().id()).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+            assertThat(batchRecords.find("demo", batch.id())).contains(batch);
+            var replay = submit(body, key, "cashier"); assertThat(replay.getStatus()).isEqualTo(202); assertThat(replay.getContentAsString()).isEqualTo(created.getContentAsString());
+            assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true"); assertThat(WRITES.get()).isEqualTo(2);
+            var detail = get(PATH + "/" + batch.id(), "cashier"); assertThat(detail.getStatus()).isEqualTo(200);
+            var view = json.read(detail.getContentAsString(), PaymentBatchService.Detail.class); assertThat(view.items()).hasSize(2);
+            assertThat(view.items()).allSatisfy(item -> assertThat(item.current().payment().operation().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED));
+            assertThat(detail.getContentAsString()).doesNotContain("commandDigest", "targetDigest", "debitReference", "accountDigest", "synthetic-account");
+            assertThat(get(PATH + "?limit=1", "cashier").getStatus()).isEqualTo(200);
+            for (String who : List.of("admin", "finance", "alice", "manager")) {
+                assertThat(get(PATH + "/" + batch.id(), who).getStatus()).isEqualTo(403);
+                assertThat(submit(body, UUID.randomUUID().toString(), who).getStatus()).isEqualTo(403);
+            }
+            jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+            assertThat(get(PATH + "/" + batch.id(), "cashier").getStatus()).isEqualTo(404);
+            assertThat(submit(body, key, "cashier").getStatus()).isEqualTo(404);
+        }
+
+        @Test void laterStaleMemberRollsBackEarlierRequestsAuditAndIdempotencyClaim() throws Exception {
+            var values = List.of(authorized(), authorized()).stream().sorted(java.util.Comparator.comparing(value -> value.terms().binding().applicationId().toString())).toList();
+            var body = new java.util.LinkedHashMap<String, Object>(input(values));
+            body.put("items", List.of(Map.of("authorizationId", values.get(0).terms().id(), "authorizationVersion", 1), Map.of("authorizationId", values.get(1).terms().id(), "authorizationVersion", 2)));
+            long audit = jdbc.queryForObject("SELECT count(*) FROM audit_event", Long.class); String key = UUID.randomUUID().toString();
+            assertThat(submit(json.write(body), key, "cashier").getStatus()).isEqualTo(409); noRequests(values);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_event", Long.class)).isEqualTo(audit);
+            assertThat(submit(json.write(input(values)), key, "cashier").getStatus()).isEqualTo(202);
+        }
+
+        @Test void failedBatchMembershipInsertRollsBackAllRegisteredChoices() {
+            var values = List.of(authorized(), authorized()); var input = json.read(json.write(input(values)), PaymentBatchService.Input.class);
+            long audit = jdbc.queryForObject("SELECT count(*) FROM audit_event", Long.class);
+            jdbc.execute("ALTER TABLE payment_batch_item ADD CONSTRAINT batch_membership_fixture CHECK(line_no<2)");
+            actors.set(new io.agentflow.common.Actor("demo", "cashier", java.util.Set.of("CASHIER")));
+            try {
+                assertThatThrownBy(() -> tx().execute(status -> paymentBatches.submit(input))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            } finally { actors.clear(); jdbc.execute("ALTER TABLE payment_batch_item DROP CONSTRAINT batch_membership_fixture"); }
+            noRequests(values); assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_event", Long.class)).isEqualTo(audit);
+        }
+
+        @Test void oneAuthorizationVoidedAfterSubmissionDoesNotAuthorizeOrBlockTheOtherPayment() throws Exception {
+            var first = authorized(); var second = authorized(); var created = submit(json.write(input(List.of(first, second))), UUID.randomUUID().toString(), "cashier");
+            assertThat(created.getStatus()).isEqualTo(202);
+            tx().executeWithoutResult(status -> { sources.lock(first); authorizations.update(first.voidBeforeExecution("finance", "原授权需要复核", now())); });
+            requestWorker.poll(); worker.poll(); assertThat(WRITES.get()).isEqualTo(1);
+            assertThat(executionRequests.forAuthorization("demo", first.terms().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.VOIDED);
+            assertThat(operations.find("demo", first.terms().id())).isEmpty();
+            assertThat(operations.find("demo", second.terms().id()).orElseThrow().status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+            var id = json.read(created.getContentAsString(), PaymentBatchService.Receipt.class).batchId();
+            assertThat(get(PATH + "/" + id, "cashier").getStatus()).isEqualTo(200);
+        }
+
+        @Test void oppositeSelectionOrderWithDifferentKeysKeepsOneBatchAndOneRequestPerAuthorization() throws Exception {
+            var first = authorized(); var second = authorized(); String normal = json.write(input(List.of(first, second))), reversed = json.write(input(List.of(second, first)));
+            var ready = new CountDownLatch(2); var release = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
+            try {
+                var one = pool.submit(() -> { ready.countDown(); release.await(); return submit(normal, UUID.randomUUID().toString(), "cashier").getStatus(); });
+                var two = pool.submit(() -> { ready.countDown(); release.await(); return submit(reversed, UUID.randomUUID().toString(), "cashier").getStatus(); });
+                assertThat(ready.await(3, TimeUnit.SECONDS)).isTrue(); release.countDown();
+                assertThat(List.of(one.get(8, TimeUnit.SECONDS), two.get(8, TimeUnit.SECONDS))).containsExactlyInAnyOrder(202, 409);
+                for (var value : List.of(first, second)) assertThat(executionRequests.forAuthorization("demo", value.terms().id())).isPresent();
+                assertThat(jdbc.queryForObject("SELECT count(DISTINCT batch_id) FROM payment_batch_item WHERE authorization_id IN (?,?)", Long.class, first.terms().id().toString(), second.terms().id().toString())).isEqualTo(1);
+                assertThat(WRITES.get()).isZero();
+            } finally { release.countDown(); pool.shutdownNow(); }
+        }
+
+        @Test void invalidShapesDuplicateSelectionsAndUnknownFieldsNeverRegisterRequests() throws Exception {
+            var value = authorized(); var valid = input(List.of(value));
+            var duplicate = new java.util.LinkedHashMap<String, Object>(valid); duplicate.put("items", List.of(((List<?>) valid.get("items")).get(0), ((List<?>) valid.get("items")).get(0)));
+            var injected = new java.util.LinkedHashMap<String, Object>(valid); injected.put("amount", "1.00");
+            var nested = new java.util.LinkedHashMap<String, Object>(valid); nested.put("items", List.of(Map.of("authorizationId", value.terms().id(), "authorizationVersion", 1, "paid", true)));
+            var empty = new java.util.LinkedHashMap<String, Object>(valid); empty.put("items", List.of());
+            for (var body : List.of(duplicate, injected, nested, empty)) assertThat(submit(json.write(body), UUID.randomUUID().toString(), "cashier").getStatus()).isEqualTo(400);
+            for (var query : List.of("limit=0", "limit=101", "beforeId=invalid", "tenantId=other")) assertThat(get(PATH + "?" + query, "cashier").getStatus()).isEqualTo(400);
+            noRequests(List.of(value));
+        }
+
+        private Map<String, Object> input(List<PaymentAuthorization> values) {
+            return Map.of("items", values.stream().map(value -> Map.of("authorizationId", value.terms().id(), "authorizationVersion", value.version())).toList(),
+                    "debitAccountReference", "debit-1", "debitAccountVersion", "v1", "comment", "已逐笔核对原授权和共同付款账户");
+        }
+        private org.springframework.mock.web.MockHttpServletResponse submit(String body, String key, String user) throws Exception {
+            return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(PATH).header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())
+                    .header("Idempotency-Key", key).contentType("application/json").content(body)).andReturn().getResponse();
+        }
+        private org.springframework.mock.web.MockHttpServletResponse get(String path, String user) throws Exception {
+            return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn().getResponse();
+        }
+        private void noRequests(List<PaymentAuthorization> values) {
+            for (var value : values) {
+                assertThat(executionRequests.forAuthorization("demo", value.terms().id())).isEmpty();
+                assertThat(operations.find("demo", value.terms().id())).isEmpty();
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_batch_item WHERE tenant_id='demo' AND authorization_id=?", Long.class, value.terms().id().toString())).isZero();
+            }
+            assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero();
+        }
     }
 
     private PaymentOperation job() { return register(authorized()); }

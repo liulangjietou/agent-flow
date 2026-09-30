@@ -1,3 +1,4 @@
+import type { PaymentBatchInput, PaymentBatchReceipt, PaymentBatchPage, PaymentBatchDetail } from './paymentBatches'
 import type { SupplierCashierView, SupplierCashierPage, SupplierCashierAccounts, SupplierCashierInput, SupplierCashierReceipt } from './supplierCashier'
 import type { SupplierFinanceView, SupplierReviewInput, SupplierAuthorizeInput, SupplierHoldInput, SupplierFinanceReceipt } from './supplierFinance'
 import type { SupplierSettlementView, SupplierSettlementPrepareInput, SupplierSettlementActionInput, SupplierSettlementReceipt } from './supplierSettlement'
@@ -343,6 +344,9 @@ export const api = {
   financePaymentAction: (id: string, input: FinancePaymentActionInput) => write<FinancePaymentReceipt>(`/payments/${encodeURIComponent(id)}/finance-actions`, 'POST', '财务核对付款授权', input),
   reviewPaymentPayee: (id: string, input: PayeeReviewInput) => write<PayeeReviewReceipt>(`/payments/${encodeURIComponent(id)}/payee-reviews`, 'POST', '重新核对本人账户', input),
   resolvePaymentDispute: (id: string, input: PaymentDisputeInput) => write<PaymentDisputeReceipt>(`/payments/${encodeURIComponent(id)}/dispute-resolutions`, 'POST', '确认原付款对账结果', input),
+  paymentBatches: (beforeId: string | undefined, signal: AbortSignal) => request<PaymentBatchPage>('/payment-batches' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
+  paymentBatch: (id: string, signal: AbortSignal) => request<PaymentBatchDetail>(`/payment-batches/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
+  submitPaymentBatch: (input: PaymentBatchInput) => write<PaymentBatchReceipt>('/payment-batches', 'POST', '登记批量付款', input),
   cashierPayments: (beforeId: string | undefined, signal: AbortSignal) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),

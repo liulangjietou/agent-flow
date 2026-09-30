@@ -13,6 +13,7 @@ import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
 import CashierWorkspace from './components/CashierWorkspace.vue'
+import PaymentBatchWorkspace from './components/PaymentBatchWorkspace.vue'
 import SupplierCashierWorkspace from './components/SupplierCashierWorkspace.vue'
 import ExpenseDetail from './components/ExpenseDetail.vue'
 import ExpensePlanDetail from './components/ExpensePlanDetail.vue'
@@ -123,7 +124,7 @@ const serverAvailable = ref(false)
 const taskCount = ref<number | null>(null)
 const taskRefresh = ref(0)
 const taskQueueView = ref<'list' | 'board'>('list')
-const cashierKind = ref<'employee' | 'supplier'>('employee')
+const cashierKind = ref<'employee' | 'supplier' | 'batches'>('employee')
 const taskQueuePanel = ref<InstanceType<typeof PendingTaskQueue> | null>(null)
 watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee' }, { flush: 'sync' })
 let workspaceRefreshGeneration = 0
@@ -956,6 +957,9 @@ async function recoverOperation(id: string) {
       } else if (/^\/invoices\/[^/]+\/verifications$/.test(request.path)) {
         templateRefresh.value++
         notice.value = '原验票任务已确认受理，请打开原票据并刷新查验状态。'
+      } else if (request.path === '/payment-batches') {
+        templateRefresh.value++
+        notice.value = '原批次登记已确认，请查看已登记批次并逐笔核对付款结果。'
       } else if (request.path.startsWith('/cashier/payments/') || request.path.startsWith('/cashier/supplier-payments/') || request.path.startsWith('/payments/') || /\/applications\/[^/]+\/payments\/authorizations$/.test(request.path)) {
         notice.value = '原付款操作已确认，请刷新付款详情，核对最新授权与银行状态。'
       } else if (request.path.startsWith('/procurement-payments')) {
@@ -1234,8 +1238,9 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           </section>
         </section>
         <section v-else-if="page === 'cashier' && canCashier" :key="actorScope">
-          <div class="cashier-kind" role="group" aria-label="付款业务"><button type="button" class="quiet" :aria-pressed="cashierKind === 'employee'" :disabled="busy || writesBlocked" @click="cashierKind = 'employee'">借款与报销</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'supplier'" :disabled="busy || writesBlocked" @click="cashierKind = 'supplier'">供应商付款</button></div>
+          <div class="cashier-kind" role="group" aria-label="付款业务"><button type="button" class="quiet" :aria-pressed="cashierKind === 'employee'" :disabled="busy || writesBlocked" @click="cashierKind = 'employee'">借款与报销</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'supplier'" :disabled="busy || writesBlocked" @click="cashierKind = 'supplier'">供应商付款</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'batches'" :disabled="busy || writesBlocked" @click="cashierKind = 'batches'">批量付款</button></div>
           <CashierWorkspace v-if="cashierKind === 'employee'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
+          <PaymentBatchWorkspace v-else-if="cashierKind === 'batches'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
           <SupplierCashierWorkspace v-else :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         </section>
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
@@ -1274,7 +1279,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 </template>
 
 <style scoped>
-.cashier-kind{display:flex;gap:10px;padding:24px 40px 0}.cashier-kind button[aria-pressed="true"]{background:#e3f2eb;border-color:#3c8a74;color:#145d4c}.cashier-kind button{min-height:40px}@media(max-width:600px){.cashier-kind{padding:16px 16px 0}}
+.cashier-kind{display:flex;flex-wrap:wrap;gap:10px;padding:24px 40px 0}.cashier-kind button[aria-pressed="true"]{background:#e3f2eb;border-color:#3c8a74;color:#145d4c}.cashier-kind button{min-height:40px}@media(max-width:600px){.cashier-kind{padding:16px 16px 0}}
 
 .session-notice{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:22px 30px;padding:18px 22px;border:1px solid #dfcfac;border-radius:12px;background:#fff8e9;color:var(--ink);font-size:13px;line-height:1.7}
 .session-notice>div{flex:1 1 340px;min-width:0;overflow-wrap:anywhere}.session-notice p{margin:6px 0 0}.session-notice button{flex-shrink:0}
