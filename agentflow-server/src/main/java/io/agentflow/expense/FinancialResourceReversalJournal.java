@@ -113,8 +113,13 @@ public class FinancialResourceReversalJournal {
                 ? Map.of(0, EmployeeAdvance.restore(json.read(resource.state(), EmployeeAdvance.State.class)).balance())
                 : ExpenseRequest.restore(json.read(resource.state(), ExpenseRequest.State.class)).balances();
         var result = new ArrayList<Entry>();
-        balances.forEach((line, balance) -> balance.reversals().forEach(value -> result.add(new Entry(
-                new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reversedAt()))));
+        balances.forEach((line, balance) -> {
+            balance.reversals().forEach(value -> result.add(new Entry(
+                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reversedAt())));
+            // 部分冲回同样属于已核销资源的反向事实，不能借普通预留修改绕过独立调整凭据。
+            balance.reductions().forEach(value -> result.add(new Entry(
+                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reducedAt())));
+        });
         return List.copyOf(result);
     }
     private static DomainException conflict() { return new DomainException("EXPENSE_CONSUMPTION_REVERSAL_UNAUTHORIZED", "Resource reversal requires an unchanged original consumption, accepted budget reversal and authorized adjustment"); }

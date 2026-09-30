@@ -68,6 +68,12 @@ public final class ExpenseRequest {
         replace(requestLine, balance(requestLine).reverseConsumption(use, adjustmentId, at));
     }
 
+    /** 部分取消只恢复对应费用行的已核销差额，批准上限和关闭状态保持。 */
+    public void reduceConsumption(long expectedVersion, int requestLine, ExpenseUse use, Money amount, UUID adjustmentId, Instant at) {
+        requireVersion(expectedVersion); requireLineUse(use);
+        replace(requestLine, balance(requestLine).reduceConsumption(use, amount, adjustmentId, at));
+    }
+
     /** 显式关闭停止新增核销计划，保留仍未结算的全部占用。 */
     public void close(long expectedVersion) {
         requireVersion(expectedVersion);

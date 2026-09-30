@@ -70,6 +70,12 @@ public final class EmployeeAdvance {
         balance = balance.reverseConsumption(use, adjustmentId, at); version++;
     }
 
+    /** 部分取消恢复原借款抵扣差额，增加未还金额而不解除资金、凭证和还款冻结。 */
+    public void reduceOffset(long expectedVersion, ExpenseUse use, Money amount, UUID adjustmentId, Instant at) {
+        requireVersion(expectedVersion); requireWholeReport(use);
+        balance = balance.reduceConsumption(use, amount, adjustmentId, at); version++;
+    }
+
     /** 逾期是日期和剩余未冲销额派生的提醒事实，不自动拒绝费用审批。 */
     public boolean overdue(LocalDate date) { return !date.isBefore(paidOn) && date.isAfter(dueOn) && outstanding().value().signum() > 0; }
 

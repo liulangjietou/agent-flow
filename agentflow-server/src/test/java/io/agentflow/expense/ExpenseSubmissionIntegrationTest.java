@@ -1162,7 +1162,12 @@ class ExpenseSubmissionIntegrationTest {
 
     private void pollArchive() { archiveWorker.poll(); archiveWorker.poll(); }
     private ExpenseReport archiveReadyExpense() throws Exception {
-        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); voucherPreparationWorker.poll(); voucherWorker.poll(); return report;
+        var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); voucherPreparationWorker.poll(); voucherWorker.poll();
+        assertThat(voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.PAYMENT))
+                .as(() -> "Payment voucher preparation: " + voucherPreparations.latest("demo", report.applicationId(), 1, VoucherCommand.Kind.PAYMENT)
+                        .map(value -> value.status() + ":" + value.result()).orElse("missing"))
+                .hasValueSatisfying(value -> assertThat(value.usablePosted()).isTrue());
+        return report;
     }
     private byte[] archiveDownload(ExpenseReport report, String user) throws Exception {
         var pending = mvc.perform(get(path(report) + "/archive/content?roundNo=1").header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn();

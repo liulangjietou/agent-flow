@@ -1,0 +1,48 @@
+{
+  "status": "PASS_LOCAL_DOMAIN_AND_PERSISTENCE_GUARD_FOUNDATION",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "publicPartialExpenseWorkflowComplete": false,
+  "tests": {
+    "domain": 80,
+    "h2ResourceRepository": 15,
+    "postgresqlResourceRepository": 15,
+    "postgresqlOriginalResourceAdjustmentWorkflow": 21,
+    "scopesOverlap": true
+  },
+  "red": {
+    "missingAmountModel": "expense-adjustment-amounts-red.log",
+    "missingPartialConsumption": "expense-consumption-reduction-red.log",
+    "ordinaryUpdateAcceptedUnprovenReduction": "expense-consumption-reduction-persistence-red.log"
+  },
+  "green": [
+    "expense-partial-foundation-green.log",
+    "expense-partial-foundation-isolated-postgres.log"
+  ],
+  "postgresqlIsolation": {
+    "initialSharedContextFailures": 1,
+    "diagnosticFailures": 2,
+    "rootCause": "Gateway-disabled repository-context scheduler claimed workflow-context payment voucher preparation in their shared test database",
+    "fix": "Separate PostgreSQL databases for the two Spring contexts; assert archive fixture payment voucher readiness",
+    "dedicatedContainerSharedMemoryMiB": 512,
+    "temporaryContainerRemoved": true
+  },
+  "preserved": [
+    "Original approved report, cost positions and frozen exchange rate",
+    "Original consumption identities, full reversal history, limits and other reservations",
+    "Closed prior request and independent advance bank, voucher and repayment holds",
+    "Legacy snapshots missing reversals and reductions"
+  ],
+  "remaining": [
+    "Resource delta plan",
+    "Actual previous-completion binding and independent accounting/budget proof",
+    "Atomic durable completion, public API and finance page",
+    "Actual HTTP, upgrade and browser acceptance"
+  ],
+  "authorCheck": {
+    "files": 1079,
+    "namedTypes": 2062,
+    "missing": 0,
+    "parseErrors": 0
+  }
+}
