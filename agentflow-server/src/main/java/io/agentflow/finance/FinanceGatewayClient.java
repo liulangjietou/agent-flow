@@ -56,6 +56,7 @@ public class FinanceGatewayClient {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.BUDGET_QUERY
                 || operation == Operation.BUDGET_ADJUSTMENT_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_QUERY
                 || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_QUERY
+                || operation == Operation.BUDGET_REDUCTION_COMMAND || operation == Operation.BUDGET_REDUCTION_QUERY
                 || operation == Operation.PAYMENT_COMMAND || operation == Operation.PAYMENT_QUERY
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYABLE_HOLD_QUERY
                 || operation == Operation.SUPPLIER_PAYMENT_COMMAND || operation == Operation.SUPPLIER_PAYMENT_QUERY
@@ -96,6 +97,19 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> queryBudgetReversal(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.BUDGET_REVERSAL_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 已消费预算只发送持久的独立差额，完整前后位置由预算系统原子核对。 */
+    public <T> FinanceResult<T> executeBudgetReduction(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A budget reduction operation identity is required");
+        return exchange(tenantId, targetDigest, Operation.BUDGET_REDUCTION_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 差额结果未知时查询相同目标和指令，不能通过普通读取生成替代编号。 */
+    public <T> FinanceResult<T> queryBudgetReduction(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.BUDGET_REDUCTION_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 付款查询始终使用原租户、原目标和原授权，不能改查当前新配置的资金系统。 */
@@ -276,6 +290,7 @@ public class FinanceGatewayClient {
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
                 || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_COMMAND
+                || operation == Operation.BUDGET_REDUCTION_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
@@ -342,6 +357,8 @@ public class FinanceGatewayClient {
         BUDGET_QUERY("budget-query", Set.of()),
         BUDGET_REVERSAL_COMMAND("budget-consumption-reversal-command", Set.of()),
         BUDGET_REVERSAL_QUERY("budget-consumption-reversal-query", Set.of()),
+        BUDGET_REDUCTION_COMMAND("budget-consumption-reduction-command", Set.of()),
+        BUDGET_REDUCTION_QUERY("budget-consumption-reduction-query", Set.of()),
         PAYMENT_COMMAND("payment-command", Set.of()),
         PAYMENT_QUERY("payment-query", Set.of()),
         DEBIT_ACCOUNTS("debit-accounts", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.CASHIER_UNAVAILABLE, FinanceResult.Reason.DEBIT_ACCOUNT_UNAVAILABLE)),
