@@ -79,4 +79,3 @@ CREATE TABLE budget_adjustment_check_revision (
     PRIMARY KEY (tenant_id,job_id,version),
     CONSTRAINT fk_budget_adjustment_check_revision FOREIGN KEY (tenant_id,job_id) REFERENCES budget_adjustment_check_job(tenant_id,id)
 );
-

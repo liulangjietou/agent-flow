@@ -21,6 +21,7 @@ import io.agentflow.expense.ExpenseReleaseService;
 import io.agentflow.expense.ExpensePlanApprovalService;
 import io.agentflow.expense.AdvanceRequestApprovalService;
 import io.agentflow.procurement.ProcurementPaymentApprovalService;
+import io.agentflow.budget.BudgetAdjustmentApprovalService;
 import io.agentflow.procurement.ProcurementPayableReservations;
 import io.agentflow.finance.VoucherPreparationService;
 import org.flowable.engine.TaskService;
@@ -52,6 +53,7 @@ public class FlowableTaskFacade {
     private final ExpensePlanApprovalService expensePlans;
     private final AdvanceRequestApprovalService advanceRequests;
     private final ProcurementPaymentApprovalService procurementPayments;
+    private final BudgetAdjustmentApprovalService budgetAdjustments;
     private final ProcurementPayableReservations procurementReservations;
     private final VoucherPreparationService voucherPreparation;
 
@@ -62,7 +64,8 @@ public class FlowableTaskFacade {
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
                               ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases, ExpensePlanApprovalService expensePlans,
                               AdvanceRequestApprovalService advanceRequests, VoucherPreparationService voucherPreparation,
-                              ProcurementPaymentApprovalService procurementPayments, ProcurementPayableReservations procurementReservations) {
+                              ProcurementPaymentApprovalService procurementPayments, ProcurementPayableReservations procurementReservations,
+                              BudgetAdjustmentApprovalService budgetAdjustments) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -75,6 +78,7 @@ public class FlowableTaskFacade {
         this.expensePlans = expensePlans;
         this.advanceRequests = advanceRequests;
         this.procurementPayments = procurementPayments;
+        this.budgetAdjustments = budgetAdjustments;
         this.procurementReservations = procurementReservations;
         this.voucherPreparation = voucherPreparation;
     }
@@ -140,6 +144,7 @@ public class FlowableTaskFacade {
         expensePlans.lock(application);
         advanceRequests.lock(application);
         procurementPayments.lock(application);
+        budgetAdjustments.lock(application);
         task = authorization.require(taskId, actor);
         application = authorization.application(actor, task);
         ApplicationStatus previousStatus = application.status();
@@ -220,6 +225,7 @@ public class FlowableTaskFacade {
                 expensePlans.approved(application, actor.userId());
                 advanceRequests.approved(application, actor.userId());
                 procurementPayments.approved(application, actor.userId());
+                budgetAdjustments.approved(application, actor.userId());
                 voucherPreparation.approved(application, actor.userId());
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
             }
