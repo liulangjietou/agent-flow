@@ -18,11 +18,12 @@ public class SupplierSettlementSources {
     private final ApprovedSupplierPaymentSources approved;
     private final JdbcSupplierPaymentOperationRepository payments;
     private final PaymentPersonnel personnel;
+    private final SupplierPayableReturnGuard returns;
 
     /** 已付款后的核销不继承银行发送的授权到期门槛，原资金身份与申请锁仍保持。 */
     public SupplierSettlementSources(SupplierPaymentSources paymentSources, ApprovedSupplierPaymentSources approved,
-            JdbcSupplierPaymentOperationRepository payments, PaymentPersonnel personnel) {
-        this.paymentSources = paymentSources; this.approved = approved; this.payments = payments; this.personnel = personnel;
+            JdbcSupplierPaymentOperationRepository payments, PaymentPersonnel personnel, SupplierPayableReturnGuard returns) {
+        this.paymentSources = paymentSources; this.approved = approved; this.payments = payments; this.personnel = personnel; this.returns = returns;
     }
 
     /** 使用与银行、采购相同的申请优先锁，失效来源仍允许查询原结算。 */
@@ -34,6 +35,11 @@ public class SupplierSettlementSources {
     /** 读取当前银行事实，不能用准备里的旧成功覆盖当前查询或争议。 */
     public SupplierPaymentOperation payment(String tenant, UUID paymentId) {
         return payments.find(tenant, paymentId).orElseThrow(SupplierSettlementSources::changed);
+    }
+
+    /** 银行实际回款冻结本地补全，原 ERP 成功继续保存并等待独立调整。 */
+    public boolean returnReviewRequired(SupplierPaymentCommand command) {
+        return returns.blocked(command.tenantId(), command.holdCommand().authorization().source().reservation().source().round().content());
     }
 
     /** 新准备和新发送依赖当前批准、原占用及结算人员，原出纳离职不撤销已发生付款。 */

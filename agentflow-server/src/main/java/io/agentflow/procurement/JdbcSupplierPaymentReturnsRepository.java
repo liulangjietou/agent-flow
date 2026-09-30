@@ -22,10 +22,11 @@ public class JdbcSupplierPaymentReturnsRepository {
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     private final JdbcSupplierPaymentOperationRepository payments;
+    private final SupplierPayableReturnGuard guard;
 
     /** 原成功来源由银行仓储核对，持久化不借用当前账户目录或原核销状态。 */
-    public JdbcSupplierPaymentReturnsRepository(JdbcTemplate jdbc, JsonUtil json, JdbcSupplierPaymentOperationRepository payments) {
-        this.jdbc = jdbc; this.json = json; this.payments = payments;
+    public JdbcSupplierPaymentReturnsRepository(JdbcTemplate jdbc, JsonUtil json, JdbcSupplierPaymentOperationRepository payments, SupplierPayableReturnGuard guard) {
+        this.jdbc = jdbc; this.json = json; this.payments = payments; this.guard = guard;
     }
 
     /** 首次只能保存空账本，并关联实际首次成功银行修订。 */
@@ -67,6 +68,9 @@ public class JdbcSupplierPaymentReturnsRepository {
     }
 
     SupplierPaymentReturns locked(String tenant, UUID id) {
+        var source = find(tenant, id).orElseThrow(JdbcSupplierPaymentReturnsRepository::conflict).request().command()
+                .holdCommand().authorization().source().reservation().source();
+        guard.lock(tenant, source.round().content());
         return jdbc.query("SELECT * FROM supplier_payment_returns WHERE tenant_id=? AND payment_id=? FOR UPDATE", row(), tenant, id.toString()).stream()
                 .findFirst().orElseThrow(JdbcSupplierPaymentReturnsRepository::conflict);
     }

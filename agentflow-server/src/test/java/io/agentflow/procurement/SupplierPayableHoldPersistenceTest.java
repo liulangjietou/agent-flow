@@ -74,8 +74,10 @@ class SupplierPayableHoldPersistenceTest {
         migration.load().migrate(); jdbc = new JdbcTemplate(source);
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
         requests = new JdbcProcurementPaymentRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc));
-        sources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), requests, reservations);
+        // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
+        var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        sources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), requests, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, sources); operations = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {

@@ -59,7 +59,7 @@ class CrossBusinessInvoiceClaimTest {
         invoices = new JdbcInvoiceRepository(new FinancialResourceStore(jdbc,
                 new FinancialResourceReversalJournal(jdbc, json, expenses, new JdbcBudgetConsumptionReversalRepository(jdbc, json))), jdbc, json);
         requests = new JdbcProcurementPaymentRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc));
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), new SupplierPayableReturnGuard(jdbc));
     }
 
     @Test void procurementRecognitionRejectsAnExpenseCopyAndRollsBackItsVersionAndJournal() {

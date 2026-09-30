@@ -103,7 +103,7 @@ public class SupplierSettlementService {
     private void completeReservation(SupplierPayableSettlementOperation current, Instant now) {
         if (!current.settled()) return;
         var command = current.command(); var bank = sources.payment(command.tenantId(), command.payment().id());
-        if (!bank.settleable()) return;
+        if (!bank.settleable() || sources.returnReviewRequired(command.payment())) return;
         var original = command.payment().holdCommand().authorization().source().reservation();
         if (!reservations.active(command.tenantId(), original.source().requestId()).filter(original::equals).isPresent()) return;
         reservations.complete(current, bank, now);

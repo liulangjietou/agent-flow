@@ -26,10 +26,11 @@ public class JdbcProcurementPayableReservationRepository {
     private final JsonUtil json;
     private final ProcurementPaymentRepository requests;
     private final JdbcProcurementInvoiceClaims invoices;
+    private final SupplierPayableReturnGuard returns;
 
     /** 占用引用实际冻结版本，不能由页面自行填写余额或原应付事实。 */
-    public JdbcProcurementPayableReservationRepository(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests, JdbcProcurementInvoiceClaims invoices) {
-        this.jdbc = jdbc; this.json = json; this.requests = requests; this.invoices = invoices;
+    public JdbcProcurementPayableReservationRepository(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests, JdbcProcurementInvoiceClaims invoices, SupplierPayableReturnGuard returns) {
+        this.jdbc = jdbc; this.json = json; this.requests = requests; this.invoices = invoices; this.returns = returns;
     }
 
     /** 唯一冲突拒绝第二张申请；不会覆盖原占用或把较小金额当作可并行承诺。 */
@@ -38,6 +39,7 @@ public class JdbcProcurementPayableReservationRepository {
         var source = value.source(); var current = requests.find(source.tenantId(), source.requestId()).orElseThrow(JdbcProcurementPayableReservationRepository::conflict);
         if (!value.held() || !ProcurementPayableReservation.hold(value.id(), current, value.heldAt()).equals(value)) throw conflict();
         var content = source.round().content();
+        returns.lock(source.tenantId(), content); returns.requireClear(source.tenantId(), content);
         try {
             jdbc.update("""
                     INSERT INTO procurement_payable_reservation(tenant_id,id,request_id,application_id,employee_id,request_version,
@@ -73,6 +75,7 @@ public class JdbcProcurementPayableReservationRepository {
     public ProcurementPayableReservation complete(SupplierPayableSettlementOperation operation, SupplierPaymentOperation bank, Instant now) {
         var command = operation.command(); var original = command.payment().holdCommand().authorization().source().reservation(); var tenant = command.tenantId();
         requests.lock(tenant, original.source().requestId());
+        returns.lock(tenant, original.source().round().content()); returns.requireClear(tenant, original.source().round().content());
         var before = find(tenant, original.id()).orElseThrow(JdbcProcurementPayableReservationRepository::conflict);
         if (!matchesBank(operation, bank, now) || !original.equals(before)) throw conflict();
         var saved = jdbc.query("""

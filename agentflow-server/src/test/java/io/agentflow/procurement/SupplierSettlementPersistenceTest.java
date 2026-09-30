@@ -89,8 +89,10 @@ class SupplierSettlementPersistenceTest {
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target); migration.load().migrate();
         jdbc = new JdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc));
-        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations);
+        // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
+        var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {
@@ -105,7 +107,7 @@ class SupplierSettlementPersistenceTest {
         preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
         intents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
         settlements = new JdbcSupplierPayableSettlementRepository(jdbc, json, intents, payments, reservations);
-        var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel);
+        var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
         settlementPreparation = proxy(new SupplierSettlementPreparationService(settlementSources, intents, settlements, 30));
         settlementExecution = proxy(new SupplierSettlementService(settlementSources, settlements, reservations, 30));
     }
@@ -534,6 +536,111 @@ class SupplierSettlementPersistenceTest {
         });
     }
 
+    @Test void returnReviewStopsNewSettlementWithoutChangingTheOriginalBank() {
+        var payment = supplierBank(); freezeReturn(payment);
+        assertThatThrownBy(() -> serviceIntent(payment)).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED"));
+        assertThat(payments.find(tenant, payment.command().id())).contains(payment);
+        assertThat(count("supplier_settlement_preparation")).isZero();
+    }
+
+    @Test void returnReviewBeforeFirstErpSendVoidsOnlyTheUnsentSettlement() {
+        var payment = supplierBank(); var queued = serviceSettlement(payment); freezeReturn(payment);
+        assertThat(settlementExecution.claim(tenant, queued.command().id(), clock())).isNull();
+        var stopped = settlements.find(tenant, queued.command().id()).orElseThrow();
+        assertThat(stopped.status()).isEqualTo(SupplierPayableSettlementOperation.Status.VOIDED);
+        assertThat(stopped.dispatches()).isZero(); assertThat(payments.find(tenant, payment.command().id())).contains(payment);
+    }
+
+    @Test void returnReviewDuringErpCallKeepsActualPostingAndBlocksLocalCompletion() {
+        var payment = supplierBank(); var queued = serviceSettlement(payment); var claimed = settlementExecution.claim(tenant, queued.command().id(), at());
+        var sent = settlementExecution.ready(claimed, read(payment, at(), date()), at()); freezeReturn(payment);
+        settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), clock());
+        var actual = settlements.find(tenant, queued.command().id()).orElseThrow(); assertThat(actual.settled()).isTrue();
+        assertThat(count("supplier_settlement_completion")).isZero(); assertThat(settlements.awaitingLocalCompletion()).isEmpty();
+        settlementExecution.completeLocal(tenant, actual.command().id(), clock());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> reservations.complete(actual, payment, clock()))).isInstanceOf(DomainException.class);
+        var original = payment.command().holdCommand().authorization().source().reservation();
+        assertThat(reservations.find(tenant, original.id())).contains(original); assertThat(payments.find(tenant, payment.command().id())).contains(payment);
+    }
+
+    @Test void returnAfterCompletionBlocksAnotherRequestAndKeepsOriginalCompletion() {
+        var payment = supplierBank(); var queued = serviceSettlement(payment); var claimed = settlementExecution.claim(tenant, queued.command().id(), at());
+        var sent = settlementExecution.ready(claimed, read(payment, at(), date()), at());
+        settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), at());
+        var original = payment.command().holdCommand().authorization().source().reservation();
+        var completed = reservations.find(tenant, original.id()).orElseThrow(); var originalErp = settlements.find(tenant, queued.command().id()).orElseThrow();
+        freezeReturn(payment);
+        assertThatThrownBy(() -> approved(original.source().round().content())).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED"));
+        assertThat(approved().source().reservation().source().round().content().payableReference()).isNotEqualTo(original.source().round().content().payableReference());
+        assertThat(reservations.find(tenant, original.id())).contains(completed); assertThat(settlements.find(tenant, queued.command().id())).contains(originalErp);
+        assertThat(count("supplier_settlement_completion")).isEqualTo(1); assertThat(count("supplier_payment_operation")).isEqualTo(1);
+    }
+
+    @Test void newPayableReservationWaitsForConcurrentReturnFreezeToCommit() throws Exception {
+        var payment = supplierBank(); var queued = serviceSettlement(payment); var claimed = settlementExecution.claim(tenant, queued.command().id(), at());
+        var sent = settlementExecution.ready(claimed, read(payment, at(), date()), at());
+        settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), at());
+        var request = new SupplierPaymentReturnPort.Request(payment.command(), payment.observation());
+        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc));
+        tx.executeWithoutResult(status -> ledgers.create(SupplierPaymentReturns.open(request, clock())));
+        var frozen = new CountDownLatch(1); var release = new CountDownLatch(1); var attempting = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> tx.executeWithoutResult(status -> {
+                sources.lock(tenant, payment.command().id()); ledgers.requireReview(tenant, payment.command().id(), clock()); frozen.countDown();
+                try { if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Synthetic freeze release timed out"); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+            }));
+            assertThat(frozen.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = pool.submit(() -> { attempting.countDown(); try { approved(request.command().holdCommand().authorization().source().reservation().source().round().content()); return "OK"; }
+                catch (DomainException rejected) { return rejected.code(); } });
+            assertThat(attempting.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> second.get(100, TimeUnit.MILLISECONDS)).isInstanceOf(java.util.concurrent.TimeoutException.class);
+            release.countDown(); first.get(10, TimeUnit.SECONDS); assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo("SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED");
+        } finally { release.countDown(); pool.shutdownNow(); }
+        assertThat(count("procurement_payment")).isEqualTo(1); assertThat(count("supplier_settlement_completion")).isEqualTo(1);
+    }
+
+    @Test void completedPayableWithNewBankUncertaintyCannotStartAnotherPaymentRequest() {
+        var payment = supplierBank(); var queued = serviceSettlement(payment); var claimed = settlementExecution.claim(tenant, queued.command().id(), at());
+        var sent = settlementExecution.ready(claimed, read(payment, at(), date()), at());
+        settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), at());
+        var original = payment.command().holdCommand().authorization().source().reservation(); var completed = reservations.find(tenant, original.id()).orElseThrow();
+        tx.executeWithoutResult(status -> bank.query(tenant, payment.command().id(), payment.version(), clock()));
+        assertThatThrownBy(() -> approved(original.source().round().content())).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED"));
+        assertThat(count("supplier_payment_returns")).isZero(); assertThat(reservations.find(tenant, original.id())).contains(completed);
+        var query = bank.claim(tenant, payment.command().id(), clock()); bank.finish(query, new FinanceResult.Success<>(paid(payment.command(), clock())), clock());
+        assertThat(new SupplierPayableReturnGuard(jdbc).blocked(tenant, original.source().round().content())).isFalse();
+    }
+
+    @Test void localCompletionQueueExcludesAnEarlierCompletedPaymentWithNewBankUncertainty() {
+        var firstContent = new ProcurementPaymentContent(entity, "采购付款", "原应付分次付款", "supplier-1", UUID.randomUUID().toString(), money("20"));
+        var first = supplierBank(approved(firstContent)); var firstQueued = serviceSettlement(first);
+        var firstClaim = settlementExecution.claim(tenant, firstQueued.command().id(), at());
+        var firstSent = settlementExecution.ready(firstClaim, read(first, at(), date()), at());
+        settlementExecution.finish(firstSent, new FinanceResult.Success<>(settled(firstSent).observation()), at());
+        var laterContent = new ProcurementPaymentContent(entity, "采购付款", "原应付后续付款", "supplier-1", firstContent.payableReference(), money("10"));
+        var later = supplierBank(approved(laterContent)); var laterQueued = serviceSettlement(later);
+        var laterClaim = settlementExecution.claim(tenant, laterQueued.command().id(), at());
+        var laterSent = settlementExecution.ready(laterClaim, read(later, at(), date()), at());
+        tx.executeWithoutResult(status -> bank.query(tenant, first.command().id(), first.version(), clock()));
+        settlementExecution.finish(laterSent, new FinanceResult.Success<>(settled(laterSent).observation()), clock());
+        assertThat(settlements.find(tenant, laterQueued.command().id()).orElseThrow().settled()).isTrue();
+        assertThat(count("supplier_settlement_completion")).isEqualTo(1);
+        assertThat(settlements.awaitingLocalCompletion()).isEmpty();
+    }
+
+    private void freezeReturn(SupplierPaymentOperation payment) {
+        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc)); var current = clock();
+        tx.executeWithoutResult(status -> {
+            sources.lock(tenant, payment.command().id());
+            ledgers.create(SupplierPaymentReturns.open(new SupplierPaymentReturnPort.Request(payment.command(), payment.observation()), current));
+            ledgers.requireReview(tenant, payment.command().id(), current);
+        });
+    }
+
     private SupplierSettlementPreparation serviceIntent(SupplierPaymentOperation payment) { return tx.execute(status -> settlementPreparation.register(tenant, payment.command().id(), payment.version(), "finance", date(), at())); }
     private SupplierPayableSettlementOperation serviceSettlement(SupplierPaymentOperation payment) {
         var pending = serviceIntent(payment); var claimed = settlementPreparation.claim(tenant, pending.input().id(), at());
@@ -554,7 +661,10 @@ class SupplierSettlementPersistenceTest {
     private Instant clock() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
 
     private SupplierPaymentOperation supplierBank() {
-        var sent = sending(prepared(register(confirmed()))); bank.finish(sent, new FinanceResult.Success<>(paid(sent.command(), at())), at());
+        return supplierBank(approved());
+    }
+    private SupplierPaymentOperation supplierBank(SupplierPaymentAuthorization authorization) {
+        var sent = sending(prepared(register(confirmed(authorization)))); bank.finish(sent, new FinanceResult.Success<>(paid(sent.command(), at())), at());
         return payments.find(tenant, sent.command().id()).orElseThrow();
     }
     private SupplierSettlementPreparation intent(SupplierPaymentOperation payment) {
@@ -585,14 +695,17 @@ class SupplierSettlementPersistenceTest {
         return new SupplierPayableSettlementEvidence(observed(payment.command().holdCommand().authorization(), at), paid(payment.command(), at), period, at);
     }
     private SupplierPayableSettlementOperation settled(SupplierPayableSettlementOperation sent) {
-        var command = sent.command(); var posting = new SupplierPayableSettlementObservation.Posting("settlement-1", command.payment().held().holdReference(), "ledger-2", command.payment().amount(), money("30"), money("100"),
+        var command = sent.command(); var posting = new SupplierPayableSettlementObservation.Posting("settlement-1", command.payment().held().holdReference(), "ledger-2", command.payment().amount(), money("30"), money("30").plus(command.payment().amount()),
                 command.paid().paymentReference(), command.paid().receiptReference(), "voucher-settlement", command.period().periodReference(), command.period().request().accountingDate(), sent.updatedAt());
         return sent.complete(new FinanceResult.Success<>(new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.SETTLED, 1L, sent.updatedAt(), posting, null)), sent.updatedAt());
     }
     private LocalDate date() { return at().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate(); }
 
     private SupplierPaymentAuthorization approved() {
-        var ref = UUID.randomUUID().toString(); var content = new ProcurementPaymentContent(entity, "采购付款", "已验收货物付款", "supplier-1", ref, money("70"));
+        return approved(new ProcurementPaymentContent(entity, "采购付款", "已验收货物付款", "supplier-1", UUID.randomUUID().toString(), money("70")));
+    }
+    private SupplierPaymentAuthorization approved(ProcurementPaymentContent content) {
+        var ref = UUID.randomUUID().toString();
         var request = ProcurementPaymentRequest.draft(UUID.randomUUID(), tenant, UUID.randomUUID(), "alice", content);
         var payable = payable(request); var catalog = new FinanceCatalog("alice", "v1", now.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
         var initiator = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
@@ -613,7 +726,10 @@ class SupplierSettlementPersistenceTest {
                 new SupplierAccountSnapshot(entity, "supplier-1", "supplier-account", "****1234", "b".repeat(64), "v1"), "contract", "order", "matching", "voucher", "budget", LocalDate.parse("2026-10-01"), money("100"), money("30"), List.of(line));
     }
     private SupplierPayableHoldOperation confirmed() {
-        var authorization = approved(); tx.executeWithoutResult(status -> holdService.register(authorization, authorizedAt()));
+        return confirmed(approved());
+    }
+    private SupplierPayableHoldOperation confirmed(SupplierPaymentAuthorization authorization) {
+        tx.executeWithoutResult(status -> holdService.register(authorization, authorizedAt()));
         var claimed = holdService.claim(tenant, authorization.id(), authorizedAt()); holdService.finish(claimed, new FinanceResult.Success<>(observed(authorization, authorizedAt().plusSeconds(1))), authorizedAt().plusSeconds(1));
         return holds.find(tenant, authorization.id()).orElseThrow();
     }

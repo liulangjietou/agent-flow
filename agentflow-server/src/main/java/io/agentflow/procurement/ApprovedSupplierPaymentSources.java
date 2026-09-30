@@ -18,10 +18,11 @@ public class ApprovedSupplierPaymentSources {
     private final ApplicationRepository applications;
     private final ProcurementPaymentRepository requests;
     private final JdbcProcurementPayableReservationRepository reservations;
+    private final SupplierPayableReturnGuard returns;
 
     /** 跨聚合规则放在应用层，领域只处理已取得的不可变事实。 */
-    public ApprovedSupplierPaymentSources(ApplicationRepository applications, ProcurementPaymentRepository requests, JdbcProcurementPayableReservationRepository reservations) {
-        this.applications = applications; this.requests = requests; this.reservations = reservations;
+    public ApprovedSupplierPaymentSources(ApplicationRepository applications, ProcurementPaymentRepository requests, JdbcProcurementPayableReservationRepository reservations, SupplierPayableReturnGuard returns) {
+        this.applications = applications; this.requests = requests; this.reservations = reservations; this.returns = returns;
     }
 
     /** 沿用审批申请优先的锁顺序；查询恢复同样按原申请定位锁。 */
@@ -34,6 +35,7 @@ public class ApprovedSupplierPaymentSources {
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock(ApprovedProcurementPayment approved) {
         var source = approved.reservation().source(); requests.lock(source.tenantId(), source.requestId());
+        returns.lock(source.tenantId(), source.round().content());
     }
 
     /** 新授权及发送读取真实最终批准版本、冻结内容和仍保留的本地应付占用。 */
@@ -45,6 +47,7 @@ public class ApprovedSupplierPaymentSources {
                 || !application.createdBy().equals(request.employeeId()) || application.roundNo() != request.approval().roundNo()
                 || application.version() != request.approval().applicationVersion()
                 || !application.payload().equals(ProcurementPaymentFormContract.submittedPayload(request.currentRound()))) throw changed();
+        returns.requireClear(tenant, request.currentRound().content());
         return ApprovedProcurementPayment.from(request, reservations.active(tenant, requestId).orElseThrow(ApprovedSupplierPaymentSources::changed));
     }
 

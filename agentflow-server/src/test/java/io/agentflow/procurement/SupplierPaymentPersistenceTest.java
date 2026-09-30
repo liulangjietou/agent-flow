@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.Actor;
+import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.FinanceJsonConfiguration;
 import io.agentflow.expense.InvoiceKey;
@@ -75,6 +77,9 @@ class SupplierPaymentPersistenceTest {
     private JdbcSupplierPaymentReturnsRepository returnLedgers;
     private JdbcSupplierPaymentReturnCheckRepository returnChecks;
     private JdbcSupplierPaymentReturnRepository returnRegistrations;
+    private SupplierPaymentReturnService returnService;
+    private CurrentActor returnActor;
+    private SupplierSettlementAccess returnAccess;
     private static final PaymentAccountsPort.DebitAccount DEBIT = new PaymentAccountsPort.DebitAccount("debit-1", "法人基本户", "****5678", "CNY", "v1");
 
     @BeforeEach void database() { database(null); }
@@ -86,8 +91,10 @@ class SupplierPaymentPersistenceTest {
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target); migration.load().migrate();
         jdbc = new JdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc));
-        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations);
+        // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
+        var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {
@@ -100,9 +107,13 @@ class SupplierPaymentPersistenceTest {
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
         preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
-        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments);
+        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc));
         returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
         returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
+        returnActor = mock(CurrentActor.class); when(returnActor.actor()).thenReturn(new Actor(tenant, "finance", Set.of("FINANCE")));
+        returnAccess = mock(SupplierSettlementAccess.class);
+        var returnSources = new SupplierPaymentReturnSources(sources, payments, new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard));
+        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations, jdbc, json));
     }
 
     @Test void cashierChoiceRegistrationAndAllBankRevisionsSurviveRepositoryRecreation() {
@@ -394,7 +405,7 @@ class SupplierPaymentPersistenceTest {
         var check = returnCheck(payment, "finance", 2, returnFunds("one", "20", clock()));
         var before = returnLedgers.find(tenant, id).orElseThrow(); var decision = returnDecision(check);
         var after = tx.execute(status -> returnRegistrations.register(decision, before.version(), check.version()));
-        var reopened = new JdbcSupplierPaymentReturnRepository(jdbc, json, new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments),
+        var reopened = new JdbcSupplierPaymentReturnRepository(jdbc, json, new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc)),
                 new JdbcSupplierPaymentReturnCheckRepository(jdbc, json), payments, new JdbcFinanceReceiptCreditRepository(jdbc));
         assertThat(reopened.history(tenant, id)).containsExactly(decision); assertThat(reopened.history("other", id)).isEmpty();
         assertThat(returnLedgers.find(tenant, id)).contains(after); assertThat(returnLedgers.find("other", id)).isEmpty();
@@ -495,6 +506,135 @@ class SupplierPaymentPersistenceTest {
         assertThat(payments.find(tenant, payment.command().id())).contains(payment);
         assertThat(count("supplier_payment_returns")).isZero(); assertThat(count("supplier_payment_return_check")).isZero();
         assertThat(migration.migrate().migrationsExecuted).isZero(); assertThat(migration.validateWithResult().validationSuccessful).isTrue();
+    }
+
+    @Test void returnWorkerReadsOutsideTransactionsAndRequiresExplicitRegistration() {
+        var payment = returnedSource(); var intent = queueReturn(payment); var gateway = mock(SupplierPaymentReturnPort.class);
+        when(gateway.query(any())).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(returnChecks.find(tenant, intent.checkId()).orElseThrow().status()).isEqualTo(SupplierPaymentReturnCheck.Status.RUNNING);
+            return new FinanceResult.Success<>(returnProof(invocation.getArgument(0), 2, returnFunds("worker", "20", clock())));
+        });
+        var worker = new SupplierPaymentReturnWorker(returnChecks, returnService, gateway); worker.poll(); worker.poll();
+        verify(gateway, times(1)).query(any()); assertThat(count("finance_receipt_credit")).isZero();
+        var check = returnChecks.find(tenant, intent.checkId()).orElseThrow(); var ledger = returnLedgers.find(tenant, payment.command().id()).orElseThrow();
+        assertThat(ledger.reviewRequired()).isTrue(); assertThat(ledger.entries()).isEmpty(); assertThat(check.status()).isEqualTo(SupplierPaymentReturnCheck.Status.CHECKED);
+        var result = returnService.register(payment.command().id(), returnInput(payment, check));
+        assertThat(result.registrationId()).isNotNull(); assertThat(count("finance_receipt_credit")).isEqualTo(1);
+        assertThat(returnLedgers.find(tenant, payment.command().id()).orElseThrow().totalReturned()).isEqualTo(money("20"));
+        assertThat(payments.find(tenant, payment.command().id())).contains(payment);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id=? AND action LIKE 'SUPPLIER_PAYMENT_RETURN_%'", Integer.class, tenant)).isEqualTo(2);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> worker.poll())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test void uncertainReturnNeedsFreshIndependentConfirmationToClearOnlyItsOwnFreeze() {
+        var payment = returnedSource(); var intent = queueReturn(payment); var claimed = returnService.claim(tenant, intent.checkId(), clock()); var at = clock();
+        returnService.finish(claimed, new FinanceResult.Success<>(new SupplierPaymentReturnPort.Receipt(claimed.input().request(),
+                SupplierPaymentReturnPort.Status.UNRESOLVED, 1, at, at.plusSeconds(120), null, List.of())), at);
+        assertThat(returnLedgers.find(tenant, payment.command().id()).orElseThrow().reviewRequired()).isTrue();
+        var next = queueReturn(payment); var query = returnService.claim(tenant, next.checkId(), clock());
+        returnService.finish(query, new FinanceResult.Success<>(returnProof(query.input().request(), 2)), clock());
+        var checked = returnChecks.find(tenant, next.checkId()).orElseThrow();
+        assertThat(returnLedgers.find(tenant, payment.command().id()).orElseThrow().reviewRequired()).isTrue();
+        when(returnActor.actor()).thenReturn(new Actor(tenant, "finance-two", Set.of("FINANCE")));
+        assertThatThrownBy(() -> returnService.register(payment.command().id(), returnInput(payment, checked))).isInstanceOf(DomainException.class);
+        when(returnActor.actor()).thenReturn(new Actor(tenant, "finance", Set.of("FINANCE")));
+        returnService.register(payment.command().id(), returnInput(payment, checked));
+        assertThat(returnLedgers.find(tenant, payment.command().id()).orElseThrow().reviewRequired()).isFalse();
+        assertThat(count("finance_receipt_credit")).isZero();
+        assertThatThrownBy(() -> returnService.register(payment.command().id(), returnInput(payment, checked))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void returnRegistrationAndAuditFailureRollBackTheEntireFinancialDecision() {
+        var payment = returnedSource(); var check = checkedReturn(payment, returnFunds("audit", "20", clock())); var input = returnInput(payment, check);
+        var before = returnLedgers.find(tenant, payment.command().id()).orElseThrow();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT reject_supplier_return_audit CHECK (action<>'SUPPLIER_PAYMENT_RETURN_REGISTER')");
+        assertThatThrownBy(() -> returnService.register(payment.command().id(), input)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(returnChecks.find(tenant, check.input().id())).contains(check); assertThat(returnLedgers.find(tenant, payment.command().id())).contains(before);
+        assertThat(count("finance_receipt_credit")).isZero(); assertThat(count("supplier_payment_return_registration")).isZero();
+        jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT reject_supplier_return_audit");
+        returnService.register(payment.command().id(), input); assertThat(count("finance_receipt_credit")).isEqualTo(1);
+    }
+
+    @Test void returnQueryExpiryAndChangedFinanceNeverAcceptALateWorkerResult() {
+        var payment = returnedSource(); var intent = queueReturn(payment); var claimed = returnService.claim(tenant, intent.checkId(), clock());
+        assertThat(returnService.claim(tenant, intent.checkId(), claimed.leaseUntil())).isNull();
+        returnService.finish(claimed, new FinanceResult.Success<>(returnProof(claimed.input().request(), 2, returnFunds("late", "20", clock()))), claimed.leaseUntil());
+        var expired = returnChecks.find(tenant, intent.checkId()).orElseThrow(); assertThat(expired.issue()).isEqualTo(SupplierPaymentReturnCheck.Issue.TIMEOUT);
+        assertThat(count("finance_receipt_credit")).isZero(); var next = queueReturn(payment); disabled.add("finance");
+        assertThat(returnService.claim(tenant, next.checkId(), clock())).isNull();
+        assertThat(returnChecks.find(tenant, next.checkId()).orElseThrow().status()).isEqualTo(SupplierPaymentReturnCheck.Status.VOIDED);
+    }
+
+    @Test void returnServiceRechecksCurrentAccessAndOriginalBankBeforeEveryDecision() {
+        var payment = returnedSource(); var check = checkedReturn(payment, returnFunds("access", "20", clock())); var input = returnInput(payment, check);
+        when(returnAccess.requireFinance(payment.command().id())).thenThrow(new DomainException("FORBIDDEN", "Synthetic finance role removed"));
+        assertThatThrownBy(() -> returnService.register(payment.command().id(), input)).isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("FORBIDDEN"));
+        reset(returnAccess); tx.executeWithoutResult(status -> bank.query(tenant, payment.command().id(), payment.version(), clock()));
+        var pending = payments.find(tenant, payment.command().id()).orElseThrow();
+        assertThatThrownBy(() -> returnService.register(payment.command().id(), returnInput(pending, check))).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_RETURN_PAYMENT_UNRESOLVED"));
+        assertThat(count("finance_receipt_credit")).isZero(); assertThat(returnChecks.find(tenant, check.input().id())).contains(check);
+    }
+
+    @Test void returnReadFailureRetainsPriorFreezeAndDoesNotAutomaticallyRetry() {
+        var payment = returnedSource(); checkedReturn(payment, returnFunds("held", "20", clock())); var before = returnLedgers.find(tenant, payment.command().id()).orElseThrow();
+        var intent = queueReturn(payment); var gateway = mock(SupplierPaymentReturnPort.class);
+        when(gateway.query(any())).thenThrow(new IllegalStateException("Synthetic read failure"));
+        var worker = new SupplierPaymentReturnWorker(returnChecks, returnService, gateway); worker.poll(); worker.poll(); verify(gateway, times(1)).query(any());
+        assertThat(returnChecks.find(tenant, intent.checkId()).orElseThrow().issue()).isEqualTo(SupplierPaymentReturnCheck.Issue.INTERNAL_ERROR);
+        assertThat(returnLedgers.find(tenant, payment.command().id())).contains(before); assertThat(count("finance_receipt_credit")).isZero();
+    }
+
+    @Test void partialThenFullReturnUsesOriginalSuccessAndAddsOnlyTheRemainingBankFunds() {
+        var payment = returnedSource(); var firstFunds = returnFunds("partial", "20", clock()); var first = checkedReturn(payment, firstFunds);
+        var firstDecision = returnService.register(payment.command().id(), returnInput(payment, first)); var original = payment.observation();
+        tx.executeWithoutResult(status -> bank.query(tenant, payment.command().id(), payment.version(), clock()));
+        var bankClaim = bank.claim(tenant, payment.command().id(), clock()); var at = clock();
+        var reversal = new PaymentObservation(payment.command().id(), payment.command().digest(), PaymentObservation.Status.REVERSED, 2L, at,
+                original.paymentReference(), original.paidAmount(), original.accountDigest(), at, "reversal-bank-receipt", null);
+        bank.finish(bankClaim, new FinanceResult.Success<>(reversal), at); var reversed = payments.find(tenant, payment.command().id()).orElseThrow();
+        assertThat(reversed.status()).isEqualTo(SupplierPaymentOperation.Status.REVERSED);
+        var intent = queueReturn(reversed); var claimed = returnService.claim(tenant, intent.checkId(), clock()); var observed = clock();
+        var proof = new SupplierPaymentReturnPort.Receipt(claimed.input().request(), SupplierPaymentReturnPort.Status.RETURNED, 3,
+                observed, observed.plusSeconds(120), reversal, List.of(firstFunds, returnFunds("remaining", "50", observed)));
+        returnService.finish(claimed, new FinanceResult.Success<>(proof), observed); var check = returnChecks.find(tenant, intent.checkId()).orElseThrow();
+        returnService.register(payment.command().id(), returnInput(reversed, check));
+        var ledger = returnLedgers.find(tenant, payment.command().id()).orElseThrow(); assertThat(ledger.totalReturned()).isEqualTo(money("70"));
+        assertThat(ledger.entries().get(0).registrationId()).isEqualTo(firstDecision.registrationId()); assertThat(ledger.reviewRequired()).isTrue();
+        assertThat(payments.firstSuccessfulRevision(tenant, payment.command().id())).contains(payment); assertThat(payments.find(tenant, payment.command().id())).contains(reversed);
+        assertThat(count("finance_receipt_credit")).isEqualTo(2); assertThat(count("supplier_payable_settlement_operation")).isZero();
+    }
+
+    @Test void duplicateBankReceiptIsAStableFinanceConflictAndLeavesTheSecondQueryUnconsumed() {
+        var first = returnedSource(); var second = returnedSource(); var funds = returnFunds("duplicate-service", "20", clock());
+        var firstCheck = checkedReturn(first, funds); returnService.register(first.command().id(), returnInput(first, firstCheck));
+        var secondCheck = checkedReturn(second, funds); var before = returnLedgers.find(tenant, second.command().id()).orElseThrow();
+        assertThatThrownBy(() -> returnService.register(second.command().id(), returnInput(second, secondCheck))).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED"));
+        assertThat(returnChecks.find(tenant, secondCheck.input().id())).contains(secondCheck); assertThat(returnLedgers.find(tenant, second.command().id())).contains(before);
+        assertThat(count("finance_receipt_credit")).isEqualTo(1); assertThat(count("supplier_payment_return_registration")).isEqualTo(1);
+    }
+
+    private SupplierPaymentReturnService.ActionReceipt queueReturn(SupplierPaymentOperation payment) {
+        var version = returnLedgers.find(tenant, payment.command().id()).map(SupplierPaymentReturns::version).orElse(0L);
+        return returnService.queue(payment.command().id(), new SupplierPaymentReturnService.QueryInput(payment.version(), version, "查询原付款实际入款"));
+    }
+    private SupplierPaymentReturnCheck checkedReturn(SupplierPaymentOperation payment, SupplierPaymentReturnPort.BankReceipt... funds) {
+        var intent = queueReturn(payment); var claimed = returnService.claim(tenant, intent.checkId(), clock());
+        returnService.finish(claimed, new FinanceResult.Success<>(returnProof(claimed.input().request(), 2, funds)), clock());
+        return returnChecks.find(tenant, intent.checkId()).orElseThrow();
+    }
+    private SupplierPaymentReturnPort.Receipt returnProof(SupplierPaymentReturnPort.Request request, long revision, SupplierPaymentReturnPort.BankReceipt... funds) {
+        var at = clock(); var original = request.original();
+        var current = new PaymentObservation(original.authorizationId(), original.commandDigest(), original.status(), original.revision(), at,
+                original.paymentReference(), original.paidAmount(), original.accountDigest(), original.completedAt(), original.receiptReference(), null);
+        return new SupplierPaymentReturnPort.Receipt(request, funds.length == 0 ? SupplierPaymentReturnPort.Status.CONFIRMED : SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED,
+                revision, at, at.plusSeconds(120), current, List.of(funds));
+    }
+    private SupplierPaymentReturnService.RegisterInput returnInput(SupplierPaymentOperation payment, SupplierPaymentReturnCheck check) {
+        return new SupplierPaymentReturnService.RegisterInput(payment.version(), returnLedgers.find(tenant, payment.command().id()).orElseThrow().version(),
+                check.input().id(), check.version(), check.receipt().status(), "bank-statement-1", "核对原公司账户已实际收到回款");
     }
 
     private SupplierPaymentOperation returnedSource() {

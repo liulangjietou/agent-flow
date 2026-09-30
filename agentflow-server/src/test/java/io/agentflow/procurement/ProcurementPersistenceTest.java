@@ -54,7 +54,7 @@ class ProcurementPersistenceTest {
         Flyway.configure().dataSource(source).load().migrate();
         jdbc = new JdbcTemplate(source); tx = new TransactionTemplate(new DataSourceTransactionManager(source));
         requests = new JdbcProcurementPaymentRepository(jdbc, json); checks = new JdbcProcurementPaymentCheckRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc));
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), new SupplierPayableReturnGuard(jdbc));
         reservationService = new ProcurementPayableReservations(reservations); applications = new JdbcApplicationRepository(jdbc, json);
     }
 

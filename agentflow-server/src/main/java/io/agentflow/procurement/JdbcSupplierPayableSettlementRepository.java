@@ -206,6 +206,14 @@ public class JdbcSupplierPayableSettlementRepository {
                 JOIN procurement_payable_reservation r ON r.tenant_id=o.tenant_id AND r.id=o.reservation_id
                 JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
                 WHERE o.status='SETTLED' AND o.retired_version IS NULL AND r.version=1 AND b.status='SUCCEEDED'
+                AND NOT EXISTS (SELECT 1 FROM supplier_payment_returns f WHERE f.tenant_id=r.tenant_id AND f.legal_entity_id=r.legal_entity_id
+                    AND f.supplier_reference=r.supplier_reference AND f.payable_reference=r.payable_reference AND f.review_required=TRUE)
+                AND NOT EXISTS (SELECT 1 FROM supplier_payment_operation old_bank
+                    JOIN supplier_payment_authorization old_auth ON old_auth.tenant_id=old_bank.tenant_id AND old_auth.id=old_bank.id
+                    JOIN procurement_payable_reservation old_reservation ON old_reservation.tenant_id=old_auth.tenant_id AND old_reservation.id=old_auth.reservation_id
+                    WHERE old_bank.tenant_id=r.tenant_id AND old_reservation.legal_entity_id=r.legal_entity_id
+                    AND old_reservation.supplier_reference=r.supplier_reference AND old_reservation.payable_reference=r.payable_reference
+                    AND old_reservation.settled_at IS NOT NULL AND old_bank.status<>'SUCCEEDED')
                 ORDER BY o.updated_at,o.id LIMIT 10
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))));
     }
