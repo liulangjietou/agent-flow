@@ -12,6 +12,8 @@
 
 ## 已确认并完成的本地能力
 
+V77 预算执行持久化已通过领域 20 项、H2 服务端 40 项和 PostgreSQL 数据库 18 项范围验证，见[持久执行证据](evidence/budget-adjustment-execution-persistence-20260930.json)。单次台账消费、并发唯一授权、租约恢复及安全结束均保存原修订，迁移保持旧批准。继续后台、权限入口与页面；现有验收服务仍为 V76。
+
 | 范围 | 当前可用行为 | 证据入口 |
 | --- | --- | --- |
 | 本地组织 | 法人、部门、岗位、人员、多任职；保留 OIDC 身份；组织启用状态进入系统自检 | [组织目录](local-organization.md)、[自检](system-diagnostics-alignment.md) |
