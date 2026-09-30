@@ -1,0 +1,38 @@
+{
+  "status": "PASS_REGISTERED_FUNDING_SOURCE_BINDING",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "publicPartialExpenseWorkflowComplete": false,
+  "tests": {
+    "newFundingSource": 9,
+    "relatedDomain": 40,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlapPriorRuns": true
+  },
+  "red": "expense-adjustment-funding-source-red.log",
+  "green": "expense-adjustment-funding-source-final.log",
+  "checks": [
+    "Bind original settled payment, exact current bank facts and latest cumulative registration",
+    "Only complete registered entries retaining their first registration identity may be selected",
+    "Previous and current selections are disjoint and equal the respective payable reductions",
+    "Unselected new funds remain pending and entry order follows the original ledger",
+    "Reject applicant or original cashier authorization and authorization before adopted evidence",
+    "Retain original payment accounting and payable account mapping",
+    "An already reversed payment voucher requires recorded reversal and the same payable credits as registered bank returns",
+    "A still posted original payment voucher cannot also be used as the return voucher",
+    "Originally zero payable requires no bank evidence; later advance-only changes retain previous bank entries"
+  ],
+  "authorCheck": {
+    "files": 1084,
+    "namedTypes": 2070,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Restore previous projection and used receipts only from actual completed adjustments",
+    "Independent budget and accounting commands, observations and execution lifecycle",
+    "Durable preparation, atomic completion and public API/UI",
+    "Nonempty upgrade, real HTTP, browser and restart acceptance"
+  ]
+}

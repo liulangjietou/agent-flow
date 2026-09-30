@@ -98,7 +98,7 @@ class ExpenseAdjustmentFinancialSourceTest {
         invalid(() -> new ExpenseAdjustmentFinancialSource(reduce(ExpenseAdjustmentAmounts.from(fixture("30").report()), "80", "4"), fixture.settlement(), fixture.budget(), fixture.accrual()));
     }
 
-    private static Fixture fixture(String offset) {
+    static Fixture fixture(String offset) {
         var entity = UUID.randomUUID(); var line = new ExpenseLine(1, "OFFICE", DATE, null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money("100"), money("6"), List.of(), null,
                 List.of(new CostAllocation("A", null, money("60")), new CostAllocation("B", "PROJECT", money("40"))), "已核销费用", null);
         var report = ExpenseReport.draft(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", new ExpenseContent(entity, ExpenseContent.Type.DAILY, "独立调整", List.of(line), List.of(new AdvanceOffset(UUID.randomUUID(), money(offset)))));
@@ -137,5 +137,5 @@ class ExpenseAdjustmentFinancialSourceTest {
      * 原批准与三份独立财务依据，测试替换其一不能借用另一来源的金额。
      * @author owlzhangfq@gmail.com
      */
-    private record Fixture(ExpenseReport report, ExpenseSettlement settlement, BudgetOperation budget, VoucherOperation accrual) { }
+    record Fixture(ExpenseReport report, ExpenseSettlement settlement, BudgetOperation budget, VoucherOperation accrual) { }
 }
