@@ -60,6 +60,7 @@ public class FinanceGatewayClient {
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYABLE_HOLD_QUERY
                 || operation == Operation.SUPPLIER_PAYMENT_COMMAND || operation == Operation.SUPPLIER_PAYMENT_QUERY
                 || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_QUERY
+                || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_QUERY
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
@@ -147,6 +148,19 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> querySupplierPayableSettlement(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYABLE_SETTLEMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 原付款回款另建固定调整号，ERP 原子核对新增入款、原记账和指定期间。 */
+    public <T> FinanceResult<T> adjustSupplierPayable(String tenantId, String targetDigest, UUID operationId, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        if (operationId == null) throw new IllegalArgumentException("A supplier payable adjustment identity is required");
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND, operationId, data, resultType, matchesRequest);
+    }
+
+    /** 已发送调整的恢复不重复确认原付款或入款，永远查询原目标及原调整号。 */
+    public <T> FinanceResult<T> querySupplierPayableAdjustment(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYABLE_ADJUSTMENT_QUERY, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 付款前账户复查绑定原目标，只允许员工账户及出纳出款目录两个只读操作。 */
@@ -263,7 +277,7 @@ public class FinanceGatewayClient {
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
                 || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_COMMAND
                 || operation == Operation.SUPPLIER_PAYABLE_HOLD_COMMAND || operation == Operation.SUPPLIER_PAYMENT_COMMAND
-                || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
+                || operation == Operation.SUPPLIER_PAYABLE_SETTLEMENT_COMMAND || operation == Operation.SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND) request.header("Idempotency-Key", requestId.toString());
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {
@@ -349,6 +363,8 @@ public class FinanceGatewayClient {
         SUPPLIER_PAYMENT_RETURN("supplier-payment-return", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.SUPPLIER_UNAVAILABLE)),
         SUPPLIER_PAYABLE_SETTLEMENT_COMMAND("supplier-payable-settlement-command", Set.of()),
         SUPPLIER_PAYABLE_SETTLEMENT_QUERY("supplier-payable-settlement-query", Set.of()),
+        SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND("supplier-payable-adjustment-command", Set.of()),
+        SUPPLIER_PAYABLE_ADJUSTMENT_QUERY("supplier-payable-adjustment-query", Set.of()),
         VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         VOUCHER_REVERSAL_COMMAND("voucher-reversal-command", Set.of()),
         VOUCHER_REVERSAL_QUERY("voucher-reversal-query", Set.of());

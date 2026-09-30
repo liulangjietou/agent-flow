@@ -1,0 +1,57 @@
+{
+  "status": "PASS_DOMAIN_AND_HTTP_PROTOCOL",
+  "date": "2026-09-30",
+  "liveSchema": 80,
+  "syntheticFinanceOnly": true,
+  "domain": {
+    "total": 39,
+    "newAdjustmentTests": 13,
+    "failures": 0,
+    "errors": 0
+  },
+  "server": {
+    "total": 35,
+    "newAdjustmentHttpTests": 6,
+    "failures": 0,
+    "errors": 0
+  },
+  "regressionLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-adjustment-contract-final.log",
+  "authors": {
+    "files": 1050,
+    "namedTypes": 1997,
+    "missing": 0,
+    "parseErrors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-adjustment-authors.log"
+  },
+  "verified": [
+    "Original held payable and already settled payable have different atomic accounting deltas",
+    "Subsequent adjustments account only newly registered bank receipts",
+    "Previous adjustments preserve immutable original bank receipt ownership",
+    "Independent finance and fixed accounting date remain bound after original authorization expires",
+    "Fresh preflight includes every registered bank receipt and preserves original ERP postings",
+    "Original accrual voucher is distinct from payment recognition and return entries",
+    "Fixed destination, original command bytes and exact decimal quantities survive retries and credential rotation",
+    "Unknown writes recover only by original identity; queries carry no write idempotency header",
+    "Conflicting postings preserve the original result; ambiguous outcomes cannot be safely retired",
+    "Original and subsequent adjustment commands and recovery states round trip with the application JSON configuration"
+  ],
+  "redThenGreen": [
+    {
+      "case": "Previous adjustment posting must belong to its own registered bank receipts",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-adjustment-previous-red.log",
+      "productionBoundaryFailures": 1
+    },
+    {
+      "case": "Original and previous accounting dates cannot move backwards; original accrual voucher cannot be reused",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-adjustment-accounting-red.log",
+      "productionBoundaryFailures": 3
+    }
+  ],
+  "remaining": [
+    "Persistent preparation and execution queues, revisions, single active attempt and entry deduplication",
+    "Atomic local completion and current bank/return review rules",
+    "Current finance permissions, public APIs and explicit UI",
+    "Nonempty database upgrade, actual HTTP, restart and browser acceptance",
+    "Real enterprise finance integration"
+  ]
+}
