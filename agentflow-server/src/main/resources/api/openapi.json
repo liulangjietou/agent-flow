@@ -77,6 +77,258 @@
     }
   ],
   "paths": {
+    "/api/v1/supplier-adjustments/{id}/dispute": {
+      "get": {
+        "operationId": "getSupplierAdjustmentDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "读取原供应商 ERP 调整争议",
+        "description": "原轮次完整财务字段权限约束读取；当前原调整事实、候选和历史决定分别展示，响应禁止缓存。",
+        "x-access": "原轮次具有完整字段读取权限的参与人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "原 ERP 事实、候选和独立裁决能力。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierAdjustmentDisputeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原调整历史不完整或当前状态不能支持读取。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/supplier-adjustments/{id}/dispute/resolutions": {
+      "post": {
+        "operationId": "resolveSupplierAdjustmentDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "明确采用原 ERP 调整近期终态",
+        "description": "当前独立财务核对原轮次字段权限、法人任职和三方分离；幂等回放仍重查权限。只采用五分钟内最高外部终态，已确认的原凭证、每笔入款分录和前后余额不可替换。决定、连续修订及审计原子保存，不发送银行或 ERP 写入；成功后由后台另行核对银行并补全本地完成。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非原申请人和原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前证据无法支持裁决，或不满足独立财务条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原 ERP 裁决及审计已保存；银行和本地完成需要重新读取。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierAdjustmentDisputeReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierAdjustmentDisputeResolveInput"
+              },
+              "example": {
+                "adjustmentVersion": 12,
+                "outcome": "ADJUSTED",
+                "evidenceReference": "ERP-STATEMENT-1",
+                "comment": "核对原调整凭证及应付余额后采用终态"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/supplier-payments/{id}/adjustments": {
       "get": {
         "operationId": "getSupplierAdjustments",
@@ -32357,6 +32609,394 @@
       }
     },
     "schemas": {
+      "SupplierAdjustmentDisputeView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentId",
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "adjustmentVersion",
+          "status",
+          "amount",
+          "observed",
+          "candidate",
+          "issue",
+          "canResolve",
+          "latest",
+          "returnedAmount",
+          "totalReturned",
+          "netPaid",
+          "recognizesOriginalPayment"
+        ],
+        "properties": {
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CHECKING",
+              "ADJUSTING",
+              "UNKNOWN",
+              "QUERYING",
+              "ADJUSTED",
+              "REJECTED",
+              "NOT_FOUND",
+              "RECONCILING",
+              "VOIDED"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "observed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentDisputeFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentDisputeFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_DISPUTED",
+                  "NON_TERMINAL",
+                  "STALE_EVIDENCE",
+                  "EXPIRED_EVIDENCE",
+                  "HISTORY_CHANGED",
+                  "ADJUSTMENT_ALREADY_OBSERVED",
+                  "DIFFERENT_POSTING"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentDisputeDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnedAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "netPaid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "recognizesOriginalPayment": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SupplierAdjustmentDisputeFact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "rejection",
+          "posting"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "ADJUSTED",
+              "REJECTED",
+              "NOT_FOUND"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACCOUNTING_PERIOD_CLOSED",
+                  "ORIGINAL_CHANGED",
+                  "RETURNS_CHANGED",
+                  "PREVIOUS_CHANGED",
+                  "PAYABLE_CHANGED",
+                  "ALREADY_ADJUSTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentDisputePosting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierAdjustmentDisputePosting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentReference",
+          "recognitionVoucherReference",
+          "returnedAmount",
+          "totalReturned",
+          "netPaid",
+          "payableSettledBefore",
+          "payableSettledAfter",
+          "entries",
+          "adjustedAt",
+          "periodReference",
+          "accountingDate"
+        ],
+        "properties": {
+          "adjustmentReference": {
+            "type": "string"
+          },
+          "recognitionVoucherReference": {
+            "type": "string"
+          },
+          "returnedAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "totalReturned": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "netPaid": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "payableSettledBefore": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "payableSettledAfter": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "entries": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/SupplierAdjustmentEntry"
+            }
+          },
+          "adjustedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "SupplierAdjustmentDisputeDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "adjustmentVersion",
+          "outcome",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ADJUSTED",
+              "REJECTED"
+            ]
+          },
+          "resolvedBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          }
+        }
+      },
+      "SupplierAdjustmentDisputeReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentId",
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "adjustmentVersion",
+          "status",
+          "resolutionId",
+          "auditEventId"
+        ],
+        "properties": {
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ADJUSTED",
+              "REJECTED"
+            ]
+          },
+          "resolutionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SupplierAdjustmentDisputeResolveInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ADJUSTED",
+              "REJECTED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
       "SupplierAdjustmentPrepareInput": {
         "type": "object",
         "additionalProperties": false,

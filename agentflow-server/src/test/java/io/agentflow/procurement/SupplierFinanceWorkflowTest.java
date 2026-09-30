@@ -979,6 +979,98 @@ class SupplierFinanceWorkflowTest {
         assertThat(secondPage.path("returnVersion")).isEqualTo(firstView.path("returnVersion")); assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command");
     }
 
+    @Test void adjustmentDisputePreservesCompletedAccountingAndNeverSendsAnotherCommand() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID id = queueAdjustment(payment); pollAdjustment(id);
+        var original = adjustments.find("demo", id).orElseThrow(); var completed = adjustmentView(payment).path("completion");
+        var bank = bankPayments.find("demo", payment).orElseThrow();
+        queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.REJECTED, 2);
+        var invalid = adjustmentDisputeView(id); assertThat(invalid.path("canResolve").asBoolean()).isFalse();
+        assertThat(invalid.path("issue").asText()).isEqualTo("ADJUSTMENT_ALREADY_OBSERVED");
+        okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", adjustmentDisputeInput(invalid)), 422, "SUPPLIER_ADJUSTMENT_DISPUTE_UNRESOLVABLE");
+        queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.ADJUSTED, 3); var ready = adjustmentDisputeView(id);
+        assertThat(ready.path("canResolve").asBoolean()).isTrue(); String key = UUID.randomUUID().toString(); var input = adjustmentDisputeInput(ready);
+        var first = send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input); var receipt = ok(first, 202);
+        assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(receipt.path("adjustmentVersion").asLong()).isEqualTo(ready.path("adjustmentVersion").asLong() + 1);
+        assertThat(send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        assertThat(adjustmentView(payment).path("completion")).isEqualTo(completed); assertThat(bankPayments.find("demo", payment)).contains(bank);
+        assertThat(adjustments.find("demo", id).orElseThrow().command()).isEqualTo(original.command());
+        assertThat(adjustmentDisputeView(id).at("/latest/id").asText()).isEqualTo(receipt.path("resolutionId").asText());
+        assertThat(calls.get("supplier-payable-adjustment-command").get()).isEqualTo(1);
+        assertThat(ready.toString()).doesNotContain("private-ledger", "creditAccountReference", "commandDigest", "holdCommand");
+    }
+
+    @Test void adjustmentDisputeCompletesLocallyOnlyAfterSeparateBankRecheck() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedAdjustment(payment); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2);
+        var ready = adjustmentDisputeView(id); ok(send(adjustmentDisputePath(id) + "/resolutions", "finance", adjustmentDisputeInput(ready)), 202);
+        assertThat(adjustments.find("demo", id).orElseThrow().adjusted()).isTrue(); assertThat(adjustmentView(payment).path("completion").isNull()).isTrue();
+        pollAdjustment(id); assertThat(adjustmentView(payment).at("/completion/adjustmentId").asText()).isEqualTo(id.toString());
+        assertThat(calls.get("supplier-payable-adjustment-command").get()).isEqualTo(1);
+        assertThat(adjustmentDisputeView(id).path("candidate").isNull()).isTrue();
+    }
+
+    @Test void adjustmentDisputeReplayRechecksIndependentFinanceAndSensitiveFields() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedAdjustment(payment); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2);
+        var input = adjustmentDisputeInput(adjustmentDisputeView(id)); String key = UUID.randomUUID().toString();
+        for (String user : List.of("alice", "cashier", "admin", "manager", "bob")) assertThat(send(adjustmentDisputePath(id) + "/resolutions", user, input).getStatus()).isBetween(400, 499);
+        assertThat(ok(read(adjustmentDisputePath(id), "alice"), 200).path("canResolve").asBoolean()).isFalse();
+        okError(read(adjustmentDisputePath(id), "admin"), 403, "FORBIDDEN"); okError(read(adjustmentDisputePath(id), "bob"), 404, "NOT_FOUND");
+        var first = send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input); ok(first, 202);
+        organization.updateAppointment(admin, financeAppointment, false, 1); okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input), 403, "FORBIDDEN");
+        organization.updateAppointment(admin, financeAppointment, true, 2);
+        assertThat(send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try { okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input), 403, "FORBIDDEN"); okError(read(adjustmentDisputePath(id), "finance"), 403, "FORBIDDEN"); }
+        finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+    }
+
+    @Test void adjustmentDisputeRejectsForgedFactsWrongTerminalVersionAndQueryParameters() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedAdjustment(payment); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2);
+        var displayed = adjustmentDisputeView(id); var input = adjustmentDisputeInput(displayed); var forged = new java.util.HashMap<>(input); forged.put("voucherReference", "FORGED");
+        okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", forged), 400, "INVALID_REQUEST");
+        forged = new java.util.HashMap<>(input); forged.put("adjustmentVersion", displayed.path("adjustmentVersion").asLong() - 1);
+        okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", forged), 409, "CONCURRENCY_CONFLICT");
+        forged = new java.util.HashMap<>(input); forged.put("outcome", "REJECTED");
+        okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", forged), 422, "SUPPLIER_ADJUSTMENT_DISPUTE_UNRESOLVABLE");
+        forged.put("outcome", "NOT_FOUND"); okError(send(adjustmentDisputePath(id) + "/resolutions", "finance", forged), 400, "INVALID_REQUEST");
+        okError(read(adjustmentDisputePath(id) + "?paymentId=" + payment, "finance"), 400, "INVALID_SUPPLIER_ADJUSTMENT_DISPUTE_QUERY");
+        okError(send(adjustmentDisputePath(id) + "/resolutions?paymentId=" + payment, "finance", input), 400, "INVALID_SUPPLIER_ADJUSTMENT_DISPUTE_QUERY");
+        okError(read(adjustmentDisputePath(UUID.randomUUID()), "finance"), 404, "NOT_FOUND");
+    }
+
+    @Test void adjustmentDisputeAuditFailureRollsBackDecisionRevisionAndIdempotency() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedAdjustment(payment); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2);
+        var before = adjustments.find("demo", id).orElseThrow(); var input = adjustmentDisputeInput(adjustmentDisputeView(id)); String key = UUID.randomUUID().toString();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_adjustment_dispute_audit CHECK(aggregate_id<>'%s' OR action<>'SUPPLIER_ADJUSTMENT_DISPUTE_RESOLVE')".formatted(id));
+        try { assertThatThrownBy(() -> send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_adjustment_dispute_audit"); }
+        assertThat(adjustments.find("demo", id)).contains(before); assertThat(adjustments.latestResolution("demo", id)).isEmpty();
+        assertThat(adjustments.revision("demo", id, before.version() + 1)).isEmpty();
+        ok(send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input), 202);
+        assertThat(adjustmentView(payment).path("completion").isNull()).isTrue(); pollAdjustment(id);
+        assertThat(adjustmentView(payment).at("/completion/adjustmentId").asText()).isEqualTo(id.toString());
+    }
+
+    private String adjustmentDisputePath(UUID id) { return "/api/v1/supplier-adjustments/" + id + "/dispute"; }
+    private JsonNode adjustmentDisputeView(UUID id) throws Exception { var response = read(adjustmentDisputePath(id), "finance"); var value = ok(response, 200); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return value; }
+    private Map<String, Object> adjustmentDisputeInput(JsonNode view) { return Map.of("adjustmentVersion", view.path("adjustmentVersion").asLong(), "outcome", view.at("/candidate/outcome").asText(), "evidenceReference", "ERP-ADJUSTMENT-STATEMENT", "comment", "明确核对原回款调整与实际分录"); }
+    private UUID unresolvedAdjustment(UUID payment) throws Exception {
+        registerFunds(payment); UUID id = queueAdjustment(payment); var command = adjustments.find("demo", id).orElseThrow().command();
+        responder = (operation, request) -> operation.equals("supplier-payable-adjustment-command") ? adjustmentResponse(request,
+                new SupplierPayableAdjustmentObservation(id, command.digest(), SupplierPayableAdjustmentObservation.Status.PENDING, 1, Instant.now(), null, null)) : normal(operation, request);
+        pollAdjustment(id); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.NOT_FOUND, 0); return id;
+    }
+    private void queryAdjustmentDispute(UUID id, SupplierPayableAdjustmentObservation.Status outcome, long revision) throws Exception {
+        var current = adjustments.find("demo", id).orElseThrow(); var command = current.command();
+        responder = (operation, request) -> operation.equals("supplier-payable-adjustment-query") ? adjustmentResponse(request,
+                new SupplierPayableAdjustmentObservation(id, command.digest(), outcome, revision, Instant.now(), outcome == SupplierPayableAdjustmentObservation.Status.ADJUSTED ? adjustmentObservation(command).posting() : null,
+                        outcome == SupplierPayableAdjustmentObservation.Status.REJECTED ? SupplierPayableAdjustmentObservation.Rejection.ACCOUNTING_PERIOD_CLOSED : null)) : normal(operation, request);
+        ok(send(adjustmentActionPath(id), "finance", Map.of("action", "QUERY", "adjustmentVersion", current.version(), "comment", "按原调整编号读取近期终态")), 202); pollAdjustment(id);
+        assertThat(adjustments.find("demo", id).orElseThrow().status()).isEqualTo(SupplierPayableAdjustmentOperation.Status.RECONCILING);
+    }
+    private String adjustmentResponse(JsonNode request, SupplierPayableAdjustmentObservation value) {
+        return json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", value));
+    }
+
     private String adjustmentPath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/adjustments"; }
     private String adjustmentPreparePath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/adjustment-preparations"; }
     private String adjustmentActionPath(UUID id) { return "/api/v1/supplier-adjustments/" + id + "/finance-actions"; }

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import SupplierAdjustmentDisputeStatus from './SupplierAdjustmentDisputeStatus.vue'
 import { paymentOperationLabels, adjustmentLabels, adjustmentPreparationLabels, adjustmentActionLabels, adjustmentRejectionLabels, adjustmentIssueLabels, validateSupplierAdjustment, supplierAdjustmentAllowed, supplierAdjustmentPreparationInput, supplierAdjustmentActionInput, validateSupplierAdjustmentReceipt, supplierAdjustmentError, type SupplierAdjustmentAction, type SupplierAdjustmentView } from '../supplierAdjustment'
 
 const props = defineProps<{ paymentId: string; requestId: string; applicationId: string; roundNo: number; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; changed: [] }>()
 const view = ref<SupplierAdjustmentView | null>(null), loading = ref(false), saving = ref(false), unconfirmed = ref(false), requiresRefresh = ref(false)
+const disputeId = ref<string | null>(null), disputeBusy = ref(false)
 const error = ref(''), notice = ref(''), comment = ref(''), accountingDate = ref(''), beforeId = ref<string | undefined>()
 const pending = ref<{ action: 'PREPARE' | SupplierAdjustmentAction; id?: string } | null>(null), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
-const blocked = computed(() => !!props.locked || loading.value || saving.value || unconfirmed.value || requiresRefresh.value)
+const blocked = computed(() => !!props.locked || loading.value || saving.value || disputeBusy.value || unconfirmed.value || requiresRefresh.value)
 const active = computed(() => view.value?.items.find(item => item.id === view.value?.activeAdjustmentId))
 const selected = computed(() => view.value?.items.find(item => item.id === pending.value?.id))
 function syncPending() {
@@ -21,11 +23,11 @@ const unsubscribe = writeRequests.subscribe(syncPending)
 function stop() { epoch++; controller?.abort(); controller = null }
 /** 历史整页替换，避免把旧权限或旧银行版本拼接到当前调整记录。 */
 async function load(cursor?: string) {
-  if (saving.value || !props.scopeKey) return
+  if (saving.value || disputeBusy.value || !props.scopeKey) return
   const previous = view.value; let changed = false
   stop(); const current = epoch, request = new AbortController(); controller = request; loading.value = true
   const binding = { paymentId: props.paymentId, requestId: props.requestId, applicationId: props.applicationId, roundNo: props.roundNo }
-  view.value = null; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; beforeId.value = cursor
+  view.value = null; disputeId.value = null; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; beforeId.value = cursor
   const timeout = setTimeout(() => { if (current === epoch) { stop(); loading.value = false; error.value = '调整状态读取超时，请重新查询。' } }, 12_000)
   try {
     const result = validateSupplierAdjustment(await api.supplierAdjustments(binding.paymentId, cursor, request.signal), binding)
@@ -35,6 +37,12 @@ async function load(cursor?: string) {
     changed = !!previous && (previous.returnVersion !== result.returnVersion || previous.bank?.version !== result.bank?.version)
   } catch (cause) { if (current === epoch) error.value = supplierAdjustmentError(cause) }
   finally { clearTimeout(timeout); if (current === epoch) { loading.value = false; controller = null; if (changed) emit('changed') } }
+}
+function disputeActivity(value: boolean) { disputeBusy.value = value; emit('busy', saving.value || value) }
+function toggleDispute(id: string) { if (!blocked.value && !pending.value) disputeId.value = disputeId.value === id ? null : id }
+async function disputeChanged() {
+  const refresh = load(), current = epoch
+  await refresh; if (epoch === current && view.value) emit('changed')
 }
 function allowed(action: 'PREPARE' | SupplierAdjustmentAction, id?: string) {
   return action === 'PREPARE' ? !!view.value?.canPrepare && beforeId.value === undefined : supplierAdjustmentAllowed(view.value, id ?? '', action)
@@ -62,7 +70,7 @@ async function execute() {
   finally { if (current === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
 }
 watch(() => JSON.stringify([props.scopeKey, props.paymentId, props.requestId, props.applicationId, props.roundNo]), () => {
-  stop(); view.value = null; loading.value = false; saving.value = false; requiresRefresh.value = false; beforeId.value = undefined; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; notice.value = ''
+  stop(); view.value = null; disputeId.value = null; disputeBusy.value = false; loading.value = false; saving.value = false; requiresRefresh.value = false; beforeId.value = undefined; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; notice.value = ''
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
@@ -71,7 +79,7 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
 
 <template>
   <section class="supplier-adjustment" aria-label="供应商回款账务调整">
-    <div class="adjustment-heading"><div><p class="adjustment-eyebrow">实际回款后 · 独立财务记账</p><h4>回款账务调整</h4></div><button class="quiet" type="button" :disabled="loading || saving || locked" @click="notice = ''; load()">{{ beforeId ? '返回最新状态' : '刷新调整状态' }}</button></div>
+    <div class="adjustment-heading"><div><p class="adjustment-eyebrow">实际回款后 · 独立财务记账</p><h4>回款账务调整</h4></div><button class="quiet" type="button" :disabled="loading || saving || disputeBusy || locked" @click="notice = ''; load()">{{ beforeId ? '返回最新状态' : '刷新调整状态' }}</button></div>
     <p class="adjustment-help">已登记的实际回款需另行记账。财务确认会计日期后，分别核对 ERP 调整与本地完成结果。</p>
     <p v-if="loading" role="status" class="adjustment-help">正在核对原付款、登记回款与调整历史…</p>
     <p v-if="error" role="alert" class="adjustment-error">{{ error }}</p><p v-if="notice" role="status" class="adjustment-help">{{ notice }}</p>
@@ -102,9 +110,11 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
           <p v-if="item.rejection" class="adjustment-warning">{{ adjustmentRejectionLabels[item.rejection] }}</p><p v-if="item.issue" class="adjustment-help">{{ adjustmentIssueLabels[item.issue] }}</p>
           <p v-if="item.retirement" class="adjustment-help">{{ item.retirement.basis === 'NEVER_DISPATCHED' ? '确认从未外发调整' : 'ERP 已明确拒绝本次调整' }} · {{ item.retirement.retiredBy }} · {{ date(item.retirement.retiredAt) }}</p>
           <div v-if="!pending" class="adjustment-buttons"><button v-for="action in (['QUERY', 'RETRY', 'RETIRE'] as const)" v-show="allowed(action, item.id)" :key="action" type="button" class="quiet" :disabled="blocked" @click="prepare(action, item.id)">{{ adjustmentActionLabels[action] }}</button></div>
+          <button v-if="item.dispatches > 0 && !item.retirement" type="button" class="quiet" :disabled="blocked || !!pending" @click="toggleDispute(item.id)">{{ disputeId === item.id ? '收起调整裁决' : '核对调整回执与裁决' }}</button>
+          <SupplierAdjustmentDisputeStatus v-if="disputeId === item.id" :adjustment-id="item.id" :payment-id="paymentId" :request-id="requestId" :application-id="applicationId" :round-no="roundNo" :amount="view.amount" :returned-amount="item.returnedAmount" :total-returned="item.totalReturned" :net-paid="item.netPaid" :recognizes-original-payment="item.recognizesOriginalPayment" :scope-key="scopeKey" :locked="locked || saving || loading || !!pending" @busy="disputeActivity" @changed="disputeChanged" />
         </li>
       </ol>
-      <button v-if="view.nextBeforeId && !pending" class="quiet" type="button" :disabled="loading || saving || locked" @click="load(view.nextBeforeId)">查看更早调整</button>
+      <button v-if="view.nextBeforeId && !pending" class="quiet" type="button" :disabled="loading || saving || disputeBusy || locked" @click="load(view.nextBeforeId)">查看更早调整</button>
       <form v-if="pending" ref="form" class="adjustment-confirm" @submit.prevent="execute">
         <h4>{{ adjustmentActionLabels[pending.action] }}</h4>
         <p>供应商 {{ view.supplierName }}，原付款 {{ view.amount.currency }} {{ view.amount.value }}，收款账户 {{ view.maskedPayeeAccount }}。</p>

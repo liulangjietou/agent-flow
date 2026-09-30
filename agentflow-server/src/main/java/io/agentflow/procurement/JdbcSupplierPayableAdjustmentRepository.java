@@ -62,6 +62,61 @@ public class JdbcSupplierPayableAdjustmentRepository {
         persist(value);
     }
 
+    /** 解除争议与具名决定原子保存，普通状态写入不能绕过这条路径。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierPayableAdjustmentOperation resolve(SupplierAdjustmentDisputeResolution decision) {
+        var locked = jdbc.queryForList("SELECT id FROM supplier_payable_adjustment_operation WHERE tenant_id=? AND id=? FOR UPDATE",
+                String.class, decision.tenantId(), decision.adjustmentId().toString());
+        if (locked.isEmpty()) throw conflict();
+        var before = find(decision.tenantId(), decision.adjustmentId()).orElseThrow(JdbcSupplierPayableAdjustmentRepository::conflict);
+        var after = decision.resolve(before, resolutionHistory(before));
+        persist(after);
+        jdbc.update("""
+                INSERT INTO supplier_adjustment_dispute_resolution(tenant_id,id,adjustment_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+                VALUES(?,?,?,?,?,?,?,?,?,?)
+                """, decision.tenantId(), decision.id().toString(), decision.adjustmentId().toString(), decision.disputedVersion(), decision.resolvedVersion(),
+                decision.observation().status().name(), decision.resolvedBy(), timestamp(decision.observation().observedAt()), timestamp(decision.resolvedAt()), json.write(decision));
+        return after;
+    }
+
+    /** 连续修订中的成功与已调整提示均保留，后续候选不能把历史消费改成未调整。 */
+    public SupplierPayableAdjustmentOperation.ResolutionHistory resolutionHistory(String tenant, UUID id) {
+        return resolutionHistory(find(tenant, id).orElseThrow(JdbcSupplierPayableAdjustmentRepository::conflict));
+    }
+
+    /** 读取最新决定时核对原修订与当时历史，不让后续原号查询改写旧决定。 */
+    public Optional<SupplierAdjustmentDisputeResolution> latestResolution(String tenant, UUID id) {
+        return jdbc.query("SELECT * FROM supplier_adjustment_dispute_resolution WHERE tenant_id=? AND adjustment_id=? ORDER BY resolved_version DESC LIMIT 1", (row, index) -> {
+            var value = json.read(row.getString("state_json"), SupplierAdjustmentDisputeResolution.class);
+            if (!tenant.equals(value.tenantId()) || !id.equals(value.adjustmentId()) || !value.id().toString().equals(row.getString("id"))
+                    || value.disputedVersion() != row.getLong("disputed_version") || value.resolvedVersion() != row.getLong("resolved_version")
+                    || !value.observation().status().name().equals(row.getString("outcome")) || !value.resolvedBy().equals(row.getString("resolved_by"))
+                    || !value.observation().observedAt().truncatedTo(ChronoUnit.MICROS).equals(instant(row.getTimestamp("observed_at")))
+                    || !value.resolvedAt().truncatedTo(ChronoUnit.MICROS).equals(instant(row.getTimestamp("resolved_at")))) throw conflict();
+            var before = revision(tenant, id, value.disputedVersion()).orElseThrow(JdbcSupplierPayableAdjustmentRepository::conflict);
+            var after = revision(tenant, id, value.resolvedVersion()).orElseThrow(JdbcSupplierPayableAdjustmentRepository::conflict);
+            if (!value.resolve(before, resolutionHistory(before)).equals(after)) throw conflict();
+            return value;
+        }, tenant, id.toString()).stream().findFirst();
+    }
+
+    private SupplierPayableAdjustmentOperation.ResolutionHistory resolutionHistory(SupplierPayableAdjustmentOperation current) {
+        var command = current.command();
+        return jdbc.query("SELECT version,state_json FROM supplier_payable_adjustment_revision WHERE tenant_id=? AND operation_id=? AND version<=? ORDER BY version", rows -> {
+            SupplierPayableAdjustmentObservation firstAdjustment = null; boolean adjustmentObserved = false;
+            long version = 0; SupplierPayableAdjustmentOperation previous = null;
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), SupplierPayableAdjustmentOperation.class);
+                if (++version != rows.getLong("version") || value.version() != version || !value.command().equals(command)) throw conflict();
+                if (firstAdjustment == null && value.adjusted()) firstAdjustment = value.observation();
+                adjustmentObserved |= SupplierPayableAdjustmentOperation.adjustmentRisk(value.observation())
+                        || SupplierPayableAdjustmentOperation.adjustmentRisk(value.conflictingObservation()); previous = value;
+            }
+            if (!current.equals(previous)) throw conflict();
+            return new SupplierPayableAdjustmentOperation.ResolutionHistory(firstAdjustment, adjustmentObserved);
+        }, command.tenantId(), command.id().toString(), current.version());
+    }
+
     private void persist(SupplierPayableAdjustmentOperation value) {
         var command = value.command();
         int changed = jdbc.update("""

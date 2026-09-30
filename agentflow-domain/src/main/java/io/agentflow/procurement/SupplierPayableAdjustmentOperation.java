@@ -13,6 +13,7 @@ import java.util.Objects;
 public record SupplierPayableAdjustmentOperation(SupplierPayableAdjustmentCommand command, long version, Status status, int attempts, int dispatches,
         Instant createdAt, Instant updatedAt, Instant nextAttemptAt, Instant leaseUntil, SupplierPayableAdjustmentEvidence evidence,
         SupplierPayableAdjustmentObservation observation, SupplierPayableAdjustmentObservation conflictingObservation, long highestRevision, Failure failure) {
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
 
@@ -151,6 +152,56 @@ public record SupplierPayableAdjustmentOperation(SupplierPayableAdjustmentComman
     public boolean leaseExpired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     /** 只有本次新增入款分录与原应付余额均确认后表示调整完成。 */
     public boolean adjusted() { return status == Status.ADJUSTED; }
+
+    /** 原 ERP 争议只接受近期最高终态，历史调整与原凭证、余额均不能被新回执抹去。 */
+    public ResolutionIssue resolutionIssue(ResolutionHistory history, Instant now) {
+        if (status != Status.RECONCILING) return ResolutionIssue.NOT_DISPUTED;
+        var candidate = conflictingObservation;
+        if (candidate.status() != SupplierPayableAdjustmentObservation.Status.ADJUSTED
+                && candidate.status() != SupplierPayableAdjustmentObservation.Status.REJECTED) return ResolutionIssue.NON_TERMINAL;
+        if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())) return ResolutionIssue.STALE_EVIDENCE;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EXPIRED_EVIDENCE;
+        if (history.firstAdjustment() != null && !command.matches(history.firstAdjustment(), true, now)) return ResolutionIssue.HISTORY_CHANGED;
+        if (candidate.status() == SupplierPayableAdjustmentObservation.Status.REJECTED
+                && (history.adjustmentObserved() || adjustmentRisk(observation))) return ResolutionIssue.ADJUSTMENT_ALREADY_OBSERVED;
+        var original = history.firstAdjustment() != null ? history.firstAdjustment()
+                : observation != null && observation.status() == SupplierPayableAdjustmentObservation.Status.ADJUSTED ? observation : null;
+        if (original != null && !original.posting().equals(candidate.posting())) return ResolutionIssue.DIFFERENT_POSTING;
+        return null;
+    }
+
+    /** 只采用本次原号查询候选，不重发 ERP、不改变银行事实或自动冲销已完成的占用。 */
+    public SupplierPayableAdjustmentOperation resolveDispute(SupplierPayableAdjustmentObservation.Status outcome, ResolutionHistory history, Instant now) {
+        requireTime(now);
+        if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome) {
+            throw new DomainException("SUPPLIER_ADJUSTMENT_DISPUTE_UNRESOLVABLE", "Recent terminal evidence must preserve the original supplier adjustment and historical postings");
+        }
+        return changed(Status.valueOf(outcome.name()), now, null, null, evidence, conflictingObservation, null, highestRevision, null);
+    }
+
+    /** 已调整和 ERP 明确提示已经调整都不能作为无外部影响的证明。 */
+    public static boolean adjustmentRisk(SupplierPayableAdjustmentObservation value) {
+        return value != null && (value.status() == SupplierPayableAdjustmentObservation.Status.ADJUSTED
+                || value.rejection() == SupplierPayableAdjustmentObservation.Rejection.ALREADY_ADJUSTED);
+    }
+
+    /**
+     * 仓储提供连续修订的最小调整事实；争议候选中的成功或已调整提示也须保留。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ResolutionHistory(SupplierPayableAdjustmentObservation firstAdjustment, boolean adjustmentObserved) {
+        /** 首次确认的调整必须有完整成功凭据，不能同时宣称从未见过调整。 */
+        public ResolutionHistory {
+            if (firstAdjustment != null && (firstAdjustment.status() != SupplierPayableAdjustmentObservation.Status.ADJUSTED || !adjustmentObserved)) throw invalid();
+        }
+    }
+
+    /**
+     * 裁决受阻原因只说明业务边界，不返回 ERP 响应原文。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_EVIDENCE, EXPIRED_EVIDENCE, HISTORY_CHANGED,
+        ADJUSTMENT_ALREADY_OBSERVED, DIFFERENT_POSTING }
 
     private SupplierPayableAdjustmentOperation reconcile(SupplierPayableAdjustmentObservation incoming, long highest, Failure reason, Instant now) {
         return changed(Status.RECONCILING, now, null, null, evidence, observation, incoming, highest, reason);

@@ -1,0 +1,125 @@
+{
+  "recordedAt": "2026-09-30T17:57:57.632550+00:00",
+  "result": "PASS_LOCAL_SCOPE",
+  "scope": "Supplier independent ERP adjustment explicit dispute resolution",
+  "domain": {
+    "relatedTests": 38,
+    "newDisputeTests": 8
+  },
+  "h2": {
+    "serverTests": 108,
+    "classes": {
+      "StartupTest": 1,
+      "SupplierAdjustmentPersistenceTest": 47,
+      "SupplierFinanceWorkflowTest": 54,
+      "OpenApiContractTest": 6
+    }
+  },
+  "postgresql": {
+    "newTests": 11,
+    "persistence": 6,
+    "authenticatedWorkflow": 5,
+    "isolatedContainer": true,
+    "sharedMemoryBytes": 536870912,
+    "removed": true
+  },
+  "frontend": {
+    "newDisputeTests": 13,
+    "relatedDistinctTests": 81,
+    "build": "PASS",
+    "staticContract": {
+      "operations": 248,
+      "schemas": 498,
+      "requestExamples": 92
+    }
+  },
+  "migration": {
+    "newVersion": 82,
+    "unchangedLongLivedVersion": 81,
+    "v81AdjustmentAndBankFactsPreservedByH2AndPostgresUpgradeTests": true
+  },
+  "verified": [
+    "Recent highest ERP terminal evidence only",
+    "Immutable confirmed voucher, each bank-return entry and payable balances",
+    "Historical success and ALREADY_ADJUSTED cannot become no-effect rejection",
+    "Same-transaction named decision, adjacent revision, audit and idempotency",
+    "Current independent finance authorization and sensitive-field scope on replay",
+    "Concurrent decisions append exactly one revision",
+    "Completed accounting stays inactive and keeps original completion proof",
+    "Uncompleted ERP success goes through separate bank recheck before local completion",
+    "Explicit UI confirmation, original-key recovery, identity changes and stale response rejection"
+  ],
+  "red": {
+    "missingPublicEndpoint": "expected 200, actual 404",
+    "parentCrossIdentityRefresh": "expected zero change events, actual one"
+  },
+  "authorCheck": {
+    "files": 1076,
+    "namedTypes": 2055,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Long-lived V82 nonempty upgrade, actual HTTP/browser/restart acceptance",
+    "Partial expense adjustments and other authorized work packages",
+    "Real enterprise finance integration and remote delivery"
+  ],
+  "logs": {
+    "supplier-adjustment-dispute-domain-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-domain-red.log",
+      "sha256": "a75b1468a16fbd399d962fc796d4368ff20659b09cdccdaffce5c22ee86a3c46"
+    },
+    "supplier-adjustment-dispute-domain-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-domain-final.log",
+      "sha256": "b5ebfef163f1512812f3474db351fe8a1c81e30bb970c7fb2c6d3aba0349f0c0"
+    },
+    "supplier-adjustment-dispute-persistence-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-persistence-red.log",
+      "sha256": "6bd832ca8b82ef0c393ba99a542a6560985492ff6bc75fe33ec01ee59d907396"
+    },
+    "supplier-adjustment-dispute-workflow-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-workflow-red.log",
+      "sha256": "c3242408c2cadeef3b2cee5600ba7f1a5b91a036db2e7a6cf25cfd9ebec19cbf"
+    },
+    "supplier-adjustment-dispute-h2-regression.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-h2-regression.log",
+      "sha256": "68cc0c290acd9c478030a4493f2c29e84d787a14425cf0327ea12860a79f01ba"
+    },
+    "supplier-adjustment-dispute-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-postgres.log",
+      "sha256": "df8f0e1c0f29dcfc7dfe261909f20e053ec4c49d77e87e3c8e6641b33fe3b368"
+    },
+    "supplier-adjustment-dispute-ui-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-ui-tests.log",
+      "sha256": "4447a2543aa47076494799c1d2513437c894c35b3a3cb41b97a4fad531b1d556"
+    },
+    "supplier-adjustment-dispute-return-ui-regression.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-return-ui-regression.log",
+      "sha256": "e615ee84b6619e9be1f61799ef8efc88659d486676832bf8b2dbf7df5427fc68"
+    },
+    "supplier-adjustment-dispute-parent-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-parent-red.log",
+      "sha256": "a6e9773f823a204207d944ef561a42624187c97da8076c92549bfecf9006433a"
+    },
+    "supplier-adjustment-dispute-parent-green.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-parent-green.log",
+      "sha256": "329fd7ece34ca9602fa2259da95a0966bf6e7423d87be21ed635e7f619d1fd1b"
+    },
+    "supplier-adjustment-dispute-ui-final-build.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-ui-final-build.log",
+      "sha256": "9a2fae4b19c8ee55340b4c2958f5652d350c30cca6ba14eceb496e631accf9f1"
+    },
+    "supplier-adjustment-dispute-authors.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-authors.log",
+      "sha256": "35a18fbafbd0e6ae9f6301d6c4d803a0a26f48527be1452463ae0afa53458456"
+    },
+    "supplier-adjustment-dispute-openapi.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-openapi.log",
+      "sha256": "4e1ae49feac80740dbe8a6931b1b3d7bff60ca23f3e750fc588f47129cb2db07"
+    },
+    "supplier-adjustment-dispute-openapi-preserved.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-openapi-preserved.json",
+      "sha256": "0d7a1007cda4fdc92e5555595174369550e8fe28a9d8782af74846e3ac1db57b"
+    }
+  }
+}

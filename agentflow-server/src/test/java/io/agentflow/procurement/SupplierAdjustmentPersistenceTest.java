@@ -675,6 +675,125 @@ class SupplierAdjustmentPersistenceTest {
         assertThat(querying.dispatches()).isEqualTo(1); assertThat(completions.find(tenant, sent.command().id())).isEmpty();
     }
 
+    @Test void adjustmentDisputeResolutionRequiresNamedDecisionAndPersistsExactRevisions() {
+        var current = disputedAdjustment(); var decision = adjustmentDecision(current); var history = adjustments.resolutionHistory(tenant, current.command().id());
+        assertThat(history.firstAdjustment()).isNull(); assertThat(history.adjustmentObserved()).isTrue();
+        var proposed = decision.resolve(current, history);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> adjustments.update(proposed))).isInstanceOf(DomainException.class);
+        assertThat(adjustments.find(tenant, current.command().id())).contains(current);
+        var resolved = tx.execute(status -> adjustments.resolve(decision));
+        assertThat(resolved).isEqualTo(proposed); assertThat(resolved.dispatches()).isEqualTo(1);
+        assertThat(adjustments.revision(tenant, current.command().id(), current.version())).contains(current);
+        assertThat(adjustments.revision(tenant, current.command().id(), resolved.version())).contains(resolved);
+        assertThat(adjustments.latestResolution(tenant, current.command().id())).contains(decision);
+        assertThat(adjustments.latestResolution("other", current.command().id())).isEmpty();
+        assertThat(completions.find(tenant, current.command().id())).isEmpty();
+        var proof = finish(resolved, 20);
+        assertThat(proof.operation()).isEqualTo(resolved); assertThat(adjustments.active(tenant, proof.after().request().command().id())).isEmpty();
+        assertThatThrownBy(() -> tx.execute(status -> adjustments.resolve(decision))).isInstanceOf(DomainException.class);
+        assertThat(count("supplier_adjustment_dispute_resolution")).isEqualTo(1);
+    }
+
+    @Test void completedAdjustmentResolutionKeepsCompletionAndCannotReclaimActivePosition() {
+        var done = adjusted(adjustment(intent(source())), "return-original"); var proof = finish(done, 20); var id = done.command().id();
+        var credits = jdbc.queryForList("SELECT * FROM finance_receipt_credit WHERE tenant_id=?", tenant);
+        var candidate = adjustmentQuery(done, new SupplierPayableAdjustmentObservation(id, done.command().digest(), SupplierPayableAdjustmentObservation.Status.REJECTED,
+                2, clock(), null, SupplierPayableAdjustmentObservation.Rejection.ACCOUNTING_PERIOD_CLOSED));
+        assertThatThrownBy(() -> tx.execute(status -> adjustments.resolve(adjustmentDecision(candidate)))).isInstanceOf(DomainException.class);
+        var restored = adjustmentQuery(candidate, new SupplierPayableAdjustmentObservation(id, done.command().digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED,
+                3, clock(), done.observation().posting(), null));
+        var decision = adjustmentDecision(restored); var resolved = tx.execute(status -> adjustments.resolve(decision));
+        assertThat(resolved.adjusted()).isTrue(); assertThat(resolved.command()).isEqualTo(done.command()); assertThat(resolved.dispatches()).isEqualTo(1);
+        assertThat(adjustments.active(tenant, proof.after().request().command().id())).isEmpty(); assertThat(completions.find(tenant, id)).contains(proof);
+        assertThat(returnLedgers.find(tenant, proof.after().request().command().id())).contains(proof.after());
+        assertThat(jdbc.queryForList("SELECT * FROM finance_receipt_credit WHERE tenant_id=?", tenant)).isEqualTo(credits);
+        assertThat(completion.complete(resolved, proof.receipt(), clock())).isEqualTo(proof);
+        assertThat(adjustments.resolutionHistory(tenant, id).firstAdjustment()).isEqualTo(done.observation());
+    }
+
+    @Test void overwrittenAdjustmentSuccessAndAlreadyAdjustedRemainVisibleInPersistentHistory() {
+        var current = disputedAdjustment(); var id = current.command().id();
+        var rejected = adjustmentQuery(current, new SupplierPayableAdjustmentObservation(id, current.command().digest(), SupplierPayableAdjustmentObservation.Status.REJECTED,
+                3, clock(), null, SupplierPayableAdjustmentObservation.Rejection.ACCOUNTING_PERIOD_CLOSED));
+        assertThat(rejected.observation().status()).isEqualTo(SupplierPayableAdjustmentObservation.Status.PENDING);
+        assertThat(adjustments.resolutionHistory(tenant, id).adjustmentObserved()).isTrue();
+        assertThatThrownBy(() -> tx.execute(status -> adjustments.resolve(adjustmentDecision(rejected)))).isInstanceOf(DomainException.class);
+        assertThat(count("supplier_adjustment_dispute_resolution")).isZero();
+        var candidate = adjustmentQuery(rejected, new SupplierPayableAdjustmentObservation(id, current.command().digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED,
+                4, clock(), current.conflictingObservation().posting(), null));
+        var decision = adjustmentDecision(candidate); var resolved = tx.execute(status -> adjustments.resolve(decision));
+        assertThat(adjustments.latestResolution(tenant, id)).contains(decision);
+        jdbc.update("UPDATE supplier_adjustment_dispute_resolution SET resolved_by='tampered' WHERE tenant_id=? AND id=?", tenant, decision.id().toString());
+        assertThatThrownBy(() -> adjustments.latestResolution(tenant, id)).isInstanceOf(DomainException.class);
+        assertThat(adjustments.find(tenant, id)).contains(resolved);
+    }
+
+    @Test void failedAdjustmentDecisionInsertRollsBackStateAndNewRevision() {
+        var current = disputedAdjustment(); var first = adjustmentDecision(current); var resolved = tx.execute(status -> adjustments.resolve(first));
+        var pending = adjustmentQuery(resolved, new SupplierPayableAdjustmentObservation(current.command().id(), current.command().digest(), SupplierPayableAdjustmentObservation.Status.PENDING,
+                3, clock(), null, null));
+        var candidate = adjustmentQuery(pending, new SupplierPayableAdjustmentObservation(current.command().id(), current.command().digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED,
+                4, clock(), resolved.observation().posting(), null));
+        var valid = adjustmentDecision(candidate); var duplicate = new SupplierAdjustmentDisputeResolution(first.id(), tenant, valid.adjustmentId(), valid.disputedVersion(), valid.resolvedVersion(),
+                valid.observation(), valid.resolvedBy(), valid.resolvedAt(), valid.evidenceReference(), valid.reason());
+        int revisions = count("supplier_payable_adjustment_revision");
+        assertThatThrownBy(() -> tx.execute(status -> adjustments.resolve(duplicate))).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(adjustments.find(tenant, candidate.command().id())).contains(candidate);
+        assertThat(count("supplier_payable_adjustment_revision")).isEqualTo(revisions); assertThat(count("supplier_adjustment_dispute_resolution")).isEqualTo(1);
+        assertThat(adjustments.latestResolution(tenant, candidate.command().id())).contains(first);
+    }
+
+    @Test void concurrentAdjustmentDecisionsOnlyAppendOneResolvedRevision() throws Exception {
+        var current = disputedAdjustment(); var decision = adjustmentDecision(current); var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<Boolean> action = () -> {
+                assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                try { tx.execute(status -> adjustments.resolve(decision)); return true; }
+                catch (DomainException conflict) { return false; }
+            };
+            var first = executor.submit(action); var second = executor.submit(action); start.countDown();
+            assertThat(List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS))).containsExactlyInAnyOrder(true, false);
+            assertThat(count("supplier_adjustment_dispute_resolution")).isEqualTo(1);
+            assertThat(adjustments.find(tenant, current.command().id()).orElseThrow().version()).isEqualTo(current.version() + 1);
+            assertThat(adjustments.latestResolution(tenant, current.command().id())).contains(decision);
+        } finally { executor.shutdownNow(); }
+    }
+
+    @Test void v82MigrationPreservesUnresolvedAdjustmentAndOriginalCompletion() {
+        database("81"); var current = disputedAdjustment(); var done = adjusted(adjustment(intent(source(true))), "return-upgrade"); var proof = finish(done, 20);
+        var bankRows = jdbc.queryForList("SELECT * FROM supplier_payment_operation WHERE tenant_id=?", tenant);
+        var adjustmentRows = jdbc.queryForList("SELECT * FROM supplier_payable_adjustment_operation WHERE tenant_id=?", tenant);
+        var oldCompletions = jdbc.queryForList("SELECT * FROM supplier_settlement_completion WHERE tenant_id=?", tenant);
+        assertThat(Flyway.configure().dataSource(dataSource).defaultSchema(schema).target("82").load().migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_payment_operation WHERE tenant_id=?", tenant)).isEqualTo(bankRows);
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_payable_adjustment_operation WHERE tenant_id=?", tenant)).isEqualTo(adjustmentRows);
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_settlement_completion WHERE tenant_id=?", tenant)).isEqualTo(oldCompletions);
+        assertThat(count("supplier_adjustment_dispute_resolution")).isZero(); assertThat(adjustments.find(tenant, current.command().id())).contains(current);
+        assertThat(completions.find(tenant, done.command().id())).contains(proof);
+        assertThat(tx.execute(status -> adjustments.resolve(adjustmentDecision(current))).adjusted()).isTrue();
+    }
+
+    private SupplierPayableAdjustmentOperation disputedAdjustment() {
+        var sent = dispatch(adjustment(intent(source()))); var id = sent.command().id(); var at = clock();
+        var pending = sent.complete(new FinanceResult.Success<>(new SupplierPayableAdjustmentObservation(id, sent.command().digest(), SupplierPayableAdjustmentObservation.Status.PENDING,
+                1, at, null, null)), at); tx.executeWithoutResult(status -> adjustments.update(pending));
+        var missing = adjustmentQuery(pending, new SupplierPayableAdjustmentObservation(id, sent.command().digest(), SupplierPayableAdjustmentObservation.Status.NOT_FOUND, 0, clock(), null, null));
+        var posting = adjustmentObservation(sent.command(), "return-disputed", clock());
+        return adjustmentQuery(missing, new SupplierPayableAdjustmentObservation(id, sent.command().digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2, clock(), posting.posting(), null));
+    }
+    private SupplierPayableAdjustmentOperation adjustmentQuery(SupplierPayableAdjustmentOperation before, SupplierPayableAdjustmentObservation incoming) {
+        return tx.execute(status -> {
+            var requested = before.requestQuery(incoming.observedAt()); adjustments.update(requested);
+            var queried = requested.claim(incoming.observedAt(), Duration.ofSeconds(30)); adjustments.update(queried);
+            var after = queried.complete(new FinanceResult.Success<>(incoming), incoming.observedAt()); adjustments.update(after); return after;
+        });
+    }
+    private SupplierAdjustmentDisputeResolution adjustmentDecision(SupplierPayableAdjustmentOperation current) {
+        return new SupplierAdjustmentDisputeResolution(UUID.randomUUID(), tenant, current.command().id(), current.version(), current.version() + 1,
+                current.conflictingObservation(), "finance", clock(), "erp-return-statement", "核对原回款调整与全部实际分录");
+    }
+
     private SupplierAdjustmentPreparation submitted(SupplierPayableAdjustmentSource source) {
         var payment = payments.find(tenant, source.returns().request().command().id()).orElseThrow(); var at = clock();
         return tx.execute(status -> adjustmentPreparation.register(tenant, payment.command().id(), payment.version(), source.returns().version(), "finance", at.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate(), at));

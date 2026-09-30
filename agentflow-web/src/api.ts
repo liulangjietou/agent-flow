@@ -1,3 +1,4 @@
+import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
 import type { SupplierAdjustmentView, SupplierAdjustmentPrepareInput, SupplierAdjustmentActionInput, SupplierAdjustmentReceipt } from './supplierAdjustment'
 import type { PaymentBatchInput, PaymentBatchReceipt, PaymentBatchPage, PaymentBatchDetail } from './paymentBatches'
 import type { SupplierCashierView, SupplierCashierPage, SupplierCashierAccounts, SupplierCashierInput, SupplierCashierReceipt } from './supplierCashier'
@@ -373,6 +374,8 @@ export const api = {
   supplierDispute: (id: string, signal: AbortSignal) => request<SupplierDisputeView>(`/supplier-payments/${encodeURIComponent(id)}/dispute`, { signal, cache: 'no-store' }),
   querySupplierDispute: (id: string, input: SupplierDisputeQueryInput) => write<SupplierDisputeReceipt>(`/supplier-payments/${encodeURIComponent(id)}/dispute/queries`, 'POST', '查询原供应商银行交易', input),
   resolveSupplierDispute: (id: string, input: SupplierDisputeResolveInput) => write<SupplierDisputeReceipt>(`/supplier-payments/${encodeURIComponent(id)}/dispute/resolutions`, 'POST', '确认原供应商付款裁决', input),
+  supplierAdjustmentDispute: (id: string, signal: AbortSignal) => request<AdjustmentDisputeView>(`/supplier-adjustments/${encodeURIComponent(id)}/dispute`, { signal, cache: 'no-store' }),
+  resolveSupplierAdjustmentDispute: (id: string, input: AdjustmentDisputeInput) => write<AdjustmentDisputeReceipt>(`/supplier-adjustments/${encodeURIComponent(id)}/dispute/resolutions`, 'POST', '确认原供应商调整裁决', input),
   supplierSettlementDispute: (id: string, signal: AbortSignal) => request<SettlementDisputeView>(`/supplier-settlements/${encodeURIComponent(id)}/dispute`, { signal, cache: 'no-store' }),
   resolveSupplierSettlementDispute: (id: string, input: SettlementDisputeInput) => write<SettlementDisputeReceipt>(`/supplier-settlements/${encodeURIComponent(id)}/dispute/resolutions`, 'POST', '确认原供应商核销裁决', input),
   supplierReturns: (id: string, beforeVersion: number | undefined, signal: AbortSignal) => request<SupplierReturnView>(`/supplier-payments/${encodeURIComponent(id)}/returns` + historyQuery({ beforeVersion, limit: 25 }), { signal, cache: 'no-store' }),
