@@ -8,6 +8,7 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.finance.callback.*;
 import io.agentflow.definition.DefinitionApplicationService;
 import io.agentflow.expense.ExpenseLine;
 import io.agentflow.expense.InvoiceKey;
@@ -64,7 +65,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.supplier-payments.execution-worker-enabled=false", "agentflow.supplier-payments.payment-worker-enabled=false",
         "agentflow.supplier-payments.settlement-preparation-worker-enabled=false", "agentflow.supplier-payments.settlement-worker-enabled=false",
         "agentflow.supplier-payments.hold-worker-enabled=false", "agentflow.supplier-payments.review-worker-enabled=false",
-        "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false"})
+        "agentflow.procurement-payments.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
+        "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class SupplierFinanceWorkflowTest {
     private static final HttpServer SERVER = server();
@@ -84,6 +86,7 @@ class SupplierFinanceWorkflowTest {
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
+        registry.add("agentflow.payment-callbacks.tenants.demo.signing-secrets[0]", () -> PaymentCallbackTestRequests.SECRET);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> "true");
         registry.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_SUPPLIER_FINANCE_URL", "jdbc:h2:mem:supplier-finance-workflow;DB_CLOSE_DELAY=-1"));
         registry.add("spring.datasource.driver-class-name", () -> System.getenv().getOrDefault("AGENTFLOW_SUPPLIER_FINANCE_DRIVER", "org.h2.Driver"));
@@ -127,6 +130,8 @@ class SupplierFinanceWorkflowTest {
     @Autowired SupplierSettlementService settlementExecution;
     @Autowired SupplierSettlementEvidenceReader settlementReader;
     @Autowired SupplierPayableSettlementPort settlementPort;
+    @Autowired PaymentCallbackService callbacks;
+    @Autowired JdbcPaymentCallbackRepository callbackRecords;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -473,6 +478,39 @@ class SupplierFinanceWorkflowTest {
         assertThat(send(settlementActionPath(id), "finance", key, input).getContentAsString()).isEqualTo(receipt.getContentAsString());
         pollSettlement(id); assertThat(settlementView(payment).at("/items/0/status").asText()).isEqualTo("SETTLED");
         assertThat(calls.keySet()).doesNotContain("supplier-payable-settlement-command"); assertThat(calls.get("supplier-payable-settlement-query").get()).isEqualTo(1);
+    }
+
+    @Test void signedSupplierCallbackQueriesOriginalBankAndKeepsCompletedErpAndLocalSettlement() throws Exception {
+        UUID payment = paidBank(); UUID settlement = queueSettlement(payment); pollSettlement(settlement);
+        var before = settlementView(payment); var original = bankPayments.find("demo", payment).orElseThrow();
+        int previousQueries = calls.get("supplier-payment-query").get();
+        String event = "evt_" + UUID.randomUUID(); String body = json.write(new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.SUPPLIER,
+                payment, original.command().digest(), 1));
+        ok(mvc.perform(PaymentCallbackTestRequests.request(event, body)).andReturn().getResponse(), 202);
+        var callback = callbackRecords.byEvent("demo", event).orElseThrow();
+        ok(mvc.perform(PaymentCallbackTestRequests.request(event, body)).andReturn().getResponse(), 202);
+        callbacks.process(new JdbcPaymentCallbackRepository.Candidate("demo", callback.id()), Instant.now()); pollBank(payment);
+        assertThat(bankPayments.find("demo", payment).orElseThrow().settleable()).isTrue();
+        assertThat(settlementView(payment).path("completion")).isEqualTo(before.path("completion"));
+        assertThat(settlements.find("demo", settlement).orElseThrow().status()).isEqualTo(SupplierPayableSettlementOperation.Status.SETTLED);
+        assertThat(callbackRecords.get("demo", callback.id()).reason()).isEqualTo(PaymentCallback.Reason.ALREADY_OBSERVED);
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payment-query").get()).isEqualTo(previousQueries + 1);
+        assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1);
+    }
+
+    @Test void signedSupplierCallbackCannotSwapCommandKindDigestOrInventPaidFacts() throws Exception {
+        UUID payment = paidBank(); var original = bankPayments.find("demo", payment).orElseThrow();
+        for (var signal : List.of(
+                new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.SUPPLIER, payment, "a".repeat(64), 1),
+                new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.EMPLOYEE, payment, original.command().digest(), 1))) {
+            var response = mvc.perform(PaymentCallbackTestRequests.request("evt_" + UUID.randomUUID(), json.write(signal))).andReturn().getResponse();
+            assertThat(response.getStatus()).isIn(404, 409);
+        }
+        String event = "evt_" + UUID.randomUUID(); String body = json.write(new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.SUPPLIER,
+                payment, original.command().digest(), 2));
+        var tampered = body.substring(0, body.length() - 1) + ",\"status\":\"SUCCEEDED\"}";
+        okError(mvc.perform(PaymentCallbackTestRequests.request(event, tampered)).andReturn().getResponse(), 400, "PAYMENT_CALLBACK_INVALID");
+        assertThat(callbackRecords.byEvent("demo", event)).isEmpty(); assertThat(bankPayments.find("demo", payment)).contains(original);
     }
 
     private UUID paidBank() throws Exception {

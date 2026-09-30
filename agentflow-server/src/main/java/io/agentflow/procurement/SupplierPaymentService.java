@@ -82,6 +82,11 @@ public class SupplierPaymentService {
     public SupplierPaymentOperation query(String tenant, UUID id, long expectedVersion, Instant now) {
         var current = version(tenant, id, expectedVersion); var next = current.requestQuery(time(now)); payments.update(next); return next;
     }
+    /** 已认证回调只恢复原号查询，同时使尚未外发的查无重试领取失效。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierPaymentOperation callbackQuery(String tenant, UUID id, long expectedVersion, Instant now) {
+        var current = version(tenant, id, expectedVersion); var next = current.requestCallbackQuery(time(now)); payments.update(next); return next;
+    }
 
     /** 权威查无后的人工重试仍受当前批准、原人员和原账户约束。 */
     @Transactional(propagation = Propagation.MANDATORY)

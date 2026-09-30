@@ -154,6 +154,12 @@ public record PaymentOperation(Input input, long version, Status status, int att
         return changed(Status.UNKNOWN, now, now, null, accountEvidence, observation, conflictingObservation, highestRevision, Failure.RECHECK_REQUESTED);
     }
 
+    /** 已认证信号可停止查无后的重发检查，但不能打断正在发送或查询的原领取。 */
+    public PaymentOperation requestCallbackQuery(Instant now) {
+        requireTime(now); if (status == Status.SENDING || status == Status.QUERYING || dispatches == 0) throw conflict();
+        return changed(Status.UNKNOWN, now, now, null, accountEvidence, observation, conflictingObservation, highestRevision, Failure.RECHECK_REQUESTED);
+    }
+
     /** 人工裁决只采用刚查询到的原交易终态，不能倒退外部版本或改写已经确认的到账回单。 */
     public ResolutionIssue resolutionIssue(Instant now, PaymentObservation originalSuccess, boolean fundingObserved) {
         if (status != Status.RECONCILING) return ResolutionIssue.NOT_DISPUTED;

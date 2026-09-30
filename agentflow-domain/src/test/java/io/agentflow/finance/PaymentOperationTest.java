@@ -19,6 +19,28 @@ class PaymentOperationTest {
     private final PaymentAuthorization authorization = authorization();
     private final PaymentCommand command = authorization.execution().command();
 
+    @Test void signedCallbackStopsQueuedAndCheckingResendsWithoutSendingOrChangingOriginalFacts() {
+        var missing = sending().unavailable(PaymentOperation.Failure.TIMEOUT, NOW).claim(NOW.plusSeconds(5), LEASE)
+                .complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.NOT_FOUND, 0, NOW.plusSeconds(5))), NOW.plusSeconds(5));
+        var retry = missing.retryNotFound(NOW.plusSeconds(6));
+        for (var original : List.of(retry, retry.claim(NOW.plusSeconds(6), LEASE))) {
+            var callback = original.requestCallbackQuery(NOW.plusSeconds(7));
+            assertThat(callback.status()).isEqualTo(PaymentOperation.Status.UNKNOWN); assertThat(callback.dispatches()).isEqualTo(1);
+            assertThat(callback.input()).isEqualTo(original.input()); assertThat(callback.observation()).isEqualTo(original.observation());
+            assertThat(callback.leaseUntil()).isNull(); assertThat(callback.claim(NOW.plusSeconds(8), LEASE).status()).isEqualTo(PaymentOperation.Status.QUERYING);
+        }
+    }
+    @Test void signedCallbackCannotInterruptNetworkOrInventFirstDispatchAndKeepsSettledEvidence() {
+        var sending = sending();
+        var query = sending.unavailable(PaymentOperation.Failure.TIMEOUT, NOW).claim(NOW.plusSeconds(5), LEASE);
+        for (var blocked : List.of(queue(), queue().claim(NOW, LEASE), sending, query)) {
+            assertThatThrownBy(() -> blocked.requestCallbackQuery(NOW.plusSeconds(6))).isInstanceOf(DomainException.class);
+        }
+        var paid = sending.complete(new FinanceResult.Success<>(fact(PaymentObservation.Status.SUCCEEDED, 1, NOW)), NOW);
+        var callback = paid.requestCallbackQuery(NOW.plusSeconds(1));
+        assertThat(callback.observation()).isEqualTo(paid.observation()); assertThat(callback.highestRevision()).isEqualTo(1);
+    }
+
     @Test void checkingCrashAndReadFailureCanRecheckWithoutClaimingBankWasCalled() {
         var checking = queue().claim(NOW, LEASE);
         assertThat(checking.status()).isEqualTo(PaymentOperation.Status.CHECKING); assertThat(checking.dispatches()).isZero();

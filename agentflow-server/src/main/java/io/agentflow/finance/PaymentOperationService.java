@@ -86,6 +86,12 @@ public class PaymentOperationService {
     public PaymentOperation query(String tenant, UUID id, long expectedVersion, Instant now) {
         var current = currentVersion(tenant, id, expectedVersion); var next = current.requestQuery(time(now)); complete(current, next); return next;
     }
+    /** 已验签且绑定原命令的回调只能安排查询；旧授权安全结束后也保留原银行的迟到事实。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PaymentOperation callbackQuery(String tenant, UUID id, long expectedVersion, Instant now) {
+        var current = locked(tenant, id); if (current == null || current.version() != expectedVersion) throw conflict();
+        var next = current.requestCallbackQuery(time(now)); complete(current, next); return next;
+    }
     /** 显式重发仍受原有效期、真实批准和当前人员约束，不能改变命令或另造授权号。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public PaymentOperation resend(String tenant, UUID id, long expectedVersion, Instant now) {

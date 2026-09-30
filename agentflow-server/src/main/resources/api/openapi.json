@@ -77,6 +77,481 @@
     }
   ],
   "paths": {
+    "/api/v1/integrations/payment/callbacks": {
+      "post": {
+        "operationId": "receivePaymentCallback",
+        "tags": [
+          "集成"
+        ],
+        "summary": "接收已签名的支付变化通知",
+        "description": "仅服务端使用：正文最大 8192 字节，严格 UTF-8 JSON。Standard Webhooks v1 HMAC-SHA256 覆盖 webhook-id + 点 + webhook-timestamp + 点 + 原始正文；投递时间允许正负 300 秒。webhook-tenant 选择租户密钥并必须等于签名正文中的 tenantId。事件号在同租户内唯一；相同事件和原始正文重投返回同一接收编号，时间戳可更新。只登记原交易查询，不代表到账，不接受金额、账户、状态或地址覆盖。",
+        "x-access": "已配置租户的 Standard Webhooks HMAC 签名",
+        "x-idempotency": false,
+        "responses": {
+          "202": {
+            "description": "已持久接收或相同事件重投；不代表资金成功",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCallbackReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求正文或编码无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "签名、租户或投递时间无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "原交易不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "事件号重用或原命令、目标不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "原始正文过大",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "回调未启用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "webhook-tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,11}$"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 600
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCallbackSignal"
+              },
+              "example": {
+                "contractVersion": 1,
+                "type": "payment.changed",
+                "tenantId": "demo",
+                "kind": "SUPPLIER",
+                "authorizationId": "09ce297b-0811-4015-a135-eae7ed1cc2d1",
+                "commandDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "sourceRevision": 2
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "paymentCallbackSignature": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "listPaymentCallbacks",
+        "tags": [
+          "集成"
+        ],
+        "summary": "查看支付回调收件箱",
+        "description": "仅处理元数据，不含签名、密钥、原始正文、金额或账户。QUERY_QUEUED 只表示原号查询已登记。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "接收时间倒序的一页",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCallbackPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "游标不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/payment/callbacks/{id}": {
+      "get": {
+        "operationId": "getPaymentCallback",
+        "tags": [
+          "集成"
+        ],
+        "summary": "查看回调处理历史",
+        "description": "最新 50 次处理记录，人工重试保留原事件身份与原因。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前记录与有界历史",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCallbackDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/payment/callbacks/{id}/retry": {
+      "post": {
+        "operationId": "retryPaymentCallback",
+        "tags": [
+          "集成"
+        ],
+        "summary": "重新处理原支付回调",
+        "description": "仅 REVIEW_REQUIRED 可恢复，必须携带原幂等键、期望版本和原因。重新排队原信号，不能创建或重发付款。OIDC 会话仍要求 CSRF 和页面身份头。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "持久恢复结果；重复请求回放原结果",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCallbackView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员或 CSRF 失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态、版本或幂等内容冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCallbackRetryInput"
+              },
+              "example": {
+                "expectedVersion": 2,
+                "reason": "已核对原交易和接收配置，重新处理原回调"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login",
@@ -27743,6 +28218,12 @@
   },
   "components": {
     "securitySchemes": {
+      "paymentCallbackSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "webhook-signature",
+        "description": "服务端 Standard Webhooks v1 HMAC；用户 Bearer 和 OIDC 会话不能替代回调签名。"
+      },
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
@@ -27756,6 +28237,283 @@
       }
     },
     "schemas": {
+      "PaymentCallbackSignal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contractVersion",
+          "type",
+          "tenantId",
+          "kind",
+          "authorizationId",
+          "commandDigest",
+          "sourceRevision"
+        ],
+        "properties": {
+          "contractVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "type": {
+            "type": "string",
+            "const": "payment.changed"
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE",
+              "SUPPLIER"
+            ]
+          },
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commandDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "PaymentCallbackReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "eventId",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "WAITING",
+              "QUERY_QUEUED",
+              "REVIEW_REQUIRED"
+            ]
+          }
+        }
+      },
+      "PaymentCallbackView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "eventId",
+          "kind",
+          "authorizationId",
+          "sourceRevision",
+          "version",
+          "status",
+          "receivedAt",
+          "updatedAt",
+          "nextAttemptAt",
+          "failures",
+          "queryVersion",
+          "reason",
+          "requestedBy",
+          "requestReason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE",
+              "SUPPLIER"
+            ]
+          },
+          "authorizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "WAITING",
+              "QUERY_QUEUED",
+              "REVIEW_REQUIRED"
+            ]
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failures": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "queryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "QUERY_REQUESTED",
+                  "ALREADY_OBSERVED",
+                  "BUSY",
+                  "NEVER_DISPATCHED",
+                  "TARGET_CHANGED",
+                  "SOURCE_MISSING",
+                  "PROCESSING_FAILED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentCallbackRetryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "reason"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "PaymentCallbackPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextBeforeId"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/PaymentCallbackView"
+            }
+          },
+          "nextBeforeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentCallbackDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "callback",
+          "history"
+        ],
+        "properties": {
+          "callback": {
+            "$ref": "#/components/schemas/PaymentCallbackView"
+          },
+          "history": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/PaymentCallbackView"
+            }
+          }
+        }
+      },
       "Actor": {
         "type": "object",
         "properties": {

@@ -46,7 +46,13 @@ public class JdbcPaymentAuthorizationRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public void update(PaymentAuthorization value) {
         if (value.version() != 2 && value.status() != PaymentAuthorization.Status.RETIRED) throw conflict();
-        if (value.status() == PaymentAuthorization.Status.RETIRED) requireRetirementProof(value);
+        if (value.status() == PaymentAuthorization.Status.RETIRED) {
+            requireRetirementProof(value);
+            // 首次结束必须仍对应最新执行事实；结束后的只读查询不能反向改写当时的安全依据。
+            var current = jdbc.queryForObject("SELECT version FROM payment_operation WHERE tenant_id=? AND id=?", Long.class,
+                    value.terms().tenantId(), value.terms().id().toString());
+            if (!Objects.equals(current, value.retirement().operationVersion())) throw conflict();
+        }
         int changed = jdbc.update("""
                 UPDATE payment_authorization SET state_json=?,version=?,status=?,active_business_id=?,updated_at=?
                 WHERE tenant_id=? AND id=? AND version=? AND status=? AND terms_json=? AND decision_json=?
@@ -121,8 +127,6 @@ public class JdbcPaymentAuthorizationRepository {
         var proofs = jdbc.query("SELECT state_json FROM payment_operation_revision WHERE tenant_id=? AND operation_id=? AND version=?",
                 (row, index) -> json.read(row.getString("state_json"), PaymentOperation.class), value.terms().tenantId(), value.terms().id().toString(), value.retirement().operationVersion());
         if (proofs.size() != 1 || !value.matchesRetirement(proofs.get(0))) throw conflict();
-        var current = jdbc.queryForObject("SELECT version FROM payment_operation WHERE tenant_id=? AND id=?", Long.class, value.terms().tenantId(), value.terms().id().toString());
-        if (!Objects.equals(current, value.retirement().operationVersion())) throw conflict();
     }
     private static String activeBusiness(PaymentAuthorization value) { return value.status() == PaymentAuthorization.Status.AUTHORIZED || value.status() == PaymentAuthorization.Status.EXECUTION_REGISTERED ? value.terms().binding().businessId().toString() : null; }
     private void append(PaymentAuthorization value) { jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,?,?)", value.terms().tenantId(), value.terms().id().toString(), value.version(), json.write(value)); }

@@ -8,6 +8,7 @@ import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.finance.callback.*;
 import io.agentflow.expense.*;
 import io.agentflow.notification.NotificationTexts;
 import io.agentflow.organization.*;
@@ -52,7 +53,9 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.payments.worker-enabled=false", "agentflow.payments.lease-seconds=15",
         "agentflow.payments.request-worker-enabled=false", "agentflow.payments.request-lease-seconds=15", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
-        "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false"})
+        "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false",
+        "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false"})
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 @Import(PaymentOperationIntegrationTest.ListenerConfiguration.class)
 class PaymentOperationIntegrationTest {
     private static final UUID ENTITY = UUID.randomUUID();
@@ -98,9 +101,14 @@ class PaymentOperationIntegrationTest {
     @Autowired FailureListener listener;
     @Autowired org.springframework.context.ApplicationEventPublisher events;
     @Autowired JdbcPaymentDisputeResolutionRepository disputeDecisions;
+    @Autowired org.springframework.test.web.servlet.MockMvc mvc;
+    @Autowired PaymentCallbackService callbacks;
+    @Autowired JdbcPaymentCallbackRepository callbackRecords;
+    @Autowired io.agentflow.auth.AuthService auth;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
         values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
+        values.add("agentflow.payment-callbacks.tenants.demo.signing-secrets[0]", () -> PaymentCallbackTestRequests.SECRET);
         values.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> "true");
         values.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_PAYMENT_OPERATION_TEST_URL", "jdbc:h2:mem:payment-operations;DB_CLOSE_DELAY=-1"));
         values.add("spring.datasource.driver-class-name", () -> System.getenv().getOrDefault("AGENTFLOW_PAYMENT_OPERATION_TEST_DRIVER", "org.h2.Driver"));
@@ -119,6 +127,8 @@ class PaymentOperationIntegrationTest {
             jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?)", id.toString(), id.toString());
         }
         for (var id : fixtures) {
+            jdbc.update("DELETE FROM payment_callback_revision WHERE tenant_id='demo' AND callback_id IN (SELECT id FROM payment_callback WHERE tenant_id='demo' AND employee_payment_id=?)", id.toString());
+            jdbc.update("DELETE FROM payment_callback WHERE tenant_id='demo' AND employee_payment_id=?", id.toString());
             jdbc.update("DELETE FROM payment_dispute_resolution WHERE tenant_id='demo' AND payment_id=?", id.toString());
             jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id=?", id.toString());
             String application = "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND id=?";
@@ -136,6 +146,111 @@ class PaymentOperationIntegrationTest {
         jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN ('finance','cashier')");
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test void signedCallbackIsDurableIdempotentAndOnlyWakesTheOriginalBankQuery() throws Exception {
+        var payment = job(); worker.poll(); var paid = reload(payment); var balance = balances.find("demo", payment.input().command().binding().businessId()).orElseThrow();
+        String event = "evt_" + UUID.randomUUID(); String body = callbackBody(payment, 1); var callback = receiveCallback(event, body);
+        assertThat(receiveCallback(event, body).id()).isEqualTo(callback.id()); assertThat(QUERIES.get()).isZero();
+        assertThat(reload(payment)).isEqualTo(paid); assertThat(callbackRecords.history("demo", callback.id())).hasSize(1);
+        var conflict = mvc.perform(PaymentCallbackTestRequests.request(event, callbackBody(payment, 2))).andReturn().getResponse();
+        assertThat(conflict.getStatus()).isEqualTo(409); assertThat(conflict.getContentAsString()).contains("PAYMENT_CALLBACK_EVENT_CONFLICT");
+        callbacks.process(candidate(callback), now()); var handled = callbackRecords.get("demo", callback.id());
+        assertThat(handled.status()).isEqualTo(PaymentCallback.Status.QUERY_QUEUED); assertThat(handled.reason()).isEqualTo(PaymentCallback.Reason.ALREADY_OBSERVED);
+        assertThat(reload(payment).observation()).isEqualTo(paid.observation()); assertThat(handled.queryVersion()).isEqualTo(reload(payment).version());
+        worker.poll(); callbacks.process(candidate(callback), now()); worker.poll();
+        assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1); assertThat(reload(payment).settleable()).isTrue();
+        assertThat(balances.find("demo", balance.id()).orElseThrow().state()).isEqualTo(balance.state());
+    }
+
+    @Test void callbackQueueAndPaymentRevisionRollbackTogetherWhenHistoryCannotBeSaved() throws Exception {
+        var payment = job(); worker.poll(); var before = reload(payment); var callback = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 2));
+        jdbc.execute("ALTER TABLE payment_callback_revision ADD CONSTRAINT callback_history_fixture CHECK(version<2)");
+        try { assertThatThrownBy(() -> callbacks.process(candidate(callback), now())).isInstanceOf(RuntimeException.class); }
+        finally { jdbc.execute("ALTER TABLE payment_callback_revision DROP CONSTRAINT callback_history_fixture"); }
+        assertThat(reload(payment)).isEqualTo(before); assertThat(callbackRecords.get("demo", callback.id())).isEqualTo(callback);
+        callbacks.process(candidate(callback), now()); worker.poll(); assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1);
+    }
+
+    @Test void callbackWaitsForRunningNetworkAndNeverAuthorizesAFirstPayment() throws Exception {
+        var payment = job(); var early = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 1));
+        callbacks.process(candidate(early), now());
+        assertThat(callbackRecords.get("demo", early.id()).reason()).isEqualTo(PaymentCallback.Reason.NEVER_DISPATCHED); assertThat(reload(payment)).isEqualTo(payment);
+        var checking = execution.claim("demo", payment.input().command().id(), now());
+        var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
+        var callback = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 1)); callbacks.process(candidate(callback), now());
+        var waiting = callbackRecords.get("demo", callback.id()); assertThat(waiting.status()).isEqualTo(PaymentCallback.Status.WAITING);
+        assertThat(reload(payment)).isEqualTo(sending);
+        execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now());
+        callbacks.process(candidate(callback), waiting.nextAttemptAt());
+        assertThat(callbackRecords.get("demo", callback.id()).status()).isEqualTo(PaymentCallback.Status.QUERY_QUEUED);
+        assertThat(reload(payment).dispatches()).isEqualTo(1); assertThat(WRITES.get()).isZero();
+    }
+
+    @Test void concurrentCallbacksKeepOneReceiptAndChangedGatewayCannotRetargetIt() throws Exception {
+        var payment = job(); worker.poll(); String event = "evt_" + UUID.randomUUID(), body = callbackBody(payment, 2);
+        var ready = new CountDownLatch(2); var release = new CountDownLatch(1); var executor = Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<PaymentCallback> action = () -> { ready.countDown(); release.await(); return receiveCallback(event, body); };
+            var first = executor.submit(action); var second = executor.submit(action); assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue(); release.countDown();
+            var callback = first.get(5, TimeUnit.SECONDS); assertThat(second.get(5, TimeUnit.SECONDS).id()).isEqualTo(callback.id());
+            assertThat(callbackRecords.history("demo", callback.id())).hasSize(1);
+            var before = reload(payment); configuration.getTenants().get("demo").setEndpoint(ENDPOINT + "/changed");
+            callbacks.process(candidate(callback), now()); assertThat(callbackRecords.get("demo", callback.id()).reason()).isEqualTo(PaymentCallback.Reason.TARGET_CHANGED);
+            assertThat(reload(payment)).isEqualTo(before); assertThat(QUERIES.get()).isZero();
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test void callbackFromRetiredFailedAuthorizationStillQueriesAndRecordsContradictionWithoutNewFunding() throws Exception {
+        var payment = job(); var command = payment.input().command();
+        RESPONDER.set((path, data) -> path.endsWith("payment-command")
+                ? new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.FAILED, 1L, now(), "bank-" + command.id(), null, null, null, null, PaymentObservation.Failure.PAYMENT_REJECTED)
+                : response(path, data));
+        worker.poll(); assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.FAILED);
+        tx().executeWithoutResult(status -> {
+            var original = authorizations.find("demo", command.id()).orElseThrow();
+            var stopped = execution.stopForRetirement("demo", command.id(), reload(payment).version(), now());
+            authorizations.update(original.retire(stopped, "finance", "原银行明确拒绝后结束", now()));
+        });
+        var retired = authorizations.find("demo", command.id()).orElseThrow();
+        var callback = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 2));
+        RESPONDER.set((path, data) -> path.endsWith("payment-query") ? paid(command, 2) : response(path, data));
+        callbacks.process(candidate(callback), now()); worker.poll(); var disputed = reload(payment);
+        assertThat(disputed.status()).isEqualTo(PaymentOperation.Status.RECONCILING); assertThat(disputed.observation().status()).isEqualTo(PaymentObservation.Status.FAILED);
+        assertThat(disputed.conflictingObservation().status()).isEqualTo(PaymentObservation.Status.SUCCEEDED);
+        assertThat(authorizations.find("demo", command.id())).contains(retired); assertThat(balances.find("demo", command.binding().businessId())).isEmpty();
+        assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1);
+    }
+
+    @Test void callbackAdministrationRequiresUserRoleAndRetryKeepsReasonWithOriginalIdempotency() throws Exception {
+        var payment = job(); var callback = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 1)); callbacks.process(candidate(callback), now());
+        var review = callbackRecords.get("demo", callback.id()); String path = PaymentCallbackVerifier.PATH;
+        assertThat(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)).andReturn().getResponse().getStatus()).isEqualTo(401);
+        String employee = auth.login("demo", "alice", "demo").token(), admin = auth.login("demo", "admin", "demo").token();
+        assertThat(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).header("Authorization", "Bearer " + employee)).andReturn().getResponse().getStatus()).isEqualTo(403);
+        var detail = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path + "/" + callback.id()).header("Authorization", "Bearer " + admin)).andReturn().getResponse();
+        assertThat(detail.getStatus()).isEqualTo(200); assertThat(detail.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(detail.getContentAsString()).doesNotContain("commandDigest", "targetDigest", "paidAmount", "maskedAccount", "signature");
+        String key = UUID.randomUUID().toString(), body = json.write(Map.of("expectedVersion", review.version(), "reason", "核对原交易后重新处理回调"));
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path + "/" + callback.id() + "/retry")
+                .header("Authorization", "Bearer " + admin).header("Idempotency-Key", key).contentType("application/json").content(body);
+        var first = mvc.perform(request).andReturn().getResponse(); var second = mvc.perform(request).andReturn().getResponse();
+        assertThat(first.getStatus()).isEqualTo(200); assertThat(second.getContentAsString()).isEqualTo(first.getContentAsString());
+        assertThat(callbackRecords.get("demo", callback.id()).requestedBy()).isEqualTo("admin");
+        assertThat(callbackRecords.get("demo", callback.id()).requestReason()).isEqualTo("核对原交易后重新处理回调");
+        assertThat(callbackRecords.history("demo", callback.id())).hasSize(3);
+        assertThatThrownBy(() -> callbackRecords.get("foreign", callback.id())).isInstanceOf(DomainException.class);
+    }
+
+    private String callbackBody(PaymentOperation value, long revision) {
+        return json.write(new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.EMPLOYEE,
+                value.input().command().id(), value.input().command().digest(), revision));
+    }
+    private PaymentCallback receiveCallback(String event, String body) throws Exception {
+        var response = mvc.perform(PaymentCallbackTestRequests.request(event, body)).andReturn().getResponse();
+        assertThat(response.getStatus()).isEqualTo(202); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        return callbackRecords.byEvent("demo", event).orElseThrow();
+    }
+    private static JdbcPaymentCallbackRepository.Candidate candidate(PaymentCallback callback) { return new JdbcPaymentCallbackRepository.Candidate("demo", callback.id()); }
 
     @Test void financeRetirementWhileAccountReadIsInFlightPreventsLateWorkerFromSending() throws Exception {
         var job = job(); var id = job.input().command().id(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);

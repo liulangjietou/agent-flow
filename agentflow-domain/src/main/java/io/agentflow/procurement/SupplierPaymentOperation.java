@@ -126,6 +126,12 @@ public record SupplierPaymentOperation(SupplierPaymentCommand command, long vers
         return changed(Status.UNKNOWN, now, now, null, evidence, observation, conflictingObservation, highestRevision, Failure.RECHECK_REQUESTED);
     }
 
+    /** 已认证信号优先复查原交易，查无后的排队或账户复查不能继续自动进入重发。 */
+    public SupplierPaymentOperation requestCallbackQuery(Instant now) {
+        requireTime(now); if (status == Status.SENDING || status == Status.QUERYING || dispatches == 0) throw conflict();
+        return changed(Status.UNKNOWN, now, now, null, evidence, observation, conflictingObservation, highestRevision, Failure.RECHECK_REQUESTED);
+    }
+
     /** 权威查无须人工明确重试，同一命令重新核对原预留和账户，仍不得延长授权。 */
     public SupplierPaymentOperation retryNotFound(Instant now) {
         requireTime(now); if (status != Status.NOT_FOUND || highestRevision != 0 || conflictingObservation != null) throw conflict();

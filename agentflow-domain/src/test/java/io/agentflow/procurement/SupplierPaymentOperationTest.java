@@ -91,6 +91,28 @@ class SupplierPaymentOperationTest {
         assertThatThrownBy(() -> sending.requireSendAt(proof.validUntil())).isInstanceOf(DomainException.class);
     }
 
+    @Test void callbackCancelsUnsentRetryChecksAndOnlyQueriesOriginalCommand() {
+        var sending = sending(payment()); var at = sending.updatedAt();
+        var missing = sending.unavailable(SupplierPaymentOperation.Failure.TIMEOUT, at).claim(at.plusSeconds(5), LEASE)
+                .complete(new FinanceResult.Success<>(absent(sending.command(), at.plusSeconds(5))), at.plusSeconds(5));
+        var retry = missing.retryNotFound(at.plusSeconds(6));
+        for (var original : List.of(retry, retry.claim(at.plusSeconds(6), LEASE))) {
+            var query = original.requestCallbackQuery(at.plusSeconds(7));
+            assertThat(query.command()).isEqualTo(sending.command()); assertThat(query.dispatches()).isEqualTo(1); assertThat(query.leaseUntil()).isNull();
+            assertThat(query.observation()).isEqualTo(missing.observation()); assertThat(query.claim(at.plusSeconds(8), LEASE).status()).isEqualTo(SupplierPaymentOperation.Status.QUERYING);
+        }
+    }
+    @Test void callbackKeepsBankProofAndRejectsFirstDispatchOrInFlightNetwork() {
+        var sending = sending(payment()); var at = sending.updatedAt(); var original = paid(sending.command(), 1, at);
+        var queued = SupplierPaymentOperation.queue(sending.command(), REGISTERED_AT);
+        for (var blocked : List.of(queued, queued.claim(REGISTERED_AT, LEASE), sending,
+                sending.unavailable(SupplierPaymentOperation.Failure.TIMEOUT, at).claim(at.plusSeconds(5), LEASE))) {
+            assertThatThrownBy(() -> blocked.requestCallbackQuery(at.plusSeconds(6))).isInstanceOf(DomainException.class);
+        }
+        var callback = sending.complete(new FinanceResult.Success<>(original), at).requestCallbackQuery(at.plusSeconds(1));
+        assertThat(callback.observation()).isEqualTo(original); assertThat(callback.highestRevision()).isEqualTo(1);
+    }
+
     @Test void readFailureAndReadLeaseExpiryRecheckOriginalChoiceWithoutAWrite() {
         var command = payment(); var checking = SupplierPaymentOperation.queue(command, REGISTERED_AT).claim(REGISTERED_AT, LEASE);
         var unread = checking.unavailableBeforeSend(SupplierPaymentOperation.Failure.CONNECTION, REGISTERED_AT.plusSeconds(1));

@@ -76,6 +76,11 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "PAYMENT_CALLBACK_INVALID" -> HttpStatus.BAD_REQUEST;
+            case "PAYMENT_CALLBACK_UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
+            case "PAYMENT_CALLBACK_DISABLED" -> HttpStatus.SERVICE_UNAVAILABLE;
+            case "PAYMENT_CALLBACK_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case "PAYMENT_CALLBACK_SOURCE_CONFLICT", "PAYMENT_CALLBACK_EVENT_CONFLICT" -> HttpStatus.CONFLICT;
             case "INVALID_PROCUREMENT_QUERY", "INVALID_SUPPLIER_PAYMENT_QUERY" -> HttpStatus.BAD_REQUEST;
             case "SUPPLIER_PAYABLE_REVIEW_PENDING", "SUPPLIER_PAYABLE_REVIEW_STATE_CONFLICT", "SUPPLIER_PAYMENT_ALREADY_AUTHORIZED",
                     "SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT", "SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE", "SUPPLIER_PAYMENT_EXECUTION_PENDING",
