@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import SupplierSettlementDisputeStatus from './SupplierSettlementDisputeStatus.vue'
 import { paymentOperationLabels, supplierSettlementLabels, settlementPreparationLabels, settlementActionLabels, settlementRejectionLabels, settlementIssueLabels, validateSupplierSettlement, supplierSettlementAllowed, supplierSettlementPreparationInput, supplierSettlementActionInput, validateSupplierSettlementReceipt, supplierSettlementError, type SupplierSettlementAction, type SupplierSettlementView } from '../supplierSettlement'
 
 const props = defineProps<{ paymentId: string; requestId: string; applicationId: string; roundNo: number; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<SupplierSettlementView | null>(null), loading = ref(false), saving = ref(false), unconfirmed = ref(false), requiresRefresh = ref(false)
+const disputeId = ref<string | null>(null), disputeBusy = ref(false)
 const error = ref(''), notice = ref(''), comment = ref(''), accountingDate = ref(''), beforeId = ref<string | undefined>()
 const pending = ref<{ action: 'PREPARE' | SupplierSettlementAction; id?: string } | null>(null), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
-const blocked = computed(() => !!props.locked || loading.value || saving.value || unconfirmed.value || requiresRefresh.value)
+const blocked = computed(() => !!props.locked || loading.value || saving.value || disputeBusy.value || unconfirmed.value || requiresRefresh.value)
 const active = computed(() => view.value?.items.find(item => item.id === view.value?.activeSettlementId))
 const selected = computed(() => view.value?.items.find(item => item.id === pending.value?.id))
 function syncPending() {
@@ -18,10 +20,12 @@ function syncPending() {
   unconfirmed.value = active
 }
 const unsubscribe = writeRequests.subscribe(syncPending)
+function disputeActivity(value: boolean) { disputeBusy.value = value; emit('busy', saving.value || value) }
+function openDispute(id: string) { if (!blocked.value && !pending.value) disputeId.value = disputeId.value === id ? null : id }
 function stop() { epoch++; controller?.abort(); controller = null }
 /** 历史整页替换，避免把旧权限或旧银行版本拼接到当前结算记录。 */
 async function load(cursor?: string) {
-  if (saving.value || !props.scopeKey) return
+  if (saving.value || disputeBusy.value || !props.scopeKey) return
   stop(); const current = epoch, request = new AbortController(); controller = request; loading.value = true
   const binding = { paymentId: props.paymentId, requestId: props.requestId, applicationId: props.applicationId, roundNo: props.roundNo }
   view.value = null; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; beforeId.value = cursor
@@ -60,7 +64,7 @@ async function execute() {
   finally { if (current === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
 }
 watch(() => JSON.stringify([props.scopeKey, props.paymentId, props.requestId, props.applicationId, props.roundNo]), () => {
-  stop(); view.value = null; loading.value = false; saving.value = false; requiresRefresh.value = false; beforeId.value = undefined; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; notice.value = ''
+  stop(); view.value = null; loading.value = false; saving.value = false; disputeBusy.value = false; disputeId.value = null; requiresRefresh.value = false; beforeId.value = undefined; pending.value = null; comment.value = ''; accountingDate.value = ''; error.value = ''; notice.value = ''
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
@@ -69,7 +73,7 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
 
 <template>
   <section class="supplier-settlement" aria-label="供应商应付结算">
-    <div class="settlement-heading"><div><p class="settlement-eyebrow">到账后 · 独立财务核销</p><h4>原应付结算</h4></div><button class="quiet" type="button" :disabled="loading || saving || locked" @click="notice = ''; load()">{{ beforeId ? '返回最新状态' : '刷新结算状态' }}</button></div>
+    <div class="settlement-heading"><div><p class="settlement-eyebrow">到账后 · 独立财务核销</p><h4>原应付结算</h4></div><button class="quiet" type="button" :disabled="loading || saving || disputeBusy || locked" @click="notice = ''; load()">{{ beforeId ? '返回最新状态' : '刷新结算状态' }}</button></div>
     <p class="settlement-help">银行到账后，由财务选择会计日期。ERP 核销和本地应付完成分别确认。</p>
     <p v-if="loading" role="status" class="settlement-help">正在读取原付款与结算记录…</p>
     <p v-if="error" role="alert" class="settlement-error">{{ error }}</p><p v-if="notice" role="status" class="settlement-help">{{ notice }}</p>
@@ -95,9 +99,11 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
           <p v-if="item.rejection" class="settlement-warning">{{ settlementRejectionLabels[item.rejection] }}</p><p v-if="item.issue" class="settlement-help">{{ settlementIssueLabels[item.issue] }}</p>
           <p v-if="item.retirement" class="settlement-help">{{ item.retirement.basis === 'NEVER_DISPATCHED' ? '确认从未外发核销' : 'ERP 已明确拒绝本次核销' }} · {{ item.retirement.retiredBy }} · {{ date(item.retirement.retiredAt) }}</p>
           <div v-if="!pending" class="settlement-buttons"><button v-for="action in (['QUERY', 'RETRY', 'RETIRE'] as const)" v-show="allowed(action, item.id)" :key="action" type="button" class="quiet" :disabled="blocked" @click="prepare(action, item.id)">{{ settlementActionLabels[action] }}</button></div>
+          <button v-if="item.dispatches > 0 && !pending" type="button" class="quiet settlement-dispute-toggle" :disabled="blocked" @click="openDispute(item.id)">{{ disputeId === item.id ? '收起核销回执与裁决' : '核对核销回执与裁决' }}</button>
+          <SupplierSettlementDisputeStatus v-if="disputeId === item.id" :settlement-id="item.id" :payment-id="paymentId" :request-id="requestId" :application-id="applicationId" :round-no="roundNo" :amount="view.amount" :scope-key="scopeKey + ':' + item.version" :locked="locked || saving || loading || !!pending || requiresRefresh || unconfirmed" @busy="disputeActivity" @changed="load(beforeId)" />
         </li>
       </ol>
-      <button v-if="view.nextBeforeId && !pending" class="quiet" type="button" :disabled="loading || saving || locked" @click="load(view.nextBeforeId)">查看更早核销</button>
+      <button v-if="view.nextBeforeId && !pending" class="quiet" type="button" :disabled="loading || saving || disputeBusy || locked" @click="load(view.nextBeforeId)">查看更早核销</button>
       <form v-if="pending" ref="form" class="settlement-confirm" @submit.prevent="execute">
         <h4>{{ settlementActionLabels[pending.action] }}</h4>
         <p>确认供应商 {{ view.supplierName }}，金额 {{ view.amount.currency }} {{ view.amount.value }}，收款账户 {{ view.maskedPayeeAccount }}。</p>
@@ -113,5 +119,6 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
 </template>
 
 <style scoped>
+.settlement-dispute-toggle{margin-top:12px}
 .supplier-settlement{margin-top:24px;padding-top:22px;border-top:1px solid var(--line);min-width:0}.settlement-heading,.settlement-record-heading{display:flex;justify-content:space-between;gap:14px;align-items:center}.settlement-heading h4{font-size:16px;margin:4px 0}.settlement-eyebrow{font-size:11px;color:var(--muted);margin:0}.settlement-help{font-size:12px;line-height:1.9;color:var(--muted);overflow-wrap:anywhere}.settlement-stages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}.settlement-stages>div{display:flex;flex-direction:column;gap:8px}.settlement-stages span,.settlement-stages small{font-size:11px;color:var(--muted);line-height:1.7}.settlement-stages strong{font-size:13px;line-height:1.7}.settlement-stages small{overflow-wrap:anywhere}.settlement-preparation{display:grid;gap:8px;padding:12px 0;font-size:12px}.settlement-preparation span,.settlement-record-heading span{font-size:11px;color:var(--muted)}.settlement-history{list-style:none;padding:0;margin:16px 0}.settlement-record{padding:16px 0;border-bottom:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}.settlement-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.settlement-error,.settlement-warning{padding:12px;border-radius:7px;font-size:12px;line-height:1.8;background:#fff0ed;color:var(--red)}.settlement-warning{background:var(--paper);color:var(--ink);border-left:3px solid var(--red)}.settlement-confirm{padding:16px;margin-top:18px;border:1px solid var(--line);border-radius:8px;font-size:12px;line-height:1.9}.settlement-confirm h4{margin:0 0 8px;font-size:13px}.settlement-confirm label{display:grid;gap:8px}.settlement-confirm input,.settlement-confirm textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;color:var(--ink);background:var(--paper)}.settlement-confirm input{max-width:250px}.settlement-confirm textarea{resize:vertical}@media(max-width:650px){.settlement-stages{grid-template-columns:1fr}.settlement-heading,.settlement-record-heading{align-items:flex-start;flex-wrap:wrap}}
 </style>

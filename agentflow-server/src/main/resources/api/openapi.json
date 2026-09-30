@@ -77,6 +77,258 @@
     }
   ],
   "paths": {
+    "/api/v1/supplier-settlements/{id}/dispute": {
+      "get": {
+        "operationId": "getSupplierSettlementDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "读取原供应商 ERP 核销争议",
+        "description": "原轮次完整财务字段权限约束读取；当前原核销事实、候选和历史决定分别展示，响应禁止缓存。",
+        "x-access": "原轮次具有完整字段读取权限的参与人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "原 ERP 事实、候选和独立裁决能力。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierSettlementDisputeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原核销历史不完整或当前状态不能支持读取。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/supplier-settlements/{id}/dispute/resolutions": {
+      "post": {
+        "operationId": "resolveSupplierSettlementDispute",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "明确采用原 ERP 核销近期终态",
+        "description": "当前有效任职的独立财务核对原轮次字段权限，排除原申请人与出纳；幂等回放仍重查权限。只采用五分钟内最高外部版本，历史原凭证和核销余额不可改写。决定、状态修订、本地占用完成及审计原子保存，不发送银行或 ERP 指令。",
+        "x-access": "FINANCE + 原轮次完整财务字段可读 + 当前法人有效任职 + 非原申请人和原出纳",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前证据无法支持裁决，或不满足独立财务条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "原 ERP 裁决及审计已保存；银行和本地完成需要重新读取。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierSettlementDisputeReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierSettlementDisputeResolveInput"
+              },
+              "example": {
+                "settlementVersion": 12,
+                "outcome": "SETTLED",
+                "evidenceReference": "ERP-STATEMENT-1",
+                "comment": "核对原核销凭证及应付余额后采用终态"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/supplier-payments/{id}/dispute": {
       "get": {
         "operationId": "getSupplierPaymentDispute",
@@ -31183,6 +31435,364 @@
       }
     },
     "schemas": {
+      "SupplierSettlementDisputeView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settlementId",
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "settlementVersion",
+          "status",
+          "amount",
+          "observed",
+          "candidate",
+          "issue",
+          "canResolve",
+          "latest"
+        ],
+        "properties": {
+          "settlementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CHECKING",
+              "SETTLING",
+              "UNKNOWN",
+              "QUERYING",
+              "SETTLED",
+              "REJECTED",
+              "NOT_FOUND",
+              "RECONCILING",
+              "VOIDED"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "observed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementDisputeFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementDisputeFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_DISPUTED",
+                  "NON_TERMINAL",
+                  "STALE_EVIDENCE",
+                  "EXPIRED_EVIDENCE",
+                  "HISTORY_CHANGED",
+                  "SETTLEMENT_ALREADY_OBSERVED",
+                  "DIFFERENT_POSTING"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementDisputeDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierSettlementDisputeFact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil",
+          "rejection",
+          "posting"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SETTLED",
+              "REJECTED",
+              "NOT_FOUND"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACCOUNTING_PERIOD_CLOSED",
+                  "HOLD_UNAVAILABLE",
+                  "HOLD_CHANGED",
+                  "PAYMENT_UNAVAILABLE",
+                  "PAYMENT_CHANGED",
+                  "PAYABLE_CHANGED",
+                  "ALREADY_SETTLED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "posting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementDisputePosting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierSettlementDisputePosting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settlementReference",
+          "voucherReference",
+          "amount",
+          "settledBefore",
+          "settledAfter",
+          "periodReference",
+          "accountingDate",
+          "settledAt"
+        ],
+        "properties": {
+          "settlementReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "voucherReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "settledBefore": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "settledAfter": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "periodReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierSettlementDisputeDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "settlementVersion",
+          "outcome",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SETTLED",
+              "REJECTED"
+            ]
+          },
+          "resolvedBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          }
+        }
+      },
+      "SupplierSettlementDisputeReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settlementId",
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "settlementVersion",
+          "status",
+          "resolutionId",
+          "auditEventId"
+        ],
+        "properties": {
+          "settlementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SETTLED",
+              "REJECTED"
+            ]
+          },
+          "resolutionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SupplierSettlementDisputeResolveInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "settlementVersion",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "SETTLED",
+              "REJECTED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
       "SupplierDisputeView": {
         "type": "object",
         "additionalProperties": false,

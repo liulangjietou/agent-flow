@@ -3,6 +3,7 @@ import type { SupplierCashierView, SupplierCashierPage, SupplierCashierAccounts,
 import type { SupplierFinanceView, SupplierReviewInput, SupplierAuthorizeInput, SupplierHoldInput, SupplierFinanceReceipt } from './supplierFinance'
 import type { BudgetFinanceView, BudgetFinancePage, BudgetFinanceReviewInput, BudgetFinanceAuthorizeInput, BudgetFinanceActionInput, BudgetFinanceReceipt } from './budgetFinance'
 import type { SupplierDisputeView, SupplierDisputeQueryInput, SupplierDisputeResolveInput, SupplierDisputeReceipt } from './supplierDispute'
+import type { SettlementDisputeView, SettlementDisputeInput, SettlementDisputeReceipt } from './supplierSettlementDispute'
 import type { SupplierSettlementView, SupplierSettlementPrepareInput, SupplierSettlementActionInput, SupplierSettlementReceipt } from './supplierSettlement'
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
@@ -370,6 +371,8 @@ export const api = {
   supplierDispute: (id: string, signal: AbortSignal) => request<SupplierDisputeView>(`/supplier-payments/${encodeURIComponent(id)}/dispute`, { signal, cache: 'no-store' }),
   querySupplierDispute: (id: string, input: SupplierDisputeQueryInput) => write<SupplierDisputeReceipt>(`/supplier-payments/${encodeURIComponent(id)}/dispute/queries`, 'POST', '查询原供应商银行交易', input),
   resolveSupplierDispute: (id: string, input: SupplierDisputeResolveInput) => write<SupplierDisputeReceipt>(`/supplier-payments/${encodeURIComponent(id)}/dispute/resolutions`, 'POST', '确认原供应商付款裁决', input),
+  supplierSettlementDispute: (id: string, signal: AbortSignal) => request<SettlementDisputeView>(`/supplier-settlements/${encodeURIComponent(id)}/dispute`, { signal, cache: 'no-store' }),
+  resolveSupplierSettlementDispute: (id: string, input: SettlementDisputeInput) => write<SettlementDisputeReceipt>(`/supplier-settlements/${encodeURIComponent(id)}/dispute/resolutions`, 'POST', '确认原供应商核销裁决', input),
   supplierSettlements: (id: string, beforeId: string | undefined, signal: AbortSignal) => request<SupplierSettlementView>(`/supplier-payments/${encodeURIComponent(id)}/settlements` + historyQuery({ beforeId, limit: 25 }), { signal, cache: 'no-store' }),
   prepareSupplierSettlement: (id: string, input: SupplierSettlementPrepareInput) => write<SupplierSettlementReceipt>(`/supplier-payments/${encodeURIComponent(id)}/settlement-preparations`, 'POST', '登记供应商应付结算', input),
   supplierSettlementAction: (id: string, input: SupplierSettlementActionInput) => write<SupplierSettlementReceipt>(`/supplier-settlements/${encodeURIComponent(id)}/finance-actions`, 'POST', '办理供应商原核销', input),

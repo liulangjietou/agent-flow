@@ -604,6 +604,129 @@ class SupplierFinanceWorkflowTest {
         assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
     }
 
+    @Test void erpDisputeRequiresOriginalPostingAndKeepsPriorCompletionAndCommands() throws Exception {
+        UUID payment = paidBank(); UUID id = queueSettlement(payment); pollSettlement(id);
+        var original = settlements.find("demo", id).orElseThrow(); var completed = settlementView(payment).path("completion");
+        queryErp(id, SupplierPayableSettlementObservation.Status.SETTLED, "DIFFERENT-VOUCHER", 2);
+        var invalid = erpDisputeView(id); assertThat(invalid.path("issue").asText()).isEqualTo("DIFFERENT_POSTING");
+        okError(send(erpDisputePath(id) + "/resolutions", "finance", erpDisputeInput(invalid)), 422, "SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE");
+        queryErp(id, SupplierPayableSettlementObservation.Status.SETTLED, "SUPPLIER-VOUCHER-1", 3);
+        var ready = erpDisputeView(id); assertThat(ready.path("canResolve").asBoolean()).isTrue(); assertCashierPrivateFactsAbsent(ready);
+        String key = UUID.randomUUID().toString(); var input = erpDisputeInput(ready); var first = send(erpDisputePath(id) + "/resolutions", "finance", key, input);
+        var receipt = ok(first, 202); assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(receipt.path("status").asText()).isEqualTo("SETTLED"); assertThat(receipt.path("settlementVersion").asLong()).isEqualTo(ready.path("settlementVersion").asLong() + 1);
+        assertThat(send(erpDisputePath(id) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        var done = erpDisputeView(id); assertThat(done.path("candidate").isNull()).isTrue(); assertThat(done.at("/latest/id").asText()).isEqualTo(receipt.path("resolutionId").asText());
+        assertThat(settlementView(payment).path("completion")).isEqualTo(completed);
+        assertThat(settlements.find("demo", id).orElseThrow().command()).isEqualTo(original.command());
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1);
+    }
+
+    @Test void erpDecisionAuditFailureRollsBackDecisionCompletionRevisionAndIdempotency() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedErp(payment); queryErp(id, SupplierPayableSettlementObservation.Status.SETTLED, "SUPPLIER-VOUCHER-1", 2);
+        var before = settlements.find("demo", id).orElseThrow(); var input = erpDisputeInput(erpDisputeView(id)); String key = UUID.randomUUID().toString();
+        assertThat(settlementView(payment).path("completion").isNull()).isTrue();
+        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT fixture_erp_dispute_audit CHECK(aggregate_id<>'%s' OR action<>'SUPPLIER_SETTLEMENT_DISPUTE_RESOLVE')".formatted(id));
+        try { assertThatThrownBy(() -> send(erpDisputePath(id) + "/resolutions", "finance", key, input)).hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT fixture_erp_dispute_audit"); }
+        assertThat(settlements.find("demo", id)).contains(before); assertThat(settlements.latestResolution("demo", id)).isEmpty();
+        assertThat(settlements.revision("demo", id, before.version() + 1)).isEmpty(); assertThat(settlementView(payment).path("completion").isNull()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?", Integer.class, key)).isZero();
+        ok(send(erpDisputePath(id) + "/resolutions", "finance", key, input), 202);
+        assertThat(settlementView(payment).at("/completion/settlementId").asText()).isEqualTo(id.toString());
+        assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1);
+    }
+
+    @Test void erpDecisionReplayRechecksIndependentFinanceAppointmentAndSensitiveFields() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedErp(payment); queryErp(id, SupplierPayableSettlementObservation.Status.SETTLED, "SUPPLIER-VOUCHER-1", 2);
+        var input = erpDisputeInput(erpDisputeView(id)); String key = UUID.randomUUID().toString();
+        for (String user : List.of("alice", "cashier", "admin", "manager", "bob")) assertThat(send(erpDisputePath(id) + "/resolutions", user, input).getStatus()).isBetween(400, 499);
+        assertThat(ok(read(erpDisputePath(id), "alice"), 200).path("canResolve").asBoolean()).isFalse();
+        okError(read(erpDisputePath(id), "admin"), 403, "FORBIDDEN"); okError(read(erpDisputePath(id), "bob"), 404, "NOT_FOUND");
+        var first = send(erpDisputePath(id) + "/resolutions", "finance", key, input); ok(first, 202);
+        organization.updateAppointment(admin, financeAppointment, false, 1);
+        okError(send(erpDisputePath(id) + "/resolutions", "finance", key, input), 403, "FORBIDDEN");
+        organization.updateAppointment(admin, financeAppointment, true, 2);
+        assertThat(send(erpDisputePath(id) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try { okError(send(erpDisputePath(id) + "/resolutions", "finance", key, input), 403, "FORBIDDEN"); okError(read(erpDisputePath(id), "finance"), 403, "FORBIDDEN"); }
+        finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+    }
+
+    @Test void erpDecisionRejectsForgedFactsWrongTerminalStaleRevisionAndForeignScope() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedErp(payment); queryErp(id, SupplierPayableSettlementObservation.Status.SETTLED, "SUPPLIER-VOUCHER-1", 2);
+        var displayed = erpDisputeView(id); var forged = new java.util.HashMap<>(erpDisputeInput(displayed)); forged.put("voucherReference", "FORGED");
+        okError(send(erpDisputePath(id) + "/resolutions", "finance", forged), 400, "INVALID_REQUEST");
+        forged = new java.util.HashMap<>(erpDisputeInput(displayed)); forged.put("settlementVersion", displayed.path("settlementVersion").asLong() - 1);
+        okError(send(erpDisputePath(id) + "/resolutions", "finance", forged), 409, "CONCURRENCY_CONFLICT");
+        forged = new java.util.HashMap<>(erpDisputeInput(displayed)); forged.put("outcome", "REJECTED");
+        okError(send(erpDisputePath(id) + "/resolutions", "finance", forged), 422, "SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE");
+        forged.put("outcome", "PENDING"); okError(send(erpDisputePath(id) + "/resolutions", "finance", forged), 400, "INVALID_REQUEST");
+        forged = new java.util.HashMap<>(erpDisputeInput(displayed)); forged.put("evidenceReference", "INVALID\nREFERENCE");
+        assertThat(send(erpDisputePath(id) + "/resolutions", "finance", forged).getStatus()).isEqualTo(400);
+        okError(read(erpDisputePath(id) + "?paymentId=" + UUID.randomUUID(), "finance"), 400, "INVALID_SUPPLIER_SETTLEMENT_DISPUTE_QUERY");
+        okError(read(erpDisputePath(UUID.randomUUID()), "finance"), 404, "NOT_FOUND");
+        actors.set(new Actor("other", "finance", Set.of("FINANCE")));
+        try { assertThatThrownBy(() -> settlementAccess.requireSettlement(id)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, e -> assertThat(e.code()).isEqualTo("NOT_FOUND")); }
+        finally { actors.clear(); }
+        assertThat(settlements.latestResolution("demo", id)).isEmpty();
+    }
+
+    @Test void erpResolutionDoesNotClearIndependentBankDisputeOrCompleteWhileBankIsUnsettled() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedErp(payment); queryErp(id, SupplierPayableSettlementObservation.Status.SETTLED, "SUPPLIER-VOUCHER-1", 2);
+        queryDispute(payment, "WRONG-RECEIPT", 2);
+        ok(send(erpDisputePath(id) + "/resolutions", "finance", erpDisputeInput(erpDisputeView(id))), 202);
+        assertThat(settlements.find("demo", id).orElseThrow().settled()).isTrue();
+        assertThat(bankPayments.find("demo", payment).orElseThrow().status()).isEqualTo(SupplierPaymentOperation.Status.RECONCILING);
+        assertThat(settlementView(payment).path("completion").isNull()).isTrue();
+        queryDispute(payment, "RECEIPT-1", 3); ok(send(disputePath(payment) + "/resolutions", "finance", disputeInput(disputeView(payment))), 202);
+        settlementExecution.completeLocal("demo", id, Instant.now());
+        assertThat(settlementView(payment).at("/completion/settlementId").asText()).isEqualTo(id.toString());
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1); assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1);
+    }
+
+    @Test void confirmedErpRejectionStillNeedsSeparateRetirementAndPreservesItsDecision() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedErp(payment); queryErp(id, SupplierPayableSettlementObservation.Status.REJECTED, null, 2);
+        var view = erpDisputeView(id); assertThat(view.path("canResolve").asBoolean()).isTrue();
+        ok(send(erpDisputePath(id) + "/resolutions", "finance", erpDisputeInput(view)), 202);
+        assertThat(settlements.retirement("demo", id)).isEmpty(); assertThat(settlementView(payment).path("completion").isNull()).isTrue();
+        var decision = erpDisputeView(id).path("latest"); var state = settlementView(payment).at("/items/0");
+        ok(send(settlementActionPath(id), "finance", settlementAction(state, "RETIRE")), 202);
+        assertThat(erpDisputeView(id).path("latest")).isEqualTo(decision); assertThat(erpDisputeView(id).path("canResolve").asBoolean()).isFalse();
+        assertThat(bankPayments.find("demo", payment).orElseThrow().settleable()).isTrue();
+        assertThat(calls.get("supplier-payable-settlement-command").get()).isEqualTo(1);
+    }
+
+    private String erpDisputePath(UUID id) { return "/api/v1/supplier-settlements/" + id + "/dispute"; }
+    private JsonNode erpDisputeView(UUID id) throws Exception {
+        var response = read(erpDisputePath(id), "finance"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200);
+    }
+    private Map<String, Object> erpDisputeInput(JsonNode view) {
+        return Map.of("settlementVersion", view.path("settlementVersion").asLong(), "outcome", view.at("/candidate/outcome").asText(), "evidenceReference", "ERP-STATEMENT-1", "comment", "核对原 ERP 凭证与应付核销余额");
+    }
+    private UUID unresolvedErp(UUID payment) throws Exception {
+        UUID id = queueSettlement(payment); var command = settlements.find("demo", id).orElseThrow().command();
+        responder = (operation, request) -> operation.equals("supplier-payable-settlement-command")
+                ? erpResponse(request, new SupplierPayableSettlementObservation(id, command.digest(), SupplierPayableSettlementObservation.Status.PENDING, 1L, Instant.now(), null, null)) : normal(operation, request);
+        pollSettlement(id); queryErp(id, SupplierPayableSettlementObservation.Status.NOT_FOUND, null, 0); return id;
+    }
+    private void queryErp(UUID id, SupplierPayableSettlementObservation.Status outcome, String voucher, long revision) throws Exception {
+        var current = settlements.find("demo", id).orElseThrow(); var command = current.command();
+        responder = (operation, request) -> {
+            if (!operation.equals("supplier-payable-settlement-query")) return normal(operation, request);
+            var original = settlementObservation(command).posting();
+            var posting = outcome != SupplierPayableSettlementObservation.Status.SETTLED ? null : new SupplierPayableSettlementObservation.Posting(original.settlementReference(), original.holdReference(), original.ledgerVersion(),
+                    original.settledAmount(), original.settledBefore(), original.settledAfter(), original.bankPaymentReference(), original.bankReceiptReference(), voucher, original.periodReference(), original.accountingDate(), original.settledAt());
+            return erpResponse(request, new SupplierPayableSettlementObservation(id, command.digest(), outcome, revision, Instant.now(), posting,
+                    outcome == SupplierPayableSettlementObservation.Status.REJECTED ? SupplierPayableSettlementObservation.Rejection.ACCOUNTING_PERIOD_CLOSED : null));
+        };
+        ok(send(settlementActionPath(id), "finance", Map.of("action", "QUERY", "settlementVersion", current.version(), "comment", "按原核销号查询最新事实")), 202);
+        pollSettlement(id); assertThat(settlements.find("demo", id).orElseThrow().status()).isEqualTo(SupplierPayableSettlementOperation.Status.RECONCILING);
+    }
+    private String erpResponse(JsonNode request, SupplierPayableSettlementObservation observation) {
+        return json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", observation));
+    }
+
     private String disputePath(UUID payment) { return "/api/v1/supplier-payments/" + payment + "/dispute"; }
     private JsonNode disputeView(UUID payment) throws Exception {
         var response = read(disputePath(payment), "finance"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); return ok(response, 200);
