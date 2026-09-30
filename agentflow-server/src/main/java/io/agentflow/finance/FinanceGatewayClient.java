@@ -63,7 +63,8 @@ public class FinanceGatewayClient {
                 || operation == Operation.VOUCHER_COMMAND || operation == Operation.VOUCHER_QUERY
                 || operation == Operation.ACCOUNTING_PERIOD || operation == Operation.ACCOUNT_MAPPING || operation == Operation.DEBIT_ACCOUNTS
                 || operation == Operation.ADVANCE_REPAYMENT || operation == Operation.ADVANCE_REPAYMENT_ADJUSTMENT || operation == Operation.ADVANCE_DISBURSEMENT_RETURN
-                || operation == Operation.EXPENSE_PAYMENT_RETURN || operation == Operation.PROCUREMENT_PAYABLE || operation == Operation.BUDGET_LEDGER
+                || operation == Operation.EXPENSE_PAYMENT_RETURN || operation == Operation.SUPPLIER_PAYMENT_RETURN
+                || operation == Operation.PROCUREMENT_PAYABLE || operation == Operation.BUDGET_LEDGER
                 || operation == Operation.VOUCHER_REVERSAL || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.VOUCHER_REVERSAL_QUERY) {
             throw new IllegalArgumentException("A financial operation requires its persisted identity and destination");
         }
@@ -197,6 +198,12 @@ public class FinanceGatewayClient {
     public <T> FinanceResult<T> queryExpensePaymentReturn(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
         requireTarget(targetDigest);
         return exchange(tenantId, targetDigest, Operation.EXPENSE_PAYMENT_RETURN, UUID.randomUUID(), data, resultType, matchesRequest);
+    }
+
+    /** 供应商退回只读取原公司账户的实际入款，不继承新付款的发送窗口或改变原目标。 */
+    public <T> FinanceResult<T> querySupplierPaymentReturn(String tenantId, String targetDigest, Object data, Class<T> resultType, Predicate<T> matchesRequest) {
+        requireTarget(targetDigest);
+        return exchange(tenantId, targetDigest, Operation.SUPPLIER_PAYMENT_RETURN, UUID.randomUUID(), data, resultType, matchesRequest);
     }
 
     /** 采购应付匹配只读取原目标，不创建应付、余额占用或付款命令。 */
@@ -339,6 +346,7 @@ public class FinanceGatewayClient {
         SUPPLIER_PAYABLE_HOLD_QUERY("supplier-payable-hold-query", Set.of()),
         SUPPLIER_PAYMENT_COMMAND("supplier-payment-command", Set.of()),
         SUPPLIER_PAYMENT_QUERY("supplier-payment-query", Set.of()),
+        SUPPLIER_PAYMENT_RETURN("supplier-payment-return", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.SUPPLIER_UNAVAILABLE)),
         SUPPLIER_PAYABLE_SETTLEMENT_COMMAND("supplier-payable-settlement-command", Set.of()),
         SUPPLIER_PAYABLE_SETTLEMENT_QUERY("supplier-payable-settlement-query", Set.of()),
         VOUCHER_REVERSAL("voucher-reversal", Set.of(FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),

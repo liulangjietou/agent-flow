@@ -1,0 +1,38 @@
+{
+  "status": "PASS_DOMAIN_AND_LOOPBACK_HTTP",
+  "date": "2026-09-30",
+  "syntheticFinanceOnly": true,
+  "tests": {
+    "SupplierPaymentReturnTest": 13,
+    "SupplierPaymentOperationTest": 16,
+    "SupplierPaymentDisputeResolutionTest": 7,
+    "GatewaySupplierPaymentTest": 9,
+    "FinanceGatewayClientTest": 14,
+    "domainTotal": 36,
+    "serverTotal": 23,
+    "newDomainTests": 13,
+    "newGatewayTests": 3
+  },
+  "regression": {
+    "test": "newerReturnRevisionCannotRewriteTheSameBankReversalRevision",
+    "redFailures": 1,
+    "cause": "Cumulative return revision increased while the same bank revision changed its reversal receipt.",
+    "fixed": true,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-bank-revision-red.log"
+  },
+  "validationLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-contract-final.log",
+  "javaAuthors": {
+    "files": 1030,
+    "namedTypes": 1951,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "liveSchema": 79,
+  "remaining": [
+    "Persistence and cross-business received-funds uniqueness",
+    "Independent finance service and background read worker",
+    "Public API and browser workflow",
+    "Independent ERP adjustment",
+    "Actual local upgrade and enterprise integration acceptance"
+  ]
+}

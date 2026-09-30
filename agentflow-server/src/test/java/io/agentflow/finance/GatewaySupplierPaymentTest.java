@@ -27,6 +27,10 @@ import io.agentflow.procurement.SupplierPaymentAuthorization;
 import io.agentflow.procurement.SupplierPaymentCommand;
 import io.agentflow.procurement.SupplierPaymentEvidence;
 import io.agentflow.procurement.SupplierPaymentOperation;
+import io.agentflow.procurement.SupplierPaymentReturn;
+import io.agentflow.procurement.SupplierPaymentReturnCheck;
+import io.agentflow.procurement.SupplierPaymentReturnPort;
+import io.agentflow.procurement.SupplierPaymentReturns;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
@@ -172,6 +176,74 @@ class GatewaySupplierPaymentTest {
             assertThat(json.read(json.write(value), SupplierPaymentOperation.class)).isEqualTo(value);
         }
         assertThat(json.read(json.write(evidence), SupplierPaymentEvidence.class)).isEqualTo(evidence);
+    }
+
+    @Test void supplierReturnReadKeepsOriginalTargetAndUsesNoExternalWriteKeyAfterAuthorizationExpiry() {
+        var old = command(Instant.now().minusSeconds(172800));
+        var request = new SupplierPaymentReturnPort.Request(old, paid(old));
+        var proof = returned(request); answer(proof);
+        var returns = new GatewaySupplierPaymentReturn(client);
+        assertThat(returns.query(request).requireValue()).isEqualTo(proof);
+        assertThat(path.get()).isEqualTo("/finance/supplier-payment-return"); assertThat(key.get()).isNull();
+        var envelope = json.read(received.get(), JsonNode.class);
+        assertThat(json.read(envelope.path("data").toString(), SupplierPaymentReturnPort.Request.class)).isEqualTo(request);
+        assertThat(received.get()).contains("999999999999999.123456");
+        returns.query(request).requireValue();
+        assertThat(json.read(received.get(), JsonNode.class).path("requestId").asText()).isNotEqualTo(envelope.path("requestId").asText());
+        assertThat(calls.get()).isEqualTo(2);
+        configuration.getTenants().get("tenant-a").setEndpoint("http://127.0.0.1:" + server.getAddress().getPort() + "/other");
+        assertThat(returns.query(request)).isEqualTo(unavailable(FinanceResult.Failure.TARGET_CHANGED));
+        configuration.setEnabled(false); assertThat(returns.query(request)).isEqualTo(unavailable(FinanceResult.Failure.NOT_CONFIGURED));
+        assertThat(calls.get()).isEqualTo(2);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        assertThatThrownBy(() -> returns.query(request)).hasMessage("Finance gateway must run outside a transaction");
+        TransactionSynchronizationManager.setActualTransactionActive(false);
+        assertThatThrownBy(() -> client.read("tenant-a", FinanceGatewayClient.Operation.SUPPLIER_PAYMENT_RETURN, request,
+                SupplierPaymentReturnPort.Receipt.class, value -> true)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void malformedSupplierReturnEvidenceCannotRegisterFundsOrChangeTheOriginalAccount() {
+        var request = new SupplierPaymentReturnPort.Request(command, paid(command));
+        var proof = returned(request); var returns = new GatewaySupplierPaymentReturn(client);
+        List<Consumer<ObjectNode>> corruptions = List.of(
+                data -> data.put("revision", "2"), data -> data.put("revision", 0), data -> data.remove("revision"),
+                data -> data.put("observedAt", Instant.now().plusSeconds(60).toString()),
+                data -> data.put("validUntil", Instant.now().minusSeconds(1).toString()),
+                data -> ((ObjectNode) data.at("/returns/0/amount")).put("value", 20),
+                data -> ((ObjectNode) data.at("/returns/0/amount")).put("value", "70.01"),
+                data -> ((ObjectNode) data.at("/returns/0")).put("creditAccountReference", "other-company-account"),
+                data -> ((ObjectNode) data.at("/returns/0")).put("transactionReference", proof.request().original().receiptReference()),
+                data -> ((ObjectNode) data.at("/current")).put("commandDigest", "b".repeat(64)),
+                data -> data.put("status", "RETURNED"), data -> data.put("unknown", true));
+        for (var corrupt : corruptions) {
+            responder.set(envelope -> { var response = success(envelope, proof); corrupt.accept((ObjectNode) response.path("data")); return json.write(response); });
+            assertThat(returns.query(request)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
+        }
+        responder.set(envelope -> json.write(Map.of("contractVersion", 1, "tenantId", "tenant-a", "requestId", envelope.path("requestId").asText(),
+                "outcome", "REJECTED", "reason", "SUPPLIER_UNAVAILABLE")));
+        assertThat(returns.query(request)).isEqualTo(new FinanceResult.Rejected<>(FinanceResult.Reason.SUPPLIER_UNAVAILABLE));
+    }
+
+    @Test void supplierReturnReadAndIndependentRegistrationRoundTripWithoutReplacingOriginalFunds() {
+        var request = new SupplierPaymentReturnPort.Request(command, paid(command)); var now = Instant.now();
+        var queued = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), "tenant-a", target, 4, request, "finance", now));
+        var running = queued.claim(now, Duration.ofSeconds(90)); var proof = returned(request); var at = Instant.now();
+        var checked = running.complete(new FinanceResult.Success<>(proof), at);
+        var decision = new SupplierPaymentReturn(UUID.randomUUID(), "tenant-a", queued.input().id(), proof, "finance", at, "bank-statement", "核对原银行回款");
+        var resolved = checked.resolve(decision, at);
+        var ledger = SupplierPaymentReturns.open(request, now).register(decision);
+        for (var value : List.of(queued, running, checked, resolved)) assertThat(json.read(json.write(value), SupplierPaymentReturnCheck.class)).isEqualTo(value);
+        assertThat(json.read(json.write(ledger), SupplierPaymentReturns.class)).isEqualTo(ledger);
+        assertThat(json.read(json.write(decision), SupplierPaymentReturn.class)).isEqualTo(decision);
+        assertThat(ledger.totalReturned()).isEqualTo(money("20")); assertThat(ledger.request().command().amount()).isEqualTo(money("70"));
+    }
+
+    private static SupplierPaymentReturnPort.Receipt returned(SupplierPaymentReturnPort.Request request) {
+        var now = Instant.now(); var original = request.original();
+        var current = new PaymentObservation(original.authorizationId(), original.commandDigest(), original.status(), 2L, now,
+                original.paymentReference(), original.paidAmount(), original.accountDigest(), original.completedAt(), original.receiptReference(), null);
+        var funds = new SupplierPaymentReturnPort.BankReceipt("returned-bank-1", request.command().debitAccount().reference(), money("20"), now);
+        return new SupplierPaymentReturnPort.Receipt(request, SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED, 2, now, now.plusSeconds(120), current, List.of(funds));
     }
 
     private SupplierPaymentCommand command(Instant now) {
