@@ -58,6 +58,7 @@ public record SupplierPaymentReturns(SupplierPaymentReturnPort.Request request, 
         requireTime(now);
         if (operation == null || !operation.adjusted() || now.isBefore(operation.updatedAt()) || verified == null
                 || !verified.matches(request, now) || verified.observedAt().isBefore(updatedAt) || verified.observedAt().isBefore(operation.updatedAt())
+                || operation.evidence() == null || !verified.continues(operation.evidence().bank())
                 || verified.status() != SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED && verified.status() != SupplierPaymentReturnPort.Status.RETURNED
                 || verified.returns().size() != entries.size() || !verified.returns().containsAll(entries.stream().map(Entry::proof).toList())) throw accountingChanged();
         var source = operation.command().source().returns(); var covered = source.entries().size();

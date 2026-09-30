@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,10 +28,12 @@ public class JdbcProcurementPayableReservationRepository {
     private final ProcurementPaymentRepository requests;
     private final JdbcProcurementInvoiceClaims invoices;
     private final SupplierPayableReturnGuard returns;
+    private final JdbcSupplierAdjustmentCompletions adjustments;
 
     /** 占用引用实际冻结版本，不能由页面自行填写余额或原应付事实。 */
-    public JdbcProcurementPayableReservationRepository(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests, JdbcProcurementInvoiceClaims invoices, SupplierPayableReturnGuard returns) {
-        this.jdbc = jdbc; this.json = json; this.requests = requests; this.invoices = invoices; this.returns = returns;
+    public JdbcProcurementPayableReservationRepository(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests, JdbcProcurementInvoiceClaims invoices, SupplierPayableReturnGuard returns,
+            JdbcSupplierAdjustmentCompletions adjustments) {
+        this.jdbc = jdbc; this.json = json; this.requests = requests; this.invoices = invoices; this.returns = returns; this.adjustments = adjustments;
     }
 
     /** 唯一冲突拒绝第二张申请；不会覆盖原占用或把较小金额当作可并行承诺。 */
@@ -100,6 +103,33 @@ public class JdbcProcurementPayableReservationRepository {
         if (changed != 1) throw conflict(); append(value); return value;
     }
 
+    /** 独立调整只结束仍保留的原占用；已有核销或前次调整的本地完成原件保持不变。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ProcurementPayableReservation completeAdjustment(SupplierAdjustmentCompletion proof) {
+        var command = proof.operation().command(); var source = command.source(); var tenant = command.tenantId();
+        var original = proof.bank().command().holdCommand().authorization().source().reservation();
+        requests.lock(tenant, original.source().requestId()); returns.lock(tenant, original.source().round().content());
+        if (adjustments.find(tenant, command.id()).filter(proof::equals).isEmpty()) throw conflict();
+        var before = find(tenant, original.id()).orElseThrow(JdbcProcurementPayableReservationRepository::conflict);
+        if (!before.source().equals(original.source()) || before.release() != null) throw conflict();
+        if (!before.held()) {
+            if (source.recognizesOriginalPayment() || before.settlement() != null && (source.settlement() == null
+                    || !before.settlement().operationId().equals(source.settlement().command().id()))
+                    || before.adjustment() != null && source.previous() == null) throw conflict();
+            return before;
+        }
+        // 原 ERP 核销成功但本地未结束时，调整仍可结束原占用，不重复确认原付款。
+        if (!original.equals(before) || source.previous() != null) throw conflict();
+        var value = before.adjust(proof.operation(), proof.completedAt());
+        int changed = jdbc.update("""
+                UPDATE procurement_payable_reservation SET version=2,state_json=?,adjusted_at=?,adjustment_id=?,adjustment_version=?,
+                    active_request_id=NULL,active_payable_reference=NULL
+                WHERE tenant_id=? AND id=? AND version=1 AND state_json=?
+                """, json.write(value), Timestamp.from(proof.completedAt().truncatedTo(ChronoUnit.MICROS)), command.id().toString(), proof.operation().version(),
+                tenant, original.id().toString(), json.write(before));
+        if (changed != 1) throw conflict(); append(value); return value;
+    }
+
     /** 当前申请只能有一笔未释放占用，保留中的旧轮次也必须先显式处理。 */
     public Optional<ProcurementPayableReservation> active(String tenant, UUID requestId) {
         return jdbc.query("SELECT * FROM procurement_payable_reservation WHERE tenant_id=? AND active_request_id=?", this::restore,
@@ -134,7 +164,22 @@ public class JdbcProcurementPayableReservationRepository {
                     || proof.operationVersion() != row.getLong("settlement_version")) throw conflict();
             requireCompletion(value);
         }
+        requireAdjustment(row, value);
         return value;
+    }
+    private void requireAdjustment(ResultSet row, ProcurementPayableReservation value) throws SQLException {
+        var reference = value.adjustment();
+        // 历史迁移夹具仍读取 V81 之前的表，旧结构只允许恢复没有调整引用的占用。
+        var metadata = row.getMetaData(); boolean present = false;
+        for (int index = 1; index <= metadata.getColumnCount(); index++) if ("adjustment_id".equalsIgnoreCase(metadata.getColumnLabel(index))) present = true;
+        if (!present && reference == null) return;
+        if (!Objects.equals(reference == null ? null : reference.operationId().toString(), row.getString("adjustment_id"))
+                || !Objects.equals(reference == null ? null : reference.operationVersion(), row.getObject("adjustment_version", Long.class))
+                || !Objects.equals(reference == null ? null : reference.completedAt().truncatedTo(ChronoUnit.MICROS), instant(row.getTimestamp("adjusted_at")))) throw conflict();
+        if (reference == null) return;
+        var proof = adjustments.find(value.source().tenantId(), reference.operationId()).orElseThrow(JdbcProcurementPayableReservationRepository::conflict);
+        var original = proof.bank().command().holdCommand().authorization().source().reservation();
+        if (!original.adjust(proof.operation(), proof.completedAt()).equals(value)) throw conflict();
     }
     private void requireCompletion(ProcurementPayableReservation value) {
         var proof = value.settlement();

@@ -2,6 +2,7 @@ package io.agentflow.procurement;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
+import io.agentflow.finance.PaymentObservation;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,6 +44,44 @@ class SupplierPaymentReturnAccountingTest {
         assertThatThrownBy(() -> before.account(done, missing, at)).isInstanceOf(DomainException.class);
         var unknown = done.requestQuery(done.updatedAt());
         assertThatThrownBy(() -> before.account(unknown, proof, at)).isInstanceOf(DomainException.class);
+    }
+
+    @Test void completionProofReplaysExactLedgerTransitionAndRejectsUnknownOrNewerBankFacts() {
+        var done = done(); var before = done.command().source().returns(); var at = done.updatedAt().plusSeconds(1);
+        var receipt = proof(done.command(), before.entries(), at); var bank = bank(before.request(), before.request().original());
+        var completion = SupplierAdjustmentCompletion.from(done, bank, before, receipt, at);
+        assertThat(completion.after()).isEqualTo(before.account(done, receipt, at)); assertThat(completion.completedAt()).isEqualTo(at);
+        assertThatThrownBy(() -> SupplierAdjustmentCompletion.from(done, bank.requestQuery(at), before, receipt, at)).isInstanceOf(DomainException.class);
+        var old = receipt.current();
+        var newer = new PaymentObservation(old.authorizationId(), old.commandDigest(), old.status(), old.revision() + 1, at,
+                old.paymentReference(), old.paidAmount(), old.accountDigest(), old.completedAt(), old.receiptReference(), null);
+        assertThatThrownBy(() -> SupplierAdjustmentCompletion.from(done, bank(before.request(), newer), before, receipt, at)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new SupplierAdjustmentCompletion(done, bank, receipt, before, completion.after().requireReview(at.plusSeconds(1)))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void fullyReturnedCompletionPreservesTheActualOriginalBankReversal() {
+        var command = SupplierPayableAdjustmentTest.command(false, "70"); var at = command.registeredAt();
+        var done = SupplierPayableAdjustmentOperation.queue(command, at).claim(at, Duration.ofSeconds(30))
+                .readyToSend(SupplierPayableAdjustmentTest.evidence(command, at), at)
+                .complete(new FinanceResult.Success<>(SupplierPayableAdjustmentTest.adjusted(command, 1, at, "30", "30")), at);
+        var before = command.source().returns(); var previous = done.evidence().bank(); var reversal = previous.current();
+        var observed = new PaymentObservation(reversal.authorizationId(), reversal.commandDigest(), reversal.status(), reversal.revision(), at.plusSeconds(1),
+                reversal.paymentReference(), reversal.paidAmount(), reversal.accountDigest(), reversal.completedAt(), reversal.receiptReference(), null);
+        var receipt = new SupplierPaymentReturnPort.Receipt(previous.request(), previous.status(), previous.revision() + 1, at.plusSeconds(1),
+                at.plusSeconds(301), observed, previous.returns());
+        var current = bank(before.request(), receipt.current());
+        var completion = SupplierAdjustmentCompletion.from(done, current, before, receipt, at.plusSeconds(1));
+        assertThat(completion.after().reviewRequired()).isFalse(); assertThat(completion.after().request().original().status()).isEqualTo(PaymentObservation.Status.SUCCEEDED);
+        assertThat(completion.bank().status()).isEqualTo(SupplierPaymentOperation.Status.REVERSED);
+        assertThatThrownBy(() -> SupplierAdjustmentCompletion.from(done, bank(before.request(), before.request().original()), before, receipt, at.plusSeconds(1))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void completionCannotForgetTheHigherReturnRevisionObservedBeforeDispatch() {
+        var done = done(); var before = done.command().source().returns(); var at = done.updatedAt().plusSeconds(1);
+        var fresh = proof(done.command(), before.entries(), at); var earlier = done.evidence().bank();
+        var stale = new SupplierPaymentReturnPort.Receipt(fresh.request(), fresh.status(), earlier.revision() - 1, at,
+                fresh.validUntil(), fresh.current(), fresh.returns());
+        assertThatThrownBy(() -> before.account(done, stale, at)).isInstanceOf(DomainException.class);
     }
 
     @Test void laterRegisteredFundsRemainPendingWhileOriginalConfirmedPortionIsAccounted() {
@@ -97,6 +136,10 @@ class SupplierPaymentReturnAccountingTest {
         return SupplierPayableAdjustmentOperation.queue(command, at).claim(at, Duration.ofSeconds(30))
                 .readyToSend(SupplierPayableAdjustmentTest.evidence(command, at), at)
                 .complete(new FinanceResult.Success<>(SupplierPayableAdjustmentTest.adjusted(command, 1, at, "30", "80")), at);
+    }
+    private static SupplierPaymentOperation bank(SupplierPaymentReturnPort.Request request, PaymentObservation observation) {
+        return new SupplierPaymentOperation(request.command(), 4, SupplierPaymentOperation.Status.valueOf(observation.status().name()), 1, 1,
+                request.command().registeredAt(), observation.observedAt(), null, null, null, observation, null, observation.revision(), null);
     }
     private static List<SupplierPaymentReturns.Entry> added(SupplierPaymentReturns before, String amount, Instant at) {
         var entries = new ArrayList<>(before.entries()); entries.add(new SupplierPaymentReturns.Entry(UUID.randomUUID(), new SupplierPaymentReturnPort.BankReceipt("return-2", before.request().command().debitAccount().reference(), money(amount), at))); return entries;

@@ -67,6 +67,18 @@ public class JdbcSupplierAdjustmentSources {
     public void requireCurrent(SupplierPayableAdjustmentSource source) {
         var bank = source.returns().request().command(); var tenant = bank.tenantId();
         if (!lock(tenant, bank.id()).equals(source.returns())) throw changed();
+        requireFinancialState(source);
+    }
+
+    /** ERP 已成功时允许之后登记的新入款保留待办，原核销、前次调整和银行状态仍须可确认。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierPaymentReturns currentForCompletion(SupplierPayableAdjustmentSource source) {
+        var bank = source.returns().request().command();
+        var current = lock(bank.tenantId(), bank.id()); requireFinancialState(source); return current;
+    }
+
+    private void requireFinancialState(SupplierPayableAdjustmentSource source) {
+        var bank = source.returns().request().command(); var tenant = bank.tenantId();
         requireRecorded(source);
         var currentBank = payments.find(tenant, bank.id()).orElseThrow(JdbcSupplierAdjustmentSources::changed);
         if (!currentBank.command().equals(bank) || currentBank.conflictingObservation() != null

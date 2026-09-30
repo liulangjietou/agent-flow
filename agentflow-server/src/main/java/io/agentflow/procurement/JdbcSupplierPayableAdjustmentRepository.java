@@ -146,6 +146,19 @@ public class JdbcSupplierPayableAdjustmentRepository {
                 ORDER BY updated_at,id LIMIT 10
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))));
     }
+
+    // 与账本、分录和占用同事务调用；后续查询只改变状态，不得再次占用办理位置。
+    void complete(SupplierAdjustmentCompletion proof) {
+        var operation = proof.operation(); var command = operation.command();
+        int changed = jdbc.update("""
+                UPDATE supplier_payable_adjustment_operation SET completed_version=?,active_payment_id=NULL
+                WHERE tenant_id=? AND id=? AND version=? AND state_json=? AND status='ADJUSTED'
+                    AND retired_version IS NULL AND completed_version IS NULL AND active_payment_id=payment_id
+                    AND EXISTS(SELECT 1 FROM supplier_adjustment_completion c WHERE c.tenant_id=? AND c.operation_id=? AND c.operation_version=?)
+                """, operation.version(), command.tenantId(), command.id().toString(), operation.version(), json.write(operation),
+                command.tenantId(), command.id().toString(), operation.version());
+        if (changed != 1) throw conflict();
+    }
     private void requireCompletion(SupplierPayableAdjustmentOperation value, long completedVersion) {
         var command = value.command();
         var proof = revision(command.tenantId(), command.id(), completedVersion).orElseThrow(JdbcSupplierPayableAdjustmentRepository::conflict);

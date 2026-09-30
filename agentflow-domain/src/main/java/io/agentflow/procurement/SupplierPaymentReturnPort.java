@@ -101,6 +101,13 @@ public interface SupplierPaymentReturnPort {
                     && Objects.equals(current.paidAmount(), other.paidAmount()) && Objects.equals(current.accountDigest(), other.accountDigest())
                     && Objects.equals(current.completedAt(), other.completedAt()) && Objects.equals(current.receiptReference(), other.receiptReference());
         }
+        /** 登记资金与完成记账都须匹配当前无争议银行；相同原付款的旧成功不能覆盖未知或更新的外部修订。 */
+        public boolean matchesCurrentBank(SupplierPaymentOperation bank) {
+            return bank != null && bank.command().equals(request.command()) && bank.conflictingObservation() == null
+                    && (bank.settleable() || bank.status() == SupplierPaymentOperation.Status.REVERSED)
+                    && current != null && samePaymentFacts(bank.observation()) && bank.observation().revision() <= current.revision()
+                    && !bank.observation().observedAt().isAfter(current.observedAt());
+        }
         /** 原付款金额保持，退回单独汇总，不能在这里重开应付或释放预算。 */
         public Money totalReturned() { return returns.stream().map(BankReceipt::amount).reduce(Money.zero(request.command().amount().currency()), Money::plus); }
         @Override public String toString() { return "SupplierPaymentReturnReceipt[paymentId=" + request.command().id() + ", status=" + status + ", revision=" + revision + "]"; }

@@ -93,7 +93,7 @@ class SupplierPaymentPersistenceTest {
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
         var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
         approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
@@ -107,7 +107,7 @@ class SupplierPaymentPersistenceTest {
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
         preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
-        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc));
+        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
         returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
         returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
         returnActor = mock(CurrentActor.class); when(returnActor.actor()).thenReturn(new Actor(tenant, "finance", Set.of("FINANCE")));
@@ -405,7 +405,7 @@ class SupplierPaymentPersistenceTest {
         var check = returnCheck(payment, "finance", 2, returnFunds("one", "20", clock()));
         var before = returnLedgers.find(tenant, id).orElseThrow(); var decision = returnDecision(check);
         var after = tx.execute(status -> returnRegistrations.register(decision, before.version(), check.version()));
-        var reopened = new JdbcSupplierPaymentReturnRepository(jdbc, json, new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc)),
+        var reopened = new JdbcSupplierPaymentReturnRepository(jdbc, json, new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json)),
                 new JdbcSupplierPaymentReturnCheckRepository(jdbc, json), payments, new JdbcFinanceReceiptCreditRepository(jdbc));
         assertThat(reopened.history(tenant, id)).containsExactly(decision); assertThat(reopened.history("other", id)).isEmpty();
         assertThat(returnLedgers.find(tenant, id)).contains(after); assertThat(returnLedgers.find("other", id)).isEmpty();

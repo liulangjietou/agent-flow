@@ -3,9 +3,13 @@ package io.agentflow.procurement;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.Timestamp;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -23,10 +27,12 @@ public class JdbcSupplierPaymentReturnsRepository {
     private final JsonUtil json;
     private final JdbcSupplierPaymentOperationRepository payments;
     private final SupplierPayableReturnGuard guard;
+    private final JdbcSupplierAdjustmentCompletions completions;
 
     /** 原成功来源由银行仓储核对，持久化不借用当前账户目录或原核销状态。 */
-    public JdbcSupplierPaymentReturnsRepository(JdbcTemplate jdbc, JsonUtil json, JdbcSupplierPaymentOperationRepository payments, SupplierPayableReturnGuard guard) {
-        this.jdbc = jdbc; this.json = json; this.payments = payments; this.guard = guard;
+    public JdbcSupplierPaymentReturnsRepository(JdbcTemplate jdbc, JsonUtil json, JdbcSupplierPaymentOperationRepository payments,
+            SupplierPayableReturnGuard guard, JdbcSupplierAdjustmentCompletions completions) {
+        this.jdbc = jdbc; this.json = json; this.payments = payments; this.guard = guard; this.completions = completions;
     }
 
     /** 首次只能保存空账本，并关联实际首次成功银行修订。 */
@@ -63,6 +69,7 @@ public class JdbcSupplierPaymentReturnsRepository {
         return jdbc.query("SELECT state_json FROM supplier_payment_returns_revision WHERE tenant_id=? AND payment_id=? AND version=?", (row, index) -> {
             var value = json.read(row.getString("state_json"), SupplierPaymentReturns.class);
             if (!value.request().command().tenantId().equals(tenant) || !value.request().command().id().equals(id) || value.version() != version) throw conflict();
+            requireAccounting(value);
             return value;
         }, tenant, id.toString(), version).stream().findFirst().orElseThrow(JdbcSupplierPaymentReturnsRepository::conflict);
     }
@@ -78,6 +85,34 @@ public class JdbcSupplierPaymentReturnsRepository {
     // 只有同包的登记仓储在保存具名决定的事务中调用，公开仓储没有任意账本更新入口。
     SupplierPaymentReturns register(SupplierPaymentReturns before, SupplierPaymentReturn decision) {
         var next = before.register(decision); persist(before, next); return next;
+    }
+
+    // 完成表引用后继修订，当前账本又引用完成表；先追加修订，再由同事务保存证明并更新当前行。
+    void stageAccounting(SupplierAdjustmentCompletion proof) {
+        var before = proof.before(); var bank = before.request().command();
+        if (!locked(bank.tenantId(), bank.id()).equals(before)) throw conflict();
+        append(proof.after());
+    }
+
+    // 只供同包原子完成编排调用，普通查询和登记不能直接改变已记账引用。
+    void completeAccounting(SupplierAdjustmentCompletion proof) {
+        var bank = proof.before().request().command(); var after = proof.after(); var accounted = after.accounting();
+        if (!completions.find(bank.tenantId(), accounted.operationId()).filter(proof::equals).isPresent()) throw conflict();
+        int changed = jdbc.update("""
+                UPDATE supplier_payment_returns SET state_json=?,version=?,review_required=?,updated_at=?,
+                    accounting_id=?,accounting_version=?,accounted_entry_count=?,accounted_at=?
+                WHERE tenant_id=? AND payment_id=? AND version=? AND input_json=? AND state_json=?
+                """, json.write(after), after.version(), after.reviewRequired(), timestamp(after.updatedAt()), accounted.operationId().toString(),
+                accounted.operationVersion(), accounted.entryCount(), timestamp(accounted.accountedAt()), bank.tenantId(), bank.id().toString(),
+                proof.before().version(), json.write(proof.before().request()), json.write(proof.before()));
+        if (changed != 1) throw conflict();
+    }
+
+    /** 完成时读到的更高修订也属于已知原件，后续登记不得仅比较较早的查询记录。 */
+    public List<SupplierPaymentReturnPort.Receipt> accountingReceipts(SupplierPaymentReturns ledger) {
+        if (ledger.accounting() == null) return List.of();
+        requireAccounting(ledger); var bank = ledger.request().command();
+        return completions.history(bank.tenantId(), bank.id()).stream().map(SupplierAdjustmentCompletion::receipt).toList();
     }
 
     private void persist(SupplierPaymentReturns before, SupplierPaymentReturns value) {
@@ -102,8 +137,31 @@ public class JdbcSupplierPaymentReturnsRepository {
                     || !time(value.createdAt()).equals(row.getTimestamp("created_at").toInstant()) || !time(value.updatedAt()).equals(row.getTimestamp("updated_at").toInstant())) throw conflict();
             var original = payments.revision(command.tenantId(), command.id(), row.getLong("payment_version")).orElseThrow(JdbcSupplierPaymentReturnsRepository::conflict);
             if (!original.settleable() || !original.command().equals(command) || !original.observation().equals(request.original())) throw conflict();
+            requireAccountingHeaders(row, value); requireAccounting(value);
             return value;
         };
+    }
+    private void requireAccounting(SupplierPaymentReturns ledger) {
+        var accounted = ledger.accounting(); if (accounted == null) return;
+        var proof = completions.find(ledger.request().command().tenantId(), accounted.operationId()).orElseThrow(JdbcSupplierPaymentReturnsRepository::conflict);
+        var after = proof.after();
+        if (!ledger.request().equals(after.request()) || !accounted.equals(after.accounting()) || ledger.version() < after.version()
+                || ledger.updatedAt().isBefore(after.updatedAt()) || ledger.entries().size() < after.entries().size()
+                || !after.entries().equals(ledger.entries().subList(0, after.entries().size()))) throw conflict();
+    }
+    private static void requireAccountingHeaders(ResultSet row, SupplierPaymentReturns ledger) throws SQLException {
+        var accounted = ledger.accounting();
+        // V80 非空升级核验会读取旧表；没有记账列的旧表只允许恢复没有记账引用的原记录。
+        if (accounted == null && !hasAccountingColumn(row)) return;
+        if (!Objects.equals(accounted == null ? null : accounted.operationId().toString(), row.getString("accounting_id"))
+                || !Objects.equals(accounted == null ? null : accounted.operationVersion(), row.getObject("accounting_version", Long.class))
+                || !Objects.equals(accounted == null ? null : accounted.entryCount(), row.getObject("accounted_entry_count", Integer.class))
+                || !Objects.equals(accounted == null ? null : time(accounted.accountedAt()), row.getTimestamp("accounted_at") == null ? null : row.getTimestamp("accounted_at").toInstant())) throw conflict();
+    }
+    private static boolean hasAccountingColumn(ResultSet row) throws SQLException {
+        var metadata = row.getMetaData();
+        for (int index = 1; index <= metadata.getColumnCount(); index++) if ("accounting_id".equalsIgnoreCase(metadata.getColumnLabel(index))) return true;
+        return false;
     }
     private void append(SupplierPaymentReturns value) {
         var command = value.request().command();

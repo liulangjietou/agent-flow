@@ -12,6 +12,32 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 public class SupplierPayableReturnGuard {
+    // r 是调用查询中的原占用；页面判定和后台核销扫描共用同一应付冻结规则。
+    static final String BLOCKED_SQL = """
+            EXISTS (SELECT 1 FROM supplier_payment_returns f WHERE f.tenant_id=r.tenant_id AND f.legal_entity_id=r.legal_entity_id
+                AND f.supplier_reference=r.supplier_reference AND f.payable_reference=r.payable_reference AND f.review_required=TRUE)
+            OR EXISTS (SELECT 1 FROM supplier_payment_operation b
+                JOIN supplier_payment_authorization a ON a.tenant_id=b.tenant_id AND a.id=b.id
+                JOIN procurement_payable_reservation prior ON prior.tenant_id=a.tenant_id AND prior.id=a.reservation_id
+                WHERE b.tenant_id=r.tenant_id AND prior.legal_entity_id=r.legal_entity_id
+                    AND prior.supplier_reference=r.supplier_reference AND prior.payable_reference=r.payable_reference
+                    AND (prior.settled_at IS NOT NULL OR prior.adjusted_at IS NOT NULL)
+                    AND (b.status NOT IN ('SUCCEEDED','REVERSED') OR b.status='REVERSED' AND NOT EXISTS (
+                        SELECT 1 FROM supplier_payment_returns f JOIN supplier_adjustment_completion c
+                            ON c.tenant_id=f.tenant_id AND c.operation_id=f.accounting_id AND c.operation_version=f.accounting_version
+                        WHERE f.tenant_id=b.tenant_id AND f.payment_id=b.id AND c.bank_status='REVERSED')))
+            OR EXISTS (SELECT 1 FROM supplier_payable_adjustment_operation adjustment
+                JOIN procurement_payable_reservation prior ON prior.tenant_id=adjustment.tenant_id AND prior.id=adjustment.reservation_id
+                WHERE adjustment.tenant_id=r.tenant_id AND prior.legal_entity_id=r.legal_entity_id
+                    AND prior.supplier_reference=r.supplier_reference AND prior.payable_reference=r.payable_reference
+                    AND adjustment.completed_version IS NOT NULL AND adjustment.status<>'ADJUSTED')
+            OR EXISTS (SELECT 1 FROM supplier_payable_settlement_operation settlement
+                JOIN procurement_payable_reservation prior ON prior.tenant_id=settlement.tenant_id AND prior.id=settlement.reservation_id
+                WHERE settlement.tenant_id=r.tenant_id AND prior.legal_entity_id=r.legal_entity_id
+                    AND prior.supplier_reference=r.supplier_reference AND prior.payable_reference=r.payable_reference
+                    AND (prior.settled_at IS NOT NULL OR prior.adjusted_at IS NOT NULL)
+                    AND settlement.active_payment_id=settlement.payment_id AND settlement.status<>'SETTLED')
+            """;
     private final JdbcTemplate jdbc;
 
     /** 只关联持久的原应付身份，不依赖当前账户目录或外部网络。 */
@@ -37,17 +63,9 @@ public class SupplierPayableReturnGuard {
     /** 只读投影与本地完成共用判定；原来已完成的凭据不会被回退。 */
     public boolean blocked(String tenant, ProcurementPaymentContent content) {
         var identity = new Object[] {tenant, content.legalEntityId().toString(), content.supplierReference(), content.payableReference()};
-        if (jdbc.queryForObject("""
-                SELECT COUNT(*) FROM supplier_payment_returns WHERE tenant_id=? AND legal_entity_id=?
-                AND supplier_reference=? AND payable_reference=? AND review_required=TRUE
-                """, Integer.class, identity) > 0) return true;
-        // 已完成后又出现银行未知、争议或退回，同样不能让另一张申请沿用旧完成事实继续付款。
         return jdbc.queryForObject("""
-                SELECT COUNT(*) FROM supplier_payment_operation b
-                JOIN supplier_payment_authorization a ON a.tenant_id=b.tenant_id AND a.id=b.id
-                JOIN procurement_payable_reservation r ON r.tenant_id=a.tenant_id AND r.id=a.reservation_id
-                WHERE b.tenant_id=? AND r.legal_entity_id=? AND r.supplier_reference=? AND r.payable_reference=?
-                AND r.settled_at IS NOT NULL AND b.status<>'SUCCEEDED'
-                """, Integer.class, identity) > 0;
+                SELECT COUNT(*) FROM procurement_payable_reservation r
+                WHERE r.tenant_id=? AND r.legal_entity_id=? AND r.supplier_reference=? AND r.payable_reference=? AND (%s)
+                """.formatted(BLOCKED_SQL), Integer.class, identity) > 0;
     }
 }

@@ -79,6 +79,8 @@ class SupplierAdjustmentPersistenceTest {
     private JdbcSupplierAdjustmentSources adjustmentSources;
     private JdbcSupplierAdjustmentPreparationRepository adjustmentIntents;
     private JdbcSupplierPayableAdjustmentRepository adjustments;
+    private JdbcSupplierAdjustmentCompletions completions;
+    private SupplierAdjustmentCompletionService completion;
 
     @BeforeEach void database() { database(null); }
 
@@ -91,7 +93,7 @@ class SupplierAdjustmentPersistenceTest {
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
         var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
         approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
@@ -104,12 +106,15 @@ class SupplierAdjustmentPersistenceTest {
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
         preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
-        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc));
+        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
         returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
         returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
         adjustmentSources = new JdbcSupplierAdjustmentSources(jdbc, json, procurements, returnLedgers, reservations, payments);
         adjustmentIntents = new JdbcSupplierAdjustmentPreparationRepository(jdbc, json, adjustmentSources);
         adjustments = new JdbcSupplierPayableAdjustmentRepository(jdbc, json, adjustmentIntents, adjustmentSources);
+        completions = new JdbcSupplierAdjustmentCompletions(jdbc, json);
+        completion = proxy(new SupplierAdjustmentCompletionService(adjustmentSources, adjustments, payments, returnLedgers, returnChecks, completions,
+                new JdbcFinanceReceiptCreditRepository(jdbc), reservations));
     }
 
 
@@ -234,6 +239,213 @@ class SupplierAdjustmentPersistenceTest {
         assertThatThrownBy(() -> jdbc.update("UPDATE finance_receipt_credit SET voucher_reference='forged',entry_reference='entry' WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
     }
 
+
+    @Test void atomicCompletionAccountsFundsEndsOriginalHoldAndRestoresExactHistoricalProof() {
+        var source = source(); var done = adjusted(adjustment(intent(source)), "return-voucher");
+        var proof = finish(done, 20); var paymentId = proof.bank().command().id();
+        assertThat(proof.after().reviewRequired()).isFalse(); assertThat(proof.after().accountedEntryCount()).isEqualTo(1);
+        assertThat(returnLedgers.find(tenant, paymentId)).contains(proof.after());
+        var original = proof.bank().command().holdCommand().authorization().source().reservation();
+        assertThat(reservations.find(tenant, original.id())).contains(original.adjust(done, proof.completedAt()));
+        assertThat(adjustments.active(tenant, paymentId)).isEmpty(); assertThat(adjustments.awaitingLocalCompletion()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT supplier_adjustment_id FROM finance_receipt_credit WHERE tenant_id=?", String.class, tenant)).isEqualTo(done.command().id().toString());
+        assertThat(new JdbcSupplierAdjustmentCompletions(jdbc, json).find(tenant, done.command().id())).contains(proof);
+        assertThat(completions.find("other", done.command().id())).isEmpty();
+        assertThat(completion.complete(done, proof.receipt(), clock())).isEqualTo(proof);
+        assertThat(count("supplier_adjustment_completion")).isEqualTo(1);
+        assertThat(adjustments.find(tenant, done.command().id())).contains(done);
+    }
+
+    @Test void adjustmentAfterOriginalSettlementPreservesOriginalCompletionAndReservationBytes() {
+        var source = source(true); var original = source.returns().request().command().holdCommand().authorization().source().reservation();
+        var saved = jdbc.queryForList("SELECT * FROM supplier_settlement_completion WHERE tenant_id=?", tenant);
+        var state = jdbc.queryForObject("SELECT state_json FROM procurement_payable_reservation WHERE tenant_id=? AND id=?", String.class, tenant, original.id().toString());
+        var proof = finish(adjusted(adjustment(intent(source)), "return-after-settlement"), 20);
+        assertThat(proof.after().reviewRequired()).isFalse();
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_settlement_completion WHERE tenant_id=?", tenant)).isEqualTo(saved);
+        assertThat(jdbc.queryForObject("SELECT state_json FROM procurement_payable_reservation WHERE tenant_id=? AND id=?", String.class, tenant, original.id().toString())).isEqualTo(state);
+        assertThat(reservations.find(tenant, original.id()).orElseThrow().settlement()).isNotNull();
+    }
+
+    @Test void lateRegisteredFundsRemainPendingAndNextAdjustmentOnlyPostsNewMoney() {
+        var source = source(); var done = adjusted(adjustment(intent(source)), "return-first"); var paymentId = source.returns().request().command().id();
+        var funds = source.returns().entries().get(0).proof();
+        var check = returnCheck(payments.find(tenant, paymentId).orElseThrow(), "finance", 11, funds, returnFunds("second", "10", clock()));
+        registerReturn(check, returnDecision(check));
+        var first = finish(done, 20); assertThat(first.after().reviewRequired()).isTrue(); assertThat(first.after().accountedEntryCount()).isEqualTo(1);
+        var previous = new SupplierPayableAdjustmentSource.Previous(paymentId, done.command().source().returns().request().command().digest(), null,
+                done.version(), done.command().source().returns().entries(), done.observation());
+        var next = new SupplierPayableAdjustmentSource(first.after(), null, previous);
+        var queued = adjustment(intent(next));
+        // 旧完成进入查询仍不能夺走新命令的活动位置，且新的记账必须等待旧结果再次核清。
+        var unknown = done.requestQuery(clock()); tx.executeWithoutResult(status -> adjustments.update(unknown));
+        assertThat(adjustments.active(tenant, paymentId)).contains(queued); assertThat(completions.find(tenant, done.command().id())).contains(first);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> adjustmentSources.requireCurrent(next))).isInstanceOf(DomainException.class);
+        var querying = unknown.claim(clock(), Duration.ofSeconds(30)); tx.executeWithoutResult(status -> adjustments.update(querying));
+        var at = clock(); var reconciled = querying.complete(new FinanceResult.Success<>(new SupplierPayableAdjustmentObservation(done.command().id(), done.command().digest(),
+                SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2, at, done.observation().posting(), null)), at);
+        tx.executeWithoutResult(status -> adjustments.update(reconciled));
+        var secondDone = adjusted(queued, "return-second"); var second = finish(secondDone, 40);
+        assertThat(second.after().reviewRequired()).isFalse(); assertThat(second.after().accountedEntryCount()).isEqualTo(2);
+        assertThat(secondDone.observation().posting().returnedAmount()).isEqualTo(money("10"));
+        assertThat(count("supplier_adjustment_completion")).isEqualTo(2);
+        assertThat(completions.history(tenant, paymentId)).containsExactly(first, second);
+        var original = source.returns().request().command().holdCommand().authorization().source().reservation();
+        assertThat(reservations.find(tenant, original.id())).contains(original.adjust(done, first.completedAt()));
+    }
+
+    @Test void accountingEntryConflictRollsBackAllLocalCompletionWhileErpSuccessRemainsDurable() {
+        finish(adjusted(adjustment(intent(source())), "shared-voucher"), 20);
+        var next = source(); var done = adjusted(adjustment(intent(next)), "shared-voucher"); var paymentId = next.returns().request().command().id();
+        var beforeRows = jdbc.queryForList("SELECT * FROM supplier_payment_returns_revision WHERE tenant_id=? AND payment_id=?", tenant, paymentId.toString());
+        assertThatThrownBy(() -> finish(done, 20)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(adjustments.find(tenant, done.command().id())).contains(done); assertThat(adjustments.active(tenant, paymentId)).contains(done);
+        assertThat(returnLedgers.find(tenant, paymentId)).contains(next.returns()); assertThat(completions.find(tenant, done.command().id())).isEmpty();
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_payment_returns_revision WHERE tenant_id=? AND payment_id=?", tenant, paymentId.toString())).isEqualTo(beforeRows);
+        var original = next.returns().request().command().holdCommand().authorization().source().reservation(); assertThat(reservations.find(tenant, original.id())).contains(original);
+        assertThat(jdbc.queryForObject("SELECT voucher_reference FROM finance_receipt_credit WHERE tenant_id=? AND business_id=?", String.class, tenant, original.source().requestId().toString())).isNull();
+    }
+
+    @Test void completedHigherBankRevisionCannotBeDowngradedByARegistrationQuery() {
+        var source = source(); var done = adjusted(adjustment(intent(source)), "return-higher-bank"); var proof = finish(done, 20);
+        var check = returnCheck(proof.bank(), "finance", 11, source.returns().entries().get(0).proof(), returnFunds("newer", "10", clock()));
+        assertThatThrownBy(() -> registerReturn(check, returnDecision(check))).isInstanceOf(DomainException.class);
+        assertThat(returnLedgers.find(tenant, proof.bank().command().id()).orElseThrow().entries()).isEqualTo(proof.after().entries());
+        assertThat(count("finance_receipt_credit")).isEqualTo(1);
+    }
+
+    @Test void staleSuccessAndFreshButUnregisteredMoneyCannotCompleteAccounting() {
+        var source = source(); var done = adjusted(adjustment(intent(source)), "return-protected"); var paymentId = source.returns().request().command().id();
+        var check = returnCheck(payments.find(tenant, paymentId).orElseThrow(), "finance", 15,
+                source.returns().entries().get(0).proof(), returnFunds("unregistered", "10", clock()));
+        assertThatThrownBy(() -> finish(done, 20)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> completion.complete(done, check.receipt(), clock())).isInstanceOf(DomainException.class);
+        var unknown = done.requestQuery(clock()); tx.executeWithoutResult(status -> adjustments.update(unknown));
+        assertThatThrownBy(() -> finish(done, 20)).isInstanceOf(DomainException.class);
+        assertThat(count("supplier_adjustment_completion")).isZero(); assertThat(count("finance_receipt_credit")).isEqualTo(1);
+    }
+
+    @Test void bankUnknownAfterAdjustmentBlocksFurtherPaymentsOnTheSamePayable() {
+        var done = adjusted(adjustment(intent(source())), "return-bank-query"); var proof = finish(done, 20);
+        var content = proof.bank().command().holdCommand().authorization().source().reservation().source().round().content();
+        var guard = new SupplierPayableReturnGuard(jdbc); assertThat(guard.blocked(tenant, content)).isFalse();
+        tx.executeWithoutResult(status -> bank.query(tenant, proof.bank().command().id(), proof.bank().version(), clock()));
+        assertThat(guard.blocked(tenant, content)).isTrue();
+    }
+
+    @Test void erpUnknownAfterCompletedAdjustmentBlocksFurtherPaymentsOnTheSamePayable() {
+        var done = adjusted(adjustment(intent(source())), "return-erp-query"); var proof = finish(done, 20);
+        var content = proof.bank().command().holdCommand().authorization().source().reservation().source().round().content();
+        var guard = new SupplierPayableReturnGuard(jdbc); assertThat(guard.blocked(tenant, content)).isFalse();
+        tx.executeWithoutResult(status -> adjustments.update(done.requestQuery(clock())));
+        assertThat(guard.blocked(tenant, content)).isTrue();
+    }
+
+    @Test void fullyReturnedBankBecomesClearOnlyAfterExactAccountingBeforeOrAfterOriginalSettlement() {
+        for (boolean settled : List.of(false, true)) {
+            var partial = source(settled); var paymentId = partial.returns().request().command().id();
+            var reversed = reverseBank(payments.find(tenant, paymentId).orElseThrow());
+            var check = returnCheck(reversed, "finance", 3, partial.returns().entries().get(0).proof(), returnFunds("remaining-" + settled, "50", clock()));
+            var all = registerReturn(check, returnDecision(check)); var source = new SupplierPayableAdjustmentSource(all, partial.settlement(), null);
+            var content = reversed.command().holdCommand().authorization().source().reservation().source().round().content();
+            var guard = new SupplierPayableReturnGuard(jdbc); assertThat(guard.blocked(tenant, content)).isTrue();
+            var done = adjusted(adjustment(intent(source)), "full-return-" + settled); var completed = finish(done, 20);
+            assertThat(completed.after().totalReturned()).isEqualTo(reversed.command().amount());
+            assertThat(done.observation().posting().netPaid()).isEqualTo(money("0"));
+            assertThat(completed.after().reviewRequired()).isFalse(); assertThat(guard.blocked(tenant, content)).isFalse();
+            assertThat(jdbc.queryForObject("SELECT bank_status FROM supplier_adjustment_completion WHERE tenant_id=? AND operation_id=?", String.class, tenant, done.command().id().toString())).isEqualTo("REVERSED");
+        }
+    }
+
+    @Test void newBankReversalAfterPartialAccountingStillRequiresFullReturnVerification() {
+        var done = adjusted(adjustment(intent(source())), "partial-before-reversal"); var completed = finish(done, 20);
+        var reversed = reverseBank(completed.bank());
+        var content = reversed.command().holdCommand().authorization().source().reservation().source().round().content();
+        assertThat(returnLedgers.find(tenant, reversed.command().id()).orElseThrow().reviewRequired()).isFalse();
+        assertThat(new SupplierPayableReturnGuard(jdbc).blocked(tenant, content)).isTrue();
+    }
+
+    @Test void concurrentCompletionUsesOneProofAndOneAccountingRevision() throws Exception {
+        var done = adjusted(adjustment(intent(source())), "return-concurrent"); var at = clock();
+        var ledger = done.command().source().returns(); var receipt = completionReceipt(ledger, 20, at);
+        var start = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> { start.await(); return completion.complete(done, receipt, at); });
+            var second = pool.submit(() -> { start.await(); return completion.complete(done, receipt, at); }); start.countDown();
+            assertThat(first.get(15, TimeUnit.SECONDS)).isEqualTo(second.get(15, TimeUnit.SECONDS));
+        } finally { pool.shutdownNow(); }
+        assertThat(count("supplier_adjustment_completion")).isEqualTo(1);
+        assertThat(returnLedgers.find(tenant, ledger.request().command().id()).orElseThrow().version()).isEqualTo(ledger.version() + 1);
+        assertThat(count("finance_receipt_credit")).isEqualTo(1);
+    }
+
+    @Test void originalErpSucceededButLocalReservationStillHeldCanFinishViaAdjustment() {
+        var payment = returnedSource(); var originalSettlement = originalSettlement(payment, false);
+        var oldOperation = jdbc.queryForList("SELECT * FROM supplier_payable_settlement_operation WHERE tenant_id=?", tenant);
+        var check = returnCheck(payment, "finance", 2, returnFunds("before-local-settlement", "20", clock()));
+        var ledger = registerReturn(check, returnDecision(check)); var source = new SupplierPayableAdjustmentSource(ledger, originalSettlement, null);
+        var original = payment.command().holdCommand().authorization().source().reservation();
+        assertThat(reservations.find(tenant, original.id())).contains(original);
+        var done = adjusted(adjustment(intent(source)), "after-erp-before-local"); var proof = finish(done, 20);
+        assertThat(reservations.find(tenant, original.id())).contains(original.adjust(done, proof.completedAt()));
+        assertThat(count("supplier_settlement_completion")).isZero();
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_payable_settlement_operation WHERE tenant_id=?", tenant)).isEqualTo(oldOperation);
+        assertThat(proof.after().reviewRequired()).isFalse();
+        var nextCheck = returnCheck(payment, "finance", 21, ledger.entries().get(0).proof(), returnFunds("later-after-erp", "10", clock()));
+        var nextLedger = registerReturn(nextCheck, returnDecision(nextCheck));
+        var previous = new SupplierPayableAdjustmentSource.Previous(payment.command().id(), payment.command().digest(), originalSettlement.command().id(),
+                done.version(), done.command().source().returns().entries(), done.observation());
+        var nextSource = new SupplierPayableAdjustmentSource(nextLedger, originalSettlement, previous);
+        var second = finish(adjusted(adjustment(intent(nextSource)), "second-after-erp-before-local"), 40);
+        assertThat(second.after().reviewRequired()).isFalse(); assertThat(count("supplier_settlement_completion")).isZero();
+        assertThat(reservations.find(tenant, original.id())).contains(original.adjust(done, proof.completedAt()));
+    }
+
+    @Test void originalSettlementUncertaintyAfterAdjustmentKeepsPayableFrozen() {
+        var source = source(true); var done = adjusted(adjustment(intent(source)), "after-original-query"); var proof = finish(done, 20);
+        var oldIntents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
+        var oldOperations = new JdbcSupplierPayableSettlementRepository(jdbc, json, oldIntents, payments, reservations);
+        var original = oldOperations.find(tenant, source.settlement().command().id()).orElseThrow();
+        tx.executeWithoutResult(status -> oldOperations.update(original.requestQuery(clock())));
+        var content = proof.bank().command().holdCommand().authorization().source().reservation().source().round().content();
+        assertThat(new SupplierPayableReturnGuard(jdbc).blocked(tenant, content)).isTrue();
+    }
+
+    private SupplierPaymentOperation reverseBank(SupplierPaymentOperation paid) {
+        tx.executeWithoutResult(status -> bank.query(tenant, paid.command().id(), paid.version(), clock()));
+        var claimed = bank.claim(tenant, paid.command().id(), clock()); var at = clock(); var original = paid.observation();
+        var reversed = new PaymentObservation(paid.command().id(), paid.command().digest(), PaymentObservation.Status.REVERSED, original.revision() + 1, at,
+                original.paymentReference(), original.paidAmount(), original.accountDigest(), at, "reversal-bank-receipt", null);
+        bank.finish(claimed, new FinanceResult.Success<>(reversed), at); return payments.find(tenant, paid.command().id()).orElseThrow();
+    }
+
+    private SupplierPayableAdjustmentOperation adjusted(SupplierPayableAdjustmentOperation queued, String voucher) {
+        var sent = dispatch(queued); var command = sent.command(); var source = command.source(); var at = clock();
+        var payment = source.returns().request().command();
+        var before = source.previous() != null ? source.previous().observation().posting().payableSettledAfter()
+                : source.settlement() != null ? source.settlement().observation().posting().settledAfter() : payment.holdCommand().authorization().payable().settled();
+        var after = (source.recognizesOriginalPayment() ? before.plus(payment.amount()) : before).minus(source.newReturned());
+        var recognition = source.previous() != null ? source.previous().observation().posting().recognitionVoucherReference()
+                : source.settlement() != null ? source.settlement().observation().posting().voucherReference() : "recognized-payment";
+        var posting = new SupplierPayableAdjustmentObservation.Posting("adjust-" + command.id(), payment.held().holdReference(), "ledger-adjusted", recognition,
+                source.newReturned(), source.returns().totalReturned(), source.netPaid(), before, after,
+                java.util.stream.IntStream.range(0, source.newReturns().size()).mapToObj(index -> { var entry = source.newReturns().get(index); return new SupplierPayableAdjustmentObservation.ReturnEntry(entry.proof().transactionReference(), entry.proof().amount(), voucher, "return-entry-" + index); }).toList(),
+                command.period().periodReference(), command.period().request().accountingDate(), at);
+        var result = sent.complete(new FinanceResult.Success<>(new SupplierPayableAdjustmentObservation(command.id(), command.digest(), SupplierPayableAdjustmentObservation.Status.ADJUSTED, 1, at, posting, null)), at);
+        assertThat(result.adjusted()).isTrue(); tx.executeWithoutResult(status -> adjustments.update(result)); return result;
+    }
+    private SupplierAdjustmentCompletion finish(SupplierPayableAdjustmentOperation done, long revision) {
+        var ledger = returnLedgers.find(tenant, done.command().source().returns().request().command().id()).orElseThrow(); var at = clock();
+        return completion.complete(done, completionReceipt(ledger, revision, at), at);
+    }
+    private SupplierPaymentReturnPort.Receipt completionReceipt(SupplierPaymentReturns ledger, long revision, Instant at) {
+        var payment = ledger.request().command(); var original = payments.find(tenant, payment.id()).orElseThrow().observation();
+        var observed = new PaymentObservation(payment.id(), payment.digest(), original.status(), revision, at, original.paymentReference(), payment.amount(), payment.payee().accountDigest(), original.completedAt(), original.receiptReference(), null);
+        var status = original.status() == PaymentObservation.Status.REVERSED ? SupplierPaymentReturnPort.Status.RETURNED : SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED;
+        return new SupplierPaymentReturnPort.Receipt(ledger.request(), status, revision, at, at.plusSeconds(300), observed,
+                ledger.entries().stream().map(SupplierPaymentReturns.Entry::proof).toList());
+    }
+
     private SupplierPayableAdjustmentSource source() { return source(false); }
     private SupplierPayableAdjustmentSource source(boolean alreadySettled) {
         var payment = returnedSource(); var settlement = alreadySettled ? originalSettlement(payment) : null;
@@ -262,17 +474,20 @@ class SupplierAdjustmentPersistenceTest {
     }
     private SupplierPayableAdjustmentEvidence adjustmentEvidence(SupplierPayableAdjustmentSource source, Instant at) {
         var request = source.returns().request(); var original = request.original(); var payment = request.command();
-        var current = new PaymentObservation(payment.id(), payment.digest(), PaymentObservation.Status.SUCCEEDED, 10L, at, original.paymentReference(), payment.amount(), payment.payee().accountDigest(), original.completedAt(), original.receiptReference(), null);
-        var receipt = new SupplierPaymentReturnPort.Receipt(request, SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED, 10, at, at.plusSeconds(300), current, source.returns().entries().stream().map(SupplierPaymentReturns.Entry::proof).toList());
         var date = at.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate();
         var period = new AccountingPeriodPort.OpenPeriod(new AccountingPeriodPort.Request(entity, "CNY", date), "period", "period-v1", date, date, at, at.plusSeconds(300));
         var settled = source.settlement();
         var originalPosting = settled == null ? null : new SupplierPayableSettlementObservation(settled.command().id(), settled.command().digest(),
                 SupplierPayableSettlementObservation.Status.SETTLED, settled.observation().revision(), at, settled.observation().posting(), null);
-        return new SupplierPayableAdjustmentEvidence(receipt, settled == null ? observed(payment.holdCommand().authorization(), at) : null, originalPosting, null, period, at);
+        var previous = source.previous();
+        var previousPosting = previous == null ? null : new SupplierPayableAdjustmentObservation(previous.observation().operationId(), previous.observation().commandDigest(),
+                SupplierPayableAdjustmentObservation.Status.ADJUSTED, previous.observation().revision(), at, previous.observation().posting(), null);
+        return new SupplierPayableAdjustmentEvidence(completionReceipt(source.returns(), previous == null ? 10 : 30, at), source.recognizesOriginalPayment() ? observed(payment.holdCommand().authorization(), at) : null,
+                originalPosting, previousPosting, period, at);
     }
 
-    private SupplierPayableAdjustmentSource.OriginalSettlement originalSettlement(SupplierPaymentOperation payment) {
+    private SupplierPayableAdjustmentSource.OriginalSettlement originalSettlement(SupplierPaymentOperation payment) { return originalSettlement(payment, true); }
+    private SupplierPayableAdjustmentSource.OriginalSettlement originalSettlement(SupplierPaymentOperation payment, boolean completeLocally) {
         var oldIntents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
         var oldOperations = new JdbcSupplierPayableSettlementRepository(jdbc, json, oldIntents, payments, reservations);
         var at = clock(); var date = at.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate();
@@ -289,7 +504,7 @@ class SupplierAdjustmentPersistenceTest {
             var posting = new SupplierPayableSettlementObservation.Posting("settlement", payment.command().held().holdReference(), "ledger-2", payment.command().amount(), money("30"), money("100"),
                     payment.observation().paymentReference(), payment.observation().receiptReference(), "original-payment-voucher", period.periodReference(), date, at);
             var done = sent.complete(new FinanceResult.Success<>(new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.SETTLED, 1L, at, posting, null)), at);
-            oldOperations.update(done); reservations.complete(done, payment, at);
+            oldOperations.update(done); if (completeLocally) reservations.complete(done, payment, at);
             return new SupplierPayableAdjustmentSource.OriginalSettlement(done.version(), command, done.observation());
         });
     }
@@ -306,9 +521,10 @@ class SupplierAdjustmentPersistenceTest {
             if (returnLedgers.find(tenant, payment.command().id()).isEmpty()) returnLedgers.create(SupplierPaymentReturns.open(request, time));
             var queued = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), tenant, payment.command().targetDigest(), original.version(), request, actor, time));
             returnChecks.create(queued); var running = queued.claim(time, java.time.Duration.ofSeconds(90)); returnChecks.update(running);
-            var bankReceipt = new PaymentObservation(payment.command().id(), payment.command().digest(), PaymentObservation.Status.SUCCEEDED, revision, observed,
-                    original.observation().paymentReference(), payment.command().amount(), payment.command().payee().accountDigest(), original.observation().completedAt(), original.observation().receiptReference(), null);
-            var proof = new SupplierPaymentReturnPort.Receipt(request, funds.length == 0 ? SupplierPaymentReturnPort.Status.CONFIRMED : SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED,
+            var bankReceipt = new PaymentObservation(payment.command().id(), payment.command().digest(), payment.observation().status(), revision, observed,
+                    original.observation().paymentReference(), payment.command().amount(), payment.command().payee().accountDigest(), payment.observation().completedAt(), payment.observation().receiptReference(), null);
+            var returnStatus = payment.status() == SupplierPaymentOperation.Status.REVERSED ? SupplierPaymentReturnPort.Status.RETURNED : SupplierPaymentReturnPort.Status.PARTIALLY_RETURNED;
+            var proof = new SupplierPaymentReturnPort.Receipt(request, funds.length == 0 ? SupplierPaymentReturnPort.Status.CONFIRMED : returnStatus,
                     revision, observed, observed.plusSeconds(120), bankReceipt, List.of(funds));
             var checked = running.complete(new FinanceResult.Success<>(proof), observed); returnChecks.update(checked);
             returnLedgers.requireReview(tenant, payment.command().id(), observed); return checked;

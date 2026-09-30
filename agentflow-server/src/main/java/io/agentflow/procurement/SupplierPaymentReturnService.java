@@ -95,7 +95,7 @@ public class SupplierPaymentReturnService {
         if ((!bank.settleable() && bank.status() != SupplierPaymentOperation.Status.REVERSED) || bank.conflictingObservation() != null)
             return "SUPPLIER_PAYMENT_RETURN_PAYMENT_UNRESOLVED";
         if (!proof.samePaymentFacts(bank.observation()) || bank.observation().revision() > proof.current().revision()
-                || bank.observation().observedAt().isAfter(proof.current().observedAt()) || evidenceChanged(check)) return "SUPPLIER_PAYMENT_RETURN_EVIDENCE_CHANGED";
+                || bank.observation().observedAt().isAfter(proof.current().observedAt()) || evidenceChanged(check, ledger)) return "SUPPLIER_PAYMENT_RETURN_EVIDENCE_CHANGED";
         try {
             sources.requireCheck(check, source);
             ledger.register(new SupplierPaymentReturn(UUID.randomUUID(), check.input().tenantId(), check.input().id(), proof,
@@ -124,7 +124,7 @@ public class SupplierPaymentReturnService {
         var ledger = ledgers.find(input.tenantId(), input.request().command().id()).orElseThrow(SupplierPaymentReturnService::conflict);
         var proof = completed.receipt(); var recorded = ledger.entries().stream().map(SupplierPaymentReturns.Entry::proof).toList();
         boolean same = proof.status() != SupplierPaymentReturnPort.Status.UNRESOLVED && proof.returns().size() == recorded.size()
-                && proof.returns().containsAll(recorded) && proof.samePaymentFacts(source.payment().observation()) && !evidenceChanged(completed);
+                && proof.returns().containsAll(recorded) && proof.samePaymentFacts(source.payment().observation()) && !evidenceChanged(completed, ledger);
         if (!same) ledgers.requireReview(input.tenantId(), input.request().command().id(), now);
     }
 
@@ -135,8 +135,9 @@ public class SupplierPaymentReturnService {
         if (current != null) checks.update(current.fail(SupplierPaymentReturnCheck.Issue.INTERNAL_ERROR, time(at)));
     }
 
-    private boolean evidenceChanged(SupplierPaymentReturnCheck check) {
-        return checks.history(check.input().tenantId(), check.input().request().command().id()).stream().anyMatch(value -> !check.receipt().continues(value.receipt()));
+    private boolean evidenceChanged(SupplierPaymentReturnCheck check, SupplierPaymentReturns ledger) {
+        return checks.history(check.input().tenantId(), check.input().request().command().id()).stream().anyMatch(value -> !check.receipt().continues(value.receipt()))
+                || ledgers.accountingReceipts(ledger).stream().anyMatch(value -> !check.receipt().continues(value));
     }
     private SupplierPaymentReturnSources.Source locked(UUID paymentId) {
         requireFinance(paymentId); var actor = actors.actor(); var source = sources.locked(actor.tenantId(), paymentId);

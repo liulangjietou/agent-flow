@@ -77,7 +77,7 @@ class SupplierPayableReviewPersistenceTest {
         requests = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
         var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
         sources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), requests, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, sources); operations = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         reviews = new JdbcSupplierPayableReviewRepository(jdbc, json, sources, authorizations);

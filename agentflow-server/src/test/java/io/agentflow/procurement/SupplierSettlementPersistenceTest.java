@@ -91,7 +91,7 @@ class SupplierSettlementPersistenceTest {
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
         var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard);
+        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
         approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
         authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
@@ -583,7 +583,7 @@ class SupplierSettlementPersistenceTest {
         var sent = settlementExecution.ready(claimed, read(payment, at(), date()), at());
         settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), at());
         var request = new SupplierPaymentReturnPort.Request(payment.command(), payment.observation());
-        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc));
+        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
         tx.executeWithoutResult(status -> ledgers.create(SupplierPaymentReturns.open(request, clock())));
         var frozen = new CountDownLatch(1); var release = new CountDownLatch(1); var attempting = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
         try {
@@ -633,7 +633,7 @@ class SupplierSettlementPersistenceTest {
     }
 
     private void freezeReturn(SupplierPaymentOperation payment) {
-        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc)); var current = clock();
+        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json)); var current = clock();
         tx.executeWithoutResult(status -> {
             sources.lock(tenant, payment.command().id());
             ledgers.create(SupplierPaymentReturns.open(new SupplierPaymentReturnPort.Request(payment.command(), payment.observation()), current));

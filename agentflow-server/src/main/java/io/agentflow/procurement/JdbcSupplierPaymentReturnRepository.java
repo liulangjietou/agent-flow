@@ -45,11 +45,9 @@ public class JdbcSupplierPaymentReturnRepository {
                 || !checks.latest(tenant, id, decision.registeredBy()).map(value -> value.input().id().equals(check.input().id())).orElse(false)) throw conflict();
         var resolved = check.resolve(decision, decision.registeredAt());
         var bank = payments.find(tenant, id).orElseThrow(JdbcSupplierPaymentReturnRepository::conflict);
-        if (!bank.settleable() && bank.status() != SupplierPaymentOperation.Status.REVERSED || bank.conflictingObservation() != null
-                || !bank.command().equals(before.request().command()) || !decision.receipt().samePaymentFacts(bank.observation())
-                || bank.observation().revision() > decision.receipt().current().revision()
-                || bank.observation().observedAt().isAfter(decision.receipt().current().observedAt())
-                || checks.history(tenant, id).stream().anyMatch(value -> !decision.receipt().continues(value.receipt()))) throw conflict();
+        if (!decision.receipt().matchesCurrentBank(bank)
+                || checks.history(tenant, id).stream().anyMatch(value -> !decision.receipt().continues(value.receipt()))
+                || ledgers.accountingReceipts(before).stream().anyMatch(value -> !decision.receipt().continues(value))) throw conflict();
         var next = ledgers.register(before, decision); checks.resolve(check, decision);
         jdbc.update("""
                 INSERT INTO supplier_payment_return_registration(tenant_id,id,payment_id,before_version,return_version,check_id,check_version,outcome,registered_by,observed_at,registered_at,state_json)

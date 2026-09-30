@@ -139,6 +139,7 @@ CREATE TABLE supplier_adjustment_completion (
     operation_version BIGINT NOT NULL CHECK (operation_version>0),
     payment_id VARCHAR(36) NOT NULL,
     payment_version BIGINT NOT NULL CHECK (payment_version>0),
+    bank_status VARCHAR(16) NOT NULL CHECK (bank_status IN ('SUCCEEDED','REVERSED')),
     reservation_id VARCHAR(36) NOT NULL,
     before_return_version BIGINT NOT NULL CHECK (before_return_version>0),
     return_version BIGINT NOT NULL,

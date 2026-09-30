@@ -6,6 +6,8 @@ import io.agentflow.expense.ExpensePaymentReturn;
 import io.agentflow.expense.ExpensePaymentReturns;
 import io.agentflow.procurement.SupplierPaymentReturn;
 import io.agentflow.procurement.SupplierPaymentReturns;
+import io.agentflow.procurement.SupplierAdjustmentCompletion;
+import io.agentflow.common.DomainException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -50,6 +52,25 @@ public class JdbcFinanceReceiptCreditRepository {
                 VALUES(?,?,?,?,?,?,?,?)
                 """, decision.tenantId(), source.round().content().legalEntityId().toString(), source.requestId().toString(), AdvanceRepaymentPort.Channel.BANK_TRANSFER.name(),
                 funds.transactionReference(), funds.amount().value(), funds.amount().currency(), decision.id().toString());
+    }
+    /** 已保存的独立完成证明补齐原实收资金分录，沿用跨财务业务的法人内分录唯一键。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void account(SupplierAdjustmentCompletion proof) {
+        var operation = proof.operation(); var adjustment = operation.command(); var command = proof.before().request().command();
+        var source = command.holdCommand().authorization().source().reservation().source();
+        for (var received : adjustment.source().newReturns()) {
+            var funds = received.proof();
+            var posting = operation.observation().posting().entries().stream().filter(entry -> entry.transactionReference().equals(funds.transactionReference())).findFirst().orElseThrow();
+            int changed = jdbc.update("""
+                    UPDATE finance_receipt_credit SET voucher_reference=?,entry_reference=?,supplier_adjustment_id=?,supplier_adjustment_version=?
+                    WHERE tenant_id=? AND legal_entity_id=? AND business_id=? AND channel='BANK_TRANSFER' AND transaction_reference=?
+                        AND supplier_registration_id=? AND amount=? AND currency=? AND voucher_reference IS NULL AND entry_reference IS NULL
+                        AND supplier_adjustment_id IS NULL AND supplier_adjustment_version IS NULL
+                    """, posting.voucherReference(), posting.entryReference(), adjustment.id().toString(), operation.version(), adjustment.tenantId(),
+                    source.round().content().legalEntityId().toString(), source.requestId().toString(), funds.transactionReference(), received.registrationId().toString(),
+                    funds.amount().value(), funds.amount().currency());
+            if (changed != 1) throw new DomainException("SUPPLIER_ADJUSTMENT_CREDIT_CHANGED", "Supplier adjustment must account each original bank receipt once with its first registration owner");
+        }
     }
     private void insert(String tenant, UUID entity, UUID business, String channel, String transaction, String voucher, String entry, Money amount, UUID repayment, UUID disbursement, UUID expense) {
         jdbc.update("""
