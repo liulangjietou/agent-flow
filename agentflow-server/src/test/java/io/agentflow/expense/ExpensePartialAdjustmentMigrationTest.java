@@ -12,7 +12,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * 非空 V82 的原财务修订不被迁移改写；新部分调整必须引用实际同租户修订且不能跳过互斥约束。
+ * 非空 V82、V83 的原财务修订不被迁移改写；新部分调整与完成必须引用实际同租户修订。
  * @author owlzhangfq@gmail.com
  */
 class ExpensePartialAdjustmentMigrationTest {
@@ -70,5 +70,14 @@ class ExpensePartialAdjustmentMigrationTest {
         jdbc.update(command, tenant, operation, id);
         assertThatThrownBy(() -> jdbc.update(command, tenant, operation, id)).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(upgraded.migrate().migrationsExecuted).isZero(); assertThat(upgraded.validateWithResult().validationSuccessful).isTrue();
+        var oldAdjustments = jdbc.queryForList("SELECT * FROM expense_partial_adjustment");
+        var oldOperations = jdbc.queryForList("SELECT * FROM expense_partial_adjustment_operation");
+        var completed = Flyway.configure().dataSource(source).target("84").load(); assertThat(completed.migrate().migrationsExecuted).isEqualTo(1);
+        before.forEach((table, rows) -> assertThat(jdbc.queryForList("SELECT * FROM " + table)).as(table).containsExactlyInAnyOrderElementsOf(rows));
+        assertThat(jdbc.queryForList("SELECT * FROM expense_partial_adjustment")).containsExactlyInAnyOrderElementsOf(oldAdjustments);
+        assertThat(jdbc.queryForList("SELECT * FROM expense_partial_adjustment_operation")).containsExactlyInAnyOrderElementsOf(oldOperations);
+        assertThatThrownBy(() -> jdbc.update("INSERT INTO expense_partial_adjustment_completion(tenant_id,adjustment_id,before_version,after_version,source_json,completed_at) VALUES(?,?,1,2,'{}',CURRENT_TIMESTAMP)", tenant, id))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(completed.migrate().migrationsExecuted).isZero(); assertThat(completed.validateWithResult().validationSuccessful).isTrue();
     }
 }

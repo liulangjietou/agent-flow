@@ -56,8 +56,10 @@ class CrossBusinessInvoiceClaimTest {
         Flyway.configure().dataSource(source).load().migrate(); jdbc = new JdbcTemplate(source);
         tx = new TransactionTemplate(new DataSourceTransactionManager(source)); applications = new JdbcApplicationRepository(jdbc, json);
         expenses = new JdbcExpenseReportRepository(jdbc, json);
+        // 本组只验票号占用；如果误入部分调整分支，必须失败而不能绕过真实完成证明。
+        var reductions = org.mockito.Mockito.mock(FinancialResourceReductionJournal.class, invocation -> { throw new AssertionError("Unexpected partial adjustment in invoice claim fixture"); });
         invoices = new JdbcInvoiceRepository(new FinancialResourceStore(jdbc,
-                new FinancialResourceReversalJournal(jdbc, json, expenses, new JdbcBudgetConsumptionReversalRepository(jdbc, json))), jdbc, json);
+                new FinancialResourceReversalJournal(jdbc, json, expenses, new JdbcBudgetConsumptionReversalRepository(jdbc, json), reductions)), jdbc, json);
         requests = new JdbcProcurementPaymentRepository(jdbc, json);
         reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
     }

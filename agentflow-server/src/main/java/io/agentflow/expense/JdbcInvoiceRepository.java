@@ -59,7 +59,11 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
                 && (invoice.occupation() != Invoice.Occupation.CONSUMED || !previous.use().equals(invoice.use()))) {
             if (invoice.occupation() != Invoice.Occupation.AVAILABLE || invoice.verification() != Invoice.Verification.PENDING
                     || jdbc.queryForObject("""
-                    SELECT COUNT(*) FROM finance_consumption_reversal WHERE tenant_id=? AND resource_type='INVOICE' AND resource_id=? AND after_version=?
+                    SELECT COUNT(*) FROM (
+                        SELECT tenant_id,resource_type,resource_id,after_version,report_id,round_no,report_line FROM finance_consumption_reversal
+                        UNION ALL
+                        SELECT tenant_id,resource_type,resource_id,after_version,report_id,round_no,report_line FROM finance_consumption_reduction
+                    ) effects WHERE tenant_id=? AND resource_type='INVOICE' AND resource_id=? AND after_version=?
                     AND report_id=? AND round_no=? AND report_line=?
                     """, Integer.class, invoice.tenantId(), invoice.id().toString(), invoice.version(), previous.use().reportId().toString(), previous.use().roundNo(), previous.use().lineNo()) != 1) {
                 throw new DomainException("INVOICE_OCCUPATION_CHANGED", "Consumed invoice occupation requires an authorized reversal before release");

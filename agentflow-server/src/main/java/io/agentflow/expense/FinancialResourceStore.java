@@ -54,7 +54,7 @@ public class FinancialResourceStore {
                 value.sourceReference(), value.context(), expectedVersion);
         if (updated != 1) throw conflict();
         append(kind, value, actor, operation);
-        reversals.append(kind, value, reversal);
+        reversals.append(kind, value, reversal, operation);
     }
 
     /** 不从 JSON 中推断查询租户，所有定位都使用独立身份列。 */

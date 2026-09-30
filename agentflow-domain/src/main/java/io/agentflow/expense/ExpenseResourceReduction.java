@@ -6,6 +6,7 @@ import io.agentflow.finance.ReservedAmount;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import static io.agentflow.expense.ExpenseSubmissionResources.*;
@@ -33,7 +34,7 @@ public final class ExpenseResourceReduction {
                 owner(report, invoice.tenantId(), invoice.ownerId(), invoice.facts().legalEntityId());
                 if (after.gross().value().signum() == 0) {
                     invoice.reverseConsumption(invoice.version(), use, adjustmentId, at);
-                    invoices.add(new InvoiceChange(invoice.state(), Operation.REVERSE_CONSUMPTION));
+                    invoices.add(new InvoiceChange(invoice.state(), Operation.REDUCE_CONSUMPTION));
                 }
             }
             var reference = original.priorRequest();
@@ -65,6 +66,37 @@ public final class ExpenseResourceReduction {
         }
         return new Plan(invoices, requests, advances);
     }
+
+    /** 资源持久化与最终完成采用同一差额集合，原核销及此次之前的净额分别保留。 */
+    public List<Requirement> requirements(ExpenseAdjustmentAmounts.Change change) {
+        var report = ExpenseReport.restore(change.before().original()); var round = report.requireFrozenRound();
+        var result = new ArrayList<Requirement>();
+        for (int index = 0; index < round.approvedLines().size(); index++) {
+            var original = round.originalLines().get(index).original(); var approved = round.approvedLines().get(index);
+            var before = change.before().lines().get(index); var after = change.after().lines().get(index);
+            var amount = before.gross().minus(after.gross()); if (amount.value().signum() == 0) continue;
+            var use = new ExpenseUse(report.id(), round.roundNo(), approved.lineNo());
+            if (after.gross().value().signum() == 0) for (var invoice : original.invoiceIds()) result.add(new Requirement(
+                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.INVOICE, invoice, 0, use, null), null, null));
+            var prior = original.priorRequest();
+            if (prior != null) result.add(new Requirement(new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.PRIOR_REQUEST,
+                    prior.requestId(), prior.lineNo(), use, amount), approved.gross(), before.gross()));
+        }
+        var use = new ExpenseUse(report.id(), round.roundNo(), 0);
+        for (int index = 0; index < round.advanceOffsets().size(); index++) {
+            var original = round.advanceOffsets().get(index); var before = change.before().offsets().get(index); var after = change.after().offsets().get(index);
+            var amount = before.amount().minus(after.amount());
+            if (amount.value().signum() > 0) result.add(new Requirement(new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.ADVANCE,
+                    original.advanceId(), 0, use, amount), original.amount(), before.amount()));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * 实际差额与原额、事前净额共同约束每笔资源，不能将原全额或其他调整作为本次效果。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Requirement(ExpenseResourceReversal.Consumption effect, Money originalAmount, Money beforeAmount) { }
 
     private static void consumed(ReservedAmount balance, ExpenseUse use, Money original, Money remaining, Instant at) {
         if (!balance.consumedAmountFor(use).equals(original) || !balance.netConsumedAmountFor(use).equals(remaining)

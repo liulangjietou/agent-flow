@@ -25,11 +25,13 @@ public class FinancialResourceReversalJournal {
     private final JsonUtil json;
     private final ExpenseReportRepository reports;
     private final JdbcBudgetConsumptionReversalRepository budgets;
+    private final FinancialResourceReductionJournal reductions;
     private final ExpenseResourceReversal resourceRules = new ExpenseResourceReversal();
 
     /** 共用本地事务，外部预算已由工作器确认，这里不做网络调用。 */
-    public FinancialResourceReversalJournal(JdbcTemplate jdbc, JsonUtil json, ExpenseReportRepository reports, JdbcBudgetConsumptionReversalRepository budgets) {
-        this.jdbc = jdbc; this.json = json; this.reports = reports; this.budgets = budgets;
+    public FinancialResourceReversalJournal(JdbcTemplate jdbc, JsonUtil json, ExpenseReportRepository reports, JdbcBudgetConsumptionReversalRepository budgets,
+            FinancialResourceReductionJournal reductions) {
+        this.jdbc = jdbc; this.json = json; this.reports = reports; this.budgets = budgets; this.reductions = reductions;
     }
     /** 新资源没有历史核销，更不能携带其他资源的冲回证据。 */
     public void requireInitial(FinancialResourceStore.Kind kind, FinancialResourceStore.Stored value) {
@@ -46,8 +48,12 @@ public class FinancialResourceReversalJournal {
             if (ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION.name().equals(operation)
                     || ExpenseSubmissionResources.Operation.REDUCE_CONSUMPTION.name().equals(operation)) throw conflict(); return null;
         }
-        if (added.size() != 1 || !ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION.name().equals(operation)) throw conflict();
-        var entry = added.get(0); if (entry.partial()) throw conflict(); requireExactTransition(kind, before, after, entry);
+        boolean partial = ExpenseSubmissionResources.Operation.REDUCE_CONSUMPTION.name().equals(operation);
+        if (added.size() != 1 || !partial && !ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION.name().equals(operation)) throw conflict();
+        var entry = added.get(0);
+        if (entry.partial() != (partial && kind != FinancialResourceStore.Kind.INVOICE)) throw conflict();
+        requireExactTransition(kind, before, after, entry);
+        if (partial) { reductions.requireEffect(kind, before, entry); return entry; }
         var use = entry.consumption().use(); reports.lock(after.tenantId(), use.reportId());
         var adjustment = jdbc.query("SELECT state_json FROM expense_resource_adjustment WHERE tenant_id=? AND id=?", (row, index) -> json.read(row.getString("state_json"), ExpenseResourceAdjustment.class),
                 after.tenantId(), entry.adjustmentId().toString()).stream().findFirst().orElseThrow(FinancialResourceReversalJournal::conflict);
@@ -63,8 +69,10 @@ public class FinancialResourceReversalJournal {
 
     /** 后修订写入后追加规范明细，外键或唯一归属冲突使整笔资源事务回滚。 */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void append(FinancialResourceStore.Kind kind, FinancialResourceStore.Stored after, Entry entry) {
-        if (entry == null) return; var original = entry.consumption(); var amount = original.amount(); var use = original.use();
+    public void append(FinancialResourceStore.Kind kind, FinancialResourceStore.Stored after, Entry entry, String operation) {
+        if (entry == null) return;
+        if (ExpenseSubmissionResources.Operation.REDUCE_CONSUMPTION.name().equals(operation)) { reductions.append(kind, after, entry); return; }
+        var original = entry.consumption(); var amount = original.amount(); var use = original.use();
         jdbc.update("""
                 INSERT INTO finance_consumption_reversal(tenant_id,resource_type,resource_id,source_line,report_id,round_no,report_line,adjustment_id,
                 before_version,after_version,amount,currency,reversed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -82,12 +90,14 @@ public class FinancialResourceReversalJournal {
             }
             case PRIOR_REQUEST -> {
                 var original = ExpenseRequest.restore(json.read(before.state(), ExpenseRequest.State.class));
-                original.reverseConsumption(before.version(), required.sourceLine(), required.use(), entry.adjustmentId(), entry.reversedAt());
+                if (entry.partial()) original.reduceConsumption(before.version(), required.sourceLine(), required.use(), required.amount(), entry.adjustmentId(), entry.reversedAt());
+                else original.reverseConsumption(before.version(), required.sourceLine(), required.use(), entry.adjustmentId(), entry.reversedAt());
                 yield original.state().equals(ExpenseRequest.restore(json.read(after.state(), ExpenseRequest.State.class)).state());
             }
             case ADVANCE -> {
                 var original = EmployeeAdvance.restore(json.read(before.state(), EmployeeAdvance.State.class));
-                original.reverseOffset(before.version(), required.use(), entry.adjustmentId(), entry.reversedAt());
+                if (entry.partial()) original.reduceOffset(before.version(), required.use(), required.amount(), entry.adjustmentId(), entry.reversedAt());
+                else original.reverseOffset(before.version(), required.use(), entry.adjustmentId(), entry.reversedAt());
                 yield original.state().equals(EmployeeAdvance.restore(json.read(after.state(), EmployeeAdvance.State.class)).state());
             }
         };

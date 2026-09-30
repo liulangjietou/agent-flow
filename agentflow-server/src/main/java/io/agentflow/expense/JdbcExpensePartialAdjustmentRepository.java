@@ -5,9 +5,11 @@ import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.BudgetConsumptionReductionOperation;
 import io.agentflow.finance.ExpenseAccrualReductionOperation;
 import io.agentflow.finance.ExpenseAdjustmentFundingSource;
+import io.agentflow.finance.Money;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +45,7 @@ public class JdbcExpensePartialAdjustmentRepository {
         if (!value.equals(ExpensePartialAdjustment.begin(input))) throw conflict();
         if (active(basis.tenantId(), basis.reportId()).isPresent()) throw pending();
         sources.requireCurrent(basis.funding());
+        requireCompletedHistoryCurrent(basis);
         var previous = latestCompleted(basis.tenantId(), basis.reportId()).orElse(null);
         if (!basis.equals(ExpensePartialAdjustmentBasis.from(basis.funding(), previous))) throw conflict();
         requireUsedReturns(basis);
@@ -120,6 +123,46 @@ public class JdbcExpensePartialAdjustmentRepository {
         }
     }
 
+    /** 资源执行前在原报销锁内复核全部完成历史和当前来源；查询恢复不受此新效果守卫限制。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ExpenseAdjustmentFundingSource requireCompletionSource(ExpensePartialAdjustment value) {
+        var basis = value.input().basis(); reports.lock(basis.tenantId(), basis.reportId());
+        if (value.status() != ExpensePartialAdjustment.Status.READY || !find(basis.tenantId(), value.id()).filter(value::equals).isPresent()) throw conflict();
+        requireCurrentPredecessor(basis); requireUsedReturns(basis);
+        return sources.current(basis.funding());
+    }
+
+    /** 只有本次全部资源差额实际持久后才能保存完成、回款消费和活动位置释放，任一步失败全部回滚。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void completeResources(ExpensePartialAdjustment value) {
+        var basis = value.input().basis(); reports.lock(basis.tenantId(), basis.reportId());
+        var before = find(basis.tenantId(), value.id()).orElseThrow(JdbcExpensePartialAdjustmentRepository::conflict);
+        if (!before.completeResources(value.updatedAt()).equals(value)) throw conflict();
+        var currentSource = requireCompletionSource(before);
+        var required = new ExpenseResourceReduction().requirements(basis.funding().financial().change()).stream().map(ExpenseResourceReduction.Requirement::effect).toList();
+        var actual = jdbc.query("SELECT * FROM finance_consumption_reduction WHERE tenant_id=? AND adjustment_id=?", (row, index) -> {
+            if (!value.updatedAt().equals(instant(row.getTimestamp("adjusted_at")))) throw conflict();
+            return new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(row.getString("resource_type")), UUID.fromString(row.getString("resource_id")), row.getInt("source_line"),
+                    new ExpenseUse(UUID.fromString(row.getString("report_id")), row.getInt("round_no"), row.getInt("report_line")),
+                    row.getBigDecimal("amount") == null ? null : new Money(row.getBigDecimal("amount"), row.getString("currency")));
+        }, basis.tenantId(), value.id().toString());
+        if (actual.size() != required.size() || !new HashSet<>(actual).equals(new HashSet<>(required))) throw conflict();
+        var selected = jdbc.query("SELECT * FROM expense_partial_adjustment_return WHERE tenant_id=? AND adjustment_id=?", (row, index) -> {
+            var entry = json.read(row.getString("entry_json"), ExpensePaymentReturns.Entry.class);
+            if (!basis.reportId().toString().equals(row.getString("report_id")) || !entry.registrationId().toString().equals(row.getString("registration_id"))
+                    || !entry.proof().fundsIdentity().equals(row.getString("funds_identity")) || !entry.proof().fundsIdentity().equals(row.getString("active_funds_identity"))
+                    || row.getTimestamp("completed_at") != null || row.getTimestamp("released_at") != null) throw conflict();
+            return entry;
+        }, basis.tenantId(), value.id().toString());
+        if (selected.size() != basis.funding().selectedReturns().size() || !new HashSet<>(selected).equals(new HashSet<>(basis.funding().selectedReturns()))) throw conflict();
+        save(value);
+        jdbc.update("INSERT INTO expense_partial_adjustment_completion(tenant_id,adjustment_id,before_version,after_version,source_json,completed_at) VALUES(?,?,?,?,?,?)",
+                basis.tenantId(), value.id().toString(), before.version(), value.version(), json.write(currentSource), timestamp(value.updatedAt()));
+        int consumed = jdbc.update("UPDATE expense_partial_adjustment_return SET completed_at=?,completed_version=? WHERE tenant_id=? AND adjustment_id=? AND completed_at IS NULL AND released_at IS NULL",
+                timestamp(value.updatedAt()), value.version(), basis.tenantId(), value.id().toString());
+        if (consumed != selected.size()) throw conflict();
+    }
+
     /** 读取始终从独立租户列定位，JSON 身份及规范化操作列不一致时拒绝恢复。 */
     public Optional<ExpensePartialAdjustment> find(String tenant, UUID id) {
         return jdbc.query("SELECT * FROM expense_partial_adjustment WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst();
@@ -137,7 +180,7 @@ public class JdbcExpensePartialAdjustmentRepository {
         return jdbc.query("SELECT state_json FROM expense_partial_adjustment_revision WHERE tenant_id=? AND adjustment_id=? AND version=?", (row, index) -> {
             var value = json.read(row.getString("state_json"), ExpensePartialAdjustment.class);
             if (!value.input().basis().tenantId().equals(tenant) || !value.id().equals(id) || value.version() != version) throw inconsistent();
-            requireRegisteredOperations(value); return value;
+            requireRegisteredOperations(value); requireRecordedCompletion(value); return value;
         }, tenant, id.toString(), version).stream().findFirst();
     }
     /** 预算和会计分别扫描各自到期队列，同一操作租约到期后仍只查询原号。 */
@@ -179,6 +222,7 @@ public class JdbcExpensePartialAdjustmentRepository {
     }
     /** 新效果不能跨过前次争议；完成后无变化的查询允许增加修订，但原完成事实不能替换。 */
     private void requireCurrentPredecessor(ExpensePartialAdjustmentBasis basis) {
+        requireCompletedHistoryCurrent(basis);
         var current = latestCompleted(basis.tenantId(), basis.reportId()).orElse(null);
         var expected = basis.previous();
         if (expected == null) { if (current != null) throw conflict(); return; }
@@ -187,6 +231,10 @@ public class JdbcExpensePartialAdjustmentRepository {
         var original = revision(basis.tenantId(), expected.id(), expected.version()).orElseThrow(JdbcExpensePartialAdjustmentRepository::conflict);
         if (!basis.equals(ExpensePartialAdjustmentBasis.from(basis.funding(), original)) || !current.input().equals(original.input())
                 || !current.completion().equals(original.completion())) throw conflict();
+    }
+    private void requireCompletedHistoryCurrent(ExpensePartialAdjustmentBasis basis) {
+        if (!jdbc.queryForList("SELECT id FROM expense_partial_adjustment WHERE tenant_id=? AND report_id=? AND completed_at IS NOT NULL AND status<>'APPLIED' LIMIT 1",
+                String.class, basis.tenantId(), basis.reportId().toString()).isEmpty()) throw conflict();
     }
     private long sequence(ExpensePartialAdjustmentBasis basis) {
         if (basis.previous() == null) return 1;
@@ -219,8 +267,28 @@ public class JdbcExpensePartialAdjustmentRepository {
                     || !Objects.equals(value.completion() == null ? null : sequence(basis), row.getObject("completed_sequence", Long.class))
                     || !Objects.equals(value.retirement() == null ? null : value.retirement().at(), instant(row.getTimestamp("retired_at")))
                     || !value.input().createdAt().equals(instant(row.getTimestamp("created_at"))) || !value.updatedAt().equals(instant(row.getTimestamp("updated_at")))) throw inconsistent();
-            requireRegisteredOperations(value); return value;
+            requireRegisteredOperations(value); requireRecordedCompletion(value); return value;
         };
+    }
+    /** 历史完成引用真实相邻修订，后续查询不能换掉原接受凭据，也不能仅凭 JSON 标记完成。 */
+    private void requireRecordedCompletion(ExpensePartialAdjustment value) {
+        if (value.completion() == null) return;
+        var proof = jdbc.query("""
+                SELECT c.before_version,c.after_version,c.source_json,c.completed_at,b.state_json AS before_json,a.state_json AS after_json
+                FROM expense_partial_adjustment_completion c
+                JOIN expense_partial_adjustment_revision b ON b.tenant_id=c.tenant_id AND b.adjustment_id=c.adjustment_id AND b.version=c.before_version
+                JOIN expense_partial_adjustment_revision a ON a.tenant_id=c.tenant_id AND a.adjustment_id=c.adjustment_id AND a.version=c.after_version
+                WHERE c.tenant_id=? AND c.adjustment_id=?
+                """, (row, index) -> {
+            var before = json.read(row.getString("before_json"), ExpensePartialAdjustment.class);
+            var after = json.read(row.getString("after_json"), ExpensePartialAdjustment.class);
+            if (before.version() != row.getLong("before_version") || after.version() != row.getLong("after_version") || after.version() > value.version()
+                    || !before.completeResources(instant(row.getTimestamp("completed_at"))).equals(after)
+                    || !after.input().equals(value.input()) || !after.completion().equals(value.completion())) throw inconsistent();
+            ExpensePartialAdjustmentSources.requireContinuation(value.input().basis().funding(), json.read(row.getString("source_json"), ExpenseAdjustmentFundingSource.class));
+            return true;
+        }, value.input().basis().tenantId(), value.id().toString());
+        if (proof.size() != 1) throw inconsistent();
     }
     private void requireRegisteredOperations(ExpensePartialAdjustment value) {
         if (value.budget() != null) requireRegistered(value, "BUDGET", value.budget().input().command().id(), value.budget().input());
