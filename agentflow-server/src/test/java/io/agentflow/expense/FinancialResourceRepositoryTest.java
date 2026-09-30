@@ -79,6 +79,15 @@ class FinancialResourceRepositoryTest {
     }
 
     @Test
+    void partialReductionOperationCannotPersistUnrelatedStateWithoutANewAdjustmentFact() {
+        var advance = advance("demo", "invalid-reduction-operation-" + UUID.randomUUID()); advances.create(advance, "fixture");
+        var original = advance.state(); advance.requirePaymentReview(advance.version());
+        assertThatThrownBy(() -> advances.update(advance, original.version(), "fixture", ExpenseSubmissionResources.Operation.REDUCE_CONSUMPTION.name()))
+                .isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo("EXPENSE_CONSUMPTION_REVERSAL_UNAUTHORIZED"));
+        assertThat(advances.find("demo", advance.id()).orElseThrow().state()).isEqualTo(original);
+    }
+
+    @Test
     void legacyClosedPriorRequestPreservesConsumedAmountsWithoutSynthesizingReversals() {
         var source = sourceApplication(ApplicationStatus.APPROVED); var request = request(source.id()); requests.create(request, "approval");
         var use = new ExpenseUse(report("demo").id(), 1, 1);

@@ -43,10 +43,11 @@ public class FinancialResourceReversalJournal {
         if (!changed.containsAll(original)) throw conflict();
         var added = changed.stream().filter(value -> !original.contains(value)).toList();
         if (added.isEmpty()) {
-            if (ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION.name().equals(operation)) throw conflict(); return null;
+            if (ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION.name().equals(operation)
+                    || ExpenseSubmissionResources.Operation.REDUCE_CONSUMPTION.name().equals(operation)) throw conflict(); return null;
         }
         if (added.size() != 1 || !ExpenseSubmissionResources.Operation.REVERSE_CONSUMPTION.name().equals(operation)) throw conflict();
-        var entry = added.get(0); requireExactTransition(kind, before, after, entry);
+        var entry = added.get(0); if (entry.partial()) throw conflict(); requireExactTransition(kind, before, after, entry);
         var use = entry.consumption().use(); reports.lock(after.tenantId(), use.reportId());
         var adjustment = jdbc.query("SELECT state_json FROM expense_resource_adjustment WHERE tenant_id=? AND id=?", (row, index) -> json.read(row.getString("state_json"), ExpenseResourceAdjustment.class),
                 after.tenantId(), entry.adjustmentId().toString()).stream().findFirst().orElseThrow(FinancialResourceReversalJournal::conflict);
@@ -108,25 +109,25 @@ public class FinancialResourceReversalJournal {
     }
     private List<Entry> entries(FinancialResourceStore.Kind kind, FinancialResourceStore.Stored resource) {
         if (kind == FinancialResourceStore.Kind.INVOICE) return Invoice.restore(json.read(resource.state(), Invoice.State.class)).reversals().stream().map(value -> new Entry(
-                new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.INVOICE, resource.id(), 0, value.use(), null), value.adjustmentId(), value.reversedAt())).toList();
+                new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.INVOICE, resource.id(), 0, value.use(), null), value.adjustmentId(), value.reversedAt(), false)).toList();
         Map<Integer, ReservedAmount> balances = kind == FinancialResourceStore.Kind.ADVANCE
                 ? Map.of(0, EmployeeAdvance.restore(json.read(resource.state(), EmployeeAdvance.State.class)).balance())
                 : ExpenseRequest.restore(json.read(resource.state(), ExpenseRequest.State.class)).balances();
         var result = new ArrayList<Entry>();
         balances.forEach((line, balance) -> {
             balance.reversals().forEach(value -> result.add(new Entry(
-                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reversedAt())));
+                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reversedAt(), false)));
             // 部分冲回同样属于已核销资源的反向事实，不能借普通预留修改绕过独立调整凭据。
             balance.reductions().forEach(value -> result.add(new Entry(
-                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reducedAt())));
+                    new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(kind.name()), resource.id(), line, value.use(), value.amount()), value.adjustmentId(), value.reducedAt(), true)));
         });
         return List.copyOf(result);
     }
     private static DomainException conflict() { return new DomainException("EXPENSE_CONSUMPTION_REVERSAL_UNAUTHORIZED", "Resource reversal requires an unchanged original consumption, accepted budget reversal and authorized adjustment"); }
 
     /**
-     * 仓储内部的精确反向事实，不作为客户端可编辑输入。
+     * 仓储内部的精确反向事实；完整取消与部分差额不得互换，也不作为客户端可编辑输入。
      * @author owlzhangfq@gmail.com
      */
-    public record Entry(ExpenseResourceReversal.Consumption consumption, UUID adjustmentId, Instant reversedAt) { }
+    public record Entry(ExpenseResourceReversal.Consumption consumption, UUID adjustmentId, Instant reversedAt, boolean partial) { }
 }

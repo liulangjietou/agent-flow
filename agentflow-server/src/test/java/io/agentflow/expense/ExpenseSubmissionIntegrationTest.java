@@ -1420,6 +1420,21 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(resourceVersions(report)).isEqualTo(after);
     }
 
+    @Test void resourceAdjustmentCannotReclassifyAnOldFullReversalAsAPartialReduction() throws Exception {
+        var report = resourceAdjustmentReport(); var ready = readyResourceExecution(report);
+        resourceAdjustmentExecution.apply(resourceCandidate(ready));
+        var id = current(report).currentRound().advanceOffsets().get(0).advanceId();
+        var advance = advances.find("demo", id).orElseThrow(); var original = advance.state(); var reversal = advance.balance().reversals().get(0);
+        var changed = json.read(json.write(original), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        changed.put("version", advance.version() + 1); var balance = (com.fasterxml.jackson.databind.node.ObjectNode) changed.get("balance");
+        balance.putArray("reversals"); balance.set("reductions", json.read(json.write(List.of(new ReservedAmount.ConsumptionReduction(
+                reversal.adjustmentId(), reversal.use(), reversal.amount(), reversal.reversedAt()))), JsonNode.class));
+        var replacement = EmployeeAdvance.restore(json.read(json.write(changed), EmployeeAdvance.State.class));
+        assertThatThrownBy(() -> advances.update(replacement, advance.version(), "finance", "REDUCE"))
+                .isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("EXPENSE_CONSUMPTION_REVERSAL_UNAUTHORIZED"));
+        assertThat(advances.find("demo", id).orElseThrow().state()).isEqualTo(original);
+    }
+
     @Test void resourceAdjustmentRejectsUnauthorizedReversalsAndUnrelatedAggregateChanges() throws Exception {
         var report = resourceAdjustmentReport(); var versions = resourceVersions(report); var at = adjustmentTime();
         var unauthorized = new ExpenseResourceReversal().plan(report, financialResources.loadReserved(report), UUID.randomUUID(), at);

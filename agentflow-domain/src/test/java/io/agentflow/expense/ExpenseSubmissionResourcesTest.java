@@ -306,6 +306,120 @@ class ExpenseSubmissionResourcesTest {
         assertThat(settled.requests().get(prior.id()).balances().get(1).reversals()).isEmpty();
     }
 
+    @Test
+    void partialResourceReductionKeepsInvoiceUntilItsWholeRemainingLineIsCancelled() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("250"); var advance = advance("180");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id()), line(2, "100", List.of(), prior.id())), List.of(new AdvanceOffset(advance.id(), money("150"))));
+        var original = report.state(); var settled = settled(report, resources(List.of(invoice), List.of(prior), List.of(advance)));
+        var first = ExpenseAdjustmentAmounts.from(report).reduce(List.of(new ExpenseReport.Reduction(1, money("60"), money("0"))));
+        var rules = new ExpenseResourceReduction(); var firstId = UUID.randomUUID();
+        var plan = rules.plan(first, settled, firstId, NOW.plusSeconds(2)); var reduced = applied(settled, plan);
+        assertThat(plan.invoices()).isEmpty(); assertThat(plan.advances()).isEmpty(); assertThat(plan.requests()).hasSize(1);
+        assertThat(reduced.invoices()).isEqualTo(settled.invoices());
+        assertThat(reduced.requests().get(prior.id()).balances().get(1).consumed()).isEqualTo(money("160"));
+        var last = first.after().reduce(List.of(new ExpenseReport.Reduction(1, money("0"), money("0")))); var lastId = UUID.randomUUID();
+        var lastPlan = rules.plan(last, reduced, lastId, NOW.plusSeconds(3)); var completed = applied(reduced, lastPlan);
+        assertThat(lastPlan.invoices()).hasSize(1); assertThat(lastPlan.advances()).hasSize(1);
+        assertThat(completed.invoices().get(invoice.id()).verification()).isEqualTo(Invoice.Verification.PENDING);
+        assertThat(completed.invoices().get(invoice.id()).reversals().get(0).adjustmentId()).isEqualTo(lastId);
+        var balance = completed.requests().get(prior.id()).balances().get(1);
+        assertThat(balance.consumptions()).isEqualTo(settled.requests().get(prior.id()).balances().get(1).consumptions());
+        assertThat(balance.reductions()).extracting(value -> value.amount()).containsExactly(money("40"), money("60"));
+        assertThat(balance.netConsumedAmountFor(new ExpenseUse(report.id(), 1, 1))).isEqualTo(money("0"));
+        assertThat(balance.netConsumedAmountFor(new ExpenseUse(report.id(), 1, 2))).isEqualTo(money("100"));
+        assertThat(completed.advances().get(advance.id()).balance().consumed()).isEqualTo(money("100"));
+        assertThat(last.bankReturn()).isEqualTo(money("10")); assertThat(report.state()).isEqualTo(original);
+    }
+
+    @Test
+    void sharedPriorPartialReductionPreservesEveryVersionOtherReservationsAndIndependentHolds() {
+        var prior = request("250"); var advance = advance("180");
+        var report = frozen(List.of(line(1, "100", List.of(), prior.id()), line(2, "100", List.of(), prior.id())), List.of(new AdvanceOffset(advance.id(), money("150"))));
+        var settled = settled(report, resources(List.of(), List.of(prior), List.of(advance)));
+        var closed = ExpenseRequest.restore(settled.requests().get(prior.id()));
+        closed.reserve(closed.version(), 1, new ExpenseUse(UUID.randomUUID(), 1, 1), money("10")); closed.close(closed.version());
+        var held = EmployeeAdvance.restore(settled.advances().get(advance.id()));
+        held.reserve(held.version(), new ExpenseUse(UUID.randomUUID(), 1, 0), money("20")); held.requirePaymentReview(held.version()); held.requireVoucherReview(held.version(), UUID.randomUUID());
+        var current = resources(List.of(), List.of(closed), List.of(held));
+        var change = ExpenseAdjustmentAmounts.from(report).reduce(List.of(new ExpenseReport.Reduction(1, money("30"), money("0")), new ExpenseReport.Reduction(2, money("40"), money("0"))));
+        var plan = new ExpenseResourceReduction().plan(change, current, UUID.randomUUID(), NOW.plusSeconds(2)); var reduced = applied(current, plan);
+        assertThat(plan.requests()).extracting(value -> value.after().version()).containsExactly(8L, 9L);
+        assertThat(plan.requests()).extracting(ExpenseSubmissionResources.PriorChange::operation).containsOnly(ExpenseSubmissionResources.Operation.REDUCE_CONSUMPTION);
+        var remaining = ExpenseRequest.restore(reduced.requests().get(prior.id()));
+        assertThat(remaining.closed()).isTrue(); assertThat(remaining.balance(1).consumed()).isEqualTo(money("70"));
+        assertThat(remaining.balance(1).reservations()).isEqualTo(closed.balance(1).reservations());
+        var restored = EmployeeAdvance.restore(reduced.advances().get(advance.id()));
+        assertThat(restored.outstanding()).isEqualTo(money("110")); assertThat(restored.available()).isEqualTo(money("0"));
+        assertThat(restored.paymentReviewRequired()).isTrue(); assertThat(restored.voucherReviews()).isEqualTo(held.voucherReviews());
+        assertThat(restored.balance().reservations()).isEqualTo(held.balance().reservations());
+        assertThat(closed.balance(1).consumed()).isEqualTo(money("200")); assertThat(held.balance().consumed()).isEqualTo(money("150"));
+    }
+
+    @Test
+    void laterPartialReductionDoesNotTouchAnAlreadyReleasedInvoiceReusedByAnotherReport() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("200");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id()), line(2, "100", List.of(), prior.id())), List.of());
+        var settled = settled(report, resources(List.of(invoice), List.of(prior), List.of()));
+        var first = ExpenseAdjustmentAmounts.from(report).reduce(List.of(new ExpenseReport.Reduction(1, money("0"), money("0"))));
+        var reduced = applied(settled, new ExpenseResourceReduction().plan(first, settled, UUID.randomUUID(), NOW.plusSeconds(2)));
+        var reused = Invoice.restore(reduced.invoices().get(invoice.id())); var facts = reused.facts(); var checked = NOW.plusSeconds(3);
+        reused.verified(reused.version(), new Invoice.VerifiedFacts(facts.key(), facts.legalEntityId(), facts.gross(), facts.tax(), facts.issueDate(), facts.originalDigest(), "new-check", checked, checked.plusSeconds(300)));
+        reused.occupy(reused.version(), new ExpenseUse(UUID.randomUUID(), 1, 1), "alice", ENTITY, checked);
+        var current = new ExpenseSubmissionResources.Resources(Map.of(reused.id(), reused.state()), reduced.requests(), reduced.advances());
+        var last = first.after().reduce(List.of(new ExpenseReport.Reduction(2, money("0"), money("0"))));
+        var plan = new ExpenseResourceReduction().plan(last, current, UUID.randomUUID(), NOW.plusSeconds(4));
+        assertThat(plan.invoices()).isEmpty(); assertThat(plan.requests()).hasSize(1); assertThat(plan.requests().get(0).after().balances().get(1).consumed()).isEqualTo(money("0"));
+        assertThat(applied(current, plan).invoices().get(invoice.id())).isEqualTo(reused.state());
+    }
+
+    @Test
+    void partialReductionRejectsStaleRemainingPositionOriginalAmountAndBackdatedResourceFacts() {
+        var prior = request("100"); var report = frozen(List.of(line(1, "100", List.of(), prior.id())), List.of());
+        var settled = settled(report, resources(List.of(), List.of(prior), List.of())); var rules = new ExpenseResourceReduction();
+        var first = ExpenseAdjustmentAmounts.from(report).reduce(List.of(new ExpenseReport.Reduction(1, money("80"), money("0"))));
+        var reduced = applied(settled, rules.plan(first, settled, UUID.randomUUID(), NOW.plusSeconds(3)));
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> rules.plan(first, reduced, UUID.randomUUID(), NOW.plusSeconds(4)));
+        var next = first.after().reduce(List.of(new ExpenseReport.Reduction(1, money("60"), money("0"))));
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> rules.plan(next, settled, UUID.randomUUID(), NOW.plusSeconds(4)));
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> rules.plan(next, reduced, UUID.randomUUID(), NOW.plusSeconds(2)));
+        var wrong = ExpenseRequest.restore(prior.state()); var use = new ExpenseUse(report.id(), 1, 1);
+        wrong.reserve(1, 1, use, money("99")); wrong.consume(2, 1, use);
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> rules.plan(first, resources(List.of(), List.of(wrong), List.of()), UUID.randomUUID(), NOW.plusSeconds(4)));
+    }
+
+    @Test
+    void partialReductionLateFailureLeavesEarlierInvoiceAndPriorCopiesUnchanged() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("100"); var advance = advance("50");
+        var report = frozen(List.of(line(1, "100", List.of(invoice.id()), prior.id())), List.of(new AdvanceOffset(advance.id(), money("50"))));
+        var settled = settled(report, resources(List.of(invoice), List.of(prior), List.of(advance)));
+        var change = ExpenseAdjustmentAmounts.from(report).reduce(List.of(new ExpenseReport.Reduction(1, money("0"), money("0"))));
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> new ExpenseResourceReduction().plan(change,
+                new ExpenseSubmissionResources.Resources(settled.invoices(), settled.requests(), Map.of()), UUID.randomUUID(), NOW.plusSeconds(2)));
+        assertThat(settled.invoices().get(invoice.id()).occupation()).isEqualTo(Invoice.Occupation.CONSUMED);
+        assertThat(settled.requests().get(prior.id()).balances().get(1).reductions()).isEmpty();
+        assertThat(settled.advances().get(advance.id()).balance().consumed()).isEqualTo(money("50"));
+    }
+
+    @Test
+    void partialReductionRequiresOriginalOwnershipEvenForAnUnchangedLiveLine() {
+        var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var prior = request("200");
+        var report = frozen(List.of(line(1, "100", List.of(), prior.id()), line(2, "100", List.of(invoice.id()), prior.id())), List.of());
+        var settled = settled(report, resources(List.of(invoice), List.of(prior), List.of()));
+        var change = ExpenseAdjustmentAmounts.from(report).reduce(List.of(new ExpenseReport.Reduction(1, money("50"), money("0"))));
+        var other = Invoice.restore(invoice.state()); var otherUse = new ExpenseUse(UUID.randomUUID(), 1, 2);
+        other.occupy(other.version(), otherUse, "alice", ENTITY, NOW); other.consume(other.version(), otherUse, NOW);
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> new ExpenseResourceReduction().plan(change,
+                new ExpenseSubmissionResources.Resources(Map.of(invoice.id(), other.state()), settled.requests(), settled.advances()), UUID.randomUUID(), NOW.plusSeconds(2)));
+        var foreign = new ExpenseRequest(prior.id(), "foreign", UUID.randomUUID(), ENTITY, "alice", prior.approvedLines());
+        fails("EXPENSE_CONSUMPTION_CHANGED", () -> new ExpenseResourceReduction().plan(change,
+                new ExpenseSubmissionResources.Resources(settled.invoices(), Map.of(prior.id(), foreign.state()), settled.advances()), UUID.randomUUID(), NOW.plusSeconds(2)));
+    }
+
+    private ExpenseSubmissionResources.Resources settled(ExpenseReport report, ExpenseSubmissionResources.Resources input) {
+        var reserved = applied(input, planner.plan(report, input, NOW));
+        return applied(reserved, new ExpenseSettlementResources().plan(report, reserved, NOW.plusSeconds(1)));
+    }
+
     private ExpenseReport frozen(List<ExpenseLine> lines, List<AdvanceOffset> offsets) {
         var report = ExpenseReport.draft(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", content(lines, offsets)); freeze(report, NOW); return report;
     }

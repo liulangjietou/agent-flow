@@ -1,0 +1,46 @@
+{
+  "status": "PASS_RESOURCE_PLAN_AND_FACT_IDENTITY",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "publicPartialExpenseWorkflowComplete": false,
+  "tests": {
+    "newResourcePlanScenarios": 6,
+    "relatedDomain": 42,
+    "h2ResourceAndFactIdentity": 17,
+    "postgresqlResourceRepository": 16,
+    "postgresqlOriginalAdjustmentWorkflow": 22,
+    "scopesOverlap": true
+  },
+  "red": {
+    "missingResourcePlan": "expense-resource-reduction-red.log",
+    "twoPersistenceBypasses": "expense-reduction-fact-identity-red.log",
+    "actualAssertionFailures": 2
+  },
+  "green": [
+    "expense-resource-reduction-green.log",
+    "expense-reduction-fact-identity-green.log",
+    "expense-resource-reduction-postgres.log"
+  ],
+  "checks": [
+    "Compare each original and remaining consumption before reducing",
+    "Keep live original invoices occupied; release only fully cancelled lines",
+    "Preserve prior close state, other reservations and independent advance holds",
+    "Retain each shared resource version and unchanged original report",
+    "Reject stale projected amounts, other owners and backdated facts",
+    "Failure on last resource changes none of the input snapshots",
+    "Full reversal facts cannot be rewritten as partial reductions",
+    "A reduction operation without a new adjustment fact cannot save unrelated state"
+  ],
+  "postgresql": {
+    "separateContextDatabases": true,
+    "dedicatedContainerRemoved": true,
+    "sharedMemoryMiB": 512
+  },
+  "authorCheck": {
+    "files": 1080,
+    "namedTypes": 2063,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": "Independent original-source financial commands and actual completion proof, atomic persistence, API/UI and runtime acceptance"
+}

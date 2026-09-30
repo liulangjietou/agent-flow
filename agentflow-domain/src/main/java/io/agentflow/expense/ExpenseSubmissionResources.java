@@ -203,7 +203,7 @@ public final class ExpenseSubmissionResources {
      * 资源计划的真实用途；提交、核减与结算各自限制可产生的操作。
      * @author owlzhangfq@gmail.com
      */
-    public enum Operation { RESERVE, MOVE, RELEASE, REDUCE, CONSUME, REVERSE_CONSUMPTION }
+    public enum Operation { RESERVE, MOVE, RELEASE, REDUCE, CONSUME, REVERSE_CONSUMPTION, REDUCE_CONSUMPTION }
     /**
      * 事前批准行及报销行的配对，迁移不得串到另一行的额度。
      * @author owlzhangfq@gmail.com
