@@ -71,6 +71,11 @@ public class JdbcBudgetAdjustmentOperationRepository {
     public Optional<BudgetAdjustmentOperation> activeForRequest(String tenant, UUID requestId) {
         return jdbc.query("SELECT * FROM budget_adjustment_operation WHERE tenant_id=? AND active_request_id=?", this::restore, tenant, requestId.toString()).stream().findFirst();
     }
+    /** 工作区按实际登记时间展示最近一次决定，随机 UUID 只用来打破同刻排序。 */
+    public Optional<BudgetAdjustmentOperation> latestForRequest(String tenant, UUID requestId) {
+        return jdbc.query("SELECT * FROM budget_adjustment_operation WHERE tenant_id=? AND request_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
+                this::restore, tenant, requestId.toString()).stream().findFirst();
+    }
     /** 按真实指令版本保留外部证据，后来查询不覆盖既有修订。 */
     public Optional<BudgetAdjustmentOperation> revision(String tenant, UUID id, long version) {
         return jdbc.query("SELECT state_json FROM budget_adjustment_operation_revision WHERE tenant_id=? AND operation_id=? AND version=?", (row, index) -> {

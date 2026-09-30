@@ -18,13 +18,17 @@ public record BudgetAdjustmentRoundView(int roundNo, long submittedRequestVersio
 
     /** 调出和调入顺序取自已核对的调整意图，页面不自行计算金额。 */
     public static BudgetAdjustmentRoundView of(BudgetAdjustmentRound round) {
-        var positions = round.changes().stream().map(change -> {
-            var position = round.ledger().position(change.budgetReference());
+        return new BudgetAdjustmentRoundView(round.roundNo(), round.submittedRequestVersion(), round.submittedBy(), round.submittedAt(),
+                round.content(), round.legalEntity(), round.catalogVersion(), round.ledger().sourceVersion(), round.ledger().observedAt(), positions(round.content(), round.ledger()));
+    }
+
+    /** 审批冻结与批准后的财务复核共用精确金额投影，不为复核伪造新的审批轮次。 */
+    public static List<PositionView> positions(BudgetAdjustmentContent content, BudgetLedgerPort.Snapshot ledger) {
+        return content.changes(ledger).stream().map(change -> {
+            var position = ledger.position(change.budgetReference());
             return new PositionView(position.reference(), position.name(), position.version(), position.periodReference(), position.periodStart(),
                     position.periodEnd(), position.periodStatus(), position.limit(), position.committed(), position.consumed(), position.available(), change.afterLimit());
         }).toList();
-        return new BudgetAdjustmentRoundView(round.roundNo(), round.submittedRequestVersion(), round.submittedBy(), round.submittedAt(),
-                round.content(), round.legalEntity(), round.catalogVersion(), round.ledger().sourceVersion(), round.ledger().observedAt(), positions);
     }
 
     /**

@@ -77,6 +77,740 @@
     }
   ],
   "paths": {
+    "/api/v1/budget-adjustments/{id}/execution": {
+      "get": {
+        "operationId": "getBudgetAdjustmentFinanceWorkspace",
+        "tags": [
+          "预算调整"
+        ],
+        "summary": "读取预算财务办理状态",
+        "description": "按原申请与轮次完整字段权限读取。已批准、已授权与外部 APPLIED 是不同事实；不返回目标摘要或完整外部指令。响应禁止缓存。",
+        "x-access": "原申请人或原轮次全部预算明细可读的参与人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "读取预算财务办理状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAdjustmentFinanceWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "省略时选择当前轮次；旧审批人仍受其原轮次权限约束。"
+          },
+          {
+            "name": "operationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "可选择本申请本轮原指令，省略选择最后创建的指令。"
+          }
+        ]
+      }
+    },
+    "/api/v1/budget-adjustments/{id}/execution/history": {
+      "get": {
+        "operationId": "listBudgetAdjustmentFinanceOperations",
+        "tags": [
+          "预算调整"
+        ],
+        "summary": "分页读取原预算调整执行历史",
+        "description": "按原申请与轮次完整字段权限读取。已批准、已授权与外部 APPLIED 是不同事实；不返回目标摘要或完整外部指令。响应禁止缓存。",
+        "x-access": "原申请人或原轮次全部预算明细可读的参与人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "分页读取原预算调整执行历史",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAdjustmentFinancePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "省略时选择当前轮次；旧审批人仍受其原轮次权限约束。"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "上一页 nextBefore，按固定编号倒序分页。"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": "每页条数。"
+          }
+        ]
+      }
+    },
+    "/api/v1/budget-adjustments/{id}/execution/reviews": {
+      "post": {
+        "operationId": "reviewBudgetAdjustmentLedger",
+        "tags": [
+          "预算调整"
+        ],
+        "summary": "登记批准后台账复核",
+        "description": "只保存具名只读任务，后台读取原批准目标；读取成功不产生任何预算授权。 幂等回放前仍重查原轮次字段权限、当前角色和法人任职。客户端不能提交余额、额度变化或执行结果。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、最新台账、授权期限或原操作状态不符合办理条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "人工决定已持久保存；不代表外部预算已经生效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAdjustmentFinanceReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceReviewInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 5,
+                "requestVersion": 3,
+                "comment": "核对原批准与最新预算台账"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget-adjustments/{id}/execution/authorizations": {
+      "post": {
+        "operationId": "authorizeBudgetAdjustmentExecution",
+        "tags": [
+          "预算调整"
+        ],
+        "summary": "消费本人台账并授权原子预算调整",
+        "description": "必须绑定原批准双版本及本人最新 READY 台账；原子消费、授权、队列、审计一起提交。有效窗口最长五分钟且不延长台账原有效期。 幂等回放前仍重查原轮次字段权限、当前角色和法人任职。客户端不能提交余额、额度变化或执行结果。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、最新台账、授权期限或原操作状态不符合办理条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "人工决定已持久保存；不代表外部预算已经生效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAdjustmentFinanceReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceAuthorizeInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 5,
+                "requestVersion": 3,
+                "reviewId": "40000000-0000-4000-8000-000000000001",
+                "reviewVersion": 3,
+                "comment": "确认本次原子预算调拨"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget-adjustment-operations/{id}/actions": {
+      "post": {
+        "operationId": "actOnBudgetAdjustmentExecution",
+        "tags": [
+          "预算调整"
+        ],
+        "summary": "原号查询、明确重试或安全结束",
+        "description": "QUERY 只读原指令；RETRY 仅允许原授权人对有效窗口内明确 NOT_FOUND 的同一指令重发；RETIRE 必须有从未发送或原系统明确无副作用拒绝的持久证明。 幂等回放前仍重查原轮次字段权限、当前角色和法人任职。客户端不能提交余额、额度变化或执行结果。",
+        "x-access": "FINANCE + 本轮完整财务字段可读 + 非申请人 + 当前法人有效任职",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "审批、财务、操作版本或幂等键冲突，读取最新状态后核对",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、最新台账、授权期限或原操作状态不符合办理条件。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "人工决定已持久保存；不代表外部预算已经生效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAdjustmentFinanceReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceActionInput"
+              },
+              "example": {
+                "action": "QUERY",
+                "operationVersion": 3,
+                "comment": "查询原指令实际处理结果"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/payment-batches": {
       "get": {
         "operationId": "listPaymentBatches",
@@ -30032,6 +30766,633 @@
       }
     },
     "schemas": {
+      "BudgetAdjustmentFinanceWorkspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "requestVersion",
+          "destinationReady",
+          "review",
+          "operation",
+          "actions"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requestVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "destinationReady": {
+            "type": "boolean"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actions": {
+            "$ref": "#/components/schemas/BudgetAdjustmentFinanceActions"
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "checkedAt",
+          "validUntil",
+          "positions",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "CONSUMED",
+              "BLOCKED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetAdjustmentPosition"
+            }
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_CONFIGURED",
+                  "TARGET_CHANGED",
+                  "TIMEOUT",
+                  "CONNECTION",
+                  "AUTHENTICATION",
+                  "REMOTE_FAILURE",
+                  "INVALID_RESPONSE",
+                  "RESPONSE_TOO_LARGE",
+                  "INTERNAL_ERROR",
+                  "SOURCE_CHANGED",
+                  "LEDGER_CHANGED",
+                  "LEDGER_REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "authorizedBy",
+          "reason",
+          "authorizedAt",
+          "expiresAt",
+          "updatedAt",
+          "positions",
+          "observation",
+          "conflictingObservation",
+          "failure",
+          "retirement"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "QUERYING",
+              "UNKNOWN",
+              "APPLIED",
+              "REJECTED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "authorizedBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "authorizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetAdjustmentPosition"
+            }
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflictingObservation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_CONFIGURED",
+                  "TARGET_CHANGED",
+                  "TIMEOUT",
+                  "CONNECTION",
+                  "AUTHENTICATION",
+                  "REMOTE_FAILURE",
+                  "INVALID_RESPONSE",
+                  "RESPONSE_TOO_LARGE",
+                  "LEASE_EXPIRED",
+                  "INTERNAL_ERROR",
+                  "AUTHORIZATION_EXPIRED",
+                  "SOURCE_CHANGED",
+                  "INCONSISTENT_OBSERVATION",
+                  "RECHECK_REQUESTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentFinanceRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "revision",
+          "observedAt",
+          "reference",
+          "appliedAt",
+          "rejection"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "PENDING",
+              "NOT_FOUND"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appliedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "AUTHORIZATION_EXPIRED",
+                  "BUDGET_PERIOD_CLOSED",
+                  "BUDGET_INSUFFICIENT",
+                  "LEDGER_VERSION_CONFLICT",
+                  "BUDGET_POLICY_UNAVAILABLE",
+                  "BUDGET_POSITION_UNAVAILABLE",
+                  "LEGAL_ENTITY_UNAVAILABLE",
+                  "EMPLOYEE_UNAVAILABLE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "operationVersion",
+          "basis",
+          "retiredBy",
+          "retiredAt"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_SENT",
+              "REJECTED"
+            ]
+          },
+          "retiredBy": {
+            "type": "string"
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceActions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "review",
+          "authorize",
+          "query",
+          "retry",
+          "retire"
+        ],
+        "properties": {
+          "review": {
+            "type": "boolean"
+          },
+          "authorize": {
+            "type": "boolean"
+          },
+          "query": {
+            "type": "boolean"
+          },
+          "retry": {
+            "type": "boolean"
+          },
+          "retire": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BudgetAdjustmentFinancePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextBefore"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetAdjustmentFinanceOperation"
+            }
+          },
+          "nextBefore": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "action",
+          "reviewId",
+          "reviewVersion",
+          "operationId",
+          "operationVersion",
+          "auditEventId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "REVIEW",
+              "AUTHORIZE",
+              "QUERY",
+              "RETRY",
+              "RETIRE"
+            ]
+          },
+          "reviewId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceReviewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "requestVersion",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requestVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceAuthorizeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "requestVersion",
+          "reviewId",
+          "reviewVersion",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requestVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reviewId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "BudgetAdjustmentFinanceActionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "operationVersion",
+          "comment"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "QUERY",
+              "RETRY",
+              "RETIRE"
+            ]
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
       "PaymentBatchSelection": {
         "type": "object",
         "additionalProperties": false,
