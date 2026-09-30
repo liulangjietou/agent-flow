@@ -389,6 +389,151 @@ class SupplierSettlementPersistenceTest {
         var stopped = settlements.find(tenant, queued.command().id()).orElseThrow(); assertThat(stopped.dispatches()).isEqualTo(1); assertThat(stopped.retirementBasis()).isNull();
     }
 
+    @Test void ordinaryUpdateCannotClearAnErpDisputeWithoutAnIndependentDecision() {
+        var disputed = disputedSettlement();
+        var resolved = disputed.resolveDispute(SupplierPayableSettlementObservation.Status.SETTLED,
+                new SupplierPayableSettlementOperation.ResolutionHistory(null, true), disputed.updatedAt());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.update(resolved))).isInstanceOf(DomainException.class);
+        assertThat(settlements.find(tenant, disputed.command().id())).contains(disputed);
+        assertThat(settlements.revision(tenant, disputed.command().id(), resolved.version())).isEmpty();
+    }
+
+    @Test void explicitResolutionSurvivesRecreationAndLocalCompletionDoesNotResendBankOrErp() {
+        var disputed = disputedSettlement(); var old = disputed.conflictingObservation();
+        var precise = new SupplierPayableSettlementObservation(old.operationId(), old.commandDigest(), old.status(), 3L,
+                disputed.updatedAt().plusNanos(333), old.posting(), null);
+        var fresh = querySettlement(disputed, precise); var decision = settlementDecision(fresh);
+        var resolved = tx.execute(status -> settlements.resolve(decision));
+        var reopened = new JdbcSupplierPayableSettlementRepository(jdbc, json, intents, payments, reservations);
+        assertThat(reopened.find(tenant, old.operationId())).contains(resolved); assertThat(reopened.latestResolution(tenant, old.operationId())).contains(decision);
+        assertThat(reopened.latestResolution("other", old.operationId())).isEmpty();
+        assertThat(reopened.revision(tenant, old.operationId(), fresh.version())).contains(fresh);
+        assertThat(reopened.resolutionHistory(tenant, old.operationId()).firstSettlement()).isEqualTo(precise);
+        settlementExecution.completeLocal(tenant, old.operationId(), resolved.updatedAt());
+        settlementExecution.completeLocal(tenant, old.operationId(), resolved.updatedAt());
+        assertThat(count("supplier_settlement_completion")).isEqualTo(1);
+        assertThat(count("supplier_settlement_dispute_resolution")).isEqualTo(1);
+        assertThat(count("supplier_payment_operation")).isEqualTo(1); assertThat(count("supplier_payable_settlement_operation")).isEqualTo(1);
+        assertThat(resolved.dispatches()).isEqualTo(1); assertThat(reopened.find(tenant, old.operationId())).contains(resolved);
+        assertThat(reopened.latestResolution(tenant, old.operationId())).contains(decision);
+    }
+
+    @Test void resolutionInsertFailureRollsBackStateAndRevisionTogether() {
+        var disputed = disputedSettlement(); var decision = settlementDecision(disputed);
+        jdbc.execute("ALTER TABLE supplier_settlement_dispute_resolution ADD CONSTRAINT synthetic_resolution_failure CHECK (resolved_by<>'finance')");
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.resolve(decision))).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(settlements.find(tenant, decision.settlementId())).contains(disputed);
+        assertThat(settlements.revision(tenant, decision.settlementId(), decision.resolvedVersion())).isEmpty();
+        assertThat(count("supplier_settlement_dispute_resolution")).isZero(); assertThat(count("supplier_settlement_completion")).isZero();
+        assertThat(settlements.active(tenant, disputed.command().payment().id())).contains(disputed);
+    }
+
+    @Test void racingDecisionsConsumeTheSameDisputedRevisionOnlyOnce() throws Exception {
+        var disputed = disputedSettlement(); var start = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> { start.await(); return settlementResolutionOutcome(disputed); });
+            var second = pool.submit(() -> { start.await(); return settlementResolutionOutcome(disputed); }); start.countDown();
+            assertThat(List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("OK", "INVALID_SUPPLIER_SETTLEMENT_DISPUTE_RESOLUTION");
+        } finally { pool.shutdownNow(); }
+        assertThat(count("supplier_settlement_dispute_resolution")).isEqualTo(1);
+        var result = settlements.find(tenant, disputed.command().id()).orElseThrow();
+        assertThat(result.version()).isEqualTo(disputed.version() + 1); assertThat(result.dispatches()).isEqualTo(1);
+    }
+
+    @Test void overwrittenPostingAndAlreadySettledEvidenceRemainVisibleInHistory() {
+        var disputed = disputedSettlement(); var at = disputed.updatedAt().plusSeconds(1); var command = disputed.command();
+        var refused = querySettlement(disputed, new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.REJECTED,
+                3L, at, null, SupplierPayableSettlementObservation.Rejection.ACCOUNTING_PERIOD_CLOSED));
+        var proof = settlements.resolutionHistory(tenant, command.id()); assertThat(proof.firstSettlement()).isNull(); assertThat(proof.settlementObserved()).isTrue();
+        assertThat(refused.observation().status()).isEqualTo(SupplierPayableSettlementObservation.Status.PENDING);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.resolve(settlementDecision(refused))))
+                .isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE"));
+        var other = dispatch(settlement(supplierBank())); var id = other.command().id();
+        var already = other.complete(new FinanceResult.Success<>(new SupplierPayableSettlementObservation(id, other.command().digest(), SupplierPayableSettlementObservation.Status.REJECTED,
+                1L, other.updatedAt(), null, SupplierPayableSettlementObservation.Rejection.ALREADY_SETTLED)), other.updatedAt());
+        tx.executeWithoutResult(status -> settlements.update(already));
+        assertThat(settlements.resolutionHistory(tenant, id).settlementObserved()).isTrue();
+        assertThat(count("supplier_settlement_dispute_resolution")).isZero();
+    }
+
+    @Test void brokenHistoryCannotAuthorizeResolutionAndForeignKeysProtectBothRevisions() {
+        var disputed = disputedSettlement(); var d = settlementDecision(disputed);
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO supplier_settlement_dispute_resolution(tenant_id,id,settlement_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+                VALUES(?,?,?,?,?,'SETTLED','finance',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,?)
+                """, tenant, d.id().toString(), d.settlementId().toString(), d.disputedVersion(), d.resolvedVersion(), json.write(d)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update("DELETE FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? AND version=2", tenant, d.settlementId().toString());
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.resolve(d))).isInstanceOf(DomainException.class);
+        assertThat(settlements.find(tenant, d.settlementId())).contains(disputed); assertThat(count("supplier_settlement_dispute_resolution")).isZero();
+    }
+
+    @Test void laterQueriesAndDecisionsPreserveOriginalLocalCompletionAndEarlierDecision() {
+        var first = disputedSettlement(); var firstDecision = settlementDecision(first);
+        var resolved = tx.execute(status -> settlements.resolve(firstDecision)); settlementExecution.completeLocal(tenant, resolved.command().id(), resolved.updatedAt());
+        var completionBefore = jdbc.queryForList("SELECT * FROM supplier_settlement_completion WHERE tenant_id=?", tenant);
+        var reservationBefore = jdbc.queryForList("SELECT * FROM procurement_payable_reservation WHERE tenant_id=?", tenant);
+        var posting = resolved.observation().posting(); var at = resolved.updatedAt().plusSeconds(1);
+        var conflicting = new SupplierPayableSettlementObservation.Posting(posting.settlementReference(), posting.holdReference(), posting.ledgerVersion(), posting.settledAmount(),
+                posting.settledBefore(), posting.settledAfter(), posting.bankPaymentReference(), posting.bankReceiptReference(), "different-voucher", posting.periodReference(), posting.accountingDate(), posting.settledAt());
+        var bad = querySettlement(resolved, new SupplierPayableSettlementObservation(resolved.command().id(), resolved.command().digest(), SupplierPayableSettlementObservation.Status.SETTLED, 3L, at, conflicting, null));
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.resolve(settlementDecision(bad)))).isInstanceOf(DomainException.class);
+        var fresh = querySettlement(bad, new SupplierPayableSettlementObservation(resolved.command().id(), resolved.command().digest(), SupplierPayableSettlementObservation.Status.SETTLED, 4L, at.plusSeconds(1), posting, null));
+        var latestDecision = settlementDecision(fresh); var latest = tx.execute(status -> settlements.resolve(latestDecision));
+        settlementExecution.completeLocal(tenant, latest.command().id(), latest.updatedAt());
+        assertThat(jdbc.queryForList("SELECT * FROM supplier_settlement_completion WHERE tenant_id=?", tenant)).isEqualTo(completionBefore);
+        assertThat(jdbc.queryForList("SELECT * FROM procurement_payable_reservation WHERE tenant_id=?", tenant)).isEqualTo(reservationBefore);
+        assertThat(count("supplier_settlement_dispute_resolution")).isEqualTo(2);
+        assertThat(settlements.latestResolution(tenant, latest.command().id())).contains(latestDecision);
+        assertThat(settlements.revision(tenant, first.command().id(), firstDecision.disputedVersion())).contains(first);
+        assertThat(latest.dispatches()).isEqualTo(1);
+    }
+
+    @Test void v78UpgradeOnlyAddsDecisionsAndPreservesExistingSettlementAndBankFacts() {
+        database("78"); var disputed = disputedSettlement();
+        var tables = List.of("supplier_payment_authorization", "supplier_payable_hold_operation", "supplier_payable_hold_revision", "supplier_payment_execution_request",
+                "supplier_payment_execution_revision", "supplier_payment_operation", "supplier_payment_revision", "supplier_payment_dispute_resolution",
+                "supplier_settlement_preparation", "supplier_settlement_preparation_revision", "supplier_payable_settlement_operation", "supplier_payable_settlement_revision",
+                "procurement_payable_reservation", "procurement_payable_reservation_revision", "supplier_settlement_completion", "supplier_settlement_retirement");
+        var original = tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList();
+        var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema).target("79").load();
+        assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " WHERE tenant_id=?", tenant)).toList()).isEqualTo(original);
+        assertThat(count("supplier_settlement_dispute_resolution")).isZero();
+        assertThat(migration.migrate().migrationsExecuted).isZero(); assertThat(migration.validateWithResult().validationSuccessful).isTrue();
+        assertThat(tx.execute(status -> settlements.resolve(settlementDecision(disputed))).settled()).isTrue();
+    }
+
+    private SupplierSettlementDisputeResolution settlementDecision(SupplierPayableSettlementOperation disputed) {
+        return new SupplierSettlementDisputeResolution(UUID.randomUUID(), tenant, disputed.command().id(), disputed.version(), disputed.version() + 1,
+                disputed.conflictingObservation(), "finance", disputed.updatedAt(), "erp-evidence-1", "核对原核销凭证与应付余额");
+    }
+    private String settlementResolutionOutcome(SupplierPayableSettlementOperation disputed) {
+        try { tx.executeWithoutResult(status -> settlements.resolve(settlementDecision(disputed))); return "OK"; }
+        catch (DomainException conflict) { return conflict.code(); }
+    }
+
+    private SupplierPayableSettlementOperation disputedSettlement() {
+        var sent = dispatch(settlement(supplierBank())); var command = sent.command();
+        var pending = sent.complete(new FinanceResult.Success<>(new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.PENDING,
+                1L, sent.updatedAt(), null, null)), sent.updatedAt()); tx.executeWithoutResult(status -> settlements.update(pending));
+        var missing = querySettlement(pending, new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.NOT_FOUND,
+                0L, pending.updatedAt().plusSeconds(1), null, null));
+        return querySettlement(missing, new SupplierPayableSettlementObservation(command.id(), command.digest(), SupplierPayableSettlementObservation.Status.SETTLED,
+                2L, missing.updatedAt().plusSeconds(1), settled(sent).observation().posting(), null));
+    }
+    private SupplierPayableSettlementOperation querySettlement(SupplierPayableSettlementOperation current, SupplierPayableSettlementObservation observation) {
+        var observed = observation.observedAt(); var micros = observed.truncatedTo(ChronoUnit.MICROS);
+        var completedAt = micros.isBefore(observed) ? micros.plusNanos(1000) : micros;
+        return tx.execute(status -> {
+            sources.lock(tenant, current.command().payment().id());
+            var queued = current.requestQuery(completedAt); settlements.update(queued);
+            var claimed = queued.claim(completedAt, Duration.ofSeconds(30)); settlements.update(claimed);
+            var result = claimed.complete(new FinanceResult.Success<>(observation), completedAt); settlements.update(result); return result;
+        });
+    }
+
     private SupplierSettlementPreparation serviceIntent(SupplierPaymentOperation payment) { return tx.execute(status -> settlementPreparation.register(tenant, payment.command().id(), payment.version(), "finance", date(), at())); }
     private SupplierPayableSettlementOperation serviceSettlement(SupplierPaymentOperation payment) {
         var pending = serviceIntent(payment); var claimed = settlementPreparation.claim(tenant, pending.input().id(), at());

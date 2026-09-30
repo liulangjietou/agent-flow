@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -59,6 +60,70 @@ public class JdbcSupplierPayableSettlementRepository {
     /** 原文和前版参与条件更新；已安全结束的命令不可再次领取、查询或重试。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void update(SupplierPayableSettlementOperation value) {
+        var before = find(value.command().tenantId(), value.command().id()).orElseThrow(JdbcSupplierPayableSettlementRepository::conflict);
+        if (before.version() != value.version() - 1 || before.conflictingObservation() != null && value.conflictingObservation() == null) throw conflict();
+        persist(value);
+    }
+
+    /** 解除争议与具名决定原子保存，普通状态写入不能绕过这条路径。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SupplierPayableSettlementOperation resolve(SupplierSettlementDisputeResolution decision) {
+        var locked = jdbc.queryForList("SELECT id FROM supplier_payable_settlement_operation WHERE tenant_id=? AND id=? FOR UPDATE",
+                String.class, decision.tenantId(), decision.settlementId().toString());
+        if (locked.isEmpty()) throw conflict();
+        var before = find(decision.tenantId(), decision.settlementId()).orElseThrow(JdbcSupplierPayableSettlementRepository::conflict);
+        var after = decision.resolve(before, resolutionHistory(before));
+        persist(after);
+        jdbc.update("""
+                INSERT INTO supplier_settlement_dispute_resolution(tenant_id,id,settlement_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+                VALUES(?,?,?,?,?,?,?,?,?,?)
+                """, decision.tenantId(), decision.id().toString(), decision.settlementId().toString(), decision.disputedVersion(), decision.resolvedVersion(),
+                decision.observation().status().name(), decision.resolvedBy(), preciseTimestamp(decision.observation().observedAt()), preciseTimestamp(decision.resolvedAt()), json.write(decision));
+        return after;
+    }
+
+    /** 连续修订中的成功与已结算提示均保留，后续候选不能把历史消费改成未核销。 */
+    public SupplierPayableSettlementOperation.ResolutionHistory resolutionHistory(String tenant, UUID id) {
+        return resolutionHistory(find(tenant, id).orElseThrow(JdbcSupplierPayableSettlementRepository::conflict));
+    }
+
+    /** 读取最新决定时核对原修订与当时历史，不让后续原号查询改写旧决定。 */
+    public Optional<SupplierSettlementDisputeResolution> latestResolution(String tenant, UUID id) {
+        return jdbc.query("SELECT * FROM supplier_settlement_dispute_resolution WHERE tenant_id=? AND settlement_id=? ORDER BY resolved_version DESC LIMIT 1", (row, index) -> {
+            var value = json.read(row.getString("state_json"), SupplierSettlementDisputeResolution.class);
+            if (!tenant.equals(value.tenantId()) || !id.equals(value.settlementId()) || !value.id().toString().equals(row.getString("id"))
+                    || value.disputedVersion() != row.getLong("disputed_version") || value.resolvedVersion() != row.getLong("resolved_version")
+                    || !value.observation().status().name().equals(row.getString("outcome")) || !value.resolvedBy().equals(row.getString("resolved_by"))
+                    || !value.observation().observedAt().truncatedTo(ChronoUnit.MICROS).equals(instant(row.getTimestamp("observed_at")))
+                    || !value.resolvedAt().truncatedTo(ChronoUnit.MICROS).equals(instant(row.getTimestamp("resolved_at")))) throw conflict();
+            var before = revision(tenant, id, value.disputedVersion()).orElseThrow(JdbcSupplierPayableSettlementRepository::conflict);
+            var after = revision(tenant, id, value.resolvedVersion()).orElseThrow(JdbcSupplierPayableSettlementRepository::conflict);
+            if (!value.resolve(before, resolutionHistory(before)).equals(after)) throw conflict();
+            return value;
+        }, tenant, id.toString()).stream().findFirst();
+    }
+
+    private SupplierPayableSettlementOperation.ResolutionHistory resolutionHistory(SupplierPayableSettlementOperation current) {
+        var command = current.command();
+        return jdbc.query("SELECT version,state_json FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? AND version<=? ORDER BY version", rows -> {
+            SupplierPayableSettlementObservation firstSettlement = null; boolean settlementObserved = false;
+            long version = 0; SupplierPayableSettlementOperation previous = null;
+            while (rows.next()) {
+                var value = json.read(rows.getString("state_json"), SupplierPayableSettlementOperation.class);
+                if (++version != rows.getLong("version") || value.version() != version || !value.command().equals(command)) throw conflict();
+                if (firstSettlement == null && value.settled()) firstSettlement = value.observation();
+                settlementObserved |= SupplierPayableSettlementOperation.settlementRisk(value.observation())
+                        || SupplierPayableSettlementOperation.settlementRisk(value.conflictingObservation()); previous = value;
+            }
+            if (!current.equals(previous)) throw conflict();
+            return new SupplierPayableSettlementOperation.ResolutionHistory(firstSettlement, settlementObserved);
+        }, command.tenantId(), command.id().toString(), current.version());
+    }
+
+    // 外部回执保留原始纳秒，关系列主动截断，避免数据库舍入改变比较依据。
+    private static Timestamp preciseTimestamp(Instant value) { return Timestamp.from(value.truncatedTo(ChronoUnit.MICROS)); }
+
+    private void persist(SupplierPayableSettlementOperation value) {
         var command = value.command();
         int changed = jdbc.update("""
                 UPDATE supplier_payable_settlement_operation SET state_json=?,version=?,status=?,attempts=?,dispatches=?,highest_revision=?,updated_at=?,next_attempt_at=?,lease_until=?

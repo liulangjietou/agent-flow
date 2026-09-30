@@ -15,6 +15,7 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
         SupplierPayableSettlementObservation observation, SupplierPayableSettlementObservation conflictingObservation, long highestRevision, Failure failure) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
 
     /** 恢复原命令时保留发送记录与 ERP 事实，不能把超时或查无改写成尚未发送。 */
     public SupplierPayableSettlementOperation {
@@ -151,6 +152,56 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
     public boolean leaseExpired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     /** 仅原预留核销及对应付款凭证均确认后表示结算完成。 */
     public boolean settled() { return status == Status.SETTLED; }
+
+    /** 原 ERP 争议只接受近期最高终态，历史核销与原凭证、余额均不能被新回执抹去。 */
+    public ResolutionIssue resolutionIssue(ResolutionHistory history, Instant now) {
+        if (status != Status.RECONCILING) return ResolutionIssue.NOT_DISPUTED;
+        var candidate = conflictingObservation;
+        if (candidate.status() != SupplierPayableSettlementObservation.Status.SETTLED
+                && candidate.status() != SupplierPayableSettlementObservation.Status.REJECTED) return ResolutionIssue.NON_TERMINAL;
+        if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())) return ResolutionIssue.STALE_EVIDENCE;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EXPIRED_EVIDENCE;
+        if (history.firstSettlement() != null && !command.matches(history.firstSettlement(), true, now)) return ResolutionIssue.HISTORY_CHANGED;
+        if (candidate.status() == SupplierPayableSettlementObservation.Status.REJECTED
+                && (history.settlementObserved() || settlementRisk(observation))) return ResolutionIssue.SETTLEMENT_ALREADY_OBSERVED;
+        var original = history.firstSettlement() != null ? history.firstSettlement()
+                : observation != null && observation.status() == SupplierPayableSettlementObservation.Status.SETTLED ? observation : null;
+        if (original != null && !original.posting().equals(candidate.posting())) return ResolutionIssue.DIFFERENT_POSTING;
+        return null;
+    }
+
+    /** 只采用本次原号查询候选，不重发 ERP、不改变银行事实或自动冲销已完成的占用。 */
+    public SupplierPayableSettlementOperation resolveDispute(SupplierPayableSettlementObservation.Status outcome, ResolutionHistory history, Instant now) {
+        requireTime(now);
+        if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome) {
+            throw new DomainException("SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE", "Recent terminal evidence must preserve the original supplier settlement and historical postings");
+        }
+        return changed(Status.valueOf(outcome.name()), now, null, null, evidence, conflictingObservation, null, highestRevision, null);
+    }
+
+    /** 已核销和 ERP 明确提示已经结算都不能作为无外部影响的证明。 */
+    public static boolean settlementRisk(SupplierPayableSettlementObservation value) {
+        return value != null && (value.status() == SupplierPayableSettlementObservation.Status.SETTLED
+                || value.rejection() == SupplierPayableSettlementObservation.Rejection.ALREADY_SETTLED);
+    }
+
+    /**
+     * 仓储提供连续修订的最小核销事实；争议候选中的成功或已结算提示也须保留。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ResolutionHistory(SupplierPayableSettlementObservation firstSettlement, boolean settlementObserved) {
+        /** 首次确认的核销必须有完整成功凭据，不能同时宣称从未见过核销。 */
+        public ResolutionHistory {
+            if (firstSettlement != null && (firstSettlement.status() != SupplierPayableSettlementObservation.Status.SETTLED || !settlementObserved)) throw invalid();
+        }
+    }
+
+    /**
+     * 裁决受阻原因只说明业务边界，不返回 ERP 响应原文。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, STALE_EVIDENCE, EXPIRED_EVIDENCE, HISTORY_CHANGED,
+        SETTLEMENT_ALREADY_OBSERVED, DIFFERENT_POSTING }
 
     private SupplierPayableSettlementOperation reconcile(SupplierPayableSettlementObservation incoming, long highest, Failure reason, Instant now) {
         return changed(Status.RECONCILING, now, null, null, evidence, observation, incoming, highest, reason);
