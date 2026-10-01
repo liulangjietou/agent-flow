@@ -1,0 +1,184 @@
+{
+  "date": "2026-10-01",
+  "status": "EVENT_CONTRACT_BACKEND_ACCEPTED_EVENT_WAIT_STILL_INCOMPLETE",
+  "baseCommit": "35da0596acd2b4246dc73708d2b288db8c981d62",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "immutable tenant-scoped event contract versions",
+    "explicit administrator publication and version-specific availability",
+    "append-only publication and availability history",
+    "read-only designer selection",
+    "authorization before idempotency replay",
+    "bounded pagination and transactional concurrency",
+    "OpenAPI and PostgreSQL CI configuration"
+  ],
+  "notCompleted": [
+    "native event wait node and published-definition binding",
+    "trusted source signature verification",
+    "durable inbox and exact round/activation matching",
+    "single-consumption advancement and audited failure recovery",
+    "management and designer UI",
+    "complete event wait runtime acceptance",
+    "the remaining four work packages"
+  ],
+  "tests": {
+    "domain": {
+      "tests": 5,
+      "status": "PASS"
+    },
+    "h2Server": {
+      "tests": 17,
+      "status": "PASS",
+      "includes": "10 event contract integration, 1 migration, 6 OpenAPI"
+    },
+    "postgresServer": {
+      "tests": 11,
+      "status": "PASS",
+      "includes": "the same 10 event contract integration cases and 1 migration case"
+    },
+    "countsOverlap": true,
+    "postgresDatabases": {
+      "business": "event_contract_it_53cdad0558",
+      "migration": "event_contract_migration_53cdad0558"
+    },
+    "packaging": "PASS",
+    "openapi": {
+      "operations": 273,
+      "schemas": 542,
+      "requestExamples": 106,
+      "status": "PASS",
+      "allPreviousOperationsAndSchemasUnchanged": true
+    },
+    "paginationRegression": {
+      "uncoveredReason": "The initial pagination cases used versions 1 and 2; a null cursor was incorrectly implemented as less than the largest valid long value.",
+      "failedReproductionLog": "/fyoung/tmp/agentflow-remaining-20260928/event-contract-pagination-red.log",
+      "fix": "Only add the before-version or before-revision predicate when the caller actually supplied a cursor.",
+      "fixedOnH2AndPostgres": true
+    }
+  },
+  "runtime": {
+    "database": "event_contract_runtime_e5362fbca1",
+    "backendPort": 18218,
+    "jarSha256": "1d9e39342d18f8bd8cd95a558e539c63783287db143ee40eb024eabb726165d9",
+    "sourceDatabase": "instance_ui_5a3fbce0c04d",
+    "sourceBackupSha256": "03d68290526620ede07a6230b2e3227ff260569447223269d18d18cdba7c12a8",
+    "sourceBackupBytes": 1707696,
+    "migration": {
+      "oldTables": 213,
+      "oldRows": 5105,
+      "allOldTablesPreserved": true,
+      "newTables": 3
+    },
+    "preservationAfterHttpAndRestart": {
+      "status": "PASS",
+      "unchangedOldTablesAfterHttpAndRestart": 212,
+      "changedOldTable": "request_idempotency",
+      "addedIdempotencyRows": 5,
+      "eventRows": {
+        "event_contract": 1,
+        "event_contract_version": 2,
+        "event_contract_availability_history": 5
+      },
+      "preservedFiles": 10
+    },
+    "http": {
+      "result": "PASS",
+      "actualResponses": 45,
+      "operations": [
+        "changeEventContractAvailability",
+        "definitionEventContractDirectory",
+        "definitionEventContractVersion",
+        "definitionEventContractVersions",
+        "eventContractAvailabilityHistory",
+        "eventContractDirectory",
+        "eventContractVersion",
+        "eventContractVersions",
+        "publishEventContract"
+      ],
+      "statuses": [
+        200,
+        201,
+        400,
+        401,
+        403,
+        404,
+        409
+      ]
+    },
+    "restartVerified": true,
+    "browserTested": false,
+    "externalSourcesConnected": false,
+    "workerConfiguration": {
+      "agentflow.expenses.resource-adjustment-worker-enabled": false,
+      "agentflow.advances.disbursement-return-worker-enabled": false,
+      "agentflow.advance-requests.precheck-worker-enabled": false,
+      "agentflow.invoices.verification-worker-enabled": false,
+      "agentflow.expenses.payment-return-worker-enabled": false,
+      "agentflow.expenses.partial-adjustment-worker-enabled": false,
+      "agentflow.expenses.archive-worker-enabled": false,
+      "agentflow.expenses.precheck-worker-enabled": false,
+      "agentflow.expense-plans.precheck-worker-enabled": false,
+      "agentflow.advances.repayment-worker-enabled": false,
+      "agentflow.advances.repayment-review-worker-enabled": false,
+      "agentflow.expenses.settlement-worker-enabled": false,
+      "agentflow.webhooks.worker-enabled": false,
+      "agentflow.assist.worker-enabled": false,
+      "agentflow.supplier-payments.return-worker-enabled": false,
+      "agentflow.supplier-payments.adjustment-preparation-worker-enabled": false,
+      "agentflow.supplier-payments.adjustment-worker-enabled": false,
+      "agentflow.supplier-payments.execution-worker-enabled": false,
+      "agentflow.supplier-payments.payment-worker-enabled": false,
+      "agentflow.procurement-payments.precheck-worker-enabled": false,
+      "agentflow.supplier-payments.review-worker-enabled": false,
+      "agentflow.supplier-payments.hold-worker-enabled": false,
+      "agentflow.supplier-payments.settlement-preparation-worker-enabled": false,
+      "agentflow.supplier-payments.settlement-worker-enabled": false,
+      "agentflow.payments.payee-review-worker-enabled": false,
+      "agentflow.vouchers.reversal-execution-worker-enabled": false,
+      "agentflow.vouchers.reversal-worker-enabled": false,
+      "agentflow.payments.worker-enabled": false,
+      "agentflow.vouchers.preparation-worker-enabled": false,
+      "agentflow.payments.request-worker-enabled": false,
+      "agentflow.vouchers.worker-enabled": false,
+      "agentflow.budgets.worker-enabled": false,
+      "agentflow.payment-callbacks.worker-enabled": false,
+      "agentflow.budget-adjustments.precheck-worker-enabled": false,
+      "agentflow.budget-adjustments.review-worker-enabled": false,
+      "agentflow.budget-adjustments.execution-worker-enabled": false,
+      "agentflow.sla.reminders-enabled": false,
+      "agentflow.timers.enabled": false
+    },
+    "harnessCorrection": "The first HTTP assertion incorrectly required Cache-Control to equal no-store. The real response contained no-store with other directives. Corrected the assertion and resumed the already-created publication using the same original idempotency key; no duplicate publication was created."
+  },
+  "delivery": {
+    "localOnly": true,
+    "remoteConfigured": false,
+    "prCreated": false,
+    "remoteCiRun": false,
+    "fullGoalComplete": false
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/event/EventContract.java": "418f56aa7675657e6ecc9fd56bbe75b70cb012a514eaf1c9f3136bae76ddd996",
+    "agentflow-domain/src/main/java/io/agentflow/event/EventContractAvailability.java": "5fb694957e4dc87fe46a167626b20640d43ce34271d70889df17d9ed48371a30",
+    "agentflow-domain/src/main/java/io/agentflow/event/EventContractRepository.java": "dcaabb0ff3047cefaf53eaa3884cf2748d27fd8120e3f24da239dec3ed402437",
+    "agentflow-server/src/main/java/io/agentflow/event/JdbcEventContractRepository.java": "42be370716f0cf531dc5c5391971eb61e78910abc6f6f69cd16429127a26f5ad",
+    "agentflow-server/src/main/java/io/agentflow/event/EventContractService.java": "700e0b317780ed0692fc38b7d24251b9180cae7d3991fce731b04cfa2344a6d0",
+    "agentflow-server/src/main/java/io/agentflow/event/EventContractQuery.java": "5aa3cdc56b1a748503a8c8e1b563af989487f839887369fc05f1f8744c318dee",
+    "agentflow-server/src/main/java/io/agentflow/event/EventContractController.java": "162884d0fb2de222cb94f01764ebc60d9abd7747bd4253544397b032f89d4798",
+    "agentflow-server/src/main/java/io/agentflow/event/DefinitionEventContractController.java": "1deb5c41663e7bb1ed09e26d8018b5da3ec93f7d97af8458c605500962f9a54e",
+    "agentflow-server/src/main/java/io/agentflow/event/EventContractViews.java": "d34f603d48a3abbc9c8d59315667b921162e5555e182d99ee5d286dfae6002f0",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "f1dfba7513ef0b451bf6107bd2a3ab6c2c0edfe9913cf9fffd5033c9201f8ff7",
+    "agentflow-server/src/main/resources/db/migration/V87__published_event_contracts.sql": "889b1da08e94ec8ca856d1b8eb661eb6ba5fa5497da51709913932d6e1287cb3",
+    "agentflow-server/src/main/resources/api/openapi.json": "aa80b69a34072eb969c269ad93235bd8e9bef6f8b610f4cc1ce7f6951003105e"
+  },
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-h2-final.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-postgres-tests.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-openapi.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-package.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-schema-migrate.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-http.jsonl",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-http-contracts.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-preservation.json"
+  ]
+}
