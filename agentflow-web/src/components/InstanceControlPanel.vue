@@ -16,8 +16,10 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN')
 let generation = 0
 
 function cancel() {
-  const origin = selected.value === 'terminate' ? terminationTrigger.value : trigger.value
-  selected.value = null; reason.value = ''; error.value = ''; void nextTick(() => origin?.focus())
+  const action = selected.value
+  selected.value = null; reason.value = ''; error.value = ''
+  // 确认表单会卸载原按钮，必须在按钮重新挂载后读取引用。
+  if (action) void nextTick(() => (action === 'terminate' ? terminationTrigger.value : trigger.value)?.focus())
 }
 async function prepare(action: InstanceControlAction) {
   if (blocked.value || !query.value || !(action === 'pause' ? query.value.canPause : action === 'resume' ? query.value.canResume : query.value.canTerminate)) return

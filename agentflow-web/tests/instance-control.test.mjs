@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createRenderer, reactive } from 'vue'
+import { createRenderer, reactive, toRaw } from 'vue'
 const rules = await import(process.env.AGENTFLOW_TEST_INSTANCE_CONTROL)
 const { default: Panel } = await import(process.env.AGENTFLOW_TEST_INSTANCE_PANEL)
+const { default: RenderedPanel } = await import(process.env.AGENTFLOW_TEST_INSTANCE_RENDERED)
 const { default: Record } = await import(process.env.AGENTFLOW_TEST_APPLICATION_RECORD)
 const { render: recordBinding } = await import(process.env.AGENTFLOW_TEST_INSTANCE_RECORD)
 const { createRecordChanged } = await import(process.env.AGENTFLOW_TEST_RECORD_CHANGED)
@@ -23,6 +24,36 @@ function mount(Component, props, handlers = {}) {
   const instance = app.mount({})
   return { state: instance.$.setupState, close: () => { app.unmount(); Object.assign(api, originalApi) } }
 }
+
+test('取消确认后焦点返回重新挂载的原操作按钮，不丢到页面主体', async () => {
+  let focused
+  const node = (tag, text = '') => ({ tag, text, props: {}, children: [], parent: null,
+    addEventListener() {}, removeEventListener() {}, focus() { focused = this } })
+  const remove = child => { if (child.parent) child.parent.children.splice(child.parent.children.indexOf(child), 1); child.parent = null }
+  const host = createRenderer({
+    createElement: tag => node(tag), createText: text => node('#text', text), createComment: () => node('#comment'),
+    setText: (el, text) => { el.text = text }, setElementText: (el, text) => { el.text = text; el.children = [] },
+    patchProp: (el, key, _old, value) => { el.props[key] = value }, remove,
+    insert: (child, parent, anchor = null) => { remove(child); child.parent = parent; parent.children.splice(anchor ? parent.children.indexOf(anchor) : parent.children.length, 0, child) },
+    parentNode: el => el.parent, nextSibling: el => el.parent?.children[el.parent.children.indexOf(el) + 1] ?? null
+  })
+  const find = (el, label) => el.tag === 'button' && el.text === label ? el : el.children.map(child => find(child, label)).find(Boolean)
+  for (const [action, label, initial] of [['pause', '暂停本轮审批', view()], ['resume', '恢复本轮审批', paused()], ['terminate', '终止本轮审批', paused()]]) {
+    api.instanceControl = async () => initial
+    const root = node('root'), props = { ...panelProps(), version: initial.applicationVersion }
+    const app = host.createApp(RenderedPanel, props)
+    try {
+      app.mount(root); await settle()
+      const original = find(root, label)
+      assert.ok(original, action); await original.props.onClick(); await settle()
+      assert.ok(find(root, label) === undefined, '确认表单应卸载原操作按钮')
+      find(root, '取消操作').props.onClick(); await settle()
+      const restored = find(root, label)
+      assert.ok(restored); assert.ok(restored !== original)
+      assert.ok(toRaw(focused) === restored, `取消 ${action} 后应聚焦新挂载的原按钮`)
+    } finally { app.unmount(); Object.assign(api, originalApi) }
+  }
+})
 
 test('终止要求本轮管理权限和明确原因，只接受无后续操作能力的终态回执', () => {
   for (const initial of [view(), paused()]) {

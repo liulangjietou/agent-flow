@@ -80,6 +80,15 @@ writeFileSync(resolve(output, 'InstanceControlPanel.js'), ts.transpileModule(ins
 }).outputText)
 process.env.AGENTFLOW_TEST_INSTANCE_PANEL = resolve(output, 'InstanceControlPanel.js')
 process.env.AGENTFLOW_TEST_INSTANCE_CONTROL = resolve(output, 'instanceControl.js')
+// 挂载完整模板，覆盖确认表单切换时按钮引用的卸载与重新创建。
+const instanceRendered = compileScript(instanceDescriptor, { id: 'instance-control-rendered-test', inlineTemplate: true }).content
+  .replaceAll('from "vue"', `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
+  .replaceAll("from 'vue'", `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
+  .replaceAll("'../api'", "'./api.js'").replaceAll("'../instanceControl'", "'./instanceControl.js'")
+writeFileSync(resolve(output, 'InstanceControlRendered.js'), ts.transpileModule(instanceRendered, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText)
+process.env.AGENTFLOW_TEST_INSTANCE_RENDERED = resolve(output, 'InstanceControlRendered.js')
 const instanceElement = recordSource.match(/<InstanceControlPanel\s[\s\S]*?\/>/)?.[0]
 if (!instanceElement) throw new Error('Missing actual instance control binding')
 const instanceBinding = compileTemplate({ source: instanceElement, id: 'instance-record-binding', filename: 'ApplicationRecord.vue' })
