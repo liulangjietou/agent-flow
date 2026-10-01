@@ -70,6 +70,7 @@ jobs:
             'AGENTFLOW_REVERSAL_EXECUTION_MIGRATION:reversal_execution_migration'
             'AGENTFLOW_REVERSAL_RETIREMENT_MIGRATION:reversal_retirement_migration'
             'AGENTFLOW_COUNTERSIGN_POLICY:countersign_policy'
+            'AGENTFLOW_TIMER_WAIT:timer_wait'
           )
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
@@ -80,7 +81,7 @@ jobs:
             export "${test_config_prefix}_PASSWORD=${AGENTFLOW_SCHEMA_TEST_PASSWORD}"
             export "${test_config_prefix}_DRIVER=org.postgresql.Driver"
           done
-          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest,ApplicationCopyIntegrationTest,CopyMigrationTest,AssistExecutionIntegrationTest,AssistExecutionMigrationTest,AdvanceRepaymentIntegrationTest,DisbursementReturnMigrationTest,AdvanceVoucherReviewMigrationTest,VoucherReversalMigrationTest,VoucherReversalExecutionMigrationTest,CountersignPolicyIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest,ApplicationCopyIntegrationTest,CopyMigrationTest,AssistExecutionIntegrationTest,AssistExecutionMigrationTest,AdvanceRepaymentIntegrationTest,DisbursementReturnMigrationTest,AdvanceVoucherReviewMigrationTest,VoucherReversalMigrationTest,VoucherReversalExecutionMigrationTest,CountersignPolicyIntegrationTest,TimerWaitIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
           for test_case in "${postgres_cases[@]}"; do
             IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
             test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"

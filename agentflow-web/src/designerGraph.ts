@@ -23,6 +23,7 @@ export interface DesignerNode {
   recipientRule?: string
   approvalMode?: string
   approvalPercentage?: string
+  timerDelaySeconds?: string
   deadline?: DesignerDeadline
   originalProperties?: Record<string, string>
   loadedPosition?: { x: number; y: number }
@@ -42,6 +43,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
     return { id: node.id, name: node.name, type: node.type, x, y, assigneeRule: node.properties.assigneeRule ?? '', recipientRule: node.properties.recipientRule ?? '',
       deadline: readDesignerDeadline(node.properties),
       approvalMode: node.properties.approvalMode ?? 'SINGLE', approvalPercentage: node.properties.approvalPercentage,
+      timerDelaySeconds: node.properties.timerDelaySeconds,
       originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
 }
@@ -50,6 +52,10 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
 export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
   return nodes.map(node => {
     const properties = { ...node.originalProperties }
+    if (node.type === 'TIMER_WAIT') {
+      if (node.timerDelaySeconds !== undefined) properties.timerDelaySeconds = node.timerDelaySeconds
+      else delete properties.timerDelaySeconds
+    }
     if (node.type === 'COPY') {
       if (node.recipientRule) properties.recipientRule = node.recipientRule
       else delete properties.recipientRule

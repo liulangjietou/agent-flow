@@ -279,7 +279,7 @@ onUnmounted(() => returnFocus?.focus())
           </details>
         </section>
         <RoundComparison v-else-if="historyTab === 'compare'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" />
-        <RoundDiagram v-else-if="historyTab === 'diagram'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" />
+        <RoundDiagram v-else-if="historyTab === 'diagram'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" :locked="writesBlocked" @changed="load(); emit('changed')" />
         <AssistRunRecords v-else-if="historyTab === 'assist'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="application.roundNo" />
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />

@@ -61,7 +61,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * 实际 HTTP 财务端口、认证、数据库和 Flowable 联合验收借款申请；企业数据均为合成夹具。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
+@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true", "agentflow.timers.enabled=false",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
         "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.expense-plans.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false"})
@@ -98,6 +98,9 @@ class AdvanceRequestIntegrationTest {
     @Autowired AdvanceRequestRepository advances;
     @Autowired EmployeeAdvanceRepository paidAdvances;
     @Autowired TaskService tasks;
+    @Autowired io.agentflow.approval.process.TimerWaitService timerWaits;
+    @Autowired org.flowable.engine.ManagementService timerJobs;
+    @Autowired org.flowable.engine.ProcessEngine engine;
     @Autowired AdvanceRequestCheckService execution;
     @Autowired AdvanceRequestCheckWorker worker;
     @Autowired JdbcAdvanceRequestCheckRepository checks;
@@ -401,6 +404,38 @@ class AdvanceRequestIntegrationTest {
         ok(act(id, "APPROVE"), 200); assertThat(voucherPreparations.latest(voucherSources.reference(app(id)))).isPresent();
     }
 
+    @Test void finalTimerAndFinancialPreparationCommitTogetherAfterTheRealHumanDecisions() throws Exception {
+        UUID id = id(ok(send("/api/v1/advance-requests", "alice", createBody(published(false, false, true), content("100"))), 201));
+        submit(id); ok(act(id, "APPROVE"), 200);
+        // 只调整该测试的引擎时钟，管理员重试仍核对真实时间，不等待或修改持久到期值。
+        engine.getProcessEngineConfiguration().getClock().setCurrentTime(java.util.Date.from(Instant.now().minusSeconds(120)));
+        try { ok(act(id, "APPROVE"), 200); }
+        finally { engine.getProcessEngineConfiguration().getClock().reset(); }
+        var before = app(id); long previous = before.version();
+        String instanceId = engine.getRuntimeService().createProcessInstanceQuery().variableValueEquals("applicationId", before.id().toString()).singleResult().getId();
+        var job = timerJobs.createTimerJobQuery().processInstanceId(instanceId).singleResult();
+        assertThat(before.status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(current(id).approval()).isNull(); assertThat(paidAdvances.find("demo", id)).isEmpty();
+        jdbc.execute("ALTER TABLE voucher_preparation ADD CONSTRAINT ck_timer_voucher_fixture CHECK (business_id <> '" + id + "')");
+        try {
+            assertThatThrownBy(() -> timerWaits.advance(job.getId(), Instant.now())).isInstanceOf(RuntimeException.class);
+            assertThat(timerJobs.createTimerJobQuery().jobId(job.getId()).singleResult().getDuedate()).isEqualTo(job.getDuedate());
+            assertThat(app(id).version()).isEqualTo(previous); assertThat(current(id).approval()).isNull();
+            assertThat(jdbc.queryForObject("SELECT status FROM approval_submission_round WHERE application_id=? AND round_no=1", String.class, before.id().toString())).isEqualTo("IN_APPROVAL");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='TIMER_ELAPSED'", Integer.class, before.id().toString())).isZero();
+        } finally { jdbc.execute("ALTER TABLE voucher_preparation DROP CONSTRAINT ck_timer_voucher_fixture"); }
+        assertThat(timerWaits.advance(job.getId(), Instant.now())).isTrue();
+        assertThat(app(id).status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(current(id).approval().applicationVersion()).isEqualTo(app(id).version());
+        assertThat(current(id).approval().approvedBy()).isEqualTo("system:timer");
+        assertThat(voucherPreparations.latest(voucherSources.reference(app(id))).orElseThrow().status()).isEqualTo(VoucherPreparation.Status.QUEUED);
+        assertThat(paidAdvances.find("demo", id)).isEmpty();
+        assertThat(timerWaits.advance(job.getId(), Instant.now())).isFalse();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM advance_request_revision WHERE request_id=? AND operation='APPROVE'", Integer.class, id.toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE business_id=?", Integer.class, id.toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class, before.id().toString())).isEqualTo(2);
+    }
+
     private UUID create() throws Exception { return id(ok(send("/api/v1/advance-requests", "alice", createBody(published(false, false), content("100"))), 201)); }
     private Map<String, Object> createBody(DefinitionDraft definition, AdvanceRequestContent content) { return Map.of("businessNo", "PLAN-" + UUID.randomUUID(), "processKey", definition.key(), "definitionVersion", definition.version(), "content", content); }
     private AdvanceRequestContent content(String amount) { return new AdvanceRequestContent(entity, "合成出差借款", "客户现场交流", money(amount, "CNY"), LocalDate.now().plusDays(10)); }
@@ -428,10 +463,20 @@ class AdvanceRequestIntegrationTest {
     private static Money money(String value, String currency) { return new Money(new BigDecimal(value), currency); }
     private UUID person(String subject, boolean approver) { var found = jdbc.queryForList("SELECT id FROM organization_person WHERE tenant_id='demo' AND subject=?", String.class, subject); return found.isEmpty() ? organization.createPerson(admin, subject, subject, true, approver).id() : UUID.fromString(found.get(0)); }
     private DefinitionDraft published(boolean noHuman, boolean masked) {
+        return published(noHuman, masked, false);
+    }
+    private DefinitionDraft published(boolean noHuman, boolean masked, boolean waitAfterApproval) {
         var graph = noHuman ? new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()), new Node("end", "结束", NodeType.END, Map.of())), List.of(new Edge("a", "start", "end", "", false)))
                 : new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()), new Node("review", "主管", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
                     new Node("finalReview", "复核", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)), new Node("end", "结束", NodeType.END, Map.of())),
                     List.of(new Edge("a", "start", "review", "", false), new Edge("b", "review", "finalReview", "", false), new Edge("c", "finalReview", "end", "", false)));
+        if (waitAfterApproval) {
+            var nodes = new java.util.ArrayList<>(graph.nodes());
+            nodes.add(new Node("wait", "批准后等待", NodeType.TIMER_WAIT, Map.of("timerDelaySeconds", "1")));
+            var edges = new java.util.ArrayList<>(graph.edges()); edges.removeIf(edge -> edge.target().equals("end"));
+            edges.add(new Edge("timerIn", "finalReview", "wait", "", false)); edges.add(new Edge("timerOut", "wait", "end", "", false));
+            graph = new Graph(nodes, edges);
+        }
         var access = noHuman ? Map.<String, FieldVisibility>of() : Map.of("review", masked ? FieldVisibility.MASKED : FieldVisibility.READ_ONLY, "finalReview", FieldVisibility.READ_ONLY);
         var schema = new FormSchema(2, List.of(new FormSchema.Field(AdvanceRequestFormContract.DETAILS, "借款明细", FormSchema.FieldType.TEXT, true, null,
                 null, null, null, null, null, null, true, access), new FormSchema.Field("amount", "借款本币额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),

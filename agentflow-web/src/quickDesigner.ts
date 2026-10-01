@@ -10,7 +10,7 @@ export interface QuickBranch { edgeId: string; sequence: QuickSequence }
 export interface QuickProjection { sequence: QuickSequence | null; reason: string }
 /** 编辑命令只作用于未发布草稿；权限和会话锁由调用层控制。@author owlzhangfq@gmail.com */
 export type QuickCommand =
-  | { kind: 'insert'; edgeId?: string; beforeNodeId?: string; type: 'USER_TASK' | 'COPY' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' }
+  | { kind: 'insert'; edgeId?: string; beforeNodeId?: string; type: 'USER_TASK' | 'COPY' | 'TIMER_WAIT' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' }
   | { kind: 'removeTask'; nodeId: string }
   | { kind: 'addBranch'; nodeId: string }
   | { kind: 'removeBranch'; nodeId: string; edgeId: string }
@@ -19,7 +19,7 @@ export type QuickCommand =
   | { kind: 'swapTasks'; firstId: string; secondId: string }
 
 const EXIT = Symbol('exit')
-const supported = new Set(['START', 'END', 'USER_TASK', 'COPY', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'])
+const supported = new Set(['START', 'END', 'USER_TASK', 'COPY', 'TIMER_WAIT', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'])
 const isGateway = (node: GraphNode) => node.type === 'EXCLUSIVE_GATEWAY' || node.type === 'PARALLEL_GATEWAY'
 
 /** 依据最近共同后继将无环图投影成步骤与分支，发现交叉共享即退出而非重复显示。 */
@@ -136,13 +136,13 @@ export function editQuickGraph(source: Graph, command: QuickCommand, newId: () =
     if (!connections.length || new Set(connections.map(item => item.target)).size !== 1) throw new Error('插入位置已变化，请重新选择。')
     const target = connections[0]!.target
     if (command.beforeNodeId && isGateway(find(target)) && connections.length > 1) throw new Error('请在汇合之后或某条分支内插入步骤，不能绕过汇合。')
-    const added = node(command.type, command.type === 'COPY' ? '抄送' : command.type === 'USER_TASK' ? '审批步骤' : command.type === 'PARALLEL_GATEWAY' ? '并行审批' : '条件分支')
+    const added = node(command.type, command.type === 'TIMER_WAIT' ? '定时等待' : command.type === 'COPY' ? '抄送' : command.type === 'USER_TASK' ? '审批步骤' : command.type === 'PARALLEL_GATEWAY' ? '并行审批' : '条件分支')
     // 原审批步骤可能同时汇合互斥路径；新并行网关只能接收汇合后的一个令牌。
     const entrance = command.type === 'PARALLEL_GATEWAY' && connections.length > 1
       ? node('EXCLUSIVE_GATEWAY', '条件汇合').id : added.id
     connections.forEach(item => { item.target = entrance })
     if (entrance !== added.id) graph.edges.push(edge(entrance, added.id))
-    if (['USER_TASK', 'COPY'].includes(command.type)) graph.edges.push(edge(added.id, target))
+    if (['USER_TASK', 'COPY', 'TIMER_WAIT'].includes(command.type)) graph.edges.push(edge(added.id, target))
     else if (command.type === 'PARALLEL_GATEWAY') {
       const join = node('PARALLEL_GATEWAY', '全部汇合')
       for (const name of ['分支审批 1', '分支审批 2']) {
@@ -158,7 +158,7 @@ export function editQuickGraph(source: Graph, command: QuickCommand, newId: () =
       if (merge !== target) graph.edges.push(edge(merge, target))
     }
   } else if (command.kind === 'removeTask') {
-    if (!['USER_TASK', 'COPY'].includes(find(command.nodeId).type)) throw new Error('只能直接删除审批或抄送步骤。')
+    if (!['USER_TASK', 'COPY', 'TIMER_WAIT'].includes(find(command.nodeId).type)) throw new Error('只能直接删除审批、抄送或定时等待步骤。')
     const next = graph.edges.find(item => item.source === command.nodeId)!
     const entrances = graph.edges.filter(item => item.target === command.nodeId)
     // 删除审批行为仍须保留其互斥合流，不能让未选路径成为并行网关的独立入口。
@@ -168,7 +168,7 @@ export function editQuickGraph(source: Graph, command: QuickCommand, newId: () =
     if (target !== next.target) next.source = target
     remove([command.nodeId])
   } else if (command.kind === 'swapTasks') {
-    if (!['USER_TASK', 'COPY'].includes(find(command.firstId).type) || !['USER_TASK', 'COPY'].includes(find(command.secondId).type)) throw new Error('只能移动相邻审批或抄送步骤。')
+    if (!['USER_TASK', 'COPY', 'TIMER_WAIT'].includes(find(command.firstId).type) || !['USER_TASK', 'COPY', 'TIMER_WAIT'].includes(find(command.secondId).type)) throw new Error('只能移动相邻审批、抄送或定时等待步骤。')
     const between = graph.edges.find(item => item.source === command.firstId && item.target === command.secondId)
     const next = graph.edges.find(item => item.source === command.secondId)
     if (!between || !next || graph.edges.filter(item => item.target === command.secondId).length !== 1) throw new Error('存在共享步骤，不能直接移动。')

@@ -73,6 +73,10 @@ export function parseSimulationValues(raw: string): Record<string, unknown> {
 }
 
 const ruleLabels: Record<string, string> = {
+  TIMER_DELAY_REQUIRED: '请明确填写定时等待时长',
+  TIMER_DELAY_INVALID: '等待时长必须为 1 至 31536000 的整数秒，不支持表达式或小数',
+  TIMER_REQUIRES_WAIT_NODE: '只有定时等待节点可以配置等待时长',
+  TIMER_REQUIRES_APPROVAL_PATH: '此结束路径可能绕过全部人工审批，定时等待不能代替审批',
   PARALLEL_BRANCH_REQUIRED: '并行网关需要至少两条入线或两条出线',
   PARALLEL_CONDITION_FORBIDDEN: '并行出线全部执行，不能设置条件',
   PARALLEL_JOIN_MISMATCH: '并行汇合必须接齐同一拆分的全部分支，不能把互斥路径分别作为入口',

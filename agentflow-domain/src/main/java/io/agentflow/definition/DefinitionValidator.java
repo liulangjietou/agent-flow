@@ -31,6 +31,10 @@ public final class DefinitionValidator {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (n.type() == NodeType.TIMER_WAIT) {
+                try { TimerWaitPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            } else if (n.properties().containsKey(TimerWaitPolicy.PROPERTY)) errors.add("TIMER_REQUIRES_WAIT_NODE:" + n.id());
             if (n.properties().containsKey(ExpenseProcessPolicy.PROPERTY)) {
                 try { ExpenseProcessPolicy.stage(n); }
                 catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
@@ -58,11 +62,13 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.SERVICE_TASK) {
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
             }
-            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY) {
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
                     errors.add("TASK_NAME_EXPRESSION_FORBIDDEN:" + n.id());
                 }
+            }
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY) {
                 String assigneeRule = n.properties().get(n.type() == NodeType.COPY ? "recipientRule" : "assigneeRule");
                 if (assigneeRule == null || assigneeRule.isBlank()) {
                     errors.add("ASSIGNEE_RULE_REQUIRED:" + n.id());
@@ -128,7 +134,8 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.START && incoming.contains(n.id())) errors.add("START_MUST_HAVE_NO_INCOMING:" + n.id());
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
             // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
-            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY) && outgoingCount > 1) {
+            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY
+                    || n.type() == NodeType.TIMER_WAIT) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
@@ -167,7 +174,28 @@ public final class DefinitionValidator {
         }
         if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
         if (errors.isEmpty()) errors.addAll(new ParallelStructureValidator().validate(graph));
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.TIMER_WAIT)) {
+            validateTimerApprovalPaths(graph, errors);
+        }
         return List.copyOf(errors);
+    }
+
+    /** 并行汇合要求全部入口到达，因此另一分支的人工审批不能被误判为可绕过。 */
+    private void validateTimerApprovalPaths(Graph graph, List<String> errors) {
+        Map<String, Boolean> withoutApproval = new HashMap<>();
+        Set<String> remaining = new LinkedHashSet<>(graph.nodes().stream().map(Node::id).toList());
+        while (!remaining.isEmpty()) {
+            for (String id : List.copyOf(remaining)) {
+                Node node = graph.node(id);
+                var parents = graph.edges().stream().filter(e -> e.target().equals(id)).map(Edge::source).toList();
+                if (!withoutApproval.keySet().containsAll(parents)) continue;
+                boolean bypass = node.type() == NodeType.START || node.type() != NodeType.USER_TASK
+                        && (node.type() == NodeType.PARALLEL_GATEWAY && parents.size() > 1
+                            ? parents.stream().allMatch(withoutApproval::get) : parents.stream().anyMatch(withoutApproval::get));
+                withoutApproval.put(id, bypass); remaining.remove(id);
+                if (node.type() == NodeType.END && bypass) errors.add("TIMER_REQUIRES_APPROVAL_PATH:" + id);
+            }
+        }
     }
 
     private boolean containsMembership(ConditionAst condition) {

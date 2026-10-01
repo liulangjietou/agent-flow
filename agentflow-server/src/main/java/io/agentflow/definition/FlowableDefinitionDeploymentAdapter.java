@@ -71,6 +71,10 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                     case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
                             .append(escape(node.name())).append("\"/>");
                     case USER_TASK -> appendUserTask(xml, node);
+                    case TIMER_WAIT -> xml.append("<intermediateCatchEvent id=\"").append(escape(node.id()))
+                            .append("\" name=\"").append(escape(node.name())).append("\"><timerEventDefinition><timeDuration>")
+                            .append(TimerWaitPolicy.fromProperties(node.properties()).duration())
+                            .append("</timeDuration></timerEventDefinition></intermediateCatchEvent>");
                     case COPY -> {
                         String encodedRule = Base64.getEncoder().encodeToString(node.properties().get("recipientRule")
                                 .getBytes(java.nio.charset.StandardCharsets.UTF_8));

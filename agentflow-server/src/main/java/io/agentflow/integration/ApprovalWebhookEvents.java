@@ -32,12 +32,21 @@ public class ApprovalWebhookEvents {
             case WITHDRAW -> "ApplicationWithdrawn";
             case CANCEL -> "ApplicationCancelled";
             case RETURN -> "ApplicationReturned";
+            case TIMER_ELAPSED -> "TimerWaitElapsed";
+            case TIMER_FAILED -> "TimerWaitFailed";
+            case TIMER_RETRY -> "TimerWaitRetried";
             default -> null;
         };
         if (type == null) return;
         append(operation.tenantId(), eventId, type, "Application", operation.applicationId().toString(),
                 operation.applicationId(), operation.aggregateVersion(), occurredAt, eventId,
                 payload(operation.applicationId(), operation.roundNo(), operation.actor(), operation.action().name(), operation.previousStatus(), operation.currentStatus()));
+        if (operation.currentStatus() == io.agentflow.approval.model.ApplicationStatus.APPROVED
+                && operation.previousStatus() != operation.currentStatus()) {
+            append(operation.tenantId(), UUID.randomUUID().toString(), "ApplicationApproved", "Application", operation.applicationId().toString(),
+                    operation.applicationId(), operation.aggregateVersion(), occurredAt, eventId,
+                    payload(operation.applicationId(), operation.roundNo(), operation.actor(), operation.action().name(), operation.previousStatus(), operation.currentStatus()));
+        }
     }
 
     /** 会签中的单人同意只产生任务事件，申请结论必须来自真实状态转换。 */

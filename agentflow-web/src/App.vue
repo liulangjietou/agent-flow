@@ -64,6 +64,7 @@ import DefinitionPicker from './components/DefinitionPicker.vue'
 import { DefinitionSelection } from './definitionSelection'
 import DefinitionAssignee from './components/DefinitionAssignee.vue'
 import DefinitionDeadline from './components/DefinitionDeadline.vue'
+import DefinitionTimerWait from './components/DefinitionTimerWait.vue'
 import DefinitionExpenseStage from './components/DefinitionExpenseStage.vue'
 import { assigneeLabel } from './definitionAssignees'
 import { approvalPolicyLabel, isCountersignMode } from './approvalPolicy'
@@ -87,7 +88,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 
-type NodeType = 'START' | 'COPY' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
+type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }))
@@ -232,6 +233,7 @@ let stopNodeDrag: (() => void) | null = null
 const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'USER_TASK', label: '人工审批', icon: '人' },
   { type: 'COPY', label: '抄送', icon: '抄' },
+  { type: 'TIMER_WAIT', label: '定时等待', icon: '时' },
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
   { type: 'PARALLEL_GATEWAY', label: '并行网关', icon: '＋' },
   { type: 'END', label: '结束节点', icon: '●' }
@@ -748,7 +750,7 @@ function editQuick(command: QuickCommand) {
       ?? nodes.value.find(node => node.id === selectedId.value)?.id ?? nodes.value[0]?.id ?? ''
     connectionTarget.value = ''
     notice.value = command.kind === 'insert' || command.kind === 'addBranch'
-      ? '步骤已添加，请配置审批人和分支条件；完成后保存并校验。' : '流程已更新，可通过撤销恢复。'
+      ? '步骤已添加，请配置节点规则；完成后保存并校验。' : '流程已更新，可通过撤销恢复。'
   } catch (error) { notice.value = errorMessage(error) }
 }
 function patchQuickNode(id: string, patch: Partial<GraphNode>) {
@@ -760,6 +762,7 @@ function patchQuickNode(id: string, patch: Partial<GraphNode>) {
     node.originalProperties = { ...node.originalProperties, ...patch.properties }
     node.assigneeRule = patch.properties.assigneeRule ?? node.assigneeRule
     node.recipientRule = patch.properties.recipientRule ?? node.recipientRule
+    node.timerDelaySeconds = patch.properties.timerDelaySeconds ?? node.timerDelaySeconds
     node.approvalMode = patch.properties.approvalMode ?? node.approvalMode
   }
 }
@@ -1032,6 +1035,10 @@ async function recoverOperation(id: string) {
           notice.value = '原费用保存结果已确认，请核对原单据后继续预检。'
         } else notice.value = '原费用操作已确认，请刷新费用详情或预检结果核对当前状态。'
         templateRefresh.value++
+      } else if (/^\/applications\/[^/]+\/rounds\/[1-9][0-9]*\/timers\/[^/]+\/retry$/.test(request.path)) {
+        const value = result as { applicationId: string; applicationStatus: string }
+        if (recordApplicationId.value === value.applicationId) recordRefresh.value++
+        notice.value = `已确认原等待的重试结果，申请状态：${statusLabel(value.applicationStatus)}。`
       } else if (request.path.startsWith('/applications')) {
         templateRefresh.value++
         const value = result as Application
@@ -1244,7 +1251,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
@@ -1252,6 +1259,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" :approval-mode="selectedNode.approvalMode" :approval-percentage="selectedNode.approvalPercentage" @policy="(mode, percentage) => patchApprovalPolicy(selectedNode!.id, mode, percentage)" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+                <DefinitionTimerWait v-if="selectedNode.type === 'TIMER_WAIT'" :key="selectedNode.id" v-model="selectedNode.timerDelaySeconds" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionCopyRecipient v-if="selectedNode.type === 'COPY'" :key="selectedNode.id" :model-value="selectedNode.recipientRule ?? ''" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="selectedNode.recipientRule = $event" />
                 <DefinitionExpenseStage v-if="selectedNode.type === 'USER_TASK'" :model-value="selectedNode.originalProperties?.expenseStage" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseStage(selectedNode.id, $event)" />
                 <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />

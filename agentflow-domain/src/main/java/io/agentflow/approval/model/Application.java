@@ -229,6 +229,13 @@ public final class Application {
         version++;
     }
 
+    /** 记录等待节点推进、失败或重试，不将系统动作伪装成人工审批意见。 */
+    public void recordRuntimeAction(long expectedVersion) {
+        checkVersion(expectedVersion);
+        requireInApproval();
+        version++;
+    }
+
     /** 申请人撤回未结束的申请。 */
     public void withdraw(long expectedVersion) {
         checkVersion(expectedVersion);

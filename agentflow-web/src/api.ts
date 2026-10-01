@@ -14,6 +14,7 @@ import type { NotificationTexts } from './notificationTexts'
 import type { AssistRunDetail, AssistRunFilter, AssistRunPage, AssistInputOptions, AssistReceipt, AssistGenerateRequest, AssistReviewRequest } from './assistRuns'
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
 import type { RoundDiagram } from './roundDiagram'
+import { validateTimerReceipt, type TimerView, type TimerRetryInput, type TimerReceipt } from './timerWaits.js'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
@@ -324,6 +325,8 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
   const membership = /^\/tasks\/([^/?]+)\/countersign-changes$/.exec(operation.path)
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
+  const timer = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/timers\/([^/?]+)\/retry$/.exec(operation.path)
+  if (timer) validateTimerReceipt(result as TimerReceipt, decodeURIComponent(timer[1]!), Number(timer[2]), decodeURIComponent(timer[3]!), JSON.parse(operation.body!) as TimerRetryInput)
   return result
 })
 function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
@@ -331,6 +334,8 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  timerWaits: (id: string, round: number, signal: AbortSignal) => request<TimerView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers`, { signal, cache: 'no-store' }),
+  retryTimer: (id: string, round: number, jobId: string, input: TimerRetryInput) => write<TimerReceipt>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers/${encodeURIComponent(jobId)}/retry`, 'POST', '重试原定时等待', input),
   vouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   voucherAction: (id: string, input: VoucherActionInput) => write<VoucherReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/actions`, 'POST', '办理本轮凭证操作', input),
   paymentVouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers/payment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

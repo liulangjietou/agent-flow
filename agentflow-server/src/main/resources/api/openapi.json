@@ -6543,7 +6543,10 @@
                 "CANCEL",
                 "EXPENSE_REDUCE",
                 "ADD_SIGNER",
-                "REMOVE_SIGNER"
+                "REMOVE_SIGNER",
+                "TIMER_ELAPSED",
+                "TIMER_FAILED",
+                "TIMER_RETRY"
               ]
             }
           },
@@ -9916,7 +9919,10 @@
                 "APPROVE",
                 "EXPENSE_REDUCE",
                 "ADD_SIGNER",
-                "REMOVE_SIGNER"
+                "REMOVE_SIGNER",
+                "TIMER_ELAPSED",
+                "TIMER_FAILED",
+                "TIMER_RETRY"
               ]
             }
           },
@@ -11437,7 +11443,10 @@
                 "APPROVE",
                 "EXPENSE_REDUCE",
                 "ADD_SIGNER",
-                "REMOVE_SIGNER"
+                "REMOVE_SIGNER",
+                "TIMER_ELAPSED",
+                "TIMER_FAILED",
+                "TIMER_RETRY"
               ]
             }
           },
@@ -34328,6 +34337,296 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/timers": {
+      "get": {
+        "operationId": "roundTimerWaits",
+        "tags": [
+          "申请"
+        ],
+        "summary": "读取本轮定时等待",
+        "description": "读取精确绑定该审批轮次的原生等待、原到期时间及安全错误码。不暴露表单、引擎变量或异常原文。只有同租户管理员可在当前有效轮次重试已到期的失败等待；暂停期间不可推进。禁止查询参数。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerWaitView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存等待状态与操作能力。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/timers/{jobId}/retry": {
+      "post": {
+        "operationId": "retryTimerWait",
+        "tags": [
+          "申请"
+        ],
+        "summary": "明确重试原失败等待",
+        "description": "同租户管理员填写原因并确认申请版本，仅执行当前轮次已到期的原失败等待。不能修改时长、跳过节点或代替人工审批。原生引擎、业务完成、财务准备、审计、Webhook outbox 与通知同事务；失败保留原等待。幂等回放仍核对当前管理员身份。禁止查询参数。",
+        "x-access": "同租户 ADMIN；当前在审轮次、未暂停且原失败等待已经到期。",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerWaitReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存等待状态与操作能力。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "下游服务暂不可用；本次推进已回滚，原失败等待保留。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "本轮原失败等待任务标识",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimerWaitRetryInput"
+              },
+              "example": {
+                "expectedVersion": 3,
+                "reason": "人员配置已修复，重试原等待"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -38281,7 +38580,8 @@
               "USER_TASK",
               "EXCLUSIVE_GATEWAY",
               "PARALLEL_GATEWAY",
-              "COPY"
+              "COPY",
+              "TIMER_WAIT"
             ]
           },
           "properties": {
@@ -38289,10 +38589,10 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）、ALL（全员会签）、ANY（任一人同意）和 PERCENT（按比例通过）。PERCENT 必须明确提供 approvalPercentage，为 1..100 的整数文本；其他方式禁止残留该属性。会签在激活时固定有效成员，ANY/PERCENT 同时固定所需人数，比例向上取整。达标结束其他待办但不伪造同意；任一驳回结束整轮。空名单回滚本次操作；增减签仅限 ALL。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。"
+            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）、ALL（全员会签）、ANY（任一人同意）和 PERCENT（按比例通过）。PERCENT 必须明确提供 approvalPercentage，为 1..100 的整数文本；其他方式禁止残留该属性。会签在激活时固定有效成员，ANY/PERCENT 同时固定所需人数，比例向上取整。达标结束其他待办但不伪造同意；任一驳回结束整轮。空名单回滚本次操作；增减签仅限 ALL。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。 TIMER_WAIT 必须明确配置 timerDelaySeconds，为 1..31536000 的规范正整数文本，从实际激活时计时。禁止表达式、重复或 cron；其他节点不可配置该属性。重启保留原到期时间。含等待的每条结束路径必须包含人工审批。"
           }
         },
-        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。其他引擎节点尚未支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。",
+        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。仅列出的节点类型支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。",
         "required": [
           "id",
           "name",
@@ -41372,7 +41672,8 @@
               "USER_TASK",
               "EXCLUSIVE_GATEWAY",
               "PARALLEL_GATEWAY",
-              "OTHER"
+              "OTHER",
+              "TIMER_WAIT"
             ]
           },
           "state": {
@@ -59927,6 +60228,150 @@
               "targetTaskId"
             ]
           }
+        ]
+      },
+      "TimerWaitEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "WAITING",
+              "FAILED",
+              "SUSPENDED"
+            ]
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,79}$"
+          },
+          "canRetry": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "jobId",
+          "nodeId",
+          "nodeName",
+          "executionId",
+          "dueAt",
+          "state",
+          "canRetry"
+        ]
+      },
+      "TimerWaitView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimerWaitEntry"
+            }
+          }
+        },
+        "required": [
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "items"
+        ]
+      },
+      "TimerWaitReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "jobId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "applicationStatus": {
+            "type": "string",
+            "enum": [
+              "IN_APPROVAL",
+              "APPROVED"
+            ]
+          }
+        },
+        "required": [
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "jobId",
+          "nodeId",
+          "applicationStatus"
+        ]
+      },
+      "TimerWaitRetryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": ".*\\S.*"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason"
         ]
       }
     }

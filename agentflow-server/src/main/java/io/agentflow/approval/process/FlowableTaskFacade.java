@@ -18,12 +18,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.notification.ApprovalNotificationService;
 import io.agentflow.expense.ExpenseApprovalService;
 import io.agentflow.expense.ExpenseReleaseService;
-import io.agentflow.expense.ExpensePlanApprovalService;
-import io.agentflow.expense.AdvanceRequestApprovalService;
-import io.agentflow.procurement.ProcurementPaymentApprovalService;
-import io.agentflow.budget.BudgetAdjustmentApprovalService;
 import io.agentflow.procurement.ProcurementPayableReservations;
-import io.agentflow.finance.VoucherPreparationService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
@@ -50,22 +45,16 @@ public class FlowableTaskFacade {
     private final FlowableTaskAuthorization authorization;
     private final ExpenseApprovalService expenses;
     private final ExpenseReleaseService expenseReleases;
-    private final ExpensePlanApprovalService expensePlans;
-    private final AdvanceRequestApprovalService advanceRequests;
-    private final ProcurementPaymentApprovalService procurementPayments;
-    private final BudgetAdjustmentApprovalService budgetAdjustments;
+    private final ApprovalCompletionService completion;
     private final ProcurementPayableReservations procurementReservations;
-    private final VoucherPreparationService voucherPreparation;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
                               ApplicationRepository applicationRepository, ProcessRuntimePort processRuntime,
                               TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients,
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
-                              ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases, ExpensePlanApprovalService expensePlans,
-                              AdvanceRequestApprovalService advanceRequests, VoucherPreparationService voucherPreparation,
-                              ProcurementPaymentApprovalService procurementPayments, ProcurementPayableReservations procurementReservations,
-                              BudgetAdjustmentApprovalService budgetAdjustments) {
+                              ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases,
+                              ProcurementPayableReservations procurementReservations, ApprovalCompletionService completion) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -75,12 +64,8 @@ public class FlowableTaskFacade {
         this.rounds = rounds;
         this.notifications = notifications;
         this.authorization = authorization; this.expenses = expenses; this.expenseReleases = expenseReleases;
-        this.expensePlans = expensePlans;
-        this.advanceRequests = advanceRequests;
-        this.procurementPayments = procurementPayments;
-        this.budgetAdjustments = budgetAdjustments;
+        this.completion = completion;
         this.procurementReservations = procurementReservations;
-        this.voucherPreparation = voucherPreparation;
     }
 
     /** 只返回当前主体可领取或已指派给自己的待办。 */
@@ -146,11 +131,7 @@ public class FlowableTaskFacade {
         }
         Task task = authorization.require(taskId, actor);
         Application application = authorization.application(actor, task);
-        expenses.lock(application);
-        expensePlans.lock(application);
-        advanceRequests.lock(application);
-        procurementPayments.lock(application);
-        budgetAdjustments.lock(application);
+        completion.lock(application);
         task = authorization.require(taskId, actor);
         application = authorization.application(actor, task);
         ApplicationStatus previousStatus = application.status();
@@ -229,16 +210,8 @@ public class FlowableTaskFacade {
                 recordDecisionAssignee(task, actor);
                 ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
                         new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized.name(), comment));
-                if (completed.processEnded()) {
-                    application.approve(application.version());
-                    completeRound(task, application, actor, comment);
-                }
-                applicationRepository.update(application, expectedVersion);
-                expensePlans.approved(application, actor.userId());
-                advanceRequests.approved(application, actor.userId());
-                procurementPayments.approved(application, actor.userId());
-                budgetAdjustments.approved(application, actor.userId());
-                voucherPreparation.approved(application, actor.userId());
+                completion.persistProgress(application, expectedVersion, task.getProcessInstanceId(),
+                        completed.processEnded(), actor.userId(), comment);
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");

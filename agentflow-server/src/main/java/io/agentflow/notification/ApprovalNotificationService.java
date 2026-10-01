@@ -94,11 +94,7 @@ public class ApprovalNotificationService {
     public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName,
                           Set<String> previousTaskIds) {
         switch (action) {
-            case APPROVE -> {
-                if (application.status() == ApplicationStatus.APPROVED) {
-                    send(application, actor, application.createdBy(), Kind.APPLICATION_APPROVED, taskId, nodeName);
-                } else pending(application, actor, Kind.TASK_PENDING, task -> !previousTaskIds.contains(task.taskId()));
-            }
+            case APPROVE -> processAdvanced(application, actor, taskId, nodeName, previousTaskIds);
             case RETURN -> send(application, actor, application.createdBy(), Kind.APPLICATION_RETURNED, taskId, nodeName);
             case REJECT -> send(application, actor, application.createdBy(), Kind.APPLICATION_REJECTED, taskId, nodeName);
             case TRANSFER -> pending(application, actor, Kind.TASK_TRANSFERRED, task -> taskId.equals(task.taskId()));
@@ -107,6 +103,13 @@ public class ApprovalNotificationService {
             case RELEASE -> pending(application, actor, Kind.TASK_PENDING, task -> taskId.equals(task.taskId()));
             case CLAIM -> { /* 领取不生成新提醒，原消息仍保留其发生时事实。 */ }
         }
+    }
+
+    /** 人工完成或等待推进后只发送实际新待办或最终结论；系统推进没有人工任务编号。 */
+    public void processAdvanced(Application application, String actor, String taskId, String nodeName, Set<String> previousTaskIds) {
+        if (application.status() == ApplicationStatus.APPROVED) {
+            send(application, actor, application.createdBy(), Kind.APPLICATION_APPROVED, taskId, nodeName);
+        } else pending(application, actor, Kind.TASK_PENDING, task -> !previousTaskIds.contains(task.taskId()));
     }
 
     private void pending(Application application, String actor, Kind kind, Predicate<TaskAudiencePort.Audience> affected) {

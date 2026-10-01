@@ -1,0 +1,156 @@
+{
+  "status": "PASS_LOCAL_ACCEPTANCE",
+  "recordedAt": "2026-10-01T05:33:43.200783+00:00",
+  "baseCommit": "7792da8d8d4e4335a61042f78a3374a4f065972b",
+  "branch": "codex/governance-identifier-integration",
+  "migrationVersion": 86,
+  "newMigration": false,
+  "scope": "Single relative timer wait and explicit original-failure retry; other advanced workflows remain incomplete",
+  "h2": {
+    "domain": 6,
+    "serverRelatedUniqueTests": 53,
+    "executedInBatches": true,
+    "timerIntegrationFinal": 9,
+    "logs": [
+      "timer-third-h2.log",
+      "timer-fourth-h2.log"
+    ]
+  },
+  "postgres": {
+    "domain": 6,
+    "server": 11,
+    "timer": 9,
+    "finance": 2,
+    "log": "timer-wait-postgres.log",
+    "databases": {
+      "databases": {
+        "AGENTFLOW_TIMER_WAIT": "timer_wait_ac064e2cd476",
+        "AGENTFLOW_ADVANCE_TEST": "timer_finance_3abc963956be"
+      },
+      "container": "agentflow-attachments-postgres-20260928"
+    }
+  },
+  "frontend": {
+    "relatedTests": 71,
+    "typeCheck": "PASS",
+    "build": "PASS",
+    "log": "timer-web-verified.log",
+    "redReproductions": [
+      "application detail did not reload after retry",
+      "operation recovery mistook timer receipt for application"
+    ],
+    "responsive": {
+      "actualCssWidth": 500,
+      "documentWidth": 480,
+      "noHeaderListOverlap": true,
+      "rootCause": "Global header fixed height 58px leaked into wrapping child header",
+      "fix": "Use a local timer-heading container",
+      "temporaryViewportRestored": true
+    }
+  },
+  "openapi": {
+    "operations": 261,
+    "schemas": 532,
+    "requestExamples": 102,
+    "result": "PASS"
+  },
+  "runtime": {
+    "database": "timer_ui_c7b09f2d377c",
+    "backendPort": 18216,
+    "frontendPort": 15316,
+    "container": "agentflow-attachments-postgres-20260928",
+    "backendPid": 29859,
+    "backendSession": 34420,
+    "frontendSession": 21615,
+    "browserId": "1",
+    "browserTab": "4",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/timer-ui-server.jar",
+    "launcher": "/fyoung/tmp/agentflow-remaining-20260928/run-timer-ui-server.py",
+    "jarSha256": "f0c9d671c9fb1ac4831f429eba513c3a43d1fe93e15083a5cfb61e9580209dac",
+    "syntheticOnly": true
+  },
+  "responses": {
+    "status": "PASS",
+    "actualHttpResponses": 147,
+    "actualFrontendViews": 29,
+    "browserWriteReceipts": 1,
+    "actualFrontendReceipts": 1
+  },
+  "checks": {
+    "setup": "PASS",
+    "restart": "PASS",
+    "directoryChangeCannotReinterpretOriginalRole": "PASS",
+    "elapsedAfterRestart": "PASS",
+    "browserRetryAndHumanCompletion": "PASS",
+    "publishedVersionFreeze": "PASS",
+    "finalRestart": "PASS"
+  },
+  "applications": {
+    "原普通审批保留": {
+      "id": "e850da58-73fa-425b-add1-d6bba1b90391",
+      "status": "APPROVED",
+      "version": 4,
+      "definitionVersion": 1
+    },
+    "真实到期后产生待办": {
+      "id": "af2c4fae-d0aa-400a-bea7-b4738a48c6cb",
+      "status": "APPROVED",
+      "version": 5,
+      "definitionVersion": 1
+    },
+    "人工审批后等待再完成": {
+      "id": "52ebe0b3-8985-4f99-8fa3-c3bb6d9cc218",
+      "status": "APPROVED",
+      "version": 5,
+      "definitionVersion": 1
+    },
+    "重启保留原定等待": {
+      "id": "df93f8c0-0630-48c6-9a3c-335b8daadeb1",
+      "status": "APPROVED",
+      "version": 5,
+      "definitionVersion": 1
+    },
+    "人员失效保留原等待": {
+      "id": "8a41ad5c-7b3f-41a5-9d94-cc12081969a0",
+      "status": "WITHDRAWN",
+      "version": 4,
+      "definitionVersion": 1
+    },
+    "人员停用后恢复原等待": {
+      "id": "1f68e7b2-18e1-4f54-8e46-bf08a444363f",
+      "status": "APPROVED",
+      "version": 6,
+      "definitionVersion": 1
+    }
+  },
+  "oldRuntimeReadiness": {
+    "18214": "UP",
+    "18215": "UP",
+    "18216": "UP"
+  },
+  "browser": [
+    "blank delay blocks validation",
+    "explicit 60 seconds published as v2 while original round stays v1 and 8 seconds",
+    "cancel does not execute",
+    "local person restored before administrator explicitly retries",
+    "successful retry reloads application and real downstream task",
+    "audits separate system failure, admin retry and human decision"
+  ],
+  "screenshots": [
+    "/fyoung/tmp/agentflow-remaining-20260928/timer-retry-500-final.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/timer-completed-audit.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/timer-designer-final.jpg"
+  ],
+  "rawEvidence": "/fyoung/tmp/agentflow-remaining-20260928/timer-runtime-evidence.json",
+  "rawResponses": "/fyoung/tmp/agentflow-remaining-20260928/timer-http-responses.jsonl",
+  "browserReceipt": "/fyoung/tmp/agentflow-remaining-20260928/timer-browser-retry.json",
+  "remainingPackages": 4,
+  "remoteConfigured": false,
+  "remoteCi": "not_run",
+  "remaining": [
+    "Events and published-version-bound subprocesses",
+    "Audited instance pause/resume/terminate and other exact failure retry; safe batch operations",
+    "External notifications, mentions, preferences, escalation and paused SLA",
+    "Actual enterprise financial, model/IdP and environment integration; remote PR/CI"
+  ]
+}
