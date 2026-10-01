@@ -22,6 +22,7 @@ export interface DesignerNode {
   id: string; name: string; type: string; x: number; y: number; assigneeRule: string
   recipientRule?: string
   approvalMode?: string
+  approvalPercentage?: string
   deadline?: DesignerDeadline
   originalProperties?: Record<string, string>
   loadedPosition?: { x: number; y: number }
@@ -40,7 +41,8 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
     const y = Number.isFinite(rawY) && rawY >= 0 ? rawY : DEFAULT_NODE_Y
     return { id: node.id, name: node.name, type: node.type, x, y, assigneeRule: node.properties.assigneeRule ?? '', recipientRule: node.properties.recipientRule ?? '',
       deadline: readDesignerDeadline(node.properties),
-      approvalMode: node.properties.approvalMode ?? 'SINGLE', originalProperties: { ...node.properties }, loadedPosition: { x, y } }
+      approvalMode: node.properties.approvalMode ?? 'SINGLE', approvalPercentage: node.properties.approvalPercentage,
+      originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
 }
 
@@ -64,6 +66,8 @@ export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
       if (node.approvalMode && (node.approvalMode !== 'SINGLE' || properties.approvalMode !== undefined)) {
         properties.approvalMode = node.approvalMode
       }
+      if (node.approvalPercentage !== undefined) properties.approvalPercentage = node.approvalPercentage
+      else delete properties.approvalPercentage
     }
     for (const axis of ['x', 'y'] as const) {
       if (!node.loadedPosition || node[axis] !== node.loadedPosition[axis]) properties[axis] = String(node[axis])

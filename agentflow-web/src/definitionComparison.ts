@@ -1,4 +1,5 @@
 import type { ApiError, ComparisonInput, ComparisonResult } from './api'
+import { approvalPolicyLabel } from './approvalPolicy.js'
 
 /**
  * 版本比较属于当前设计快照；切换基线或编辑内容后不得展示旧差异。
@@ -63,6 +64,7 @@ const labels: Record<string, string> = {
   properties: '节点属性', assigneeRule: '审批人规则', 'properties.assigneeRule': '审批人规则',
   recipientRule: '抄送收件规则', 'properties.recipientRule': '抄送收件规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
+  approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
   'properties.deadlineCalendarId': '期限工作日历', 'properties.deadlineCalendarRevision': '期限日历修订', 'properties.deadlineWorkingMinutes': '期限工作分钟',
   x: '水平位置', y: '垂直位置', 'properties.x': '水平位置', 'properties.y': '垂直位置', value: '保存值'
 }
@@ -79,7 +81,7 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (value === '') return '空值'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'string') {
-    if (property.endsWith('approvalMode')) return value === 'ALL' ? '全员会签' : value === 'SINGLE' ? '单人审批' : value
+    if (property.endsWith('approvalMode')) return approvalPolicyLabel(value)
     if (property === 'type') return own(types, value) ?? value
     if (property.endsWith('assigneeRule')) {
       const roles: Record<string, string> = { 'role:MANAGER': '部门审批组', 'role:FINANCE': '财务审批组', 'role:ADMIN': '额外复核组（示例）' }

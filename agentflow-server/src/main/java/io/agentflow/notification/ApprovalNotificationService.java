@@ -76,6 +76,20 @@ public class ApprovalNotificationService {
         send(application, actor, targetUser, Kind.TASK_COUNTERSIGN_REMOVED, targetTaskId, nodeName);
     }
 
+    /** 达标前保留同一节点其他实际待办的接收人，不能把另一个并行节点当成取消目标。 */
+    public List<TaskAudiencePort.Audience> beforeCountersignCompletion(Application application, Set<String> scopeTaskIds) {
+        return audience.pending(application.tenantId(), application.id()).stream().filter(task -> scopeTaskIds.contains(task.taskId())).toList();
+    }
+
+    /** 只通知本次实际结束的其他待办；消息不表示这些人员已作出批准意见。 */
+    public void countersignCompleted(Application application, String actor, List<TaskAudiencePort.Audience> previous) {
+        if (previous.isEmpty()) return;
+        Set<String> active = pendingTaskIds(application);
+        for (var task : previous) if (!active.contains(task.taskId())) {
+            for (String recipient : task.recipients()) send(application, actor, recipient, Kind.TASK_COUNTERSIGN_COMPLETED, task.taskId(), task.nodeName());
+        }
+    }
+
     /** 通知内容取已成功执行后的事实；领取不重复提醒，释放提醒恢复的候选人。 */
     public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName,
                           Set<String> previousTaskIds) {

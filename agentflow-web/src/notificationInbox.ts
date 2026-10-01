@@ -3,9 +3,10 @@ import type { InboxMessage, InboxPage, InboxQuery } from './api'
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
   APPLICATION_SUBMITTED: '申请已提交', TASK_PENDING: '有新的待办', APPLICATION_RETURNED: '申请已退回',
   APPLICATION_REJECTED: '申请已驳回', APPLICATION_APPROVED: '申请已批准', APPLICATION_WITHDRAWN: '申请已撤回',
-  TASK_TRANSFERRED: '收到转交任务', TASK_DELEGATED: '收到委派任务', TASK_RESOLVED: '受托意见已回交', TASK_OVERDUE: '审批任务已超时', APPLICATION_COPIED: '收到审批抄送', EXPENSE_ADJUSTED: '报销核定金额已调整', TASK_COUNTERSIGN_REMOVED: '会签任务已取消'
+  TASK_TRANSFERRED: '收到转交任务', TASK_DELEGATED: '收到委派任务', TASK_RESOLVED: '受托意见已回交', TASK_OVERDUE: '审批任务已超时', APPLICATION_COPIED: '收到审批抄送', EXPENSE_ADJUSTED: '报销核定金额已调整', TASK_COUNTERSIGN_REMOVED: '会签任务已取消', TASK_COUNTERSIGN_COMPLETED: '会签已达通过条件，你的待办已结束'
 }
-export const isTaskNotification = (item: InboxMessage) => item.kind.startsWith('TASK_')
+/** 只有办理提醒尝试打开实时任务；已结束的会签直接进入仍受权限约束的申请详情。 */
+export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK_TRANSFERRED', 'TASK_DELEGATED', 'TASK_RESOLVED', 'TASK_OVERDUE'].includes(item.kind)
 
 /**
  * 消息查询绑定当前账号与未读筛选，取消、失败与分页均不混入其他上下文的记录。

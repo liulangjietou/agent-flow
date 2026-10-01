@@ -48,7 +48,7 @@
 
 流程管理员可通过 `/process-definitions/assignee-options` 读取当前身份源中的可配置审批账号和角色。发布会重新核对有效成员，完整语义见[审批人配置](designer-assignees.md)。
 
-会签模式使用人工节点 `properties.approvalMode=ALL`，默认 SINGLE。任务详情可返回 `countersign.total/completed`，并限制固定责任动作。全员规则、空名单回滚与并发处理见[全员会签](all-countersign.md)。
+人工节点 `properties.approvalMode` 支持 SINGLE（旧定义缺省）、ALL、ANY 和 PERCENT；PERCENT 必须显式提供 `approvalPercentage`，为 1 至 100 的整数字符串。任务详情返回 `countersign.total/completed/mode/required`，比例模式另含 `percentage`，门槛按实际激活名单向上取整并固定。达标结束的待办保留取消历史，不生成批准意见；`TASK_COUNTERSIGN_COMPLETED` 通知直接打开受权限检查的申请。新模式固定分母，仅 ALL 支持加减签，具体兼容与责任边界见[会签策略](countersign-policies.md)和[全员会签](all-countersign.md)。
 
 全员会签的加减签使用独立入口：`GET /api/v1/tasks/{taskId}/countersign-members` 读取实际责任集合，`POST /api/v1/tasks/{taskId}/countersign-changes` 明确增加或移除未决责任。请求携带 `action=ADD/REMOVE`、唯一目标、原因、申请版本及原幂等键，不接受查询参数或客户端提供的轮次与人数。管理员不能越过实际任务关系；委派期间不能增减。响应为 `no-store`，结果未知按原请求恢复，成功不代表该节点已同意。申请审计、管理员审计及本人已办支持 `ADD_SIGNER`、`REMOVE_SIGNER`，取消通知为 `TASK_COUNTERSIGN_REMOVED`。完整边界见[加减签办理](countersign-membership.md)。
 

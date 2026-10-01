@@ -1,0 +1,327 @@
+{
+  "status": "PASS_LOCAL",
+  "recordedAt": "2026-10-01T04:29:14.523708+00:00",
+  "branch": "codex/governance-identifier-integration",
+  "baselineCommit": "ee34ae41b7b474244854c008af0c171bef786081",
+  "scope": "任一人通过与比例会签的领域规则、原生引擎、公开接口、设计器、办理、通知、升级和重启接续",
+  "rules": {
+    "modes": [
+      "SINGLE",
+      "ALL",
+      "ANY",
+      "PERCENT"
+    ],
+    "percentage": "Explicit canonical integer string 1..100; no implicit default",
+    "threshold": "Ceiling of the frozen activation roster size times the configured percentage",
+    "canceledTasks": "Engine cancellation history retained; no invented approval audit",
+    "membershipChanges": "ALL only; ANY/PERCENT denominator stays frozen",
+    "delegation": "RESOLVE does not count as approval; the owner makes the final decision",
+    "negativeDecision": "REJECT or RETURN before the threshold terminates the round",
+    "concurrency": "Only one concurrent decision commits"
+  },
+  "validation": {
+    "h2": {
+      "status": "PASS",
+      "domainTests": 12,
+      "serverTests": 40,
+      "serverClasses": {
+        "CountersignPolicyIntegrationTest": 12,
+        "CountersignIntegrationTest": 11,
+        "CountersignMembershipApiTest": 17
+      },
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-h2-green.log"
+    },
+    "postgresql": {
+      "status": "PASS",
+      "version": "17.11",
+      "policyIntegrationTests": 12,
+      "database": "countersign_policy_87f65dbe7464",
+      "additionalTestsInSameRun": {
+        "domain": 3,
+        "openApiContractOnH2": 6
+      },
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-postgres.log"
+    },
+    "frontend": {
+      "status": "PASS",
+      "tests": 68,
+      "typecheck": "PASS",
+      "productionBuild": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-web-final.log",
+      "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-web-final-build.log",
+      "existingBundleSizeWarning": true
+    },
+    "notificationRegression": {
+      "rootCause": "TASK_ prefix classification sent ended countersign notifications to a canceled task before showing the application",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-notification-red.log",
+      "fix": "Explicit active-task notification kinds; ended and removed countersign notifications open authorized application detail",
+      "actualBrowserVerified": true
+    },
+    "openApiStatic": {
+      "status": "PASS",
+      "operations": 259,
+      "schemas": 528,
+      "requestExamples": 101,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-openapi-final.log"
+    },
+    "actualHttp": {
+      "status": "PASS",
+      "jsonResponses": 105,
+      "binaryDownloads": 0,
+      "totalResponses": 105,
+      "responses": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-http-responses.json",
+      "validator": "/fyoung/tmp/agentflow-remaining-20260928/validate-countersign-policy-runtime.mjs",
+      "staticPathsMatchedBeforeParameterizedPaths": true
+    },
+    "package": {
+      "status": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-final-package.log",
+      "runtimeJarMatchesPackagedJar": true,
+      "sha256": "623eab6ec6c5299a3ea516ac62b137f75bff9ee2063017dd4a38e2c89eebd4e6"
+    },
+    "ci": {
+      "postgresPolicyTestAdded": true,
+      "yamlParsed": true,
+      "runScriptBashSyntax": "PASS",
+      "remoteRun": false
+    },
+    "note": "测试范围重叠，不相加为唯一用例数；真实 HTTP 与浏览器验收使用本地合成数据。"
+  },
+  "runtime": {
+    "schemaVersion": 86,
+    "newMigration": false,
+    "database": "countersign_ui_acc1039945c5",
+    "backendPort": 18215,
+    "frontendPort": 15315,
+    "scenarios": {
+      "ANY": {
+        "applicationId": "6274c5e4-b2fb-4c03-891f-9d9fc1322c84",
+        "processKey": "policy-runtime-3d5e06549d-any",
+        "status": "APPROVED",
+        "version": 4,
+        "actualApprovalAuditCount": 1,
+        "engineCompletedTasks": 1,
+        "engineCanceledTasks": 5,
+        "engineHistory": [
+          {
+            "node": "review",
+            "actor": "admin",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "alice",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "bob",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "employee",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "finance",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "manager",
+            "cancellation": "MI_END",
+            "ended": true
+          }
+        ]
+      },
+      "PERCENT": {
+        "applicationId": "a834dfc3-d6a9-42a3-9b51-474ca8d9e541",
+        "processKey": "policy-runtime-3d5e06549d-percent",
+        "status": "APPROVED",
+        "version": 6,
+        "actualApprovalAuditCount": 3,
+        "engineCompletedTasks": 3,
+        "engineCanceledTasks": 3,
+        "engineHistory": [
+          {
+            "node": "review",
+            "actor": "admin",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "alice",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "bob",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "employee",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "finance",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "review",
+            "actor": "manager",
+            "cancellation": "MI_END",
+            "ended": true
+          }
+        ]
+      },
+      "UI": {
+        "applicationId": "6af21f74-0903-4f5a-ac5e-46a342b5c9af",
+        "processKey": "policy-ui-20261001",
+        "status": "APPROVED",
+        "version": 7,
+        "actualApprovalAuditCount": 4,
+        "engineCompletedTasks": 4,
+        "engineCanceledTasks": 4,
+        "engineHistory": [
+          {
+            "node": "finance",
+            "actor": "admin",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "finance",
+            "actor": "alice",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "finance",
+            "actor": "bob",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "finance",
+            "actor": "employee",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "finance",
+            "actor": "finance",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "finance",
+            "actor": "manager",
+            "cancellation": "MI_END",
+            "ended": true
+          },
+          {
+            "node": "manager",
+            "actor": "admin",
+            "cancellation": null,
+            "ended": true
+          },
+          {
+            "node": "manager",
+            "actor": "finance",
+            "cancellation": "MI_END",
+            "ended": true
+          }
+        ]
+      }
+    },
+    "completedMessagesForUiFinanceActor": 2,
+    "legacyAll": {
+      "applicationId": "0d67076a-78de-4cd9-883a-cf2455dd3d62",
+      "upgradedProgress": {
+        "total": 2,
+        "completed": 0,
+        "mode": "ALL",
+        "required": 2
+      },
+      "addAndRemoveAfterUpgrade": true,
+      "finalStatus": "APPROVED"
+    },
+    "restart": {
+      "percentageTaskAfterTwoVotesPreserved": true,
+      "anyOriginalReceiptPreserved": true
+    },
+    "preservation": {
+      "at": "2026-10-01T04:26:38.276650+00:00",
+      "preservedOriginalApplications": [
+        "d32779e6-cbb3-423f-b5ad-fda6997d5b09",
+        "7b056607-596c-42b8-af6d-586f11554638"
+      ],
+      "preservedAttachmentCount": 3,
+      "publishedUiPolicyMatches": true,
+      "runningJarMatchesPackagedJar": true,
+      "health": {
+        "18215": "UP",
+        "18214": "UP"
+      }
+    },
+    "rawEvidence": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-runtime-evidence.json",
+    "preUpgradeEvidence": "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-upgrade-evidence.json"
+  },
+  "browser": {
+    "publishedDefinitionId": "9098cb69-4a7c-480b-beda-2024ae12aff1",
+    "publishedPolicy": {
+      "manager": {
+        "approvalMode": "ANY"
+      },
+      "finance": {
+        "approvalMode": "PERCENT",
+        "approvalPercentage": "50"
+      }
+    },
+    "missingPercentageRejected": true,
+    "decimalPercentageRejected": true,
+    "changingModeClearsPercentage": true,
+    "quickAndAdvancedPreserveValue": true,
+    "confirmationCancellationDoesNotApprove": true,
+    "anyAndPercentApprovedInBrowser": true,
+    "endedNotificationsOpenApplicationDirectly": true,
+    "auditContainsActualVotesOnly": true,
+    "narrowViewport": {
+      "innerWidthCssPixels": 500,
+      "documentClientWidth": 480,
+      "documentScrollWidth": 480,
+      "overrideReset": true
+    },
+    "screenshots": [
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-designer.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-narrow.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-policy-audit.png"
+    ]
+  },
+  "delivery": {
+    "localOnly": true,
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "mainPreservedAt": "60bafa082b9d35a6802e846d8b96a09989ffa97d"
+  },
+  "limitations": [
+    "当前图禁止循环，重复激活子流程尚未实现；引入前须按具体激活隔离历史和收件范围。",
+    "旧二进制不能读取新模式或新通知枚举；回退需要匹配版本的数据备份。",
+    "真实企业身份源、模型、财务渠道和生产环境仍单独验收。",
+    "四个剩余工作包保持进行，详见 docs/remaining-local-work.md。"
+  ]
+}

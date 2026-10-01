@@ -55,7 +55,7 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')
     text(n.id, '节点标识', 128); text(n.name, '节点名称', 256)
     if (!['START', 'END', 'USER_TASK', 'COPY', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
-    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode',
+    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage',
       'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes'], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
       text(value, `节点配置 ${key}`, 256)

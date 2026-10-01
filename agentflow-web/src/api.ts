@@ -124,7 +124,7 @@ export interface SystemCheckReport {
 }
 export type TaskAction = 'CLAIM' | 'RELEASE' | 'TRANSFER' | 'DELEGATE' | 'RESOLVE' | 'RETURN' | 'REJECT' | 'APPROVE'
 /** 当前可操作的任务快照；动作由服务端按委派状态限制。@author owlzhangfq@gmail.com */
-export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number }; dueAt?: string | null }
+export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number; mode?: 'ALL' | 'ANY' | 'PERCENT'; percentage?: number | null; required?: number }; dueAt?: string | null }
 /** 待办只读摘要不携带审批正文或可直接提交的动作版本。@author owlzhangfq@gmail.com */
 export interface PendingTaskItem {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
@@ -173,7 +173,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED'
+  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */

@@ -116,14 +116,19 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             String rule = Objects.requireNonNull(node.properties().get("assigneeRule"), "assigneeRule");
             xml.append("<userTask id=\"").append(escape(node.id())).append("\" name=\"")
                     .append(escape(node.name())).append("\"");
-            if (node.approvalMode() == ApprovalMode.ALL) {
+            ApprovalPolicy policy = node.approvalPolicy();
+            if (policy.multiInstance()) {
                 String encodedRule = Base64.getEncoder().encodeToString(rule.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                // 不设置提前结束条件：所有子任务完成后引擎才继续；用户规则只作为编码后的字面量参数。
+                // 全员模式保留既有表达式；其他方式只传入已校验枚举及整数，不能插入自定义表达式。
                 xml.append(" flowable:assignee=\"${agentflowCountersignUser}\">")
                         .append("<multiInstanceLoopCharacteristics isSequential=\"false\" ")
-                        .append("flowable:collection=\"${flowableCountersignMembers.resolve(execution, '").append(encodedRule).append("')}\" ")
-                        .append("flowable:elementVariable=\"agentflowCountersignUser\"/>")
-                        .append("</userTask>");
+                        .append("flowable:collection=\"${flowableCountersignMembers.resolve(execution, '").append(encodedRule).append("'");
+                if (policy.mode() != ApprovalMode.ALL) xml.append(", '").append(policy.mode().name()).append("', ").append(policy.percentage());
+                xml.append(")}\" flowable:elementVariable=\"agentflowCountersignUser\">");
+                if (policy.mode() != ApprovalMode.ALL) {
+                    xml.append("<completionCondition xsi:type=\"tFormalExpression\">${nrOfCompletedInstances &gt;= agentflowCountersignRequired}</completionCondition>");
+                }
+                xml.append("</multiInstanceLoopCharacteristics></userTask>");
                 return;
             }
             if (io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)) {

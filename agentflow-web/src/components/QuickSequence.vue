@@ -4,6 +4,7 @@ import { describeBranch, branchTooltip } from '../conditionPresentation'
 import type { Graph, GraphNode } from '../api'
 import type { QuickCommand, QuickSequence } from '../quickDesigner'
 import { assigneeLabel } from '../definitionAssignees'
+import { approvalPolicyLabel, isCountersignMode } from '../approvalPolicy'
 const props = defineProps<{ sequence: QuickSequence; graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
 const emit = defineEmits<{ selectNode: [id: string]; selectEdge: [id: string]; command: [value: QuickCommand] }>()
 const node = (id: string) => props.graph.nodes.find(node => node.id === id)!
@@ -21,7 +22,7 @@ function kind(id: string, branches: boolean) {
   if (type === 'EXCLUSIVE_GATEWAY') return branches ? '条件分支' : '条件汇合'
   return type === 'START' ? '开始' : type === 'END' ? '结束' : type === 'COPY' ? '抄送' : '审批步骤'
 }
-const rule = (node: GraphNode) => node.properties.approvalMode === 'ALL' ? `全员会签 · ${assigneeLabel(node.properties.assigneeRule ?? '')}` : assigneeLabel(node.properties.assigneeRule ?? '')
+const rule = (node: GraphNode) => `${isCountersignMode(node.properties.approvalMode) ? approvalPolicyLabel(node.properties.approvalMode, node.properties.approvalPercentage) + ' · ' : ''}${assigneeLabel(node.properties.assigneeRule ?? '')}`
 </script>
 <template>
   <div class="quick-sequence">

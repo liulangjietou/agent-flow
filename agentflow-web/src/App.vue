@@ -66,6 +66,7 @@ import DefinitionAssignee from './components/DefinitionAssignee.vue'
 import DefinitionDeadline from './components/DefinitionDeadline.vue'
 import DefinitionExpenseStage from './components/DefinitionExpenseStage.vue'
 import { assigneeLabel } from './definitionAssignees'
+import { approvalPolicyLabel, isCountersignMode } from './approvalPolicy'
 import { simulationIssue } from './definitionSimulation'
 import DefinitionPublication from './components/DefinitionPublication.vue'
 import DefinitionAvailability from './components/DefinitionAvailability.vue'
@@ -762,6 +763,14 @@ function patchQuickNode(id: string, patch: Partial<GraphNode>) {
     node.approvalMode = patch.properties.approvalMode ?? node.approvalMode
   }
 }
+/** 方式与比例作为一次编辑，切换方式不会遗留上一种策略的比例。 */
+function patchApprovalPolicy(id: string, mode: string, percentage: string | undefined) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type !== 'USER_TASK') return
+  node.approvalMode = mode
+  node.approvalPercentage = percentage
+}
 /** 财务职责写入已有节点属性，清除后恢复普通业务审批，撤销保留完整配置。 */
 function patchExpenseStage(id: string, value: string | undefined) {
   if (editorLocked.value || !canManageDefinitions.value) return
@@ -1213,7 +1222,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
-          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @policy="patchApprovalPolicy" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
@@ -1235,14 +1244,14 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ node.approvalMode === 'ALL' ? '会签 · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
               <p class="canvas-hint" role="status">{{ routedEdges.some(route => route.obstructed) ? '部分节点或连线重叠，可手动调整节点或使用自动布局。' : canvasMessage }}</p>
             </div>
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
-              <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" v-model:approval-mode="selectedNode.approvalMode" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+              <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" :approval-mode="selectedNode.approvalMode" :approval-percentage="selectedNode.approvalPercentage" @policy="(mode, percentage) => patchApprovalPolicy(selectedNode!.id, mode, percentage)" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionCopyRecipient v-if="selectedNode.type === 'COPY'" :key="selectedNode.id" :model-value="selectedNode.recipientRule ?? ''" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="selectedNode.recipientRule = $event" />
                 <DefinitionExpenseStage v-if="selectedNode.type === 'USER_TASK'" :model-value="selectedNode.originalProperties?.expenseStage" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseStage(selectedNode.id, $event)" />
                 <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />

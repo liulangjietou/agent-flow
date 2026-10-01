@@ -24,7 +24,7 @@ const binding = (v: CountersignBinding) => v && [v.taskId, v.applicationId, v.pr
 /** 名单只适用于所选任务和版本；计数或授权投影不一致时不提供写入入口。 */
 export function validateCountersignView(v: CountersignView, task: Task): CountersignView {
   const fail = () => { throw new Error('会签名单与当前任务不一致，请刷新当前任务后重新查看。') }
-  if (!binding(v) || v.taskId !== task.taskId || v.applicationId !== task.applicationId || v.applicationVersion !== task.version
+  if ((task.countersign?.mode ?? 'ALL') !== 'ALL' || !binding(v) || v.taskId !== task.taskId || v.applicationId !== task.applicationId || v.applicationVersion !== task.version
       || !integer(v.total, 1) || !integer(v.completed) || !distinct(v.originalMembers) || !v.originalMembers.length
       || !distinct(v.completedUsers) || !distinct(v.additions) || !Array.isArray(v.pending) || !v.pending.length
       || v.completed !== v.completedUsers.length || v.total !== v.completed + v.pending.length

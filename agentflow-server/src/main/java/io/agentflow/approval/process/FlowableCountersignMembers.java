@@ -2,6 +2,8 @@ package io.agentflow.approval.process;
 
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.common.DomainException;
+import io.agentflow.definition.ApprovalPolicy;
+import io.agentflow.definition.DefinitionModels.ApprovalMode;
 import org.flowable.engine.delegate.DelegateExecution;
 import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +21,9 @@ public class FlowableCountersignMembers {
     static final String MEMBERS = "agentflowCountersignMembers";
     static final String TOTAL = "nrOfInstances";
     static final String COMPLETED = "nrOfCompletedInstances";
+    static final String MODE = "agentflowCountersignMode";
+    static final String PERCENTAGE = "agentflowCountersignPercentage";
+    static final String REQUIRED = "agentflowCountersignRequired";
     private final TaskRecipientDirectory directory;
     private final FlowableOrganizationMembers organization;
 
@@ -27,6 +32,11 @@ public class FlowableCountersignMembers {
 
     /** Flowable 会为基数和每个子执行反复求集合，本轮始终复用根执行中的首次快照。 */
     public List<String> resolve(DelegateExecution execution, String encodedRule) {
+        return resolve(execution, encodedRule, ApprovalMode.ALL.name(), null);
+    }
+
+    /** 任一及比例方式同时冻结人数门槛，后续目录变化不能改变当前节点的分母。 */
+    public List<String> resolve(DelegateExecution execution, String encodedRule, String mode, Integer percentage) {
         DelegateExecution root = execution;
         while (!root.isMultiInstanceRoot() && root.getParent() != null) root = root.getParent();
         String tenant = root.getTenantId();
@@ -40,6 +50,12 @@ public class FlowableCountersignMembers {
         List<String> members = new ArrayList<>((io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
                 ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles)).stream().distinct().sorted().toList());
         if (members.isEmpty()) throw new DomainException("COUNTERSIGN_NO_MEMBERS", "No active approvers are available for the countersign node");
+        ApprovalPolicy policy = new ApprovalPolicy(ApprovalMode.valueOf(mode), percentage);
+        if (policy.mode() != ApprovalMode.ALL) {
+            root.setVariableLocal(MODE, policy.mode().name());
+            if (policy.percentage() != null) root.setVariableLocal(PERCENTAGE, policy.percentage());
+            root.setVariableLocal(REQUIRED, policy.requiredApprovals(members.size()));
+        }
         root.setVariableLocal(MEMBERS, members);
         return members;
     }

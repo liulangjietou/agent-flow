@@ -4,6 +4,7 @@ import { api, type Task, type TaskAction, type TaskActionInput } from '../api'
 import { needsComment, needsRecipient, taskActionInput, taskActionLabels, TaskRecipientsQuery } from '../taskActions'
 import CountersignMembers from './CountersignMembers.vue'
 import type { CountersignInput, CountersignView } from '../countersignMembership'
+import { approvalPolicyLabel } from '../approvalPolicy'
 
 const props = defineProps<{ task: Task; scopeKey: string; locked: boolean }>()
 const emit = defineEmits<{ execute: [input: TaskActionInput]; membership: [input: CountersignInput, view: CountersignView]; refresh: [] }>()
@@ -14,6 +15,7 @@ const actionBar = ref<HTMLElement | null>(null)
 const recipients = reactive(new TaskRecipientsQuery(api.taskRecipients))
 const actions = computed(() => props.task.allowedActions ?? [])
 const delegated = computed(() => props.task.delegationState === 'PENDING')
+const membershipAllowed = computed(() => !!props.task.countersign && (props.task.countersign.mode ?? 'ALL') === 'ALL')
 function cancel() { pending.value = null; membershipOpen.value = false; comment.value = ''; target.value = ''; error.value = ''; recipients.clear() }
 /** 仅主动取消恢复按钮焦点；任务或账号变化时清理表单不抢焦点。 */
 function cancelForm() {
@@ -41,10 +43,14 @@ onUnmounted(cancel)
 
 <template>
   <div class="task-actions">
-    <div v-if="task.countersign" class="delegation-note" role="status"><strong>全员会签 · 已同意 {{ task.countersign.completed }} / {{ task.countersign.total }} 人</strong><p>当前责任人全部同意才通过，任一驳回结束整轮。人员增减须明确原因，已有意见与最初名单保留；委派协助后仍由原责任人决定。</p></div>
+    <div v-if="task.countersign" class="delegation-note" role="status">
+      <strong>{{ approvalPolicyLabel(task.countersign.mode ?? 'ALL', task.countersign.percentage) }} · 已同意 {{ task.countersign.completed }} / {{ task.countersign.total }} 人</strong>
+      <p v-if="membershipAllowed">当前责任人全部同意才通过，任一驳回结束整轮。人员增减须明确原因，已有意见与最初名单保留；委派协助后仍由原责任人决定。</p>
+      <p v-else>本节点需要 {{ task.countersign.required }} 人同意。达标后结束其余待办，不替未处理人员记录同意；达标前任一驳回结束整轮。名单和人数门槛已固定，委派协助后仍由原责任人决定。</p>
+    </div>
     <div v-if="delegated" class="delegation-note"><strong>受托处理 · 回交给 {{ task.owner || '待核对的原审批人' }}</strong><p>{{ task.owner ? '填写处理意见并回交。申请继续保持审批中，由原审批人作最终决定。' : '原责任人缺失，请联系流程管理员核对后再处理。' }}</p></div>
     <div v-else-if="task.delegationState === 'RESOLVED'" class="delegation-note"><strong>受托处理已回交</strong><p>请在操作审计中查看受托人的意见，再继续审批。</p></div>
-    <CountersignMembers v-if="membershipOpen" :task="task" :scope-key="scopeKey" :locked="locked" @execute="(input, view) => emit('membership', input, view)" @close="membershipOpen = false" @refresh="emit('refresh')" />
+    <CountersignMembers v-if="membershipOpen && membershipAllowed" :task="task" :scope-key="scopeKey" :locked="locked" @execute="(input, view) => emit('membership', input, view)" @close="membershipOpen = false" @refresh="emit('refresh')" />
     <form v-else-if="pending" class="task-action-form" @submit.prevent="execute(pending)">
       <h4>{{ taskActionLabels[pending] }}</h4>
       <p v-if="pending === 'APPROVE'" class="task-action-help">确认后批准当前节点；申请是否完成取决于后续节点和会签进度。意见将保留在操作审计中。</p>
@@ -61,7 +67,7 @@ onUnmounted(cancel)
       <p v-if="error" role="alert" class="recipient-error">{{ error }}</p>
       <div class="form-actions"><button type="button" class="secondary" :disabled="locked" @click="cancelForm">取消</button><button class="primary" :disabled="locked || recipients.loading || !!recipients.error || (needsRecipient(pending) && !target)">{{ locked ? '提交中…' : pending === 'RESOLVE' ? '确认回交给 ' + task.owner : '确认' + taskActionLabels[pending] }}</button></div>
     </form>
-    <div v-else ref="actionBar" class="action-bar"><button v-if="task.countersign" type="button" class="secondary" :disabled="locked" @click="membershipOpen = true">查看与增减会签人</button><button v-for="action in actions" :key="action" :data-action="action" :class="action === 'APPROVE' || action === 'RESOLVE' ? 'primary' : action === 'RETURN' || action === 'REJECT' ? 'return' : 'secondary'" :disabled="locked" @click="prepare(action)">{{ taskActionLabels[action] }}</button></div>
+    <div v-else ref="actionBar" class="action-bar"><button v-if="membershipAllowed" type="button" class="secondary" :disabled="locked" @click="membershipOpen = true">查看与增减会签人</button><button v-for="action in actions" :key="action" :data-action="action" :class="action === 'APPROVE' || action === 'RESOLVE' ? 'primary' : action === 'RETURN' || action === 'REJECT' ? 'return' : 'secondary'" :disabled="locked" @click="prepare(action)">{{ taskActionLabels[action] }}</button></div>
     <p v-if="error && !pending" role="alert" class="recipient-error">{{ error }}</p>
   </div>
 </template>

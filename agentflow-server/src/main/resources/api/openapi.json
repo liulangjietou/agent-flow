@@ -38289,7 +38289,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）和 ALL（全员会签）。ALL 在节点激活时固定有效成员，全部同意才通过，空名单回滚本次操作。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。"
+            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）、ALL（全员会签）、ANY（任一人同意）和 PERCENT（按比例通过）。PERCENT 必须明确提供 approvalPercentage，为 1..100 的整数文本；其他方式禁止残留该属性。会签在激活时固定有效成员，ANY/PERCENT 同时固定所需人数，比例向上取整。达标结束其他待办但不伪造同意；任一驳回结束整轮。空名单回滚本次操作；增减签仅限 ALL。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。"
           }
         },
         "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。其他引擎节点尚未支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。",
@@ -40047,7 +40047,8 @@
               "TASK_OVERDUE",
               "APPLICATION_COPIED",
               "EXPENSE_ADJUSTED",
-              "TASK_COUNTERSIGN_REMOVED"
+              "TASK_COUNTERSIGN_REMOVED",
+              "TASK_COUNTERSIGN_COMPLETED"
             ]
           },
           "actor": {
@@ -40252,7 +40253,9 @@
         "type": "object",
         "required": [
           "total",
-          "completed"
+          "completed",
+          "mode",
+          "required"
         ],
         "properties": {
           "total": {
@@ -40262,9 +40265,32 @@
           "completed": {
             "type": "integer",
             "minimum": 0
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "ANY",
+              "PERCENT"
+            ],
+            "description": "ALL 全员、ANY 任一人、PERCENT 达到固定比例。旧全员流程仍返回 ALL。"
+          },
+          "percentage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100,
+            "description": "仅 PERCENT 返回固定整数比例；其他方式省略该字段，也兼容 null。"
+          },
+          "required": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "本节点所需实际同意人数。ANY 为 1；PERCENT 在激活时按名单人数向上取整；ALL 等于当前必要人数。"
           }
         },
-        "description": "进入节点时固定有效审批名单，全部同意才流转；任一驳回终止整轮。委派协助后回交不计为同意。"
+        "description": "每人收到独立待办。ANY/PERCENT 在节点激活时固定名单及门槛，达到门槛结束剩余待办且不记为同意；达标前任一驳回终止整轮。委派回交不计票。仅 ALL 支持显式增减签。"
       },
       "OperationsMetrics": {
         "type": "object",

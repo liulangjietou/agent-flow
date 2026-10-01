@@ -44,11 +44,11 @@ public final class DefinitionValidator {
                     catch (io.agentflow.common.DomainException exception) { errors.add("DEADLINE_RULE_INVALID:" + n.id()); }
                 }
             }
-            String approvalMode = n.properties().get("approvalMode");
-            if (approvalMode != null) {
+            if (n.properties().containsKey(ApprovalPolicy.MODE_PROPERTY) || n.properties().containsKey(ApprovalPolicy.PERCENTAGE_PROPERTY)) {
                 if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_MODE_REQUIRES_USER_TASK:" + n.id());
-                else if (java.util.Arrays.stream(ApprovalMode.values()).noneMatch(mode -> mode.name().equals(approvalMode))) {
-                    errors.add("APPROVAL_MODE_INVALID:" + n.id());
+                else {
+                    try { n.approvalPolicy(); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
                 }
             }
             if (nodes.put(n.id(), n) != null) errors.add("DUPLICATE_NODE:" + n.id());

@@ -1,10 +1,10 @@
 # 全员会签
 
-本阶段按已确认的规则实现：一个人工审批节点的所有成员同意后才流转；任一成员驳回，整轮审批结束。设计器的“审批方式”可选择“单人审批”或“全员会签”，支持展示、修改、撤销/重做、自动保存、版本比较和发布后只读。
+本阶段按已确认的规则实现：一个人工审批节点的所有成员同意后才流转；任一成员驳回，整轮审批结束。本篇描述 SINGLE/ALL；新增 ANY/PERCENT 见[会签策略](countersign-policies.md)。设计器支持展示、修改、撤销/重做、自动保存、版本比较和发布后只读。
 
 ## 业务规则
 
-- `graph.nodes[].properties.approvalMode` 仅适用于 USER_TASK，取值 `SINGLE` 或 `ALL`。旧定义没有此属性时保持 SINGLE，不因加载设计器而补写默认值。
+- `graph.nodes[].properties.approvalMode` 仅适用于 USER_TASK；本篇关注 `SINGLE` 和 `ALL`，完整取值见会签策略文档。旧定义没有此属性时保持 SINGLE，不因加载设计器而补写默认值。
 - SINGLE 保留原行为：指定账号直接处理；角色候选组由一人处理。
 - ALL 在节点实际激活时，从当前租户有效审批目录解析 `assigneeRule`，去重并固定名单，每人一张独立待办。指定一个账号时是一人的会签节点。
 - 后续角色变化不自动增删已激活节点的任务；下一节点或新轮次重新解析。有效审批资格由当前身份源及已启用的本地组织目录核对，真实企业身份与组织接入仍独立验收。
@@ -20,14 +20,14 @@
 
 通知服务在 APPROVE 前记录已有任务 ID，成功后只提醒新产生的待办；部分会签同意不重复提醒其他成员。委派/回交只通知对应任务，不向其他会签任务错发消息。最终批准只通知一次申请人。
 
-全员会签的显式加减签已在后续完成：新增人员产生必要任务，减签只取消其他未决责任，已完成意见和节点初始名单保留，见[加减签办理](countersign-membership.md)。任一人通过、比例通过等其他会签策略仍未实现；其他流程能力以[当前剩余清单](remaining-local-work.md)为准。
+全员会签的显式加减签已在后续完成：新增人员产生必要任务，减签只取消其他未决责任，已完成意见和节点初始名单保留，见[加减签办理](countersign-membership.md)。任一人通过与比例通过也已完成本地验收，见[会签策略](countersign-policies.md)；其他流程能力以[当前剩余清单](remaining-local-work.md)为准。
 
 ## 接口与并发
 
 任务详情 `/api/v1/tasks/{id}` 和兼容任务列表中的 ALL 任务增加可选字段：
 
 ```json
-{"countersign":{"total":2,"completed":1},"allowedActions":["APPROVE","RETURN","REJECT","DELEGATE"]}
+{"countersign":{"total":2,"completed":1,"mode":"ALL","required":2},"allowedActions":["APPROVE","RETURN","REJECT","DELEGATE"]}
 ```
 
 SINGLE 任务不返回 countersign。数字来自引擎实际状态，委派回交不计为同意。摘要分页仍按原契约返回，打开详情时读取当前进度和版本。

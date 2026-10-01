@@ -124,10 +124,16 @@ public class FlowableTaskFacade {
 
     private CountersignProgress countersign(Task task) {
         var variables = taskService.getVariables(task.getId(), List.of(FlowableCountersignMembers.MEMBERS,
-                FlowableCountersignMembers.TOTAL, FlowableCountersignMembers.COMPLETED));
+                FlowableCountersignMembers.TOTAL, FlowableCountersignMembers.COMPLETED, FlowableCountersignMembers.MODE,
+                FlowableCountersignMembers.PERCENTAGE, FlowableCountersignMembers.REQUIRED));
         if (!variables.containsKey(FlowableCountersignMembers.MEMBERS)) return null;
-        return new CountersignProgress(((Number) variables.get(FlowableCountersignMembers.TOTAL)).intValue(),
-                ((Number) variables.get(FlowableCountersignMembers.COMPLETED)).intValue());
+        int total = ((Number) variables.get(FlowableCountersignMembers.TOTAL)).intValue();
+        int completed = ((Number) variables.get(FlowableCountersignMembers.COMPLETED)).intValue();
+        if (!variables.containsKey(FlowableCountersignMembers.MODE)) return new CountersignProgress(total, completed);
+        var mode = io.agentflow.definition.DefinitionModels.ApprovalMode.valueOf((String) variables.get(FlowableCountersignMembers.MODE));
+        Integer percentage = variables.get(FlowableCountersignMembers.PERCENTAGE) instanceof Number number ? number.intValue() : null;
+        return new CountersignProgress(total, completed, mode, percentage,
+                ((Number) variables.get(FlowableCountersignMembers.REQUIRED)).intValue());
     }
 
     /** 执行动作；负向决定直接终止实例，避免流程继续流转。 */
@@ -153,6 +159,12 @@ public class FlowableTaskFacade {
         CountersignProgress countersign = countersign(task);
         if (countersign != null) countersign.requireAction(normalized);
         var previousTaskIds = normalized == TaskAction.APPROVE ? notifications.pendingTaskIds(application) : java.util.Set.<String>of();
+        var closedAudience = normalized == TaskAction.APPROVE && countersign != null
+                && countersign.mode() != io.agentflow.definition.DefinitionModels.ApprovalMode.ALL
+                ? notifications.beforeCountersignCompletion(application, taskService.createTaskQuery()
+                    .processInstanceId(task.getProcessInstanceId()).taskDefinitionKey(task.getTaskDefinitionKey()).active().list().stream()
+                    .map(Task::getId).filter(id -> !id.equals(taskId)).collect(java.util.stream.Collectors.toSet()))
+                : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
         String auditEventId;
         switch (normalized) {
             case CLAIM -> {
@@ -236,6 +248,7 @@ public class FlowableTaskFacade {
             procurementReservations.releaseStopped(application, actor.userId(), Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
         }
         notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds);
+        notifications.countersignCompleted(application, actor.userId(), closedAudience);
         return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }
 

@@ -26,10 +26,10 @@ public final class DefinitionModels {
     public enum NodeType { START, END, USER_TASK, COPY, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
 
     /**
-     * 单人办理或全员会签；未配置的历史节点保持单人办理。
+     * 单人、全员、任一人和比例审批；历史缺省节点保持单人办理。
      * @author owlzhangfq@gmail.com
      */
-    public enum ApprovalMode { SINGLE, ALL }
+    public enum ApprovalMode { SINGLE, ALL, ANY, PERCENT }
 
     /**
      * 流程节点。
@@ -47,6 +47,9 @@ public final class DefinitionModels {
         public ApprovalMode approvalMode() {
             return ApprovalMode.valueOf(properties.getOrDefault("approvalMode", ApprovalMode.SINGLE.name()));
         }
+
+        /** 发布方式与比例共同构成不可分割的节点规则。 */
+        public ApprovalPolicy approvalPolicy() { return ApprovalPolicy.fromProperties(properties); }
     }
 
     /**

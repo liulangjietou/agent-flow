@@ -6,6 +6,7 @@ import { PortableTemplateReview, serializePortableTemplate, type PortableProcess
 import { validateTemplateCopy } from '../templateCenter'
 import { simulationIssue } from '../definitionSimulation'
 import { fieldTypes } from '../formSchema'
+import { approvalPolicyLabel } from '../approvalPolicy'
 
 const props = defineProps<{ current: PortableProcess; locked: boolean; scopeKey: string; hasUnsavedDefinition: boolean }>()
 const emit = defineEmits<{ import: [value: PortableProcess]; back: [] }>()
@@ -68,7 +69,7 @@ onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); cl
         <p v-if="review.error" role="alert" class="transfer-error">{{ review.error }}</p>
         <template v-if="review.value">
           <div class="template-summary"><strong>{{ review.value.name }}</strong><span>来源标识 {{ review.value.key }}</span><p>{{ review.value.graph.nodes.length }} 个节点 · {{ review.value.graph.edges.length }} 条连线 · {{ review.value.formSchema?.fields.length ?? 0 }} 个字段</p></div>
-          <details><summary>预览审批人和表单</summary><ul class="config-list"><li v-for="node in approvals" :key="node.id"><strong>{{ node.name }}</strong><span>{{ node.properties.assigneeRule || '未配置审批人' }} · {{ node.properties.approvalMode === 'ALL' ? '全员会签' : '单人办理' }}</span></li></ul><ul class="config-list"><li v-for="field in review.value.formSchema?.fields ?? []" :key="field.key"><strong>{{ field.label }}</strong><span>{{ fieldTypes.find(type => type.value === field.type)?.label }} · {{ field.required ? '必填' : '选填' }}</span></li></ul><p v-if="!review.value.formSchema" class="explanation">来源流程未绑定版本化表单。</p></details>
+          <details><summary>预览审批人和表单</summary><ul class="config-list"><li v-for="node in approvals" :key="node.id"><strong>{{ node.name }}</strong><span>{{ node.properties.assigneeRule || '未配置审批人' }} · {{ approvalPolicyLabel(node.properties.approvalMode, node.properties.approvalPercentage) }}</span></li></ul><ul class="config-list"><li v-for="field in review.value.formSchema?.fields ?? []" :key="field.key"><strong>{{ field.label }}</strong><span>{{ fieldTypes.find(type => type.value === field.type)?.label }} · {{ field.required ? '必填' : '选填' }}</span></li></ul><p v-if="!review.value.formSchema" class="explanation">来源流程未绑定版本化表单。</p></details>
           <div class="check-row"><button class="secondary" :disabled="locked || review.loading" @click="review.check(targetKey.trim())">{{ review.reviewed ? '重新检查模板' : '检查模板' }}</button><span v-if="review.reviewed && !review.errors.length" class="check-success" role="status">结构、表单、审批人与期限引用检查通过。</span></div>
           <ul v-if="issues.length" class="transfer-issues" role="status"><li v-for="(issue, index) in issues" :key="index">{{ issue }}</li></ul>
           <p v-if="review.canImport && review.errors.length" class="explanation">可先创建草稿，在设计器中修正审批人、期限日历或分支覆盖。发布前必须重新通过检查。</p>
