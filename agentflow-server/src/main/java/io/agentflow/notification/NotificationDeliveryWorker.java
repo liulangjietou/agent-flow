@@ -14,11 +14,13 @@ public class NotificationDeliveryWorker {
     private static final Logger LOG = LoggerFactory.getLogger(NotificationDeliveryWorker.class);
     private final JdbcNotificationDeliveryStore store;
     private final SmtpNotificationTransport smtp;
+    private final WeComNotificationTransport wecom;
     private final NotificationDeliveryService deliveries;
 
     /** 通过独立 bean 的事务代理执行领取和确认。 */
-    public NotificationDeliveryWorker(JdbcNotificationDeliveryStore store, SmtpNotificationTransport smtp, NotificationDeliveryService deliveries) {
-        this.store = store; this.smtp = smtp; this.deliveries = deliveries;
+    public NotificationDeliveryWorker(JdbcNotificationDeliveryStore store, SmtpNotificationTransport smtp,
+                                      WeComNotificationTransport wecom, NotificationDeliveryService deliveries) {
+        this.store = store; this.smtp = smtp; this.wecom = wecom; this.deliveries = deliveries;
     }
 
     /** 一批最多十条；崩溃后租约变为未知，不能因为未保存回执而自动重复发送。 */
@@ -29,8 +31,10 @@ public class NotificationDeliveryWorker {
             try {
                 var claimed = deliveries.claim(id, Instant.now());
                 if (claimed == null) continue;
-                var outcome = claimed.delivery().channel() == NotificationChannel.EMAIL
-                        ? smtp.send(claimed.destination(), claimed.delivery()) : Outcome.failed(FailureCode.CHANNEL_UNAVAILABLE);
+                var outcome = switch (claimed.delivery().channel()) {
+                    case EMAIL -> smtp.send(claimed.destination(), claimed.delivery());
+                    case ENTERPRISE_IM -> wecom.send(claimed.destination());
+                };
                 deliveries.finish(claimed.delivery(), outcome, Instant.now());
             } catch (RuntimeException failure) {
                 // 异常可能包含收件账号或连接凭据，仅记录内部投递标识和固定错误码。

@@ -45,6 +45,7 @@ class NotificationDeliveryApiIntegrationTest {
     @Autowired NotificationPreferencesService preferences;
     @Autowired InboxRepository inbox;
     @Autowired NotificationDeliveryService deliveries;
+    @Autowired NotificationDeliveryWorker worker;
     @SpyBean JdbcNotificationDeliveryStore store;
     @SpyBean NotificationDestinations destinations;
 
@@ -161,6 +162,31 @@ class NotificationDeliveryApiIntegrationTest {
         var current = failed(); doReturn(Optional.empty()).when(destinations).find("demo", "alice", NotificationChannel.EMAIL);
         assertThat(read(PATH + "/" + current.id(), "alice").path("retry").path("blockedCode").asText()).isEqualTo("BINDING_UNAVAILABLE");
         retry(current, "alice", input(current, false), UUID.randomUUID().toString(), 409);
+    }
+
+    @Test void enterpriseImUnknownIsSelfOnlyAndOriginalHttpRecoveryDoesNotSendTwice() throws Exception {
+        try (var server = new LocalWeComServer()) {
+            var target = WeComNotificationTransportTest.target(server);
+            doReturn(Optional.of(target)).when(destinations).find("demo", "alice", NotificationChannel.ENTERPRISE_IM);
+            preferences.revise(ALICE, 0, false, true);
+            var message = new InboxMessage(UUID.randomUUID(), "demo", "alice", UUID.randomUUID(), "敏感标题", "BUSINESS-SECRET", InboxMessage.Kind.COMMENT_MENTIONED,
+                    "manager", null, null, 1, Instant.now(), null, "正文");
+            inbox.append(UUID.randomUUID().toString(), message);
+            var id = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=?", String.class, message.id().toString()));
+            server.messageReplies.add(LocalWeComServer.Reply.json("{}")); worker.runOnce();
+            var value = store.get(ALICE, id).orElseThrow();
+            var detail = read(PATH + "/" + id, "alice");
+            assertThat(detail.path("delivery").path("channel").asText()).isEqualTo("ENTERPRISE_IM");
+            assertThat(detail.path("delivery").path("errorCode").asText()).isEqualTo("IM_RESULT_UNKNOWN");
+            assertThat(detail.toString()).doesNotContain("User01", "fixture-secret", "fixture-token", "fixture-corp", "敏感标题");
+            assertThat(read(PATH + "?channel=ENTERPRISE_IM&status=UNKNOWN", "alice").path("items")).hasSize(1);
+            mvc.perform(get(PATH + "/" + id).header("Authorization", token("admin"))).andExpect(status().isNotFound());
+            retry(value, "alice", input(value, false), UUID.randomUUID().toString(), 400);
+            String key = UUID.randomUUID().toString(); var receipt = retry(value, "alice", input(value, true), key, 200);
+            worker.runOnce(); assertThat(store.get(ALICE, id).orElseThrow().progress().status()).isEqualTo(Status.ACCEPTED);
+            assertThat(retry(value, "alice", input(value, true), key, 200)).isEqualTo(receipt);
+            worker.runOnce(); assertThat(server.messages).hasSize(2);
+        }
     }
 
     @Test void historyFailureRollsBackRetryAndIdempotencySoOriginalKeyCanSafelyExecute() throws Exception {

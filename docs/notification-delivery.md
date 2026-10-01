@@ -1,12 +1,12 @@
 # 外部通知投递
 
-SMTP 邮件后台、部署收件绑定、固定目的地、有限重试和结果未知保护，以及本人查询、人工恢复接口和消息中心页面已完成本地验收。独立 V92→V93 非空升级、实际 SMTP、HTTP、页面和两次重启通过，见[完整本地证据](evidence/notification-delivery-runtime-20261001.json)。企业 IM、真实企业渠道及最终递送、超时升级仍未完成，通知工作包保持进行中。
+SMTP 邮件后台、部署收件绑定、固定目的地、有限重试和结果未知保护，以及本人查询、人工恢复接口和消息中心页面已完成本地验收。独立 V92→V93 非空升级、实际 SMTP、HTTP、页面和两次重启通过，见[完整本地证据](evidence/notification-delivery-runtime-20261001.json)。[超时升级](task-escalation.md)已完成本地验收；[企业微信参考发送器](wecom-notifications.md)已完成后台及接口范围验证，独立运行、真实页面、重启和企业渠道递送继续。通知工作包保持进行中。
 
 ## 调用链与职责
 
 审批、任务、评论和抄送继续调用 `InboxRepository.append`。首次站内事件写入后，`NotificationDispatchPlanner` 读取接收人的当前偏好，并在同一事务冻结原渠道代次及可用部署绑定的标识与摘要。没有绑定也会保留意向，便于后续报告未配置；以后新增绑定不能补发该条旧意向。
 
-`NotificationDeliveryProgress` 负责发送状态、次数、租约与允许的状态变化。`NotificationDeliveryService` 编排当前组织状态、本人偏好、原消息归属和绑定复核；`JdbcNotificationDeliveryStore` 只保存队列及历史。后台先通过服务短事务记录开始发送，再在事务外调用 SMTP，最后用另一短事务保存受理或失败事实。
+`NotificationDeliveryProgress` 负责发送状态、次数、租约与允许的状态变化。`NotificationDeliveryService` 编排当前组织状态、本人偏好、原消息归属和绑定复核；`JdbcNotificationDeliveryStore` 只保存队列及历史。后台先通过服务短事务记录开始发送，再在事务外调用 SMTP 或企业微信，最后用另一短事务保存受理或失败事实。
 
 服务按组织目录、个人偏好、投递的顺序加锁，与关闭设置的锁顺序一致。入队不同时锁住多个接收人的偏好，避免审批通知扇出时出现锁顺序交叉。并发入队读到的旧代次会在发送前再次被拒绝。
 

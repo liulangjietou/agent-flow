@@ -10,6 +10,8 @@ class NotificationDestinationsTest {
     @Test void identityAndTargetChangesInvalidateOldDigestButCredentialRotationDoesNot() {
         var config = configuration("first-secret");
         var first = destination(config);
+        // V93 已入队邮件的部署摘要，新增渠道不能改变此持久身份。
+        assertThat(first.digest()).isEqualTo("fe9341b9388b11d642285f167ce1be8fbed96b5eac4fcd332960ab6f73807588");
         assertThat(new NotificationDestinations(config, false).find("other", "alice", NotificationChannel.EMAIL)).isEmpty();
         assertThat(first.toString()).doesNotContain("example", "first-secret", "alice");
         config.setSmtpServers(configuration("rotated-secret").getSmtpServers());
@@ -45,7 +47,7 @@ class NotificationDestinationsTest {
         assertThatThrownBy(() -> new NotificationDestinations(duplicates, false)).isInstanceOf(IllegalStateException.class);
     }
 
-    @Test void disabledTargetsAndMissingImAdapterDoNotPretendToBeConfigured() {
+    @Test void disabledTargetsAndMissingChannelProviderDoNotPretendToBeConfigured() {
         var config = configuration("secret");
         config.setBindings(Map.of("alice-email", new Binding("demo", "alice", NotificationChannel.EMAIL, "mail", "alice@example.invalid", false)));
         assertThat(destination(config).enabled()).isFalse();

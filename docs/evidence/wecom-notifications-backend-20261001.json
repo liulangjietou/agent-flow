@@ -1,0 +1,240 @@
+{
+  "recordedAt": "2026-10-01T19:26:09.884731+00:00",
+  "status": "BACKEND_SCOPE_PASS_RUNTIME_PENDING",
+  "baseCommit": "919a5358de991c8fbe49818d933ecf9d3cad9587",
+  "branch": "codex/governance-identifier-integration",
+  "migrationVersion": 93,
+  "newMigrations": false,
+  "scope": "WeCom self-built application reference adapter, fixed tenant recipient binding, token cache, real loopback HTTP, existing queue and self-only recovery",
+  "tests": {
+    "domain": 5,
+    "h2ServerUnique": 54,
+    "h2Classes": {
+      "io.agentflow.notification.NotificationDeliveryIntegrationTest": 12,
+      "io.agentflow.notification.SmtpNotificationTransportTest": 5,
+      "io.agentflow.notification.NotificationDestinationsTest": 4,
+      "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+      "io.agentflow.notification.NotificationDeliveryMigrationTest": 1,
+      "io.agentflow.notification.WeComNotificationTransportTest": 9,
+      "io.agentflow.notification.WeComNotificationConfigurationTest": 3,
+      "io.agentflow.notification.NotificationPreferencesIntegrationTest": 6,
+      "io.agentflow.api.OpenApiContractTest": 6
+    },
+    "postgres": 27,
+    "postgresClasses": {
+      "io.agentflow.notification.NotificationDeliveryIntegrationTest": 12,
+      "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+      "io.agentflow.notification.NotificationDeliveryMigrationTest": 1,
+      "io.agentflow.notification.NotificationPreferencesIntegrationTest": 6
+    },
+    "databaseScopesOverlap": true,
+    "frontend": 25,
+    "build": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 290,
+      "schemas": 564,
+      "requestExamples": 110
+    }
+  },
+  "regression": {
+    "before": "Trailing JSON produced ACCEPTED instead of UNKNOWN",
+    "cause": "Ordinary JsonUtil.read did not require a complete unambiguous document",
+    "fix": "Opt-in JsonUtil.readStrict plus strict UTF-8 decoding at the provider boundary",
+    "oldTestGap": "Previously covered missing and mistyped fields, not trailing documents or duplicate keys"
+  },
+  "verified": [
+    "single recipient and minimum content",
+    "literal loopback requires demo opt-in; production official origin only",
+    "application-scoped token cache and secret rotation",
+    "one refresh only after explicit invalid or expired token",
+    "no redirects and bounded complete response wait",
+    "explicit rejection, malformed receipts and unknown recovery",
+    "shared queue transactions and rollback, consent and recipient checks",
+    "late IM binding never backfills old intent; changed target never redirects queued messages",
+    "SMTP persisted digest preserved",
+    "self-only HTTP queries and original retry replay",
+    "actual Vue template renders enterprise IM unknown and duplicate confirmation"
+  ],
+  "runtime": {
+    "installedIntoExistingService": false,
+    "existingBusinessDatabasesModified": false,
+    "postgresTestDatabases": {
+      "AGENTFLOW_NOTIFICATION_DELIVERY": "wecom_delivery_test_f6ca94f603",
+      "AGENTFLOW_NOTIFICATION_PREF": "wecom_pref_test_f6ca94f603",
+      "AGENTFLOW_NOTIFICATION_DELIVERY_API": "wecom_api_test_f6ca94f603"
+    },
+    "actualEnterpriseApiCalled": false,
+    "actualEnterpriseBindingVerified": false,
+    "browserVerified": false,
+    "restartsVerified": false
+  },
+  "officialReferences": {
+    "send": "https://developer.work.weixin.qq.com/document/path/90236",
+    "token": "https://developer.work.weixin.qq.com/document/path/91039",
+    "errors": "https://developer.work.weixin.qq.com/document/path/90313",
+    "recipient": "https://developer.work.weixin.qq.com/document/path/90195"
+  },
+  "remaining": [
+    "isolated installed service and browser acceptance",
+    "existing queued record preservation and restart continuity",
+    "real enterprise tenant, app, recipient binding, credentials and final delivery",
+    "other two remaining enterprise work packages and remote delivery"
+  ],
+  "sources": [
+    {
+      "path": "agentflow-common/src/main/java/io/agentflow/common/JsonUtil.java",
+      "sha256": "44b19ebd83418f804c88e1b2f981e2f448e8581b4026f2053e8eb1c0b3595e56"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationDeliveryProgress.java",
+      "sha256": "97b77e5f79d318df3107fb69ed1abf4bffb6164d8a74363c8707f54fd9fd7a4a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryConfiguration.java",
+      "sha256": "658f591cb832fa5bfa08ce023875f2a12b76825324a5dd24fe7b369c909ab5a3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryWorker.java",
+      "sha256": "463519d43b6100e7cd52ccfe726330196bc4eb8329d793b41d3883c39f0f928b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDestinations.java",
+      "sha256": "17324f788faf3da121ad17437657d4462b1acd0c31aee737e1c7106295fb6d36"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationMessageText.java",
+      "sha256": "95317f48bb0d4a2a801cda343c9125bb936621fa2ed5d8064f41c16db5c341fb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SmtpNotificationTransport.java",
+      "sha256": "82c65c4592a3ca038bebaa91fcb985e4b6ffa73b7e00af059911fb769373ac67"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/WeComNotificationTransport.java",
+      "sha256": "7e47e89c5f52eac5245fc88c3e9de43e555abe89ea51972c56ed44d873c6c7c9"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "246c512f029f3543025397510fc8dbeb74a4eb62bcbab0c74da529b2ee64ae5a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/LocalWeComServer.java",
+      "sha256": "747be74e265f31747986fa88a4f8d9d512712e7d37d23221200886045c3a71b1"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryApiIntegrationTest.java",
+      "sha256": "02cd2c8f08e98b4528a83f89336812e59546555e3cca00f122bd5d3485745812"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+      "sha256": "5fcb9561d7fda2d2535589b0bf90e65e8365ab06095cc47b9ebcb9e5f1ca652e"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDestinationsTest.java",
+      "sha256": "fc70c58bd6797e8520f9985bbaae803c2c0da6e115d9899820f9d88ffff010e0"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/WeComNotificationConfigurationTest.java",
+      "sha256": "5fbd325545dd3e43aafa1a897d1b4de65b47e90bc4ffb986463e83e0283ab25b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/WeComNotificationTransportTest.java",
+      "sha256": "9ee73a8f8dc33a3f4c5fb213bf218d667f54248bf36af294328534496dd6feac"
+    },
+    {
+      "path": "agentflow-web/src/notificationDeliveries.ts",
+      "sha256": "704b4c506ddfb2ecf806010653483c769094b8b4bfefcd6b4c72a4041b76fdb9"
+    },
+    {
+      "path": "agentflow-web/tests/notification-deliveries.test.mjs",
+      "sha256": "41757d30f3ba328c714b1dffa95cebebbdc1f2e6d327b69305b49dd354307362"
+    },
+    {
+      "path": "docs/notification-delivery.md",
+      "sha256": "94054a4bb5590daf67cb8127891e02391f1a30c4e1a87faaa62079235d983d82"
+    },
+    {
+      "path": "docs/notification-inbox.md",
+      "sha256": "d53ca16a5f9945e87bf261b6deec0aeae75510c3eb09bd1e7fd446b15fe01322"
+    },
+    {
+      "path": "docs/notification-preferences.md",
+      "sha256": "752eed9cd2412ae24bd96f341d2c5d6fb2f1a930671e09e9dcb7a780a211d728"
+    },
+    {
+      "path": "docs/remaining-implementation-plan.md",
+      "sha256": "1109e6ba9afde3bd84915668120e9db3489fae9297c58a4203c5b4546050e699"
+    },
+    {
+      "path": "docs/remaining-local-work.md",
+      "sha256": "5b862dee3740f164c098b12171437cb15e5d78b1ee37747faa16fb4ea1f317ea"
+    },
+    {
+      "path": "docs/wecom-notifications.md",
+      "sha256": "f81be3ab0247748faa1a4f323558fa64afc203b014facd96accd296a16caa782"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-config-red.log",
+      "sha256": "3393af6e4081ba0c81b643c3fb8d2b128eed74611ffacf31ec6501af6af5fe26"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-transport-tests.log",
+      "sha256": "43b1ce53bd11019122ba5c8da3ad9bf703debfa3b4307a9f3adfe9021bc6c270"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-receipt-red.log",
+      "sha256": "18dabd0b8f5be5a54e2b4c6924df3d2ad845ba6415215c89a7fa2bff637a3bb5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-backend-h2.log",
+      "sha256": "b2c4ef47376846e6237fae541a5e4ed9d79e14e7758d06f2f6172bfd356bf52a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-backend-final.log",
+      "sha256": "4f334d39ed446ff5ac7372a860c9e8f0ff7d57d509a467ef4f614210ed98c2e1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-backend-postgres.log",
+      "sha256": "bf0179e5927da0b1ba973f36a82111e1827601d01d6e4ba08fd26ea71a43dd84"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-backend-postgres.json",
+      "sha256": "35be26a71e5581227d34b4d000ed5d038ce789bf51bfa46489d370d8a5ffc784"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-frontend-final.log",
+      "sha256": "45eee3f90f247ed266f3c0af80b893628068c179e1b92711f3a724f440441784"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-web-build.log",
+      "sha256": "c4f69b8724122ced0d9599c2aa06e6d21627b764611cbcd1e9c3e50e88e94f01"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-openapi.log",
+      "sha256": "1f8bc92b12f74b2b3554ff0fa1d6c81160cd2208ef6b35594ecb68c823e7a3fe"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-wecom-backend-postgres.py",
+      "sha256": "6fa48e3c42400e0d716e5639f398e576d1d804c3a0091f6e76509ac2c3d3189d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-docs/message.html",
+      "sha256": "39dc4bf1b01f44d63599cf3e9ce1de39714f7448c44797f8aac41e79a7fb14ec"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-docs/token.html",
+      "sha256": "e352fb9cffa828313bd3d94fbf099944cc1f16393c9b289df3e81b771fe7328f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-docs/errors.html",
+      "sha256": "3d5441fc242768d77ee1721c5af87b016c20fffd3c233a6d85bc960b88290407"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-docs/user.html",
+      "sha256": "0ce028d8ba123e518ff7ab9de95a4da1a0d22409868e51b8b318f9330186b28e"
+    }
+  ]
+}

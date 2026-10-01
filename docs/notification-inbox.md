@@ -1,6 +1,6 @@
 # 站内消息中心
 
-站内消息记录审批已经发生的进展，提供全部/未读筛选、未读总数、游标分页、标为已读，以及返回申请或当前待办的入口。审批动作消息与对应业务事务一起提交；[超时提醒](confirmed-rules-runtime.md)在独立任务事务中按真实期限发送。本中心展示站内消息，并提供[个人偏好](notification-preferences.md)与[邮件投递结果及恢复](notification-delivery.md)入口；企业 IM 待接入；已有 [Webhook 投递](webhook-delivery.md)由独立 outbox 链路处理。
+站内消息记录审批已经发生的进展，提供全部/未读筛选、未读总数、游标分页、标为已读，以及返回申请或当前待办的入口。审批动作消息与对应业务事务一起提交；[超时提醒](confirmed-rules-runtime.md)在独立任务事务中按真实期限发送。本中心展示站内消息，并提供[个人偏好](notification-preferences.md)与[邮件投递结果及恢复](notification-delivery.md)入口；[企业微信参考发送器](wecom-notifications.md)已接入后台，独立运行验收继续；已有 [Webhook 投递](webhook-delivery.md)由独立 outbox 链路处理。
 
 ## 接收规则
 

@@ -65066,6 +65066,12 @@
               "SMTP_TEMPORARY_REJECTION",
               "SMTP_PERMANENT_REJECTION",
               "SMTP_RESULT_UNKNOWN",
+              "IM_TOKEN_UNAVAILABLE",
+              "IM_AUTH_FAILED",
+              "IM_RECIPIENT_REJECTED",
+              "IM_TEMPORARY_REJECTION",
+              "IM_PERMANENT_REJECTION",
+              "IM_RESULT_UNKNOWN",
               "LEASE_EXPIRED",
               "WORKER_RESULT_UNKNOWN",
               null
@@ -65173,6 +65179,12 @@
                     "SMTP_TEMPORARY_REJECTION",
                     "SMTP_PERMANENT_REJECTION",
                     "SMTP_RESULT_UNKNOWN",
+                    "IM_TOKEN_UNAVAILABLE",
+                    "IM_AUTH_FAILED",
+                    "IM_RECIPIENT_REJECTED",
+                    "IM_TEMPORARY_REJECTION",
+                    "IM_PERMANENT_REJECTION",
+                    "IM_RESULT_UNKNOWN",
                     "LEASE_EXPIRED",
                     "WORKER_RESULT_UNKNOWN"
                   ]
@@ -65233,6 +65245,12 @@
                     "SMTP_TEMPORARY_REJECTION",
                     "SMTP_PERMANENT_REJECTION",
                     "SMTP_RESULT_UNKNOWN",
+                    "IM_TOKEN_UNAVAILABLE",
+                    "IM_AUTH_FAILED",
+                    "IM_RECIPIENT_REJECTED",
+                    "IM_TEMPORARY_REJECTION",
+                    "IM_PERMANENT_REJECTION",
+                    "IM_RESULT_UNKNOWN",
                     "LEASE_EXPIRED",
                     "WORKER_RESULT_UNKNOWN"
                   ]
@@ -65271,6 +65289,12 @@
                     "SMTP_TEMPORARY_REJECTION",
                     "SMTP_PERMANENT_REJECTION",
                     "SMTP_RESULT_UNKNOWN",
+                    "IM_TOKEN_UNAVAILABLE",
+                    "IM_AUTH_FAILED",
+                    "IM_RECIPIENT_REJECTED",
+                    "IM_TEMPORARY_REJECTION",
+                    "IM_PERMANENT_REJECTION",
+                    "IM_RESULT_UNKNOWN",
                     "LEASE_EXPIRED",
                     "WORKER_RESULT_UNKNOWN"
                   ]
@@ -65309,6 +65333,12 @@
                     "SMTP_TEMPORARY_REJECTION",
                     "SMTP_PERMANENT_REJECTION",
                     "SMTP_RESULT_UNKNOWN",
+                    "IM_TOKEN_UNAVAILABLE",
+                    "IM_AUTH_FAILED",
+                    "IM_RECIPIENT_REJECTED",
+                    "IM_TEMPORARY_REJECTION",
+                    "IM_PERMANENT_REJECTION",
+                    "IM_RESULT_UNKNOWN",
                     "LEASE_EXPIRED",
                     "WORKER_RESULT_UNKNOWN"
                   ]
@@ -65378,6 +65408,12 @@
               "SMTP_TEMPORARY_REJECTION",
               "SMTP_PERMANENT_REJECTION",
               "SMTP_RESULT_UNKNOWN",
+              "IM_TOKEN_UNAVAILABLE",
+              "IM_AUTH_FAILED",
+              "IM_RECIPIENT_REJECTED",
+              "IM_TEMPORARY_REJECTION",
+              "IM_PERMANENT_REJECTION",
+              "IM_RESULT_UNKNOWN",
               "LEASE_EXPIRED",
               "WORKER_RESULT_UNKNOWN",
               null
@@ -65439,6 +65475,12 @@
               "SMTP_TEMPORARY_REJECTION",
               "SMTP_PERMANENT_REJECTION",
               "SMTP_RESULT_UNKNOWN",
+              "IM_TOKEN_UNAVAILABLE",
+              "IM_AUTH_FAILED",
+              "IM_RECIPIENT_REJECTED",
+              "IM_TEMPORARY_REJECTION",
+              "IM_PERMANENT_REJECTION",
+              "IM_RESULT_UNKNOWN",
               "LEASE_EXPIRED",
               "WORKER_RESULT_UNKNOWN",
               null

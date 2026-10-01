@@ -38,7 +38,7 @@ public class SmtpNotificationTransport {
             message.setFrom(new InternetAddress(server.from()));
             message.setRecipient(Message.RecipientType.TO, new InternetAddress(destination.address()));
             message.setSubject(SUBJECT, "UTF-8");
-            message.setText("你有一条新的 AgentFlow 站内消息。请登录后打开消息中心查看。\n\n" + destination.publicUrl() + "\n", "UTF-8");
+            message.setText(NotificationMessageText.text(destination.publicUrl()), "UTF-8");
             message.setSentDate(Date.from(delivery.createdAt()));
             message.saveChanges();
             message.setHeader("Message-ID", "<agentflow-notification-" + delivery.id() + "@"

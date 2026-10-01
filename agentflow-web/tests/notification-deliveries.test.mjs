@@ -10,6 +10,15 @@ const id = '12345678-1234-1234-1234-123456789001', otherId = '12345678-1234-1234
 const when = '2026-10-01T12:00:00Z', originalApi = { ...api }, originalFetch = globalThis.fetch
 const settle = () => new Promise(resolve => setImmediate(resolve))
 globalThis.localStorage = { getItem: () => null }
+
+test('企业 IM 失败分类可读取，未知投递继续要求重复确认', () => {
+  for (const errorCode of ['IM_TOKEN_UNAVAILABLE', 'IM_AUTH_FAILED', 'IM_RECIPIENT_REJECTED', 'IM_TEMPORARY_REJECTION', 'IM_PERMANENT_REJECTION', 'IM_RESULT_UNKNOWN']) {
+    const value = { ...row(errorCode === 'IM_RESULT_UNKNOWN' ? 'UNKNOWN' : 'FAILED'), channel: 'ENTERPRISE_IM', errorCode }
+    assert.equal(readNotificationDelivery(value).errorCode, errorCode)
+    const result = readDeliveryDetail(detail(value), id)
+    assert.equal(result.retry.requiresDuplicateAcknowledgement, errorCode === 'IM_RESULT_UNKNOWN')
+  }
+})
 function row(status = 'FAILED', version = 3, identity = id) {
   return { id: identity, inboxId: '12345678-1234-1234-1234-123456789099', channel: 'EMAIL', status, version, attempts: 1,
     cycleAttempts: status === 'PENDING' ? 0 : 1, errorCode: ['PENDING', 'IN_FLIGHT', 'ACCEPTED'].includes(status) ? null : status === 'UNKNOWN' ? 'SMTP_RESULT_UNKNOWN' : 'SMTP_PERMANENT_REJECTION',
@@ -136,6 +145,7 @@ test('页面原请求恢复只确认原回执并刷新当前投递，不执行�
 })
 
 test('实际模板区分受理与未知，未知恢复显示重复风险并默认禁止提交', async () => {
+  for (const channel of ['EMAIL', 'ENTERPRISE_IM']) {
   const node = (tag, text = '') => ({ tag, tagName: tag.toUpperCase(), text, props: {}, children: [], parent: null, value: '', multiple: false,
     get options() { return this.children.filter(child => child.tag === 'option') }, addEventListener() {}, removeEventListener() {}, getRootNode: () => ({}), focus() {}, scrollIntoView() {} })
   const remove = el => { if (el.parent) el.parent.children.splice(el.parent.children.indexOf(el), 1); el.parent = null }
@@ -144,7 +154,8 @@ test('实际模板区分受理与未知，未知恢复显示重复风险并默�
     insert: (el, parent, anchor = null) => { remove(el); el.parent = parent; parent.children.splice(anchor ? parent.children.indexOf(anchor) : parent.children.length, 0, el) }, parentNode: el => el.parent, nextSibling: el => el.parent?.children[el.parent.children.indexOf(el) + 1] ?? null })
   const all = el => [el, ...el.children.flatMap(all)], root = node('root'), oldDocument = globalThis.Document, oldShadow = globalThis.ShadowRoot
   globalThis.Document = class {}; globalThis.ShadowRoot = class {}
-  api.notificationDeliveries = async () => ({ items: [row('UNKNOWN')], nextCursor: null }); api.notificationDelivery = async () => detail(row('UNKNOWN'))
+  const unknown = { ...row('UNKNOWN'), channel, errorCode: channel === 'ENTERPRISE_IM' ? 'IM_RESULT_UNKNOWN' : 'SMTP_RESULT_UNKNOWN' }
+  api.notificationDeliveries = async () => ({ items: [unknown], nextCursor: null }); api.notificationDelivery = async () => detail(unknown)
   const app = host.createApp(Rendered, { scopeKey: 'demo:alice', refreshVersion: 0, locked: false })
   try {
     app.mount(root); await all(root).find(el => el.tag === 'details').props.onToggle({ target: { open: true } }); await settle()
@@ -152,7 +163,9 @@ test('实际模板区分受理与未知，未知恢复显示重复风险并默�
     await all(root).find(el => el.tag === 'button' && el.text.includes('查看投递详情')).props.onClick(); await settle()
     assert.equal(all(root).filter(el => el.tag === 'input' && el.props.type === 'checkbox').length, 2)
     assert.match(all(root).map(el => el.text).join(' '), /接受重复提醒/); assert.equal(all(root).find(el => el.props.type === 'submit').props.disabled, true)
+    if (channel === 'ENTERPRISE_IM') assert.match(all(root).map(el => el.text).join(' '), /企业 IM 发送中断或回执不完整/)
   } finally { app.unmount(); Object.assign(api, originalApi); globalThis.Document = oldDocument; globalThis.ShadowRoot = oldShadow }
+  }
 })
 
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })

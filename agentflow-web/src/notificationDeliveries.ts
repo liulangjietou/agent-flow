@@ -13,6 +13,10 @@ export const deliveryErrors = {
   CHANNEL_UNAVAILABLE: '当前渠道尚未接通。', SMTP_CONNECT_FAILED: '连接发送服务失败，本次尚未提交邮件。',
   SMTP_AUTH_FAILED: '发送服务认证失败，请联系部署管理员核对。', SMTP_TEMPORARY_REJECTION: '发送服务明确临时拒绝了本次邮件。',
   SMTP_PERMANENT_REJECTION: '发送服务明确拒绝了本次邮件，请先核实原因。', SMTP_RESULT_UNKNOWN: '发送中断或确认超时，接收方可能已经收到。',
+  IM_TOKEN_UNAVAILABLE: '暂时无法获取企业 IM 凭据，本次尚未提交消息。', IM_AUTH_FAILED: '企业 IM 认证失败，请联系部署管理员核对应用配置。',
+  IM_RECIPIENT_REJECTED: '企业 IM 收件账号无效、无应用权限或缺少许可，请先核实绑定。',
+  IM_TEMPORARY_REJECTION: '企业 IM 服务繁忙或调用受限，本次已被明确拒绝。', IM_PERMANENT_REJECTION: '企业 IM 明确拒绝了本次消息，请先核实原因。',
+  IM_RESULT_UNKNOWN: '企业 IM 发送中断或回执不完整，接收方可能已经收到。',
   LEASE_EXPIRED: '发送确认未及时保存，接收方可能已经收到。', WORKER_RESULT_UNKNOWN: '后台未能确认结果，接收方可能已经收到。'
 } as const
 export type DeliveryError = keyof typeof deliveryErrors

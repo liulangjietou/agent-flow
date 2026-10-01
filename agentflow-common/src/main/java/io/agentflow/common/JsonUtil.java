@@ -38,6 +38,17 @@ public class JsonUtil {
         }
     }
 
+    /** 解析外部协议的完整 JSON 文档，重复字段或尾随内容不能形成有效回执。 */
+    public <T> T readStrict(String value, Class<T> targetType) {
+        try {
+            return objectMapper.readerFor(targetType)
+                    .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readValue(value);
+        } catch (JsonProcessingException exception) {
+            throw new DomainException("JSON_DESERIALIZATION_FAILED", "Unable to deserialize complete JSON document");
+        }
+    }
+
     /** 将 JSON 解码为通用对象映射。 */
     public Map<String, Object> map(String value) {
         try {

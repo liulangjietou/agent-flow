@@ -45,6 +45,7 @@ class NotificationDeliveryIntegrationTest {
     @Autowired OrganizationRepository organization;
     @SpyBean NotificationDestinations destinations;
     @SpyBean SmtpNotificationTransport smtp;
+    @SpyBean WeComNotificationTransport wecom;
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_NOTIFICATION_DELIVERY_URL", "jdbc:h2:mem:notification-delivery;DB_CLOSE_DELAY=-1"));
@@ -88,6 +89,60 @@ class NotificationDeliveryIntegrationTest {
             assertThat(store.get(actor, value.id())).isEmpty();
             assertThatThrownBy(() -> deliveries.retry(actor, value.id(), get(value).progress().version(), true, "拒绝越权", Instant.now()))
                     .isInstanceOfSatisfying(DomainException.class, e -> assertThat(e.code()).isEqualTo("NOTIFICATION_DELIVERY_NOT_FOUND"));
+        }
+    }
+
+    @Test void realImRunsOutsideTransactionAndUsesIndependentChannelConsent() throws Exception {
+        try (var server = new LocalWeComServer()) {
+            var target = WeComNotificationTransportTest.target(server); bind(target);
+            WeComNotificationTransport actual = AopTestUtils.getUltimateTargetObject(wecom);
+            doAnswer(call -> { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return call.callRealMethod(); }).when(actual).send(any());
+            preferences.revise(ALICE, 0, true, true);
+            var message = message(ALICE); inbox.append(UUID.randomUUID().toString(), message);
+            var im = imByInbox(message.id()); preferences.revise(ALICE, 1, false, true);
+            worker.runOnce(); worker.runOnce();
+            assertThat(get(im).progress().status()).isEqualTo(Status.ACCEPTED);
+            assertThat(server.messages).hasSize(1);
+            assertThat(server.messages.get(0).body()).doesNotContain("BUSINESS-SECRET", "敏感", message.id().toString());
+            assertThat(events(im)).containsExactly("PENDING", "IN_FLIGHT", "ACCEPTED");
+            assertThat(byInbox(ALICE, message.id()).progress().status()).isEqualTo(Status.SUPPRESSED);
+            assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> wecom.send(target)))
+                    .isInstanceOf(IllegalTransactionStateException.class);
+        }
+    }
+
+    @Test void unknownImWaitsForExplicitOriginalRetryAndRevokedConsentStopsFutureSends() throws Exception {
+        try (var server = new LocalWeComServer()) {
+            bind(WeComNotificationTransportTest.target(server)); preferences.revise(ALICE, 0, false, true);
+            var message = message(ALICE); inbox.append(UUID.randomUUID().toString(), message); var value = imByInbox(message.id());
+            server.messageReplies.add(LocalWeComServer.Reply.json("{}"));
+            worker.runOnce(); worker.runOnce(); value = get(value);
+            assertThat(value.progress().status()).isEqualTo(Status.UNKNOWN);
+            assertThat(value.progress().errorCode()).isEqualTo(FailureCode.IM_RESULT_UNKNOWN); assertThat(server.messages).hasSize(1);
+            var unknown = value;
+            assertThatThrownBy(() -> deliveries.retry(ALICE, unknown.id(), unknown.progress().version(), false, "未确认重复", Instant.now()))
+                    .isInstanceOf(DomainException.class);
+            deliveries.retry(ALICE, value.id(), value.progress().version(), true, "接受重复后恢复", Instant.now()); worker.runOnce();
+            assertThat(get(value).progress().status()).isEqualTo(Status.ACCEPTED); assertThat(server.messages).hasSize(2);
+            var next = message(ALICE); inbox.append(UUID.randomUUID().toString(), next);
+            preferences.revise(ALICE, 1, false, false); worker.runOnce();
+            assertThat(imByInbox(next.id()).progress().status()).isEqualTo(Status.SUPPRESSED); assertThat(server.messages).hasSize(2);
+        }
+    }
+
+    @Test void lateImBindingCannotBackfillOrRedirectOriginalMessages() throws Exception {
+        try (var server = new LocalWeComServer()) {
+            preferences.revise(ALICE, 0, false, true);
+            var unbound = message(ALICE); inbox.append(UUID.randomUUID().toString(), unbound);
+            bind(WeComNotificationTransportTest.target(server)); worker.runOnce();
+            assertThat(imByInbox(unbound.id()).progress().errorCode()).isEqualTo(FailureCode.BINDING_NOT_CAPTURED);
+            var original = message(ALICE); inbox.append(UUID.randomUUID().toString(), original);
+            bind(WeComNotificationConfigurationTest.destination(java.util.Map.of("wecom-apps.app.base-url", server.baseUrl(),
+                    "allow-insecure-in-demo", "true", "bindings.user-im.address", "User02"), true));
+            worker.runOnce();
+            assertThat(imByInbox(original.id()).progress().errorCode()).isEqualTo(FailureCode.BINDING_CHANGED);
+            assertThat(imByInbox(original.id()).progress().attempts()).isZero();
+            assertThat(server.tokenRequests).isEmpty(); assertThat(server.messages).isEmpty();
         }
     }
 
@@ -143,7 +198,7 @@ class NotificationDeliveryIntegrationTest {
                 .isInstanceOfSatisfying(DomainException.class, e -> assertThat(e.code()).isEqualTo("NOTIFICATION_BINDING_UNAVAILABLE"));
         var original = enqueue(ALICE); var target = target();
         bind(new NotificationDestinations.Destination(target.id(), target.tenantId(), target.recipient(), target.channel(), "changed@example.invalid",
-                target.server(), target.publicUrl(), true, "changed-digest"));
+                target.server(), target.publicUrl(), true, "changed-digest", null));
         assertThat(deliveries.claim(original.id(), Instant.now())).isNull();
         assertThat(get(original).progress().errorCode()).isEqualTo(FailureCode.BINDING_CHANGED);
         assertThat(get(original).progress().attempts()).isZero();
@@ -151,7 +206,7 @@ class NotificationDeliveryIntegrationTest {
 
     @Test void inactiveOrganizationMemberAndWrongInboxOwnerAreSuppressedWithoutGrantingRoles() {
         String tenant = "delivery-" + UUID.randomUUID(); var actor = new Actor(tenant, "alice", Set.of()); var target = target();
-        bind(new NotificationDestinations.Destination(target.id(), tenant, "alice", target.channel(), target.address(), target.server(), target.publicUrl(), true, target.digest()));
+        bind(new NotificationDestinations.Destination(target.id(), tenant, "alice", target.channel(), target.address(), target.server(), target.publicUrl(), true, target.digest(), null));
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             organization.initialize(tenant, "admin", Instant.now());
             organization.save(tenant, new OrganizationPerson(UUID.randomUUID(), "alice", "Alice", false, false, 1), 0);
@@ -166,7 +221,7 @@ class NotificationDeliveryIntegrationTest {
 
     @Test void cashierDoesNotNeedAnApproverRoleToReceiveOwnNotification() {
         var cashier = new Actor("demo", "cashier", Set.of("CASHIER")); var target = target();
-        bind(new NotificationDestinations.Destination("cashier-email", "demo", "cashier", target.channel(), "cashier@example.invalid", target.server(), target.publicUrl(), true, target.digest()));
+        bind(new NotificationDestinations.Destination("cashier-email", "demo", "cashier", target.channel(), "cashier@example.invalid", target.server(), target.publicUrl(), true, target.digest(), null));
         var value = enqueue(cashier); assertThat(deliveries.claim(value.id(), Instant.now())).isNotNull();
     }
 
@@ -192,6 +247,10 @@ class NotificationDeliveryIntegrationTest {
     private NotificationDelivery byInbox(Actor actor, UUID inboxId) {
         String id = jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, inboxId.toString());
         return store.get(actor, UUID.fromString(id)).orElseThrow();
+    }
+    private NotificationDelivery imByInbox(UUID inboxId) {
+        String id = jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='ENTERPRISE_IM'", String.class, inboxId.toString());
+        return store.get(ALICE, UUID.fromString(id)).orElseThrow();
     }
     private NotificationDelivery get(NotificationDelivery value) { return store.get(ALICE, value.id()).orElseThrow(); }
     private java.util.List<String> events(NotificationDelivery value) { return jdbc.queryForList("SELECT status FROM notification_delivery_event WHERE delivery_id=? ORDER BY version", String.class, value.id().toString()); }
