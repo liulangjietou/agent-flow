@@ -65,6 +65,8 @@ const labels: Record<string, string> = {
   recipientRule: '抄送收件规则', 'properties.recipientRule': '抄送收件规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
+  excludeApplicant: '禁止申请人办理', 'properties.excludeApplicant': '禁止申请人办理',
+  differentApproverFrom: '排除前序步骤批准人', 'properties.differentApproverFrom': '排除前序步骤批准人',
   eventContractKey: '引用事件', 'properties.eventContractKey': '引用事件', eventContractVersion: '事件发布版本', 'properties.eventContractVersion': '事件发布版本',
   subprocessKey: '子流程标识', 'properties.subprocessKey': '子流程标识', subprocessVersion: '子流程发布版本', 'properties.subprocessVersion': '子流程发布版本',
   timerDelaySeconds: '等待时长（秒）', 'properties.timerDelaySeconds': '等待时长（秒）',
@@ -85,6 +87,8 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (value === '') return '空值'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'string') {
+    if (property.endsWith('excludeApplicant')) return value === 'true' ? '启用' : value === 'false' ? '关闭' : '待修正：' + value
+    if (property.endsWith('differentApproverFrom')) return value.split(',').join('、')
     if (property.endsWith('approvalMode')) return approvalPolicyLabel(value)
     if (property === 'type') return own(types, value) ?? value
     if (property.endsWith('assigneeRule')) {

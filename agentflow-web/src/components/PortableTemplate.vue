@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { responsibilitySummary } from '../approvalResponsibilities'
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { DefinitionCatalogQuery } from '../definitionCatalog'
@@ -69,7 +70,7 @@ onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); cl
         <p v-if="review.error" role="alert" class="transfer-error">{{ review.error }}</p>
         <template v-if="review.value">
           <div class="template-summary"><strong>{{ review.value.name }}</strong><span>来源标识 {{ review.value.key }}</span><p>{{ review.value.graph.nodes.length }} 个节点 · {{ review.value.graph.edges.length }} 条连线 · {{ review.value.formSchema?.fields.length ?? 0 }} 个字段</p></div>
-          <details><summary>预览审批人和表单</summary><ul class="config-list"><li v-for="node in approvals" :key="node.id"><strong>{{ node.name }}</strong><span>{{ node.properties.assigneeRule || '未配置审批人' }} · {{ approvalPolicyLabel(node.properties.approvalMode, node.properties.approvalPercentage) }}</span></li></ul><ul class="config-list"><li v-for="field in review.value.formSchema?.fields ?? []" :key="field.key"><strong>{{ field.label }}</strong><span>{{ fieldTypes.find(type => type.value === field.type)?.label }} · {{ field.required ? '必填' : '选填' }}</span></li></ul><p v-if="!review.value.formSchema" class="explanation">来源流程未绑定版本化表单。</p></details>
+          <details><summary>预览审批人和表单</summary><ul class="config-list"><li v-for="node in approvals" :key="node.id"><strong>{{ node.name }}</strong><span>{{ node.properties.assigneeRule || '未配置审批人' }} · {{ approvalPolicyLabel(node.properties.approvalMode, node.properties.approvalPercentage) }}</span><span v-for="line in responsibilitySummary(node.properties, review.value.graph)" :key="line">{{ line }}</span></li></ul><ul class="config-list"><li v-for="field in review.value.formSchema?.fields ?? []" :key="field.key"><strong>{{ field.label }}</strong><span>{{ fieldTypes.find(type => type.value === field.type)?.label }} · {{ field.required ? '必填' : '选填' }}</span></li></ul><p v-if="!review.value.formSchema" class="explanation">来源流程未绑定版本化表单。</p></details>
           <div class="check-row"><button class="secondary" :disabled="locked || review.loading" @click="review.check(targetKey.trim())">{{ review.reviewed ? '重新检查模板' : '检查模板' }}</button><span v-if="review.reviewed && !review.errors.length" class="check-success" role="status">结构、表单、审批人与期限引用检查通过。</span></div>
           <ul v-if="issues.length" class="transfer-issues" role="status"><li v-for="(issue, index) in issues" :key="index">{{ issue }}</li></ul>
           <p v-if="review.canImport && review.errors.length" class="explanation">可先创建草稿，在设计器中修正审批人、期限日历或分支覆盖。发布前必须重新通过检查。</p>
@@ -80,7 +81,7 @@ onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); cl
           <button class="primary" :disabled="locked || !review.canImport" @click="create">创建独立草稿</button><p class="explanation">创建后进入设计器，不会自动发布或发起申请。</p>
         </template>
       </article>
-      <aside class="panel export-panel" aria-labelledby="template-export-heading"><p class="eyebrow">EXPORT</p><h3 id="template-export-heading">导出当前设计</h3><strong class="current-name">{{ current.name }}</strong><p class="explanation">包含当前画布、表单、审批人、子流程固定引用与输入映射、期限规则和通知文案，包括尚未保存的修改。不会保存草稿或改变已发布版本。</p><button class="secondary" :disabled="locked" @click="generate">生成模板文件</button><a v-if="exportUrl" :href="exportUrl" download="agentflow-process-template.json" class="download-link">下载流程模板 JSON ↓</a><p v-if="exportError" class="transfer-error" role="alert">{{ exportError }}</p><div class="file-boundary"><strong>分享前核对</strong><p>文件包含流程名称、角色、指定账号、子流程与期限日历引用、字段映射和通知文案。请确认这些配置适合接收方使用。</p><p>不包含申请正文、审批历史、发布记录、租户身份或登录凭证。</p></div></aside>
+      <aside class="panel export-panel" aria-labelledby="template-export-heading"><p class="eyebrow">EXPORT</p><h3 id="template-export-heading">导出当前设计</h3><strong class="current-name">{{ current.name }}</strong><p class="explanation">包含当前画布、表单、审批人、职责分离、子流程固定引用与输入映射、期限规则和通知文案，包括尚未保存的修改。不会保存草稿或改变已发布版本。</p><button class="secondary" :disabled="locked" @click="generate">生成模板文件</button><a v-if="exportUrl" :href="exportUrl" download="agentflow-process-template.json" class="download-link">下载流程模板 JSON ↓</a><p v-if="exportError" class="transfer-error" role="alert">{{ exportError }}</p><div class="file-boundary"><strong>分享前核对</strong><p>文件包含流程名称、角色、指定账号、子流程与期限日历引用、字段映射和通知文案。请确认这些配置适合接收方使用。</p><p>不包含申请正文、审批历史、发布记录、租户身份或登录凭证。</p></div></aside>
     </div>
   </section>
 </template>

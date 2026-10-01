@@ -5,6 +5,8 @@ import type { FormSchema } from '../formSchema'
 import { projectQuickGraph, quickNodeIds, quickStep, type QuickCommand } from '../quickDesigner'
 import QuickSequence from './QuickSequence.vue'
 import DefinitionAssignee from './DefinitionAssignee.vue'
+import DefinitionResponsibilities from './DefinitionResponsibilities.vue'
+import { readResponsibilities, type ApprovalResponsibilities } from '../approvalResponsibilities'
 import DefinitionCopyRecipient from './DefinitionCopyRecipient.vue'
 import DefinitionDeadline from './DefinitionDeadline.vue'
 import DefinitionTimerWait from './DefinitionTimerWait.vue'
@@ -17,7 +19,7 @@ import { readDesignerDeadline, type DesignerDeadline } from '../designerGraph'
 import ConditionEditor from './ConditionEditor.vue'
 import { describeBranch, branchTooltip } from '../conditionPresentation'
 const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
-const emit = defineEmits<{ subprocess: [id: string, value: SubprocessBinding]; eventContract: [id: string, value: EventBinding]; policy: [id: string, mode: string, percentage: string | undefined]; expenseStage: [id: string, value: string | undefined]; command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
+const emit = defineEmits<{ responsibilities: [id: string, value: ApprovalResponsibilities]; subprocess: [id: string, value: SubprocessBinding]; eventContract: [id: string, value: EventBinding]; policy: [id: string, mode: string, percentage: string | undefined]; expenseStage: [id: string, value: string | undefined]; command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
 const projection = computed(() => projectQuickGraph(props.graph))
 const selected = computed(() => props.graph.nodes.find(node => node.id === props.selectedNode))
 const selectedDeadline = computed(() => selected.value ? readDesignerDeadline(selected.value.properties) : undefined)
@@ -69,6 +71,7 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
             <DefinitionTimerWait v-if="selected.type === 'TIMER_WAIT'" :key="selected.id" :model-value="selected.properties.timerDelaySeconds" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('timerDelaySeconds', $event)" />
             <DefinitionCopyRecipient v-if="selected.type === 'COPY'" :key="selected.id" :model-value="selected.properties.recipientRule ?? ''" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('recipientRule', $event)" />
             <DefinitionAssignee v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selected.properties.assigneeRule ?? ''" :approval-mode="selected.properties.approvalMode ?? 'SINGLE'" :approval-percentage="selected.properties.approvalPercentage" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('assigneeRule', $event)" @policy="(mode, percentage) => emit('policy', selected!.id, mode, percentage)" />
+            <DefinitionResponsibilities v-if="selected.type === 'USER_TASK'" :key="selected.id" :node-id="selected.id" :graph="graph" :model-value="readResponsibilities(selected.properties)" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('responsibilities', selected.id, $event)" />
             <DefinitionExpenseStage v-if="selected.type === 'USER_TASK'" :model-value="selected.properties.expenseStage" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('expenseStage', selected.id, $event)" />
             <DefinitionDeadline v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selectedDeadline" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="changeDeadline" />
             <div class="quick-move"><button type="button" class="secondary" :disabled="!adjacent.before" @click="emit('command', { kind: 'swapTasks', firstId: adjacent.before!, secondId: selected.id })">上移一步</button><button type="button" class="secondary" :disabled="!adjacent.after" @click="emit('command', { kind: 'swapTasks', firstId: selected.id, secondId: adjacent.after! })">下移一步</button></div>

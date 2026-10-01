@@ -15,6 +15,13 @@ const source = () => ({ key: 'source-key', name: '原流程', graph: structuredC
 const file = value => ({ size: new TextEncoder().encode(value).length, text: async () => value })
 const envelope = () => JSON.parse(serializePortableTemplate(source()))
 
+test('职责分离模板保留 20 个最长节点引用，不被旧的 256 字符属性上限截断', () => {
+  const value = source()
+  const references = Array.from({ length: 20 }, (_, i) => `node${i}`.padEnd(128, 'x'))
+  Object.assign(value.graph.nodes[1].properties, { excludeApplicant: 'true', differentApproverFrom: references.join(',') })
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), value)
+})
+
 test('升级模板完整保留明确规则，缺少目标收件人可先导入，非法规则仍阻断', async () => {
   const value = source()
   Object.assign(value.graph.nodes[1].properties, { deadlineCalendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688',

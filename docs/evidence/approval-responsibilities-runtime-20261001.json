@@ -1,0 +1,168 @@
+{
+  "recordedAt": "2026-10-01T23:14:25.627775+00:00",
+  "status": "PASS",
+  "scope": "Local responsibility designer, template round trip, actual HTTP and browser workflow, legacy continuation and restart acceptance.",
+  "backendSourceCommit": "42f7619f07e692557ad3d2421745c72aab2020b4",
+  "sourceSha256": {
+    "agentflow-web/scripts/test-requests.mjs": "81b4e9cca1c3955697d99288dd57f21fdc67faa7468e4649fd9fdd564a0ee934",
+    "agentflow-web/src/App.vue": "bc4d9e6079d2cea083a37b8425b518d7674b315a6aafdef3361c83f721cea1d1",
+    "agentflow-web/src/api.ts": "74d49c7500c09a4aeac19192d6d46102d9c9262cf1f06fbd457e04e256339c9d",
+    "agentflow-web/src/approvalResponsibilities.ts": "1d8786038e232519284fe9fbb523764bfa16d01fdf303d629175ac8cae0f5ca9",
+    "agentflow-web/src/components/DefinitionResponsibilities.vue": "651d9b6b251b887cc146f760ec73ba48a2598183aff94db1b93d38f9389355ca",
+    "agentflow-web/src/components/DefinitionAssignee.vue": "2feeaea1be1305c09bb65fd5db2d10e3c6083ef70767e3c79f5b3a21252b2076",
+    "agentflow-web/src/components/PortableTemplate.vue": "593d6b28521cdf700ad35e6d950642f1190ce282df06031cbab230d9da0197e4",
+    "agentflow-web/src/components/QuickDesigner.vue": "94696b037b7c970087540bc269a64072e1c57c2a6ac400d153390dfd8ea14b96",
+    "agentflow-web/src/definitionComparison.ts": "df581c1dbfae2d271bb51ab5e7bc9569c4e4aded1b88854c5a7d5aca8b579563",
+    "agentflow-web/src/definitionSimulation.ts": "21a53141326db6ace8b854d3074bf5806777566b90c45ef9a76f7044f9ce2b2b",
+    "agentflow-web/src/portableTemplate.ts": "e9de4c3a34c73d37b30fcc127609d82105b077163be8b87b2470e3640f91e0b5",
+    "agentflow-web/tests/approval-responsibilities.test.mjs": "548300d71b2363626192491623c0638f8b3d95c8413a5a9f54153f141ae198e1",
+    "agentflow-web/tests/portable-template.test.mjs": "b3765dc29c85d09b5ab17381821145e3ad08e87c756e5d46e9f0c88527490895"
+  },
+  "backendEvidence": "approval-responsibilities-backend-20261001.json",
+  "tests": {
+    "frontend": {
+      "count": 86,
+      "failures": 0,
+      "newResponsibilityTests": 9,
+      "log": "approval-responsibilities-ui-tests-green.log"
+    },
+    "frontendBuild": {
+      "status": "PASS",
+      "log": "approval-responsibilities-web-build-final.log",
+      "existingChunkSizeWarning": true
+    },
+    "backendPackage": {
+      "status": "PASS",
+      "log": "approval-responsibilities-runtime-package.log",
+      "testsNotRepeatedForPackaging": true
+    },
+    "openapi": {
+      "status": "PASS",
+      "operations": 292,
+      "schemas": 580,
+      "requestExamples": 111
+    },
+    "actualContracts": {
+      "status": "PASS",
+      "files": {
+        "approval-responsibilities-browser-responses.json": {
+          "responses": 46,
+          "successfulRequests": 10
+        },
+        "approval-responsibilities-http-completion.json": {
+          "responses": 3,
+          "successfulRequests": 0
+        },
+        "approval-responsibilities-http-directory-valid.json": {
+          "responses": 1,
+          "successfulRequests": 0
+        },
+        "approval-responsibilities-http-directory.json": {
+          "responses": 1,
+          "successfulRequests": 0
+        },
+        "approval-responsibilities-http-fixture.json": {
+          "responses": 9,
+          "successfulRequests": 8
+        },
+        "approval-responsibilities-http-restart1-verified.json": {
+          "responses": 7,
+          "successfulRequests": 1
+        },
+        "approval-responsibilities-http-restart1.json": {
+          "responses": 1,
+          "successfulRequests": 0
+        },
+        "approval-responsibilities-http-restart2.json": {
+          "responses": 5,
+          "successfulRequests": 0
+        },
+        "approval-responsibilities-http-workflow.json": {
+          "responses": 36,
+          "successfulRequests": 9
+        }
+      },
+      "totalResponses": 109
+    }
+  },
+  "browser": {
+    "quickAndAdvancedViews": true,
+    "explicitApplicantControlAndPriorStepSelection": true,
+    "invalidMovePreservedAndBlockedByValidation": true,
+    "undoRestoredRules": true,
+    "actualPublishedVersion": "f10993d1-a1eb-4148-ba75-c364e7d88d2c",
+    "download": {
+      "status": "PASS",
+      "downloadEventObserved": false,
+      "actualDownloadedFileVerified": true,
+      "sourceFilename": "agentflow-process-template (4).json",
+      "file": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-downloaded-template.json",
+      "sha256": "278857700966fed3101a359a07fd7410eb5a0a960efa00fc11bf86d62cdaec8d",
+      "bytes": 1937,
+      "matchesPublishedConfiguration": true,
+      "representationDifference": "Absent riskPolicy is represented as null by the designer."
+    },
+    "actualImportCreatedIndependentDraft": "ad8856ad-638b-44b3-b94b-de27fd0e76f5",
+    "importedConfigurationMatchesOriginal": true,
+    "managerApprovedFirstFinanceApprovedReview": "cde191f1-b754-44a0-9c91-d187cd859f36",
+    "priorApproverNoLongerSeesNextTask": true,
+    "transferPickerExcludesApplicantAndPriorApprover": true,
+    "historyShowsOnlyFinanceAsReviewCandidate": true,
+    "narrowScreenMeasurement": {
+      "height": 900,
+      "page": 480,
+      "sections": [
+        {
+          "scroll": 391,
+          "width": 391
+        }
+      ],
+      "viewport": 500
+    },
+    "screenshots": [
+      "approval-responsibilities-designer.png",
+      "approval-responsibilities-approved.png"
+    ],
+    "narrowScreenshotBoundary": "Measured 500 CSS px without horizontal overflow; screenshot transport clipped the narrow viewport, so the measurement is the narrow-layout evidence."
+  },
+  "runtime": {
+    "database": "approval_responsibilities_runtime_46c956a446",
+    "backendPort": 18253,
+    "frontendPort": 15340,
+    "jarSha256": "9b8258ba6b5ba79cc421d03b875f896e094043943e585d45481e5121dd26c36b",
+    "migrationVersion": 95,
+    "newMigrations": false,
+    "sourceRowsPreservedOnStartup": 2555,
+    "sourceTablesPreservedOnStartup": 226,
+    "sourceFilesPreserved": 3,
+    "existingServicesReplaced": false,
+    "sourceUnchanged": true,
+    "restarts": [
+      {
+        "before": "approval-responsibilities-restart1-before.json",
+        "after": "approval-responsibilities-restart1-after.json",
+        "allTablesAndFilesEqual": true,
+        "rowCount": 2712,
+        "pendingTaskAndCandidateEvidencePreserved": true,
+        "conflictingTransferRejectedAfterRestart": true,
+        "originalTaskCompletedByAllowedActor": true
+      },
+      {
+        "before": "approval-responsibilities-restart2-before.json",
+        "after": "approval-responsibilities-restart2-after.json",
+        "allTablesAndFilesEqual": true,
+        "rowCount": 2703,
+        "completedApplicationAndCandidateEvidencePreserved": true,
+        "publishedAndImportedDefinitionsPreserved": true
+      }
+    ],
+    "legacyApplicationContinued": "32c826fb-4757-40d7-9f2c-3adfa6e3d730"
+  },
+  "boundaries": [
+    "No real enterprise identity source, proxy service, notifications, financial system or model was contacted.",
+    "No timed proxy or form relationship assignee implementation is included.",
+    "No parallel-sibling or cross-parent-child mutual exclusion is implied.",
+    "No Git remote, PR or remote CI is configured."
+  ],
+  "artifactsDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

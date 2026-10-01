@@ -56,7 +56,7 @@ onUnmounted(() => query.clear())
     <template v-else-if="query.loaded">
       <p v-if="!query.options.length" class="assignee-error">当前没有可用审批账号，请先配置身份源和审批角色。</p>
       <p v-else-if="modelValue && (!selected || (!selected.contextual && selected.memberCount < 1))" class="assignee-error" role="alert">已有配置当前匹配不到审批人，请重新选择后发布。</p>
-      <p v-else-if="selected">{{ selected.contextual ? '进入节点时，从申请人本轮选择的任职解析。关系缺失或人员无效时阻止推进。' : isCountersignMode(approvalMode) ? `当前匹配 ${selected.memberCount} 人，每人收到一张待办。` : selected.rule.startsWith('user:') ? '任务直接交给该账号审批。' : `当前有 ${selected.memberCount} 人可审批，由其中一人处理。` }}</p>
+      <p v-else-if="selected">{{ selected.contextual ? '进入节点时，从申请人本轮选择的任职解析。关系缺失或人员无效时阻止推进。' : isCountersignMode(approvalMode) ? `目录当前匹配 ${selected.memberCount} 人，实际名单在进入节点时确定。` : selected.rule.startsWith('user:') ? '由该账号办理；若配置职责分离，仍需满足对应约束。' : `目录当前匹配 ${selected.memberCount} 人，由进入节点后保留的候选人办理。` }}</p>
     </template>
     <p v-if="approvalMode === 'ALL'" class="assignee-help">进入节点时固定审批名单；全部同意才流转，任一驳回结束整轮。支持委派后回交，不支持转交和释放。</p>
     <p v-else-if="approvalMode === 'ANY' || approvalMode === 'PERCENT'" class="assignee-help">进入节点时固定名单和所需同意人数。{{ approvalMode === 'ANY' ? '任一责任人同意即通过。' : '人数按比例向上取整，例如 3 人按 50% 需要 2 人同意。' }}达标后结束其余待办，保留实际意见；达标前任一驳回结束整轮。支持委派协助，不支持增减人员、转交和释放。</p>
