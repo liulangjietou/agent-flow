@@ -23,7 +23,7 @@ public final class DefinitionModels {
      * 节点类型。
      * @author owlzhangfq@gmail.com
      */
-    public enum NodeType { START, END, USER_TASK, COPY, TIMER_WAIT, EVENT_WAIT, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
+    public enum NodeType { START, END, USER_TASK, COPY, TIMER_WAIT, EVENT_WAIT, SUB_PROCESS, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
 
     /**
      * 单人、全员、任一人和比例审批；历史缺省节点保持单人办理。
