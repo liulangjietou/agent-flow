@@ -56,6 +56,7 @@ import FirstWorkflow from './components/FirstWorkflow.vue'
 import { guideHidden, rememberGuideSelection } from './firstWorkflow'
 import OrganizationDirectory from './components/OrganizationDirectory.vue'
 import { organizationDrafts, type OrganizationRecord } from './organization'
+import { initializationDrafts } from './tenantInitialization'
 import BusinessCalendars from './components/BusinessCalendars.vue'
 import { calendarDrafts, type BusinessCalendar } from './businessCalendars'
 import ApprovalOperations from './components/ApprovalOperations.vue'
@@ -1036,6 +1037,10 @@ async function recoverOperation(id: string) {
         if (request.body) commentDrafts.acknowledge(actorScope.value, value.applicationId, JSON.parse(request.body) as CommentDraft)
         commentRefresh.value++
         notice.value = '已确认原评论追加成功，审批状态未改变。'
+      } else if (request.path === '/system/initialization') {
+        if (request.body) initializationDrafts.acknowledge(actorScope.value, request.body)
+        templateRefresh.value++
+        notice.value = '已确认原工作区初始化结果，请在开始使用页面核对记录；当前设置会重新读取。'
       } else if (request.path.startsWith('/organization')) {
         if (request.body) organizationDrafts.acknowledge(actorScope.value, request.path, request.body, result as OrganizationRecord)
         templateRefresh.value++
@@ -1141,7 +1146,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */
@@ -1268,7 +1273,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
         <PortableTemplate v-else-if="page === 'transfer' && canManageDefinitions" :key="actorScope" :current="comparisonInput" :locked="busy || writesBlocked || confirmationOpen" :scope-key="actorScope" :has-unsaved-definition="!readonlyDefinition && dirty" @import="importTemplate" @back="page = 'designer'" />
-        <FirstWorkflow :enterprise-auth="authOptions?.mode === 'OIDC'" v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" />
+        <FirstWorkflow :enterprise-auth="authOptions?.mode === 'OIDC'" v-else-if="page === 'guide' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @templates="page = 'templates'" @import="page = 'transfer'" @examples="page = 'examples'" @new="newDefinition()" @edit="openSavedDefinition" @apply="startGuidedApplication" @open="recordApplicationId = $event" @checks="page = 'system'" @workbench="page = 'workbench'" @organization="page = 'organization'" />
         <ApprovalOperations v-else-if="page === 'operations' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" @open="recordApplicationId = $event" />
         <OrganizationDirectory v-else-if="page === 'organization' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <BusinessCalendars v-else-if="page === 'calendars' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />

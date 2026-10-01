@@ -1,4 +1,5 @@
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
+import { readInitializationState, validateInitializationReceipt, type InitializationReceipt, type InitializationRequest } from './tenantInitialization.js'
 import { readDeliveryPage, readDeliveryDetail, readDeliveryHistory, validateDeliveryRetryReceipt, type NotificationDelivery, type NotificationDeliveryFilters, type NotificationDeliveryRetryInput } from './notificationDeliveries.js'
 import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
 import type { SupplierAdjustmentView, SupplierAdjustmentPrepareInput, SupplierAdjustmentActionInput, SupplierAdjustmentReceipt } from './supplierAdjustment'
@@ -284,6 +285,11 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       INVALID_TASK_QUERY: '待办筛选无效，请检查金额范围并重新查询。',
       INVALID_TASK_RECIPIENT: '接收人须为当前租户的其他有效审批账号，请重新选择。',
       FORBIDDEN: '当前账号没有执行此操作的权限，本次未重新执行。原操作结果请查询业务状态。',
+      INVALID_INITIALIZATION_REQUEST: '初始化配置不完整，请核对组织、日历、通知及明确确认。',
+      INVALID_INITIALIZATION_QUERY: '初始化状态不接受身份或筛选参数，请重新读取。',
+      TENANT_ALREADY_INITIALIZED: '当前租户已完成初始化，请重新读取原记录，不能再次创建。',
+      INITIALIZATION_PERSON_CHANGED: '已有管理员人员信息已变化或已停用，请重新读取并在组织与人员中核对。',
+      INITIALIZATION_CHANNEL_CHANGED: '所选通知渠道的绑定已变化或不可用，请重新读取并核对通知选择。',
       UNAUTHENTICATED: '登录已失效，请重新登录。',
       FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
       INVALID_RISK_POLICY: '风险规则配置无效，请核对唯一标识、公开说明、等级和条件。',
@@ -351,7 +357,9 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 }
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
+  const actor = requestActor ? { ...requestActor } : null
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  if (operation.path === '/system/initialization') validateInitializationReceipt(result, JSON.parse(operation.body!) as InitializationRequest, actor)
   if (operation.path === '/notifications/preferences') validateNotificationPreferencesReceipt(result, JSON.parse(operation.body!) as NotificationPreferencesInput)
   const notificationRetry = /^\/notifications\/deliveries\/([^/?]+)\/retry$/.exec(operation.path)
   if (notificationRetry) validateDeliveryRetryReceipt(result, decodeURIComponent(notificationRetry[1]!), JSON.parse(operation.body!) as NotificationDeliveryRetryInput)
@@ -598,6 +606,11 @@ export const api = {
   previewFields: (body: FieldPreviewInput, signal: AbortSignal) => request<FieldPreviewResult>('/process-definitions/field-preview', { method: 'POST', body: JSON.stringify(body), signal }),
   approvalOperations: (filter: OperationsFilter, signal: AbortSignal) => request<OperationsReport>('/operations/approvals' + historyQuery(filter), { signal }),
   firstWorkflow: (id: string, signal: AbortSignal) => request<FirstWorkflowReport>('/system/first-workflow' + (id ? '?definitionId=' + encodeURIComponent(id) : ''), { signal }),
+  tenantInitialization: (signal: AbortSignal) => {
+    const actor = requestActor ? { ...requestActor } : null
+    return request('/system/initialization', { signal, cache: 'no-store' }).then(value => readInitializationState(value, actor))
+  },
+  initializeTenant: (input: InitializationRequest) => write<InitializationReceipt>('/system/initialization', 'POST', '初始化工作区', input),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
   assistRuns: (id: string, query: AssistRunFilter, signal: AbortSignal) => request<AssistRunPage>('/applications/' + encodeURIComponent(id) + '/assist-runs' + historyQuery(query), { signal }),
