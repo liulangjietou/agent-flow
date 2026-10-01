@@ -6,11 +6,14 @@ import { DefinitionSelection } from '../definitionSelection'
 import { fieldTypes, ownValue, type FormField, type FormSchema } from '../formSchema'
 import { subprocessInputIssue, subprocessVersion, type SubprocessBinding } from '../subprocessDesigner'
 import DefinitionPicker from './DefinitionPicker.vue'
+import InitiatorRequirementNotice from './InitiatorRequirementNotice.vue'
+import { InitiatorRequirements } from '../initiatorRequirements'
 
 const props = defineProps<{ modelValue: SubprocessBinding; nodeId: string; formSchema: FormSchema | null; scopeKey: string; disabled: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: SubprocessBinding]; beforeChange: [] }>()
 const current = reactive(new DefinitionSelection(api.searchDefinitions, api.getDefinition))
 const choice = reactive(new DefinitionSelection(api.searchDefinitions, api.getDefinition))
+const initiatorRequirements = reactive(new InitiatorRequirements(api.definitionInitiatorRequirements, api.applicationInitiatorRequirements))
 const version = computed(() => subprocessVersion(props.modelValue))
 const referenced = computed(() => props.modelValue.key !== undefined || props.modelValue.version !== undefined || Object.keys(props.modelValue.inputs).length > 0)
 const targetFields = computed(() => current.definition?.formSchema?.fields ?? [])
@@ -49,7 +52,13 @@ function changeInput(targetKey: string, sourceKey: string) {
 }
 watch([() => props.scopeKey, () => props.modelValue.key, () => props.modelValue.version], () => { choice.clear(); loadCurrent() }, { immediate: true, flush: 'sync' })
 watch(() => props.disabled, disabled => { if (disabled) choice.clear() }, { flush: 'sync' })
-onUnmounted(() => { current.clear(); choice.clear() })
+/** 只对当前读取成功的原发布版本查询要求，不批量展开目录中的其他流程。 */
+function loadInitiatorRequirements() {
+  const value = current.definition
+  void initiatorRequirements.load(props.scopeKey, value ? { kind: 'definition', id: value.id, processKey: value.key, definitionVersion: value.version } : null)
+}
+watch([() => props.scopeKey, () => current.definition?.id], loadInitiatorRequirements, { flush: 'sync' })
+onUnmounted(() => { current.clear(); choice.clear(); initiatorRequirements.clear() })
 </script>
 
 <template>
@@ -64,6 +73,7 @@ onUnmounted(() => { current.clear(); choice.clear() })
       <p v-else-if="current.error || !current.definition" role="alert">{{ current.error || '当前租户找不到原发布版本。' }} 原引用和映射已保留，请核对后重新选择。</p>
       <template v-else>
         <strong>{{ current.definition.name }}</strong>
+        <InitiatorRequirementNotice :state="initiatorRequirements" @retry="loadInitiatorRequirements" />
         <p v-if="!current.definition.startEnabled" role="alert">此版本已停用。发布和发起前须恢复原版本，或明确选择其他版本。</p>
         <div class="subprocess-mappings" role="group" aria-label="子流程输入映射">
           <label v-for="field in targetFields" :key="field.key">

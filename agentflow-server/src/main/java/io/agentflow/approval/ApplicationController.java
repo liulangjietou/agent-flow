@@ -51,6 +51,12 @@ public class ApplicationController {
         return fields.application(facade.get(id));
     }
 
+    /** 查询申请原绑定版本的任职要求；重提仍按该版本固定新的轮次任职。 */
+    @GetMapping("/{id}/initiator-requirements")
+    public ResponseEntity<io.agentflow.definition.DefinitionInitiatorRequirements.View> initiatorRequirements(@PathVariable UUID id) {
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(facade.initiatorRequirements(id));
+    }
+
     /** 修改草稿或退回后的申请内容，不改变绑定定义与历史轮次。 */
     @PutMapping("/{id}")
     public ResponseEntity<String> revise(@PathVariable UUID id, @Valid @RequestBody ReviseApplicationRequest request,

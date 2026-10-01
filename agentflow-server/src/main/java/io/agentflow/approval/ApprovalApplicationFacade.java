@@ -21,6 +21,7 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionModels;
+import io.agentflow.definition.DefinitionInitiatorRequirements;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.ApprovalNotificationService;
 import io.agentflow.organization.OrganizationInitiatorDirectory;
@@ -248,6 +249,17 @@ public class ApprovalApplicationFacade {
             throw new DomainException("NOT_FOUND", "Application not found");
         }
         return application;
+    }
+
+    /** 发起提示复用详情授权与原定义来源，不读取最新同名版本，也不写入申请或轮次。 */
+    public DefinitionInitiatorRequirements.View initiatorRequirements(UUID id) {
+        var application = get(id);
+        var previous = application.runtimeDefinitionId() == null
+                ? rounds.findByRound(application.tenantId(), id, application.roundNo()).orElse(null) : null;
+        var binding = new ProcessRuntimePort.DefinitionBinding(application.tenantId(), id, application.processKey(), application.definitionVersion(),
+                application.runtimeDefinitionId(), previous == null ? null : previous.processInstanceId());
+        return new DefinitionInitiatorRequirements.View(application.processKey(), application.definitionVersion(),
+                processRuntime.requiresInitiatorAppointment(binding));
     }
 
     /** 获取当前租户申请。 */

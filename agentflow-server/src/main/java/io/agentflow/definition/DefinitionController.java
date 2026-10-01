@@ -35,12 +35,15 @@ public class DefinitionController {
     private final DefinitionApplicationService service;
     private final CurrentActor currentActor;
     private final IdempotencyExecutor idempotency;
+    private final DefinitionInitiatorRequirements initiatorRequirements;
 
     /** 创建控制器。 */
-    public DefinitionController(DefinitionApplicationService service, CurrentActor currentActor, IdempotencyExecutor idempotency) {
+    public DefinitionController(DefinitionApplicationService service, CurrentActor currentActor, IdempotencyExecutor idempotency,
+                                DefinitionInitiatorRequirements initiatorRequirements) {
         this.service = service;
         this.currentActor = currentActor;
         this.idempotency = idempotency;
+        this.initiatorRequirements = initiatorRequirements;
     }
 
     /** 校验设计器图，不落库。 */
@@ -119,6 +122,18 @@ public class DefinitionController {
     @GetMapping("/{id}")
     public DefinitionResponse get(@PathVariable UUID id) {
         return DefinitionResponse.from(requireVisibleDefinition(id));
+    }
+
+    /** 仅检查用户选中的原发布版本，不为目录每一行展开依赖，也不授予启动权限。 */
+    @GetMapping("/{id}/initiator-requirements")
+    public ResponseEntity<DefinitionInitiatorRequirements.View> initiatorRequirements(@PathVariable UUID id) {
+        var definition = requireVisibleDefinition(id);
+        if (definition.status() != DefinitionModels.DraftStatus.PUBLISHED) {
+            throw new DomainException("NOT_FOUND", "Published process definition not found");
+        }
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(new DefinitionInitiatorRequirements.View(definition.key(), definition.version(),
+                        initiatorRequirements.required(definition.tenantId(), definition.graph())));
     }
 
     /** 更新草稿。 */

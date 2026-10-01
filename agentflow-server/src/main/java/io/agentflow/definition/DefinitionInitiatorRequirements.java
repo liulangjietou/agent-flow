@@ -25,6 +25,12 @@ public class DefinitionInitiatorRequirements {
         return new Traversal(tenantId).required(graph, 0, new HashSet<>());
     }
 
+    /**
+     * 只返回固定版本与任职要求，不返回后代图、组织目录或候选人。
+     * @author owlzhangfq@gmail.com
+     */
+    public record View(String processKey, long definitionVersion, boolean appointmentRequired) { }
+
     /** @author owlzhangfq@gmail.com */
     private final class Traversal {
         private final String tenant;

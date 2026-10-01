@@ -13,6 +13,16 @@ public interface ProcessRuntimePort {
     /** 按明确来源解析实际定义标识；内置与租户定义之间禁止自动替换。 */
     String resolveDefinition(String tenantId, String processKey, long definitionVersion, boolean bundled);
 
+    /** 只读地检查原绑定版本及其固定后代是否需要任职，不选择人员或启动流程。 */
+    boolean requiresInitiatorAppointment(DefinitionBinding binding);
+
+    /**
+     * 原申请和历史实例共同确定定义来源，供启动和发起提示复用。
+     * @author owlzhangfq@gmail.com
+     */
+    record DefinitionBinding(String tenantId, UUID applicationId, String processKey, long definitionVersion,
+                             String runtimeDefinitionId, String previousProcessInstanceId) { }
+
     /** 启动与申请版本绑定的流程实例。 */
     StartedProcess start(StartProcessCommand command);
 
@@ -42,6 +52,10 @@ public interface ProcessRuntimePort {
                                long definitionVersion, int roundNo, String businessNo,
                                Map<String, Object> payload, FormSchema formSchema,
                                String runtimeDefinitionId, String previousProcessInstanceId, InitiatorContext initiatorContext) {
+        /** 提取实际定义来源；查询不需要访问表单内容或发起人的任职资料。 */
+        public DefinitionBinding definitionBinding() {
+            return new DefinitionBinding(tenantId, applicationId, processKey, definitionVersion, runtimeDefinitionId, previousProcessInstanceId);
+        }
         /** 未选择任职的旧调用不补造上下文。 */
         public StartProcessCommand(String tenantId, UUID applicationId, String processKey, long definitionVersion,
                                    int roundNo, String businessNo, Map<String, Object> payload, FormSchema formSchema,

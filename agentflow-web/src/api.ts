@@ -10,6 +10,7 @@ import type { SupplierReturnView, SupplierReturnQueryInput, SupplierReturnRegist
 import type { SupplierSettlementView, SupplierSettlementPrepareInput, SupplierSettlementActionInput, SupplierSettlementReceipt } from './supplierSettlement'
 import type { OrganizationUnit, OrganizationPerson, OrganizationAppointment, OrganizationRecord, OrganizationPage, OrganizationChange } from './organization'
 import type { InitiatorContext, InitiatorAppointmentPage } from './initiatorContext'
+import type { InitiatorRequirementsView } from './initiatorRequirements'
 import type { NotificationTexts } from './notificationTexts'
 import type { AssistRunDetail, AssistRunFilter, AssistRunPage, AssistInputOptions, AssistReceipt, AssistGenerateRequest, AssistReviewRequest } from './assistRuns'
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
@@ -614,6 +615,8 @@ export const api = {
   applicationRounds: (id: string, signal?: AbortSignal) => request<SubmissionRound[]>(`/applications/${encodeURIComponent(id)}/rounds`, { signal }),
   createApplication: (body: { businessNo: string; processKey: string; definitionVersion: number; title: string; payload: Record<string, unknown> }) => write<Application>('/applications', 'POST', '创建申请草稿', body),
   myAppointments: (afterId: string | undefined, signal: AbortSignal) => request<InitiatorAppointmentPage>('/organization/my-appointments?limit=30' + (afterId ? '&afterId=' + encodeURIComponent(afterId) : ''), { signal }),
+  definitionInitiatorRequirements: (id: string, signal: AbortSignal) => request<InitiatorRequirementsView>(`/process-definitions/${encodeURIComponent(id)}/initiator-requirements`, { signal, cache: 'no-store' }),
+  applicationInitiatorRequirements: (id: string, signal: AbortSignal) => request<InitiatorRequirementsView>(`/applications/${encodeURIComponent(id)}/initiator-requirements`, { signal, cache: 'no-store' }),
   submitApplication: (id: string, expectedVersion: number, initiatorAppointmentId?: string) => write<Application>(`/applications/${encodeURIComponent(id)}/submit`, 'POST', '提交申请', { expectedVersion, ...(initiatorAppointmentId ? { initiatorAppointmentId } : {}) }),
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   cancelApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/cancel`, 'POST', '作废申请', body),

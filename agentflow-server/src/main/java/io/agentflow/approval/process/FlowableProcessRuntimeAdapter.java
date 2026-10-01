@@ -64,7 +64,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     @Override
     @Transactional
     public StartedProcess start(StartProcessCommand command) {
-        ProcessDefinition definition = boundDefinition(command);
+        ProcessDefinition definition = boundDefinition(command.definitionBinding());
         // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
         if (command.tenantId().equals(definition.getTenantId())) {
             platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion())
@@ -111,16 +111,27 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         runtimeService.setVariable(command.processInstanceId(), "formData", Collections.unmodifiableMap(new HashMap<>(command.payload())));
     }
 
-    private ProcessDefinition boundDefinition(StartProcessCommand command) {
-        String definitionId = command.runtimeDefinitionId();
-        if (definitionId == null && command.previousProcessInstanceId() != null) {
+    /** 查询沿用启动时的精确来源规则；无租户的已知内置版本没有动态组织规则。 */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean requiresInitiatorAppointment(DefinitionBinding binding) {
+        var definition = boundDefinition(binding);
+        if (!binding.tenantId().equals(definition.getTenantId())) return false;
+        var published = platformDefinitions.findPublished(binding.tenantId(), binding.processKey(), binding.definitionVersion())
+                .orElseThrow(this::definitionUnavailable);
+        return initiatorRequirements.required(binding.tenantId(), published.graph());
+    }
+
+    private ProcessDefinition boundDefinition(DefinitionBinding binding) {
+        String definitionId = binding.runtimeDefinitionId();
+        if (definitionId == null && binding.previousProcessInstanceId() != null) {
             // 旧申请只相信实际历史实例的租户、申请绑定与定义标识，不能改用当前同号版本。
             var previous = historyService.createHistoricProcessInstanceQuery()
-                    .processInstanceId(command.previousProcessInstanceId())
-                    .variableValueEquals("tenantId", command.tenantId())
-                    .variableValueEquals("applicationId", command.applicationId().toString()).singleResult();
+                    .processInstanceId(binding.previousProcessInstanceId())
+                    .variableValueEquals("tenantId", binding.tenantId())
+                    .variableValueEquals("applicationId", binding.applicationId().toString()).singleResult();
             if (previous == null || previous.getTenantId() != null && !previous.getTenantId().isEmpty()
-                    && !command.tenantId().equals(previous.getTenantId())) {
+                    && !binding.tenantId().equals(previous.getTenantId())) {
                 throw definitionUnavailable();
             }
             definitionId = previous.getProcessDefinitionId();
@@ -129,15 +140,15 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         if (definitionId != null) {
             definition = repositoryService.createProcessDefinitionQuery().processDefinitionId(definitionId).singleResult();
         } else {
-            ProcessDefinition tenantDefinition = findDefinition(command.tenantId(), command.processKey(), command.definitionVersion(), false);
-            ProcessDefinition bundledDefinition = isBundled(command.processKey(), command.definitionVersion())
-                    ? findDefinition(command.tenantId(), command.processKey(), command.definitionVersion(), true) : null;
+            ProcessDefinition tenantDefinition = findDefinition(binding.tenantId(), binding.processKey(), binding.definitionVersion(), false);
+            ProcessDefinition bundledDefinition = isBundled(binding.processKey(), binding.definitionVersion())
+                    ? findDefinition(binding.tenantId(), binding.processKey(), binding.definitionVersion(), true) : null;
             if (tenantDefinition != null && bundledDefinition != null) {
                 throw new DomainException("DEFINITION_BINDING_AMBIGUOUS", "Legacy application has no saved definition source and multiple sources match");
             }
             definition = tenantDefinition == null ? bundledDefinition : tenantDefinition;
         }
-        requireDefinitionMatches(definition, command.tenantId(), command.processKey(), command.definitionVersion());
+        requireDefinitionMatches(definition, binding.tenantId(), binding.processKey(), binding.definitionVersion());
         return definition;
     }
 

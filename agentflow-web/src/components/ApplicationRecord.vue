@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import RoundDiagram from './RoundDiagram.vue'
 import InstanceControlPanel from './InstanceControlPanel.vue'
 import type { InstanceControlView } from '../instanceControl'
@@ -15,6 +15,8 @@ import AssistRunRecords from './AssistRunRecords.vue'
 import RequestRecovery from './RequestRecovery.vue'
 import FormFields from './FormFields.vue'
 import InitiatorAppointmentPicker from './InitiatorAppointmentPicker.vue'
+import InitiatorRequirementNotice from './InitiatorRequirementNotice.vue'
+import { InitiatorRequirements } from '../initiatorRequirements'
 import { initiatorContextLabel } from '../initiatorContext'
 import { validatePayload, type FieldErrors } from '../formSchema'
 import { api, type ApiError, type Application, type SubmissionRound } from '../api'
@@ -35,6 +37,7 @@ const rounds = ref<SubmissionRound[]>([])
 const historyTab = ref<'rounds' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist'>('rounds')
 const title = ref('')
 const initiatorAppointmentId = ref('')
+const initiatorRequirements = reactive(new InitiatorRequirements(api.definitionInitiatorRequirements, api.applicationInitiatorRequirements))
 const amount = ref('')
 const description = ref('')
 const payload = ref<Record<string, unknown>>({})
@@ -136,6 +139,7 @@ async function saveChanges() {
 async function save(submit = false) {
   if (!canEdit.value || uploading.value || saving.value || loading.value || writesBlocked.value || cancellationOpen.value) return
   error.value = ''; notice.value = ''
+  if (submit && (error.value = initiatorRequirements.submissionError(initiatorAppointmentId.value))) return
   if (!validate(submit)) return
   saving.value = true
   try {
@@ -222,7 +226,17 @@ onMounted(async () => {
   returnFocus = document.activeElement as HTMLElement | null
   await nextTick(); dialog.value?.focus(); await load()
 })
-onUnmounted(() => returnFocus?.focus())
+/** 重提读取原申请绑定；读取失败不改变表单，保存草稿仍可继续。 */
+function loadInitiatorRequirements() {
+  const value = application.value
+  void initiatorRequirements.load(props.scopeKey, canEdit.value && value ? {
+    kind: 'application', id: value.id, processKey: value.processKey, definitionVersion: value.definitionVersion
+  } : null)
+}
+watch([() => props.scopeKey, () => application.value?.id, () => canEdit.value], () => {
+  initiatorAppointmentId.value = ''; loadInitiatorRequirements()
+}, { flush: 'sync' })
+onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
 </script>
 
 <template>
@@ -257,7 +271,8 @@ onUnmounted(() => returnFocus?.focus())
             <FormFields v-if="application.formSchema" v-model="payload" :attachment-context="{ applicationId: application.id, expectedVersion: application.version, scopeKey }" @uploading="uploading = $event" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
             <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
-          <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="scopeKey" :disabled="saving || writesBlocked || cancellationOpen" />
+          <InitiatorRequirementNotice :state="initiatorRequirements" :disabled="saving || writesBlocked || cancellationOpen" @retry="loadInitiatorRequirements" />
+          <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="scopeKey" :required="initiatorRequirements.required === true" :disabled="saving || writesBlocked || cancellationOpen" />
           <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
           <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="uploading || saving || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="uploading || saving || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>

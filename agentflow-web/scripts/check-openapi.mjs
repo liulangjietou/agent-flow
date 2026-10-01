@@ -99,6 +99,7 @@ async function exercise(base) {
   definition = await call('PUT', defs + '/{id}', { path: defPath, body: { name: '接口契约验收流程', graph: create.graph, expectedRevision: definition.revision } })
   definition = await call('POST', defs + '/{id}/publish', { path: defPath + `/publish?expectedRevision=${definition.revision}`, body: example(defs + '/{id}/publish') })
   await call('GET', defs + '/{id}', { path: defPath }); await call('GET', defs)
+  await call('GET', defs + '/{id}/initiator-requirements', { path: defPath + '/initiator-requirements', user: 'alice' })
   await call('GET', defs + '/{id}/publication', { path: defPath + '/publication' })
   definition = await call('POST', defs + '/{id}/availability', { path: defPath + '/availability', body: { startEnabled: false, expectedRevision: definition.revision, reason: '契约验证停用' } })
   assert.equal(definition.startEnabled, false)
@@ -108,6 +109,7 @@ async function exercise(base) {
   await call('POST', defs + '/{id}/compare', { path: defPath + '/compare', body: { key: definition.key, name: definition.name, graph: definition.graph, formSchema: definition.formSchema } })
   let application = await call('POST', apps, { user: 'alice', status: 201, body: { ...example(apps), businessNo: `API-${suffix}`, processKey: definition.key } })
   const appPath = `${apps}/${application.id}`
+  await call('GET', apps + '/{id}/initiator-requirements', { path: appPath + '/initiator-requirements', user: 'alice' })
   const revise = { expectedVersion: application.version, title: '接口契约申请', payload: { amount: '100.01' } }, retryKey = randomUUID()
   application = await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: revise, key: retryKey })
   assert.deepEqual(await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: revise, key: retryKey }), application)

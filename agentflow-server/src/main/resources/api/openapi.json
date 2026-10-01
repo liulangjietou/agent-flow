@@ -37102,6 +37102,218 @@
           }
         }
       }
+    },
+    "/api/v1/process-definitions/{id}/initiator-requirements": {
+      "get": {
+        "operationId": "definitionInitiatorRequirements",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取所选发布版本的发起任职要求",
+        "description": "只展开选中的原发布版本及固定后代，返回是否需要任职。停用不改变要求；缺失依赖返回错误，不解释为任职可选。不返回后代明细或人员，不保证当前版本可启动。",
+        "x-access": "当前租户已登录用户，仅已发布版本",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitiatorRequirements"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原定义来源存在歧义，不能推断替代版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "绑定或固定依赖不可用，无法确认任职要求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/initiator-requirements": {
+      "get": {
+        "operationId": "applicationInitiatorRequirements",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取申请原绑定版本的发起任职要求",
+        "description": "使用申请原运行定义及必要的历史实例，不借用最新同名流程；旧内置来源保持。绑定缺失、歧义或依赖缺失返回错误，不创建轮次或选择任职。",
+        "x-access": "当前申请有读取权限的参与者或 ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitiatorRequirements"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原定义来源存在歧义，不能推断替代版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "绑定或固定依赖不可用，无法确认任职要求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -63587,6 +63799,27 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          }
+        }
+      },
+      "InitiatorRequirements": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "processKey",
+          "definitionVersion",
+          "appointmentRequired"
+        ],
+        "properties": {
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "appointmentRequired": {
+            "type": "boolean"
           }
         }
       }

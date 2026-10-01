@@ -44,6 +44,8 @@ import { commentDrafts, type CommentDraft, type ApplicationComment } from './app
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import InitiatorAppointmentPicker from './components/InitiatorAppointmentPicker.vue'
+import InitiatorRequirementNotice from './components/InitiatorRequirementNotice.vue'
+import { InitiatorRequirements } from './initiatorRequirements'
 import FormSchemaEditor from './components/FormSchemaEditor.vue'
 import TemplateCenter from './components/TemplateCenter.vue'
 import PortableTemplate from './components/PortableTemplate.vue'
@@ -203,6 +205,7 @@ watch(actorScope, () => { selectedCopy.value = null }, { flush: 'sync' })
 const applicationDefinitionId = computed(() => applicationSelection.definition?.id ?? '')
 const applicationTitle = ref('')
 const initiatorAppointmentId = ref('')
+const applicationRequirements = reactive(new InitiatorRequirements(api.definitionInitiatorRequirements, api.applicationInitiatorRequirements))
 const applicationBusinessNo = ref('')
 const applicationAmount = ref('')
 const applicationDescription = ref('')
@@ -897,6 +900,7 @@ function keyHandler(event: KeyboardEvent) {
 /** 表单只依赖当前选中的完整发布配置；切换选择立即取消旧读取。 */
 async function selectApplicationDefinition(id: string) {
   requestedApplicationDefinition.value = id
+  initiatorAppointmentId.value = ''
   applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
   await applicationSelection.load(actorScope.value, id, { publishedOnly: true, startEnabledOnly: true })
 }
@@ -912,6 +916,7 @@ async function startGuidedApplication(id: string) { await prepareApplication(id)
 async function createAndSubmitApplication(submit = true) {
   if (busy.value || writesBlocked.value || applicationSelection.loading) return
   applicationFormError.value = ''; applicationFieldErrors.value = {}
+  if (submit && (applicationFormError.value = applicationRequirements.submissionError(initiatorAppointmentId.value))) return
   const definition = applicationSelection.definition
   if ((!definition && !createdApplication.value) || !applicationTitle.value.trim() || !applicationBusinessNo.value.trim()) { applicationFormError.value = '请选择已发布流程，并填写申请标题和业务单号。'; return }
   let payload: Record<string, unknown>
@@ -937,6 +942,15 @@ async function createAndSubmitApplication(submit = true) {
     applicationFormError.value = `${errorMessage(error)}${createdApplication.value ? '；草稿已保留，可在申请记录中补充填写或重试提交。' : ''}`
   } finally { busy.value = false }
 }
+/** 新申请读取点选版本；创建后的重试只读取已保存申请的原绑定。 */
+function loadApplicationRequirements() {
+  const source = createdApplication.value, definition = applicationSelection.definition
+  void applicationRequirements.load(newApplicationOpen.value ? actorScope.value : '', source
+    ? { kind: 'application', id: source.id, processKey: source.processKey, definitionVersion: source.definitionVersion }
+    : definition ? { kind: 'definition', id: definition.id, processKey: definition.key, definitionVersion: definition.version } : null)
+}
+watch([actorScope, newApplicationOpen, () => createdApplication.value?.id, () => applicationSelection.definition?.id], loadApplicationRequirements, { flush: 'sync' })
+onUnmounted(() => applicationRequirements.clear())
 watch(newApplicationOpen, open => { if (!open) applicationSelection.clear() }, { flush: 'sync' })
 watch(actorScope, () => { restoredDefinition.clear(); applicationSelection.clear(); newApplicationOpen.value = false }, { flush: 'sync' })
 
@@ -1341,7 +1355,8 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
               <FormFields v-if="applicationFormSchema" v-model="applicationPayload" :schema="applicationFormSchema" :disabled="busy || writesBlocked || !!createdApplication" :errors="applicationFieldErrors" @update:model-value="applicationFieldErrors = {}" />
               <template v-else><label>申请金额<input v-model="applicationAmount" type="number" min="0" step="0.01" /></label><label>申请说明<textarea v-model="applicationDescription" rows="3" /></label></template>
             </fieldset>
-            <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="actorScope" :disabled="busy || writesBlocked" />
+            <InitiatorRequirementNotice :state="applicationRequirements" :disabled="busy || writesBlocked" @retry="loadApplicationRequirements" />
+            <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="actorScope" :required="applicationRequirements.required === true" :disabled="busy || writesBlocked" />
             <p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿；需要修改时请关闭后从申请记录打开。</p>
             <p v-else class="field-help">必填字段在提交时检查，未填完整也可先保存草稿。</p>
             <div class="form-actions"><button type="button" class="secondary" :disabled="busy" @click="newApplicationOpen = false">关闭</button><button v-if="!createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked || !applicationSelection.definition" @click="createAndSubmitApplication(false)">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || (!createdApplication && !applicationSelection.definition)">{{ busy ? '处理中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div>
