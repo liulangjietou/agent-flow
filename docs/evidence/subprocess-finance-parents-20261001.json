@@ -1,0 +1,243 @@
+{
+  "recordedAt": "2026-10-01T14:47:23.323342+00:00",
+  "feature": "四类财务父申请与固定版本普通子审批的后台联动",
+  "status": "SCOPED_BACKEND_VERIFIED_FULL_SUBPROCESS_LIFECYCLE_PENDING",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "d9701cad696e72746244f4b03bacff76d7660a27",
+  "productionCodeChanged": false,
+  "migrationsAdded": false,
+  "scope": {
+    "parentTypes": [
+      "EXPENSE_PLAN",
+      "ADVANCE_REQUEST",
+      "PROCUREMENT_PAYMENT",
+      "BUDGET_ADJUSTMENT"
+    ],
+    "entry": "真实认证的 MockMvc 专用预检、提交和任务办理接口；预检请求实际回环合成财务 HTTP",
+    "deployment": "普通子定义经公开发布，财务父定义由内部夹具经正式部署适配器生成固定版本原生调用；未开放公开父定义保存或发布",
+    "scenarios": [
+      "四类子审批最后完成时，同事务形成一次原财务批准依据，原幂等请求回放保持结果",
+      "四类父申请在子审批先完成后，仍等待本身的实际财务复核",
+      "四类子申请退回时保留原财务轮次，重提创建新子申请并保留旧调用和结论",
+      "四类子申请驳回时父子一起结束，不生成额度、凭证或付款，采购释放原占用",
+      "四类仅有普通子审批的父图被财务专用提交拒绝，不新增财务轮次、子申请或引擎任务",
+      "事前额度写入失败整体回滚父子结论、任务和幂等键，修复故障后原请求成功",
+      "采购占用释放失败整体回滚父子驳回与占用，修复故障后原请求成功"
+    ],
+    "financialBoundary": "子申请无财务业务绑定，只包含显式映射的金额和币种，沿用根轮次任职；原财务金额及不可变轮次保持。借款批准仅排队凭证准备，未产生资金到账或外部账务写入。"
+  },
+  "tests": {
+    "h2": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-finance-h2-report.xml",
+      "sha256": "de0a7feb074d3ed9c0dc4ba69d547bb09e973b18b6b9e0e2821dd98fb7f1899f"
+    },
+    "postgres": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-finance-postgres-report.xml",
+      "sha256": "73812d0c077b38c657c2d6e233c3c18e3f3a386edb10a58fea8bced09bda37d6"
+    }
+  },
+  "countsOverlap": true,
+  "postgres": {
+    "database": "subprocess_finance_9541f3dc30",
+    "queries": {
+      "schemaVersion": 90,
+      "applications": [
+        {
+          "business_type": "ADVANCE_REQUEST",
+          "status": "APPROVED",
+          "count": 3
+        },
+        {
+          "business_type": "ADVANCE_REQUEST",
+          "status": "DRAFT",
+          "count": 1
+        },
+        {
+          "business_type": "ADVANCE_REQUEST",
+          "status": "REJECTED",
+          "count": 1
+        },
+        {
+          "business_type": "BUDGET_ADJUSTMENT",
+          "status": "APPROVED",
+          "count": 3
+        },
+        {
+          "business_type": "BUDGET_ADJUSTMENT",
+          "status": "DRAFT",
+          "count": 1
+        },
+        {
+          "business_type": "BUDGET_ADJUSTMENT",
+          "status": "REJECTED",
+          "count": 1
+        },
+        {
+          "business_type": "EXPENSE_PLAN",
+          "status": "APPROVED",
+          "count": 4
+        },
+        {
+          "business_type": "EXPENSE_PLAN",
+          "status": "DRAFT",
+          "count": 1
+        },
+        {
+          "business_type": "EXPENSE_PLAN",
+          "status": "REJECTED",
+          "count": 1
+        },
+        {
+          "business_type": "ORDINARY",
+          "status": "APPROVED",
+          "count": 13
+        },
+        {
+          "business_type": "ORDINARY",
+          "status": "REJECTED",
+          "count": 5
+        },
+        {
+          "business_type": "ORDINARY",
+          "status": "RETURNED",
+          "count": 4
+        },
+        {
+          "business_type": "PROCUREMENT_PAYMENT",
+          "status": "APPROVED",
+          "count": 3
+        },
+        {
+          "business_type": "PROCUREMENT_PAYMENT",
+          "status": "DRAFT",
+          "count": 1
+        },
+        {
+          "business_type": "PROCUREMENT_PAYMENT",
+          "status": "REJECTED",
+          "count": 2
+        }
+      ],
+      "rounds": [
+        {
+          "status": "APPROVED",
+          "count": 26
+        },
+        {
+          "status": "REJECTED",
+          "count": 10
+        },
+        {
+          "status": "RETURNED",
+          "count": 8
+        }
+      ],
+      "calls": 22,
+      "invalidBindings": 0,
+      "voucherPreparations": [
+        {
+          "business_type": "ADVANCE_REQUEST",
+          "status": "QUEUED",
+          "count": 3
+        }
+      ],
+      "voucherOperations": 0,
+      "paymentAuthorizations": 0,
+      "reservations": [
+        {
+          "active": false,
+          "count": 3
+        },
+        {
+          "active": true,
+          "count": 3
+        }
+      ],
+      "failureConstraintsRemaining": 0
+    }
+  },
+  "publicSaveAndPublishGate": "CLOSED: SUBPROCESS_RUNTIME_NOT_READY",
+  "verificationLimits": {
+    "realEnterpriseSystems": false,
+    "applicationHttpServer": false,
+    "browser": false,
+    "inFlightUpgrade": false,
+    "restart": false,
+    "fullRepositoryTestSuite": false
+  },
+  "fixtureCorrections": "编译签名、测试审批人配置、预检响应层级及草稿初始轮次断言在夹具调试时修正；这些失败不作为生产缺陷或生产修复证据。",
+  "existingServices": {
+    "at": "2026-10-01T14:44:44.546058+00:00",
+    "services": [
+      {
+        "port": 18224,
+        "status": 200,
+        "health": "UP"
+      },
+      {
+        "port": 18225,
+        "status": 200,
+        "health": "UP"
+      },
+      {
+        "port": 18227,
+        "status": 200,
+        "health": "UP"
+      },
+      {
+        "port": 18228,
+        "status": 200,
+        "health": "UP"
+      },
+      {
+        "port": 18229,
+        "status": 200,
+        "health": "UP"
+      },
+      {
+        "port": 15324,
+        "status": 200,
+        "health": "OK"
+      },
+      {
+        "port": 15325,
+        "status": 200,
+        "health": "OK"
+      },
+      {
+        "port": 15326,
+        "status": 200,
+        "health": "OK"
+      },
+      {
+        "port": 15327,
+        "status": 200,
+        "health": "OK"
+      },
+      {
+        "port": 15328,
+        "status": 200,
+        "health": "OK"
+      }
+    ],
+    "databaseContentRehashed": false
+  },
+  "existingDatabasesModified": false,
+  "remaining": [
+    "报销父流程的纸质签收、预算确认、同轮核减、资源释放及财务故障回滚联动",
+    "子流程完整公开 HTTP、真实页面、非空在审升级及重启验收；通过后开放保存与发布",
+    "其余明确失败重试、安全批量办理、通知协作、企业财务及环境和远端交付"
+  ],
+  "sourceHashes": {
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessFinanceIntegrationTest.java": "1142894f5f8089e4baeaf2a93946428ba24788e80f41ccde7df5a38fb2df0300",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessFinanceGatewayFixture.java": "8d746682fa976c64f25969e94c3a0acd8dc2f237f87f8bd1015539de47a5584d"
+  }
+}
