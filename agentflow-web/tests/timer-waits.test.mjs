@@ -153,7 +153,7 @@ test('父页面恢复等待回执时刷新对应申请，不把回执当成申�
   const env = { pendingWrites: box([pending]), draftScope: box(''), confirmReplaceDefinition: async (_label, action) => action(),
     busy: box(false), recoveryError: box(''), writeRequests: { recover: async () => ({ request: pending, result: receipt() }) },
     notice: box(''), createdApplication: box(null), newApplicationOpen: box(false), recordApplicationId: box('application'),
-    recordRefresh: box(0), statusLabel: value => value, refreshWorkspace: async () => {}, nextTick: async () => {}, workspace: box(null), errorMessage: e => e.message }
+    activeTask: box(null), clearTaskSelection: () => {}, recordRefresh: box(0), statusLabel: value => value, refreshWorkspace: async () => {}, nextTick: async () => {}, workspace: box(null), errorMessage: e => e.message }
   try {
     await createRecovery(env)('original')
     assert.equal(env.recordRefresh.value, 1); assert.equal(env.recoveryError.value, '')

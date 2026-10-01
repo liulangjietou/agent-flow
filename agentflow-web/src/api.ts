@@ -15,6 +15,7 @@ import type { AssistRunDetail, AssistRunFilter, AssistRunPage, AssistInputOption
 import type { WebhookFilters, WebhookPage, WebhookTarget, WebhookDetail, WebhookItem, WebhookOverview, WebhookOverviewFilters } from './webhooks'
 import type { RoundDiagram } from './roundDiagram'
 import { validateTimerReceipt, type TimerView, type TimerRetryInput, type TimerReceipt } from './timerWaits.js'
+import { validateInstanceReceipt, type InstanceControlAction, type InstanceControlInput, type InstanceControlView } from './instanceControl.js'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
@@ -327,6 +328,8 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
   const timer = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/timers\/([^/?]+)\/retry$/.exec(operation.path)
   if (timer) validateTimerReceipt(result as TimerReceipt, decodeURIComponent(timer[1]!), Number(timer[2]), decodeURIComponent(timer[3]!), JSON.parse(operation.body!) as TimerRetryInput)
+  const instance = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/runtime\/(pause|resume)$/.exec(operation.path)
+  if (instance) validateInstanceReceipt(result as InstanceControlView, decodeURIComponent(instance[1]!), Number(instance[2]), instance[3] as InstanceControlAction, JSON.parse(operation.body!) as InstanceControlInput)
   return result
 })
 function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
@@ -334,6 +337,8 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  instanceControl: (id: string, round: number, signal: AbortSignal) => request<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime`, { signal, cache: 'no-store' }),
+  controlInstance: (id: string, round: number, action: InstanceControlAction, input: InstanceControlInput) => write<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime/${action}`, 'POST', action === 'pause' ? '暂停本轮审批' : '恢复本轮审批', input),
   timerWaits: (id: string, round: number, signal: AbortSignal) => request<TimerView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers`, { signal, cache: 'no-store' }),
   retryTimer: (id: string, round: number, jobId: string, input: TimerRetryInput) => write<TimerReceipt>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers/${encodeURIComponent(jobId)}/retry`, 'POST', '重试原定时等待', input),
   vouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

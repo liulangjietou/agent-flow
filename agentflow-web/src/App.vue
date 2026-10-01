@@ -375,6 +375,11 @@ async function refreshPage() {
   if (authOptions.value?.mode === 'OIDC' && !await restoreEnterpriseSession()) return
   templateRefresh.value++; void refreshWorkspace()
 }
+/** 申请变更后清除同一申请的旧办理面板，暂停、恢复及其他变更都重新读取队列。 */
+async function applicationRecordChanged() {
+  if (activeTask.value?.applicationId === recordApplicationId.value) clearTaskSelection()
+  await refreshPage()
+}
 async function copyTemplate(templateKey: string, body: TemplateCopyInput) {
   const originalBody = { ...body }
   await confirmReplaceDefinition('放弃修改并复制', async () => {
@@ -1035,10 +1040,12 @@ async function recoverOperation(id: string) {
           notice.value = '原费用保存结果已确认，请核对原单据后继续预检。'
         } else notice.value = '原费用操作已确认，请刷新费用详情或预检结果核对当前状态。'
         templateRefresh.value++
-      } else if (/^\/applications\/[^/]+\/rounds\/[1-9][0-9]*\/timers\/[^/]+\/retry$/.test(request.path)) {
-        const value = result as { applicationId: string; applicationStatus: string }
-        if (recordApplicationId.value === value.applicationId) recordRefresh.value++
-        notice.value = `已确认原等待的重试结果，申请状态：${statusLabel(value.applicationStatus)}。`
+      } else if (/^\/applications\/[^/?]+\//.test(request.path) && !/^\/applications\/[^/?]+\/(submit|withdraw|cancel)$/.test(request.path)) {
+        // 子资源回执不具备完整申请字段；统一按原请求目标重读，完整申请仅来自明确的聚合操作。
+        const applicationId = decodeURIComponent(request.path.split('/')[2]!)
+        if (recordApplicationId.value === applicationId) recordRefresh.value++
+        if (activeTask.value?.applicationId === applicationId) clearTaskSelection()
+        notice.value = '已确认本轮原操作，请查看申请的最新状态。'
       } else if (request.path.startsWith('/applications')) {
         templateRefresh.value++
         const value = result as Application
@@ -1292,7 +1299,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>
       <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />
-      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="refreshPage()" />
+      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="applicationRecordChanged" />
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
           <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>

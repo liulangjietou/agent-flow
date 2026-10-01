@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import RoundDiagram from './RoundDiagram.vue'
+import InstanceControlPanel from './InstanceControlPanel.vue'
+import type { InstanceControlView } from '../instanceControl'
 import ExpenseDetail from './ExpenseDetail.vue'
 import ExpensePlanDetail from './ExpensePlanDetail.vue'
 import AdvanceRequestDetail from './AdvanceRequestDetail.vue'
@@ -23,6 +25,12 @@ const emit = defineEmits<{ close: []; changed: []; commentPosted: []; recover: [
 const writesBlocked = computed(() => props.pendingWrites.length > 0)
 const dialog = ref<HTMLElement | null>(null)
 const application = ref<Application | null>(null)
+const runtimeState = ref<InstanceControlView | null>(null)
+const runtimeBusy = ref(false)
+const runtimeBlocked = computed(() => application.value?.status === 'IN_APPROVAL' && (!runtimeState.value
+  || runtimeState.value.applicationId !== application.value.id || runtimeState.value.roundNo !== application.value.roundNo
+  || runtimeState.value.applicationVersion !== application.value.version || runtimeState.value.state !== 'RUNNING'))
+const businessLocked = computed(() => saving.value || writesBlocked.value || runtimeBusy.value || runtimeBlocked.value)
 const rounds = ref<SubmissionRound[]>([])
 const historyTab = ref<'rounds' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist'>('rounds')
 const title = ref('')
@@ -55,7 +63,7 @@ const cancellationTrigger = ref<HTMLButtonElement | null>(null)
 let returnFocus: HTMLElement | null = null
 const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
 const canEdit = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
-const canWithdraw = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL')
+const canWithdraw = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL' && !runtimeBlocked.value && !runtimeBusy.value)
 const conclusionLabel = computed(() => application.value?.status === 'WITHDRAWN' ? '撤回说明' : '退回原因')
 const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
 const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
@@ -89,7 +97,7 @@ function setApplication(value: Application) {
   cancellationOpen.value = false; cancellationComment.value = ''
 }
 async function load() {
-  loading.value = true; error.value = ''; notice.value = ''
+  loading.value = true; error.value = ''; notice.value = ''; runtimeState.value = null
   try {
     const [value, history] = await Promise.all([api.application(props.applicationId), api.applicationRounds(props.applicationId)])
     setApplication(value); rounds.value = [...history].sort((a, b) => b.roundNo - a.roundNo)
@@ -146,6 +154,7 @@ async function save(submit = false) {
   }
 }
 async function openWithdrawal() {
+  if (!canWithdraw.value || writesBlocked.value || saving.value || loading.value) return
   withdrawalOpen.value = true
   await nextTick(); withdrawalInput.value?.focus()
 }
@@ -170,7 +179,11 @@ async function withdraw() {
   }
 }
 function close() {
-  if (!expenseBusy.value && !uploading.value && !saving.value && !dirty.value) emit('close')
+  if (!runtimeBusy.value && !expenseBusy.value && !uploading.value && !saving.value && !dirty.value) emit('close')
+}
+function runtimeUpdated(value: InstanceControlView | null) {
+  runtimeState.value = value
+  if (runtimeBlocked.value) { withdrawalOpen.value = false; withdrawalComment.value = '' }
 }
 async function openCancellation() {
   if (!canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
@@ -217,7 +230,7 @@ onUnmounted(() => returnFocus?.focus())
     <section ref="dialog" class="modal application-record" role="dialog" aria-modal="true" aria-labelledby="record-title" tabindex="-1" @keydown="trapFocus">
       <div class="modal-heading">
         <div><p class="eyebrow">APPLICATION RECORD</p><h2 id="record-title">申请详情与轮次</h2></div>
-        <button aria-label="关闭申请详情" :disabled="expenseBusy || uploading || saving || dirty" @click="close">×</button>
+        <button aria-label="关闭申请详情" :disabled="runtimeBusy || expenseBusy || uploading || saving || dirty" @click="close">×</button>
       </div>
       <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
@@ -226,16 +239,17 @@ onUnmounted(() => returnFocus?.focus())
       <template v-else-if="application">
         <div class="record-meta"><span class="status-chip">{{ stateLabel(application.status) }}</span><span>第 {{ application.roundNo }} 轮</span><span>{{ application.businessNo }}</span></div>
         <p class="record-binding">{{ application.processKey }} · v{{ application.definitionVersion }} · 申请人 {{ application.createdBy }}</p>
+        <InstanceControlPanel v-if="application.status === 'IN_APPROVAL'" :application-id="application.id" :round-no="application.roundNo" :version="application.version" :scope-key="scopeKey" :locked="saving || expenseBusy || writesBlocked" @state="runtimeUpdated" @busy="runtimeBusy = $event" @changed="load(); emit('changed')" />
         <div v-if="['RETURNED', 'WITHDRAWN'].includes(application.status)" class="return-context">
           <strong>{{ conclusionLabel }}</strong><p>{{ conclusionReason }}</p>
           <small v-if="currentRound?.completedBy">{{ currentRound.completedBy }}<template v-if="currentRound.completedAt"> · {{ timeLabel(currentRound.completedAt) }}</template></small>
           <p v-if="canEdit">修改后提交将开始第 {{ application.roundNo + 1 }} 轮审批，前一轮内容和意见会保留。</p>
         </div>
-        <ExpenseDetail v-if="expenseId" :report-id="expenseId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :locked="saving || writesBlocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ExpenseDetail>
-        <ExpensePlanDetail v-else-if="planId" :plan-id="planId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="saving || writesBlocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ExpensePlanDetail>
-        <AdvanceRequestDetail v-else-if="advanceRequestId" :request-id="advanceRequestId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="saving || writesBlocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></AdvanceRequestDetail>
-        <ProcurementPaymentDetail v-else-if="procurementPaymentId" :request-id="procurementPaymentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="saving || writesBlocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ProcurementPaymentDetail>
-        <BudgetAdjustmentDetail v-else-if="budgetAdjustmentId" :request-id="budgetAdjustmentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="saving || writesBlocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></BudgetAdjustmentDetail>
+        <ExpenseDetail v-if="expenseId" :report-id="expenseId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ExpenseDetail>
+        <ExpensePlanDetail v-else-if="planId" :plan-id="planId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ExpensePlanDetail>
+        <AdvanceRequestDetail v-else-if="advanceRequestId" :request-id="advanceRequestId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></AdvanceRequestDetail>
+        <ProcurementPaymentDetail v-else-if="procurementPaymentId" :request-id="procurementPaymentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ProcurementPaymentDetail>
+        <BudgetAdjustmentDetail v-else-if="budgetAdjustmentId" :request-id="budgetAdjustmentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></BudgetAdjustmentDetail>
         <form v-else-if="canEdit" novalidate @submit.prevent="save(true)">
           <fieldset :disabled="saving || writesBlocked || cancellationOpen">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>

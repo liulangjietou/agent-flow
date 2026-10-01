@@ -1,0 +1,128 @@
+{
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "date": "2026-10-01",
+  "backendCommit": "787951fe8f2eac336885ff5de96dec50ca8b885e",
+  "backendEvidence": "docs/evidence/instance-control-backend-20261001.json",
+  "frontend": {
+    "newTests": 13,
+    "relatedTests": 179,
+    "typecheck": "PASS",
+    "build": "PASS",
+    "openApi": {
+      "operations": 264,
+      "schemas": 534,
+      "requestExamples": 104
+    },
+    "regression": "Application subresource receipts used to enter the full Application branch; failing regression reproduced before correction. Exact full-application lifecycle recovery remains covered.",
+    "unknownResultRecovery": "Automated original key/body, unreadable 200 response and changed-body refusal; not injected in the browser."
+  },
+  "runtime": {
+    "database": "instance_ui_5a3fbce0c04d",
+    "sourceDatabase": "expense_ui_b8e8e035f6",
+    "backendPort": 18217,
+    "frontendPort": 15317,
+    "container": "agentflow-attachments-postgres-20260928",
+    "jarSha256": "55cad8578cd23133680271ee5bf465f50b72d8921312f42a96d4fb5e04486d04",
+    "sourceBackupSha256": "a0f71e591b58a2fa6bb438d76f26c48a794c980e33c242ef0e7a5720cf718beb",
+    "sourceBackupBytes": 1683368
+  },
+  "syntheticOnly": true,
+  "schema": 86,
+  "newMigration": false,
+  "checks": {
+    "oldVersionUpgrade": {
+      "status": "PASS",
+      "businessTables": 168,
+      "businessRows": 3604,
+      "taskRows": 8,
+      "variableRows": 69,
+      "files": 10,
+      "schema": 86
+    },
+    "httpPause": "PASS",
+    "timerStayedPausedPastDue": "PASS",
+    "pausedRestart": {
+      "status": "PASS",
+      "views": 4,
+      "tasks": 8,
+      "timers": 1,
+      "unchangedFinancialTables": 120
+    },
+    "httpResume": {
+      "status": "PASS",
+      "parallelOriginalTasks": 2,
+      "preciseRemainingTimeVerified": true,
+      "originalDueTimerAdvancedAfterResume": true,
+      "unchangedFinancialTables": 120
+    },
+    "browserResume": {
+      "status": "PASS",
+      "originalTaskPreserved": true,
+      "preciseRemainingTimeVerified": true,
+      "blankReasonBlocked": true,
+      "cancelSentNoWrites": true,
+      "sensitiveFieldMaskedForAdmin": true,
+      "applicantPausedActionsBlocked": true,
+      "actualWidth": 500
+    },
+    "runningRestart": {
+      "status": "PASS",
+      "views": 4,
+      "tasks": 9,
+      "originalResumedDueDatesPreserved": true
+    },
+    "finalAcceptance": {
+      "status": "PASS",
+      "ordinaryApplicationsApproved": 3,
+      "realApprovals": 4,
+      "financialApplicationStillInApproval": true,
+      "originalFinancialTablesPreserved": 120,
+      "filesPreserved": 10
+    }
+  },
+  "responses": {
+    "status": "PASS",
+    "actualHttpResponses": 198,
+    "actualFrontendViews": 29,
+    "actualFrontendReceipts": 11,
+    "browserWriteReceipts": 2
+  },
+  "narrowViewport": {
+    "dialogScrollWidth": 436,
+    "dialogWidth": 436,
+    "documentWidth": 480,
+    "textareaWidth": 351.3333435058594,
+    "width": 500
+  },
+  "screenshots": [
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-control-paused.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-control-narrow.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-control-applicant-paused.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-control-resumed.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-control-final-audit.jpg"
+  ],
+  "preservation": {
+    "originalRuntimesUntouched": [
+      18214,
+      18215,
+      18216
+    ],
+    "sourceFinancialAdapter": "Existing loopback synthetic finance fixture at 18222; copied database and independent file directory",
+    "financialWorkers": "Only invoice verification, expense precheck and budget workers enabled for fixtures; existing payment, voucher and adjustment workers disabled in the independent copy.",
+    "realModelIdpOrEnterpriseFinance": false
+  },
+  "rawEvidence": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-runtime-evidence.json",
+  "logs": {
+    "frontendRed": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-ui-red.log",
+    "frontendTests": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-ui-scoped.log",
+    "build": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-ui-build.log",
+    "openApi": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-ui-openapi.log",
+    "package": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-ui-package.log",
+    "httpPause": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-http-pause.log",
+    "httpResume": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-http-resume.log",
+    "finalAcceptance": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-runtime-final.log",
+    "contracts": "/fyoung/tmp/agentflow-remaining-20260928/instance-control-runtime-contracts.log"
+  },
+  "remainingPackages": 4,
+  "remotePrOrCi": false
+}
