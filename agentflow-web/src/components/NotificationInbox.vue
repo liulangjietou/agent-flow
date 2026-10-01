@@ -3,6 +3,7 @@ import { onUnmounted, reactive, ref, watch } from 'vue'
 import { api, type InboxMessage } from '../api'
 import { isTaskNotification, notificationLabels, NotificationInboxQuery } from '../notificationInbox'
 import NotificationPreferencesPanel from './NotificationPreferencesPanel.vue'
+import NotificationDeliveriesPanel from './NotificationDeliveriesPanel.vue'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage] }>()
@@ -18,6 +19,7 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
   <section class="content inbox-page" aria-labelledby="inbox-title">
     <div class="inbox-heading"><div><p class="eyebrow">NOTIFICATIONS</p><h2 id="inbox-title">消息中心</h2><p class="inbox-intro">跟进审批与任务流转，回到申请继续处理。</p></div><span v-if="query.loaded" class="unread-total" role="status">{{ query.unreadCount }} 条未读</span></div>
     <NotificationPreferencesPanel :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
+    <NotificationDeliveriesPanel :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
     <div class="inbox-toolbar"><div role="group" aria-label="消息筛选"><button :class="{ selected: readFilter === 'all' }" :aria-pressed="readFilter === 'all'" :disabled="locked" @click="readFilter = 'all'">全部消息</button><button :class="{ selected: readFilter === 'unread' }" :aria-pressed="readFilter === 'unread'" :disabled="locked" @click="readFilter = 'unread'">只看未读</button></div><button class="secondary" :disabled="query.loading || locked" @click="refresh">刷新消息</button></div>
     <p class="inbox-hint">消息保留发生时的进展，最新状态请查看申请。已读不会改变审批状态。</p>
     <div v-if="query.error" class="inbox-error" role="alert"><p>{{ query.error }}</p><button class="secondary" :disabled="locked || query.loading" @click="query.loaded ? query.more() : refresh()">重新读取</button></div>

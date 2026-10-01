@@ -1,4 +1,5 @@
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
+import { readDeliveryPage, readDeliveryDetail, readDeliveryHistory, validateDeliveryRetryReceipt, type NotificationDelivery, type NotificationDeliveryFilters, type NotificationDeliveryRetryInput } from './notificationDeliveries.js'
 import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
 import type { SupplierAdjustmentView, SupplierAdjustmentPrepareInput, SupplierAdjustmentActionInput, SupplierAdjustmentReceipt } from './supplierAdjustment'
 import type { PaymentBatchInput, PaymentBatchReceipt, PaymentBatchPage, PaymentBatchDetail } from './paymentBatches'
@@ -253,6 +254,12 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       COMMENT_MENTION_UNAVAILABLE: '提醒对象已不在本轮可提醒范围，请刷新名单后重新选择。',
   INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
+      INVALID_NOTIFICATION_DELIVERY_QUERY: '投递筛选或分页已失效，请重新读取。',
+      NOTIFICATION_DELIVERY_NOT_FOUND: '投递记录不存在或当前账号无权查看。',
+      NOTIFICATION_DELIVERY_STATE_INVALID: '当前投递状态不允许人工重试，请重新读取。',
+      NOTIFICATION_CONSENT_REVOKED: '当前收件资格或原通知偏好已失效，不能重试旧提醒。',
+      NOTIFICATION_BINDING_UNAVAILABLE: '原收件绑定不可用或已经变更，不能把旧提醒改投新地址。',
+      NOTIFICATION_DUPLICATE_ACK_REQUIRED: '接收方可能已经收到，请明确确认可能重复后再重试。',
       COUNTERSIGN_ASSIGNMENT_FIXED: '会签任务不能转交、释放或重新领取；可委派协助后回交，或使用独立加减签入口。',
       COUNTERSIGN_NO_MEMBERS: '会签节点当前没有有效审批人，本次操作未生效，请联系管理员补齐审批名单。',
       TASK_DELEGATION_PENDING: '这项任务处于受托处理阶段，请填写意见并回交给原审批人。',
@@ -332,6 +339,8 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 export const writeRequests = new PendingWrites(async (operation, key) => {
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
   if (operation.path === '/notifications/preferences') validateNotificationPreferencesReceipt(result, JSON.parse(operation.body!) as NotificationPreferencesInput)
+  const notificationRetry = /^\/notifications\/deliveries\/([^/?]+)\/retry$/.exec(operation.path)
+  if (notificationRetry) validateDeliveryRetryReceipt(result, decodeURIComponent(notificationRetry[1]!), JSON.parse(operation.body!) as NotificationDeliveryRetryInput)
   const comment = /^\/applications\/([^/?]+)\/comments$/.exec(operation.path)
   if (comment) validateCommentReceipt(result, decodeURIComponent(comment[1]!), JSON.parse(operation.body!) as CommentDraft)
   const taskAction = /^\/tasks\/([^/?]+)\/actions$/.exec(operation.path)
@@ -611,6 +620,16 @@ export const api = {
   },
   notificationPreferences: (signal: AbortSignal) => request<NotificationPreferences>('/notifications/preferences', { signal, cache: 'no-store' }).then(readNotificationPreferences),
   reviseNotificationPreferences: (input: NotificationPreferencesInput) => write<NotificationPreferences>('/notifications/preferences', 'PUT', '保存通知偏好', input),
+  notificationDeliveries: (filters: NotificationDeliveryFilters, signal: AbortSignal) => {
+    const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)) })
+    return request('/notifications/deliveries?' + query, { signal, cache: 'no-store' }).then(readDeliveryPage)
+  },
+  notificationDelivery: (id: string, signal: AbortSignal) => request('/notifications/deliveries/' + encodeURIComponent(id), { signal, cache: 'no-store' }).then(value => readDeliveryDetail(value, id)),
+  notificationDeliveryHistory: (id: string, filters: Pick<NotificationDeliveryFilters, 'limit' | 'cursor'>, signal: AbortSignal) => {
+    const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)) })
+    return request('/notifications/deliveries/' + encodeURIComponent(id) + '/history?' + query, { signal, cache: 'no-store' }).then(readDeliveryHistory)
+  },
+  retryNotificationDelivery: (id: string, input: NotificationDeliveryRetryInput) => write<NotificationDelivery>('/notifications/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '恢复外部通知投递', input),
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskCountersignMembers: (taskId: string, signal: AbortSignal) => request<CountersignView>(`/tasks/${encodeURIComponent(taskId)}/countersign-members`, { signal, cache: 'no-store' }),

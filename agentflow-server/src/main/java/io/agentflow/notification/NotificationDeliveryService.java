@@ -67,6 +67,15 @@ public class NotificationDeliveryService {
         return store.save(value, next, actor.userId(), reason);
     }
 
+    /** 本人查询的恢复提示只反映读取时资格，不能代替实际重试的锁定检查。 */
+    public NotificationDeliveryViews.RetryEligibility retryEligibility(NotificationDelivery value) {
+        boolean duplicateAcknowledgement = value.progress().status() == Status.UNKNOWN;
+        if (!value.progress().retryable()) return new NotificationDeliveryViews.RetryEligibility(false, duplicateAcknowledgement, "STATE_NOT_RETRYABLE");
+        var failure = revoked(value, preferences.get(value.tenantId(), value.recipient()));
+        if (failure == null) failure = bindingFailure(value, destinations.find(value.tenantId(), value.recipient(), value.channel()).orElse(null));
+        return new NotificationDeliveryViews.RetryEligibility(failure == null, duplicateAcknowledgement, failure == null ? null : failure.name());
+    }
+
     private NotificationPreferences lockRecipient(NotificationDelivery value) {
         if (organization.initialized(value.tenantId())) organization.lock(value.tenantId());
         return preferences.lock(value.tenantId(), value.recipient());

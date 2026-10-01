@@ -88,11 +88,14 @@ public record NotificationDeliveryProgress(Status status, long version, int atte
     /** 明确人工重试保持累计次数；未知结果必须明确接受可能重复的风险。 */
     public NotificationDeliveryProgress retry(long expectedVersion, boolean acknowledgePossibleDuplicate, Instant now) {
         if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Notification delivery changed");
-        if (status != Status.FAILED && status != Status.UNKNOWN) throw invalid();
+        if (!retryable()) throw invalid();
         if (status == Status.UNKNOWN && !acknowledgePossibleDuplicate)
             throw new DomainException("NOTIFICATION_DUPLICATE_ACK_REQUIRED", "Acknowledge possible duplicate notification before retry");
         return new NotificationDeliveryProgress(Status.PENDING, version + 1, attempts, 0, now, null, null, null, now);
     }
+
+    /** 只有明确失败和结果未知允许申请人工恢复；资格由用例层复核。 */
+    public boolean retryable() { return status == Status.FAILED || status == Status.UNKNOWN; }
 
     private NotificationDeliveryProgress terminal(Status target, FailureCode code, Instant now) {
         return new NotificationDeliveryProgress(target, version + 1, attempts, cycleAttempts, null, null, null, code, now);

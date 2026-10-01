@@ -37718,6 +37718,482 @@
           }
         }
       }
+    },
+    "/api/v1/notifications/deliveries": {
+      "get": {
+        "operationId": "notificationDeliveries",
+        "tags": [
+          "消息"
+        ],
+        "summary": "我的外部通知投递",
+        "description": "只返回本人投递元数据，不返回邮箱、凭据或业务正文。管理员无跨人员读取特权。拒绝身份覆盖、未知及重复参数。按不可变创建时间分页；当前状态筛选可能随后台处理变化，刷新以读取最新状态。",
+        "x-access": "当前已登录账号，仅限本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "本人投递及恢复响应禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EMAIL",
+                "ENTERPRISE_IM"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "IN_FLIGHT",
+                "RETRY_WAIT",
+                "ACCEPTED",
+                "FAILED",
+                "UNKNOWN",
+                "SUPPRESSED"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数，默认 20",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一页 nextCursor；保持原本人及筛选范围",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/deliveries/{id}": {
+      "get": {
+        "operationId": "notificationDelivery",
+        "tags": [
+          "消息"
+        ],
+        "summary": "我的投递详情",
+        "description": "本人范围内返回当前状态、读取时恢复资格和首段历史。历史不超过详情版本；恢复资格不是写入授权，POST 仍重新检查。无查询参数。ACCEPTED 表示服务器受理，不是最终送达。",
+        "x-access": "当前已登录账号，仅限本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryDetail"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "本人投递及恢复响应禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/deliveries/{id}/history": {
+      "get": {
+        "operationId": "notificationDeliveryHistory",
+        "tags": [
+          "消息"
+        ],
+        "summary": "我的投递完整历史",
+        "description": "按原版本从新到旧分页，每次重新检查本人归属。游标绑定本人和原投递，不能用于其他记录。",
+        "x-access": "当前已登录账号，仅限本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeliveryHistoryPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "本人投递及恢复响应禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "单页条数，默认 20",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "上一页 nextCursor；保持原本人及筛选范围",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/deliveries/{id}/retry": {
+      "post": {
+        "operationId": "retryNotificationDelivery",
+        "tags": [
+          "消息"
+        ],
+        "summary": "明确恢复我的外部通知",
+        "description": "只恢复 FAILED 或 UNKNOWN，后者必须显式确认可能重复。校验当前版本、本人同意代次、有效身份和原绑定；不接受新收件地址。原因记入原历史。原幂等请求回放历史排队回执，不重新执行；后来受理或关闭偏好不触发重复发送。当前状态须另行读取。",
+        "x-access": "当前已登录账号，仅限本人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDelivery"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "description": "本人投递及恢复响应禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选、游标或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationDeliveryRetryInput"
+              },
+              "example": {
+                "expectedVersion": 3,
+                "acknowledgePossibleDuplicate": true,
+                "reason": "已核实原结果并接受可能重复后恢复"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -64507,6 +64983,585 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          }
+        }
+      },
+      "NotificationDelivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "inboxId",
+          "channel",
+          "status",
+          "version",
+          "attempts",
+          "cycleAttempts",
+          "errorCode",
+          "createdAt",
+          "updatedAt",
+          "nextAttemptAt",
+          "leaseUntil"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inboxId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "ENTERPRISE_IM"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "IN_FLIGHT",
+              "RETRY_WAIT",
+              "ACCEPTED",
+              "FAILED",
+              "UNKNOWN",
+              "SUPPRESSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cycleAttempts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "CONSENT_REVOKED",
+              "RECIPIENT_INACTIVE",
+              "MESSAGE_UNAVAILABLE",
+              "BINDING_NOT_CAPTURED",
+              "BINDING_UNAVAILABLE",
+              "BINDING_CHANGED",
+              "CHANNEL_UNAVAILABLE",
+              "SMTP_CONNECT_FAILED",
+              "SMTP_AUTH_FAILED",
+              "SMTP_TEMPORARY_REJECTION",
+              "SMTP_PERMANENT_REJECTION",
+              "SMTP_RESULT_UNKNOWN",
+              "LEASE_EXPIRED",
+              "WORKER_RESULT_UNKNOWN",
+              null
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "leaseUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "PENDING"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "leaseUntil": {
+                  "type": "null"
+                },
+                "errorCode": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "IN_FLIGHT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "null"
+                },
+                "leaseUntil": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "errorCode": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "RETRY_WAIT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "leaseUntil": {
+                  "type": "null"
+                },
+                "errorCode": {
+                  "type": "string",
+                  "enum": [
+                    "CONSENT_REVOKED",
+                    "RECIPIENT_INACTIVE",
+                    "MESSAGE_UNAVAILABLE",
+                    "BINDING_NOT_CAPTURED",
+                    "BINDING_UNAVAILABLE",
+                    "BINDING_CHANGED",
+                    "CHANNEL_UNAVAILABLE",
+                    "SMTP_CONNECT_FAILED",
+                    "SMTP_AUTH_FAILED",
+                    "SMTP_TEMPORARY_REJECTION",
+                    "SMTP_PERMANENT_REJECTION",
+                    "SMTP_RESULT_UNKNOWN",
+                    "LEASE_EXPIRED",
+                    "WORKER_RESULT_UNKNOWN"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ACCEPTED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "null"
+                },
+                "leaseUntil": {
+                  "type": "null"
+                },
+                "errorCode": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "FAILED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "null"
+                },
+                "leaseUntil": {
+                  "type": "null"
+                },
+                "errorCode": {
+                  "type": "string",
+                  "enum": [
+                    "CONSENT_REVOKED",
+                    "RECIPIENT_INACTIVE",
+                    "MESSAGE_UNAVAILABLE",
+                    "BINDING_NOT_CAPTURED",
+                    "BINDING_UNAVAILABLE",
+                    "BINDING_CHANGED",
+                    "CHANNEL_UNAVAILABLE",
+                    "SMTP_CONNECT_FAILED",
+                    "SMTP_AUTH_FAILED",
+                    "SMTP_TEMPORARY_REJECTION",
+                    "SMTP_PERMANENT_REJECTION",
+                    "SMTP_RESULT_UNKNOWN",
+                    "LEASE_EXPIRED",
+                    "WORKER_RESULT_UNKNOWN"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "UNKNOWN"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "null"
+                },
+                "leaseUntil": {
+                  "type": "null"
+                },
+                "errorCode": {
+                  "type": "string",
+                  "enum": [
+                    "CONSENT_REVOKED",
+                    "RECIPIENT_INACTIVE",
+                    "MESSAGE_UNAVAILABLE",
+                    "BINDING_NOT_CAPTURED",
+                    "BINDING_UNAVAILABLE",
+                    "BINDING_CHANGED",
+                    "CHANNEL_UNAVAILABLE",
+                    "SMTP_CONNECT_FAILED",
+                    "SMTP_AUTH_FAILED",
+                    "SMTP_TEMPORARY_REJECTION",
+                    "SMTP_PERMANENT_REJECTION",
+                    "SMTP_RESULT_UNKNOWN",
+                    "LEASE_EXPIRED",
+                    "WORKER_RESULT_UNKNOWN"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "SUPPRESSED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "nextAttemptAt": {
+                  "type": "null"
+                },
+                "leaseUntil": {
+                  "type": "null"
+                },
+                "errorCode": {
+                  "type": "string",
+                  "enum": [
+                    "CONSENT_REVOKED",
+                    "RECIPIENT_INACTIVE",
+                    "MESSAGE_UNAVAILABLE",
+                    "BINDING_NOT_CAPTURED",
+                    "BINDING_UNAVAILABLE",
+                    "BINDING_CHANGED",
+                    "CHANNEL_UNAVAILABLE",
+                    "SMTP_CONNECT_FAILED",
+                    "SMTP_AUTH_FAILED",
+                    "SMTP_TEMPORARY_REJECTION",
+                    "SMTP_PERMANENT_REJECTION",
+                    "SMTP_RESULT_UNKNOWN",
+                    "LEASE_EXPIRED",
+                    "WORKER_RESULT_UNKNOWN"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "NotificationDeliveryEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "attempts",
+          "cycleAttempts",
+          "errorCode",
+          "actor",
+          "reason",
+          "occurredAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "IN_FLIGHT",
+              "RETRY_WAIT",
+              "ACCEPTED",
+              "FAILED",
+              "UNKNOWN",
+              "SUPPRESSED"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cycleAttempts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "CONSENT_REVOKED",
+              "RECIPIENT_INACTIVE",
+              "MESSAGE_UNAVAILABLE",
+              "BINDING_NOT_CAPTURED",
+              "BINDING_UNAVAILABLE",
+              "BINDING_CHANGED",
+              "CHANNEL_UNAVAILABLE",
+              "SMTP_CONNECT_FAILED",
+              "SMTP_AUTH_FAILED",
+              "SMTP_TEMPORARY_REJECTION",
+              "SMTP_PERMANENT_REJECTION",
+              "SMTP_RESULT_UNKNOWN",
+              "LEASE_EXPIRED",
+              "WORKER_RESULT_UNKNOWN",
+              null
+            ]
+          },
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NotificationRetryEligibility": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "allowed",
+          "requiresDuplicateAcknowledgement",
+          "blockedCode"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "requiresDuplicateAcknowledgement": {
+            "type": "boolean"
+          },
+          "blockedCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "STATE_NOT_RETRYABLE",
+              "CONSENT_REVOKED",
+              "RECIPIENT_INACTIVE",
+              "MESSAGE_UNAVAILABLE",
+              "BINDING_NOT_CAPTURED",
+              "BINDING_UNAVAILABLE",
+              "BINDING_CHANGED",
+              "CHANNEL_UNAVAILABLE",
+              "SMTP_CONNECT_FAILED",
+              "SMTP_AUTH_FAILED",
+              "SMTP_TEMPORARY_REJECTION",
+              "SMTP_PERMANENT_REJECTION",
+              "SMTP_RESULT_UNKNOWN",
+              "LEASE_EXPIRED",
+              "WORKER_RESULT_UNKNOWN",
+              null
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "allowed": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "blockedCode": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "blockedCode": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "NotificationDeliveryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/NotificationDelivery"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "NotificationDeliveryHistoryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/NotificationDeliveryEvent"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "NotificationDeliveryDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "delivery",
+          "retry",
+          "history"
+        ],
+        "properties": {
+          "delivery": {
+            "$ref": "#/components/schemas/NotificationDelivery"
+          },
+          "retry": {
+            "$ref": "#/components/schemas/NotificationRetryEligibility"
+          },
+          "history": {
+            "$ref": "#/components/schemas/NotificationDeliveryHistoryPage"
+          }
+        }
+      },
+      "NotificationDeliveryRetryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "acknowledgePossibleDuplicate",
+          "reason"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "acknowledgePossibleDuplicate": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
           }
         }
       }

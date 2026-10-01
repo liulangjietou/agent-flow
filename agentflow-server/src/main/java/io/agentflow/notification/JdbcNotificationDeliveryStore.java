@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,6 +71,34 @@ public class JdbcNotificationDeliveryStore {
     public Optional<NotificationDelivery> get(Actor actor, UUID id) {
         return jdbc.query("SELECT * FROM notification_dispatch WHERE id=? AND tenant_id=? AND recipient_id=?",
                 JdbcNotificationDeliveryStore::map, id.toString(), actor.tenantId(), actor.userId()).stream().findFirst();
+    }
+
+    /** 本人列表每次最多读取一页加一条，不选择任意租户或接收人。 */
+    public List<NotificationDelivery> search(Actor actor, NotificationDeliveryQueryParameters.Search query) {
+        var parameters = new ArrayList<Object>(List.of(actor.tenantId(), actor.userId()));
+        var sql = new StringBuilder("SELECT * FROM notification_dispatch WHERE tenant_id=? AND recipient_id=?");
+        if (!query.channel().isEmpty()) { sql.append(" AND channel=?"); parameters.add(query.channel()); }
+        if (!query.status().isEmpty()) { sql.append(" AND status=?"); parameters.add(query.status()); }
+        if (query.beforeTime() != null) {
+            sql.append(" AND (created_at<? OR (created_at=? AND id<?))");
+            parameters.add(stamp(query.beforeTime())); parameters.add(stamp(query.beforeTime())); parameters.add(query.beforeId().toString());
+        }
+        sql.append(" ORDER BY created_at DESC,id DESC LIMIT ?"); parameters.add(query.limit() + 1);
+        return jdbc.query(sql.toString(), JdbcNotificationDeliveryStore::map, parameters.toArray());
+    }
+
+    /** 历史再次关联当前本人范围，并受详情读取版本限制，避免混入晚到的新版本。 */
+    public List<NotificationDeliveryViews.Event> history(Actor actor, UUID id, long throughVersion, NotificationDeliveryQueryParameters.History query) {
+        var parameters = new ArrayList<Object>(List.of(id.toString(), actor.tenantId(), actor.userId(), throughVersion));
+        var sql = new StringBuilder("""
+                SELECT e.* FROM notification_delivery_event e JOIN notification_dispatch d ON d.id=e.delivery_id
+                WHERE d.id=? AND d.tenant_id=? AND d.recipient_id=? AND e.version<=?
+                """);
+        if (query.beforeVersion() != null) { sql.append(" AND e.version<?"); parameters.add(query.beforeVersion()); }
+        sql.append(" ORDER BY e.version DESC LIMIT ?"); parameters.add(query.limit() + 1);
+        return jdbc.query(sql.toString(), (row, index) -> new NotificationDeliveryViews.Event(row.getLong("version"), Status.valueOf(row.getString("status")),
+                row.getInt("attempts"), row.getInt("cycle_attempts"), row.getString("error_code") == null ? null : FailureCode.valueOf(row.getString("error_code")),
+                row.getString("actor_id"), row.getString("reason"), time(row, "occurred_at")), parameters.toArray());
     }
 
     /** 只检查原消息的身份归属，不读取标题、表单或评论正文。 */
