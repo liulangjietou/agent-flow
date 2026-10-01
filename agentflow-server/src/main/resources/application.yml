@@ -24,6 +24,10 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  events:
+    enabled: ${AGENTFLOW_EVENTS_ENABLED:false}
+    worker-enabled: ${AGENTFLOW_EVENTS_WORKER_ENABLED:true}
+    sources: {}
   budgets:
     worker-enabled: ${AGENTFLOW_BUDGET_WORKER_ENABLED:true}
     lease-seconds: ${AGENTFLOW_BUDGET_LEASE_SECONDS:90}

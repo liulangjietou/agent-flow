@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.callback.PaymentCallbackVerifier;
+import io.agentflow.event.EventIngressVerifier;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -142,7 +143,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
 
     private boolean isPublic(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return PaymentCallbackVerifier.matches(request) || (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
+        return PaymentCallbackVerifier.matches(request) || EventIngressVerifier.matches(request) || (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
                 || (HttpMethod.GET.matches(request.getMethod()) && path.equals("/api/v1/auth/options"))
                 || ((HttpMethod.GET.matches(request.getMethod()) || HttpMethod.HEAD.matches(request.getMethod()))
                 && PUBLIC_HEALTH_PATHS.contains(path)) || path.equals("/error");

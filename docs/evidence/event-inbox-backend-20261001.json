@@ -1,0 +1,226 @@
+{
+  "recordedAt": "2026-10-01T08:40:27.295637+00:00",
+  "status": "LOCAL_BACKEND_ACCEPTANCE_PASSED",
+  "scope": "Signed source authentication, durable event inbox, transactional native consumption and original-event administrative recovery",
+  "baseCommit": "d199763fc58bee04f5a1ccc7c4850db3a733320b",
+  "branch": "codex/governance-identifier-integration",
+  "tests": {
+    "h2": {
+      "domain": 5,
+      "server": 77,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "serverClasses": [
+        "OidcAuthenticationIntegrationTest",
+        "OpenApiContractTest",
+        "PaymentCallbackWorkerTest",
+        "PaymentCallbackVerifierTest",
+        "EventInboxMigrationTest",
+        "EventInboxWorkerTest",
+        "EventInboxIntegrationTest",
+        "EventIngressVerifierTest",
+        "EventWaitIntegrationTest"
+      ]
+    },
+    "postgres": {
+      "domain": 5,
+      "server": 29,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "serverClasses": [
+        "EventInboxMigrationTest",
+        "EventInboxIntegrationTest",
+        "EventWaitIntegrationTest"
+      ]
+    },
+    "scopesOverlap": true,
+    "package": "PASS",
+    "javaAuthorTags": {
+      "files": 1183,
+      "namedTypes": 2282,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "openapi": {
+      "operations": 279,
+      "schemas": 550,
+      "requestExamples": 108,
+      "existingPathsAndSchemasUnchanged": true
+    }
+  },
+  "failingRegressionsReproducedBeforeFix": [
+    "SQL CHECK allowed NULL terminal reason through three-valued logic; migration now explicitly rejects missing reasons and processing error codes.",
+    "Event IDs containing a dot were accepted before the canonical signed input boundary was enforced.",
+    "Shared signing credentials across sources were accepted before startup uniqueness validation.",
+    "An additional untrusted signature scheme wrongly rejected a valid HMAC v1 signature."
+  ],
+  "runtime": {
+    "database": "event_inbox_runtime_f48711e9f7",
+    "sourceDatabase": "event_contract_runtime_e5362fbca1",
+    "backendPort": 18224,
+    "backendPid": 53691,
+    "jarSha256": "b59c0d39306b7bbab9028a35b98ecfb6d3e0cd6561e83973fd608d088ef8d557",
+    "migration": {
+      "oldTables": 216,
+      "oldRows": 5118,
+      "allOldTablesPreserved": true,
+      "newTables": 2
+    },
+    "starts": [
+      {
+        "phase": "queued",
+        "pid": 52918
+      },
+      {
+        "phase": "quarantine",
+        "pid": 53264
+      },
+      {
+        "phase": "consume",
+        "pid": 53420
+      },
+      {
+        "phase": "consume",
+        "pid": 53691
+      }
+    ],
+    "schema": 88,
+    "restartsVerified": 3
+  },
+  "httpContracts": {
+    "result": "PASS",
+    "actualResponses": 173,
+    "operations": [
+      "changeEventContractAvailability",
+      "createApplication",
+      "createDefinition",
+      "eventContractVersion",
+      "eventInboxDetail",
+      "eventInboxHistory",
+      "getApplication",
+      "listEventInbox",
+      "listTasks",
+      "myOrganizationAppointments",
+      "organizationPersonPage",
+      "pauseApprovalInstance",
+      "publishDefinition",
+      "publishEventContract",
+      "receiveWorkflowEvent",
+      "resumeApprovalInstance",
+      "retryOriginalEvent",
+      "roundEventWaits",
+      "submitApplication",
+      "taskAction"
+    ],
+    "statuses": [
+      200,
+      201,
+      202,
+      400,
+      401,
+      403,
+      409
+    ]
+  },
+  "checks": {
+    "prepare": {
+      "durableReceipt": true,
+      "duplicateReceiptStable": true,
+      "notYetConsumed": true,
+      "rawSignatureAndStrictEnvelope": true,
+      "administratorBoundary": true
+    },
+    "quarantine": {
+      "queuedEventSurvivedRestart": true,
+      "changedTrustRequiresReview": true,
+      "administratorCannotChangeTrust": true,
+      "retryReplayStable": true,
+      "fullHistoryPagination": true
+    },
+    "consume": {
+      "originalIdRecovered": true,
+      "originalReceiptRetained": true,
+      "singleNativeAdvance": true,
+      "explicitHumanApprovalRequired": true,
+      "staleTargetIgnored": true,
+      "retryDoesNotRepeatEffects": true
+    },
+    "holds": {
+      "mismatchedContractIgnored": true,
+      "pausedWaitRetained": true,
+      "disabledContractRetained": true,
+      "bothResumedWithSameWaitAndEvent": true,
+      "inboxPagination": true
+    },
+    "restart": {
+      "consumedReplayAfterRestart": true,
+      "auditedRecoveryReplayAfterRestart": true,
+      "noDuplicateHumanTasks": true,
+      "humanDecisionPreserved": true
+    }
+  },
+  "preservation": {
+    "oldBusinessTables": 171,
+    "oldBusinessRows": 3673,
+    "allOldBusinessRowsPreserved": true,
+    "attachmentFiles": 10,
+    "attachmentFilesUnchanged": true
+  },
+  "nativeAdvances": {
+    "durable": 1,
+    "paused": 1,
+    "disabled": 1
+  },
+  "inboxStatuses": {
+    "IGNORED": 2,
+    "CONSUMED": 3
+  },
+  "inboxHistoryRevisions": 16,
+  "syntheticOnly": true,
+  "transactionChecks": [
+    "Native subscription, application state, audit and notifications roll back if the consumed marker cannot be saved.",
+    "A failed notification rolls back native progress.",
+    "A late failure from an old version cannot overwrite a successful consumption.",
+    "Concurrent identical reception has one inbox identity; concurrent consumers have one native advance."
+  ],
+  "remaining": [
+    "Event catalog management, inbox management, designer selection and active wait UI with browser acceptance.",
+    "Actual enterprise event source integration.",
+    "Fixed-version subprocesses, audited termination, other explicit failure recovery and safe batch handling.",
+    "Notification collaboration, actual enterprise finance and deployment/model/IdP/remote delivery."
+  ],
+  "remainingWorkPackages": 4,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "remoteCi": "NOT_RUN_NO_REMOTE",
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": {
+    "event-inbox-h2-final.log": {
+      "sha256": "28639c6a6e608ae9705f4d6149892e4290bc9130b97a9ce58aac3ef833d2655f",
+      "bytes": 136178
+    },
+    "event-inbox-postgres.log": {
+      "sha256": "1ecdef6ae4cb7f27585eecdae05aacc26fa0c2eb04d9d519b5b1139fd968b7cf",
+      "bytes": 72618
+    },
+    "event-ingress-boundaries-red.log": {
+      "sha256": "14f9ee5d7bd0d5b91cf60e20ae2caf340132bb3d0de263cd9adb927be6f8880c",
+      "bytes": 11547
+    },
+    "event-inbox-h2-first.log": {
+      "sha256": "072d7a5634539dc1d450d259feae6fb9885fafb92c5c505cc6e3fdfbb9cfaba5",
+      "bytes": 105157
+    },
+    "event-inbox-package.log": {
+      "sha256": "149e88e28f419fd5d2fadcec0aa5792f7825445a55d1a51c1f7fa2f65a423f99",
+      "bytes": 11671
+    },
+    "event-inbox-openapi.log": {
+      "sha256": "e57522c0f90ea67e32185840b6a0fb2e5267952b7fc89f99ded0019d3646be49",
+      "bytes": 71
+    }
+  },
+  "runtimeHarnessCorrection": "Terminal inbox/history cursors are optional in OpenAPI. The Python fixture was corrected to accept an omitted cursor; production code was unchanged and successful mutations were not repeated."
+}

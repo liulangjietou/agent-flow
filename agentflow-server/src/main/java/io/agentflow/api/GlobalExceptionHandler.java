@@ -76,6 +76,11 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "EVENT_INPUT_INVALID", "INVALID_EVENT_INBOX_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "EVENT_UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
+            case "EVENT_INGRESS_DISABLED" -> HttpStatus.SERVICE_UNAVAILABLE;
+            case "EVENT_BODY_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case "EVENT_SOURCE_CONFLICT", "EVENT_ID_CONFLICT" -> HttpStatus.CONFLICT;
             case "INVALID_EVENT_CONTRACT", "INVALID_EVENT_CONTRACT_QUERY", "INVALID_EVENT_WAIT_QUERY" -> HttpStatus.BAD_REQUEST;
             case "EVENT_CONTRACT_AVAILABILITY_UNCHANGED", "EVENT_CONTRACT_UNAVAILABLE" -> HttpStatus.CONFLICT;
             case "INVALID_COUNTERSIGN_QUERY", "INVALID_TIMER_QUERY", "INVALID_INSTANCE_QUERY" -> HttpStatus.BAD_REQUEST;

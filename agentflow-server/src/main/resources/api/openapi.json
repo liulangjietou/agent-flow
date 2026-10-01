@@ -36310,6 +36310,605 @@
           }
         ]
       }
+    },
+    "/api/v1/integrations/events": {
+      "post": {
+        "operationId": "receiveWorkflowEvent",
+        "tags": [
+          "集成"
+        ],
+        "summary": "接收可信来源的事件",
+        "description": "正文最大 8192 字节，仅严格 UTF-8 JSON。v1 HMAC-SHA256 签名覆盖 webhook-id、点、webhook-timestamp、点和原始正文；投递时间允许正负 300 秒。事件号禁止点等分隔符。webhook-tenant 与 webhook-source 选择独立来源密钥，必须分别等于签名正文中的 tenantId、sourceKey。租户、来源、事件号唯一；相同原始正文和信任修订重投返回同一持久编号。202 只代表持久接收；推进由后台按精确契约与等待身份执行。禁止查询参数和附加字段，不接受表单、流程变量或审批结果。",
+        "x-access": "部署配置的可信租户及来源 HMAC 签名",
+        "x-idempotency": false,
+        "responses": {
+          "202": {
+            "description": "已持久接收或相同事件重投；不代表等待已推进或申请已批准",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "(^|.*,\\s*)no-store(\\s*,.*|$)"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventInboxReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求正文或编码无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "签名、租户或投递时间无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "同租户申请不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "契约不存在、来源不匹配，或原事件号被不同正文或信任修订重用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "原始正文过大",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "事件接收未启用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "webhook-tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-source",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            }
+          },
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,11}$"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 600
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboundEventSignal"
+              },
+              "example": {
+                "envelopeVersion": 1,
+                "tenantId": "demo",
+                "sourceKey": "erp",
+                "eventType": "GoodsAccepted",
+                "applicationId": "09ce297b-0811-4015-a135-eae7ed1cc2d1",
+                "roundNo": 1,
+                "waitId": "2a6f798e-3cce-4972-aa86-d5a9fb99e2a1",
+                "contractKey": "goods-accepted",
+                "contractVersion": 1
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "eventIngressSignature": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "listEventInbox",
+        "tags": [
+          "集成"
+        ],
+        "summary": "读取事件收件箱",
+        "description": "当前租户管理员按接收时间及标识倒序读取最小运行元数据，不包含表单、原始正文、签名或密钥。重复或未知查询参数拒绝。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "接收时间倒序的一页",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "(^|.*,\\s*)no-store(\\s*,.*|$)"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventInboxPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "游标不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/events/{id}": {
+      "get": {
+        "operationId": "eventInboxDetail",
+        "tags": [
+          "集成"
+        ],
+        "summary": "读取原事件处理状态",
+        "description": "同租户管理员读取当前持久修订；读取不改变来源信任或原事件身份，禁止查询参数。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前记录与有界历史",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "(^|.*,\\s*)no-store(\\s*,.*|$)"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventInboxView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/events/{id}/history": {
+      "get": {
+        "operationId": "eventInboxHistory",
+        "tags": [
+          "集成"
+        ],
+        "summary": "读取原事件追加处理历史",
+        "description": "按真实处理修订倒序分页，权限限定当前租户管理员。未知参数或重复参数拒绝。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "接收时间倒序的一页",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "(^|.*,\\s*)no-store(\\s*,.*|$)"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventInboxHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "游标不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "beforeVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations/events/{id}/retry": {
+      "post": {
+        "operationId": "retryOriginalEvent",
+        "tags": [
+          "集成"
+        ],
+        "summary": "明确重试原失败事件",
+        "description": "只允许 REVIEW_REQUIRED 状态，使用期望处理修订、非空原因和原幂等键。重排原信号，不能替换租户、来源信任修订、契约或等待身份。权限在回放前重新检查，OIDC 会话仍要求 CSRF 和页面身份头，禁止查询参数。",
+        "x-access": "当前租户 ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "持久恢复结果；重复请求回放原结果",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "(^|.*,\\s*)no-store(\\s*,.*|$)"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventInboxView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非管理员或 CSRF 失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不属于本租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态、版本或幂等内容冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "基础设施错误；结果未知时保留原事件号和正文重投。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9._:-]{1,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventInboxRetryInput"
+              },
+              "example": {
+                "expectedVersion": 2,
+                "reason": "已恢复原来源配置，重试原事件"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -36330,6 +36929,12 @@
         "in": "cookie",
         "name": "AGENTFLOW_SESSION",
         "description": "仅企业 OIDC 模式；经浏览器授权码登录创建的 HttpOnly 会话。写请求还需 CSRF 及页面身份绑定请求头；不接受外部 access token 作为平台 API Bearer。"
+      },
+      "eventIngressSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "webhook-signature",
+        "description": "已配置租户及独立来源的 v1 HMAC-SHA256 签名。另要求 webhook-tenant、webhook-source、webhook-id 和 webhook-timestamp；不使用用户会话或 Bearer 令牌。"
       }
     },
     "schemas": {
@@ -62477,6 +63082,312 @@
           "applicationVersion",
           "items"
         ]
+      },
+      "InboundEventSignal": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "envelopeVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "tenantId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$"
+          },
+          "sourceKey": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "eventType": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,127}$"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "waitId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "contractKey": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "contractVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "envelopeVersion",
+          "tenantId",
+          "sourceKey",
+          "eventType",
+          "applicationId",
+          "roundNo",
+          "waitId",
+          "contractKey",
+          "contractVersion"
+        ]
+      },
+      "EventInboxReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+          }
+        },
+        "required": [
+          "id",
+          "eventId"
+        ]
+      },
+      "EventInboxView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+          },
+          "sourceKey": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "trustRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "eventType": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,127}$"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "waitId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "contractKey": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "contractVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "WAITING",
+              "CONSUMED",
+              "IGNORED",
+              "REVIEW_REQUIRED"
+            ]
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failures": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "MATCHED",
+                  "PAUSED",
+                  "CONTRACT_DISABLED",
+                  "SOURCE_DISABLED",
+                  "SOURCE_CHANGED",
+                  "TARGET_STALE",
+                  "CONTRACT_MISMATCH",
+                  "PROCESSING_FAILED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "EVENT_PROCESSING_FAILED"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "sourceKey",
+          "trustRevision",
+          "eventType",
+          "applicationId",
+          "roundNo",
+          "waitId",
+          "contractKey",
+          "contractVersion",
+          "version",
+          "status",
+          "receivedAt",
+          "updatedAt",
+          "failures"
+        ]
+      },
+      "EventInboxPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/EventInboxView"
+            }
+          },
+          "nextBeforeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "EventInboxHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/EventInboxView"
+            }
+          },
+          "nextBeforeVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "EventInboxRetryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "reason"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
       }
     }
   }
