@@ -1,0 +1,66 @@
+{
+  "status": "PASS_FRONTEND_IMPLEMENTATION_AND_AUTOMATED_CHECKS",
+  "baseCommit": "213f7364d1cd2bb4e67aa0f3d0410735648c9c85",
+  "scope": [
+    "Read and validate immutable approved amounts, actual completed remainder, original financial versions, complete registered returns, private preparations and separate side facts",
+    "Create with exact BigInt minor units and manual whole receipt selection; support advance-offset and consecutive completed adjustment rules",
+    "Independent preparation and authorization, original/source recovery, same-id resend, safe retirement, source confirmation and actual-candidate dispute decisions",
+    "Current scope binding, expired evidence rejection, no initial writes, parent write exclusion, sensitive-state clearing, unknown-result original body and key recovery"
+  ],
+  "tests": {
+    "newFrontendScenarios": 20,
+    "relatedFrontendTests": 72,
+    "failures": 0,
+    "types": "PASS",
+    "productionBuild": "PASS",
+    "openapi": {
+      "operations": 257,
+      "schemas": 523,
+      "requestExamples": 100
+    }
+  },
+  "regressions": [
+    {
+      "issue": "Local validation explanation was hidden by generic expenseError",
+      "red": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-ui-tests.log",
+      "fix": "Use a private page validation error; external exceptions remain mapped to safe messages"
+    },
+    {
+      "issue": "APPLIED proof references and displayed authorization capability were not cross-checked against side facts and root state",
+      "red": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-ui-proof-red.log",
+      "fix": "Validate actual completion references and preparation capability before retaining the view"
+    }
+  ],
+  "testHarnessCorrections": [
+    "Use existing writeRequests.recover API",
+    "Model expiry by advancing the client clock after a valid read; do not manufacture an observation older than its posting"
+  ],
+  "logs": {
+    "frontend": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-ui-tests-final.log",
+    "build": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-ui-build-final.log",
+    "openapi": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-ui-openapi.log",
+    "runtime": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-ui-runtime-preserved.json"
+  },
+  "runtime": {
+    "health": "UP",
+    "schema": 82,
+    "upgradedThisStage": false,
+    "actualHttpAcceptance": false,
+    "actualBrowserAcceptance": false,
+    "liveExpiryAcceptance": false,
+    "restartAcceptance": false
+  },
+  "backendChanged": false,
+  "backendTestsRerun": false,
+  "remaining": [
+    "Long-lived nonempty V82 to V86 upgrade; actual HTTP, browser, 500 CSS px, expiry, restart and old records/files preservation",
+    "Real enterprise finance integration",
+    "Advanced workflow, notifications, external/production/remote delivery"
+  ],
+  "delivery": {
+    "branch": "codex/governance-identifier-integration",
+    "main": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "remoteConfigured": false,
+    "pullRequest": null
+  }
+}

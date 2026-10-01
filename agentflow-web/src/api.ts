@@ -45,6 +45,7 @@ import type { VoucherReversalExecutionView, ReversalPrepareInput, ReversalAuthor
 import type { SettlementView, SettlementRetry, SettlementReceipt } from './expenseSettlement'
 import type { ExpenseReturnView, ExpenseReturnQueryInput, ExpenseReturnRegisterInput, ExpenseReturnActionReceipt } from './expensePaymentReturn'
 import type { AdjustmentView, AdjustmentPrepareInput, AdjustmentAuthorizeInput, AdjustmentOperationInput, AdjustmentRetireInput, AdjustmentPreparationReceipt, AdjustmentActionReceipt } from './expenseResourceAdjustment'
+import type { PartialView, PartialReceipt, PartialCreateInput, PartialOriginalInput, PartialSourceInput, PartialPrepareInput, PartialAuthorizeInput, PartialActionInput, PartialRetireInput, PartialDisputeInput } from './expensePartialAdjustment'
 import type { ExpenseArchiveView } from './expenseArchive'
 import type { PlanItem, PlanDetail, PlanCreate, PlanRevise, PlanReceipt, PlanVersions, PlanCheckOptions, PlanCheckInput, PlanCheckView } from './expensePlan'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
@@ -335,6 +336,15 @@ export const api = {
   voucherReversalOperationAction: (id: string, operationId: string, input: ReversalOperationInput) => write<ReversalExecutionReceipt>(`/applications/${encodeURIComponent(id)}/vouchers/${encodeURIComponent(operationId)}/reversal-execution/actions`, 'POST', '办理原冲销命令', input),
   expenseSettlement: (id: string, roundNo: number, signal: AbortSignal) => request<SettlementView>(`/expense-reports/${encodeURIComponent(id)}/settlement` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseResourceAdjustment: (id: string, roundNo: number, signal: AbortSignal) => request<AdjustmentView>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expensePartialAdjustments: (id: string, roundNo: number, signal: AbortSignal) => request<PartialView>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  createExpensePartialAdjustment: (id: string, input: PartialCreateInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments`, 'POST', '登记报销部分调整', input),
+  queryExpensePartialOriginals: (id: string, input: PartialOriginalInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/original-queries`, 'POST', '查询部分调整原财务', input),
+  prepareExpensePartialAdjustment: (id: string, input: PartialPrepareInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/preparations`, 'POST', '准备本侧部分调整', input),
+  authorizeExpensePartialAdjustment: (id: string, input: PartialAuthorizeInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/authorizations`, 'POST', '授权本侧部分调整', input),
+  actExpensePartialAdjustment: (id: string, input: PartialActionInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/actions`, 'POST', '办理原部分调整', input),
+  queryExpensePartialSources: (id: string, input: PartialSourceInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/source-queries`, 'POST', '重查部分调整原件', input),
+  retireExpensePartialAdjustment: (id: string, input: PartialRetireInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/retirements`, 'POST', '安全结束部分调整', input),
+  resolveExpensePartialDispute: (id: string, input: PartialDisputeInput) => write<PartialReceipt>(`/expense-reports/${encodeURIComponent(id)}/partial-adjustments/disputes`, 'POST', '明确裁决本侧部分调整争议', input),
   prepareExpenseResourceAdjustment: (id: string, input: AdjustmentPrepareInput) => write<AdjustmentPreparationReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/preparations`, 'POST', '准备报销独立调整', input),
   authorizeExpenseResourceAdjustment: (id: string, input: AdjustmentAuthorizeInput) => write<AdjustmentPreparationReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/authorizations`, 'POST', '授权报销独立调整', input),
   actExpenseResourceAdjustment: (id: string, input: AdjustmentOperationInput) => write<AdjustmentActionReceipt>(`/expense-reports/${encodeURIComponent(id)}/resource-adjustment/actions`, 'POST', '办理原报销独立调整', input),
