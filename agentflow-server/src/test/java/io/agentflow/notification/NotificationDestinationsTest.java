@@ -5,11 +5,15 @@ import org.junit.jupiter.api.Test;
 import static io.agentflow.notification.NotificationDeliveryConfiguration.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** 部署白名单、租户隔离和原目的地摘要不能被个人偏好扩大。 @author owlzhangfq@gmail.com */
+/** 部署白名单、租户隔离和原目的地摘要不能被个人偏好扩大。
+ * @author owlzhangfq@gmail.com
+ */
 class NotificationDestinationsTest {
     @Test void identityAndTargetChangesInvalidateOldDigestButCredentialRotationDoesNot() {
         var config = configuration("first-secret");
         var first = destination(config);
+        assertThat(new NotificationDestinations(config, false).enabledChannels("demo")).containsExactly(NotificationChannel.EMAIL);
+        assertThat(new NotificationDestinations(config, false).enabledChannels("other")).isEmpty();
         // V93 已入队邮件的部署摘要，新增渠道不能改变此持久身份。
         assertThat(first.digest()).isEqualTo("fe9341b9388b11d642285f167ce1be8fbed96b5eac4fcd332960ab6f73807588");
         assertThat(new NotificationDestinations(config, false).find("other", "alice", NotificationChannel.EMAIL)).isEmpty();
@@ -51,6 +55,10 @@ class NotificationDestinationsTest {
         var config = configuration("secret");
         config.setBindings(Map.of("alice-email", new Binding("demo", "alice", NotificationChannel.EMAIL, "mail", "alice@example.invalid", false)));
         assertThat(destination(config).enabled()).isFalse();
+        assertThat(new NotificationDestinations(config, false).enabledChannels("demo")).isEmpty();
+        config.setBindings(configuration("secret").getBindings());
+        config.setSmtpServers(Map.of("mail", new SmtpServer("demo", "smtp.example.invalid", 587, Security.STARTTLS, "sender", "secret", "notify@example.invalid", false)));
+        assertThat(new NotificationDestinations(config, false).enabledChannels("demo")).isEmpty();
         assertThat(new NotificationDestinations(config, false).find("demo", "alice", NotificationChannel.ENTERPRISE_IM)).isEmpty();
         config.setBindings(Map.of("alice-im", new Binding("demo", "alice", NotificationChannel.ENTERPRISE_IM, "mail", "alice@example.invalid", true)));
         assertThatThrownBy(() -> new NotificationDestinations(config, false)).isInstanceOf(IllegalStateException.class);

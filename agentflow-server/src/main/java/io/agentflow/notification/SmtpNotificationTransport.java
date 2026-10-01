@@ -19,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import static io.agentflow.notification.NotificationDeliveryConfiguration.Security;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 
-/** SMTP 只发送最小提醒；网络调用没有业务事务，协议回执不等于最终送达。 @author owlzhangfq@gmail.com */
+/** SMTP 只发送最小提醒；网络调用没有业务事务，协议回执不等于最终送达。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class SmtpNotificationTransport {
     private static final String SUBJECT = "AgentFlow 站内消息提醒";

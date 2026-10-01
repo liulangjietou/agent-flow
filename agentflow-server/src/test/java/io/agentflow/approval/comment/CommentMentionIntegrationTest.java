@@ -33,7 +33,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** 评论提醒通过实际组织、Flowable、幂等事务和消息表验证，不以保存名单代替实际通知。 @author owlzhangfq@gmail.com */
+/** 评论提醒通过实际组织、Flowable、幂等事务和消息表验证，不以保存名单代替实际通知。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.sla.reminders-enabled=false", "agentflow.timers.enabled=false"})
 @AutoConfigureMockMvc
 class CommentMentionIntegrationTest {

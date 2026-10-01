@@ -5,7 +5,9 @@ import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-/** 外部收件账号和服务器只来自部署配置，个人偏好接口不能覆盖。 @author owlzhangfq@gmail.com */
+/** 外部收件账号和服务器只来自部署配置，个人偏好接口不能覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 @ConfigurationProperties(prefix = "agentflow.notifications")
 public class NotificationDeliveryConfiguration {
@@ -26,22 +28,31 @@ public class NotificationDeliveryConfiguration {
     public boolean isAllowInsecureInDemo() { return allowInsecureInDemo; }
     public void setAllowInsecureInDemo(boolean value) { allowInsecureInDemo = value; }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     public enum Security { STARTTLS, TLS, DEMO_PLAIN }
 
-    /** 自建应用使用官方入口；其他入口仅供明确开启的本机协议验收。 */
+    /** 自建应用使用官方入口；其他入口仅供明确开启的本机协议验收。
+     * @author owlzhangfq@gmail.com
+     */
     public record WeComApp(String tenantId, String corpId, long agentId, String secret, String baseUrl, boolean enabled) {
         public static final String OFFICIAL_BASE_URL = "https://qyapi.weixin.qq.com";
         public WeComApp { if (baseUrl == null) baseUrl = OFFICIAL_BASE_URL; }
         @Override public String toString() { return "NotificationWeComApp[redacted]"; }
     }
 
-    /** 禁止把账号、密码、地址通过配置对象的字符串表示写入日志。 */
+    /** 禁止把账号、密码、地址通过配置对象的字符串表示写入日志。
+     * @author owlzhangfq@gmail.com
+     */
     public record SmtpServer(String tenantId, String host, int port, Security security,
                              String username, String password, String from, boolean enabled) {
         @Override public String toString() { return "NotificationSmtpServer[redacted]"; }
     }
 
-    /** 每个租户、稳定主体和渠道只允许一个明确绑定。 */
+    /** 每个租户、稳定主体和渠道只允许一个明确绑定。
+     * @author owlzhangfq@gmail.com
+     */
     public record Binding(String tenantId, String recipient, NotificationChannel channel,
                           String serverId, String address, boolean enabled) {
         @Override public String toString() { return "NotificationBinding[redacted]"; }

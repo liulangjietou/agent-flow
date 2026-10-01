@@ -3,7 +3,7 @@
   "info": {
     "title": "AgentFlow API",
     "version": "0.1.0",
-    "description": "与当前工程同步的已实现 API。支持演示 Bearer 认证，或显式配置的企业 OIDC 会话认证；支持本地组织目录和显式配置的单机附件目录；真实模型和财务支付尚未接入。企业浏览器经同源入口使用 HttpOnly 会话 Cookie，写请求须携带 auth/options 返回的 X-CSRF-TOKEN，以及 URL 编码的 JSON 数组 [tenantId,userId] 作为 X-AgentFlow-Actor，后者仅用于核对页面身份，不授予权限。所有资源继续限定认证主体租户。",
+    "description": "与当前工程同步的已实现 API。支持演示 Bearer 认证，或显式配置的企业 OIDC 会话认证；支持本地组织目录和显式配置的单机附件目录；模型、财务和外部通知由部署配置显式接入，本地协议验收不代表真实企业联调完成。企业浏览器经同源入口使用 HttpOnly 会话 Cookie，写请求须携带 auth/options 返回的 X-CSRF-TOKEN，以及 URL 编码的 JSON 数组 [tenantId,userId] 作为 X-AgentFlow-Actor，后者仅用于核对页面身份，不授予权限。所有资源继续限定认证主体租户。",
     "contact": {
       "email": "owlzhangfq@gmail.com"
     }
@@ -7609,7 +7609,7 @@
           "集成"
         ],
         "summary": "系统自检",
-        "description": "执行真实只读检查；尚未接入的企业认证、组织、存储或模型明确返回 WARNING/NOT_IMPLEMENTED。",
+        "description": "执行真实只读存储与配置检查；模型和本租户外部通知分别报告未启用、后台停用或配置有效，不调用模型、获取令牌或发送通知。配置有效仍返回 WARNING，不代表外部连接或递送已验收。无效配置和依赖失败返回脱敏结果。",
         "x-access": "ADMIN",
         "x-idempotency": false,
         "responses": {

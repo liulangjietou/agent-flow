@@ -14,7 +14,9 @@ import org.junit.jupiter.api.Test;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** 使用实际 HTTP 核对缓存、回执及不确定发送的停发边界。 @author owlzhangfq@gmail.com */
+/** 使用实际 HTTP 核对缓存、回执及不确定发送的停发边界。
+ * @author owlzhangfq@gmail.com
+ */
 class WeComNotificationTransportTest {
     private final JsonUtil json = new JsonUtil(new ObjectMapper());
 
@@ -134,6 +136,9 @@ class WeComNotificationTransportTest {
         var values = new java.util.LinkedHashMap<>(changes); values.put("wecom-apps.app.base-url", server.baseUrl()); values.put("allow-insecure-in-demo", "true");
         return WeComNotificationConfigurationTest.destination(values, true);
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private static final class MutableClock extends Clock {
         private Instant now = Instant.parse("2026-10-01T00:00:00Z");
         @Override public ZoneId getZone() { return ZoneOffset.UTC; }

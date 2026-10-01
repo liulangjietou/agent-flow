@@ -30,7 +30,9 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 实际数据库并发、同意撤销、绑定变化及事务外 SMTP 的完整后台边界。 @author owlzhangfq@gmail.com */
+/** 实际数据库并发、同意撤销、绑定变化及事务外 SMTP 的完整后台边界。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.notifications.delivery-worker-enabled=false",
         "agentflow.sla.reminders-enabled=false", "agentflow.timers.enabled=false"})
 class NotificationDeliveryIntegrationTest {

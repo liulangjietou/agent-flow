@@ -10,7 +10,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 升级必须依附完整期限和明确收件规则，非法配置不能被静默忽略。 @author owlzhangfq@gmail.com */
+/** 升级必须依附完整期限和明确收件规则，非法配置不能被静默忽略。
+ * @author owlzhangfq@gmail.com
+ */
 class TaskEscalationPolicyTest {
     @Test
     void rejectsEscalationWithoutADeadlineOrOnANonHumanNode() {

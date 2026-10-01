@@ -32,7 +32,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** 本人设置、同意撤销、审批事务与外发意向的真实数据库边界。 @author owlzhangfq@gmail.com */
+/** 本人设置、同意撤销、审批事务与外发意向的真实数据库边界。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.sla.reminders-enabled=false", "agentflow.timers.enabled=false"})
 @AutoConfigureMockMvc
 class NotificationPreferencesIntegrationTest {

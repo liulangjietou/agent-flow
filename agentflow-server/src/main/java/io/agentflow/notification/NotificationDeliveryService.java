@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 
-/** 跨组织、偏好和投递的短事务编排，外部传输由事务外后台调用。 @author owlzhangfq@gmail.com */
+/** 跨组织、偏好和投递的短事务编排，外部传输由事务外后台调用。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class NotificationDeliveryService {
     private final JdbcNotificationDeliveryStore store;
@@ -94,6 +96,8 @@ public class NotificationDeliveryService {
         return target.id().equals(value.bindingId()) && target.digest().equals(value.destinationDigest()) ? null : FailureCode.BINDING_CHANGED;
     }
 
-    /** 只有通过当前资格和原目的地检查的领取才携带实际发送目标。 */
+    /** 只有通过当前资格和原目的地检查的领取才携带实际发送目标。
+     * @author owlzhangfq@gmail.com
+     */
     public record Claim(NotificationDelivery delivery, NotificationDestinations.Destination destination) { }
 }

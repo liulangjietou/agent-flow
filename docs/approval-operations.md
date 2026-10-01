@@ -1,5 +1,7 @@
 # 审批运营统计
 
+2026-10-01 范围核对：历史 SLA 违约率、外部通知失败统计和 Agent 人工采纳率仍未实现，已补回[剩余工作](remaining-local-work.md)。实际发送器及人工复核流程已存在，不等于这些运营汇总已经接入。
+
 管理员侧栏“审批运营”读取当前租户的提交轮次和真实待办。接口为 `GET /api/v1/operations/approvals`，仅允许 `ADMIN`，响应 `Cache-Control: no-store`；仅有 `PROCESS_ADMIN` 不获得全租户申请权限。
 
 ## 统计口径

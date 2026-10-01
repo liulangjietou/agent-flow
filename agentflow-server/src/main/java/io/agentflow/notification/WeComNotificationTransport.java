@@ -28,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 import static io.agentflow.notification.NotificationDeliveryConfiguration.WeComApp;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 
-/** 企业微信自建应用的最小单人提醒；不保存令牌、远端正文或企业回执标识。 @author owlzhangfq@gmail.com */
+/** 企业微信自建应用的最小单人提醒；不保存令牌、远端正文或企业回执标识。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class WeComNotificationTransport {
     private static final int MAX_RESPONSE_BYTES = 16384;
@@ -160,16 +162,27 @@ public class WeComNotificationTransport {
     private static ChannelFailure unreadable(boolean sending) {
         return new ChannelFailure(sending ? Outcome.unknown(FailureCode.IM_RESULT_UNKNOWN) : Outcome.retryable(FailureCode.IM_TOKEN_UNAVAILABLE));
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private static final class TokenSlot { private Token token; }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Token(String value, Instant expiresAt) {
         @Override public String toString() { return "WeComToken[redacted]"; }
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private static final class ChannelFailure extends RuntimeException {
         private final Outcome outcome;
         private ChannelFailure(Outcome outcome) { super("WeCom notification request failed", null, false, false); this.outcome = outcome; }
     }
 
-    /** 分块接收时立即限制总量；整次等待同时覆盖慢响应体，不能只等待响应头。 */
+    /** 分块接收时立即限制总量；整次等待同时覆盖慢响应体，不能只等待响应头。
+     * @author owlzhangfq@gmail.com
+     */
     private static final class BoundedBody implements HttpResponse.BodySubscriber<byte[]> {
         private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         private final CompletableFuture<byte[]> result = new CompletableFuture<>();

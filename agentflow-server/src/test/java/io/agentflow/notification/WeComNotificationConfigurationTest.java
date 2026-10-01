@@ -8,7 +8,9 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import static org.assertj.core.api.Assertions.*;
 
-/** 用实际部署属性绑定验证单人收件、固定身份和凭据轮换边界。 @author owlzhangfq@gmail.com */
+/** 用实际部署属性绑定验证单人收件、固定身份和凭据轮换边界。
+ * @author owlzhangfq@gmail.com
+ */
 class WeComNotificationConfigurationTest {
     @Test void freezesEnterpriseApplicationAndRecipientButAllowsSecretRotation() {
         var original = destination(Map.of(), false);

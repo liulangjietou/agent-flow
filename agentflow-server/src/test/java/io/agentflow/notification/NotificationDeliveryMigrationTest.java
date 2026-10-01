@@ -8,7 +8,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.assertj.core.api.Assertions.*;
 
-/** V92 旧意向不具备原收件绑定；升级只抑制这些意向，保持站内消息和偏好事实。 @author owlzhangfq@gmail.com */
+/** V92 旧意向不具备原收件绑定；升级只抑制这些意向，保持站内消息和偏好事实。
+ * @author owlzhangfq@gmail.com
+ */
 class NotificationDeliveryMigrationTest {
     @Test void legacyUnboundIntentsNeverBecomeSendableAndUpgradeIsRepeatable() throws Exception {
         var source = new DriverManagerDataSource(System.getenv().getOrDefault("AGENTFLOW_NOTIFICATION_DELIVERY_URL", "jdbc:h2:mem:notification-delivery-migration;DB_CLOSE_DELAY=-1"),

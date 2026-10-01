@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** 发送事实与重复风险的领域边界。 @author owlzhangfq@gmail.com */
+/** 发送事实与重复风险的领域边界。
+ * @author owlzhangfq@gmail.com
+ */
 class NotificationDeliveryProgressTest {
     private static final Instant NOW = Instant.parse("2026-10-01T12:00:00Z");
 

@@ -1,6 +1,7 @@
 package io.agentflow.system;
 
 import io.agentflow.common.Actor;
+import io.agentflow.notification.NotificationChannel;
 import io.agentflow.template.ClasspathProcessTemplateCatalog;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,10 +88,7 @@ public class SystemCheckService {
                 oidcEnabled ? "OIDC_CONFIGURED" : demoEnabled ? "DEMO_AUTH_ONLY" : "AUTH_PROVIDER_NOT_CONFIGURED",
                 oidcEnabled ? "已配置企业 OIDC 登录；本次未探测身份服务可用性，组织状态见本地目录检查。"
                         : demoEnabled ? "使用演示账号，企业身份认证尚未接入。" : "演示登录已关闭，企业身份认证尚未接入。"));
-        checks.add(inspect("notifications", () -> {
-            diagnostics.notifications(actor.tenantId());
-            return new Check("notifications", Status.WARNING, "IN_APP_ONLY", "站内消息存储查询成功；邮件和 IM 尚未接入。本项不验证超时提醒调度是否运行。");
-        }));
+        checks.add(inspect("notifications", () -> notificationCheck(actor.tenantId())));
         checks.add(jdbcSessions ? inspect("sessionStorage", () -> {
             diagnostics.sessions();
             return up("sessionStorage", "共享会话存储查询成功；空闲超时、令牌到期和当前身份映射仍受校验。");
@@ -107,8 +105,33 @@ public class SystemCheckService {
                         "附件元数据可查询，持久目录访问权限正常；本项未写入文件或校验全部存量内容。当前未接入内容扫描。")
                 : new Check("objectStorage", Status.WARNING, "ATTACHMENT_STORAGE_NOT_CONFIGURED",
                         "附件持久目录尚未配置；管理员配置后可在申请表单中上传。")));
-        checks.add(new Check("model", Status.NOT_IMPLEMENTED, "ADAPTER_NOT_IMPLEMENTED", "当前版本尚未实现模型服务接入，未执行连接检查。"));
+        checks.add(inspect("model", this::modelCheck));
         return new Report(Instant.now(), List.copyOf(checks));
+    }
+
+    private Check notificationCheck(String tenantId) {
+        var configuration = diagnostics.notifications(tenantId);
+        String channels = String.join("、", java.util.Arrays.stream(NotificationChannel.values())
+                .filter(configuration.channels()::contains)
+                .map(channel -> channel == NotificationChannel.EMAIL ? "邮件" : "企业 IM").toList());
+        String binding = configuration.channels().isEmpty() ? "本租户尚无启用的外部收件绑定。"
+                : "本租户已配置的外部渠道：" + channels + "；个人偏好和发送前资格仍需核对。";
+        String code = !configuration.workerEnabled() ? "NOTIFICATION_WORKER_DISABLED"
+                : configuration.channels().isEmpty() ? "NOTIFICATION_BINDINGS_MISSING" : "NOTIFICATION_CHANNELS_CONFIGURED";
+        String worker = configuration.workerEnabled() ? "外部发送后台已启用。" : "外部发送后台未启用。";
+        return new Check("notifications", Status.WARNING, code, "站内消息存储查询成功；" + binding + worker
+                + "本次未探测渠道连接或最终递送，也不验证超时提醒调度是否运行。");
+    }
+
+    private Check modelCheck() {
+        return switch (diagnostics.modelConfiguration()) {
+            case DISABLED -> new Check("model", Status.WARNING, "AGENT_MODEL_DISABLED",
+                    "模型适配器已实现，当前部署未启用；历史运行仍可读取，本次未调用模型。");
+            case WORKER_DISABLED -> new Check("model", Status.WARNING, "AGENT_MODEL_WORKER_DISABLED",
+                    "模型参数校验通过，执行后台未启用；本次未调用模型。");
+            case CONFIGURED -> new Check("model", Status.WARNING, "AGENT_MODEL_CONFIGURED",
+                    "模型参数校验通过，执行后台已启用；本次未调用模型，不代表连接或输出质量通过验收。");
+        };
     }
 
     private Check inspect(String id, Supplier<Check> probe) {

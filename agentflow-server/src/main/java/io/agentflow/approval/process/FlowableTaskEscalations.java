@@ -17,7 +17,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 升级只投递原名单的协调通知，与原任务及父子轮次共用事务和锁。 @author owlzhangfq@gmail.com */
+/** 升级只投递原名单的协调通知，与原任务及父子轮次共用事务和锁。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class FlowableTaskEscalations {
     public static final int BATCH_SIZE = 100;
@@ -81,6 +83,8 @@ public class FlowableTaskEscalations {
         return true;
     }
 
-    /** 有界游标只记录原生任务事实，不提供任务操作权限。 @author owlzhangfq@gmail.com */
+    /** 有界游标只记录原生任务事实，不提供任务操作权限。
+     * @author owlzhangfq@gmail.com
+     */
     public record Candidate(String taskId, Instant dueAt) { }
 }

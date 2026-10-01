@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 只从会话取得租户和接收人，外部地址、凭据与站内开关不接受请求覆盖。 @author owlzhangfq@gmail.com */
+/** 只从会话取得租户和接收人，外部地址、凭据与站内开关不接受请求覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 @RestController
 @RequestMapping("/api/v1/notifications/preferences")
 public class NotificationPreferencesController {
@@ -54,13 +56,17 @@ public class NotificationPreferencesController {
         if (!parameters.isEmpty()) throw new DomainException("INVALID_NOTIFICATION_PREFERENCES", "Notification preferences do not accept query parameters");
     }
 
-    /** 站内业务提醒始终开启；更新时间为 null 表示未保存过个人外部设置。 @author owlzhangfq@gmail.com */
+    /** 站内业务提醒始终开启；更新时间为 null 表示未保存过个人外部设置。
+     * @author owlzhangfq@gmail.com
+     */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(boolean inAppEnabled, boolean emailEnabled, boolean enterpriseImEnabled, long version, Instant updatedAt) {
         static View of(NotificationPreferences value) { return new View(true, value.emailEnabled(), value.enterpriseImEnabled(), value.version(), value.updatedAt()); }
     }
 
-    /** 所有外部开关显式提供，不能把遗漏误当关闭，也不能指定外部接收地址。 @author owlzhangfq@gmail.com */
+    /** 所有外部开关显式提供，不能把遗漏误当关闭，也不能指定外部接收地址。
+     * @author owlzhangfq@gmail.com
+     */
     public record Input(@NotNull Boolean emailEnabled, @NotNull Boolean enterpriseImEnabled, @NotNull @PositiveOrZero Long expectedVersion) {
         /** 不接受身份、站内开关、邮件地址或其他额外字段。 */
         @JsonAnySetter public void reject(String key, Object value) { throw new IllegalArgumentException("Unknown notification preference field"); }

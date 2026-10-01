@@ -74,7 +74,7 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
         <p class="eyebrow">ENVIRONMENT</p><h3 id="guide-environment-title">运行前，检查环境</h3><p>确认数据库、迁移、流程引擎和模板可用，再开始配置。</p>
         <p v-if="diagnostics.loading" role="status">正在执行实际依赖检查…</p>
         <div v-else-if="diagnostics.error" role="alert"><strong>未取得环境结果</strong><p>{{ diagnostics.error }}</p></div>
-        <template v-else-if="diagnostics.report"><strong :class="coreReady ? 'guide-ready' : 'guide-caution'">{{ coreReady ? '四项运行基础检查通过' : '运行基础尚未全部确认' }}</strong><p>检查于 {{ time(diagnostics.report.checkedAt) }}。认证、本地组织与附件目录状态请查看系统自检；内容扫描和模型尚待接入。</p></template>
+        <template v-else-if="diagnostics.report"><strong :class="coreReady ? 'guide-ready' : 'guide-caution'">{{ coreReady ? '四项运行基础检查通过' : '运行基础尚未全部确认' }}</strong><p>检查于 {{ time(diagnostics.report.checkedAt) }}。认证、本地组织、附件、模型与通知配置请查看系统自检；配置检查不代表外部服务连接或业务验收完成。</p></template>
         <p v-else class="guide-footnote">尚未执行检查，不能据此判断服务就绪。</p>
         <button class="secondary" :disabled="diagnostics.loading" @click="diagnostics.load(scopeKey)">{{ diagnostics.loading ? '正在检查…' : '检查运行环境' }}</button><button class="quiet" @click="emit('checks')">查看完整系统自检 →</button>
         <div class="guide-account-note"><strong>切换账号验证</strong><p v-if="enterpriseAuth">请使用身份服务已分配权限的账号，并在本地目录维护对应人员、任职与审批资格。登录成功后仍需核对审批人配置；仅退出平台会保留企业账号登录；身份服务支持时，可在退出窗口选择同时退出企业账号。</p><template v-else><p>演示环境可用申请人 alice、审批人 manager / finance，以及 admin；具体处理人由你配置的节点规则决定。</p><p>使用导航中的“退出登录”，再以对应账号登录。引导不代办审批，也不更改角色。</p></template></div>

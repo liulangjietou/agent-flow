@@ -156,7 +156,9 @@ public class SubprocessProgressService {
         return new DomainException("SUBPROCESS_RUNTIME_MISMATCH", "Subprocess runtime and application round do not match");
     }
 
-    /** 仅在当前事务命令前后传递，构造入口不对其他调用方开放。 @author owlzhangfq@gmail.com */
+    /** 仅在当前事务命令前后传递，构造入口不对其他调用方开放。
+     * @author owlzhangfq@gmail.com
+     */
     public static final class Before {
         private final String tenant;
         private final UUID rootId;

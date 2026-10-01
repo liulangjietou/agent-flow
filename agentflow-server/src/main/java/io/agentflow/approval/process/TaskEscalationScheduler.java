@@ -7,7 +7,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 升级与普通到期提醒分别推进有界游标，空名单或失败任务不会阻塞下一页。 @author owlzhangfq@gmail.com */
+/** 升级与普通到期提醒分别推进有界游标，空名单或失败任务不会阻塞下一页。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 @ConditionalOnProperty(name = "agentflow.sla.reminders-enabled", havingValue = "true", matchIfMissing = true)
 public class TaskEscalationScheduler {

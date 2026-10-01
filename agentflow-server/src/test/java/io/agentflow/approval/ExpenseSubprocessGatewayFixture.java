@@ -128,5 +128,8 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
     private static Money money(String amount) { return new Money(new BigDecimal(amount), "CNY"); }
     /** 只关闭本用例的合成端口，已有验收服务保持运行。 */
     @Override public void close() { server.stop(0); }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Context(JsonUtil json, UUID entity, String invoiceNumber) { }
 }

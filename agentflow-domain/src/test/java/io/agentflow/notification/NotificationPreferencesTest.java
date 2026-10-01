@@ -5,7 +5,9 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
-/** 渠道同意的撤销与版本规则，不依赖投递基础设施。 @author owlzhangfq@gmail.com */
+/** 渠道同意的撤销与版本规则，不依赖投递基础设施。
+ * @author owlzhangfq@gmail.com
+ */
 class NotificationPreferencesTest {
     private static final Instant NOW = Instant.parse("2026-10-01T12:00:00Z");
 

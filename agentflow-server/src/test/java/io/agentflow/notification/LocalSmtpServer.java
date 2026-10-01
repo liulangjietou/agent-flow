@@ -14,8 +14,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/** 仅监听回环的实际 SMTP 协议夹具，不向外部邮件服务发送测试数据。 @author owlzhangfq@gmail.com */
+/** 仅监听回环的实际 SMTP 协议夹具，不向外部邮件服务发送测试数据。
+ * @author owlzhangfq@gmail.com
+ */
 final class LocalSmtpServer implements AutoCloseable {
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     enum Mode { ACCEPT, REJECT_RECIPIENT_TEMPORARY, REJECT_RECIPIENT_PERMANENT, REJECT_DATA_TEMPORARY, REJECT_DATA_PERMANENT, DISCONNECT_AFTER_DATA, WAIT_AFTER_DATA, AUTH_REJECT }
     private final ServerSocket server;
     private final java.util.concurrent.ExecutorService executor = Executors.newSingleThreadExecutor();

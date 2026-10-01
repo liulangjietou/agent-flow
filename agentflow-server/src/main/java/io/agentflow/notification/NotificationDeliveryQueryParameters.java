@@ -12,7 +12,9 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.util.MultiValueMap;
 
-/** 查询入口一次校验；游标绑定本人、筛选和历史所属投递，不接受身份覆盖。 @author owlzhangfq@gmail.com */
+/** 查询入口一次校验；游标绑定本人、筛选和历史所属投递，不接受身份覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 public final class NotificationDeliveryQueryParameters {
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
@@ -74,12 +76,16 @@ public final class NotificationDeliveryQueryParameters {
     private static String encode(String value) { return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8)); }
     private static DomainException invalid() { return new DomainException("INVALID_NOTIFICATION_DELIVERY_QUERY", "Invalid notification delivery filter or cursor"); }
 
-    /** 已完成入口校验的投递筛选。 */
+    /** 已完成入口校验的投递筛选。
+     * @author owlzhangfq@gmail.com
+     */
     public record Search(String channel, String status, int limit, Instant beforeTime, UUID beforeId, String context) {
         /** 只使用实际返回页的最后一条记录续查。 */
         public String cursor(NotificationDelivery value) { return encode(context + "\n" + value.createdAt() + "\n" + value.id()); }
     }
-    /** 已完成入口校验的历史范围。 */
+    /** 已完成入口校验的历史范围。
+     * @author owlzhangfq@gmail.com
+     */
     public record History(int limit, Long beforeVersion, String context) {
         /** 历史只向更早版本翻页，不用页码推断总量。 */
         public String cursor(long version) { return encode(context + "\n" + version); }

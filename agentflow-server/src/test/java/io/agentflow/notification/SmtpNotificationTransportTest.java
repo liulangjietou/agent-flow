@@ -14,7 +14,9 @@ import static io.agentflow.notification.NotificationDeliveryConfiguration.*;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** 验证实际 SMTP 命令和最终 DATA 回执，不以模拟 send 方法代替协议验收。 @author owlzhangfq@gmail.com */
+/** 验证实际 SMTP 命令和最终 DATA 回执，不以模拟 send 方法代替协议验收。
+ * @author owlzhangfq@gmail.com
+ */
 class SmtpNotificationTransportTest {
     private final SmtpNotificationTransport transport = new SmtpNotificationTransport();
 

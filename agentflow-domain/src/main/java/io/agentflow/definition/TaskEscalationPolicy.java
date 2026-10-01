@@ -6,7 +6,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** 原审批期限之后沿同一日历等待，再向固定对象发送一次协调提醒。 @author owlzhangfq@gmail.com */
+/** 原审批期限之后沿同一日历等待，再向固定对象发送一次协调提醒。
+ * @author owlzhangfq@gmail.com
+ */
 public record TaskEscalationPolicy(int workingMinutes, String recipientRule) {
     public static final String WORKING_MINUTES = "escalationWorkingMinutes";
     public static final String RECIPIENT_RULE = "escalationRecipientRule";

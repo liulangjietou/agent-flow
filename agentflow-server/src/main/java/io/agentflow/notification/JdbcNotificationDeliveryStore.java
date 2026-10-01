@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 
-/** 投递身份、乐观状态和追加历史共用事务，不在仓储中决定人员资格或执行外部发送。 @author owlzhangfq@gmail.com */
+/** 投递身份、乐观状态和追加历史共用事务，不在仓储中决定人员资格或执行外部发送。
+ * @author owlzhangfq@gmail.com
+ */
 @Repository
 public class JdbcNotificationDeliveryStore {
     private final JdbcTemplate jdbc;

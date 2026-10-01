@@ -2,8 +2,10 @@ package io.agentflow.system;
 
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
+import io.agentflow.notification.NotificationChannel;
 import io.agentflow.template.ClasspathProcessTemplateCatalog;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.time.Duration;
 import java.util.List;
@@ -22,6 +24,58 @@ class SystemCheckServiceTest {
     private final SystemDiagnostics diagnostics = mock(SystemDiagnostics.class);
     private final ClasspathProcessTemplateCatalog catalog = mock(ClasspathProcessTemplateCatalog.class);
     private final Actor admin = new Actor("tenant-for-check", "admin", Set.of("ADMIN"));
+
+    @BeforeEach
+    void disabledAdapters() {
+        when(diagnostics.notifications(anyString())).thenReturn(new SystemDiagnostics.NotificationConfiguration(false, Set.of()));
+        when(diagnostics.modelConfiguration()).thenReturn(SystemDiagnostics.ModelConfiguration.DISABLED);
+    }
+
+    @Test
+    void notificationConfigurationDistinguishesStoppedWorkerMissingBindingsAndConfiguredChannels() {
+        when(catalog.list()).thenReturn(List.of());
+        var service = new SystemCheckService(diagnostics, catalog, true);
+        try {
+            when(diagnostics.notifications(admin.tenantId())).thenReturn(new SystemDiagnostics.NotificationConfiguration(false, Set.of(NotificationChannel.EMAIL)));
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("notifications"))
+                    .singleElement().satisfies(check -> {
+                        assertThat(check.code()).isEqualTo("NOTIFICATION_WORKER_DISABLED");
+                        assertThat(check.message()).contains("邮件").doesNotContain("企业 IM");
+                    });
+            when(diagnostics.notifications(admin.tenantId())).thenReturn(new SystemDiagnostics.NotificationConfiguration(true, Set.of()));
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("notifications"))
+                    .singleElement().satisfies(check -> assertThat(check.code()).isEqualTo("NOTIFICATION_BINDINGS_MISSING"));
+            when(diagnostics.notifications(admin.tenantId())).thenReturn(new SystemDiagnostics.NotificationConfiguration(true, Set.of(NotificationChannel.EMAIL, NotificationChannel.ENTERPRISE_IM)));
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("notifications"))
+                    .singleElement().satisfies(check -> {
+                        assertThat(check.status()).isEqualTo(SystemCheckService.Status.WARNING);
+                        assertThat(check.code()).isEqualTo("NOTIFICATION_CHANNELS_CONFIGURED");
+                        assertThat(check.message()).contains("邮件、企业 IM", "未探测");
+                    });
+        } finally { service.close(); }
+    }
+
+    @Test
+    void stoppedModelWorkerAndInvalidConfigurationAreNotReportedAsAvailable() {
+        when(catalog.list()).thenReturn(List.of());
+        var service = new SystemCheckService(diagnostics, catalog, true);
+        try {
+            when(diagnostics.modelConfiguration()).thenReturn(SystemDiagnostics.ModelConfiguration.WORKER_DISABLED);
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("model"))
+                    .singleElement().satisfies(check -> {
+                        assertThat(check.status()).isEqualTo(SystemCheckService.Status.WARNING);
+                        assertThat(check.code()).isEqualTo("AGENT_MODEL_WORKER_DISABLED");
+                    });
+            when(diagnostics.modelConfiguration()).thenThrow(new IllegalStateException("https://private-model.invalid token=secret"));
+            var report = service.check(admin);
+            assertThat(report.checks()).filteredOn(check -> check.id().equals("model"))
+                    .singleElement().satisfies(check -> {
+                        assertThat(check.status()).isEqualTo(SystemCheckService.Status.DOWN);
+                        assertThat(check.code()).isEqualTo("CHECK_FAILED");
+                    });
+            assertThat(report.toString()).doesNotContain("private-model", "secret");
+        } finally { service.close(); }
+    }
 
     @Test
     void rejectsBeforeQueryingAnyDependency() {

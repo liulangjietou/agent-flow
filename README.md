@@ -2,9 +2,9 @@
 
 AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。领域层表达审批、流程定义与工作日历规则，Flowable 作为基础设施防腐层运行 BPMN，Web 层提供租户隔离后的 REST API，Vue 设计器负责流程图编辑。
 
-当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。[Agent 字段选择、模型执行和人工复核](docs/agent-execution.md)已完成本地与合成环境验收。财务业务闭环、真实外部系统和企业生产验收仍未完成；这些分支成果尚未合入主线或部署到主演示。
+当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。[Agent 字段选择、模型执行和人工复核](docs/agent-execution.md)、结构化财务及高级流程已完成当前方案的本地验收；真实通知渠道、企业财务制度与接口、企业环境和远端交付仍待完成，详见[当前剩余清单](docs/remaining-local-work.md)。
 
-截至 2026-09-27，以上组织与治理成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收，详细进度见[本分支交付核对](docs/system-diagnostics-alignment.md)。
+截至 2026-10-01，上述本地成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收；[系统自检](docs/system-adapter-checks.md)区分存储查询、适配器配置与实际企业验收，不能用健康状态推定完整平台已上线。
 
 “流程管理”提供[流程目录](docs/definition-catalog.md)，支持名称、状态、准确流程标识及版本筛选，分批加载草稿和发布版本；打开时读取最新配置并保护未保存修改。
 
@@ -12,8 +12,7 @@ AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。�
 
 待办办理支持[批准意见填写与确认](docs/approval-comments.md)：意见选填，确认后提交；支持取消、原请求恢复和会签分别留痕，可在已办记录与操作审计追溯。
 
-[Agent 审批摘要核心](docs/agent-summary-core.md)正在开发：已建立领域状态、证据绑定与事务存储，并接入有申请授权的只读 API 和记录详情；真实模型、执行器及生成/复核操作尚未接入，不计为可用 Agent 生成功能。
-- [Agent 摘要运行记录](docs/agent-summary-records.md)：有申请授权的分页目录与详情展示；模型生成和人工复核写入尚未启用。
+[Agent 审批摘要](docs/agent-execution.md)支持当前审批人显式选择允许发送的字段，通过持久队列调用受控模型服务，再由有效审批人采纳修订或拒绝。结果不能代替批准；[运行记录](docs/agent-summary-records.md)保留原文、证据与人工复核历史。适配器默认关闭，真实模型连接和输出质量仍需目标环境验收。
 
 管理员“操作审计”支持按操作人、动作、来源、申请及 UTC 时间跨申请检索追加事件，保留缺失元数据的旧记录，并可下钻原申请详情。详见[管理员操作审计](docs/audit-search.md)。
 
@@ -80,7 +79,7 @@ npm run dev -- --host 127.0.0.1
 - `agentflow-server`：Spring Boot、Flowable/Flyway/JDBC 适配器、认证过滤器和 REST API。
 - `agentflow-web`：Vue 3 + TypeScript 的任务中心、申请表单和流程设计器。
 
-流程设计器接受 `START`、`END`、`USER_TASK`、`EXCLUSIVE_GATEWAY` 和 `PARALLEL_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
+流程设计器接受 `START`、`END`、`USER_TASK`、`COPY`、`TIMER_WAIT`、`EVENT_WAIT`、`SUB_PROCESS`、`EXCLUSIVE_GATEWAY` 和 `PARALLEL_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
 
 高级画布支持[并行拆分与汇合](docs/parallel-gateways.md)：同时启动多个审批分支，全部完成后进入后续步骤；支持嵌套、分支内会签与条件选择，发布前阻止缺分支或交叉汇合造成的永久等待。
 
@@ -96,7 +95,7 @@ Web 端的流程管理、申请记录和待办动作均调用服务端接口。�
 
 待办支持委派、回交、转交、领取和释放。受托人填写意见并回交后，由原审批人最终决定；接收人从当前身份源读取，操作审计和已办保留双方办理事实。详见[任务委派与回交](docs/task-delegation.md)。
 
-消息中心提供真实站内提醒、全部/未读筛选、未读总数、分页和已读操作，可从消息定位当前待办或申请。审批与消息共同提交，消息不扩大原申请权限。配置期限的新任务到期后可发送站内提醒；邮件、IM 和超时升级尚未接入。详见[站内消息中心](docs/notification-inbox.md)。
+消息中心提供真实站内提醒、全部/未读筛选、未读总数、分页和已读操作，可从消息定位当前待办或申请。审批与消息共同提交，消息不扩大原申请权限。[个人偏好](docs/notification-preferences.md)、[邮件投递与恢复](docs/notification-delivery.md)、[企业微信参考发送器](docs/wecom-notifications.md)及[超时升级](docs/task-escalation.md)已完成本地验收；外发只使用通用提醒，真实企业渠道和最终递送另行验收。详见[站内消息中心](docs/notification-inbox.md)。
 
 待办与申请详情支持真实审批轨迹、操作审计、轮次与动作/时间筛选及游标分页。新操作在业务事务内保存当时的操作人、转交接收人和申请状态变化；旧记录没有的信息不补造。详见[审批轨迹与操作审计](docs/approval-history.md)。
 
@@ -104,7 +103,7 @@ Web 端的流程管理、申请记录和待办动作均调用服务端接口。�
 
 待办与申请详情提供[提交轮次内容对比](docs/submission-round-comparison.md)，并排核对任意两轮的标题、版本、字段和表单配置，保留精确金额、空值及字段增删。对比仅使用提交快照，不包含尚未提交的修改。
 
-审批中申请支持协作评论，按申请权限读取并保留当时的轮次和状态，支持分页、草稿保留及幂等恢复；已结束申请的追加策略待确认，当前只读。详见[申请协作评论](docs/application-comments.md)。
+审批中申请支持协作评论，按申请权限读取并保留当时的轮次和状态，支持分页、草稿保留、幂等恢复及对本轮已有读取权限人员的 @ 提醒；已结束申请保持只读。详见[申请协作评论](docs/application-comments.md)。
 
 管理员可维护工作日历、节假日与调休，保留不可变修订并按固定版本试算到期时间。流程节点绑定明确日历修订后，新任务从创建时起计算期限；转交、委派和回交不重置，旧任务不补造期限。详见[工作日历与期限试算](docs/business-calendars.md)与[任务期限](docs/task-deadlines.md)。
 

@@ -50,7 +50,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 原任务、日历、暂停、通知与权限的真实事务验收；升级从不生成审批意见。 @author owlzhangfq@gmail.com */
+/** 原任务、日历、暂停、通知与权限的真实事务验收；升级从不生成审批意见。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.sla.reminders-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class TaskEscalationIntegrationTest {

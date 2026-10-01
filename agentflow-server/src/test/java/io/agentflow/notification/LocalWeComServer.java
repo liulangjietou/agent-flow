@@ -10,7 +10,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 
-/** 本机真实 HTTP 协议夹具；请求只保留在测试内存，不写凭据日志。 @author owlzhangfq@gmail.com */
+/** 本机真实 HTTP 协议夹具；请求只保留在测试内存，不写凭据日志。
+ * @author owlzhangfq@gmail.com
+ */
 final class LocalWeComServer implements AutoCloseable {
     static final String TOKEN = "{\"errcode\":0,\"access_token\":\"fixture-token\",\"expires_in\":7200}";
     static final String ACCEPT = "{\"errcode\":0,\"errmsg\":\"ok\",\"msgid\":\"fixture-message\"}";
@@ -46,7 +48,13 @@ final class LocalWeComServer implements AutoCloseable {
         }
     }
     @Override public void close() { server.stop(0); executor.shutdownNow(); }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     record Reply(int status, String body, long delayMillis) { static Reply json(String body) { return new Reply(200, body, 0); } }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     record Request(String method, String query, String body) {
         @Override public String toString() { return "WeComFixtureRequest[redacted]"; }
     }

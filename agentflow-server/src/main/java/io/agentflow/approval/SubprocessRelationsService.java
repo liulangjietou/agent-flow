@@ -63,15 +63,21 @@ public class SubprocessRelationsService {
 
     private static DomainException unavailable() { return new DomainException("SUBPROCESS_RELATION_UNAVAILABLE", "Subprocess relation does not match the saved round"); }
 
-    /** 已授权的最小原轮次引用，不包含表单、自由文本意见、发起任职或附件。@author owlzhangfq@gmail.com */
+    /** 已授权的最小原轮次引用，不包含表单、自由文本意见、发起任职或附件。
+     * @author owlzhangfq@gmail.com
+     */
     public record Reference(UUID applicationId, String businessNo, String processKey, long definitionVersion,
                             int roundNo, String title, SubmissionRound.Status status) { }
 
-    /** 调用节点属于已授权的父轮次，目标申请仍可能不可读。@author owlzhangfq@gmail.com */
+    /** 调用节点属于已授权的父轮次，目标申请仍可能不可读。
+     * @author owlzhangfq@gmail.com
+     */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Child(UUID id, String nodeId, String nodeName, Instant createdAt, Reference target) { }
 
-    /** 没有父调用与来源不可读分别表示；空页不推断尚未激活的流程路径。@author owlzhangfq@gmail.com */
+    /** 没有父调用与来源不可读分别表示；空页不推断尚未激活的流程路径。
+     * @author owlzhangfq@gmail.com
+     */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Page(UUID applicationId, int roundNo, Instant observedAt, boolean childApplication,
                        Reference parent, List<Child> children, UUID nextAfterId) { }

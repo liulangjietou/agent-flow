@@ -50,16 +50,21 @@ assert set(checks) == {"database", "migrations", "flowable", "templates", "authe
 for check_id in ("database", "migrations", "flowable", "templates"):
     assert checks[check_id]["status"] == "UP", (check_id, checks[check_id]["code"])
 assert checks["authentication"]["code"] == "DEMO_AUTH_ONLY"
-assert {check["id"] for check in report["checks"] if check["status"] == "NOT_IMPLEMENTED"} == {"objectStorage", "model"}
+assert not any(check["status"] == "NOT_IMPLEMENTED" for check in report["checks"])
+assert checks["objectStorage"]["code"] in {"LOCAL_ATTACHMENT_STORAGE", "ATTACHMENT_STORAGE_NOT_CONFIGURED"}
+assert checks["objectStorage"]["status"] == ("UP" if checks["objectStorage"]["code"] == "LOCAL_ATTACHMENT_STORAGE" else "WARNING")
+assert checks["model"]["status"] == "WARNING"
+assert checks["model"]["code"] in {"AGENT_MODEL_DISABLED", "AGENT_MODEL_WORKER_DISABLED", "AGENT_MODEL_CONFIGURED"}
 initialized = before[-1]["initialized"]
 assert checks["organization"]["status"] == ("UP" if initialized else "WARNING")
 assert checks["organization"]["code"] == ("LOCAL_ORGANIZATION_ENABLED" if initialized else "LOCAL_ORGANIZATION_NOT_INITIALIZED")
-assert next(check for check in report["checks"] if check["id"] == "notifications")["code"] == "IN_APP_ONLY"
+assert checks["notifications"]["status"] == "WARNING"
+assert checks["notifications"]["code"] in {"NOTIFICATION_WORKER_DISABLED", "NOTIFICATION_BINDINGS_MISSING", "NOTIFICATION_CHANNELS_CONFIGURED"}
 assert request("/actuator/health/readiness")["status"] == "UP"
 for forbidden in ("jdbc:", "password=", "Bearer ", "agentflow-local-demo-only"):
     assert forbidden not in json.dumps(report)
 print(json.dumps({"result": "PASS", "origin": origin, "report": report,
                   "verified": ["anonymous-401", "approver-403", "admin-checks", "same-origin-login",
                                "untrusted-origin-403", "readiness", "business-state-unchanged", "redacted-response",
-                               "local-organization-state"]},
+                               "local-organization-state", "adapter-configuration-not-delivery"]},
                  ensure_ascii=False, indent=2))

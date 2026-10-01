@@ -5,7 +5,9 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 个人偏好用例不具备代他人修改或关闭站内业务提醒的入口。 @author owlzhangfq@gmail.com */
+/** 个人偏好用例不具备代他人修改或关闭站内业务提醒的入口。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 public class NotificationPreferencesService {
     private final NotificationPreferencesRepository repository;

@@ -8,7 +8,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 
-/** 领取和确认各自使用短事务，渠道发送在两次事务之间执行。 @author owlzhangfq@gmail.com */
+/** 领取和确认各自使用短事务，渠道发送在两次事务之间执行。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class NotificationDeliveryWorker {
     private static final Logger LOG = LoggerFactory.getLogger(NotificationDeliveryWorker.class);

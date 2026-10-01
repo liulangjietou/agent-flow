@@ -163,7 +163,9 @@ public class SubprocessStopService {
         return new DomainException("SUBPROCESS_STOP_MISMATCH", "Subprocess stop no longer matches the original application tree");
     }
 
-    /** 当前事务内的原调用树，不能由客户端构造或用于另一个轮次。 @author owlzhangfq@gmail.com */
+    /** 当前事务内的原调用树，不能由客户端构造或用于另一个轮次。
+     * @author owlzhangfq@gmail.com
+     */
     public static final class Plan {
         private final UUID sourceId;
         private final List<Node> nodes;

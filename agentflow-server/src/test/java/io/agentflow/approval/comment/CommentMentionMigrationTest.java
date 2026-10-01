@@ -7,7 +7,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 旧评论及旧消息保留原事实，升级只给旧评论补空提醒名单。 @author owlzhangfq@gmail.com */
+/** 旧评论及旧消息保留原事实，升级只给旧评论补空提醒名单。
+ * @author owlzhangfq@gmail.com
+ */
 class CommentMentionMigrationTest {
     @Test void existingCommentsAndNotificationsKeepTheirOriginalData() {
         var source = new DriverManagerDataSource("jdbc:h2:mem:comment-mention-migration-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");

@@ -521,6 +521,9 @@ class SubprocessFinanceIntegrationTest {
     }
     private static FormSchema.Field field(String key, FormSchema.FieldType type) { return new FormSchema.Field(key, key, type, true, null, null, null, null, null); }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind {
         PLAN("/api/v1/expense-plans", ExpensePlanFormContract.DETAILS, "EXPENSE_PLAN_REVIEW_REQUIRED"),
         ADVANCE("/api/v1/advance-requests", AdvanceRequestFormContract.DETAILS, "ADVANCE_REQUEST_REVIEW_REQUIRED"),
@@ -531,7 +534,13 @@ class SubprocessFinanceIntegrationTest {
         private final String reviewCode;
         Kind(String path, String details, String reviewCode) { this.path = path; this.details = details; this.reviewCode = reviewCode; }
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Layout { REVIEW_THEN_CHILD, CHILD_THEN_REVIEW, CHILD_ONLY }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Fixture(Kind kind, UUID id, UUID applicationId, UUID childDefinitionId) {
         private String path() { return kind.path + "/" + id; }
     }

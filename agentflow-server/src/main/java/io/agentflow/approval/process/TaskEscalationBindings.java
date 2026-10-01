@@ -11,7 +11,9 @@ import java.util.Date;
 import org.flowable.task.service.delegate.DelegateTask;
 import org.springframework.stereotype.Component;
 
-/** 新任务在原事务固定升级时间、选人规则、目录修订和实际名单。 @author owlzhangfq@gmail.com */
+/** 新任务在原事务固定升级时间、选人规则、目录修订和实际名单。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class TaskEscalationBindings {
     public static final String DUE_AT = "agentflowEscalationDueAt";

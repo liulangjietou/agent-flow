@@ -659,6 +659,12 @@ class ExpenseSubprocessIntegrationTest {
         for (int index = 1; index < nodes.size(); index++) edges.add(new Edge("edge" + index, nodes.get(index - 1).id(), nodes.get(index).id(), ""));
         return new Graph(nodes, edges);
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Layout { COMPLETE, MISSING_FINANCE, MISSING_RECEIPT }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Fixture(UUID id, UUID applicationId, UUID invoice, UUID prior, UUID advance) { }
 }

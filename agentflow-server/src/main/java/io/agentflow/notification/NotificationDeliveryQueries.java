@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import static io.agentflow.notification.NotificationDeliveryViews.*;
 
-/** 本人投递与历史的只读用例，不根据管理员角色放宽接收人范围。 @author owlzhangfq@gmail.com */
+/** 本人投递与历史的只读用例，不根据管理员角色放宽接收人范围。
+ * @author owlzhangfq@gmail.com
+ */
 @Service
 @Transactional(readOnly = true)
 public class NotificationDeliveryQueries {

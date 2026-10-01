@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 原名单不可投递、单笔错误与扫描错误都不能跳过其他待升级任务。 @author owlzhangfq@gmail.com */
+/** 原名单不可投递、单笔错误与扫描错误都不能跳过其他待升级任务。
+ * @author owlzhangfq@gmail.com
+ */
 class TaskEscalationSchedulerTest {
     @Test
     void keepsBoundedCursorAcrossFailuresAndReturnsToUndeliverableTasks() {

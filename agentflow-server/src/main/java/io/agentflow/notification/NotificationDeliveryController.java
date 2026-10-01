@@ -19,7 +19,9 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import static io.agentflow.notification.NotificationDeliveryViews.*;
 
-/** 本人通知外发的查询与明确恢复，不接受接收人、地址或服务器覆盖。 @author owlzhangfq@gmail.com */
+/** 本人通知外发的查询与明确恢复，不接受接收人、地址或服务器覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 @RestController
 @RequestMapping("/api/v1/notifications/deliveries")
 public class NotificationDeliveryController {
@@ -68,7 +70,9 @@ public class NotificationDeliveryController {
 
     private static <T> ResponseEntity<T> noStore(T value) { return ResponseEntity.ok().header("Cache-Control", "no-store").body(value); }
 
-    /** 所有恢复选择显式提供；原因记录到原投递历史，不允许覆盖目标或状态。 */
+    /** 所有恢复选择显式提供；原因记录到原投递历史，不允许覆盖目标或状态。
+     * @author owlzhangfq@gmail.com
+     */
     public record RetryInput(@NotNull @Min(1) Long expectedVersion, @NotNull Boolean acknowledgePossibleDuplicate,
                              @NotBlank @Size(max = 1000) String reason) {
         /** 拒绝地址、收件人、状态及其他未定义字段。 */

@@ -111,5 +111,8 @@ final class SubprocessFinanceGatewayFixture implements AutoCloseable {
     private static Money money(String amount) { return new Money(new BigDecimal(amount), "CNY"); }
     /** 用例组结束后关闭自己的回环服务，不影响既有验收服务。 */
     @Override public void close() { server.stop(0); }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Context(JsonUtil json, UUID entity) { }
 }

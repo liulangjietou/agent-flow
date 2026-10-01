@@ -5,7 +5,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
-/** 外部通知的发送事实；结果未知时不自动重发，渠道受理不表示用户已经收到。 @author owlzhangfq@gmail.com */
+/** 外部通知的发送事实；结果未知时不自动重发，渠道受理不表示用户已经收到。
+ * @author owlzhangfq@gmail.com
+ */
 public record NotificationDeliveryProgress(Status status, long version, int attempts, int cycleAttempts,
                                            Instant nextAttemptAt, Instant leaseUntil, UUID leaseToken,
                                            FailureCode errorCode, Instant changedAt) {
@@ -14,7 +16,13 @@ public record NotificationDeliveryProgress(Status status, long version, int atte
     private static final Duration FIRST_RETRY_DELAY = Duration.ofSeconds(30);
     private static final Duration SECOND_RETRY_DELAY = Duration.ofSeconds(120);
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     public enum Status { PENDING, IN_FLIGHT, RETRY_WAIT, ACCEPTED, FAILED, UNKNOWN, SUPPRESSED }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     public enum FailureCode {
         CONSENT_REVOKED, RECIPIENT_INACTIVE, MESSAGE_UNAVAILABLE,
         BINDING_NOT_CAPTURED, BINDING_UNAVAILABLE, BINDING_CHANGED, CHANNEL_UNAVAILABLE,
@@ -22,9 +30,14 @@ public record NotificationDeliveryProgress(Status status, long version, int atte
         SMTP_RESULT_UNKNOWN, IM_TOKEN_UNAVAILABLE, IM_AUTH_FAILED, IM_RECIPIENT_REJECTED,
         IM_TEMPORARY_REJECTION, IM_PERMANENT_REJECTION, IM_RESULT_UNKNOWN, LEASE_EXPIRED, WORKER_RESULT_UNKNOWN
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     public enum Result { ACCEPTED, RETRYABLE, FAILED, UNKNOWN }
 
-    /** 传输层只提供固定分类，不持久化服务端错误正文或地址。 */
+    /** 传输层只提供固定分类，不持久化服务端错误正文或地址。
+     * @author owlzhangfq@gmail.com
+     */
     public record Outcome(Result result, FailureCode code) {
         public static Outcome accepted() { return new Outcome(Result.ACCEPTED, null); }
         public static Outcome retryable(FailureCode code) { return new Outcome(Result.RETRYABLE, code); }

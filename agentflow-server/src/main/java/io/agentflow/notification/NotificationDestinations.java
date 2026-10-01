@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import static io.agentflow.notification.NotificationDeliveryConfiguration.*;
 
-/** 启动时校验并冻结部署绑定；旧消息不能随配置变更转投新账号。 @author owlzhangfq@gmail.com */
+/** 启动时校验并冻结部署绑定；旧消息不能随配置变更转投新账号。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 public class NotificationDestinations {
     private static final Set<String> LOOPBACK = Set.of("127.0.0.1", "::1");
@@ -59,6 +61,13 @@ public class NotificationDestinations {
     /** 返回当前身份的原渠道绑定，调用方必须同时核对启用状态和已冻结摘要。 */
     public Optional<Destination> find(String tenant, String recipient, NotificationChannel channel) {
         return Optional.ofNullable(destinations.get(new Key(tenant, recipient, channel)));
+    }
+
+    /** 只返回本租户已启用绑定的渠道，用于配置诊断，不暴露收件人或证明渠道可用。 */
+    public Set<NotificationChannel> enabledChannels(String tenant) {
+        return destinations.values().stream()
+                .filter(destination -> destination.enabled() && destination.tenantId().equals(tenant))
+                .map(Destination::channel).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private static Destination email(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
@@ -121,9 +130,14 @@ public class NotificationDestinations {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Key(String tenant, String recipient, NotificationChannel channel) { }
 
-    /** 只供发送适配器使用，不作为 HTTP 响应或日志内容。 */
+    /** 只供发送适配器使用，不作为 HTTP 响应或日志内容。
+     * @author owlzhangfq@gmail.com
+     */
     public record Destination(String id, String tenantId, String recipient, NotificationChannel channel, String address,
                               SmtpServer server, String publicUrl, boolean enabled, String digest, WeComApp wecomApp) {
         @Override public String toString() { return "NotificationDestination[redacted]"; }

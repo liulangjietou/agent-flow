@@ -8,7 +8,9 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 个人偏好与完整启停代次历史共用事务，不能被并发初次创建覆盖。 @author owlzhangfq@gmail.com */
+/** 个人偏好与完整启停代次历史共用事务，不能被并发初次创建覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 @Repository
 public class JdbcNotificationPreferencesRepository implements NotificationPreferencesRepository {
     private final JdbcTemplate jdbc;

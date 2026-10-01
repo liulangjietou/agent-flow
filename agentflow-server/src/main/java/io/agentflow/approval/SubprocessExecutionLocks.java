@@ -100,10 +100,14 @@ public class SubprocessExecutionLocks {
         return applications.lockById(tenant, id).orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
     }
 
-    /** 暂停及过期是异步消费的正常结果，不通过事务代理异常把收件事务标为只能回滚。 @author owlzhangfq@gmail.com */
+    /** 暂停及过期是异步消费的正常结果，不通过事务代理异常把收件事务标为只能回滚。
+     * @author owlzhangfq@gmail.com
+     */
     public enum AncestorState { ACTIVE, PAUSED, STALE }
 
-    /** 锁后事实同时供人工入口的拒绝规则和后台消费的状态分支使用。 @author owlzhangfq@gmail.com */
+    /** 锁后事实同时供人工入口的拒绝规则和后台消费的状态分支使用。
+     * @author owlzhangfq@gmail.com
+     */
     public record LockedPath(List<Application> applications, AncestorState ancestors) {
         /** 路径最后一项始终是调用方指定的申请。 */
         public Application application() { return applications.get(applications.size() - 1); }

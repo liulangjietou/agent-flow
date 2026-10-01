@@ -21,7 +21,7 @@ onUnmounted(() => query.clear())
 <template>
   <section class="content system-checks" :aria-busy="query.loading">
     <div class="page-heading"><div><p class="eyebrow">WORKSPACE / SYSTEM CHECKS</p><h2>系统自检</h2><p class="subhead">查看实际运行状态，再开始第一条审批。</p></div><button class="secondary" :disabled="query.loading" @click="refresh">{{ query.loading ? '正在检查…' : '重新检查' }}</button></div>
-    <div class="system-scope-note"><strong>当前版本用于开发与演示</strong><span>检查结果反映本次查询范围，认证与本地组织状态见下方。目录启用后仍需核对人员、任职和审批资格；附件目录状态见下方；内容扫描、邮件 / IM 和模型服务尚待接入。</span></div>
+    <div class="system-scope-note"><strong>当前版本用于开发与演示</strong><span>检查范围见下方各项说明。目录启用后仍需核对人员、任职和审批资格；模型与外部通知配置通过不代表连接或递送已验收。本次不会调用模型或发送通知；附件内容扫描需另行接入。</span></div>
     <div v-if="query.loading" class="panel system-empty" role="status"><strong>正在检查依赖</strong><p>查询数据库、迁移记录与流程引擎，请稍候。</p></div>
     <div v-else-if="query.error" class="panel system-empty" role="alert"><strong>未取得自检结果</strong><p>{{ query.error }}</p><button class="secondary" @click="refresh">重试检查</button></div>
     <template v-else-if="query.report">

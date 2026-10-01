@@ -4,7 +4,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 外发轮询默认关闭，部署方配置收件绑定和服务器后显式启用。 @author owlzhangfq@gmail.com */
+/** 外发轮询默认关闭，部署方配置收件绑定和服务器后显式启用。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 @ConditionalOnProperty(name = "agentflow.notifications.delivery-worker-enabled", havingValue = "true")
 public class NotificationDeliveryScheduler {

@@ -7,7 +7,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.*;
 
-/** V92 不从历史消息推断同意，也不批量补造外发意向。 @author owlzhangfq@gmail.com */
+/** V92 不从历史消息推断同意，也不批量补造外发意向。
+ * @author owlzhangfq@gmail.com
+ */
 class NotificationPreferencesMigrationTest {
     @Test void oldInboxAndCommentsStayUnchangedWithoutAnyExternalConsent() {
         var source=new DriverManagerDataSource("jdbc:h2:mem:notification-pref-migration-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa","");
