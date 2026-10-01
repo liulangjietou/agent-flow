@@ -8,6 +8,11 @@ import io.agentflow.approval.process.FlowableTaskFacade;
 import io.agentflow.approval.process.TimerWaitService;
 import io.agentflow.approval.process.EventWaitService;
 import io.agentflow.approval.process.InstanceControlService;
+import io.agentflow.approval.process.FlowableTaskDeadlineListener;
+import io.agentflow.approval.process.FlowableTaskDeadlineReminders;
+import io.agentflow.calendar.BusinessCalendar;
+import io.agentflow.calendar.BusinessCalendarRepository;
+import io.agentflow.calendar.CalendarRules;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.repository.SubprocessCallRepository;
@@ -16,6 +21,8 @@ import io.agentflow.attachment.JdbcAttachmentRepository;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.auth.AuthService;
 import io.agentflow.definition.DefinitionApplicationService;
 import io.agentflow.definition.DefinitionAvailabilityService;
 import io.agentflow.definition.DefinitionDraftRepository;
@@ -42,20 +49,29 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Date;
+import java.util.EnumMap;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.engine.ManagementService;
+import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.web.servlet.MockMvc;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -72,6 +88,7 @@ import static org.mockito.Mockito.doCallRealMethod;
         "agentflow.webhooks.worker-enabled=false", "agentflow.webhooks.targets.subprocess.tenant-id=demo",
         "agentflow.webhooks.targets.subprocess.label=子流程合成验收", "agentflow.webhooks.targets.subprocess.url=https://example.invalid/webhook",
         "agentflow.webhooks.targets.subprocess.enabled=true", "agentflow.webhooks.targets.subprocess.signing-secret=whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class SubprocessStartIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN"));
     private static final Path FILES = Path.of("/fyoung/tmp/agentflow-subprocess-start-" + UUID.randomUUID());
@@ -97,6 +114,12 @@ class SubprocessStartIntegrationTest {
     @Autowired EventContractService contracts;
     @Autowired InstanceControlService instances;
     @Autowired ManagementService jobs;
+    @Autowired ProcessEngine processEngine;
+    @Autowired BusinessCalendarRepository calendars;
+    @Autowired FlowableTaskDeadlineReminders reminders;
+    @Autowired MockMvc mvc;
+    @Autowired AuthService auth;
+    @Autowired JsonUtil json;
     @MockitoSpyBean SubprocessStartService starts;
     @MockitoSpyBean InboxRepository inbox;
 
@@ -109,7 +132,7 @@ class SubprocessStartIntegrationTest {
         registry.add("spring.datasource.password", () -> System.getenv().getOrDefault("AGENTFLOW_SUBPROCESS_START_PASSWORD", ""));
     }
 
-    @AfterEach void clearActor() { actors.clear(); }
+    @AfterEach void clearActor() { actors.clear(); processEngine.getProcessEngineConfiguration().getClock().reset(); }
 
     @Test
     void initialSubmissionStartsTheFixedChildVersionWithSeparateIdentityAndOnlyMappedInputs() {
@@ -437,9 +460,12 @@ class SubprocessStartIntegrationTest {
         try { instances.pause(application.id(), 1, new InstanceControlService.Input(2L, "原根流程暂停")); }
         finally { actors.clear(); }
         assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
+        var suspended = jobs.createSuspendedJobQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        assertThat(suspended.getId()).isEqualTo(job.getId()); assertThat(suspended.getDuedate()).isEqualTo(job.getDuedate());
         actors.set(ADMIN);
         try { instances.resume(application.id(), 1, new InstanceControlService.Input(3L, "原根流程恢复")); }
         finally { actors.clear(); }
+        assertThat(jobs.createTimerJobQuery().jobId(job.getId()).singleResult().getDuedate()).isEqualTo(job.getDuedate());
         assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
         assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
         assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
@@ -465,6 +491,7 @@ class SubprocessStartIntegrationTest {
         try { instances.pause(application.id(), 1, new InstanceControlService.Input(2L, "等待来源期间暂停")); }
         finally { actors.clear(); }
         assertThat(events.advance(command)).isEqualTo(EventWaitService.Outcome.PAUSED);
+        assertThat(runtime.createProcessInstanceQuery().processInstanceId(call.childProcessInstanceId()).singleResult().isSuspended()).isTrue();
         actors.set(ADMIN);
         try { instances.resume(application.id(), 1, new InstanceControlService.Input(3L, "继续原等待")); }
         finally { actors.clear(); }
@@ -486,11 +513,12 @@ class SubprocessStartIntegrationTest {
             assertThat(instances.read(call.childApplicationId(), 1).canPause()).isFalse();
         } finally { actors.clear(); }
         var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
-        failure(() -> as("manager", () -> actions.action(task.getId(), "APPROVE", "根流程未恢复", null, 2L)), "SUBPROCESS_PARENT_CHANGED");
+        assertThat(task.isSuspended()).isTrue();
+        failure(() -> as("manager", () -> actions.action(task.getId(), "APPROVE", "根流程未恢复", null, 3L)), "NOT_FOUND");
         actors.set(ADMIN);
         try { instances.resume(application.id(), 1, new InstanceControlService.Input(3L, "恢复原根流程")); }
         finally { actors.clear(); }
-        as("manager", () -> actions.action(task.getId(), "APPROVE", "恢复后办理", null, 2L));
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "恢复后办理", null, 4L));
         assertThat(repository.findById("demo", application.id()).orElseThrow().version()).isEqualTo(5);
     }
 
@@ -764,9 +792,278 @@ class SubprocessStartIntegrationTest {
                 call.childApplicationId().toString())).isZero();
     }
 
+    @Test
+    void rootPauseFreezesEveryNestedParallelChildAndResumesItsOriginalCalendarDeadline() {
+        var calendar = calendar(); setTime("2026-09-25T16:30:00Z");
+        var leaf = child(key(), schema("total"), Map.of("assigneeRule", "user:manager", "deadlineCalendarId", calendar.id().toString(),
+                "deadlineCalendarRevision", "1", "deadlineWorkingMinutes", "60"));
+        var middle = parent(leaf, schema("total"), Map.of("total", "total"), false, false, nativeId(leaf), false);
+        var application = create(parallelParent(middle), Map.of("amount", "10"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var branches = calls.findByParentRound("demo", application.id(), 1);
+        var allCalls = new ArrayList<>(branches);
+        for (var branch : branches) allCalls.add(onlyCall(branch.childApplicationId()));
+        var originalTasks = allCalls.stream().flatMap(call -> tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).list().stream()).toList();
+        assertThat(originalTasks).hasSize(2);
+        var rootRound = rounds.findByRound("demo", application.id(), 1).orElseThrow();
+        setTime("2026-09-25T16:30:12.345Z");
+        control(application.id(), true, 2, "只留在根申请的维护原因");
+        assertThat(runtime.createProcessInstanceQuery().processInstanceId(rootRound.processInstanceId()).singleResult().isSuspended()).isTrue();
+        for (var call : allCalls) {
+            var instance = runtime.createProcessInstanceQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+            assertThat(instance.isSuspended()).as("child %s is natively paused", call.childApplicationId()).isTrue();
+            assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().version()).isEqualTo(3);
+            assertThat(rounds.findByRound("demo", call.childApplicationId(), 1).orElseThrow().status()).isEqualTo(SubmissionRound.Status.IN_APPROVAL);
+            actors.set(ADMIN);
+            try {
+                var view = instances.read(call.childApplicationId(), 1);
+                assertThat(view.state()).isEqualTo(InstanceControlService.State.PAUSED);
+                assertThat(view.pausedAt()).isEqualTo(Instant.parse("2026-09-25T16:30:12.345Z"));
+                assertThat(view.canPause()).isFalse(); assertThat(view.canResume()).isFalse();
+                failure(() -> instances.resume(call.childApplicationId(), 1, new InstanceControlService.Input(3L, "不得单独恢复")), "SUBPROCESS_PARENT_CONTROL_REQUIRED");
+            } finally { actors.clear(); }
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND payload_json LIKE ?", Integer.class,
+                    call.childApplicationId().toString(), "%只留在根申请的维护原因%")).isZero();
+        }
+        for (var original : originalTasks) {
+            var paused = tasks.createTaskQuery().taskId(original.getId()).singleResult();
+            assertThat(paused.isSuspended()).isTrue(); assertThat(paused.getDueDate()).isEqualTo(original.getDueDate());
+            assertThat(tasks.getVariableLocal(paused.getId(), InstanceControlService.PAUSED_DUE_AT)).isEqualTo(original.getDueDate().toInstant().toString());
+            assertThat(reminders.remind(paused.getId(), original.getDueDate().toInstant().plusSeconds(1))).isFalse();
+        }
+        calendars.update(calendar.revise("改变当前日历不改变原修订", new CalendarRules("UTC", Map.of(DayOfWeek.WEDNESDAY,
+                List.of(new CalendarRules.Period("12:00", "13:00"))), List.of()), 1, "admin", Instant.now()), 1);
+        setTime("2026-09-29T16:30:20.125Z"); control(application.id(), false, 3, "接续每个子任务原时限");
+        for (var call : allCalls) {
+            assertThat(runtime.createProcessInstanceQuery().processInstanceId(call.childProcessInstanceId()).singleResult().isSuspended()).isFalse();
+            assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().version()).isEqualTo(4);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action IN ('INSTANCE_PAUSE','INSTANCE_RESUME') AND actor_id='system:subprocess'",
+                    Integer.class, call.childApplicationId().toString())).isEqualTo(2);
+        }
+        for (var original : originalTasks) {
+            var resumed = tasks.createTaskQuery().taskId(original.getId()).singleResult();
+            assertThat(resumed.isSuspended()).isFalse();
+            assertThat(resumed.getDueDate().toInstant()).isEqualTo(Instant.parse("2026-09-30T09:30:07.780Z"));
+            assertThat(tasks.getVariableLocal(resumed.getId(), FlowableTaskDeadlineListener.CALENDAR_REVISION)).isEqualTo(1L);
+            assertThat(tasks.getVariableLocal(resumed.getId(), FlowableTaskDeadlineListener.STARTED_AT)).isEqualTo("2026-09-25T16:30:00Z");
+            assertThat(tasks.getVariableLocal(resumed.getId(), InstanceControlService.PAUSED_DUE_AT)).isNull();
+        }
+        assertThat(rounds.findByRound("demo", application.id(), 1).orElseThrow()).isEqualTo(rootRound);
+    }
+
+    @Test
+    void treePauseKeepsAlreadyApprovedSiblingAndDoesNotInventADueDateForTheRemainingTask() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parallelParent(leaf), Map.of("amount", "11"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var branches = calls.findByParentRound("demo", application.id(), 1);
+        var decided = branches.get(0); var waiting = branches.get(1);
+        var finishedTask = tasks.createTaskQuery().processInstanceId(decided.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(finishedTask.getId(), "APPROVE", "保留实际批准", null, 2L));
+        var approved = repository.findById("demo", decided.childApplicationId()).orElseThrow();
+        var oldRound = rounds.findByRound("demo", approved.id(), 1).orElseThrow();
+        long rootVersion = repository.findById("demo", application.id()).orElseThrow().version();
+        control(application.id(), true, rootVersion, "只冻结待办分支");
+        var remaining = tasks.createTaskQuery().processInstanceId(waiting.childProcessInstanceId()).singleResult();
+        assertThat(remaining.isSuspended()).isTrue(); assertThat(remaining.getDueDate()).isNull();
+        control(application.id(), false, rootVersion + 1, "恢复待办分支");
+        assertThat(tasks.createTaskQuery().taskId(remaining.getId()).singleResult().getDueDate()).isNull();
+        assertThat(rounds.findByRound("demo", approved.id(), 1).orElseThrow()).isEqualTo(oldRound);
+        assertThat(repository.findById("demo", approved.id()).orElseThrow().version()).isEqualTo(approved.version());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action IN ('INSTANCE_PAUSE','INSTANCE_RESUME')", Integer.class,
+                approved.id().toString())).isZero();
+        as("manager", () -> actions.action(remaining.getId(), "APPROVE", "接续剩余批准", null, 4L));
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = InboxMessage.Kind.class, names = {"APPLICATION_PAUSED", "APPLICATION_RESUMED"})
+    void aLateChildNotificationFailureRollsBackTheWholeTreeControlAndOriginalDeadlines(InboxMessage.Kind kind) {
+        setTime("2026-09-23T09:00:00Z"); var calendar = calendar();
+        var leaf = child(key(), schema("total"), Map.of("assigneeRule", "user:manager", "deadlineCalendarId", calendar.id().toString(),
+                "deadlineCalendarRevision", "1", "deadlineWorkingMinutes", "60"));
+        var application = create(parallelParent(leaf), Map.of("amount", "12"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var branches = calls.findByParentRound("demo", application.id(), 1);
+        boolean pause = kind == InboxMessage.Kind.APPLICATION_PAUSED;
+        setTime("2026-09-23T09:15:00Z");
+        if (!pause) { control(application.id(), true, 2, "保存整棵树的原暂停"); setTime("2026-09-24T09:00:00Z"); }
+        long version = pause ? 2 : 3;
+        int oldAudit = count("audit_event"), oldInbox = count("notification_inbox"), oldOutbox = count("webhook_delivery");
+        var targetChild = branches.get(1).childApplicationId();
+        InboxRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(inbox);
+        doAnswer(invocation -> {
+            Object result = invocation.callRealMethod(); InboxMessage message = invocation.getArgument(1);
+            if (message.kind() == kind && message.applicationId().equals(targetChild)) throw new IllegalStateException("Injected child runtime notification failure");
+            return result;
+        }).when(target).append(anyString(), any());
+        try {
+            assertThatThrownBy(() -> control(application.id(), pause, version, "必须整笔回滚"))
+                    .hasStackTraceContaining("Injected child runtime notification failure");
+        } finally { doCallRealMethod().when(target).append(anyString(), any()); }
+        var ids = new ArrayList<>(branches.stream().map(SubprocessCall::childApplicationId).toList()); ids.add(application.id());
+        for (var id : ids) {
+            var current = repository.findById("demo", id).orElseThrow();
+            assertThat(current.version()).isEqualTo(version); assertThat(current.status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+            var round = rounds.findByRound("demo", id, 1).orElseThrow();
+            var instance = runtime.createProcessInstanceQuery().processInstanceId(round.processInstanceId()).singleResult();
+            assertThat(instance.isSuspended()).isEqualTo(!pause);
+            assertThat(runtime.getVariable(instance.getId(), InstanceControlService.PAUSED_AT))
+                    .isEqualTo(pause ? null : "2026-09-23T09:15:00Z");
+            for (var task : tasks.createTaskQuery().processInstanceId(instance.getId()).list()) {
+                assertThat(task.isSuspended()).isEqualTo(!pause);
+                assertThat(task.getDueDate().toInstant()).isEqualTo(Instant.parse("2026-09-23T10:00:00Z"));
+                assertThat(tasks.getVariableLocal(task.getId(), InstanceControlService.PAUSED_DUE_AT))
+                        .isEqualTo(pause ? null : "2026-09-23T10:00:00Z");
+            }
+        }
+        assertThat(count("audit_event")).isEqualTo(oldAudit); assertThat(count("notification_inbox")).isEqualTo(oldInbox);
+        assertThat(count("webhook_delivery")).isEqualTo(oldOutbox);
+        control(application.id(), pause, version, "重试同一明确操作");
+        for (var id : ids) assertThat(repository.findById("demo", id).orElseThrow().version()).isEqualTo(version + 1);
+        if (pause) { setTime("2026-09-24T09:00:00Z"); control(application.id(), false, 3, "恢复实际暂停"); }
+        for (var branch : branches) assertThat(tasks.createTaskQuery().processInstanceId(branch.childProcessInstanceId()).singleResult().getDueDate().toInstant())
+                .isEqualTo(Instant.parse("2026-09-24T09:45:00Z"));
+    }
+
+    @Test
+    void treeControlKeepsAnOverdueChildsOriginalDueAndAlreadyDeliveredReminder() {
+        setTime("2026-09-23T09:00:00Z"); var calendar = calendar();
+        var leaf = child(key(), schema("total"), Map.of("assigneeRule", "user:manager", "deadlineCalendarId", calendar.id().toString(),
+                "deadlineCalendarRevision", "1", "deadlineWorkingMinutes", "60"));
+        var application = create(parent(leaf, schema("amount"), Map.of("total", "amount"), false, false), Map.of("amount", "13"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id()); var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        assertThat(reminders.remind(task.getId(), task.getDueDate().toInstant())).isTrue();
+        var marker = tasks.getVariableLocal(task.getId(), FlowableTaskDeadlineListener.REMINDED_AT);
+        setTime("2026-09-23T10:15:00Z"); control(application.id(), true, 2, "暂停已超时的原任务");
+        assertThat(reminders.candidates(Instant.parse("2026-09-24T09:00:00Z"), null)).noneMatch(candidate -> candidate.taskId().equals(task.getId()));
+        setTime("2026-09-24T09:00:00Z"); control(application.id(), false, 3, "保持原超时事实");
+        assertThat(tasks.createTaskQuery().taskId(task.getId()).singleResult().getDueDate()).isEqualTo(task.getDueDate());
+        assertThat(tasks.getVariableLocal(task.getId(), FlowableTaskDeadlineListener.REMINDED_AT)).isEqualTo(marker);
+        assertThat(reminders.remind(task.getId(), Instant.parse("2026-09-24T09:00:00Z"))).isFalse();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='TASK_OVERDUE'", Integer.class,
+                call.childApplicationId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void missingChildPauseEvidenceCannotPartiallyResumeTheRoot() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parent(leaf, schema("amount"), Map.of("total", "amount"), false, false), Map.of("amount", "14"));
+        as("alice", () -> applications.submit(application.id(), 1)); var call = onlyCall(application.id());
+        control(application.id(), true, 2, "可核验的原暂停");
+        Object pausedAt = runtime.getVariable(call.childProcessInstanceId(), InstanceControlService.PAUSED_AT);
+        // 原生 API 禁止修改暂停实例变量；直接损坏合成夹具的一列，验证缺失证据必须拒绝，再恢复原值。
+        assertThat(jdbc.update("UPDATE ACT_RU_VARIABLE SET TEXT_=NULL WHERE PROC_INST_ID_=? AND EXECUTION_ID_=? AND NAME_=?",
+                call.childProcessInstanceId(), call.childProcessInstanceId(), InstanceControlService.PAUSED_AT)).isEqualTo(1);
+        int oldAudit = count("audit_event"), oldInbox = count("notification_inbox"), oldOutbox = count("webhook_delivery");
+        failure(() -> control(application.id(), false, 3, "缺少子暂停依据必须拒绝"), "CONCURRENCY_CONFLICT");
+        for (String instance : List.of(call.parentProcessInstanceId(), call.childProcessInstanceId())) {
+            assertThat(runtime.createProcessInstanceQuery().processInstanceId(instance).singleResult().isSuspended()).isTrue();
+        }
+        assertThat(repository.findById("demo", application.id()).orElseThrow().version()).isEqualTo(3);
+        assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().version()).isEqualTo(3);
+        assertThat(count("audit_event")).isEqualTo(oldAudit); assertThat(count("notification_inbox")).isEqualTo(oldInbox);
+        assertThat(count("webhook_delivery")).isEqualTo(oldOutbox);
+        assertThat(jdbc.update("UPDATE ACT_RU_VARIABLE SET TEXT_=? WHERE PROC_INST_ID_=? AND EXECUTION_ID_=? AND NAME_=?",
+                pausedAt, call.childProcessInstanceId(), call.childProcessInstanceId(), InstanceControlService.PAUSED_AT)).isEqualTo(1);
+        control(application.id(), false, 3, "恢复已知的合成夹具后再操作");
+    }
+
+    @Test
+    void aPauseWinningWhileAuthorizedChildApprovalWaitsBlocksThatOldDecision() throws Exception {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parent(leaf, schema("amount"), Map.of("total", "amount"), false, false), Map.of("amount", "15"));
+        as("alice", () -> applications.submit(application.id(), 1)); var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        var approvalReady = new CountDownLatch(1); var pauseCommitted = new CountDownLatch(1);
+        ApplicationRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(repository);
+        doAnswer(invocation -> {
+            if (actors.actor().userId().equals("manager")) {
+                approvalReady.countDown();
+                if (!pauseCommitted.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Pause did not commit");
+            }
+            return invocation.callRealMethod();
+        }).when(target).lockById("demo", application.id());
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var approval = executor.submit(() -> {
+                try { as("manager", () -> actions.action(task.getId(), "APPROVE", "暂停期间不能接续旧决定", null, 2L)); return "ACCEPTED"; }
+                catch (DomainException conflict) { return conflict.code(); }
+            });
+            assertThat(approvalReady.await(15, TimeUnit.SECONDS)).isTrue();
+            control(application.id(), true, 2, "在根锁下先完成暂停"); pauseCommitted.countDown();
+            assertThat(approval.get(15, TimeUnit.SECONDS)).isEqualTo(SubprocessExecutionLocks.PARENT_CHANGED);
+        } finally {
+            pauseCommitted.countDown(); executor.shutdownNow(); assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            doCallRealMethod().when(target).lockById("demo", application.id());
+        }
+        assertThat(tasks.createTaskQuery().taskId(task.getId()).singleResult().isSuspended()).isTrue();
+        assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().version()).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class,
+                call.childApplicationId().toString())).isZero();
+        control(application.id(), false, 3, "恢复同一子任务");
+    }
+
+    @Test
+    void originalHttpPauseReplayControlsEachChildOnceAndCannotPauseThemAgainAfterResume() throws Exception {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parallelParent(leaf), Map.of("amount", "16"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var branches = calls.findByParentRound("demo", application.id(), 1);
+        String token = "Bearer " + auth.login("demo", "admin", "demo").token();
+        String key = UUID.randomUUID().toString(), body = json.write(Map.of("expectedVersion", 2, "reason", "原号暂停整棵树"));
+        String path = "/api/v1/applications/" + application.id() + "/rounds/1/runtime/pause";
+        var first = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+                .header("Authorization", token).header("Idempotency-Key", key).contentType("application/json").content(body))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse().getContentAsString();
+        control(application.id(), false, 3, "先完成明确恢复");
+        var replay = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+                .header("Authorization", token).header("Idempotency-Key", key).contentType("application/json").content(body))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Idempotency-Replayed", "true"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(replay).isEqualTo(first);
+        for (var call : branches) {
+            assertThat(runtime.createProcessInstanceQuery().processInstanceId(call.childProcessInstanceId()).singleResult().isSuspended()).isFalse();
+            assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().version()).isEqualTo(4);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='INSTANCE_PAUSE'", Integer.class,
+                    call.childApplicationId().toString())).isEqualTo(1);
+        }
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path.replace(application.id().toString(), branches.get(0).childApplicationId().toString()))
+                .header("Authorization", token).header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json")
+                .content(json.write(Map.of("expectedVersion", 4, "reason", "不能从子调用控制"))))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnprocessableEntity())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("code").value("SUBPROCESS_PARENT_CONTROL_REQUIRED"));
+    }
+
+    private BusinessCalendar calendar() {
+        var week = new EnumMap<DayOfWeek, List<CalendarRules.Period>>(DayOfWeek.class);
+        for (var day : List.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)) {
+            week.put(day, List.of(new CalendarRules.Period("09:00", "17:00")));
+        }
+        var rules = new CalendarRules("UTC", week, List.of(new CalendarRules.DayOverride(LocalDate.parse("2026-09-28"), List.of(), "假日")));
+        var calendar = BusinessCalendar.create("demo", "sub-pause-" + UUID.randomUUID(), "子任务原日历", rules, "admin", Instant.now());
+        calendars.create(calendar); return calendar;
+    }
+
+    private void setTime(String value) { processEngine.getProcessEngineConfiguration().getClock().setCurrentTime(Date.from(Instant.parse(value))); }
+
+    private InstanceControlService.View control(UUID application, boolean pause, long version, String reason) {
+        actors.set(ADMIN);
+        try {
+            var input = new InstanceControlService.Input(version, reason);
+            return pause ? instances.pause(application, 1, input) : instances.resume(application, 1, input);
+        } finally { actors.clear(); }
+    }
+
     private DefinitionDraft child(String key, FormSchema schema, String assignee) {
+        return child(key, schema, Map.of("assigneeRule", assignee));
+    }
+
+    private DefinitionDraft child(String key, FormSchema schema, Map<String, String> properties) {
         var graph = new Graph(List.of(new Node("start", "发起", NodeType.START, Map.of()),
-                new Node("review", "独立人工核对", NodeType.USER_TASK, Map.of("assigneeRule", assignee)),
+                new Node("review", "独立人工核对", NodeType.USER_TASK, properties),
                 new Node("end", "结束", NodeType.END, Map.of())),
                 List.of(new Edge("a", "start", "review", ""), new Edge("b", "review", "end", "")));
         var draft = definitions.create(tenant, key, "固定子流程", graph, schema);

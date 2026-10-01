@@ -3,11 +3,14 @@ package io.agentflow.approval.process;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.SubprocessExecutionLocks;
+import io.agentflow.approval.SubprocessStartService;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
+import io.agentflow.approval.model.SubprocessCall;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
+import io.agentflow.approval.repository.SubprocessCallRepository;
 import io.agentflow.approval.service.ApplicationAuditPort;
 import io.agentflow.calendar.BusinessCalendarRepository;
 import io.agentflow.calendar.BusinessDeadline;
@@ -29,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -51,16 +56,18 @@ public class InstanceControlService {
     private final CurrentActor actors;
     private final ProcessEngine engine;
     private final SubprocessExecutionLocks executionLocks;
+    private final SubprocessCallRepository calls;
 
     /** 只协调已绑定的原轮次，不提供替换审批人、跳节点或形成业务结论的能力。 */
     public InstanceControlService(ApplicationRepository applications, SubmissionRoundRepository rounds,
             ApprovalApplicationFacade reads, RuntimeService runtime, TaskService tasks,
             BusinessCalendarRepository calendars, ApplicationAuditPort audit, ApprovalNotificationService notifications,
-            CurrentActor actors, ProcessEngine engine, SubprocessExecutionLocks executionLocks) {
+            CurrentActor actors, ProcessEngine engine, SubprocessExecutionLocks executionLocks, SubprocessCallRepository calls) {
         this.applications = applications; this.rounds = rounds; this.reads = reads; this.runtime = runtime;
         this.tasks = tasks; this.calendars = calendars; this.audit = audit; this.notifications = notifications;
         this.actors = actors; this.engine = engine;
         this.executionLocks = executionLocks;
+        this.calls = calls;
     }
 
     /** 幂等回放仍检查当前管理员身份，不能借旧回执绕过角色撤销。 */
@@ -84,44 +91,80 @@ public class InstanceControlService {
     @Transactional
     public View pause(UUID id, int roundNo, Input input) {
         var actor = requireAdministrator(); var binding = lock(actor, id, roundNo);
-        var application = binding.application(); var instance = binding.instance();
-        if (instance.isSuspended() || pauseTime(instance) != null) throw changed();
-        application.recordRuntimeAction(input.expectedVersion());
-        var previous = notifications.pendingAudience(application);
+        binding.application().checkVersion(input.expectedVersion());
+        var family = family(binding);
+        for (var item : family) if (item.instance().isSuspended() || pauseTime(item.instance()) != null) throw changed();
         Instant now = now();
-        for (var task : tasks.createTaskQuery().processInstanceId(instance.getId()).includeTaskLocalVariables().list()) {
-            if (!task.getTaskLocalVariables().containsKey(FlowableTaskDeadlineListener.CALENDAR_ID)) continue;
-            if (task.getDueDate() == null || task.getTaskLocalVariables().containsKey(PAUSED_DUE_AT)) throw invalidDeadline();
-            tasks.setVariableLocal(task.getId(), PAUSED_DUE_AT, task.getDueDate().toInstant().toString());
+        for (var item : family) {
+            var application = item.application(); var instance = item.instance();
+            long version = application.version(); application.recordRuntimeAction(version);
+            var previous = notifications.pendingAudience(application);
+            for (var task : tasks.createTaskQuery().processInstanceId(instance.getId()).includeTaskLocalVariables().list()) {
+                if (!task.getTaskLocalVariables().containsKey(FlowableTaskDeadlineListener.CALENDAR_ID)) continue;
+                if (task.getDueDate() == null || task.getTaskLocalVariables().containsKey(PAUSED_DUE_AT)) throw invalidDeadline();
+                tasks.setVariableLocal(task.getId(), PAUSED_DUE_AT, task.getDueDate().toInstant().toString());
+            }
+            runtime.setVariable(instance.getId(), PAUSED_AT, now.toString());
+            runtime.suspendProcessInstanceById(instance.getId());
+            String operator = save(item, id, actor, input, ApplicationAuditPort.Action.INSTANCE_PAUSE, version);
+            notifications.instancePaused(application, operator, previous);
         }
-        runtime.setVariable(instance.getId(), PAUSED_AT, now.toString());
-        runtime.suspendProcessInstanceById(instance.getId());
-        save(binding, actor, input, ApplicationAuditPort.Action.INSTANCE_PAUSE);
-        notifications.instancePaused(application, actor.userId(), previous);
-        return view(application, roundNo, State.PAUSED, now, true);
+        return view(binding.application(), roundNo, State.PAUSED, now, true);
     }
 
     /** 恢复沿用每张任务的原日历修订与剩余工时，已经发出的超时提醒不重新投递。 */
     @Transactional
     public View resume(UUID id, int roundNo, Input input) {
         var actor = requireAdministrator(); var binding = lock(actor, id, roundNo);
-        var application = binding.application(); var instance = binding.instance();
-        Instant pausedAt = pauseTime(instance);
-        if (!instance.isSuspended() || pausedAt == null) throw changed();
-        application.recordRuntimeAction(input.expectedVersion());
+        binding.application().checkVersion(input.expectedVersion());
+        var family = family(binding);
+        Instant pausedAt = pauseTime(binding.instance());
+        if (pausedAt == null) throw changed();
+        for (var item : family) if (!item.instance().isSuspended() || !pausedAt.equals(pauseTime(item.instance()))) throw changed();
         Instant now = now();
         if (now.isBefore(pausedAt)) throw changed();
-        var deadlines = resumedDeadlines(application, instance.getId(), pausedAt, now);
-        // 先在事务内激活再更新原任务，引擎不允许修改暂停任务；任何失败均回滚激活及全部期限。
-        runtime.activateProcessInstanceById(instance.getId());
-        for (var deadline : deadlines) {
-            tasks.setDueDate(deadline.taskId(), Date.from(deadline.dueAt()));
-            tasks.removeVariableLocal(deadline.taskId(), PAUSED_DUE_AT);
+        for (var item : family) {
+            var application = item.application(); var instance = item.instance();
+            long version = application.version(); application.recordRuntimeAction(version);
+            var deadlines = resumedDeadlines(application, instance.getId(), pausedAt, now);
+            // 先在事务内激活再更新原任务，引擎不允许修改暂停任务；失败会回滚整棵树的激活及期限。
+            runtime.activateProcessInstanceById(instance.getId());
+            for (var deadline : deadlines) {
+                tasks.setDueDate(deadline.taskId(), Date.from(deadline.dueAt()));
+                tasks.removeVariableLocal(deadline.taskId(), PAUSED_DUE_AT);
+            }
+            runtime.removeVariable(instance.getId(), PAUSED_AT);
+            String operator = save(item, id, actor, input, ApplicationAuditPort.Action.INSTANCE_RESUME, version);
+            notifications.instanceResumed(application, operator);
         }
-        runtime.removeVariable(instance.getId(), PAUSED_AT);
-        save(binding, actor, input, ApplicationAuditPort.Action.INSTANCE_RESUME);
-        notifications.instanceResumed(application, actor.userId());
-        return view(application, roundNo, State.RUNNING, null, true);
+        return view(binding.application(), roundNo, State.RUNNING, null, true);
+    }
+
+    private List<Binding> family(Binding root) {
+        var active = new ArrayList<Binding>();
+        collect(root, true, new HashSet<>(), active);
+        return active;
+    }
+
+    /** 根锁串行化整棵原调用树；已结束分支只核对绑定，不能重新暂停或产生运维审计。 */
+    private void collect(Binding binding, boolean ancestorsActive, Set<UUID> seen, List<Binding> active) {
+        var application = binding.application(); var round = binding.round();
+        if (!seen.add(application.id()) || application.roundNo() != round.roundNo()
+                || application.definitionVersion() != round.definitionVersion() || !application.status().name().equals(round.status().name())) throw unavailable();
+        boolean running = application.status() == ApplicationStatus.IN_APPROVAL;
+        if (running) {
+            if (!ancestorsActive || !bound(application, round, binding.instance())) throw unavailable();
+            active.add(binding);
+        } else if (binding.instance() != null) throw unavailable();
+        for (var call : calls.findByParentRound(application.tenantId(), application.id(), round.roundNo())) {
+            if (!call.parentProcessInstanceId().equals(round.processInstanceId())
+                    || !call.parentRuntimeDefinitionId().equals(application.runtimeDefinitionId())) throw unavailable();
+            var child = applications.lockById(application.tenantId(), call.childApplicationId()).orElseThrow(InstanceControlService::unavailable);
+            var childRound = rounds.findByRound(application.tenantId(), child.id(), SubprocessCall.CHILD_ROUND).orElseThrow(InstanceControlService::unavailable);
+            if (!call.childRuntimeDefinitionId().equals(child.runtimeDefinitionId()) || !call.childProcessInstanceId().equals(childRound.processInstanceId())
+                    || call.policy().version() != child.definitionVersion() || !call.policy().processKey().equals(child.processKey())) throw unavailable();
+            collect(new Binding(child, childRound, instance(childRound.processInstanceId())), ancestorsActive && running, seen, active);
+        }
     }
 
     private List<Deadline> resumedDeadlines(Application application, String instanceId, Instant pausedAt, Instant now) {
@@ -167,11 +210,16 @@ public class InstanceControlService {
         return new View(application.id(), round, application.version(), state, pausedAt,
                 administrator && state == State.RUNNING, administrator && state == State.PAUSED && pausedAt != null);
     }
-    private void save(Binding binding, Actor actor, Input input, ApplicationAuditPort.Action action) {
-        var application = binding.application(); applications.update(application, input.expectedVersion());
+    private String save(Binding binding, UUID rootId, Actor actor, Input input, ApplicationAuditPort.Action action, long previousVersion) {
+        var application = binding.application(); applications.update(application, previousVersion);
+        boolean root = application.id().equals(rootId);
+        String operator = root ? actor.userId() : SubprocessStartService.SYSTEM_ACTOR;
+        // 原具名原因只保存在根申请；子申请用系统身份与原调用来源解释联动，不外传父表单或自由文本。
+        String reason = root ? input.reason().strip() : "Subprocess runtime controlled through root application " + rootId + ", action=" + action;
         audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(),
-                application.roundNo(), binding.round().processInstanceId(), actor.userId(), action, ApplicationStatus.IN_APPROVAL,
-                ApplicationStatus.IN_APPROVAL, input.reason().strip()));
+                application.roundNo(), binding.round().processInstanceId(), operator, action, ApplicationStatus.IN_APPROVAL,
+                ApplicationStatus.IN_APPROVAL, reason));
+        return operator;
     }
     private Instant now() { return engine.getProcessEngineConfiguration().getClock().getCurrentTime().toInstant(); }
     private static DomainException unavailable() { return new DomainException("NOT_FOUND", "The bound approval instance is not available"); }

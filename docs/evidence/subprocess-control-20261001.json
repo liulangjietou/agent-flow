@@ -1,0 +1,264 @@
+{
+  "recordedAt": "2026-10-01T11:44:00.881817+00:00",
+  "status": "NATIVE_SUBPROCESS_PAUSE_RESUME_AND_SLA_VERIFIED_PUBLIC_FEATURE_INCOMPLETE",
+  "baseCommit": "eac743a5cb10eb7562d3e5dfc59cd9c1fdee436f",
+  "scope": "Root-authorized native pause/resume of all active descendants, original per-task calendar/deadline retention, transactional control audit/inbox/outbox and idempotent replay",
+  "tests": {
+    "domainScopePassed": 6,
+    "h2ServerScopePassed": 193,
+    "h2FamilyAndStandaloneControlPassed": 45,
+    "h2AdditionalRegressionPassed": 148,
+    "subprocessCasesIncluded": 36,
+    "newSubprocessControlCases": 8,
+    "postgresPassed": 45,
+    "postgresSubprocessCases": 36,
+    "postgresStandaloneCases": 9,
+    "frontendScopePassed": 30,
+    "httpControllerAcceptance": "MockMvc root pause/replay and child-control rejection passed; standalone HTTP runtime not tested this phase",
+    "frontendSourceChanged": false,
+    "openapiContractTestPassed": true,
+    "suiteResults": {
+      "io.agentflow.approval.InstanceControlIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.SubprocessStartIntegrationTest": {
+        "tests": 36,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.calendar.BusinessDeadlineResumeTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.expense.ExpensePlanIntegrationTest": {
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.integration.WebhookIntegrationTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.api.OpenApiContractTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.event.EventInboxIntegrationTest": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.CountersignPolicyIntegrationTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApplicationWithdrawalIntegrationTest": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.EventWaitIntegrationTest": {
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.TimerWaitIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.RoundDiagramIntegrationTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApprovalSecurityTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.process.CountersignMembershipApiTest": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.process.TaskDeadlineIntegrationTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.process.TaskDeadlineReminderSchedulerTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "scopesOverlap": true
+  },
+  "redTests": {
+    "cases": 2,
+    "failures": 2,
+    "errors": 0,
+    "cause": "Root control did not natively suspend descendant instances/tasks"
+  },
+  "intermediateFixtureCorrection": {
+    "cases": 43,
+    "errors": 1,
+    "cause": "Flowable intentionally rejects variable removal on a suspended instance; the missing-evidence fixture now clears/restores only its own persisted variable column",
+    "finalResult": "Both H2 and PostgreSQL full control scope passed"
+  },
+  "postgres": {
+    "database": "subprocess_control_05dadfe962",
+    "standaloneDatabase": "subprocess_control_single_54c9a0d4ee",
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "pid": 81438,
+    "exitCode": 0,
+    "databaseEvidence": {
+      "schemaVersion": "90",
+      "applications": 88,
+      "rounds": 88,
+      "calls": 52,
+      "parentRoundBindings": 52,
+      "childRoundBindings": 52,
+      "activeNativeCallBindings": 24,
+      "nativeHistoryBindings": 52,
+      "normallyCompletedChildren": 16,
+      "approvedChildBindings": 16,
+      "normallyCompletedParents": 10,
+      "approvedParentBindings": 10,
+      "terminatedChildrenAwaitingBusinessCoordination": 0,
+      "terminatedChildInstances": 12,
+      "stoppedChildBindings": 12,
+      "childPauseAudits": 17,
+      "childResumeAudits": 17,
+      "childControlOutbox": 34,
+      "activeNativeSuspensionMismatch": 0,
+      "remainingTaskPauseSnapshots": 0,
+      "stopAudits": 12,
+      "stopOutbox": 12,
+      "stopConclusionOutbox": 12,
+      "cancelledRounds": 7,
+      "cancellationInbox": 11,
+      "progressAudits": 16,
+      "progressOutbox": 16,
+      "childAuditRecords": 104,
+      "logicalChildAttachments": 1,
+      "physicalAttachments": 1,
+      "attachmentProvenance": 1,
+      "nativeProcessHistory": 88,
+      "secondParentRoundCalls": 2
+    },
+    "tlsAccepted": false,
+    "scope": "Subprocess conclusions and native tree pause/resume with original per-task deadlines; audited termination and complete public feature acceptance remain pending"
+  },
+  "rules": [
+    "Only the root accepts explicit administrator pause/resume; child views expose their actual state without independent control rights",
+    "Each active application version advances independently; submitted snapshots and business conclusions are unchanged",
+    "Every active native descendant is suspended/resumed in the root transaction; completed branches are not controlled",
+    "All active instances share the original tree pause instant; each task retains its own original calendar revision, due time and consumed working time",
+    "Native timer due times are retained; suspended timer/event waits cannot advance",
+    "Already overdue deadlines and delivered reminders are retained; tasks without deadlines do not gain one",
+    "Root free-text reason stays on root; children use system:subprocess and source root ID/action",
+    "Child notification failure rolls back all root/child state, versions, deadlines, audit, inbox and outbox",
+    "Missing child pause evidence refuses the entire resume; original idempotency replay never re-pauses an already resumed tree"
+  ],
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/approval/process/InstanceControlService.java": "b4eedcbad8576ee981bbc17cb398494f6b1515d7c8b352362f59cf80be9ddeec",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessStartIntegrationTest.java": "6e27a284435677cecffc688f954b92bb9fd554d7a4e1a65578aa96a4d52e6575"
+  },
+  "logs": {
+    "subprocess-control-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-red.log",
+      "sha256": "4acbd87ae3c7711e77269669888f7092cfc45080587ce633e106e333a25fcfd7"
+    },
+    "subprocess-control-first.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-first.log",
+      "sha256": "79b00ec44d698fbf467a5b8abb9fd7c34aca7895afcd3281919f8d06f46e798d"
+    },
+    "subprocess-control-expanded.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-expanded.log",
+      "sha256": "07f2f58f042b42034c1d6f9cf5308fcd7d3bf43574b3eca3935d004f5c011398"
+    },
+    "subprocess-control-expanded-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-expanded-final.log",
+      "sha256": "96fa4c1dd2c2d4d9bbb9f71db3bd6bb09dfa933eb416155d77146673a60cf516"
+    },
+    "subprocess-control-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-postgres.log",
+      "sha256": "589cefb33d33fb58113f722246c9beb182932ec7f597fef0b817612fb5ade8d1"
+    },
+    "subprocess-control-h2-regression.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-h2-regression.log",
+      "sha256": "90fe4e2eca95b7747caa761c37505dcacd34a02207808fd1326c0bd15308da12"
+    },
+    "subprocess-control-frontend-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-control-frontend-tests.log",
+      "sha256": "dfc30d3409d53e101b63879df86441d0f68bdf21d1c45a521a1f55c97b05e51b"
+    }
+  },
+  "runtimePreservation": {
+    "phase": "after",
+    "tableCount": 219,
+    "totalRows": 5580,
+    "files": 10,
+    "schema": "88",
+    "allTablesAndFilesPreserved": true
+  },
+  "runtimeHealth": {
+    "http://127.0.0.1:18224/actuator/health/readiness": {
+      "status": 200,
+      "body": {
+        "status": "UP"
+      }
+    },
+    "http://127.0.0.1:15324/": {
+      "status": 200
+    },
+    "http://127.0.0.1:15324/src/App.vue": {
+      "status": 200
+    }
+  },
+  "seedFilesUnchanged": 5,
+  "mainUnchanged": true,
+  "newMigration": false,
+  "testSchema": 90,
+  "currentAcceptanceSchema": 88,
+  "existingRuntimeUpgraded": false,
+  "actualSubprocessHttpAcceptance": false,
+  "actualBrowserAcceptance": false,
+  "restartAcceptance": false,
+  "tlsAccepted": false,
+  "remoteDelivery": false,
+  "remainingPackages": 4,
+  "remaining": [
+    "Audited termination and other explicit failure recovery",
+    "Subprocess publication/dependency validation, designer/templates, authorized views, structured financial parent and complete HTTP/browser/upgrade/restart acceptance",
+    "Safe batch handling and template browser download receipt",
+    "External notifications, mentions, preferences, escalation and pause suppression",
+    "Actual enterprise finance policy and budget/ERP/bank/invoice/event-source integration and reconciliation",
+    "Actual model/IdP and enterprise deployment/upgrade/restore/capacity/alerts/TLS; Git remote/PR/CI"
+  ]
+}
