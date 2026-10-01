@@ -87,6 +87,12 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("ApprovalProxy", io.agentflow.organization.ApprovalProxy.class),
+                java.util.Map.entry("ApprovalProxyRevocation", io.agentflow.organization.ApprovalProxy.Revocation.class),
+                java.util.Map.entry("ApprovalProxyReceipt", io.agentflow.organization.ApprovalProxyController.Receipt.class),
+                java.util.Map.entry("ApprovalProxyView", io.agentflow.organization.ApprovalProxyController.View.class),
+                java.util.Map.entry("ApprovalProxyPerson", io.agentflow.organization.ApprovalProxyController.Person.class),
+                java.util.Map.entry("ApprovalProxyPage", io.agentflow.organization.ApprovalProxyController.Page.class),
                 java.util.Map.entry("TenantInitialization", io.agentflow.onboarding.TenantInitialization.class),
                 java.util.Map.entry("TenantInitializationState", io.agentflow.onboarding.TenantInitializationService.State.class),
                 java.util.Map.entry("InitializationChannelBinding", io.agentflow.onboarding.TenantInitializationService.ChannelBinding.class),
