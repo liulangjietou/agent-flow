@@ -22,6 +22,7 @@ const actionOptions = [
   ['CLAIM', '领取任务'], ['RELEASE', '释放任务'], ['TRANSFER', '转交任务'], ['DELEGATE', '委派任务'], ['RESOLVE', '回交任务'],
   ['INSTANCE_PAUSE', '暂停审批'], ['INSTANCE_RESUME', '恢复审批'],
   ['TIMER_ELAPSED', '定时等待已到期'], ['TIMER_FAILED', '定时推进失败'], ['TIMER_RETRY', '重试原定时等待'],
+  ['EVENT_RECEIVED', '事件已推进等待'],
   ['ADD_SIGNER', '增加会签人'], ['REMOVE_SIGNER', '移除会签人'],
   ['RETURN', '退回申请'], ['REJECT', '驳回申请'], ['APPROVE', '审批通过']
 ]

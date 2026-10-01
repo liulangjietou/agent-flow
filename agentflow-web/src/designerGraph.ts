@@ -24,6 +24,8 @@ export interface DesignerNode {
   approvalMode?: string
   approvalPercentage?: string
   timerDelaySeconds?: string
+  eventContractKey?: string
+  eventContractVersion?: string
   deadline?: DesignerDeadline
   originalProperties?: Record<string, string>
   loadedPosition?: { x: number; y: number }
@@ -44,6 +46,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
       deadline: readDesignerDeadline(node.properties),
       approvalMode: node.properties.approvalMode ?? 'SINGLE', approvalPercentage: node.properties.approvalPercentage,
       timerDelaySeconds: node.properties.timerDelaySeconds,
+      eventContractKey: node.properties.eventContractKey, eventContractVersion: node.properties.eventContractVersion,
       originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
 }
@@ -52,6 +55,12 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
 export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
   return nodes.map(node => {
     const properties = { ...node.originalProperties }
+    if (node.type === 'EVENT_WAIT') {
+      for (const key of ['eventContractKey', 'eventContractVersion'] as const) {
+        if (node[key] !== undefined) properties[key] = node[key]
+        else delete properties[key]
+      }
+    }
     if (node.type === 'TIMER_WAIT') {
       if (node.timerDelaySeconds !== undefined) properties.timerDelaySeconds = node.timerDelaySeconds
       else delete properties.timerDelaySeconds

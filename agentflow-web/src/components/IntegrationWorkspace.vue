@@ -2,15 +2,19 @@
 import { ref } from 'vue'
 import WebhookDeliveries from './WebhookDeliveries.vue'
 import PaymentCallbackInbox from './PaymentCallbackInbox.vue'
+import EventContracts from './EventContracts.vue'
+import EventInbox from './EventInbox.vue'
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ open: [id: string] }>()
-const tab = ref<'outbound' | 'callbacks'>('outbound')
+const tab = ref<'outbound' | 'callbacks' | 'contracts' | 'events'>('outbound')
 </script>
 <template>
   <section class="integration-workspace">
-    <nav class="integration-tabs" aria-label="集成消息类型"><button type="button" :aria-pressed="tab === 'outbound'" :disabled="locked" @click="tab = 'outbound'">审批事件投递</button><button type="button" :aria-pressed="tab === 'callbacks'" :disabled="locked" @click="tab = 'callbacks'">支付回调接收</button></nav>
+    <nav class="integration-tabs" aria-label="集成消息类型"><button type="button" :aria-pressed="tab === 'outbound'" :disabled="locked" @click="tab = 'outbound'">审批事件投递</button><button type="button" :aria-pressed="tab === 'callbacks'" :disabled="locked" @click="tab = 'callbacks'">支付回调接收</button><button type="button" :aria-pressed="tab === 'contracts'" :disabled="locked" @click="tab = 'contracts'">事件契约</button><button type="button" :aria-pressed="tab === 'events'" :disabled="locked" @click="tab = 'events'">事件收件箱</button></nav>
     <WebhookDeliveries v-if="tab === 'outbound'" v-bind="props" @open="emit('open', $event)" />
-    <PaymentCallbackInbox v-else v-bind="props" />
+    <PaymentCallbackInbox v-else-if="tab === 'callbacks'" v-bind="props" />
+    <EventContracts v-else-if="tab === 'contracts'" v-bind="props" />
+    <EventInbox v-else v-bind="props" @open="emit('open', $event)" />
   </section>
 </template>
 <style scoped>

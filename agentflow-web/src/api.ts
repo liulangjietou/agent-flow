@@ -30,6 +30,7 @@ import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import { validateCountersignReceipt, type CountersignInput, type CountersignReceipt, type CountersignView } from './countersignMembership.js'
 import type { PaymentCallbackPage, PaymentCallbackDetail, PaymentCallbackView } from './paymentCallbacks'
+import { readEventDirectory, readEventVersions, readEventOption, readEventContract, readEventContractHistory, readEventInboxItem, readEventInboxPage, readEventInboxHistory, readEventWaits, validateEventMutation, type EventDirectory, type EventVersions, type EventOption, type EventContract, type EventContractHistory, type EventPublication, type EventAvailabilityInput, type EventInboxItem, type EventInboxPage, type EventInboxHistory, type EventRetryInput, type EventWaitView } from './events.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
@@ -324,6 +325,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  validateEventMutation(result, operation.path, operation.body ?? '{}')
   const membership = /^\/tasks\/([^/?]+)\/countersign-changes$/.exec(operation.path)
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
   const timer = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/timers\/([^/?]+)\/retry$/.exec(operation.path)
@@ -337,6 +339,20 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  eventContracts: (afterKey: string | undefined, signal: AbortSignal) => request<EventDirectory>('/event-contracts' + historyQuery({ limit: 25, afterKey }), { signal, cache: 'no-store' }).then(value => readEventDirectory(value, afterKey)),
+  eventContractVersions: (key: string, beforeVersion: number | undefined, signal: AbortSignal) => request<EventVersions>(`/event-contracts/${encodeURIComponent(key)}/versions` + historyQuery({ limit: 25, beforeVersion }), { signal, cache: 'no-store' }).then(value => readEventVersions(value, key, beforeVersion)),
+  eventContract: (key: string, version: number, signal: AbortSignal) => request<EventContract>(`/event-contracts/${encodeURIComponent(key)}/versions/${version}`, { signal, cache: 'no-store' }).then(value => readEventContract(value, key, version)),
+  eventContractHistory: (key: string, version: number, beforeRevision: number | undefined, signal: AbortSignal) => request<EventContractHistory>(`/event-contracts/${encodeURIComponent(key)}/versions/${version}/history` + historyQuery({ limit: 25, beforeRevision }), { signal, cache: 'no-store' }).then(value => readEventContractHistory(value, beforeRevision)),
+  publishEventContract: (key: string, input: EventPublication) => write<EventContract>(`/event-contracts/${encodeURIComponent(key)}/versions`, 'POST', '发布事件契约版本', input),
+  changeEventAvailability: (key: string, version: number, input: EventAvailabilityInput) => write<EventContract>(`/event-contracts/${encodeURIComponent(key)}/versions/${version}/availability`, 'POST', input.enabled ? '恢复原事件版本' : '停用原事件版本', input),
+  eventContractOptions: (afterKey: string | undefined, signal: AbortSignal) => request<EventDirectory>('/process-definitions/event-contract-options' + historyQuery({ limit: 25, afterKey }), { signal, cache: 'no-store' }).then(value => readEventDirectory(value, afterKey)),
+  eventContractOptionVersions: (key: string, beforeVersion: number | undefined, signal: AbortSignal) => request<EventVersions>(`/process-definitions/event-contract-options/${encodeURIComponent(key)}/versions` + historyQuery({ limit: 25, beforeVersion }), { signal, cache: 'no-store' }).then(value => readEventVersions(value, key, beforeVersion)),
+  eventContractOption: (key: string, version: number, signal: AbortSignal) => request<EventOption>(`/process-definitions/event-contract-options/${encodeURIComponent(key)}/versions/${version}`, { signal, cache: 'no-store' }).then(value => readEventOption(value, key, version)),
+  eventInbox: (beforeId: string | undefined, signal: AbortSignal) => request<EventInboxPage>('/integrations/events' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }).then(value => readEventInboxPage(value, beforeId)),
+  eventInboxItem: (id: string, signal: AbortSignal) => request<EventInboxItem>(`/integrations/events/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }).then(value => readEventInboxItem(value, id)),
+  eventInboxHistory: (id: string, beforeVersion: number | undefined, signal: AbortSignal) => request<EventInboxHistory>(`/integrations/events/${encodeURIComponent(id)}/history` + historyQuery({ limit: 25, beforeVersion }), { signal, cache: 'no-store' }).then(value => readEventInboxHistory(value, id, beforeVersion)),
+  retryEvent: (id: string, input: EventRetryInput) => write<EventInboxItem>(`/integrations/events/${encodeURIComponent(id)}/retry`, 'POST', '重新处理原事件', input),
+  eventWaits: (id: string, round: number, signal: AbortSignal) => request<EventWaitView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/event-waits`, { signal, cache: 'no-store' }).then(value => readEventWaits(value, id, round)),
   instanceControl: (id: string, round: number, signal: AbortSignal) => request<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime`, { signal, cache: 'no-store' }),
   controlInstance: (id: string, round: number, action: InstanceControlAction, input: InstanceControlInput) => write<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime/${action}`, 'POST', action === 'pause' ? '暂停本轮审批' : '恢复本轮审批', input),
   timerWaits: (id: string, round: number, signal: AbortSignal) => request<TimerView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers`, { signal, cache: 'no-store' }),

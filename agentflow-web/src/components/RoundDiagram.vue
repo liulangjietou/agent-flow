@@ -2,6 +2,7 @@
 import { computed, nextTick, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import { api, type SubmissionRound } from '../api'
 import TimerWaitPanel from './TimerWaitPanel.vue'
+import EventWaitPanel from './EventWaitPanel.vue'
 import { RoundDiagramQuery, traversalRecords } from '../roundDiagram'
 import { arrangeNodes, clampZoom, fittedViewport, graphBounds, nodeRectangle, routeEdges } from '../designerLayout'
 
@@ -16,7 +17,7 @@ const marker = 'round-arrow-' + useId()
 const sortedRounds = computed(() => [...props.rounds].sort((a, b) => b.roundNo - a.roundNo))
 const roundLabels: Record<string, string> = { IN_APPROVAL: '审批中', APPROVED: '已批准', RETURNED: '已退回', REJECTED: '已驳回', WITHDRAWN: '已撤回' }
 const states = { NOT_REACHED: '未记录到达', ACTIVE: '当前节点', LEFT: '已离开' }
-const typeNames: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '审批', COPY: '抄送', TIMER_WAIT: '定时等待', EXCLUSIVE_GATEWAY: '条件网关', PARALLEL_GATEWAY: '并行网关', OTHER: '流程节点' }
+const typeNames: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '审批', COPY: '抄送', TIMER_WAIT: '定时等待', EVENT_WAIT: '事件等待', EXCLUSIVE_GATEWAY: '条件网关', PARALLEL_GATEWAY: '并行网关', OTHER: '流程节点' }
 const edges = computed(() => (query.value?.edges ?? []).map(edge => ({ ...edge, condition: '' })))
 const takenIds = computed(() => new Set(edges.value.filter(edge => edge.state === 'TAKEN').map(edge => edge.id)))
 const records = computed(() => query.value ? traversalRecords(query.value) : [])
@@ -60,6 +61,7 @@ onUnmounted(() => query.clear())
       <p v-if="query.loading" class="diagram-empty" role="status">正在读取本轮流程…</p>
       <div v-else-if="query.error" class="diagram-error" role="alert"><p>{{ query.error }}</p><button type="button" class="secondary" @click="load">重试加载流程图</button></div>
       <template v-else-if="query.value">
+        <EventWaitPanel v-if="query.value.nodes.some(node => node.type === 'EVENT_WAIT')" :application-id="applicationId" :round-no="selectedRound" :version="version" :scope-key="scopeKey" @changed="emit('changed'); load()" />
         <TimerWaitPanel v-if="query.value.nodes.some(node => node.type === 'TIMER_WAIT')" :application-id="applicationId" :round-no="selectedRound" :version="version" :scope-key="scopeKey" :locked="locked ?? false" @changed="emit('changed'); load()" />
         <div class="diagram-meta"><strong>第 {{ query.value.roundNo }} 轮 · {{ roundLabels[query.value.status] ?? query.value.status }}</strong><span>流程版本 v{{ query.value.definitionVersion }}</span><small>读取于 {{ time(query.value.observedAt) }}</small></div>
         <div class="diagram-toolbar"><div class="diagram-legend"><span class="ACTIVE">● 当前节点</span><span class="LEFT">● 已离开</span><span class="NOT_REACHED">○ 未记录到达</span><span class="TAKEN">━━ 已流转</span><span class="NOT_RECORDED">┄ 未记录流转</span></div><div class="diagram-zoom"><button type="button" aria-label="缩小流程图" :disabled="zoom <= 0.5" @click="zoom = clampZoom(zoom - 0.1)">−</button><span>{{ Math.round(zoom * 100) }}%</span><button type="button" aria-label="放大流程图" :disabled="zoom >= 1.6" @click="zoom = clampZoom(zoom + 0.1)">＋</button><button type="button" @click="fit">适应</button></div></div>

@@ -1,0 +1,350 @@
+{
+  "date": "2026-10-01",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "scope": "事件契约管理、设计器固定版本选择、等待面板及原事件恢复工作区",
+  "backendCommit": "542b3cd58881f37c0960604c32a1c4a944dc99c0",
+  "syntheticOnly": true,
+  "verification": {
+    "frontend": {
+      "passed": 146,
+      "failed": 0,
+      "skipped": 0,
+      "newEventCases": 20,
+      "command": "node scripts/test-requests.mjs event-ui.test.mjs quick-designer.test.mjs designer-graph.test.mjs portable-template.test.mjs timer-waits.test.mjs instance-control.test.mjs comparison.test.mjs workspace.test.mjs requests.test.mjs payment-callbacks.test.mjs audit-search.test.mjs",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/event-ui-tests-final.log"
+    },
+    "identityRefreshRegression": {
+      "beforeFixPassed": 15,
+      "beforeFixFailed": 5,
+      "afterFixEventCasesPassed": 20,
+      "rootCause": "发布、启停或恢复后的多段异步刷新缺少原身份检查，账号切换后旧操作可能继续打开旧对象。",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/event-ui-refresh-scope-red.log"
+    },
+    "typecheckAndBuild": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/event-ui-build-final.log",
+    "openapi": {
+      "result": "PASS",
+      "operations": 279,
+      "schemas": 550,
+      "examples": 108,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/event-ui-openapi.log"
+    },
+    "actualHttp": {
+      "result": "PASS",
+      "actualHttpResponses": 73,
+      "browserWriteReceipts": 16,
+      "frontendReads": 25,
+      "templateBytes": 2338
+    }
+  },
+  "checks": {
+    "cancelDidNotRetry": true,
+    "originalWaitAcrossTwoRestarts": true,
+    "oneHumanTaskPerWait": true,
+    "noAutomaticApproval": true,
+    "adminOnlyManagement": true,
+    "bothApplicationsExplicitlyApproved": true,
+    "v1UnchangedByV2HistoryFixture": true
+  },
+  "flows": {
+    "browser": {
+      "applicationId": "64ccca7e-8758-4ca0-a929-6ca3f6311a3f",
+      "definitionId": "28e49353-a6f9-4e0e-9197-82f8a1503b0a",
+      "originalWait": {
+        "waitId": "1d493281-bd77-11f1-b1d5-ee92ae4b8ffe",
+        "nodeId": "node-a9ba54d3-5dcb-4f1a-865a-e9fed7cd9301",
+        "nodeName": "事件等待",
+        "contractKey": "browser-event-20261001",
+        "contractVersion": 1,
+        "createdAt": "2026-10-01T09:04:31.529Z",
+        "suspended": false,
+        "contractEnabled": true
+      },
+      "receipt": {
+        "id": "5194e126-1604-4264-a990-beda5068e531",
+        "eventId": "a3f368e7-2329-4b23-80f5-e7b9e7467072"
+      },
+      "consumed": {
+        "id": "5194e126-1604-4264-a990-beda5068e531",
+        "eventId": "a3f368e7-2329-4b23-80f5-e7b9e7467072",
+        "sourceKey": "erp",
+        "trustRevision": 1,
+        "eventType": "GoodsAccepted",
+        "applicationId": "64ccca7e-8758-4ca0-a929-6ca3f6311a3f",
+        "roundNo": 1,
+        "waitId": "1d493281-bd77-11f1-b1d5-ee92ae4b8ffe",
+        "contractKey": "browser-event-20261001",
+        "contractVersion": 1,
+        "version": 2,
+        "status": "CONSUMED",
+        "receivedAt": "2026-10-01T09:08:36.101541Z",
+        "updatedAt": "2026-10-01T09:08:36.700948Z",
+        "failures": 0,
+        "reason": "MATCHED"
+      },
+      "history": [
+        {
+          "id": "5194e126-1604-4264-a990-beda5068e531",
+          "eventId": "a3f368e7-2329-4b23-80f5-e7b9e7467072",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "64ccca7e-8758-4ca0-a929-6ca3f6311a3f",
+          "roundNo": 1,
+          "waitId": "1d493281-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "browser-event-20261001",
+          "contractVersion": 1,
+          "version": 2,
+          "status": "CONSUMED",
+          "receivedAt": "2026-10-01T09:08:36.101541Z",
+          "updatedAt": "2026-10-01T09:08:36.700948Z",
+          "failures": 0,
+          "reason": "MATCHED"
+        },
+        {
+          "id": "5194e126-1604-4264-a990-beda5068e531",
+          "eventId": "a3f368e7-2329-4b23-80f5-e7b9e7467072",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "64ccca7e-8758-4ca0-a929-6ca3f6311a3f",
+          "roundNo": 1,
+          "waitId": "1d493281-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "browser-event-20261001",
+          "contractVersion": 1,
+          "version": 1,
+          "status": "RECEIVED",
+          "receivedAt": "2026-10-01T09:08:36.101541Z",
+          "updatedAt": "2026-10-01T09:08:36.101541Z",
+          "nextAttemptAt": "2026-10-01T09:08:36.101541Z",
+          "failures": 0
+        }
+      ],
+      "eventAdvances": 1,
+      "finalApplicationStatus": "APPROVED",
+      "approvedThroughBrowser": true
+    },
+    "browser-recovery": {
+      "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+      "definitionId": "0d46d4ad-e9e7-42db-990f-1a42a1495f23",
+      "originalWait": {
+        "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+        "nodeId": "wait",
+        "nodeName": "等待合成验收事件",
+        "contractKey": "inbox-92389b22fda9",
+        "contractVersion": 1,
+        "createdAt": "2026-10-01T09:05:22.507Z",
+        "suspended": false,
+        "contractEnabled": true
+      },
+      "receipt": {
+        "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+        "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e"
+      },
+      "consumed": {
+        "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+        "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+        "sourceKey": "erp",
+        "trustRevision": 1,
+        "eventType": "GoodsAccepted",
+        "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+        "roundNo": 1,
+        "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+        "contractKey": "inbox-92389b22fda9",
+        "contractVersion": 1,
+        "version": 6,
+        "status": "CONSUMED",
+        "receivedAt": "2026-10-01T09:05:22.596247Z",
+        "updatedAt": "2026-10-01T09:08:27.479251Z",
+        "failures": 0,
+        "reason": "MATCHED",
+        "requestedBy": "admin",
+        "requestReason": "本地页面验收：已恢复原来源信任修订，保留原事件和原等待后重新处理"
+      },
+      "history": [
+        {
+          "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+          "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+          "roundNo": 1,
+          "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "inbox-92389b22fda9",
+          "contractVersion": 1,
+          "version": 6,
+          "status": "CONSUMED",
+          "receivedAt": "2026-10-01T09:05:22.596247Z",
+          "updatedAt": "2026-10-01T09:08:27.479251Z",
+          "failures": 0,
+          "reason": "MATCHED",
+          "requestedBy": "admin",
+          "requestReason": "本地页面验收：已恢复原来源信任修订，保留原事件和原等待后重新处理"
+        },
+        {
+          "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+          "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+          "roundNo": 1,
+          "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "inbox-92389b22fda9",
+          "contractVersion": 1,
+          "version": 5,
+          "status": "WAITING",
+          "receivedAt": "2026-10-01T09:05:22.596247Z",
+          "updatedAt": "2026-10-01T09:07:57.111847Z",
+          "nextAttemptAt": "2026-10-01T09:08:27.111847Z",
+          "failures": 0,
+          "reason": "PAUSED",
+          "requestedBy": "admin",
+          "requestReason": "本地页面验收：已恢复原来源信任修订，保留原事件和原等待后重新处理"
+        },
+        {
+          "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+          "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+          "roundNo": 1,
+          "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "inbox-92389b22fda9",
+          "contractVersion": 1,
+          "version": 4,
+          "status": "RECEIVED",
+          "receivedAt": "2026-10-01T09:05:22.596247Z",
+          "updatedAt": "2026-10-01T09:07:56.687565Z",
+          "nextAttemptAt": "2026-10-01T09:07:56.687565Z",
+          "failures": 0,
+          "requestedBy": "admin",
+          "requestReason": "本地页面验收：已恢复原来源信任修订，保留原事件和原等待后重新处理"
+        },
+        {
+          "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+          "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+          "roundNo": 1,
+          "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "inbox-92389b22fda9",
+          "contractVersion": 1,
+          "version": 3,
+          "status": "REVIEW_REQUIRED",
+          "receivedAt": "2026-10-01T09:05:22.596247Z",
+          "updatedAt": "2026-10-01T09:05:52.895611Z",
+          "failures": 0,
+          "reason": "SOURCE_CHANGED"
+        },
+        {
+          "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+          "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+          "roundNo": 1,
+          "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "inbox-92389b22fda9",
+          "contractVersion": 1,
+          "version": 2,
+          "status": "WAITING",
+          "receivedAt": "2026-10-01T09:05:22.596247Z",
+          "updatedAt": "2026-10-01T09:05:22.668476Z",
+          "nextAttemptAt": "2026-10-01T09:05:52.668476Z",
+          "failures": 0,
+          "reason": "PAUSED"
+        },
+        {
+          "id": "1ecebd6d-e97f-4a90-8787-60fdaaed6a2e",
+          "eventId": "94532dc4-780a-409e-b6cd-99fe80a4cc9e",
+          "sourceKey": "erp",
+          "trustRevision": 1,
+          "eventType": "GoodsAccepted",
+          "applicationId": "fde3be86-4ae5-4423-ab0a-7242e08495e5",
+          "roundNo": 1,
+          "waitId": "3babd2b5-bd77-11f1-b1d5-ee92ae4b8ffe",
+          "contractKey": "inbox-92389b22fda9",
+          "contractVersion": 1,
+          "version": 1,
+          "status": "RECEIVED",
+          "receivedAt": "2026-10-01T09:05:22.596247Z",
+          "updatedAt": "2026-10-01T09:05:22.596247Z",
+          "nextAttemptAt": "2026-10-01T09:05:22.596247Z",
+          "failures": 0
+        }
+      ],
+      "eventAdvances": 1,
+      "finalApplicationStatus": "APPROVED",
+      "approvedThroughBrowser": true
+    }
+  },
+  "preservation": {
+    "oldBusinessTables": 171,
+    "oldBusinessRows": 3673,
+    "allOldBusinessRowsPreserved": true,
+    "attachmentFiles": 10,
+    "attachmentFilesUnchanged": true
+  },
+  "inbox": {
+    "statuses": {
+      "IGNORED": 2,
+      "CONSUMED": 5
+    },
+    "historyRevisions": 24
+  },
+  "browser": {
+    "frontendPort": 15324,
+    "actualTaskApprovals": 2,
+    "importedDraftId": "b72339fc-4328-42de-be3d-6a0e0dd907cd",
+    "exactTemplateReferencePreserved": true,
+    "catalogHistoryPagination": "27 through 3, then 2 and 1, then return to latest",
+    "recoveryCancellation": "No retry sent before explicit confirmation",
+    "auditFilter": "One event advancement in participant history and admin search"
+  },
+  "narrowViewport": {
+    "wait": {
+      "body": 480,
+      "height": 900,
+      "page": 480,
+      "viewport": 480,
+      "width": 500
+    },
+    "inbox": {
+      "page": 480,
+      "viewport": 480,
+      "width": 500
+    },
+    "contract": {
+      "page": 480,
+      "viewport": 480,
+      "width": 500
+    }
+  },
+  "runtime": {
+    "database": "event_inbox_runtime_f48711e9f7",
+    "sourceDatabase": "event_contract_runtime_e5362fbca1",
+    "backendPort": 18224,
+    "jarSha256": "b59c0d39306b7bbab9028a35b98ecfb6d3e0cd6561e83973fd608d088ef8d557",
+    "schema": 88,
+    "currentStageRestarts": 2,
+    "totalRestarts": 5
+  },
+  "screenshots": [
+    "/fyoung/tmp/agentflow-remaining-20260928/event-wait-500.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-inbox-500.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-contract-500.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/event-completed-audit.png"
+  ],
+  "limitations": [
+    "Synthetic local sources only; enterprise integration remains separate",
+    "Browser download event did not return; template serialization and real file-chooser import were verified independently",
+    "No Git remote, pull request or remote CI delivery is available."
+  ],
+  "countsNote": "不同阶段测试范围重叠，不累计为唯一用例数。实际页面创建完整流程和申请；恢复场景由 HTTP 合成夹具建立，再通过页面取消、恢复和人工批准。"
+}
