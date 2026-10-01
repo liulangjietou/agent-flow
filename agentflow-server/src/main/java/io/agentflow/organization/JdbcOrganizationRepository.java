@@ -40,6 +40,12 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
     }
 
     @Override
+    public long revision(String tenantId) {
+        return jdbc.queryForList("SELECT revision FROM organization_directory WHERE tenant_id=?", Long.class, tenantId)
+                .stream().findFirst().orElse(0L);
+    }
+
+    @Override
     public long lock(String tenantId) {
         return jdbc.queryForList("SELECT revision FROM organization_directory WHERE tenant_id=? FOR UPDATE", Long.class, tenantId)
                 .stream().findFirst().orElseThrow(() -> new DomainException("ORGANIZATION_NOT_INITIALIZED", "Initialize local organization before editing"));

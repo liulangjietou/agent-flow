@@ -87,6 +87,14 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("TenantInitialization", io.agentflow.onboarding.TenantInitialization.class),
+                java.util.Map.entry("TenantInitializationState", io.agentflow.onboarding.TenantInitializationService.State.class),
+                java.util.Map.entry("InitializationChannelBinding", io.agentflow.onboarding.TenantInitializationService.ChannelBinding.class),
+                java.util.Map.entry("InitializationOrganizationChoice", io.agentflow.onboarding.InitializationRequest.OrganizationChoice.class),
+                java.util.Map.entry("InitializationCalendarChoice", io.agentflow.onboarding.InitializationRequest.CalendarChoice.class),
+                java.util.Map.entry("InitializationNotificationChoice", io.agentflow.onboarding.InitializationRequest.NotificationChoice.class),
+                java.util.Map.entry("InitializationNotificationSnapshot", io.agentflow.notification.NotificationPreferences.class),
+                java.util.Map.entry("InitializationCalendarSnapshot", io.agentflow.calendar.BusinessCalendar.class),
                 java.util.Map.entry("Graph", io.agentflow.definition.DefinitionModels.Graph.class),
                 java.util.Map.entry("ApprovalRiskPolicy", io.agentflow.definition.ApprovalRiskPolicy.class),
                 java.util.Map.entry("ApprovalRiskRule", io.agentflow.definition.ApprovalRiskPolicy.Rule.class),

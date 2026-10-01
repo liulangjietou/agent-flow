@@ -14,6 +14,8 @@ public interface OrganizationRepository {
     void initialize(String tenantId, String actor, Instant now);
     /** 读取是否已明确启用本地目录。 */
     boolean initialized(String tenantId);
+    /** 只读目录修订，尚未初始化返回 0，供跨聚合设置确认来源。 */
+    long revision(String tenantId);
     /** 写事务首先锁定目录行，串行化跨实体关系检查，返回当前目录修订。 */
     long lock(String tenantId);
     /** 读取组织单元。 */

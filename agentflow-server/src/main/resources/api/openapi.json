@@ -9959,7 +9959,8 @@
                 "INSTANCE_TERMINATE",
                 "EVENT_RECEIVED",
                 "SUBPROCESS_COMPLETED",
-                "SUBPROCESS_STOPPED"
+                "SUBPROCESS_STOPPED",
+                "TENANT_INITIALIZE"
               ]
             }
           },
@@ -9973,7 +9974,8 @@
               "enum": [
                 "",
                 "Application",
-                "Task"
+                "Task",
+                "TenantInitialization"
               ]
             }
           },
@@ -11489,7 +11491,8 @@
                 "INSTANCE_TERMINATE",
                 "EVENT_RECEIVED",
                 "SUBPROCESS_COMPLETED",
-                "SUBPROCESS_STOPPED"
+                "SUBPROCESS_STOPPED",
+                "TENANT_INITIALIZE"
               ]
             }
           },
@@ -11503,7 +11506,8 @@
               "enum": [
                 "",
                 "Application",
-                "Task"
+                "Task",
+                "TenantInitialization"
               ]
             }
           },
@@ -38207,6 +38211,260 @@
                 "expectedVersion": 3,
                 "acknowledgePossibleDuplicate": true,
                 "reason": "已核实原结果并接受可能重复后恢复"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system/initialization": {
+      "get": {
+        "operationId": "tenantInitialization",
+        "tags": [
+          "集成"
+        ],
+        "summary": "读取租户初始化状态",
+        "description": "ADMIN 读取当前可信租户、本人身份、原初始化快照、当前个人通知偏好及本人渠道配置摘要。无查询参数，无写入副作用；旧租户未初始化时返回 null。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantInitializationState"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存租户进度",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_INITIALIZATION_QUERY：不接受查询参数。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "initializeTenant",
+        "tags": [
+          "集成"
+        ],
+        "summary": "原子完成租户首次配置",
+        "description": "ADMIN 从可信会话取得租户、稳定主体和权限，不创建登录账号或授予系统角色。显式确认本地目录及其原修订；创建法人、部门、岗位与本人任职，或采用本人有效任职；创建日历或采用同租户精确日历版本；核对本人偏好版本与已启用渠道绑定摘要。资源、本人偏好、初始化快照、统一审计和幂等成功回执同事务保存。新键重复初始化返回 409；同键回放原成功响应，不覆盖后来的设置。不开启外部发送、不补发旧通知。无查询参数；成功不可缓存。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "INVALID_INITIALIZATION_REQUEST／QUERY、未知字段、未明确确认，或缺少有效幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "已初始化、来源修订或偏好变化、已有人员状态不符、渠道绑定变化、日历业务键冲突，或原请求冲突／过期。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantInitialization"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "不缓存初始化回执"
+              }
+            }
+          },
+          "404": {
+            "description": "日历不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "所选任职不属于本人、已失效，或组织／日历规则不合法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitializationRequest"
+              },
+              "example": {
+                "workspaceName": "我的工作区",
+                "expectedOrganizationRevision": 0,
+                "confirmLocalDirectory": true,
+                "organization": {
+                  "source": "CREATE",
+                  "legalEntityName": "已确认法人",
+                  "departmentName": "运营部",
+                  "positionName": "负责人",
+                  "administratorName": "管理员姓名"
+                },
+                "calendar": {
+                  "source": "CREATE",
+                  "key": "confirmed-work",
+                  "name": "已确认工作日历",
+                  "rules": {
+                    "zoneId": "Asia/Shanghai",
+                    "weeklyHours": {
+                      "MONDAY": [
+                        {
+                          "start": "09:00",
+                          "end": "18:00"
+                        }
+                      ]
+                    },
+                    "overrides": []
+                  }
+                },
+                "notifications": {
+                  "expectedVersion": 0,
+                  "emailEnabled": false,
+                  "enterpriseImEnabled": false
+                }
               }
             }
           }
@@ -65984,6 +66242,629 @@
           "definitionVersion",
           "matches"
         ]
+      },
+      "InitializationOrganizationChoice": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "CREATE",
+              "EXISTING"
+            ]
+          },
+          "appointmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "legalEntityName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "departmentName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "positionName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "administratorName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "source": {
+                "const": "CREATE"
+              },
+              "appointmentId": {
+                "type": "null"
+              },
+              "legalEntityName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "departmentName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "positionName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "administratorName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "required": [
+              "legalEntityName",
+              "departmentName",
+              "positionName",
+              "administratorName"
+            ]
+          },
+          {
+            "properties": {
+              "source": {
+                "const": "EXISTING"
+              },
+              "appointmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "legalEntityName": {
+                "type": "null"
+              },
+              "departmentName": {
+                "type": "null"
+              },
+              "positionName": {
+                "type": "null"
+              },
+              "administratorName": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "appointmentId"
+            ]
+          }
+        ]
+      },
+      "InitializationCalendarChoice": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "CREATE",
+              "EXISTING"
+            ]
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "source": {
+                "const": "CREATE"
+              },
+              "id": {
+                "type": "null"
+              },
+              "revision": {
+                "type": "null"
+              },
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "rules": {
+                "$ref": "#/components/schemas/CalendarRules"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "rules"
+            ]
+          },
+          {
+            "properties": {
+              "source": {
+                "const": "EXISTING"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "revision": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1
+              },
+              "key": {
+                "type": "null"
+              },
+              "name": {
+                "type": "null"
+              },
+              "rules": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "id",
+              "revision"
+            ]
+          }
+        ]
+      },
+      "InitializationNotificationChoice": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "enterpriseImEnabled": {
+            "type": "boolean"
+          },
+          "emailBindingDigest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "enterpriseImBindingDigest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "emailEnabled",
+          "enterpriseImEnabled"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "emailEnabled": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "emailBindingDigest": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "emailBindingDigest"
+              ]
+            },
+            "else": {
+              "properties": {
+                "emailBindingDigest": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "enterpriseImEnabled": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "enterpriseImBindingDigest": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "enterpriseImBindingDigest"
+              ]
+            },
+            "else": {
+              "properties": {
+                "enterpriseImBindingDigest": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "InitializationRequest": {
+        "type": "object",
+        "properties": {
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "expectedOrganizationRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "confirmLocalDirectory": {
+            "type": "boolean",
+            "const": true
+          },
+          "organization": {
+            "$ref": "#/components/schemas/InitializationOrganizationChoice"
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/InitializationCalendarChoice"
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/InitializationNotificationChoice"
+          }
+        },
+        "required": [
+          "workspaceName",
+          "expectedOrganizationRevision",
+          "confirmLocalDirectory",
+          "organization",
+          "calendar",
+          "notifications"
+        ],
+        "additionalProperties": false
+      },
+      "InitializationCalendarSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/CalendarRules"
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "revision",
+          "updatedBy",
+          "updatedAt",
+          "rules",
+          "tenantId"
+        ],
+        "additionalProperties": false
+      },
+      "InitializationNotificationSnapshot": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "recipient": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "enterpriseImEnabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "emailGeneration": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "enterpriseImGeneration": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "tenantId",
+          "recipient",
+          "emailEnabled",
+          "enterpriseImEnabled",
+          "version",
+          "emailGeneration",
+          "enterpriseImGeneration"
+        ],
+        "additionalProperties": false,
+        "description": "本人当时的外部通知选择；version=0 表示默认关闭，updatedAt 可省略。后来的修改不覆盖此快照。"
+      },
+      "TenantInitialization": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "initializedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "initializedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "administratorRoles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "uniqueItems": true
+          },
+          "organization": {
+            "$ref": "#/components/schemas/InitiatorContext"
+          },
+          "administratorName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/InitializationCalendarSnapshot"
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/InitializationNotificationSnapshot"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "workspaceName",
+          "initializedBy",
+          "initializedAt",
+          "administratorRoles",
+          "organization",
+          "administratorName",
+          "calendar",
+          "notifications"
+        ],
+        "additionalProperties": false
+      },
+      "InitializationChannelBinding": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "ENTERPRISE_IM"
+            ]
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "channel",
+          "configured",
+          "digest"
+        ],
+        "additionalProperties": false,
+        "description": "只表示当前用户受控绑定存在并启用，不代表连通或递送验收；不含地址、凭据或其他用户绑定。"
+      },
+      "TenantInitializationState": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "currentSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "currentRoles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "uniqueItems": true
+          },
+          "organizationRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "currentAdministratorPerson": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "initialization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantInitialization"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currentNotifications": {
+            "$ref": "#/components/schemas/InitializationNotificationSnapshot"
+          },
+          "channelBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InitializationChannelBinding"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "tenantId",
+          "currentSubject",
+          "currentRoles",
+          "organizationRevision",
+          "currentAdministratorPerson",
+          "initialization",
+          "currentNotifications",
+          "channelBindings"
+        ],
+        "additionalProperties": false
       }
     }
   }

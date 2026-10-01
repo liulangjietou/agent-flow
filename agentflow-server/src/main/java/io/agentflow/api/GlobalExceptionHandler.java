@@ -76,6 +76,8 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "INVALID_INITIALIZATION_REQUEST", "INVALID_INITIALIZATION_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "TENANT_ALREADY_INITIALIZED", "INITIALIZATION_PERSON_CHANGED", "INITIALIZATION_CHANNEL_CHANGED" -> HttpStatus.CONFLICT;
             case "INVALID_NOTIFICATION_DELIVERY_QUERY", "NOTIFICATION_DUPLICATE_ACK_REQUIRED" -> HttpStatus.BAD_REQUEST;
             case "NOTIFICATION_DELIVERY_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "NOTIFICATION_DELIVERY_STATE_INVALID", "NOTIFICATION_CONSENT_REVOKED", "NOTIFICATION_BINDING_UNAVAILABLE" -> HttpStatus.CONFLICT;

@@ -1,0 +1,164 @@
+{
+  "recordedAt": "2026-10-01T21:57:49.356800+00:00",
+  "scope": "tenant initialization backend stage only",
+  "baseCommit": "39ff0a0294517c3147ec08000cb9e64322632a7e",
+  "fullFeatureComplete": false,
+  "goalComplete": false,
+  "firstRed": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-red.log",
+    "expected": 200,
+    "actual": 404,
+    "reason": "initialization API did not exist"
+  },
+  "h2": {
+    "tests": 53,
+    "suites": [
+      {
+        "class": "io.agentflow.organization.OrganizationIntegrationTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.calendar.BusinessCalendarIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.notification.NotificationPreferencesIntegrationTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.onboarding.TenantInitializationMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.onboarding.TenantInitializationIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.approval.operations.AuditSearchIntegrationTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "result": "PASS"
+  },
+  "postgres": {
+    "tests": 15,
+    "overlapWithH2": true,
+    "suites": [
+      {
+        "class": "io.agentflow.onboarding.TenantInitializationMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.onboarding.TenantInitializationIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "databases": {
+      "INITIALIZATION_TEST": "init_initialization_test_b1f9230f",
+      "INITIALIZATION_MIGRATION": "init_initialization_migration_d5429275"
+    },
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "exitCode": 0
+  },
+  "frontEnd": {
+    "scope": "existing audit search and export",
+    "tests": 8,
+    "testsPassed": true,
+    "typecheckAndBuild": "PASS",
+    "warning": "existing large bundle warning"
+  },
+  "openApi": {
+    "result": "PASS",
+    "operations": 292,
+    "schemas": 580,
+    "requestExamples": 111
+  },
+  "authors": "Java files=1279, named types=2457, missing author tags=0, parse errors=0",
+  "diffCheck": "PASS",
+  "accepted": [
+    "Trusted tenant and administrator identity, no role grants",
+    "Explicit new organization or own current appointment",
+    "Existing person not renamed, reactivated or made approval eligible",
+    "Explicit calendar creation or exact same-tenant calendar revision",
+    "Only own notification preference; enabled channel requires matching current binding digest",
+    "Receipt, audit, resources and successful idempotency response share transaction",
+    "Failure after receipt and audit insert rolls everything back; original failed request retries successfully",
+    "Fresh and existing directory concurrency each have one winner",
+    "Successful replay preserves later preference edits",
+    "V94 to V95 preserves all prior tables and migration records, does not backfill tenant initialization"
+  ],
+  "notYetVerified": [
+    "Initialization wizard UI and draft recovery",
+    "Actual HTTP response schemas from a running V95 server",
+    "Browser initialization through first published and approved leave workflow",
+    "Independent nonempty runtime upgrade and packaged server restarts",
+    "Enterprise identity, real external channels or production installation"
+  ],
+  "temporaryServices": {
+    "newBackendServer": false,
+    "newFrontendServer": false,
+    "originalServicesStopped": false
+  },
+  "logs": {
+    "tenant-initialization-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-red.log",
+      "sha256": "93655a98e725b88b2d3e14f6739f21034577c4904c59007a4b45c526273da674"
+    },
+    "tenant-initialization-h2.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-h2.log",
+      "sha256": "4924a4c0f27906e27023d496d4f8c84402386666c0bc27172d156866a734afdf"
+    },
+    "tenant-initialization-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-postgres.log",
+      "sha256": "a2e3b2c3a718010927f5d377247ba90f56a85563ece3e8ec744f74b443b48bef"
+    },
+    "tenant-initialization-openapi.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-openapi.log",
+      "sha256": "73283667b46d36c4aa7fffa11285d56ca66dd4aad2c7af39ab82d8f778034189"
+    },
+    "tenant-initialization-audit-web-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-audit-web-tests.log",
+      "sha256": "ef6c0eefca1f7037db77e76c3abeb3b07432866cc86d2bcc264e7f18cd591346"
+    },
+    "tenant-initialization-audit-web-build.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-audit-web-build.log",
+      "sha256": "d006242f0f59e873d67dc67a836d83ba6b07529307c375f286dc2a6412542c94"
+    },
+    "tenant-initialization-authors.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-authors.log",
+      "sha256": "9f82fc646183c779866f6cc778c4a69a0772a16f3b501f51015c52dfdd13a6b6"
+    }
+  }
+}
