@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-01",
+  "status": "INPUT_BINDING_AND_ENGINE_CONTRACT_VERIFIED",
+  "featureComplete": false,
+  "baseCommit": "7f7ddca59fd340e5bc35f0618cf4b6f368f5b627",
+  "scope": [
+    "Fixed published version and explicit field mapping policy",
+    "Typed immutable input projection with field permission and sensitivity checks",
+    "Attachment source-to-target transfer plan without granting child access",
+    "Same-tenant exact published definition and engine ID resolution with a transaction-held version lock",
+    "Native call-activity contract verification"
+  ],
+  "verification": {
+    "domain": {
+      "passed": 41,
+      "newInputTests": 22,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-domain.log",
+      "command": "mvn -pl agentflow-domain -am -Dtest=SubprocessInputsTest,EventDefinitionTest,TimerDefinitionTest,DefinitionDomainTest -Dsurefire.failIfNoSpecifiedTests=false test"
+    },
+    "h2": {
+      "domainPassed": 22,
+      "serverPassed": 27,
+      "newResolverAndNativeCases": 9,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-binding-h2-final.log",
+      "command": "mvn -pl agentflow-server -am -Dtest=SubprocessInputsTest,SubprocessDefinitionResolverIntegrationTest,DefinitionDeploymentIntegrationTest,DefinitionAvailabilityIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test"
+    },
+    "postgresql": {
+      "domainPassed": 22,
+      "serverPassed": 9,
+      "database": "subprocess_binding_fce49b9ab5",
+      "facts": {
+        "schemaVersion": "88",
+        "applications": 0,
+        "platformDefinitions": 13,
+        "activeNativeProcesses": 0,
+        "nativeProcessHistory": 4
+      },
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-binding-postgres.log",
+      "runner": "/fyoung/tmp/agentflow-remaining-20260928/run-subprocess-binding-postgres.py"
+    },
+    "scopesOverlap": true,
+    "java": "Corretto 17.0.16",
+    "initialFixtureCorrection": "Two new test fixtures tried to update a published definition before inserting its draft; corrected fixture order, then reran all scoped H2 tests.",
+    "review": {
+      "skill": "java-code-reviewer",
+      "mode": "manual scoped review",
+      "blockingFindings": 0,
+      "focus": [
+        "permission and sensitivity retention",
+        "collection ownership",
+        "exact version and tenant isolation",
+        "transaction held lock",
+        "native protocol limits"
+      ]
+    }
+  },
+  "nativeFacts": {
+    "exactPublishedIdSurvivesNewerPublication": true,
+    "allVariableInheritanceDisabled": true,
+    "parentWaitsForChild": true,
+    "childCompletionCreatesParentHumanTask": true,
+    "parentFormNotOverwritten": true,
+    "parentPauseDoesNotCascadeToCalledProcess": true,
+    "explicitChildPauseRequired": true,
+    "parentDeletionCascadesToCalledProcess": true
+  },
+  "limits": [
+    "No platform parent-child applications were created by the native contract tests",
+    "Invocation persistence, approval conclusion propagation, cancellation, pause/SLA coordination and attachment rebinding are not yet implemented",
+    "No subprocess node publication or start endpoint is exposed in this stage",
+    "No frontend or OpenAPI change; no browser or runtime-upgrade acceptance claimed",
+    "Financial business submission guards cannot be bypassed through plain input mapping",
+    "No Git remote, pull request or remote CI"
+  ],
+  "sources": [
+    "https://www.flowable.com/open-source/docs/bpmn/ch07b-BPMN-Constructs#reference-the-process-definition-by-id",
+    "https://github.com/flowable/flowable-engine/blob/flowable-7.2.0/modules/flowable-engine/src/main/java/org/flowable/engine/impl/bpmn/behavior/CallActivityBehavior.java",
+    "https://github.com/flowable/flowable-engine/blob/flowable-7.2.0/modules/flowable-engine/src/main/java/org/flowable/engine/impl/cmd/AbstractSetProcessInstanceStateCmd.java"
+  ]
+}
