@@ -257,6 +257,14 @@ public final class Application {
         version++;
     }
 
+    /** 父调用停止时取消尚未决定的子申请；已经形成的结论不可被连带操作覆盖。 */
+    public void cancelWithParent(long expectedVersion) {
+        checkVersion(expectedVersion);
+        requireInApproval();
+        status = ApplicationStatus.CANCELLED;
+        version++;
+    }
+
     private void requireInApproval() {
         if (status != ApplicationStatus.IN_APPROVAL) {
             throw new DomainException("DOMAIN_RULE_VIOLATION", "Application is not in approval");

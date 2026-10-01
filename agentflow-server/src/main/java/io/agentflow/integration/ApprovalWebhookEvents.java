@@ -39,6 +39,7 @@ public class ApprovalWebhookEvents {
             case INSTANCE_RESUME -> "ApplicationResumed";
             case EVENT_RECEIVED -> "EventWaitReceived";
             case SUBPROCESS_COMPLETED -> "SubprocessCompleted";
+            case SUBPROCESS_STOPPED -> "SubprocessStopped";
             default -> null;
         };
         if (type == null) return;
@@ -48,6 +49,17 @@ public class ApprovalWebhookEvents {
         if (operation.currentStatus() == io.agentflow.approval.model.ApplicationStatus.APPROVED
                 && operation.previousStatus() != operation.currentStatus()) {
             append(operation.tenantId(), UUID.randomUUID().toString(), "ApplicationApproved", "Application", operation.applicationId().toString(),
+                    operation.applicationId(), operation.aggregateVersion(), occurredAt, eventId,
+                    payload(operation.applicationId(), operation.roundNo(), operation.actor(), operation.action().name(), operation.previousStatus(), operation.currentStatus()));
+        }
+        if (operation.action() == io.agentflow.approval.service.ApplicationAuditPort.Action.SUBPROCESS_STOPPED) {
+            String conclusion = switch (operation.currentStatus()) {
+                case REJECTED -> "ApplicationRejected";
+                case RETURNED -> "ApplicationReturned";
+                case CANCELLED -> "ApplicationCancelled";
+                default -> throw new IllegalStateException("Unsupported subprocess stop conclusion");
+            };
+            append(operation.tenantId(), UUID.randomUUID().toString(), conclusion, "Application", operation.applicationId().toString(),
                     operation.applicationId(), operation.aggregateVersion(), occurredAt, eventId,
                     payload(operation.applicationId(), operation.roundNo(), operation.actor(), operation.action().name(), operation.previousStatus(), operation.currentStatus()));
         }

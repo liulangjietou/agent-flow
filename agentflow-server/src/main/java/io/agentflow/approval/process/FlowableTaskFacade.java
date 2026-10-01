@@ -47,6 +47,7 @@ public class FlowableTaskFacade {
     private final ExpenseReleaseService expenseReleases;
     private final ApprovalCompletionService completion;
     private final SubprocessProgressService subprocesses;
+    private final SubprocessStopService subprocessStops;
     private final ProcurementPayableReservations procurementReservations;
 
     /** 创建任务服务。 */
@@ -56,7 +57,7 @@ public class FlowableTaskFacade {
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
                               ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases,
                               ProcurementPayableReservations procurementReservations, ApprovalCompletionService completion,
-                              SubprocessProgressService subprocesses) {
+                              SubprocessProgressService subprocesses, SubprocessStopService subprocessStops) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -68,6 +69,7 @@ public class FlowableTaskFacade {
         this.authorization = authorization; this.expenses = expenses; this.expenseReleases = expenseReleases;
         this.completion = completion;
         this.subprocesses = subprocesses;
+        this.subprocessStops = subprocessStops;
         this.procurementReservations = procurementReservations;
     }
 
@@ -194,6 +196,7 @@ public class FlowableTaskFacade {
             }
             case REJECT, RETURN -> {
                 requireComment(comment);
+                var stopping = subprocessStops.before(application);
                 if (normalized == TaskAction.RETURN) {
                     application.returnToApplicant(expectedVersion);
                 } else {
@@ -202,10 +205,11 @@ public class FlowableTaskFacade {
                 recordDecisionAssignee(task, actor);
                 taskService.addComment(task.getId(), task.getProcessInstanceId(), comment);
                 processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
-                        actor.tenantId(), task.getProcessInstanceId(), normalized + " by " + actor.userId()));
+                        actor.tenantId(), stopping.instanceToStop(task.getProcessInstanceId()), normalized + " by " + actor.userId()));
                 applicationRepository.update(application, expectedVersion);
                 completeRound(task, application, actor, comment);
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
+                subprocessStops.after(stopping, application, actor.userId());
             }
             case APPROVE -> {
                 expenses.requireApproval(application, task);

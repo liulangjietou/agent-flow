@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -47,6 +48,8 @@ import org.flowable.engine.TaskService;
 import org.flowable.engine.ManagementService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -61,7 +64,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 
 /**
- * 实际提交、人工批准及等待驱动父子调用；覆盖正常接续和同事务结论，发布入口保持关闭。
+ * 实际提交、人工决定及等待驱动父子调用；覆盖正常接续、停止联动和同事务结论，发布入口保持关闭。
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.sla.reminders-enabled=false",
@@ -74,7 +77,7 @@ class SubprocessStartIntegrationTest {
     private static final Path FILES = Path.of("/fyoung/tmp/agentflow-subprocess-start-" + UUID.randomUUID());
     private String tenant = "demo";
     @Autowired ApprovalApplicationFacade applications;
-    @Autowired ApplicationRepository repository;
+    @MockitoSpyBean ApplicationRepository repository;
     @Autowired SubmissionRoundRepository rounds;
     @Autowired SubprocessCallRepository calls;
     @Autowired DefinitionDraftRepository drafts;
@@ -531,6 +534,234 @@ class SubprocessStartIntegrationTest {
         assertThatThrownBy(() -> definitions.create("demo", key(), "尚未开放", graph, schema("amount")))
                 .isInstanceOf(io.agentflow.definition.DefinitionValidationException.class);
         assertThat(definitions.validate(graph, schema("amount"))).contains("SUBPROCESS_RUNTIME_NOT_READY:call");
+    }
+
+    @Test
+    void rootWithdrawalCancelsOnlyActiveChildrenAndPreservesAnAlreadyApprovedSibling() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parallelParent(leaf), Map.of("amount", "7"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var children = calls.findByParentRound("demo", application.id(), 1);
+        var completed = children.get(0); var cancelled = children.get(1);
+        var first = tasks.createTaskQuery().processInstanceId(completed.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(first.getId(), "APPROVE", "已形成真实意见", null, 2L));
+        var approved = repository.findById("demo", completed.childApplicationId()).orElseThrow();
+        var originalRound = rounds.findByRound("demo", approved.id(), 1).orElseThrow();
+        var parent = repository.findById("demo", application.id()).orElseThrow();
+        as("alice", () -> applications.withdraw(parent.id(), parent.version(), "撤回其余未完成部分"));
+        assertThat(repository.findById("demo", parent.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.WITHDRAWN);
+        var stopped = repository.findById("demo", cancelled.childApplicationId()).orElseThrow();
+        assertThat(stopped.status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(rounds.findByRound("demo", stopped.id(), 1).orElseThrow().status().name()).isEqualTo("CANCELLED");
+        assertThat(repository.findById("demo", approved.id()).orElseThrow().version()).isEqualTo(approved.version());
+        assertThat(rounds.findByRound("demo", approved.id(), 1).orElseThrow()).isEqualTo(originalRound);
+        assertThat(runtime.createProcessInstanceQuery().processInstanceId(cancelled.childProcessInstanceId()).count()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND aggregate_type='Task'", Integer.class,
+                stopped.id().toString())).isZero();
+    }
+
+    @Test
+    void childRejectionStopsItsAncestorsAndCancelsTheOtherActiveBranchWithoutInventingOpinions() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var middle = parent(leaf, schema("total"), Map.of("total", "total"), false, false, nativeId(leaf), false);
+        var application = create(parallelParent(middle), Map.of("amount", "9"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var branches = calls.findByParentRound("demo", application.id(), 1);
+        var decidedBranch = branches.get(0); var stoppedBranch = branches.get(1);
+        var decidedLeaf = onlyCall(decidedBranch.childApplicationId());
+        var stoppedLeaf = onlyCall(stoppedBranch.childApplicationId());
+        var task = tasks.createTaskQuery().processInstanceId(decidedLeaf.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "REJECT", "仅属于本子申请的具体理由", null, 2L));
+        for (var id : List.of(application.id(), decidedBranch.childApplicationId(), decidedLeaf.childApplicationId())) {
+            assertThat(repository.findById("demo", id).orElseThrow().status()).isEqualTo(ApplicationStatus.REJECTED);
+            assertThat(rounds.findByRound("demo", id, 1).orElseThrow().status()).isEqualTo(SubmissionRound.Status.REJECTED);
+        }
+        for (var id : List.of(stoppedBranch.childApplicationId(), stoppedLeaf.childApplicationId())) {
+            assertThat(repository.findById("demo", id).orElseThrow().status()).isEqualTo(ApplicationStatus.CANCELLED);
+            assertThat(rounds.findByRound("demo", id, 1).orElseThrow().status().name()).isEqualTo("CANCELLED");
+        }
+        for (var id : List.of(application.id(), decidedBranch.childApplicationId(), stoppedBranch.childApplicationId(), stoppedLeaf.childApplicationId())) {
+            assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", id.toString()).count()).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND aggregate_type='Task'", Integer.class, id.toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND payload_json LIKE ?", Integer.class,
+                    id.toString(), "%仅属于本子申请的具体理由%")).isZero();
+        }
+    }
+
+    @Test
+    void childReturnAllowsOnlyRootCorrectionAndKeepsAllOriginalRoundSnapshotsOnResubmission() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var middle = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var definition = parent(middle, schema("rootAmount"), Map.of("amount", "rootAmount"), false, false, nativeId(middle), false);
+        var application = create(definition, Map.of("rootAmount", "6"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var parentCall = onlyCall(application.id()); var childCall = onlyCall(parentCall.childApplicationId());
+        var task = tasks.createTaskQuery().processInstanceId(childCall.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "RETURN", "补充原申请材料", null, 2L));
+        for (var id : List.of(application.id(), parentCall.childApplicationId(), childCall.childApplicationId())) {
+            assertThat(repository.findById("demo", id).orElseThrow().status()).isEqualTo(ApplicationStatus.RETURNED);
+        }
+        failure(() -> as("alice", () -> applications.revise(childCall.childApplicationId(), 3, "不能拆开修改", Map.of("total", "10"))),
+                "SUBPROCESS_PARENT_CONTROL_REQUIRED");
+        var frozen = rounds.findByRound("demo", application.id(), 1).orElseThrow();
+        as("alice", () -> applications.revise(application.id(), 3, "补正根申请", Map.of("rootAmount", "10")));
+        as("alice", () -> applications.submit(application.id(), 4));
+        var fresh = calls.findByParentRound("demo", application.id(), 2);
+        assertThat(fresh).hasSize(1);
+        assertThat(fresh.get(0).childApplicationId()).isNotEqualTo(parentCall.childApplicationId());
+        assertThat(rounds.findByRound("demo", application.id(), 1).orElseThrow()).isEqualTo(frozen);
+        assertThat(repository.findById("demo", childCall.childApplicationId()).orElseThrow().payload()).containsEntry("total", "6");
+    }
+
+    @Test
+    void childApprovalWinningWhileWithdrawalWaitsReturnsConflictAndKeepsBothApproved() throws Exception {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var definition = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var application = create(definition, Map.of("amount", "3"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        var withdrawalReady = new CountDownLatch(1); var approvalCommitted = new CountDownLatch(1);
+        ApplicationRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(repository);
+        doAnswer(invocation -> {
+            if (actors.actor().userId().equals("alice")) {
+                withdrawalReady.countDown();
+                if (!approvalCommitted.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Approval did not commit");
+            }
+            return invocation.callRealMethod();
+        }).when(target).lockById("demo", application.id());
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var withdrawal = executor.submit(() -> {
+                try { as("alice", () -> applications.withdraw(application.id(), 2, "在取锁前等待")); return "ACCEPTED"; }
+                catch (DomainException conflict) { return conflict.code(); }
+            });
+            assertThat(withdrawalReady.await(15, TimeUnit.SECONDS)).isTrue();
+            as("manager", () -> actions.action(task.getId(), "APPROVE", "真实最终批准", null, 2L));
+            approvalCommitted.countDown();
+            assertThat(withdrawal.get(15, TimeUnit.SECONDS)).isEqualTo("CONCURRENCY_CONFLICT");
+        } finally {
+            approvalCommitted.countDown(); executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            doCallRealMethod().when(target).lockById("demo", application.id());
+        }
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='WITHDRAW'", Integer.class,
+                application.id().toString())).isZero();
+    }
+
+    @Test
+    void cancellationNotificationFailureRollsBackTheWholeRejectedTreeAndPreservesTheSourceTask() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parallelParent(leaf), Map.of("amount", "4"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var branches = calls.findByParentRound("demo", application.id(), 1);
+        var source = branches.get(0); var sibling = branches.get(1);
+        var task = tasks.createTaskQuery().processInstanceId(source.childProcessInstanceId()).singleResult();
+        int oldAudit = count("audit_event"), oldInbox = count("notification_inbox"), oldOutbox = count("webhook_delivery");
+        InboxRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(inbox);
+        doAnswer(invocation -> {
+            var result = invocation.callRealMethod(); InboxMessage message = invocation.getArgument(1);
+            if (message.applicationId().equals(sibling.childApplicationId()) && message.kind() == InboxMessage.Kind.APPLICATION_CANCELLED) {
+                throw new IllegalStateException("Injected cancellation notification failure");
+            }
+            return result;
+        }).when(target).append(anyString(), any());
+        try {
+            assertThatThrownBy(() -> as("manager", () -> actions.action(task.getId(), "REJECT", "不应留下未提交的理由", null, 2L)))
+                    .hasStackTraceContaining("Injected cancellation notification failure");
+        } finally { doCallRealMethod().when(target).append(anyString(), any()); }
+        for (var id : List.of(application.id(), source.childApplicationId(), sibling.childApplicationId())) {
+            var kept = repository.findById("demo", id).orElseThrow();
+            assertThat(kept.status()).isEqualTo(ApplicationStatus.IN_APPROVAL); assertThat(kept.version()).isEqualTo(2);
+            assertThat(rounds.findByRound("demo", id, 1).orElseThrow().status()).isEqualTo(SubmissionRound.Status.IN_APPROVAL);
+        }
+        assertThat(tasks.createTaskQuery().taskId(task.getId()).count()).isEqualTo(1);
+        assertThat(tasks.getTaskComments(task.getId())).isEmpty();
+        assertThat(count("audit_event")).isEqualTo(oldAudit); assertThat(count("notification_inbox")).isEqualTo(oldInbox);
+        assertThat(count("webhook_delivery")).isEqualTo(oldOutbox);
+        as("manager", () -> actions.action(task.getId(), "REJECT", "重新明确驳回", null, 2L));
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.REJECTED);
+        assertThat(repository.findById("demo", sibling.childApplicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='REJECT'", Integer.class,
+                source.childApplicationId().toString())).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = NodeType.class, names = {"TIMER_WAIT", "EVENT_WAIT"})
+    void cancelledChildRejectsTheOriginalDelayedSignalWithoutChangingTheHumanOpinion(NodeType waitType) {
+        String contract = "cancel-event-" + UUID.randomUUID();
+        if (waitType == NodeType.EVENT_WAIT) contracts.publish(ADMIN, contract, 0, "原等待事件", "erp", "GoodsAccepted", "固定来源");
+        var leaf = waitingChild(waitType, contract);
+        var definition = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var application = create(definition, Map.of("amount", "8"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "真实人工意见需保留", null, 2L));
+        var job = jobs.createTimerJobQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        var subscription = runtime.createEventSubscriptionQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("alice", () -> applications.withdraw(application.id(), 2, "父流程撤回取消原等待"));
+        var frozen = rounds.findByRound("demo", call.childApplicationId(), 1).orElseThrow();
+        int auditCount = count("audit_event"), inboxCount = count("notification_inbox"), outboxCount = count("webhook_delivery");
+        if (waitType == NodeType.TIMER_WAIT) {
+            assertThat(job).isNotNull();
+            assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
+        } else {
+            assertThat(subscription).isNotNull();
+            var command = new EventWaitService.Command("demo", "erp", "GoodsAccepted", 1, UUID.randomUUID().toString(),
+                    call.childApplicationId(), 1, subscription.getId(), contract, 1);
+            assertThat(events.advance(command)).isEqualTo(EventWaitService.Outcome.STALE);
+        }
+        assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(frozen.status()).isEqualTo(SubmissionRound.Status.CANCELLED);
+        assertThat(rounds.findByRound("demo", call.childApplicationId(), 1).orElseThrow()).isEqualTo(frozen);
+        assertThat(jobs.createTimerJobQuery().processInstanceId(call.childProcessInstanceId()).count()).isZero();
+        assertThat(runtime.createEventSubscriptionQuery().processInstanceId(call.childProcessInstanceId()).count()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class,
+                call.childApplicationId().toString())).isEqualTo(1);
+        assertThat(count("audit_event")).isEqualTo(auditCount); assertThat(count("notification_inbox")).isEqualTo(inboxCount);
+        assertThat(count("webhook_delivery")).isEqualTo(outboxCount);
+    }
+
+    @Test
+    void rootWithdrawalWinningBeforeChildApprovalLeavesNoApprovedOrOrphanedChild() throws Exception {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var definition = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var application = create(definition, Map.of("amount", "9"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        var approvalReady = new CountDownLatch(1); var withdrawalCommitted = new CountDownLatch(1);
+        ApplicationRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(repository);
+        doAnswer(invocation -> {
+            if (actors.actor().userId().equals("manager")) {
+                approvalReady.countDown();
+                if (!withdrawalCommitted.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Withdrawal did not commit");
+            }
+            return invocation.callRealMethod();
+        }).when(target).lockById("demo", application.id());
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var approval = executor.submit(() -> {
+                try { as("manager", () -> actions.action(task.getId(), "APPROVE", "失去当前轮次后不得批准", null, 2L)); return "ACCEPTED"; }
+                catch (DomainException conflict) { return conflict.code(); }
+            });
+            assertThat(approvalReady.await(15, TimeUnit.SECONDS)).isTrue();
+            as("alice", () -> applications.withdraw(application.id(), 2, "明确先撤回"));
+            withdrawalCommitted.countDown();
+            assertThat(approval.get(15, TimeUnit.SECONDS)).isEqualTo(SubprocessExecutionLocks.PARENT_CHANGED);
+        } finally {
+            withdrawalCommitted.countDown(); executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            doCallRealMethod().when(target).lockById("demo", application.id());
+        }
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.WITHDRAWN);
+        assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(runtime.createProcessInstanceQuery().processInstanceId(call.childProcessInstanceId()).count()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class,
+                call.childApplicationId().toString())).isZero();
     }
 
     private DefinitionDraft child(String key, FormSchema schema, String assignee) {

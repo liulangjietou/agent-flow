@@ -6554,7 +6554,8 @@
                 "INSTANCE_PAUSE",
                 "INSTANCE_RESUME",
                 "EVENT_RECEIVED",
-                "SUBPROCESS_COMPLETED"
+                "SUBPROCESS_COMPLETED",
+                "SUBPROCESS_STOPPED"
               ]
             }
           },
@@ -9934,7 +9935,8 @@
                 "INSTANCE_PAUSE",
                 "INSTANCE_RESUME",
                 "EVENT_RECEIVED",
-                "SUBPROCESS_COMPLETED"
+                "SUBPROCESS_COMPLETED",
+                "SUBPROCESS_STOPPED"
               ]
             }
           },
@@ -11462,7 +11464,8 @@
                 "INSTANCE_PAUSE",
                 "INSTANCE_RESUME",
                 "EVENT_RECEIVED",
-                "SUBPROCESS_COMPLETED"
+                "SUBPROCESS_COMPLETED",
+                "SUBPROCESS_STOPPED"
               ]
             }
           },
@@ -41960,7 +41963,8 @@
               "APPROVED",
               "REJECTED",
               "RETURNED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "CANCELLED"
             ]
           },
           "reason": {
@@ -42633,6 +42637,7 @@
               "APPLICATION_REJECTED",
               "APPLICATION_APPROVED",
               "APPLICATION_WITHDRAWN",
+              "APPLICATION_CANCELLED",
               "TASK_TRANSFERRED",
               "TASK_DELEGATED",
               "TASK_RESOLVED",
@@ -43275,7 +43280,8 @@
               "APPROVED",
               "RETURNED",
               "REJECTED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "CANCELLED"
             ]
           },
           "submittedAt": {
@@ -43918,7 +43924,8 @@
               "RETURNED",
               "REJECTED",
               "APPROVED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "CANCELLED"
             ]
           },
           "observedAt": {

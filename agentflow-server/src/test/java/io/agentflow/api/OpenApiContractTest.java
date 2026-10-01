@@ -457,14 +457,13 @@ class OpenApiContractTest {
     }
 
     @Test
-    void cancellationIsAReadableApplicationStateWithoutReplacingSubmissionConclusions() throws Exception {
+    void cancellationIsReadableForApplicationsAndSystemStoppedSubprocessRounds() throws Exception {
         JsonNode spec = document();
-        for (var entry : java.util.Map.of("Application", "status", "WorkspaceApplication", "status", "HandledItem", "applicationStatus").entrySet()) {
+        for (var entry : java.util.Map.of("Application", "status", "WorkspaceApplication", "status", "HandledItem", "applicationStatus",
+                "SubmissionRound", "status", "RoundDiagram", "status", "FirstWorkflowEvidence", "status").entrySet()) {
             var values = spec.path("components").path("schemas").path(entry.getKey()).path("properties").path(entry.getValue()).path("enum");
             assertThat(java.util.stream.StreamSupport.stream(values.spliterator(), false).map(JsonNode::asText)).contains("CANCELLED");
         }
-        var roundValues = spec.path("components").path("schemas").path("SubmissionRound").path("properties").path("status").path("enum");
-        assertThat(java.util.stream.StreamSupport.stream(roundValues.spliterator(), false).map(JsonNode::asText)).doesNotContain("CANCELLED");
     }
 
     private JsonNode resolve(JsonNode spec, JsonNode schema) {

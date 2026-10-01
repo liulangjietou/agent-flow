@@ -19,7 +19,7 @@ export interface WebhookAttempt { attemptNo: number; startedAt: string; finished
 export interface WebhookRetryRequest { requestedBy: string; requestedAt: string; previousStatus: string; previousVersion: number }
 export interface WebhookDetail { delivery: WebhookItem; attempts: WebhookAttempt[]; retryRequests: WebhookRetryRequest[] }
 export const webhookStatuses: Record<string, string> = { PENDING: '待投递', IN_FLIGHT: '投递中', RETRY_WAIT: '等待重试', DELIVERED: '已送达', FAILED: '停止投递' }
-export const webhookEvents: Record<string, string> = { SubprocessCompleted: '子审批完成', ApplicationPaused: '审批暂停', ApplicationResumed: '审批恢复', ApplicationSubmitted: '提交审批', ApplicationWithdrawn: '撤回申请', ApplicationCancelled: '作废申请', TaskActionAccepted: '任务操作', ApplicationApproved: '申请批准', ApplicationReturned: '申请退回', ApplicationRejected: '申请驳回', TimerWaitElapsed: '等待到期', TimerWaitFailed: '等待推进失败', TimerWaitRetried: '原等待重试' }
+export const webhookEvents: Record<string, string> = { SubprocessCompleted: '子审批完成', SubprocessStopped: '父子审批停止联动', ApplicationPaused: '审批暂停', ApplicationResumed: '审批恢复', ApplicationSubmitted: '提交审批', ApplicationWithdrawn: '撤回申请', ApplicationCancelled: '作废申请', TaskActionAccepted: '任务操作', ApplicationApproved: '申请批准', ApplicationReturned: '申请退回', ApplicationRejected: '申请驳回', TimerWaitElapsed: '等待到期', TimerWaitFailed: '等待推进失败', TimerWaitRetried: '原等待重试' }
 export const webhookErrors: Record<string, string> = { TARGET_UNAVAILABLE: '目的地已移除或停用', TARGET_CHANGED: '目的地地址已变更', OUTCOME_UNKNOWN: '上次尝试结果未知，接收方可能已收到', CONNECTION_FAILED: '连接异常，接收方可能已收到', TIMEOUT: '响应超时，接收方可能已收到', INTERRUPTED: '发送被中断，接收方可能已收到' }
 export function webhookRetryable(item: WebhookItem) { return ['FAILED', 'DELIVERED', 'RETRY_WAIT'].includes(item.status) }
 /**

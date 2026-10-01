@@ -77,6 +77,21 @@ public class ApprovalNotificationService {
         send(application, actor, application.createdBy(), Kind.APPLICATION_RETURNED, null, null);
     }
 
+    /** 父子联动只发送本申请实际结论；源操作的申请人消息仍由原用例负责，避免重复通知。 */
+    public void subprocessStopped(Application application, String actor, List<TaskAudiencePort.Audience> previous, boolean includeApplicant) {
+        Kind kind = switch (application.status()) {
+            case RETURNED -> Kind.APPLICATION_RETURNED;
+            case REJECTED -> Kind.APPLICATION_REJECTED;
+            case CANCELLED -> Kind.APPLICATION_CANCELLED;
+            default -> throw new IllegalStateException("Unsupported subprocess stop conclusion");
+        };
+        var recipients = previous.stream().flatMap(task -> task.recipients().stream()).collect(Collectors.toSet());
+        if (includeApplicant) recipients.add(application.createdBy());
+        else recipients.remove(application.createdBy());
+        recipients.remove(actor);
+        for (String recipient : recipients) send(application, actor, recipient, kind, null, null);
+    }
+
     /** 核减通知只提供入口，逐行差额通过财务权限查询展示，不在消息中复制敏感金额。 */
     public void expenseAdjusted(Application application, String actor) {
         send(application, actor, application.createdBy(), Kind.EXPENSE_ADJUSTED, null, null);

@@ -2,6 +2,7 @@ package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.process.SubprocessProgressService;
+import io.agentflow.approval.process.SubprocessStopService;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.expense.ExpenseFormContract;
 import io.agentflow.expense.ExpensePlanFormContract;
@@ -51,13 +52,15 @@ public class ApprovalApplicationFacade {
     private final AttachmentReferenceService attachments;
     private final SubprocessExecutionLocks executionLocks;
     private final SubprocessProgressService subprocesses;
+    private final SubprocessStopService subprocessStops;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, List<ApplicationParticipantPort> participantPorts,
                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions,
                                      ApprovalNotificationService notifications, OrganizationInitiatorDirectory initiators, AttachmentReferenceService attachments,
-                                     SubprocessExecutionLocks executionLocks, SubprocessProgressService subprocesses) {
+                                     SubprocessExecutionLocks executionLocks, SubprocessProgressService subprocesses,
+                                     SubprocessStopService subprocessStops) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
@@ -70,6 +73,7 @@ public class ApprovalApplicationFacade {
         this.attachments = attachments;
         this.executionLocks = executionLocks;
         this.subprocesses = subprocesses;
+        this.subprocessStops = subprocessStops;
     }
 
     /** 创建申请草稿。 */
@@ -182,9 +186,13 @@ public class ApprovalApplicationFacade {
 
     private Application withdrawBound(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireWriteBinding(executionLocks.lock(requireApplicant(actor, id)), reference);
+        var initial = executionLocks.lock(requireApplicant(actor, id));
+        requireWriteBinding(initial, reference);
+        initial.checkVersion(expectedVersion);
+        var stopping = subprocessStops.before(initial);
         var previous = notifications.pendingAudience(service.get(actor.tenantId(), id));
         Application application = service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+        subprocessStops.after(stopping, application, actor.userId());
         notifications.withdrawn(application, actor.userId(), previous);
         return application;
     }
@@ -210,8 +218,12 @@ public class ApprovalApplicationFacade {
     /** 内部财务结果使用明确系统身份退回，不冒用申请人或某个人工审批任务。 */
     @Transactional
     public Application returnBusiness(String tenant, UUID id, long expectedVersion, BusinessReference reference, String actor, String comment) {
-        requireWriteBinding(executionLocks.lock(service.get(tenant, id)), java.util.Objects.requireNonNull(reference));
+        var initial = executionLocks.lock(service.get(tenant, id));
+        requireWriteBinding(initial, java.util.Objects.requireNonNull(reference));
+        initial.checkVersion(expectedVersion);
+        var stopping = subprocessStops.before(initial);
         var application = service.returnToApplicant(tenant, id, expectedVersion, actor, comment);
+        subprocessStops.after(stopping, application, actor);
         notifications.returned(application, actor); return application;
     }
 

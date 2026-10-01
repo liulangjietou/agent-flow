@@ -5,7 +5,7 @@ const { createNavigation } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIO
 const item = id => ({ id, kind: 'TASK_PENDING' })
 
 test('结束或移除会签的消息直接打开申请，不请求已取消任务，也不显示待办异常提示', async () => {
-  for (const kind of ['TASK_COUNTERSIGN_COMPLETED', 'TASK_COUNTERSIGN_REMOVED', 'APPLICATION_PAUSED', 'APPLICATION_RESUMED']) {
+  for (const kind of ['TASK_COUNTERSIGN_COMPLETED', 'TASK_COUNTERSIGN_REMOVED', 'APPLICATION_PAUSED', 'APPLICATION_RESUMED', 'APPLICATION_CANCELLED']) {
     let requests = 0
     const deps = { busy: { value: false }, writesBlocked: { value: false }, actorScope: { value: 'demo:finance' },
       recordApplicationId: { value: '' }, notice: { value: '' }, api: { task: async () => { requests++; throw { status: 404 } } } }

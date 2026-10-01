@@ -48,6 +48,38 @@ class ApplicationCancellationTest {
         assertThat(value.version()).isEqualTo(7);
     }
 
+    @Test
+    void parentCancellationEndsOnlyTheCurrentApprovalAndKeepsTheSubmittedContent() {
+        var value = application(ApplicationStatus.IN_APPROVAL);
+        value.cancelWithParent(7);
+        assertThat(value.status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(value.version()).isEqualTo(8);
+        assertThat(value.roundNo()).isEqualTo(2);
+        assertThat(value.definitionVersion()).isEqualTo(3);
+        assertThat(value.payload()).isEqualTo(Map.of("amount", "6000.01"));
+        assertThat(value.title()).isEqualTo("原申请");
+        assertThatThrownBy(() -> value.submit(8)).isInstanceOf(DomainException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ApplicationStatus.class, names = "IN_APPROVAL", mode = EnumSource.Mode.EXCLUDE)
+    void parentCancellationCannotOverwriteAnExistingConclusionOrEditableDraft(ApplicationStatus status) {
+        var value = application(status);
+        assertThatThrownBy(() -> value.cancelWithParent(7)).isInstanceOf(DomainException.class)
+                .extracting("code").isEqualTo("DOMAIN_RULE_VIOLATION");
+        assertThat(value.status()).isEqualTo(status);
+        assertThat(value.version()).isEqualTo(7);
+    }
+
+    @Test
+    void staleParentCancellationCannotOverwriteAChangedApproval() {
+        var value = application(ApplicationStatus.IN_APPROVAL);
+        assertThatThrownBy(() -> value.cancelWithParent(6)).isInstanceOf(DomainException.class)
+                .extracting("code").isEqualTo("CONCURRENCY_CONFLICT");
+        assertThat(value.status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(value.version()).isEqualTo(7);
+    }
+
     private Application application(ApplicationStatus status) {
         return Application.restore(UUID.randomUUID(), "demo", "CANCEL-1", "leave", 3, "alice", "原申请", Map.of("amount", "6000.01"), status, 2, 7);
     }

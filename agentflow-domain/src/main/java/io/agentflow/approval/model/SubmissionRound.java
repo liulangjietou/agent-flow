@@ -57,7 +57,7 @@ public record SubmissionRound(String tenantId, UUID applicationId, int roundNo, 
      * @author owlzhangfq@gmail.com
      */
     public enum Status {
-        IN_APPROVAL, RETURNED, REJECTED, APPROVED, WITHDRAWN;
+        IN_APPROVAL, RETURNED, REJECTED, APPROVED, WITHDRAWN, CANCELLED;
 
         /** 结论更新不能将已提交轮次重新变为审批中。 */
         public void requireTerminal() {
