@@ -5,6 +5,21 @@ const definition = (id, extra = {}) => ({ id, key: 'leave', name: '请假', stat
   graph: { nodes: [{ id: 'approval', name: '经理审批' }], edges: [] }, formSchema: { fields: [{ key: 'days', type: 'NUMBER' }] }, ...extra })
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve = a; reject = b }); return { promise, resolve, reject } }
 
+test('按标识和发布版本精确回显子流程，目录缺失或返回其他版本不能回退最新', async () => {
+  const filters = [], ids = []
+  let actual = 2, empty = false
+  const selection = new DefinitionSelection(async query => { filters.push(query); return { items: empty ? [] : [{ id: 'original' }] } },
+    async id => { ids.push(id); return definition(id, { version: actual }) })
+  assert.equal((await selection.load('demo/admin', '', { publishedOnly: true, processKey: 'leave', version: 2 })).version, 2)
+  assert.deepEqual(filters[0], { limit: 1, status: 'PUBLISHED', processKey: 'leave', version: 2 })
+  actual = 3
+  assert.equal(await selection.load('demo/admin', '', { publishedOnly: true, processKey: 'leave', version: 2 }), null)
+  assert.match(selection.error, /不符合/)
+  empty = true
+  assert.equal(await selection.load('demo/admin', '', { publishedOnly: true, processKey: 'leave', version: 2 }), null)
+  assert.equal(ids.length, 2)
+})
+
 test('新申请筛选可发起版本并复核完整配置，历史比较仍可读取停用版本', async () => {
   const filters = []
   const selection = new DefinitionSelection(async query => { filters.push(query); return { items: [{ id: 'disabled' }] } }, async id => definition(id, { startEnabled: false }))

@@ -4,6 +4,19 @@ const { loadDesignerNodes, serializeDesignerNodes, readDesignerDeadline } = awai
 const loaded = () => ({ id: 'approve', name: '审批', type: 'USER_TASK', x: 220, y: 180, assigneeRule: 'role:MANAGER',
   originalProperties: { assigneeRule: 'role:MANAGER', businessTag: '保留原属性' }, loadedPosition: { x: 220, y: 180 } })
 
+test('固定子版本与映射在两种视图往返，清除引用时不残留旧输入且不污染来源', () => {
+  const original = [{ id: 'child', name: '子审批', type: 'SUB_PROCESS', properties: {
+    subprocessKey: 'child-review', subprocessVersion: '3', 'subprocessInput.total': 'amount', businessTag: '保留' } }]
+  const nodes = loadDesignerNodes(original)
+  assert.deepEqual(nodes[0].subprocess, { key: 'child-review', version: '3', inputs: { total: 'amount' } })
+  assert.deepEqual(serializeDesignerNodes(nodes), original)
+  nodes[0].subprocess.inputs.total = 'net'
+  assert.equal(serializeDesignerNodes(nodes)[0].properties['subprocessInput.total'], 'net')
+  assert.equal(original[0].properties['subprocessInput.total'], 'amount')
+  nodes[0].subprocess = { inputs: {} }
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, { businessTag: '保留' })
+})
+
 test('抄送名单在加载、修改及清空时原样保存，不附加审批方式', () => {
   const graph = [{ id: 'copy', name: '抄送', type: 'COPY', properties: { recipientRule: 'user:bob' } }]
   const nodes = loadDesignerNodes(graph)

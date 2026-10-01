@@ -57,12 +57,12 @@ onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); cl
 
 <template>
   <section class="content portable-template">
-    <div class="page-heading"><div><p class="eyebrow">PROCESS TEMPLATE / FILE</p><h2>让流程配置可以复用。</h2><p class="subhead">导出当前设计，或从模板文件创建独立草稿。导入后核对审批人和期限日历，再模拟和发布。</p></div><button class="secondary" :disabled="locked" @click="emit('back')">返回流程设计器</button></div>
+    <div class="page-heading"><div><p class="eyebrow">PROCESS TEMPLATE / FILE</p><h2>让流程配置可以复用。</h2><p class="subhead">导出当前设计，或从模板文件创建独立草稿。导入后核对审批人、子流程版本和期限日历，再模拟和发布。</p></div><button class="secondary" :disabled="locked" @click="emit('back')">返回流程设计器</button></div>
     <p v-if="hasUnsavedDefinition" class="unsaved-note">设计器有未保存的修改。读取文件和检查模板不会替换内容；创建草稿前会再次确认。</p>
     <div class="transfer-layout">
       <article class="panel import-panel" aria-labelledby="template-import-heading">
         <p class="eyebrow">IMPORT</p><h3 id="template-import-heading">导入模板文件</h3>
-        <p class="explanation">选择平台导出的 JSON 文件，最多 1 MiB。文件中的角色、账号和期限日历需在当前租户重新核对。</p>
+        <p class="explanation">选择平台导出的 JSON 文件，最多 1 MiB。文件中的角色、账号、子流程固定版本和期限日历需在当前租户重新核对。</p>
         <label class="file-picker"><strong>{{ fileName ? '更换模板文件' : '选择流程模板文件' }}</strong><span>点击选择 JSON 文件</span><input type="file" accept=".json,application/json" :disabled="locked" aria-label="选择流程模板文件" @change="choose" /></label>
         <p v-if="fileName" class="file-name">{{ fileName }}</p>
         <p v-if="review.loading" role="status" class="explanation">正在读取或检查模板…</p>
@@ -80,7 +80,7 @@ onUnmounted(() => { clearTimeout(keyTimer); keyQuery.clear(); review.clear(); cl
           <button class="primary" :disabled="locked || !review.canImport" @click="create">创建独立草稿</button><p class="explanation">创建后进入设计器，不会自动发布或发起申请。</p>
         </template>
       </article>
-      <aside class="panel export-panel" aria-labelledby="template-export-heading"><p class="eyebrow">EXPORT</p><h3 id="template-export-heading">导出当前设计</h3><strong class="current-name">{{ current.name }}</strong><p class="explanation">包含当前画布、表单、审批人、期限规则和通知文案，包括尚未保存的修改。不会保存草稿或改变已发布版本。</p><button class="secondary" :disabled="locked" @click="generate">生成模板文件</button><a v-if="exportUrl" :href="exportUrl" download="agentflow-process-template.json" class="download-link">下载流程模板 JSON ↓</a><p v-if="exportError" class="transfer-error" role="alert">{{ exportError }}</p><div class="file-boundary"><strong>分享前核对</strong><p>文件包含流程名称、角色、指定账号、期限日历引用和通知文案。请确认这些配置适合接收方使用。</p><p>不包含申请正文、审批历史、发布记录、租户身份或登录凭证。</p></div></aside>
+      <aside class="panel export-panel" aria-labelledby="template-export-heading"><p class="eyebrow">EXPORT</p><h3 id="template-export-heading">导出当前设计</h3><strong class="current-name">{{ current.name }}</strong><p class="explanation">包含当前画布、表单、审批人、子流程固定引用与输入映射、期限规则和通知文案，包括尚未保存的修改。不会保存草稿或改变已发布版本。</p><button class="secondary" :disabled="locked" @click="generate">生成模板文件</button><a v-if="exportUrl" :href="exportUrl" download="agentflow-process-template.json" class="download-link">下载流程模板 JSON ↓</a><p v-if="exportError" class="transfer-error" role="alert">{{ exportError }}</p><div class="file-boundary"><strong>分享前核对</strong><p>文件包含流程名称、角色、指定账号、子流程与期限日历引用、字段映射和通知文案。请确认这些配置适合接收方使用。</p><p>不包含申请正文、审批历史、发布记录、租户身份或登录凭证。</p></div></aside>
     </div>
   </section>
 </template>

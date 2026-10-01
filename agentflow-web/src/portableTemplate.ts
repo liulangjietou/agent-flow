@@ -1,6 +1,7 @@
 import { readNotificationTexts, type NotificationTexts } from './notificationTexts.js'
 import type { Graph } from './api'
 import { validateFormSchema, type FormSchema } from './formSchema.js'
+import { subprocessFieldKey } from './subprocessDesigner.js'
 
 export const TEMPLATE_FILE_LIMIT = 1024 * 1024
 export const TEMPLATE_FORMAT = 'agentflow-process-template'
@@ -54,11 +55,15 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
   for (const raw of g.nodes) {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')
     text(n.id, '节点标识', 128); text(n.name, '节点名称', 256)
-    if (!['START', 'END', 'USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
+    if (!['START', 'END', 'USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
+    const inputs = n.type === 'SUB_PROCESS' && n.properties && typeof n.properties === 'object'
+      ? Object.keys(n.properties).filter(key => key.startsWith('subprocessInput.') && subprocessFieldKey(key.slice('subprocessInput.'.length))) : []
+    if (inputs.length > 50) throw new Error('子流程最多映射 50 个输入字段。')
     const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
-      'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes'], [], '节点配置')
+      'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes', ...(n.type === 'SUB_PROCESS' ? ['subprocessKey', 'subprocessVersion', ...inputs] : [])], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
       text(value, `节点配置 ${key}`, 256)
+      if (inputs.includes(key) && !subprocessFieldKey(value)) throw new Error('子流程输入只能引用父表单字段标识，不能使用路径或表达式。')
       if ((key === 'x' || key === 'y') && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 1_000_000)) throw new Error('节点位置必须在 0 至 1000000 之间。')
     }
   }

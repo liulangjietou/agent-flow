@@ -66,16 +66,18 @@ const labels: Record<string, string> = {
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
   eventContractKey: '引用事件', 'properties.eventContractKey': '引用事件', eventContractVersion: '事件发布版本', 'properties.eventContractVersion': '事件发布版本',
+  subprocessKey: '子流程标识', 'properties.subprocessKey': '子流程标识', subprocessVersion: '子流程发布版本', 'properties.subprocessVersion': '子流程发布版本',
   timerDelaySeconds: '等待时长（秒）', 'properties.timerDelaySeconds': '等待时长（秒）',
   'properties.deadlineCalendarId': '期限工作日历', 'properties.deadlineCalendarRevision': '期限日历修订', 'properties.deadlineWorkingMinutes': '期限工作分钟',
   x: '水平位置', y: '垂直位置', 'properties.x': '水平位置', 'properties.y': '垂直位置', value: '保存值'
 }
-const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', TIMER_WAIT: '定时等待', EVENT_WAIT: '事件等待', EXCLUSIVE_GATEWAY: '条件网关',
+const types: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '人工审批', TIMER_WAIT: '定时等待', EVENT_WAIT: '事件等待', SUB_PROCESS: '子流程', EXCLUSIVE_GATEWAY: '条件网关',
   SERVICE_TASK: '服务任务', PARALLEL_GATEWAY: '并行网关', TEXT: '单行文本', TEXTAREA: '多行文本', NUMBER: '数字', DATE: '日期', SELECT: '单选', BOOLEAN: '是 / 否', TABLE: '重复明细' }
 const own = <T>(values: Record<string, T>, key: string): T | undefined => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined
 
 /** 未知配置保留原键，避免静默隐藏新增属性。 */
-export const comparisonProperty = (property: string) => own(labels, property) ?? property
+export const comparisonProperty = (property: string) => property.startsWith('properties.subprocessInput.')
+  ? `子流程输入 ${property.slice('properties.subprocessInput.'.length)}` : own(labels, property) ?? property
 
 /** 仅格式化文本供 Vue 转义渲染，不将版本配置解释为 HTML。 */
 export function comparisonValue(value: unknown, property = ''): string {

@@ -10,6 +10,21 @@ const parallel = () => ({nodes:[node('start','START'),node('fork','PARALLEL_GATE
 let counter=0
 const edit = (graph, command) => editQuickGraph(graph,command,()=>String(++counter))
 
+test('子流程在直线与并行分支中插入、移动和删除，固定版本及输入映射不变', () => {
+  for (const [graph, edgeId] of [[line(), 'two'], [parallel(), 'aj']]) {
+    const inserted = edit(graph, { kind: 'insert', edgeId, type: 'SUB_PROCESS' })
+    const call = inserted.nodes.find(node => node.type === 'SUB_PROCESS')
+    assert.ok(call)
+    assert.equal(call.properties.subprocessKey, undefined)
+    Object.assign(call.properties, { subprocessKey: 'child', subprocessVersion: '1', 'subprocessInput.total': 'amount' })
+    assert.equal(projectQuickGraph(inserted).reason, '')
+    assert.equal(quickNodeIds(projectQuickGraph(inserted).sequence).filter(id => id === call.id).length, 1)
+    const moved = edit(inserted, { kind: 'swapTasks', firstId: 'a', secondId: call.id })
+    assert.deepEqual(moved.nodes.find(node => node.id === call.id).properties, call.properties)
+    assert.deepEqual(edit(inserted, { kind: 'removeTask', nodeId: call.id }), graph)
+  }
+})
+
 test('抄送可在直线和并行分支插入、移动、删除且保留收件规则', () => {
   for (const [graph, edgeId] of [[line(), 'two'], [parallel(), 'aj']]) {
     const inserted = edit(graph, { kind: 'insert', edgeId, type: 'COPY' })

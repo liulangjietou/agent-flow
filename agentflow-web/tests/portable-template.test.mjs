@@ -14,6 +14,23 @@ const graph = { nodes: [
 const source = () => ({ key: 'source-key', name: '原流程', graph: structuredClone(graph), formSchema: defaultFormSchema() })
 const file = value => ({ size: new TextEncoder().encode(value).length, text: async () => value })
 const envelope = () => JSON.parse(serializePortableTemplate(source()))
+
+test('子流程模板只保留固定引用和显式输入，拒绝路径、原型及引擎扩展', () => {
+  const value = source()
+  value.graph.nodes[1] = { id: 'review', name: '子审批', type: 'SUB_PROCESS', properties: {
+    subprocessKey: 'child', subprocessVersion: '2', 'subprocessInput.total': 'amount' } }
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), value)
+  for (const property of ['subprocessInput.__proto__', 'subprocessInput.constructor', 'subprocessInput.total.value', 'delegateExpression', 'calledElement']) {
+    const invalid = structuredClone(value)
+    invalid.graph.nodes[1].properties[property] = 'amount'
+    assert.throws(() => parsePortableTemplate(serializePortableTemplate(invalid)))
+  }
+  for (const sourceKey of ['${bean.call()}', 'formData.amount', 'applicationId']) {
+    const invalid = structuredClone(value)
+    invalid.graph.nodes[1].properties['subprocessInput.total'] = sourceKey
+    assert.throws(() => parsePortableTemplate(serializePortableTemplate(invalid)))
+  }
+})
 const deferred = () => { let resolve, reject; const promise = new Promise((ok, no) => { resolve = ok; reject = no }); return { promise, resolve, reject } }
 
 test('导出投影只保留配置，完整往返节点顺序、表单和精确数值，不改变原对象', () => {

@@ -1,4 +1,5 @@
 import type { GraphNode } from './api'
+import { readSubprocessBinding, writeSubprocessBinding, type SubprocessBinding } from './subprocessDesigner.js'
 
 /** 节点期限保留原始文本，缺项与非法旧配置由校验明确报告。@author owlzhangfq@gmail.com */
 export interface DesignerDeadline { calendarId?: string; calendarRevision?: string; workingMinutes?: string }
@@ -26,6 +27,7 @@ export interface DesignerNode {
   timerDelaySeconds?: string
   eventContractKey?: string
   eventContractVersion?: string
+  subprocess?: SubprocessBinding
   deadline?: DesignerDeadline
   originalProperties?: Record<string, string>
   loadedPosition?: { x: number; y: number }
@@ -47,6 +49,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
       approvalMode: node.properties.approvalMode ?? 'SINGLE', approvalPercentage: node.properties.approvalPercentage,
       timerDelaySeconds: node.properties.timerDelaySeconds,
       eventContractKey: node.properties.eventContractKey, eventContractVersion: node.properties.eventContractVersion,
+      subprocess: readSubprocessBinding(node.properties),
       originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
 }
@@ -54,7 +57,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
 /** 将画布节点转换为发布、保存、校验、模拟和比较共用的配置快照。 */
 export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
   return nodes.map(node => {
-    const properties = { ...node.originalProperties }
+    const properties = node.type === 'SUB_PROCESS' ? writeSubprocessBinding(node.originalProperties ?? {}, node.subprocess) : { ...node.originalProperties }
     if (node.type === 'EVENT_WAIT') {
       for (const key of ['eventContractKey', 'eventContractVersion'] as const) {
         if (node[key] !== undefined) properties[key] = node[key]
