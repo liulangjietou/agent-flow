@@ -41,6 +41,12 @@ public class ExpensePartialAdjustmentAudit {
                 "paymentVoucherVersion", source.paymentVoucher() == null ? 0 : source.paymentVoucher().version(), "returnsVersion", source.returns() == null ? 0 : source.returns().version());
         return write(report, after.id(), after.version(), Action.CONFIRM_CURRENT, comment, at, Map.of("beforeVersion", before.version(), "sourceVersions", versions));
     }
+    /** 财务裁决审计引用实际具名证明与相邻根修订，不复制完整财务候选。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID dispute(ExpenseReport report, ExpensePartialDisputeResolution decision, ExpensePartialAdjustment after) {
+        return write(report, after.id(), after.version(), Action.RESOLVE_DISPUTE, decision.reason(), decision.resolvedAt(),
+                Map.of("resolutionId", decision.id(), "side", decision.side(), "outcome", decision.outcome(), "beforeVersion", decision.beforeVersion()));
+    }
     private UUID write(ExpenseReport report, UUID id, long version, Action action, String comment, Instant at, Map<String, Object> details) {
         var payload = new java.util.LinkedHashMap<String, Object>(details);
         payload.put("reportId", report.id()); payload.put("roundNo", report.requireFrozenRound().roundNo()); payload.put("authorizedRole", "FINANCE"); payload.put("comment", comment);
@@ -57,7 +63,7 @@ public class ExpensePartialAdjustmentAudit {
      * 明确区分只读刷新、固定意图和实际写入授权。
      * @author owlzhangfq@gmail.com
      */
-    public enum Action { ORIGINAL_QUERY, CREATE, PREPARE, AUTHORIZE, QUERY_BUDGET, QUERY_ACCRUAL, RESEND_BUDGET, RESEND_ACCRUAL, CONFIRM_CURRENT, SOURCE_QUERY, RETIRE }
+    public enum Action { ORIGINAL_QUERY, CREATE, PREPARE, AUTHORIZE, QUERY_BUDGET, QUERY_ACCRUAL, RESEND_BUDGET, RESEND_ACCRUAL, CONFIRM_CURRENT, SOURCE_QUERY, RETIRE, RESOLVE_DISPUTE }
 
     /**
      * 幂等回执只携带已保存的定位，不携带敏感原件或可直接外发的命令。

@@ -190,6 +190,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("ExpensePartialAccrualFact", io.agentflow.expense.ExpensePartialAdjustmentWorkspace.AccrualFact.class),
                 java.util.Map.entry("ExpensePartialCompletion", io.agentflow.expense.ExpensePartialAdjustmentWorkspace.Completion.class),
                 java.util.Map.entry("ExpensePartialRetirement", io.agentflow.expense.ExpensePartialAdjustmentWorkspace.Retirement.class),
+                java.util.Map.entry("ExpensePartialResolution", io.agentflow.expense.ExpensePartialAdjustmentWorkspace.Resolution.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentOriginal", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Original.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentPreparation", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Preparation.class),
                 java.util.Map.entry("ExpenseResourceAdjustmentBudget", io.agentflow.expense.ExpenseResourceAdjustmentWorkspace.Budget.class),

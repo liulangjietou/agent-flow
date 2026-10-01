@@ -33873,6 +33873,175 @@
           }
         }
       }
+    },
+    "/api/v1/expense-reports/{id}/partial-adjustments/disputes": {
+      "post": {
+        "operationId": "resolveExpensePartialDispute",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "具名裁决部分报销的一侧财务争议",
+        "description": "仅采用已显示调整修订内所选侧的实际原号终态候选，候选须在五分钟内且 ERP 为最高修订。历史成功、原受理号、原凭证和资源完成不可被覆盖。查无、处理中和过期候选不能裁决；过期后沿原号重新查询。保存决定不重新外发、不自动确认原来源。根修订、相邻证明、具名审计和幂等响应同事务提交。",
+        "x-access": "每次写入及成功幂等回放先复核当前同法人独立 FINANCE 和原轮次完整字段权限；申请人、原付款出纳及缺少字段权限的管理员不可办理。原银行未知不阻止记录真实差额决定。",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "显示版本、候选终态或幂等冲突；候选过期、非终态、历史效果或原凭证矛盾不能裁决。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "所选侧具名决定与审计已保存；另一侧及原资源完成保持，当前来源复核仍由独立动作办理。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialActionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePartialDisputeInput"
+              },
+              "example": {
+                "roundNo": 1,
+                "applicationVersion": 8,
+                "businessVersion": 4,
+                "settlementVersion": 6,
+                "adjustmentId": "90000000-0000-0000-0000-000000000001",
+                "adjustmentVersion": 12,
+                "side": "BUDGET",
+                "outcome": "APPLIED",
+                "evidenceReference": "DISPUTE-20260930",
+                "comment": "核对原号查询与原凭据后采用预算成功结果"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -58227,7 +58396,11 @@
           "updatedAt",
           "issue",
           "accepted",
-          "conflicting"
+          "conflicting",
+          "canResolve",
+          "resolutionIssue",
+          "candidateValidUntil",
+          "latestResolution"
         ],
         "properties": {
           "id": {
@@ -58305,6 +58478,40 @@
                 "type": "null"
               }
             ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "resolutionIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidateValidUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestResolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialResolution"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -58323,7 +58530,11 @@
           "updatedAt",
           "issue",
           "accepted",
-          "conflicting"
+          "conflicting",
+          "canResolve",
+          "resolutionIssue",
+          "candidateValidUntil",
+          "latestResolution"
         ],
         "properties": {
           "id": {
@@ -58396,6 +58607,40 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ExpensePartialAccrualFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "resolutionIssue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidateValidUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestResolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialResolution"
               },
               {
                 "type": "null"
@@ -58881,6 +59126,145 @@
           "adjustmentVersion": {
             "type": "integer",
             "minimum": 1
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "ExpensePartialDisputeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "applicationVersion",
+          "businessVersion",
+          "settlementVersion",
+          "adjustmentId",
+          "adjustmentVersion",
+          "side",
+          "outcome",
+          "evidenceReference",
+          "comment"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "businessVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "settlementVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUDGET",
+              "ACCRUAL"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "POSTED",
+              "FAILED"
+            ]
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          }
+        }
+      },
+      "ExpensePartialResolution": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationId",
+          "beforeVersion",
+          "afterVersion",
+          "outcome",
+          "observedAt",
+          "resolvedBy",
+          "resolvedAt",
+          "evidenceReference",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "beforeVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "afterVersion": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "POSTED",
+              "FAILED"
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "evidenceReference": {
             "type": "string",

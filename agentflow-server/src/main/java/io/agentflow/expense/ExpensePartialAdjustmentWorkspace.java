@@ -33,16 +33,18 @@ public class ExpensePartialAdjustmentWorkspace {
     private final JdbcExpensePartialPreparationRepository preparations;
     private final ExpensePartialPreparationService preparing;
     private final ExpensePartialAdjustmentActions actions;
+    private final ExpensePartialAdjustmentDisputes resolving;
+    private final JdbcExpensePartialDisputeRepository disputes;
 
     /** 查询层组合真实账本与权限，金额和授权规则继续由原领域模型负责。 */
     public ExpensePartialAdjustmentWorkspace(CurrentActor actors, ExpenseSettlementAccess settlementAccess, ExpenseResourceAdjustmentAccess access,
             ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, JdbcExpensePartialAdjustmentRepository adjustments,
             JdbcExpensePaymentReturnsRepository returns, JdbcBudgetOperationRepository budgets, JdbcPaymentOperationRepository payments,
             JdbcVoucherOperationRepository vouchers, JdbcExpensePartialPreparationRepository preparations, ExpensePartialPreparationService preparing,
-            ExpensePartialAdjustmentActions actions) {
+            ExpensePartialAdjustmentActions actions, ExpensePartialAdjustmentDisputes resolving, JdbcExpensePartialDisputeRepository disputes) {
         this.actors = actors; this.settlementAccess = settlementAccess; this.access = access; this.reports = reports; this.settlements = settlements;
         this.adjustments = adjustments; this.returns = returns; this.budgets = budgets; this.payments = payments; this.vouchers = vouchers;
-        this.preparations = preparations; this.preparing = preparing; this.actions = actions;
+        this.preparations = preparations; this.preparing = preparing; this.actions = actions; this.resolving = resolving; this.disputes = disputes;
     }
 
     /** 原轮次完整字段授权后，在同一数据库快照内读取显示版本与独立财务历史。 */
@@ -90,9 +92,10 @@ public class ExpensePartialAdjustmentWorkspace {
     }
     private Adjustment adjustment(ExpensePartialAdjustment value, boolean finance, Instant now) {
         var input = value.input(); var change = input.basis().funding().financial().change(); var completed = value.completion(); var retired = value.retirement();
+        var decisions = disputes.recorded(value);
         return new Adjustment(value.id(), value.version(), value.status(), value.issue(), input.requestedBy(), input.evidenceReference(), input.reason(), input.createdAt(), value.updatedAt(),
                 amounts(change.before()), amounts(change.after()), input.basis().funding().selectedReturns().stream().map(entry -> entry.proof().fundsIdentity()).toList(),
-                budget(value.budget()), accrual(value.accrual()), completed == null ? null : new Completion(completed.budgetVersion(), completed.accrualVersion(),
+                budget(value, finance, now, decisions), accrual(value, finance, now, decisions), completed == null ? null : new Completion(completed.budgetVersion(), completed.accrualVersion(),
                         completed.budget().posting().reference(), completed.accrual().posting().voucher().postingReference(), completed.accrual().posting().voucher().voucherReference(), completed.at()),
                 retired == null ? null : new Retirement(retired.actor(), retired.evidenceReference(), retired.reason(), retired.at()),
                 finance ? preparation(value, ExpensePartialAdjustmentPreparation.Side.BUDGET, now) : null,
@@ -106,25 +109,35 @@ public class ExpensePartialAdjustmentWorkspace {
                     prepared.issue(), evidence == null ? null : evidence.period().periodReference(), evidence == null ? null : evidence.expiresAt(), issue == null, issue);
         }).orElse(null);
     }
-    private static Budget budget(BudgetConsumptionReductionOperation value) {
-        if (value == null) return null; var command = value.input().command();
+    private Budget budget(ExpensePartialAdjustment adjustment, boolean finance, Instant now, List<ExpensePartialDisputeResolution> decisions) {
+        var value = adjustment.budget(); if (value == null) return null; var command = value.input().command();
+        var issue = resolving.resolutionIssue(adjustment, ExpensePartialAdjustmentPreparation.Side.BUDGET, now);
         return new Budget(command.id(), value.version(), value.status(), value.attempts(), command.authorizedBy(), command.createdAt(), command.period().request().accountingDate(),
-                command.expiresAt(), value.updatedAt(), name(value.failure()), budgetFact(value.observation()), budgetFact(value.conflictingObservation()));
+                command.expiresAt(), value.updatedAt(), name(value.failure()), budgetFact(value.observation()), budgetFact(value.conflictingObservation()), finance && issue == null, issue,
+                value.conflictingObservation() == null ? null : value.conflictingObservation().observedAt().plus(BudgetConsumptionReductionOperation.DISPUTE_EVIDENCE_LIFETIME),
+                latest(decisions, ExpensePartialAdjustmentPreparation.Side.BUDGET));
     }
     private static BudgetFact budgetFact(BudgetConsumptionReductionObservation value) {
         if (value == null) return null; var posting = value.posting();
         return new BudgetFact(value.status(), value.observedAt(), name(value.rejection()), posting == null ? null : posting.reference(),
                 posting == null ? null : posting.reducedAmount(), posting == null ? null : posting.appliedAt());
     }
-    private static Accrual accrual(ExpenseAccrualReductionOperation value) {
-        if (value == null) return null; var command = value.input().command();
+    private Accrual accrual(ExpensePartialAdjustment adjustment, boolean finance, Instant now, List<ExpensePartialDisputeResolution> decisions) {
+        var value = adjustment.accrual(); if (value == null) return null; var command = value.input().command();
+        var issue = resolving.resolutionIssue(adjustment, ExpensePartialAdjustmentPreparation.Side.ACCRUAL, now);
         return new Accrual(command.id(), value.version(), value.status(), value.attempts(), command.authorizedBy(), command.createdAt(), command.period().request().accountingDate(),
-                command.expiresAt(), value.updatedAt(), name(value.failure()), accrualFact(value.observation()), accrualFact(value.conflictingObservation()));
+                command.expiresAt(), value.updatedAt(), name(value.failure()), accrualFact(value.observation()), accrualFact(value.conflictingObservation()), finance && issue == null, issue,
+                value.conflictingObservation() == null ? null : value.conflictingObservation().observedAt().plus(ExpenseAccrualReductionOperation.DISPUTE_EVIDENCE_LIFETIME),
+                latest(decisions, ExpensePartialAdjustmentPreparation.Side.ACCRUAL));
     }
     private static AccrualFact accrualFact(ExpenseAccrualReductionObservation value) {
         if (value == null) return null; var posting = value.posting() == null ? null : value.posting().voucher();
         return new AccrualFact(value.status(), value.revision(), value.observedAt(), name(value.rejection()), value.acceptanceReference(), posting == null ? null : posting.postingReference(),
                 posting == null ? null : posting.voucherReference(), posting == null ? null : posting.postedAt());
+    }
+    private static Resolution latest(List<ExpensePartialDisputeResolution> decisions, ExpensePartialAdjustmentPreparation.Side side) {
+        return decisions.stream().filter(value -> value.side() == side).reduce((before, after) -> after).map(value -> new Resolution(value.id(), value.operationId(),
+                value.beforeVersion(), value.afterVersion(), value.outcome(), value.observedAt(), value.resolvedBy(), value.resolvedAt(), value.evidenceReference(), value.reason())).orElse(null);
     }
     private static String name(Enum<?> value) { return value == null ? null : value.name(); }
     private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PARTIAL_ADJUSTMENT_QUERY", "Partial adjustment query only accepts a positive roundNo"); }
@@ -186,7 +199,8 @@ public class ExpensePartialAdjustmentWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Budget(UUID id, long version, BudgetConsumptionReductionOperation.Status status, int attempts, String authorizedBy, Instant authorizedAt,
-            LocalDate accountingDate, Instant expiresAt, Instant updatedAt, String issue, BudgetFact accepted, BudgetFact conflicting) { }
+            LocalDate accountingDate, Instant expiresAt, Instant updatedAt, String issue, BudgetFact accepted, BudgetFact conflicting,
+            boolean canResolve, String resolutionIssue, Instant candidateValidUntil, Resolution latestResolution) { }
     /**
      * 独立预算事实只保留页面核对所需的差额及凭据。
      * @author owlzhangfq@gmail.com
@@ -199,7 +213,8 @@ public class ExpensePartialAdjustmentWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Accrual(UUID id, long version, ExpenseAccrualReductionOperation.Status status, int attempts, String authorizedBy, Instant authorizedAt,
-            LocalDate accountingDate, Instant expiresAt, Instant updatedAt, String issue, AccrualFact accepted, AccrualFact conflicting) { }
+            LocalDate accountingDate, Instant expiresAt, Instant updatedAt, String issue, AccrualFact accepted, AccrualFact conflicting,
+            boolean canResolve, String resolutionIssue, Instant candidateValidUntil, Resolution latestResolution) { }
     /**
      * 当前接受与有争议的会计凭证身份分别保留。
      * @author owlzhangfq@gmail.com
@@ -207,6 +222,12 @@ public class ExpensePartialAdjustmentWorkspace {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record AccrualFact(ExpenseAccrualReductionObservation.Status status, long revision, Instant observedAt, String rejection, String acceptanceReference,
             String postingReference, String voucherReference, Instant postedAt) { }
+    /**
+     * 具名结果保留真实操作号，后来重新授权不会把旧决定显示成新命令的决定。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Resolution(UUID id, UUID operationId, long beforeVersion, long afterVersion, ExpensePartialDisputeResolution.Outcome outcome,
+            Instant observedAt, String resolvedBy, Instant resolvedAt, String evidenceReference, String reason) { }
     /**
      * 已完成证明引用当时实际采用的两侧版本，后续查询不会替换它。
      * @author owlzhangfq@gmail.com

@@ -22,11 +22,12 @@ public class ExpensePartialAdjustmentController {
     private final ExpensePartialAdjustmentInitiation initiation;
     private final ExpensePartialAdjustmentDecisions decisions;
     private final ExpensePartialAdjustmentActions actions;
+    private final ExpensePartialAdjustmentDisputes disputes;
     private final IdempotencyExecutor idempotency;
     /** 协议入口只做校验、当前权限与幂等响应，财务编排留在应用服务。 */
     public ExpensePartialAdjustmentController(ExpensePartialAdjustmentWorkspace workspace, ExpenseResourceAdjustmentAccess access, ExpensePartialAdjustmentInitiation initiation,
-            ExpensePartialAdjustmentDecisions decisions, ExpensePartialAdjustmentActions actions, IdempotencyExecutor idempotency) {
-        this.workspace = workspace; this.access = access; this.initiation = initiation; this.decisions = decisions; this.actions = actions; this.idempotency = idempotency;
+            ExpensePartialAdjustmentDecisions decisions, ExpensePartialAdjustmentActions actions, ExpensePartialAdjustmentDisputes disputes, IdempotencyExecutor idempotency) {
+        this.workspace = workspace; this.access = access; this.initiation = initiation; this.decisions = decisions; this.actions = actions; this.disputes = disputes; this.idempotency = idempotency;
     }
     /** 原轮次读取独立于办理资格，敏感财务字段和个人准备分别控制。 */
     @GetMapping
@@ -67,6 +68,11 @@ public class ExpensePartialAdjustmentController {
     @PostMapping("/retirements")
     public ResponseEntity<String> retire(@PathVariable UUID id, @Valid @RequestBody ExpensePartialAdjustmentActions.RetireInput input, HttpServletRequest request) {
         access.requireFinance(id, input.roundNo()); return response(idempotency.execute(request, HttpStatus.ACCEPTED, () -> actions.retire(id, input)));
+    }
+    /** 每次具名决定只采用当前一侧候选，成功幂等回放仍要求当前独立财务和原字段权限。 */
+    @PostMapping("/disputes")
+    public ResponseEntity<String> resolve(@PathVariable UUID id, @Valid @RequestBody ExpensePartialAdjustmentDisputes.Input input, HttpServletRequest request) {
+        access.requireFinance(id, input.roundNo()); return response(idempotency.execute(request, HttpStatus.ACCEPTED, () -> disputes.resolve(id, input)));
     }
     private static ResponseEntity<String> response(ResponseEntity<String> value) {
         return ResponseEntity.status(value.getStatusCode()).headers(value.getHeaders()).cacheControl(CacheControl.noStore()).body(value.getBody());

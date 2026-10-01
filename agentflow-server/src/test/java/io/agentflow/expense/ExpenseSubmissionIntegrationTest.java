@@ -206,6 +206,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpensePartialAdjustmentSources partialAdjustmentSources;
     @Autowired JdbcExpensePartialAdjustmentRepository partialAdjustments;
     @Autowired JdbcExpensePartialDisputeRepository partialDisputes;
+    @Autowired ExpensePartialAdjustmentDisputes partialResolving;
     @Autowired ExpensePartialAdjustmentExecution partialAdjustmentExecution;
     @Autowired ExpensePartialAdjustmentFinance partialFinance;
     @Autowired JdbcExpensePartialPreparationRepository partialPreparations;
@@ -3049,6 +3050,217 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(after.completion()).isEqualTo(completed.completion()); assertThat(resourceVersions(report)).isEqualTo(resources);
         assertThat(after.input().basis().funding().payment()).isNull(); assertThat(paymentWrites).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_partial_adjustment_return WHERE tenant_id='demo' AND adjustment_id=?", Integer.class, queued.id().toString())).isZero();
+    }
+
+    @Test void partialDisputeApiResolvesEachSideWithNamedAuditAndIdempotentReceipt() throws Exception {
+        var completed = completedPartialForDispute(); var before = partialDisputed(completed, true);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments";
+        var input = partialDisputeInput(report, before, "BUDGET", "APPLIED"); var key = UUID.randomUUID().toString();
+        var response = send(endpoint + "/disputes", "finance", key, input); var receipt = ok(response, 202);
+        assertThat(response.getHeader("Cache-Control")).contains("no-store");
+        var after = partialAdjustments.find("demo", before.id()).orElseThrow(); var decision = partialDisputes.recorded(after).get(0);
+        assertThat(after.resolutionCount()).isEqualTo(1); assertThat(after.completion()).isEqualTo(completed.completion());
+        assertThat(after.accrual()).isEqualTo(before.accrual()); assertThat(after.status()).isEqualTo(ExpensePartialAdjustment.Status.REVIEW_REQUIRED);
+        var audit = json.map(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE event_id=?", String.class, receipt.path("auditEventId").asText()));
+        assertThat(audit).containsEntry("resolutionId", decision.id().toString()).containsEntry("side", "BUDGET").containsEntry("outcome", "APPLIED");
+        assertThat(((Number) audit.get("beforeVersion")).longValue()).isEqualTo(before.version());
+        var replay = send(endpoint + "/disputes", "finance", key, input);
+        assertThat(ok(replay, 202)).isEqualTo(receipt); assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true");
+        var accrualBefore = partialDisputed(after, false);
+        ok(send(endpoint + "/disputes", "finance", partialDisputeInput(report, accrualBefore, "ACCRUAL", "POSTED")), 202);
+        var resolved = partialAdjustments.find("demo", before.id()).orElseThrow(); assertThat(resolved.resolutionCount()).isEqualTo(2);
+        assertThat(resolved.completion()).isEqualTo(completed.completion());
+        var view = ok(read(endpoint, "finance"), 200).path("adjustments").get(0);
+        assertThat(view.path("budget").path("latestResolution").path("id").asText()).isEqualTo(decision.id().toString());
+        assertThat(view.path("accrual").path("latestResolution").path("outcome").asText()).isEqualTo("POSTED");
+        assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+    }
+
+    @Test void partialDisputeApiProjectionIsReadOnlyAndDoesNotGiveApplicantDecisionAbility() throws Exception {
+        var before = partialDisputed(completedPartialForDispute(), true);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments";
+        int queries = partialBudgetQueries + partialAccrualQueries;
+        var financeView = ok(read(endpoint, "finance"), 200).path("adjustments").get(0);
+        assertThat(financeView.path("budget").path("canResolve").asBoolean()).isTrue();
+        assertThat(financeView.path("budget").path("resolutionIssue").isNull()).isTrue();
+        assertThat(financeView.path("budget").path("candidateValidUntil").asText()).isEqualTo(before.budget().conflictingObservation().observedAt().plusSeconds(300).toString());
+        assertThat(financeView.path("budget").path("latestResolution").isNull()).isTrue();
+        assertThat(financeView.path("accrual").path("canResolve").asBoolean()).isFalse();
+        var applicantView = ok(read(endpoint, "alice"), 200).path("adjustments").get(0);
+        assertThat(applicantView.path("budget").path("canResolve").asBoolean()).isFalse();
+        assertThat(applicantView.toString()).doesNotContain("commandDigest", "targetDigest", "bankAccount");
+        assertThat(partialAdjustments.find("demo", before.id())).contains(before); assertThat(partialDisputes.recorded(before)).isEmpty();
+        assertThat(partialBudgetQueries + partialAccrualQueries).isEqualTo(queries);
+    }
+
+    @Test void partialDisputeApiRechecksCurrentFieldsRolesAndTenantBeforeReplay() throws Exception {
+        hideBusinessDetails = true; var before = partialDisputed(completedPartialForDispute(), true);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments/disputes";
+        var input = partialDisputeInput(report, before, "BUDGET", "APPLIED");
+        for (var user : List.of("alice", "cashier", "manager", "admin", "bob")) assertThat(send(endpoint, user, input).getStatus()).as(user).isIn(403, 404);
+        actors.set(new Actor("other-tenant", "finance", Set.of("FINANCE", "ADMIN")));
+        try { assertThatThrownBy(() -> partialResolving.resolve(report.id(), json.read(json.write(input), ExpensePartialAdjustmentDisputes.Input.class)))
+                .isInstanceOf(io.agentflow.common.DomainException.class).extracting(error -> ((io.agentflow.common.DomainException) error).code()).isEqualTo("NOT_FOUND"); }
+        finally { actors.clear(); }
+        String key = UUID.randomUUID().toString(); var accepted = ok(send(endpoint, "finance", key, input), 202);
+        jdbc.update("UPDATE organization_appointment SET active=false WHERE tenant_id='demo' AND person_id=?", finance.toString());
+        try {
+            assertThat(send(endpoint, "finance", key, input).getStatus()).isEqualTo(403);
+            assertThat(ok(read(path(report) + "/partial-adjustments", "finance"), 200).path("finance").asBoolean()).isFalse();
+        } finally { jdbc.update("UPDATE organization_appointment SET active=true WHERE tenant_id='demo' AND person_id=?", finance.toString()); }
+        assertThat(ok(send(endpoint, "finance", key, input), 202)).isEqualTo(accepted);
+        assertThat(partialDisputes.recorded(partialAdjustments.find("demo", before.id()).orElseThrow())).hasSize(1);
+    }
+
+    @Test void partialDisputeApiRejectsStaleBindingsOutcomeChangesAndInjectedEvidence() throws Exception {
+        var before = partialDisputed(completedPartialForDispute(), true);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments/disputes";
+        var valid = partialDisputeInput(report, before, "BUDGET", "APPLIED");
+        for (String name : List.of("tenantId", "resolvedBy", "budget", "accrual", "conflictingObservation", "completion", "resolutionCount")) {
+            var injected = new LinkedHashMap<>(valid); injected.put(name, "injected"); assertThat(send(endpoint, "finance", injected).getStatus()).as(name).isEqualTo(400);
+        }
+        for (String name : List.of("roundNo", "applicationVersion", "businessVersion", "settlementVersion", "adjustmentVersion", "side", "outcome", "evidenceReference", "comment")) {
+            var missing = new LinkedHashMap<>(valid); missing.remove(name); assertThat(send(endpoint, "finance", missing).getStatus()).as(name).isEqualTo(400);
+        }
+        for (String name : List.of("applicationVersion", "businessVersion", "settlementVersion", "adjustmentVersion")) {
+            var stale = new LinkedHashMap<>(valid); stale.put(name, 99999); assertThat(send(endpoint, "finance", stale).getStatus()).as(name).isEqualTo(409);
+        }
+        var foreign = new LinkedHashMap<>(valid); foreign.put("adjustmentId", UUID.randomUUID()); assertThat(send(endpoint, "finance", foreign).getStatus()).isEqualTo(409);
+        var differentOutcome = new LinkedHashMap<>(valid); differentOutcome.put("outcome", "REJECTED"); assertThat(send(endpoint, "finance", differentOutcome).getStatus()).isEqualTo(409);
+        differentOutcome.put("outcome", "POSTED"); assertThat(send(endpoint, "finance", differentOutcome).getStatus()).isEqualTo(409);
+        differentOutcome.put("outcome", "NOT_FOUND"); assertThat(send(endpoint, "finance", differentOutcome).getStatus()).isEqualTo(400);
+        var otherSide = new LinkedHashMap<>(valid); otherSide.put("side", "ACCRUAL"); otherSide.put("outcome", "POSTED");
+        assertThat(send(endpoint, "finance", otherSide).getStatus()).isEqualTo(409);
+        assertThat(partialAdjustments.find("demo", before.id())).contains(before); assertThat(partialDisputes.recorded(before)).isEmpty();
+    }
+
+    @Test void partialDisputeApiAuditFailureRollsBackEitherSideAndAllowsSameRequestRetry() throws Exception {
+        var both = partialDisputed(partialDisputed(completedPartialForDispute(), true), false);
+        var report = reports.find("demo", both.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments/disputes";
+        for (String side : List.of("BUDGET", "ACCRUAL")) {
+            var before = partialAdjustments.find("demo", both.id()).orElseThrow(); var input = partialDisputeInput(report, before, side, side.equals("BUDGET") ? "APPLIED" : "POSTED");
+            String key = UUID.randomUUID().toString();
+            jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT ck_partial_dispute_audit_failure CHECK(application_id<>'" + report.applicationId()
+                    + "' OR action<>'EXPENSE_PARTIAL_RESOLVE_DISPUTE' OR aggregate_version<>" + (before.version() + 1) + ")");
+            try { assertThatThrownBy(() -> send(endpoint, "finance", key, input)).isInstanceOf(jakarta.servlet.ServletException.class); }
+            finally { jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT ck_partial_dispute_audit_failure"); }
+            assertThat(partialAdjustments.find("demo", before.id())).contains(before);
+            assertThat(partialDisputes.recorded(before)).hasSize(before.resolutionCount());
+            assertThat(jdbc.queryForObject("SELECT MAX(version) FROM expense_partial_adjustment_revision WHERE tenant_id='demo' AND adjustment_id=?", Long.class, before.id().toString())).isEqualTo(before.version());
+            var accepted = send(endpoint, "finance", key, input); assertThat(accepted.getHeader("Idempotency-Replayed")).isEqualTo("false"); ok(accepted, 202);
+        }
+        assertThat(partialAdjustments.find("demo", both.id()).orElseThrow().resolutionCount()).isEqualTo(2);
+        assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+    }
+
+    @Test void partialDisputeApiUnknownOriginalAllowsDecisionButNotSourceConfirmation() throws Exception {
+        var before = partialDisputed(completedPartialForDispute(), false);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments";
+        var bankId = before.input().basis().funding().payment().input().command().id(); var bank = paymentOperations.find("demo", bankId).orElseThrow();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", bankId, bank.version(), adjustmentTime()));
+        assertThat(ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("accrual").path("canResolve").asBoolean()).isTrue();
+        ok(send(endpoint + "/disputes", "finance", partialDisputeInput(report, before, "ACCRUAL", "POSTED")), 202);
+        var after = partialAdjustments.find("demo", before.id()).orElseThrow(); assertThat(after.completion()).isEqualTo(before.completion());
+        assertThat(send(endpoint + "/actions", "finance", partialActionInput(report, after, "CONFIRM_CURRENT")).getStatus()).isEqualTo(409);
+        assertThat(paymentOperations.find("demo", bankId).orElseThrow().status()).isEqualTo(PaymentOperation.Status.UNKNOWN);
+        assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+    }
+
+    @Test void partialDisputeApiPeerDecisionRequiresReloadAndSameKeyCannotChangeOutcome() throws Exception {
+        var before = partialDisputed(partialDisputed(completedPartialForDispute(), true), false);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments/disputes";
+        var oldBudget = partialDisputeInput(report, before, "BUDGET", "APPLIED");
+        ok(send(endpoint, "finance", partialDisputeInput(report, before, "ACCRUAL", "POSTED")), 202);
+        assertThat(send(endpoint, "finance", oldBudget).getStatus()).isEqualTo(409);
+        var reloaded = partialAdjustments.find("demo", before.id()).orElseThrow();
+        assertThat(reloaded.budget()).isEqualTo(before.budget());
+        var input = partialDisputeInput(report, reloaded, "BUDGET", "APPLIED"); String key = UUID.randomUUID().toString(); ok(send(endpoint, "finance", key, input), 202);
+        var reused = new LinkedHashMap<>(input); reused.put("outcome", "REJECTED"); assertCode(send(endpoint, "finance", key, reused), "IDEMPOTENCY_KEY_REUSED");
+        assertThat(partialAdjustments.find("demo", before.id()).orElseThrow().resolutionCount()).isEqualTo(2);
+    }
+
+    @Test void partialDisputeApiRefusesNonterminalCandidatesAndAnyErasedHistoricalEffect() throws Exception {
+        var completed = completedPartialForDispute(); var command = completed.budget().input().command();
+        var report = reports.find("demo", completed.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments";
+        partialBudgetResults.put(command.id(), new BudgetConsumptionReductionObservation(command.id(), completed.id(), command.digest(), BudgetConsumptionReductionObservation.Status.NOT_FOUND, adjustmentTime(), null, null));
+        ok(send(endpoint + "/actions", "finance", partialActionInput(report, completed, "QUERY_BUDGET")), 202); partialWorker.poll();
+        var missing = partialAdjustments.find("demo", completed.id()).orElseThrow();
+        var view = ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("budget");
+        assertThat(view.path("canResolve").asBoolean()).isFalse(); assertThat(view.path("resolutionIssue").asText()).isEqualTo("NON_TERMINAL");
+        assertCode(send(endpoint + "/disputes", "finance", partialDisputeInput(report, missing, "BUDGET", "REJECTED")), "BUDGET_REDUCTION_DISPUTE_UNRESOLVABLE");
+        partialBudgetResults.put(command.id(), new BudgetConsumptionReductionObservation(command.id(), completed.id(), command.digest(), BudgetConsumptionReductionObservation.Status.REJECTED,
+                adjustmentTime(), null, BudgetConsumptionReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED));
+        ok(send(endpoint + "/actions", "finance", partialActionInput(report, missing, "QUERY_BUDGET")), 202); partialWorker.poll();
+        var refused = partialAdjustments.find("demo", completed.id()).orElseThrow();
+        assertThat(ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("budget").path("resolutionIssue").asText()).isEqualTo("EFFECT_ALREADY_OBSERVED");
+        assertThat(send(endpoint + "/disputes", "finance", partialDisputeInput(report, refused, "BUDGET", "REJECTED")).getStatus()).isEqualTo(409);
+        assertThat(partialDisputes.recorded(refused)).isEmpty(); assertThat(refused.completion()).isEqualTo(completed.completion());
+    }
+
+    @Test void partialDisputeApiPreviewUsesExactExpiryWithoutWritingOrRefreshingEvidence() throws Exception {
+        var before = partialDisputed(partialDisputed(completedPartialForDispute(), true), false);
+        for (var side : ExpensePartialAdjustmentPreparation.Side.values()) {
+            var expiry = (side == ExpensePartialAdjustmentPreparation.Side.BUDGET ? before.budget().conflictingObservation().observedAt() : before.accrual().conflictingObservation().observedAt()).plusSeconds(300);
+            assertThat(partialResolving.resolutionIssue(before, side, expiry.minusNanos(1))).isNull();
+            assertThat(partialResolving.resolutionIssue(before, side, expiry)).isEqualTo("EXPIRED_EVIDENCE");
+        }
+        assertThat(partialAdjustments.find("demo", before.id())).contains(before); assertThat(partialDisputes.recorded(before)).isEmpty();
+    }
+
+    @Test void partialDisputeApiEffectFreeDecisionsRetainOldOperationIdentityAfterReauthorization() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); var report = reports.find("demo", queued.input().basis().reportId()).orElseThrow();
+        var resources = resourceVersions(report); var endpoint = path(report) + "/partial-adjustments";
+        var budget = partialFinance.claimBudget("demo", queued.id(), adjustmentTime()); var budgetCommand = budget.input().command();
+        partialFinance.finishBudget(budget, new FinanceResult.Success<>(new BudgetConsumptionReductionObservation(budgetCommand.id(), queued.id(), budgetCommand.digest(),
+                BudgetConsumptionReductionObservation.Status.REJECTED, adjustmentTime(), null, BudgetConsumptionReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED)), adjustmentTime());
+        var budgetBefore = partialAdjustments.find("demo", queued.id()).orElseThrow();
+        tx().executeWithoutResult(status -> partialFinance.queryBudget("demo", queued.id(), budgetBefore.version(), adjustmentTime()));
+        var budgetQuery = partialFinance.claimBudget("demo", queued.id(), adjustmentTime());
+        partialFinance.finishBudget(budgetQuery, new FinanceResult.Success<>(new BudgetConsumptionReductionObservation(budgetCommand.id(), queued.id(), budgetCommand.digest(),
+                BudgetConsumptionReductionObservation.Status.REJECTED, adjustmentTime(), null, BudgetConsumptionReductionObservation.Rejection.BUDGET_POLICY_UNAVAILABLE)), adjustmentTime());
+        var accrual = partialFinance.claimAccrual("demo", queued.id(), adjustmentTime()); var accrualCommand = accrual.input().command();
+        partialFinance.finishAccrual(accrual, new FinanceResult.Success<>(new ExpenseAccrualReductionObservation(accrualCommand.id(), queued.id(), accrualCommand.digest(),
+                ExpenseAccrualReductionObservation.Status.FAILED, 1, adjustmentTime(), "accepted-refusal", null, ExpenseAccrualReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED)), adjustmentTime());
+        var accrualBefore = partialAdjustments.find("demo", queued.id()).orElseThrow();
+        tx().executeWithoutResult(status -> partialFinance.queryAccrual("demo", queued.id(), accrualBefore.version(), adjustmentTime()));
+        var accrualQuery = partialFinance.claimAccrual("demo", queued.id(), adjustmentTime());
+        partialFinance.finishAccrual(accrualQuery, new FinanceResult.Success<>(new ExpenseAccrualReductionObservation(accrualCommand.id(), queued.id(), accrualCommand.digest(),
+                ExpenseAccrualReductionObservation.Status.FAILED, 2, adjustmentTime(), "accepted-refusal", null, ExpenseAccrualReductionObservation.Rejection.AUTHORIZATION_REJECTED)), adjustmentTime());
+        var disputed = partialAdjustments.find("demo", queued.id()).orElseThrow();
+        ok(send(endpoint + "/disputes", "finance", partialDisputeInput(report, disputed, "BUDGET", "REJECTED")), 202);
+        var one = partialAdjustments.find("demo", queued.id()).orElseThrow();
+        ok(send(endpoint + "/disputes", "finance", partialDisputeInput(report, one, "ACCRUAL", "FAILED")), 202);
+        var resolved = partialAdjustments.find("demo", queued.id()).orElseThrow(); assertThat(resolved.completion()).isNull();
+        var preparation = registerPartialPreparation(resolved, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var authorized = authorizePartialPreparation(resolved, partialPreparations.find("demo", preparation.input().id()).orElseThrow());
+        var view = ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("budget");
+        assertThat(view.path("id").asText()).isEqualTo(preparation.input().id().toString());
+        assertThat(view.path("latestResolution").path("operationId").asText()).isEqualTo(budgetCommand.id().toString());
+        assertThat(view.path("canResolve").asBoolean()).isFalse();
+        ok(send(endpoint + "/retirements", "finance", partialRetireInput(report, authorized)), 202);
+        assertThat(partialAdjustments.find("demo", queued.id()).orElseThrow().status()).isEqualTo(ExpensePartialAdjustment.Status.RETIRED);
+        assertThat(partialAdjustments.claimedReturnIds("demo", report.id())).isEmpty(); assertThat(resourceVersions(report)).isEqualTo(resources);
+        assertThat(partialBudgetWrites + partialAccrualWrites).isZero();
+    }
+
+    @Test void partialDisputeApiConcurrentSidesCannotConsumeTheSameRootRevision() throws Exception {
+        var before = partialDisputed(partialDisputed(completedPartialForDispute(), true), false);
+        var report = reports.find("demo", before.input().basis().reportId()).orElseThrow(); var endpoint = path(report) + "/partial-adjustments/disputes";
+        var gate = new java.util.concurrent.CountDownLatch(1); var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var budget = pool.submit(() -> { gate.await(); return send(endpoint, "finance", partialDisputeInput(report, before, "BUDGET", "APPLIED")).getStatus(); });
+            var accrual = pool.submit(() -> { gate.await(); return send(endpoint, "finance", partialDisputeInput(report, before, "ACCRUAL", "POSTED")).getStatus(); });
+            gate.countDown(); assertThat(List.of(budget.get(15, java.util.concurrent.TimeUnit.SECONDS), accrual.get(15, java.util.concurrent.TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(202, 409);
+        } finally { pool.shutdownNow(); }
+        var after = partialAdjustments.find("demo", before.id()).orElseThrow(); assertThat(after.resolutionCount()).isEqualTo(1);
+        assertThat(partialDisputes.recorded(after)).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_PARTIAL_RESOLVE_DISPUTE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+    }
+
+    private Map<String, Object> partialDisputeInput(ExpenseReport report, ExpensePartialAdjustment adjustment, String side, String outcome) {
+        var input = partialSourceInput(report); input.put("adjustmentId", adjustment.id()); input.put("adjustmentVersion", adjustment.version());
+        input.put("side", side); input.put("outcome", outcome); input.put("evidenceReference", "original-query-proof"); input.put("comment", "核对原号后明确裁决"); return input;
     }
 
     private ExpensePartialAdjustment completedPartialForDispute() throws Exception {
