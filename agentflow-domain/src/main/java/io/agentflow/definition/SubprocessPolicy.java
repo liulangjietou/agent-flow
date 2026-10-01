@@ -14,6 +14,8 @@ import java.util.regex.Pattern;
  */
 public record SubprocessPolicy(String processKey, long version, Map<String, String> inputs) {
     public static final int MAX_CALL_DEPTH = 16;
+    public static final int MAX_DEPENDENCIES = 256;
+    public static final int MAX_CALL_NODES = 4096;
     public static final String KEY_PROPERTY = "subprocessKey";
     public static final String VERSION_PROPERTY = "subprocessVersion";
     public static final String INPUT_PREFIX = "subprocessInput.";

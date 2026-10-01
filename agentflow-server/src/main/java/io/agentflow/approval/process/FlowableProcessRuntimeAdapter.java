@@ -5,7 +5,7 @@ import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionDraftRepository;
-import io.agentflow.organization.LocalOrganizationDirectory;
+import io.agentflow.definition.DefinitionInitiatorRequirements;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -36,12 +36,13 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final DefinitionDraftRepository platformDefinitions;
     private final JsonUtil json;
     private final EventContractBindings eventContracts;
+    private final DefinitionInitiatorRequirements initiatorRequirements;
     public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
 
     /** 注入 Flowable 运行服务。 */
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
                                          TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
-                                         JsonUtil json, EventContractBindings eventContracts) {
+                                         JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
@@ -49,6 +50,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         this.platformDefinitions = platformDefinitions;
         this.json = json;
         this.eventContracts = eventContracts;
+        this.initiatorRequirements = initiatorRequirements;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -70,9 +72,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                         published.requireStartEnabled();
                         eventContracts.requireAvailable(command.tenantId(), published.graph());
                         // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
-                        if (command.initiatorContext() == null && published.graph().nodes().stream().anyMatch(node ->
-                                LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule"))
-                                || LocalOrganizationDirectory.isContextualRule(node.properties().get("recipientRule")))) {
+                        if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
                             throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
                         }
                     });

@@ -38,6 +38,30 @@ class DefinitionPreviewIntegrationTest {
     @Autowired org.flowable.engine.RepositoryService engineRepository;
 
     @Test
+    void subprocessPreflightIsReadOnlyAndLimitsDependencyDetailsToDesigners() throws Exception {
+        String key = "preflight-" + UUID.randomUUID();
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("call", "子审批", NodeType.SUB_PROCESS, new SubprocessPolicy("missing-" + UUID.randomUUID(), 1, Map.of()).properties()),
+                new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "call", ""), new Edge("b", "call", "end", "")));
+        var body = Map.of("key", key, "graph", graph);
+        var before = snapshot();
+        mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON).content(json.write(body)))
+                .andExpect(status().isOk()).andExpect(jsonPath("errors", org.hamcrest.Matchers.containsInAnyOrder(
+                        "SUBPROCESS_DEFINITION_UNAVAILABLE:call", "SUBPROCESS_RUNTIME_NOT_READY:call")));
+        mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("employee"))
+                        .contentType(MediaType.APPLICATION_JSON).content(json.write(body)))
+                .andExpect(status().isOk()).andExpect(jsonPath("errors", org.hamcrest.Matchers.contains("SUBPROCESS_RUNTIME_NOT_READY:call")));
+        assertThat(snapshot()).isEqualTo(before);
+        mvc.perform(post("/api/v1/process-definitions").header("Authorization", token("admin"))
+                        .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json.write(Map.of("key", key, "name", "公开门禁验证", "graph", graph))))
+                .andExpect(status().isUnprocessableEntity());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition WHERE process_key=?", Integer.class, key)).isZero();
+    }
+
+    @Test
     void fieldPreviewUsesNodeRestrictionsAndDoesNotWriteBusinessOrEngineState() throws Exception {
         var schema = Map.of("schemaVersion", 2, "fields", List.of(
                 Map.of("key", "amount", "label", "金额", "type", "NUMBER", "required", false, "sensitive", true,

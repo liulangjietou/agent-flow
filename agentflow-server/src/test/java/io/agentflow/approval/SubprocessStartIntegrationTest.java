@@ -181,6 +181,9 @@ class SubprocessStartIntegrationTest {
         var childDefinition = child(key(), schema("total"), LocalOrganizationDirectory.SUPERVISOR_RULE + "1");
         var parent = parent(childDefinition, schema("amount"), Map.of("total", "amount"), true, false);
         var application = create(parent, Map.of("amount", "8"));
+        failure(() -> as("alice", () -> applications.submit(application.id(), 1)), "INITIATOR_APPOINTMENT_REQUIRED");
+        assertThat(repository.findById(tenant, application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.DRAFT);
+        assertThat(rounds.findByRound(tenant, application.id(), 1)).isEmpty();
         as("alice", () -> applications.submit(application.id(), 1, job.id()));
         var frozen = rounds.findByRound(tenant, application.id(), 1).orElseThrow().initiatorContext();
         assertThat(calls.findByParentRound(tenant, application.id(), 1)).isEmpty();

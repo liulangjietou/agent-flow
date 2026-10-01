@@ -1,0 +1,457 @@
+{
+  "recordedAt": "2026-10-01T13:09:59.914625+00:00",
+  "baseCommit": "a2cbad3f48cad23f7d7ae9171d4ba13c15429811",
+  "scope": "Fixed-version subprocess structural preflight and early root initiator requirements",
+  "callChain": [
+    "DefinitionController read-only preflight",
+    "DefinitionApplicationService structure and permission boundary",
+    "SubprocessDeploymentBindings exact dependency inspection",
+    "DefinitionApprovalPaths static evidence paths",
+    "FlowableProcessRuntimeAdapter start",
+    "DefinitionInitiatorRequirements immutable published snapshots"
+  ],
+  "behavior": [
+    "Validate call identifiers, literal labels, explicit outgoing edges, input policies and node field access",
+    "Reject completion paths lacking a human task or child approval; validate every child dependency and retain runtime evidence checks",
+    "Admin preflight maps nested issues to root call nodes without creating business, engine or idempotency records",
+    "Non-admin preflight does not inspect dependency definitions",
+    "Keep readiness rejection at public create/update/publish and legacy application validation entrypoints",
+    "Require the original requester appointment before a root start if any declared descendant uses contextual organization rules",
+    "Continue frozen round appointment inheritance through later child activation",
+    "Pure simulation records root call traversal only"
+  ],
+  "redBeforeChanges": [
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-red.log",
+      "reason": "Domain gate hid call structure and prevented pure simulation"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-server-red.log",
+      "reason": "Missing dependency and approval-path diagnostics; root submission without required appointment did not fail early"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-legacy-gate-red.log",
+      "reason": "Legacy tenant validation omitted the public readiness gate after separation"
+    }
+  ],
+  "validation": {
+    "domainPassed": 59,
+    "h2ServerPassed": 223,
+    "finalCompatibilityDomainPassed": 18,
+    "finalCompatibilityServerPassed": 32,
+    "postgresPassed": 65,
+    "overlapNote": "Scopes overlap and must not be added as unique test counts. Final compatibility rerun covers the last legacy gate correction and 200/201-character label boundary.",
+    "reports": {
+      "h2": {
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-h2-final.log",
+        "moduleResults": [
+          {
+            "tests": 59,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "tests": 223,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ],
+        "classes": [
+          {
+            "class": "io.agentflow.definition.SubprocessDefinitionValidationTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionPublicationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionIdentifierTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionAvailabilityTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionDomainTest",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionSimulationTraceTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.SubprocessInputsTest",
+            "tests": 23,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionDiffServiceTest",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.organization.OrganizationApprovalIntegrationTest",
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.calendar.DefinitionCalendarIntegrationTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.template.ProcessTemplateIntegrationTest",
+            "tests": 29,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.SubprocessDeploymentBindingsTest",
+            "tests": 8,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionSecurityTest",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionPublicationIntegrationTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionIdentifierIntegrationTest",
+            "tests": 10,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionDeploymentIntegrationTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.SubprocessDefinitionResolverIntegrationTest",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.SubprocessDeploymentIntegrationTest",
+            "tests": 15,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionComparisonIntegrationTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionInitiatorRequirementsTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionApplicationServiceTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionAvailabilityMigrationTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionPreviewIntegrationTest",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionAvailabilityIntegrationTest",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionCatalogIntegrationTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.api.OpenApiContractTest",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.event.EventContractIntegrationTest",
+            "tests": 10,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.approval.SubprocessStartIntegrationTest",
+            "tests": 41,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.approval.FieldPermissionsIntegrationTest",
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.approval.process.TaskDeadlineIntegrationTest",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ]
+      },
+      "compatibility": {
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-h2-compatibility.log",
+        "moduleResults": [
+          {
+            "tests": 18,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "tests": 32,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ],
+        "classes": [
+          {
+            "class": "io.agentflow.definition.SubprocessDefinitionValidationTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.CopyNodeTest",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.ParallelGatewayTest",
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.SubprocessDeploymentIntegrationTest",
+            "tests": 15,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionApplicationServiceTest",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.DefinitionPreviewIntegrationTest",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ]
+      },
+      "postgres": {
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-postgres.log",
+        "moduleResults": [
+          {
+            "tests": 65,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ],
+        "classes": [
+          {
+            "class": "io.agentflow.definition.SubprocessDefinitionResolverIntegrationTest",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.definition.SubprocessDeploymentIntegrationTest",
+            "tests": 15,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "class": "io.agentflow.approval.SubprocessStartIntegrationTest",
+            "tests": 41,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ]
+      }
+    }
+  },
+  "postgresDatabases": {
+    "databases": {
+      "AGENTFLOW_SUBPROCESS_DEPLOYMENT": "subprocess_preflight_df03d093b6",
+      "AGENTFLOW_SUBPROCESS": "subprocess_binding_df03d093b6",
+      "AGENTFLOW_SUBPROCESS_START": "subprocess_start_df03d093b6"
+    },
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "exitCode": 0
+  },
+  "postgresRows": {
+    "subprocess_preflight_df03d093b6": {
+      "schemaVersion": "90",
+      "calls": 1,
+      "parentRoundBindings": 1,
+      "childRoundBindings": 1,
+      "nativeHistoryBindings": 1,
+      "approvedParentAndChild": 1,
+      "childRoundStatusMismatch": 0
+    },
+    "subprocess_binding_df03d093b6": {
+      "schemaVersion": "90",
+      "calls": 0,
+      "parentRoundBindings": 0,
+      "childRoundBindings": 0,
+      "nativeHistoryBindings": 0,
+      "approvedParentAndChild": 0,
+      "childRoundStatusMismatch": 0
+    },
+    "subprocess_start_df03d093b6": {
+      "schemaVersion": "90",
+      "calls": 65,
+      "parentRoundBindings": 65,
+      "childRoundBindings": 65,
+      "nativeHistoryBindings": 65,
+      "approvedParentAndChild": 14,
+      "childRoundStatusMismatch": 0
+    }
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionApprovalPaths.java": "7d207d14e559627c6caeb20506a25e4bd25d0ec0f8f80587980a761a9e41a979",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "bf2c20592aeadb1df31b693bb0d6b4fe9b742e15a306a1d6bedf99755bbe847f",
+    "agentflow-domain/src/main/java/io/agentflow/definition/SubprocessPolicy.java": "a7a45fe80226f8cd1ce7ae3b486e1d8c6370a14508e8daa39f3be5311a03dc50",
+    "agentflow-domain/src/test/java/io/agentflow/definition/SubprocessDefinitionValidationTest.java": "c5d11987a5abcaae09a42fad86934a26a0e48bc609b1b815272502f4c614657d",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java": "d1ab321909e906d4df6724bb0e7594a1daa4cf9a7868b1b941f5f202ef26e32d",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionApplicationService.java": "b7a4ea9c682b9b1f68efafa2081e6cba0094bdb21a1ad64c71aeb7275dfc8be1",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionInitiatorRequirements.java": "1f4ed7ac17143d37c1d4a479d580ba5611737b9462c383b218663078b93c4dac",
+    "agentflow-server/src/main/java/io/agentflow/definition/SubprocessDeploymentBindings.java": "65a15a19550a601f559726d232705f6b82e78a0e478d3babced0b1c8a87782a7",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessStartIntegrationTest.java": "3d3346bc114f622f9cb8db5a2b3e889942476fde99b0cc6fc4a550044cdbebaf",
+    "agentflow-server/src/test/java/io/agentflow/definition/DefinitionApplicationServiceTest.java": "6c233c9bcf1361309e8cf4b71e84d41778ff81f098bbe5a92ca670305ed6afe3",
+    "agentflow-server/src/test/java/io/agentflow/definition/DefinitionInitiatorRequirementsTest.java": "3f117b3e56f8205372e31fc71db08298a0fc7e0d76ebd1cd0208fc34ee0815a0",
+    "agentflow-server/src/test/java/io/agentflow/definition/DefinitionPreviewIntegrationTest.java": "4d60a60a368b768ea0fbebab8139e464241a771127bf44e4b0cae7f45762dc0f",
+    "agentflow-server/src/test/java/io/agentflow/definition/SubprocessDeploymentIntegrationTest.java": "fae4a71fc2e69e6b00df8d927a81a38caa3740b5d0d5cb4e6d2f1da671032be6"
+  },
+  "runtimePreservation": {
+    "existingServicesReplaced": false,
+    "existingDatabasesModified": false,
+    "backendReadiness": [
+      "18224 UP",
+      "18225 UP"
+    ],
+    "frontendHttp": [
+      "15324 200",
+      "15325 200"
+    ],
+    "protectedSeedsUnchanged": true,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-preflight-runtime-health.json"
+  },
+  "acceptanceBoundaries": {
+    "schemaVersion": 90,
+    "newMigrations": false,
+    "publicSubprocessPublication": false,
+    "newFrontendChanges": false,
+    "mockMvcApiChecks": true,
+    "publicSocketHttpBrowserAcceptance": false,
+    "subprocessInFlightUpgradeRestartAcceptance": false,
+    "structuredFinancialParentAcceptance": false,
+    "remoteCiExecuted": false
+  },
+  "remaining": [
+    "Designer and template integration",
+    "Published definition and application UI appointment requirement hints",
+    "Permissioned parent and child round views",
+    "Structured financial parents",
+    "Public HTTP, browser, upgrade and restart acceptance"
+  ]
+}

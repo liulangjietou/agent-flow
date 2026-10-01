@@ -27,7 +27,7 @@ class DefinitionApplicationServiceTest {
                 .thenReturn(List.of(new DefinitionAssigneeDirectory.Option("role:FINANCE", "FINANCE", 0)));
         var service = new DefinitionApplicationService(repository, deployment, mock(DefinitionPublicationRepository.class), directory,
                 new DefinitionReferenceInspector(directory, mock(io.agentflow.calendar.BusinessCalendarRepository.class),
-                        mock(io.agentflow.event.EventContractBindings.class)), mock(io.agentflow.event.EventContractBindings.class));
+                        mock(io.agentflow.event.EventContractBindings.class)), mock(io.agentflow.event.EventContractBindings.class), mock(SubprocessDeploymentBindings.class));
         var draft = service.create("tenant-a", "directory-change", "目录变化", graph());
         org.assertj.core.api.Assertions.assertThat(service.validate("tenant-a", graph(), null)).isEmpty();
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.publish(
@@ -44,7 +44,7 @@ class DefinitionApplicationServiceTest {
         DefinitionAssigneeDirectory directory = tenant -> List.of(new DefinitionAssigneeDirectory.Option("role:FINANCE", "FINANCE", 1));
         DefinitionApplicationService service = new DefinitionApplicationService(repository, deployment, mock(DefinitionPublicationRepository.class),
                 directory, new DefinitionReferenceInspector(directory, mock(io.agentflow.calendar.BusinessCalendarRepository.class),
-                        mock(io.agentflow.event.EventContractBindings.class)), mock(io.agentflow.event.EventContractBindings.class));
+                        mock(io.agentflow.event.EventContractBindings.class)), mock(io.agentflow.event.EventContractBindings.class), mock(SubprocessDeploymentBindings.class));
         DefinitionDraft draft = service.create("tenant-a", "travel", "出差审批", graph());
 
         DefinitionDraft published = service.publish(new io.agentflow.common.Actor("tenant-a", "test-admin", java.util.Set.of("ADMIN")), draft.id(), 0, "集成测试发布");

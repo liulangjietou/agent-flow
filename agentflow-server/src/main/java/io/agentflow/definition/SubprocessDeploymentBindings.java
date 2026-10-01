@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,8 +19,6 @@ import static io.agentflow.definition.DefinitionModels.*;
  */
 @Service
 public class SubprocessDeploymentBindings {
-    private static final int MAX_DEPENDENCIES = 256;
-    private static final int MAX_CALL_NODES = 4096;
     private final SubprocessDefinitionResolver resolver;
     private final DefinitionReferenceInspector references;
 
@@ -39,6 +38,19 @@ public class SubprocessDeploymentBindings {
         return Map.copyOf(traversal.rootBindings);
     }
 
+    /** 只读预检把后代问题定位到当前设计的调用节点，不改变草稿，也不开放发布门禁。 */
+    public List<String> inspect(String tenantId, Graph graph, FormSchema schema) {
+        var traversal = new Traversal(tenantId);
+        try {
+            traversal.visit(graph, schema, 0, new HashSet<>());
+            return List.of();
+        } catch (DefinitionValidationException invalid) {
+            return invalid.errors().stream().map(error -> error.split(":", 2)[0] + ":" + traversal.rootNode).distinct().toList();
+        } catch (DomainException invalid) {
+            return List.of(invalid.code() + ":" + traversal.rootNode);
+        }
+    }
+
     /**
      * 每次部署独占遍历状态；共享后代只展开一次，但每条进入边都重新验证自己的字段映射。
      * @author owlzhangfq@gmail.com
@@ -49,6 +61,7 @@ public class SubprocessDeploymentBindings {
         private final Map<Reference, Integer> heights = new HashMap<>();
         private final Map<String, String> rootBindings = new LinkedHashMap<>();
         private int calls;
+        private String rootNode;
 
         private Traversal(String tenant) { this.tenant = tenant; }
 
@@ -56,7 +69,8 @@ public class SubprocessDeploymentBindings {
             int height = 0;
             for (Node node : graph.nodes()) {
                 if (node.type() != NodeType.SUB_PROCESS) continue;
-                if (++calls > MAX_CALL_NODES) throw limit();
+                if (depth == 0) rootNode = node.id();
+                if (++calls > SubprocessPolicy.MAX_CALL_NODES) throw limit();
                 if (depth >= SubprocessPolicy.MAX_CALL_DEPTH) throw depthExceeded();
                 var policy = SubprocessPolicy.fromProperties(node.properties());
                 var reference = new Reference(policy.processKey(), policy.version());
@@ -65,10 +79,13 @@ public class SubprocessDeploymentBindings {
                 }
                 var target = targets.get(reference);
                 if (target == null) {
-                    if (targets.size() >= MAX_DEPENDENCIES) throw limit();
+                    if (targets.size() >= SubprocessPolicy.MAX_DEPENDENCIES) throw limit();
                     target = resolver.inspect(tenant, policy, node.id(), schema);
                     var errors = references.inspect(tenant, target.graph());
                     if (!errors.isEmpty()) throw new DefinitionValidationException(errors);
+                    if (!DefinitionApprovalPaths.endsWithoutApproval(target.graph()).isEmpty()) {
+                        throw new DomainException("SUBPROCESS_REQUIRES_APPROVAL_PATH", "Every subprocess completion path requires actual approval");
+                    }
                     targets.put(reference, target);
                 } else {
                     SubprocessInputs.bind(policy, node.id(), schema, target.formSchema());

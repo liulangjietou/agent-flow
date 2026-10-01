@@ -28,6 +28,7 @@ public class DefinitionApplicationService {
     private final DefinitionAssigneeDirectory assignees;
     private final DefinitionReferenceInspector references;
     private final EventContractBindings eventContracts;
+    private final SubprocessDeploymentBindings subprocesses;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
@@ -36,28 +37,32 @@ public class DefinitionApplicationService {
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
                                         DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees,
-                                        DefinitionReferenceInspector references, EventContractBindings eventContracts) {
+                                        DefinitionReferenceInspector references, EventContractBindings eventContracts,
+                                        SubprocessDeploymentBindings subprocesses) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
         this.assignees = assignees;
         this.references = references;
         this.eventContracts = eventContracts;
+        this.subprocesses = subprocesses;
     }
 
     /** 校验流程图，不改变持久化状态。 */
     public List<String> validate(Graph graph) {
-        return validator.validate(graph);
+        return validate(graph, null);
     }
 
     /** 联合校验流程图与表单，不改变持久化状态。 */
     public List<String> validate(Graph graph, FormSchema formSchema) {
-        return validator.validate(graph, formSchema);
+        var errors = new java.util.ArrayList<>(validator.validate(graph, formSchema));
+        errors.addAll(unreadyNodes(graph));
+        return List.copyOf(errors);
     }
 
     /** 结构通过后核对身份源、明确日历修订与事件契约；跨上下文读取由应用层编排。 */
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
-        List<String> errors = validator.validate(graph, formSchema);
+        List<String> errors = validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
         return references.inspect(tenantId, graph);
     }
@@ -69,6 +74,13 @@ public class DefinitionApplicationService {
 
     /** 预检携带当前流程标识时，同图元素一起验证，不查询或修改流程定义。 */
     public Validation inspect(Graph graph, FormSchema formSchema, String processKey) {
+        var result = inspectStructure(graph, formSchema, processKey);
+        var errors = new java.util.ArrayList<>(result.errors());
+        errors.addAll(unreadyNodes(graph));
+        return new Validation(errors, result.branchDiagnostics());
+    }
+
+    private Validation inspectStructure(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = validator.validate(graph, formSchema, processKey);
         if (!errors.isEmpty()) return new Validation(errors, List.of());
         var diagnostics = coverage.analyze(graph, formSchema);
@@ -84,9 +96,11 @@ public class DefinitionApplicationService {
 
     /** 先检查标识和图结构，再核对当前租户审批人、固定日历修订及事件契约，发布与设计预检共用。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
-        Validation result = inspect(graph, formSchema, processKey);
+        Validation result = inspectStructure(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
-        var errors = references.inspect(tenantId, graph);
+        var errors = new java.util.ArrayList<>(references.inspect(tenantId, graph));
+        errors.addAll(subprocesses.inspect(tenantId, graph, formSchema));
+        errors.addAll(unreadyNodes(graph));
         return new Validation(errors, result.branchDiagnostics());
     }
 
@@ -220,9 +234,16 @@ public class DefinitionApplicationService {
     }
 
     private void requireValid(Graph graph, FormSchema formSchema, String processKey) {
-        List<String> errors = validator.validate(graph, formSchema, processKey);
+        var errors = new java.util.ArrayList<>(validator.validate(graph, formSchema, processKey));
+        errors.addAll(unreadyNodes(graph));
         if (!errors.isEmpty()) {
             throw new DefinitionValidationException(errors);
         }
+    }
+
+    private List<String> unreadyNodes(Graph graph) {
+        // 完整公开验收前仍禁止保存和发布，纯领域结构及只读设计检查可以继续验证。
+        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.SUB_PROCESS)
+                .map(node -> "SUBPROCESS_RUNTIME_NOT_READY:" + node.id()).toList();
     }
 }

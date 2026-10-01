@@ -179,6 +179,26 @@ class SubprocessDeploymentIntegrationTest {
         assertThatThrownBy(() -> definitions.create("demo", key(), "待完整验收", callGraph(child.key(), 1, "amount", "total"), schema("amount")))
                 .isInstanceOfSatisfying(DefinitionValidationException.class,
                         error -> assertThat(error.errors()).contains("SUBPROCESS_RUNTIME_NOT_READY:call"));
+        assertThat(definitions.validate("demo", callGraph(child.key(), 1, "amount", "total"), schema("amount")))
+                .contains("SUBPROCESS_RUNTIME_NOT_READY:call");
+    }
+
+    @Test
+    void designPreflightReportsMissingDependenciesWhileKeepingThePublicationGateClosed() {
+        var graph = callGraph(key(), 1, "amount", "total");
+        var result = definitions.inspect("demo", graph, schema("amount"), key());
+        assertThat(result.errors()).contains("SUBPROCESS_DEFINITION_UNAVAILABLE:call", "SUBPROCESS_RUNTIME_NOT_READY:call");
+        assertThat(definitions.inspect(graph, schema("amount"), key()).errors()).containsExactly("SUBPROCESS_RUNTIME_NOT_READY:call");
+    }
+
+    @Test
+    void preflightRejectsAChildWithoutAnActualApprovalPath() {
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()), new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "end", "")));
+        var child = definitions.create("demo", key(), "没有人工审批的旧定义", graph, schema("total"));
+        definitions.publish(ADMIN, child.id(), 0, "保持既有普通定义能力的夹具");
+        assertThat(definitions.inspect("demo", callGraph(child.key(), 1, "amount", "total"), schema("amount"), key()).errors())
+                .contains("SUBPROCESS_REQUIRES_APPROVAL_PATH:call");
     }
 
     private DefinitionDraft child(String key, String field) {
