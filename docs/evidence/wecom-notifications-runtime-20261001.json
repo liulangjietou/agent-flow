@@ -1,0 +1,455 @@
+{
+  "recordedAt": "2026-10-01T19:46:17.245438+00:00",
+  "status": "LOCAL_RUNTIME_ACCEPTANCE_PASSED",
+  "baseCommit": "859a27c2744266cf07bd88aed591a666e5f53582",
+  "branch": "codex/governance-identifier-integration",
+  "backendEvidence": "docs/evidence/wecom-notifications-backend-20261001.json",
+  "migrationVersion": 93,
+  "newMigrations": false,
+  "scope": "企业微信参考发送器独立运行、真实页面、原请求恢复、历史数据保持和两次重启；仅回环协议夹具",
+  "runtime": {
+    "sourceDatabase": "task_escalation_3ab59b97e5",
+    "database": "wecom_runtime_2b15e5e1e1",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-server.jar",
+    "jarSha256": "aa8574c5a7c16305be1efcda6a5bd5fe7c488aed41f859bf9c5aba5c0ae33350",
+    "backendSourceCommit": "859a27c2744266cf07bd88aed591a666e5f53582",
+    "backendPort": 18243,
+    "proxyPort": 18244,
+    "frontendPort": 15335,
+    "providerPort": 18245,
+    "existingServicesReplaced": false,
+    "sourceUnchanged": true,
+    "sourceSnapshot": {
+      "tables": 225,
+      "rows": 1780,
+      "files": 3
+    },
+    "finalSnapshot": {
+      "tables": 225,
+      "rows": 1891,
+      "files": 3
+    },
+    "allowedOriginalChangesInClone": {
+      "notification_preferences": 2,
+      "notification_dispatch": 26
+    },
+    "otherOriginalRowsPreserved": true,
+    "legacyUnboundFailedBeforeNetwork": 26,
+    "actualEnterpriseApiCalled": false,
+    "actualEnterpriseDeliveryVerified": false
+  },
+  "restarts": {
+    "count": 2,
+    "first": {
+      "rowsPreservedWhileStopped": 1878,
+      "originalRetryDuePreserved": true,
+      "retryDeliveredAfterOriginalDueMs": 395.571,
+      "changedTablesAfterRetry": [
+        "notification_dispatch",
+        "notification_delivery_event"
+      ],
+      "otherOriginalDispatchRowsUnchanged": true
+    },
+    "second": {
+      "rowsPreservedAfterBootBeforeSending": 1880,
+      "allTablesAndFilesPreserved": true,
+      "fixtureSecretRotated": true,
+      "originalDestinationPreserved": true,
+      "originalUnknownDeliveryRecoveredWithHistory": true
+    }
+  },
+  "deliveryAccounting": {
+    "distinctNewAcceptedDeliveries": 9,
+    "providerMessageRequests": 15,
+    "providerAcceptedRequests": 11,
+    "tokenRequests": 4,
+    "duplicateRiskAcknowledgedForTwoUnknownDeliveries": true,
+    "originalRequestReplayMatchedWithoutNewSend": true,
+    "note": "明确失效令牌刷新及本人接受未知重复风险会增加请求；受理不代表最终递送或外部恰好一次"
+  },
+  "httpContracts": {
+    "status": "PASS",
+    "files": {
+      "wecom-runtime-http-workflow.json": {
+        "responses": 61,
+        "successfulRequests": 9
+      },
+      "wecom-runtime-http-browser-fixtures.json": {
+        "responses": 17,
+        "successfulRequests": 2
+      },
+      "wecom-runtime-http-prepare-restart.json": {
+        "responses": 9,
+        "successfulRequests": 1
+      },
+      "wecom-runtime-http-restart1.json": {
+        "responses": 3,
+        "successfulRequests": 1
+      },
+      "wecom-runtime-http-restart2.json": {
+        "responses": 31,
+        "successfulRequests": 10
+      },
+      "wecom-runtime-browser-http-final.json": {
+        "responses": 41,
+        "successfulRequests": 3
+      }
+    },
+    "totalResponses": 162
+  },
+  "browser": {
+    "assertions": {
+      "unknownInitiallyBlocked": true,
+      "oneConfirmationStillBlocked": true,
+      "bothConfirmationsEnabled": true,
+      "staleRetryBlocked": true,
+      "explicitFailureHasOneConfirmation": true,
+      "smallScreen": {
+        "documentWidth": 480,
+        "horizontalOverflow": false,
+        "width": 500
+      },
+      "acceptedCopyCorrect": true,
+      "adminListEmpty": true,
+      "restartsKeepOriginalUnknownHistory": true
+    },
+    "consoleWarningsOrErrors": 0,
+    "finalScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-after-restarts.png",
+    "smallScreenScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-500.png",
+    "beforeFixScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-accepted.png"
+  },
+  "regression": {
+    "cause": "共用投递详情的 ACCEPTED 提示固定使用邮件措辞，企业 IM 也显示收件箱和邮件服务",
+    "oldTestGap": "实际模板测试覆盖了 UNKNOWN 和确认项，但没有检查各渠道的 ACCEPTED 分支",
+    "redVerifiedBeforeFix": true,
+    "fix": "共用组件显示对应渠道核实的受理提示，补充两个渠道的实际模板分支断言"
+  },
+  "tests": {
+    "frontend": 25,
+    "frontendFailures": 0,
+    "build": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 290,
+      "schemas": 564,
+      "requestExamples": 110
+    },
+    "backendRepeatedInThisIncrement": false,
+    "backendReason": "后台源文件未变；沿用已提交的范围证据，新增独立 HTTP 与运行验收"
+  },
+  "remainingPackages": [
+    "真实企业 IM 应用、账号绑定、权限与最终递送；真实企业 SMTP、TLS 和最终递送",
+    "真实费用制度、预算、ERP、银行及发票服务联调，真实回执和对账",
+    "真实模型和 IdP、目标安装升级与恢复、容量和告警、远端 PR 与 CI"
+  ],
+  "sources": [
+    {
+      "path": "agentflow-common/src/main/java/io/agentflow/common/JsonUtil.java",
+      "sha256": "44b19ebd83418f804c88e1b2f981e2f448e8581b4026f2053e8eb1c0b3595e56"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationDeliveryProgress.java",
+      "sha256": "97b77e5f79d318df3107fb69ed1abf4bffb6164d8a74363c8707f54fd9fd7a4a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryConfiguration.java",
+      "sha256": "658f591cb832fa5bfa08ce023875f2a12b76825324a5dd24fe7b369c909ab5a3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryWorker.java",
+      "sha256": "463519d43b6100e7cd52ccfe726330196bc4eb8329d793b41d3883c39f0f928b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDestinations.java",
+      "sha256": "17324f788faf3da121ad17437657d4462b1acd0c31aee737e1c7106295fb6d36"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationMessageText.java",
+      "sha256": "95317f48bb0d4a2a801cda343c9125bb936621fa2ed5d8064f41c16db5c341fb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SmtpNotificationTransport.java",
+      "sha256": "82c65c4592a3ca038bebaa91fcb985e4b6ffa73b7e00af059911fb769373ac67"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/WeComNotificationTransport.java",
+      "sha256": "7e47e89c5f52eac5245fc88c3e9de43e555abe89ea51972c56ed44d873c6c7c9"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "246c512f029f3543025397510fc8dbeb74a4eb62bcbab0c74da529b2ee64ae5a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/LocalWeComServer.java",
+      "sha256": "747be74e265f31747986fa88a4f8d9d512712e7d37d23221200886045c3a71b1"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryApiIntegrationTest.java",
+      "sha256": "02cd2c8f08e98b4528a83f89336812e59546555e3cca00f122bd5d3485745812"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+      "sha256": "5fcb9561d7fda2d2535589b0bf90e65e8365ab06095cc47b9ebcb9e5f1ca652e"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDestinationsTest.java",
+      "sha256": "fc70c58bd6797e8520f9985bbaae803c2c0da6e115d9899820f9d88ffff010e0"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/WeComNotificationConfigurationTest.java",
+      "sha256": "5fbd325545dd3e43aafa1a897d1b4de65b47e90bc4ffb986463e83e0283ab25b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/WeComNotificationTransportTest.java",
+      "sha256": "9ee73a8f8dc33a3f4c5fb213bf218d667f54248bf36af294328534496dd6feac"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationDeliveriesPanel.vue",
+      "sha256": "833065ca472f8b421f15b63f52dd52231ff7bc70b51490a694323c0a6f8fccd7"
+    },
+    {
+      "path": "agentflow-web/src/notificationDeliveries.ts",
+      "sha256": "704b4c506ddfb2ecf806010653483c769094b8b4bfefcd6b4c72a4041b76fdb9"
+    },
+    {
+      "path": "agentflow-web/tests/notification-deliveries.test.mjs",
+      "sha256": "8f77c2e2ff1714718605856ec950bc91e8bd7fee680c7ab336553180d12f50ca"
+    },
+    {
+      "path": "docs/notification-delivery.md",
+      "sha256": "c93a94559cb57248414167082c4161c398b906d7edd3cfcf1bad0ea591db54ce"
+    },
+    {
+      "path": "docs/notification-inbox.md",
+      "sha256": "f518086c08be3e60015d7a0ac28fa51f5806042055b5cf8d837ff1b305060873"
+    },
+    {
+      "path": "docs/notification-preferences.md",
+      "sha256": "1fbdf75c99dbc019c4f32e2228f70c10d3c8533cbc6b6babb6abd95065f077e8"
+    },
+    {
+      "path": "docs/remaining-implementation-plan.md",
+      "sha256": "302efee38d94e6d2857ea0937028132ceff8f534d2bb628a79961769ba2d86b8"
+    },
+    {
+      "path": "docs/remaining-local-work.md",
+      "sha256": "425e7d62acd1c02a37584c772d3405aeee22e69eec0e30144ede03fd1b4b9928"
+    },
+    {
+      "path": "docs/wecom-notifications.md",
+      "sha256": "43ed2d0e8cb4c9ed26f1a6addc4fe57085b4ffe9d7455e11e3fc790fcacb459c"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-verification.json",
+      "bytes": 33188,
+      "sha256": "cef4869bd8268a02ff020a8629c2a2ef8cd47b59e61abe9497e8f5eae67be742"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-contracts.json",
+      "bytes": 696,
+      "sha256": "c074d5e8ec47198d2da45fb07ba8b82c009723de64e311a905a26fa3f1066292"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-final.json",
+      "bytes": 30340,
+      "sha256": "4324a4c015599e3cbcdaa7380fdbc532a38910cdcd91778778c6ce30c6db87af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-provider-final.json",
+      "bytes": 8413,
+      "sha256": "f14410d9dce3b9f90966b7c14ee63912c06c8f0184fd91b79fedfe80f6bdb087"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-before-restart1.json",
+      "bytes": 104016,
+      "sha256": "b4b1efe7927322b8f3192aa0eb4f2c54402531b239310901a067698edcfe0459"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-stopped1.json",
+      "bytes": 26886,
+      "sha256": "c7ae0ee0376b1d6fd385c6998e705e13dae7db4872acca81398dfc2b59b75320"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-restart1-preservation.json",
+      "bytes": 26342,
+      "sha256": "4fe4ec45fdcefbd9ece21248e1376bf9e97343fa418c595b882090768f2d82c1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-before-restart2.json",
+      "bytes": 105232,
+      "sha256": "a5380a9fb82a63d32088ae3a9c3b55296168cdbd233441a9e93fd65d5844e47e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-stopped2.json",
+      "bytes": 26238,
+      "sha256": "6404d9f3fe74ec053f4dbe919350cf57e4e537a5dec1a3a9967cb459ee14aa2a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-restart2-before-send.json",
+      "bytes": 26197,
+      "sha256": "5f7cd09a2a50b04a73164097fe0254642fcf13f9ef92192628b75487e0c7982b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-http-workflow.json",
+      "bytes": 87622,
+      "sha256": "daa3b93502e6730f06b3c67ffd166dacd150d9c4c70521c147602bc054ebeeab"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-http-browser-fixtures.json",
+      "bytes": 19371,
+      "sha256": "158a2a2752dae8edeae176a104d7156611edeae62152cc08da71004e05d6a4ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-http-prepare-restart.json",
+      "bytes": 20376,
+      "sha256": "67f1af58aedc6f24efc369896b117d9aa045d8bde77a5c41446c3397a80b3ac5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-http-restart1.json",
+      "bytes": 5252,
+      "sha256": "fa97ac3dabce7d08b9959250dfe29328eb2837d0eafe0cae261b4a2ff29ab466"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-http-restart2.json",
+      "bytes": 56241,
+      "sha256": "276c67671d86646d99395aed266fc90fece7541bd8a625fac06549027c26c6df"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-before-replay.json",
+      "bytes": 43,
+      "sha256": "a42af69cf0d10bcff963572861bdd2e484a965dbc3f73c8774911f2e1567956d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-http-final.json",
+      "bytes": 116912,
+      "sha256": "693def13bb0b3001926399ad3f82086d85e683ee40b3dcff017bd364fd32047f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-assertions.json",
+      "bytes": 389,
+      "sha256": "4e7441c8d96c4101c81ef9d29d8d521ce8921001ea63d37fc5be2158b750f1f9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-console.json",
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-accepted.png",
+      "bytes": 68932,
+      "sha256": "c7015205aa3287ab4628a81acdfdd6372abcda5b277fd8c9b542fb7e9c149654"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-accepted-fixed.png",
+      "bytes": 68683,
+      "sha256": "90b4a1920cae891abba2d67684d3e82545e55567f9d5b9c367eeb169652e0846"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-500.png",
+      "bytes": 39892,
+      "sha256": "80d7321eb86147cff9103c9902bfc6f4a01aaca1290a939ad668198f7b1a8cf2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-final.png",
+      "bytes": 73497,
+      "sha256": "73d9428d7a46743900dfe6a22d210177a2727d3ab11f5bd77ec7f635e96b187f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-admin.png",
+      "bytes": 69888,
+      "sha256": "59e422cd801010b463bc4adf11d36d934947309cac62f66a00a6f5ba33b3e142"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-browser-after-restarts.png",
+      "bytes": 64157,
+      "sha256": "d9c0f35b1a6142b152515f59fbb1107b3b77954b19e0d1afc94eec9ce0bfa3e4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-ui-red.log",
+      "bytes": 2548,
+      "sha256": "9efc8586b0ada24955a741179e407790668acf83940cc13359ba353cf595e642"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-ui-green.log",
+      "bytes": 2679,
+      "sha256": "07a260827d2eeacbce087e8515b9e6c3c208fc4f2713fa62c6c2d910076c550e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-build.log",
+      "bytes": 781,
+      "sha256": "9e9b77a40a4c02809f20c51f858c0491ebb4ffe1142d8c84c3fbcfd9e2c72aef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-openapi.log",
+      "bytes": 71,
+      "sha256": "1f8bc92b12f74b2b3554ff0fa1d6c81160cd2208ef6b35594ecb68c823e7a3fe"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-package.log",
+      "bytes": 11811,
+      "sha256": "7e2446bad37ee0ee52d476305243254235593146a7e15dde6304a387814ceb64"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-boot3-verified.log",
+      "bytes": 7344,
+      "sha256": "0684090f4c4a681589c12cc2bcc580359160bccb8cb26d077ecf79eab4035a4e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-fixture.py",
+      "bytes": 4123,
+      "sha256": "3fdd81523e25d13adbeec783f27315cb00b2ef9f6c3bd1f107a5533b95c5037a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/prepare-wecom-runtime.py",
+      "bytes": 2276,
+      "sha256": "5ee8f829c6b232a211726fa15335e0bd8170503fd9364bd4190aee15e615ecbd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-wecom-runtime.py",
+      "bytes": 4370,
+      "sha256": "21b8047c6ba4dd777b7a4f99467ca329af7f584528df232fd6735bfdd5ab8838"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom_runtime_common.py",
+      "bytes": 1943,
+      "sha256": "c09857a84a04482322a4a3fe66dc5679ec97b07f0116fefa2334a52366a71259"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/stop-wecom-runtime.py",
+      "bytes": 810,
+      "sha256": "c357991116aae946d1d0b03ba154806109b8db0a71545b74da08cb097e56339e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/exercise-wecom-runtime.mjs",
+      "bytes": 11194,
+      "sha256": "74f2a80659c79083e17834c2bc46b5effbc369f28bb72d553e6c13da57188dbc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-proxy.mjs",
+      "bytes": 2042,
+      "sha256": "c72c057a4d58167c5d42385f71a516091e2a67d30a35df350743a3c740781834"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom-runtime-vite.config.mjs",
+      "bytes": 518,
+      "sha256": "556a3bf5ee16ca930621a14ed9d4bb97e2f33f41f3ebbb85da9185bce50b30fa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-wecom-runtime.py",
+      "bytes": 4474,
+      "sha256": "6399ca7bc19e8b2187411b83c29a0d545d269b4ebf26ec8b0519240cbae8078e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-wecom-runtime-contracts.mjs",
+      "bytes": 2424,
+      "sha256": "56a4749ebc2ae413844e5a31d146eb379a15afde19da03bbd16d3e4cdf34e009"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/record-wecom-runtime-evidence.py",
+      "bytes": 9070,
+      "sha256": "99bea181e555328375c710f3229dd77ae062d68d5fddf0aac0a26aefe58d305d"
+    }
+  ]
+}

@@ -105,7 +105,7 @@ onUnmounted(() => { writeGeneration++; closeDetail(); query.clear() })
         <p v-if="detailError" class="delivery-error" role="alert">{{ detailError }}</p>
         <template v-if="detail">
           <p class="delivery-current"><strong>{{ deliveryChannels[detail.delivery.channel] }} · {{ deliveryStatuses[detail.delivery.status] }}</strong><span>第 {{ detail.delivery.version }} 版 · {{ time(detail.delivery.updatedAt) }}</span></p>
-          <p v-if="detail.delivery.status === 'ACCEPTED'" class="delivery-note">发送服务已经受理，最终是否递送到收件箱还需由邮件服务确认。</p>
+          <p v-if="detail.delivery.status === 'ACCEPTED'" class="delivery-note">发送服务已经受理，最终递送结果还需通过对应渠道核实。</p>
           <p v-if="detail.delivery.errorCode" :class="detail.delivery.status === 'UNKNOWN' ? 'delivery-warning' : 'delivery-note'">{{ deliveryErrors[detail.delivery.errorCode] }}</p>
           <p v-if="detail.delivery.nextAttemptAt" class="delivery-note">下次尝试不早于 {{ time(detail.delivery.nextAttemptAt) }}。</p>
           <p v-if="stale" class="delivery-warning" role="status">上方是此前读取的状态，当前结果尚未确认。请重新读取；原写入结果未知时先恢复原操作。</p>

@@ -164,6 +164,12 @@ test('实际模板区分受理与未知，未知恢复显示重复风险并默�
     assert.equal(all(root).filter(el => el.tag === 'input' && el.props.type === 'checkbox').length, 2)
     assert.match(all(root).map(el => el.text).join(' '), /接受重复提醒/); assert.equal(all(root).find(el => el.props.type === 'submit').props.disabled, true)
     if (channel === 'ENTERPRISE_IM') assert.match(all(root).map(el => el.text).join(' '), /企业 IM 发送中断或回执不完整/)
+    api.notificationDelivery = async () => detail({ ...row('ACCEPTED', 6), channel })
+    await all(root).find(el => el.tag === 'button' && el.text === '重新读取当前投递').props.onClick(); await settle()
+    const accepted = all(root).find(el => el.tag === 'section' && el.props['aria-labelledby'] === 'delivery-detail-title')
+    const acceptedText = all(accepted).map(el => el.text).join(' ')
+    assert.match(acceptedText, new RegExp(`${channel === 'ENTERPRISE_IM' ? '企业 IM' : '邮件'} · 服务器已受理`))
+    if (channel === 'ENTERPRISE_IM') assert.doesNotMatch(acceptedText, /收件箱|邮件服务/)
   } finally { app.unmount(); Object.assign(api, originalApi); globalThis.Document = oldDocument; globalThis.ShadowRoot = oldShadow }
   }
 })
