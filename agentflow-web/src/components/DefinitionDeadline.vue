@@ -3,6 +3,7 @@ import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { CalendarRead, type CalendarPage, type CalendarSummary, type CalendarVersionPage } from '../businessCalendars'
 import type { DesignerDeadline } from '../designerGraph'
+import DefinitionEscalation from './DefinitionEscalation.vue'
 
 const props = defineProps<{ modelValue?: DesignerDeadline; scopeKey: string; disabled: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: DesignerDeadline | undefined]; beforeChange: [] }>()
@@ -16,6 +17,17 @@ const calendarId = computed(() => props.modelValue?.calendarId ?? '')
 const revision = computed(() => props.modelValue?.calendarRevision ?? '')
 const knownCalendar = computed(() => calendars.value.some(value => value.id === calendarId.value))
 const knownRevision = computed(() => versions.value.some(value => String(value.revision) === revision.value))
+const escalation = computed(() => props.modelValue?.escalationWorkingMinutes !== undefined || props.modelValue?.escalationRecipientRule !== undefined
+  ? { workingMinutes: props.modelValue?.escalationWorkingMinutes, recipientRule: props.modelValue?.escalationRecipientRule } : undefined)
+
+/** 升级输入沿用期限模型和原撤销边界；关闭升级不删除审批期限。 */
+function changeEscalation(value: { workingMinutes?: string; recipientRule?: string } | undefined) {
+  if (props.disabled) return
+  const next = { ...props.modelValue }
+  delete next.escalationWorkingMinutes; delete next.escalationRecipientRule
+  if (value) { next.escalationWorkingMinutes = value.workingMinutes; next.escalationRecipientRule = value.recipientRule }
+  emit('update:modelValue', next)
+}
 
 function change(value: DesignerDeadline | undefined) {
   if (props.disabled) return
@@ -102,6 +114,7 @@ onUnmounted(() => { directory.clear(); history.clear(); selected.clear() })
       <div v-else-if="selected.error" role="alert"><p class="deadline-error">引用修订暂不可用：{{ selected.error }}</p><button type="button" class="secondary" :disabled="disabled" @click="loadSelected">重试核对引用</button></div>
       <p v-else-if="selected.value">已引用 {{ selected.value.name }} / V{{ selected.value.revision }}，时区 {{ selected.value.zoneId }}。</p>
       <p class="deadline-help">仅累计所选修订的工作时段，休息和日期例外按该修订执行。日历后续修改不会自动改变此节点引用。</p>
+      <DefinitionEscalation :model-value="escalation" :scope-key="scopeKey" :disabled="disabled" @before-change="emit('beforeChange')" @update:model-value="changeEscalation" />
     </template>
     <p v-else>未设置期限。</p>
   </section>

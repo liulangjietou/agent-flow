@@ -41,11 +41,21 @@ public class OrganizationAssigneeResolver {
     /** 抄送与审批共用组织关系检查，但不要求收件人具有审批资格。 */
     @Transactional
     public Selection resolveCopy(String tenantId, String rule, InitiatorContext context) {
+        return resolveRecipients(tenantId, rule, context, io.agentflow.approval.copy.CopyRecipient.MAX_RECIPIENTS, "COPY_RECIPIENT_UNAVAILABLE");
+    }
+
+    /** 升级只需要有效接收账号，名单在任务创建时冻结，不授予审批或字段读取权。 */
+    @Transactional
+    public Selection resolveEscalation(String tenantId, String rule, InitiatorContext context) {
+        return resolveRecipients(tenantId, rule, context, io.agentflow.definition.TaskEscalationPolicy.MAX_RECIPIENTS, "ESCALATION_RECIPIENT_UNAVAILABLE");
+    }
+
+    private Selection resolveRecipients(String tenantId, String rule, InitiatorContext context, int maximum, String errorCode) {
         long revision = repository.initialized(tenantId) ? repository.lock(tenantId) : 0;
         var members = LocalOrganizationDirectory.isContextualRule(rule)
                 ? contextualMembers(tenantId, rule, context, false) : directory.copyMembers(tenantId, rule);
-        if (members.isEmpty() || members.size() > io.agentflow.approval.copy.CopyRecipient.MAX_RECIPIENTS) {
-            throw new DomainException("COPY_RECIPIENT_UNAVAILABLE", "Copy rule must match between one and 100 active recipients");
+        if (members.isEmpty() || members.size() > maximum) {
+            throw new DomainException(errorCode, "Recipient rule must match a supported number of active recipients");
         }
         return new Selection(revision, rule, members);
     }

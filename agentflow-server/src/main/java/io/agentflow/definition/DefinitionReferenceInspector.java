@@ -35,13 +35,16 @@ public class DefinitionReferenceInspector {
         var errors = new ArrayList<>(graph.nodes().stream().filter(node -> node.type() == NodeType.USER_TASK)
                 .filter(node -> !available.contains(node.properties().get("assigneeRule")))
                 .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList());
-        if (graph.nodes().stream().anyMatch(node -> node.type() == NodeType.COPY)) {
+        if (graph.nodes().stream().anyMatch(node -> node.type() == NodeType.COPY || node.properties().containsKey(TaskEscalationPolicy.RECIPIENT_RULE))) {
             var copyRules = assignees.copyOptions(tenantId).stream().filter(option -> option.contextual()
                     || option.memberCount() > 0 && option.memberCount() <= CopyRecipient.MAX_RECIPIENTS)
                     .map(DefinitionAssigneeDirectory.Option::rule).collect(Collectors.toSet());
             graph.nodes().stream().filter(node -> node.type() == NodeType.COPY)
                     .filter(node -> !copyRules.contains(node.properties().get("recipientRule")))
                     .forEach(node -> errors.add("COPY_RECIPIENT_UNAVAILABLE:" + node.id()));
+            graph.nodes().stream().filter(node -> node.properties().containsKey(TaskEscalationPolicy.RECIPIENT_RULE))
+                    .filter(node -> !copyRules.contains(node.properties().get(TaskEscalationPolicy.RECIPIENT_RULE)))
+                    .forEach(node -> errors.add("ESCALATION_RECIPIENT_UNAVAILABLE:" + node.id()));
         }
         for (var node : graph.nodes()) {
             TaskDeadlinePolicy.fromProperties(node.properties()).ifPresent(policy -> {

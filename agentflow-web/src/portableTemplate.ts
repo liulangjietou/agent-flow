@@ -60,7 +60,7 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
       ? Object.keys(n.properties).filter(key => key.startsWith('subprocessInput.') && subprocessFieldKey(key.slice('subprocessInput.'.length))) : []
     if (inputs.length > 50) throw new Error('子流程最多映射 50 个输入字段。')
     const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
-      'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes', ...(n.type === 'SUB_PROCESS' ? ['subprocessKey', 'subprocessVersion', ...inputs] : [])], [], '节点配置')
+      'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes', 'escalationWorkingMinutes', 'escalationRecipientRule', ...(n.type === 'SUB_PROCESS' ? ['subprocessKey', 'subprocessVersion', ...inputs] : [])], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
       text(value, `节点配置 ${key}`, 256)
       if (inputs.includes(key) && !subprocessFieldKey(value)) throw new Error('子流程输入只能引用父表单字段标识，不能使用路径或表达式。')
@@ -163,7 +163,7 @@ export class PortableTemplateReview {
 
   /** 缺失租户引用或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
   get canImport() {
-    const repairable = ['COPY_RECIPIENT_UNAVAILABLE:', 'ASSIGNEE_NOT_AVAILABLE:', 'DEADLINE_CALENDAR_UNAVAILABLE:', 'BRANCH_COVERAGE_GAP:']
+    const repairable = ['COPY_RECIPIENT_UNAVAILABLE:', 'ESCALATION_RECIPIENT_UNAVAILABLE:', 'ASSIGNEE_NOT_AVAILABLE:', 'DEADLINE_CALENDAR_UNAVAILABLE:', 'BRANCH_COVERAGE_GAP:']
     return this.reviewed && !!this.value && !this.loading && this.errors.every(error => repairable.some(prefix => error.startsWith(prefix)))
   }
 }

@@ -56,6 +56,15 @@ class DefinitionInitiatorRequirementsTest {
     private DefinitionDraft definition(String key, long version, Graph graph) {
         var draft = DefinitionDraft.create(UUID.randomUUID(), "demo", key, "子审批", graph); draft.publish(0, version); return draft;
     }
+
+    @Test
+    void supervisorEscalationInAFixedChildRequiresTheRootAppointment() {
+        var child = graph(new Node("review", "升级到主管", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager",
+                TaskEscalationPolicy.RECIPIENT_RULE, LocalOrganizationDirectory.SUPERVISOR_RULE + "2")));
+        when(definitions.findPublished("demo", "leaf", 1)).thenReturn(Optional.of(definition("leaf", 1, child)));
+        assertThat(requirements.required("demo", graph(call("child", "leaf", 1)))).isTrue();
+        verify(definitions).findPublished("demo", "leaf", 1);
+    }
     private Graph graph(Node... nodes) { return new Graph(List.of(nodes), List.of()); }
     private Node call(String id, String key, long version) { return new Node(id, "子调用", NodeType.SUB_PROCESS, new SubprocessPolicy(key, version, Map.of()).properties()); }
 }

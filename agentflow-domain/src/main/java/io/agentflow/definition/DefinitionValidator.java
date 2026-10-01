@@ -60,6 +60,14 @@ public final class DefinitionValidator {
                     catch (io.agentflow.common.DomainException exception) { errors.add("DEADLINE_RULE_INVALID:" + n.id()); }
                 }
             }
+            if (TaskEscalationPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
+                if (n.type() != NodeType.USER_TASK) errors.add("ESCALATION_REQUIRES_USER_TASK:" + n.id());
+                else {
+                    if (TaskDeadlinePolicy.PROPERTY_KEYS.stream().noneMatch(n.properties()::containsKey)) errors.add("ESCALATION_REQUIRES_DEADLINE:" + n.id());
+                    try { TaskEscalationPolicy.fromProperties(n.properties()); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                }
+            }
             if (n.properties().containsKey(ApprovalPolicy.MODE_PROPERTY) || n.properties().containsKey(ApprovalPolicy.PERCENTAGE_PROPERTY)) {
                 if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_MODE_REQUIRES_USER_TASK:" + n.id());
                 else {
@@ -84,7 +92,7 @@ public final class DefinitionValidator {
                 String assigneeRule = n.properties().get(n.type() == NodeType.COPY ? "recipientRule" : "assigneeRule");
                 if (assigneeRule == null || assigneeRule.isBlank()) {
                     errors.add("ASSIGNEE_RULE_REQUIRED:" + n.id());
-                } else if (!LITERAL_ASSIGNEE_RULE.matcher(assigneeRule).matches()) {
+                } else if (!isLiteralAssigneeRule(assigneeRule)) {
                     errors.add("ASSIGNEE_RULE_INVALID:" + n.id());
                 }
             }
@@ -196,6 +204,11 @@ public final class DefinitionValidator {
             validateWaitApprovalPaths(graph, errors, "EVENT_REQUIRES_APPROVAL_PATH");
         }
         return List.copyOf(errors);
+    }
+
+    /** 审批、抄送和升级共用字面量语法；实际成员可用性由发布编排检查。 */
+    static boolean isLiteralAssigneeRule(String value) {
+        return value != null && LITERAL_ASSIGNEE_RULE.matcher(value).matches();
     }
 
     /** 并行汇合要求全部入口到达，因此另一分支的人工审批不能被误判为可绕过。 */

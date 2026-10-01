@@ -112,9 +112,14 @@ public class InstanceControlService {
             long version = application.version(); application.recordRuntimeAction(version);
             var previous = notifications.pendingAudience(application);
             for (var task : tasks.createTaskQuery().processInstanceId(instance.getId()).includeTaskLocalVariables().list()) {
-                if (!task.getTaskLocalVariables().containsKey(FlowableTaskDeadlineListener.CALENDAR_ID)) continue;
-                if (task.getDueDate() == null || task.getTaskLocalVariables().containsKey(PAUSED_DUE_AT)) throw invalidDeadline();
+                var values = task.getTaskLocalVariables();
+                if (!values.containsKey(FlowableTaskDeadlineListener.CALENDAR_ID)) continue;
+                if (task.getDueDate() == null || values.containsKey(PAUSED_DUE_AT)) throw invalidDeadline();
                 tasks.setVariableLocal(task.getId(), PAUSED_DUE_AT, task.getDueDate().toInstant().toString());
+                if (values.containsKey(TaskEscalationBindings.DUE_AT) && !values.containsKey(TaskEscalationBindings.ESCALATED_AT)) {
+                    if (!(values.get(TaskEscalationBindings.DUE_AT) instanceof Date due) || values.containsKey(TaskEscalationBindings.PAUSED_DUE_AT)) throw invalidDeadline();
+                    tasks.setVariableLocal(task.getId(), TaskEscalationBindings.PAUSED_DUE_AT, Date.from(due.toInstant()));
+                }
             }
             runtime.setVariable(instance.getId(), PAUSED_AT, now.toString());
             runtime.suspendProcessInstanceById(instance.getId());
@@ -144,6 +149,10 @@ public class InstanceControlService {
             for (var deadline : deadlines) {
                 tasks.setDueDate(deadline.taskId(), Date.from(deadline.dueAt()));
                 tasks.removeVariableLocal(deadline.taskId(), PAUSED_DUE_AT);
+                if (deadline.escalationDueAt() != null) {
+                    tasks.setVariableLocal(deadline.taskId(), TaskEscalationBindings.DUE_AT, Date.from(deadline.escalationDueAt()));
+                    tasks.removeVariableLocal(deadline.taskId(), TaskEscalationBindings.PAUSED_DUE_AT);
+                }
             }
             runtime.removeVariable(instance.getId(), PAUSED_AT);
             String operator = save(item, id, actor, input, ApplicationAuditPort.Action.INSTANCE_RESUME, version);
@@ -220,7 +229,14 @@ public class InstanceControlService {
             var calendar = calendars.findVersion(application.tenantId(), UUID.fromString((String) values.get(FlowableTaskDeadlineListener.CALENDAR_ID)),
                     ((Number) values.get(FlowableTaskDeadlineListener.CALENDAR_REVISION)).longValue())
                     .orElseThrow(() -> new DomainException("DEADLINE_CALENDAR_UNAVAILABLE", "Bound deadline calendar is unavailable"));
-            results.add(new Deadline(task.getId(), BusinessDeadline.resume(calendar.rules(), pausedAt, Instant.parse(original), now)));
+            Instant escalationDue = null;
+            if (values.containsKey(TaskEscalationBindings.DUE_AT) && !values.containsKey(TaskEscalationBindings.ESCALATED_AT)) {
+                if (!(values.get(TaskEscalationBindings.PAUSED_DUE_AT) instanceof Date previous)
+                        || !previous.equals(values.get(TaskEscalationBindings.DUE_AT))) throw invalidDeadline();
+                // 审批已超时也可能仍有升级等待时间，必须独立接续，不能从恢复后的审批期限重算全额。
+                escalationDue = BusinessDeadline.resume(calendar.rules(), pausedAt, previous.toInstant(), now);
+            }
+            results.add(new Deadline(task.getId(), BusinessDeadline.resume(calendar.rules(), pausedAt, Instant.parse(original), now), escalationDue));
         }
         return results;
     }
@@ -273,7 +289,7 @@ public class InstanceControlService {
     /** @author owlzhangfq@gmail.com */
     private record Binding(Application application, SubmissionRound round, ProcessInstance instance) { }
     /** @author owlzhangfq@gmail.com */
-    private record Deadline(String taskId, Instant dueAt) { }
+    private record Deadline(String taskId, Instant dueAt, Instant escalationDueAt) { }
     /** @author owlzhangfq@gmail.com */
     public enum State { RUNNING, PAUSED, ENDED, UNAVAILABLE }
     /** @author owlzhangfq@gmail.com */

@@ -41,7 +41,8 @@ public class DefinitionInitiatorRequirements {
 
         private boolean required(Graph graph, int depth, Set<Reference> ancestors) {
             if (graph.nodes().stream().anyMatch(node -> LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule"))
-                    || LocalOrganizationDirectory.isContextualRule(node.properties().get("recipientRule")))) return true;
+                    || LocalOrganizationDirectory.isContextualRule(node.properties().get("recipientRule"))
+                    || LocalOrganizationDirectory.isContextualRule(node.properties().get(TaskEscalationPolicy.RECIPIENT_RULE)))) return true;
             for (var node : graph.nodes()) {
                 if (node.type() != NodeType.SUB_PROCESS) continue;
                 if (++calls > SubprocessPolicy.MAX_CALL_NODES) {

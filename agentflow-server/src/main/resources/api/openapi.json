@@ -43922,6 +43922,7 @@
               "TASK_DELEGATED",
               "TASK_RESOLVED",
               "TASK_OVERDUE",
+              "TASK_ESCALATED",
               "APPLICATION_COPIED",
               "EXPENSE_ADJUSTED",
               "TASK_COUNTERSIGN_REMOVED",

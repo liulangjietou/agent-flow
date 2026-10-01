@@ -2,8 +2,8 @@ import type { GraphNode } from './api'
 import { readSubprocessBinding, writeSubprocessBinding, type SubprocessBinding } from './subprocessDesigner.js'
 
 /** 节点期限保留原始文本，缺项与非法旧配置由校验明确报告。@author owlzhangfq@gmail.com */
-export interface DesignerDeadline { calendarId?: string; calendarRevision?: string; workingMinutes?: string }
-const deadlineProperties = { calendarId: 'deadlineCalendarId', calendarRevision: 'deadlineCalendarRevision', workingMinutes: 'deadlineWorkingMinutes' } as const
+export interface DesignerDeadline { calendarId?: string; calendarRevision?: string; workingMinutes?: string; escalationWorkingMinutes?: string; escalationRecipientRule?: string }
+const deadlineProperties = { calendarId: 'deadlineCalendarId', calendarRevision: 'deadlineCalendarRevision', workingMinutes: 'deadlineWorkingMinutes', escalationWorkingMinutes: 'escalationWorkingMinutes', escalationRecipientRule: 'escalationRecipientRule' } as const
 
 /** 两种设计视图读取相同属性，保留非法原文供校验且不共享可变引用。 */
 export function readDesignerDeadline(properties: Record<string, string>): DesignerDeadline | undefined {

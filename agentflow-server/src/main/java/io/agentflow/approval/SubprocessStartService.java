@@ -73,7 +73,8 @@ public class SubprocessStartService {
         events.requireAvailable(parent.tenantId(), bound.graph());
         if (parent.initiatorContext() == null && bound.graph().nodes().stream().anyMatch(childNode ->
                 LocalOrganizationDirectory.isContextualRule(childNode.properties().get("assigneeRule"))
-                || LocalOrganizationDirectory.isContextualRule(childNode.properties().get("recipientRule")))) {
+                || LocalOrganizationDirectory.isContextualRule(childNode.properties().get("recipientRule"))
+                || LocalOrganizationDirectory.isContextualRule(childNode.properties().get(io.agentflow.definition.TaskEscalationPolicy.RECIPIENT_RULE)))) {
             throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "The subprocess requires the original initiator appointment");
         }
         var childId = UUID.randomUUID(); var at = Instant.now();

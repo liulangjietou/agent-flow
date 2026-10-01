@@ -15,6 +15,20 @@ const source = () => ({ key: 'source-key', name: '原流程', graph: structuredC
 const file = value => ({ size: new TextEncoder().encode(value).length, text: async () => value })
 const envelope = () => JSON.parse(serializePortableTemplate(source()))
 
+test('升级模板完整保留明确规则，缺少目标收件人可先导入，非法规则仍阻断', async () => {
+  const value = source()
+  Object.assign(value.graph.nodes[1].properties, { deadlineCalendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688',
+    deadlineCalendarRevision: '1', deadlineWorkingMinutes: '480', escalationWorkingMinutes: '30', escalationRecipientRule: 'user:finance' })
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), value)
+  let errors = ['ESCALATION_RECIPIENT_UNAVAILABLE:review']
+  const review = new PortableTemplateReview(async () => ({ errors }))
+  await review.read(file(serializePortableTemplate(value))); await review.check()
+  assert.equal(review.canImport, true)
+  assert.deepEqual(review.value.graph.nodes[1].properties, value.graph.nodes[1].properties)
+  errors = ['ESCALATION_RULE_INVALID:review']; await review.check()
+  assert.equal(review.canImport, false)
+})
+
 test('子流程模板只保留固定引用和显式输入，拒绝路径、原型及引擎扩展', () => {
   const value = source()
   value.graph.nodes[1] = { id: 'review', name: '子审批', type: 'SUB_PROCESS', properties: {

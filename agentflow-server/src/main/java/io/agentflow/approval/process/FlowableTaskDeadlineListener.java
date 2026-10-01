@@ -5,6 +5,7 @@ import io.agentflow.calendar.BusinessDeadline;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.TaskDeadlinePolicy;
+import io.agentflow.definition.TaskEscalationPolicy;
 import org.flowable.common.engine.api.delegate.event.FlowableEngineEntityEvent;
 import org.flowable.common.engine.api.delegate.event.FlowableEngineEventType;
 import org.flowable.common.engine.api.delegate.event.FlowableEvent;
@@ -33,13 +34,15 @@ public class FlowableTaskDeadlineListener implements FlowableEventListener {
     private final DefinitionDraftRepository definitions;
     private final BusinessCalendarRepository calendars;
     private final ObjectProvider<RepositoryService> engine;
+    private final TaskEscalationBindings escalations;
 
     /** 引擎服务延迟获取，配置监听器时不反向初始化引擎。 */
     public FlowableTaskDeadlineListener(DefinitionDraftRepository definitions, BusinessCalendarRepository calendars,
-                                       ObjectProvider<RepositoryService> engine) {
+                                       ObjectProvider<RepositoryService> engine, TaskEscalationBindings escalations) {
         this.definitions = definitions;
         this.calendars = calendars;
         this.engine = engine;
+        this.escalations = escalations;
     }
 
     /** 每张新任务独立起算，会签和并行分支也保留各自的创建时刻。 */
@@ -54,7 +57,7 @@ public class FlowableTaskDeadlineListener implements FlowableEventListener {
         var definition = definitions.findPublished(tenantId, bound.getKey(), bound.getVersion());
         if (definition.isEmpty()) return;
         definition.get().graph().nodes().stream().filter(node -> node.id().equals(task.getTaskDefinitionKey()))
-                .findFirst().flatMap(node -> TaskDeadlinePolicy.fromProperties(node.properties())).ifPresent(policy -> {
+                .findFirst().ifPresent(node -> TaskDeadlinePolicy.fromProperties(node.properties()).ifPresent(policy -> {
                     var calendar = calendars.findVersion(tenantId, policy.calendarId(), policy.calendarRevision())
                             .orElseThrow(() -> new DomainException("DEADLINE_CALENDAR_UNAVAILABLE", "Bound deadline calendar is unavailable"));
                     var deadline = BusinessDeadline.calculate(calendar.rules(), task.getCreateTime().toInstant(), policy.workingMinutes());
@@ -63,7 +66,9 @@ public class FlowableTaskDeadlineListener implements FlowableEventListener {
                     task.setVariableLocal(CALENDAR_REVISION, policy.calendarRevision());
                     task.setVariableLocal(WORKING_MINUTES, policy.workingMinutes());
                     task.setVariableLocal(STARTED_AT, deadline.startAt().toString());
-                });
+                    TaskEscalationPolicy.fromProperties(node.properties()).ifPresent(escalation ->
+                            escalations.bind(task, tenantId, escalation, calendar.rules(), deadline.dueAt()));
+                }));
     }
 
     /** 计算失败须回滚业务动作，不能静默创建缺少已配置期限的任务。 */

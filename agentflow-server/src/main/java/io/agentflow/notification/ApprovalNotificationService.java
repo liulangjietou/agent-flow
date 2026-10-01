@@ -175,6 +175,17 @@ public class ApprovalNotificationService {
         return true;
     }
 
+    /** 升级对象只收到协调提醒；不新增任务参与、抄送或表单授权事实。 */
+    public void escalated(Application application, String taskId, String nodeName, java.util.List<String> recipients, Instant occurredAt) {
+        String eventKey = "task-escalated:" + taskId;
+        for (String recipient : recipients) {
+            UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + recipient).getBytes(StandardCharsets.UTF_8));
+            inbox.append(eventKey, new InboxMessage(id, application.tenantId(), recipient, application.id(), application.title(),
+                    application.businessNo(), Kind.TASK_ESCALATED, "system:sla", taskId, nodeName, application.roundNo(), occurredAt, null,
+                    "审批任务持续超时，请协调原审批人员处理。升级提醒不增加申请读取或审批权限。"));
+        }
+    }
+
     private void send(Application application, String actor, String recipient, Kind kind, String taskId, String nodeName) {
         String eventKey = application.id() + ":" + application.version() + ":" + kind + ":" + (taskId == null ? "" : taskId);
         UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + recipient).getBytes(StandardCharsets.UTF_8));
