@@ -23,6 +23,7 @@ const actionOptions = [
   ['INSTANCE_PAUSE', '暂停审批'], ['INSTANCE_RESUME', '恢复审批'],
   ['TIMER_ELAPSED', '定时等待已到期'], ['TIMER_FAILED', '定时推进失败'], ['TIMER_RETRY', '重试原定时等待'],
   ['EVENT_RECEIVED', '事件已推进等待'],
+  ['SUBPROCESS_COMPLETED', '子审批完成并接续'],
   ['ADD_SIGNER', '增加会签人'], ['REMOVE_SIGNER', '移除会签人'],
   ['RETURN', '退回申请'], ['REJECT', '驳回申请'], ['APPROVE', '审批通过']
 ]

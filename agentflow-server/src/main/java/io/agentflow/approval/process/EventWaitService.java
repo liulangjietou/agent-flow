@@ -1,6 +1,7 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.ApprovalApplicationFacade;
+import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -13,7 +14,6 @@ import io.agentflow.definition.DefinitionModels;
 import io.agentflow.definition.EventWaitPolicy;
 import io.agentflow.event.EventContractRepository;
 import io.agentflow.notification.ApprovalNotificationService;
-import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.eventsubscription.api.EventSubscription;
 import org.springframework.stereotype.Service;
@@ -33,23 +33,25 @@ import java.util.UUID;
 public class EventWaitService {
     private static final String MESSAGE = "message";
     private final RuntimeService runtime;
-    private final HistoryService history;
     private final ApplicationRepository applications;
     private final SubmissionRoundRepository rounds;
     private final DefinitionDraftRepository definitions;
     private final EventContractRepository contracts;
     private final ApprovalApplicationFacade reads;
     private final ApprovalCompletionService completion;
+    private final SubprocessProgressService subprocesses;
     private final ApprovalNotificationService notifications;
     private final ApplicationAuditPort audit;
 
     /** 复用原审批的业务收尾与事务通知，不建立第二套引擎等待状态机。 */
-    public EventWaitService(RuntimeService runtime, HistoryService history, ApplicationRepository applications,
+    public EventWaitService(RuntimeService runtime, ApplicationRepository applications,
             SubmissionRoundRepository rounds, DefinitionDraftRepository definitions, EventContractRepository contracts,
-            ApprovalApplicationFacade reads, ApprovalCompletionService completion, ApprovalNotificationService notifications, ApplicationAuditPort audit) {
-        this.runtime = runtime; this.history = history; this.applications = applications; this.rounds = rounds;
+            ApprovalApplicationFacade reads, ApprovalCompletionService completion, ApprovalNotificationService notifications, ApplicationAuditPort audit,
+            SubprocessProgressService subprocesses) {
+        this.runtime = runtime; this.applications = applications; this.rounds = rounds;
         this.definitions = definitions; this.contracts = contracts; this.reads = reads; this.completion = completion;
         this.notifications = notifications; this.audit = audit;
+        this.subprocesses = subprocesses;
     }
 
     /** 由可信收件编排调用；消息不携带流程变量，不能覆盖表单、审批结果或财务状态。 */
@@ -57,7 +59,9 @@ public class EventWaitService {
     public Outcome advance(Command command) {
         var initial = applications.findById(command.tenantId(), command.applicationId()).orElse(null);
         if (initial == null) return Outcome.STALE;
-        var application = completion.lock(initial);
+        var locked = completion.lockForProgress(initial);
+        if (locked.ancestors() == SubprocessExecutionLocks.AncestorState.STALE) return Outcome.STALE;
+        var application = locked.application();
         var binding = binding(application, command.roundNo(), command.waitId());
         if (binding == null) return Outcome.STALE;
         var policy = EventWaitPolicy.fromProperties(binding.node().properties());
@@ -68,14 +72,14 @@ public class EventWaitService {
         if (!contract.sourceKey().equals(command.sourceKey()) || !contract.eventType().equals(command.eventType())
                 || contract.envelopeVersion() != command.envelopeVersion()) return Outcome.MISMATCH;
         if (!referenced.availability().enabled()) return Outcome.CONTRACT_UNAVAILABLE;
-        if (binding.suspended()) return Outcome.PAUSED;
+        if (binding.suspended() || locked.ancestors() == SubprocessExecutionLocks.AncestorState.PAUSED) return Outcome.PAUSED;
+        var before = subprocesses.before(application);
         long previous = application.version(); application.recordRuntimeAction(previous);
         var previousTasks = notifications.pendingTaskIds(application);
         // 明确 executionId 是必需参数；不使用广播 API，也不向原生事件传递外部正文。
         runtime.messageEventReceived(binding.subscription().getEventName(), binding.subscription().getExecutionId());
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(binding.round().processInstanceId()).singleResult() == null;
-        if (ended && history.createHistoricTaskInstanceQuery().processInstanceId(binding.round().processInstanceId()).finished().list().stream()
-                .noneMatch(task -> task.getDeleteReason() == null && task.getAssignee() != null)) {
+        if (ended && !subprocesses.hasApprovalEvidence(application, binding.round().processInstanceId())) {
             throw new DomainException("EVENT_REQUIRES_APPROVAL", "An event wait cannot substitute for human approval");
         }
         String actor = "system:event:" + contract.sourceKey();
@@ -83,6 +87,7 @@ public class EventWaitService {
         completion.persistProgress(application, previous, binding.round().processInstanceId(), ended, actor, reason);
         audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(), application.roundNo(),
                 binding.round().processInstanceId(), actor, ApplicationAuditPort.Action.EVENT_RECEIVED, ApplicationStatus.IN_APPROVAL, application.status(), reason));
+        subprocesses.afterAdvance(before, application);
         notifications.processAdvanced(application, actor, null, binding.node().name(), previousTasks);
         return Outcome.ADVANCED;
     }

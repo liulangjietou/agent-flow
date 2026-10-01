@@ -1,6 +1,7 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.ApplicationStatus;
+import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.notification.ApprovalNotificationService;
 import org.flowable.engine.TaskService;
@@ -25,14 +26,16 @@ public class FlowableTaskDeadlineReminders {
     private final TaskService tasks;
     private final ApplicationRepository applications;
     private final ApprovalNotificationService notifications;
+    private final SubprocessExecutionLocks executionLocks;
 
     /** 复用原审批事务和站内通知，不创建第二套任务状态。 */
     public FlowableTaskDeadlineReminders(JdbcTemplate jdbc, TaskService tasks, ApplicationRepository applications,
-                                         ApprovalNotificationService notifications) {
+                                         ApprovalNotificationService notifications, SubprocessExecutionLocks executionLocks) {
         this.jdbc = jdbc;
         this.tasks = tasks;
         this.applications = applications;
         this.notifications = notifications;
+        this.executionLocks = executionLocks;
     }
 
     /** 游标按到期时刻和任务标识推进，无接收人的任务不会阻塞其他任务。 */
@@ -67,8 +70,11 @@ public class FlowableTaskDeadlineReminders {
         String tenantId = (String) variables.get("tenantId");
         if (tenantId == null || !(variables.get("applicationId") instanceof String id)) return false;
         // 与审批、暂停和恢复共用申请优先的锁顺序，锁后重新检查任务及其期限。
-        var application = applications.lockById(tenantId, UUID.fromString(id)).orElse(null);
-        if (application == null) return false;
+        var found = applications.findById(tenantId, UUID.fromString(id)).orElse(null);
+        if (found == null) return false;
+        var locked = executionLocks.lockPath(found);
+        if (locked.ancestors() != SubprocessExecutionLocks.AncestorState.ACTIVE) return false;
+        var application = locked.application();
         if (jdbc.queryForList("SELECT ID_ FROM ACT_RU_TASK WHERE ID_=? FOR UPDATE", String.class, taskId).isEmpty()) return false;
         var task = tasks.createTaskQuery().taskId(taskId).active().includeProcessVariables().includeTaskLocalVariables().singleResult();
         if (task == null || task.getDueDate() == null || task.getDueDate().toInstant().isAfter(now)

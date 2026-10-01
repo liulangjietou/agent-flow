@@ -1,7 +1,7 @@
 package io.agentflow.approval;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.agentflow.approval.service.ProcessRuntimePort;
+import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
@@ -31,7 +31,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import static io.agentflow.definition.DefinitionModels.*;
 import static io.agentflow.support.MutationRequests.post;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,7 +50,7 @@ class ParallelApprovalIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired TaskService tasks;
     @Autowired JdbcTemplate jdbc;
-    @MockitoSpyBean ProcessRuntimePort runtime;
+    @MockitoSpyBean ApplicationRepository applications;
 
     @ParameterizedTest
     @ValueSource(strings = {"5", "20"})
@@ -139,7 +138,10 @@ class ParallelApprovalIntegrationTest {
         String id = submitted(false);
         Task manager = task(id, "manager"), finance = task(id, "finance");
         CyclicBarrier barrier = new CyclicBarrier(2);
-        doAnswer(invocation -> { barrier.await(5, TimeUnit.SECONDS); return invocation.callRealMethod(); }).when(runtime).complete(any());
+        ApplicationRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(applications);
+        // 两个分支先到达申请锁，再竞争同一业务版本；持锁后不能等待另一分支进入引擎。
+        doAnswer(invocation -> { barrier.await(5, TimeUnit.SECONDS); return invocation.callRealMethod(); })
+                .when(target).lockById("demo", UUID.fromString(id));
         var executor = Executors.newFixedThreadPool(2);
         try {
             var first = executor.submit(() -> act(manager, "APPROVE", 2).andReturn().getResponse().getStatus());
@@ -148,7 +150,7 @@ class ParallelApprovalIntegrationTest {
         } finally {
             executor.shutdownNow();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
-            doCallRealMethod().when(runtime).complete(any());
+            doCallRealMethod().when(target).lockById("demo", UUID.fromString(id));
         }
         assertThat(pending(id)).hasSize(1);
         act(pending(id).get(0), "APPROVE", 3).andExpect(status().isOk());

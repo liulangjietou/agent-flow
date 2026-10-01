@@ -2,6 +2,7 @@ package io.agentflow.approval.process;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.approval.ApprovalApplicationFacade;
+import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -49,15 +50,17 @@ public class InstanceControlService {
     private final ApprovalNotificationService notifications;
     private final CurrentActor actors;
     private final ProcessEngine engine;
+    private final SubprocessExecutionLocks executionLocks;
 
     /** 只协调已绑定的原轮次，不提供替换审批人、跳节点或形成业务结论的能力。 */
     public InstanceControlService(ApplicationRepository applications, SubmissionRoundRepository rounds,
             ApprovalApplicationFacade reads, RuntimeService runtime, TaskService tasks,
             BusinessCalendarRepository calendars, ApplicationAuditPort audit, ApprovalNotificationService notifications,
-            CurrentActor actors, ProcessEngine engine) {
+            CurrentActor actors, ProcessEngine engine, SubprocessExecutionLocks executionLocks) {
         this.applications = applications; this.rounds = rounds; this.reads = reads; this.runtime = runtime;
         this.tasks = tasks; this.calendars = calendars; this.audit = audit; this.notifications = notifications;
         this.actors = actors; this.engine = engine;
+        this.executionLocks = executionLocks;
     }
 
     /** 幂等回放仍检查当前管理员身份，不能借旧回执绕过角色撤销。 */
@@ -73,7 +76,8 @@ public class InstanceControlService {
         if (!bound(application, round, instance)) return view(application, roundNo, State.UNAVAILABLE, null, false);
         Instant pausedAt = pauseTime(instance);
         return view(application, roundNo, instance.isSuspended() ? State.PAUSED : State.RUNNING, pausedAt,
-                application.status() == ApplicationStatus.IN_APPROVAL && roundNo == application.roundNo() && actors.actor().hasRole("ADMIN"));
+                application.status() == ApplicationStatus.IN_APPROVAL && roundNo == application.roundNo() && actors.actor().hasRole("ADMIN")
+                        && executionLocks.ancestry(application.tenantId(), id).isEmpty());
     }
 
     /** 暂停保持业务在审及原占用，不创建审批意见，也不改写原生定时等待的到期时刻。 */
@@ -136,7 +140,9 @@ public class InstanceControlService {
     }
 
     private Binding lock(Actor actor, UUID id, int roundNo) {
-        var application = applications.lockById(actor.tenantId(), id).orElseThrow(InstanceControlService::unavailable);
+        var initial = applications.findById(actor.tenantId(), id).orElseThrow(InstanceControlService::unavailable);
+        executionLocks.requireRoot(initial);
+        var application = executionLocks.lock(initial);
         var round = rounds.findByRound(actor.tenantId(), id, roundNo).orElseThrow(InstanceControlService::unavailable);
         var instance = instance(round.processInstanceId());
         if (application.status() != ApplicationStatus.IN_APPROVAL || application.roundNo() != roundNo

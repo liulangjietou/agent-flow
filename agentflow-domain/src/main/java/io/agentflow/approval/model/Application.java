@@ -269,7 +269,8 @@ public final class Application {
         requireInApproval();
     }
 
-    private void checkVersion(long expectedVersion) {
+    /** 取锁后先核对原操作版本，避免并发结束的任务被误报为从未存在。 */
+    public void checkVersion(long expectedVersion) {
         if (version != expectedVersion) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");
         }

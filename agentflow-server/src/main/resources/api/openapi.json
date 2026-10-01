@@ -6553,7 +6553,8 @@
                 "TIMER_RETRY",
                 "INSTANCE_PAUSE",
                 "INSTANCE_RESUME",
-                "EVENT_RECEIVED"
+                "EVENT_RECEIVED",
+                "SUBPROCESS_COMPLETED"
               ]
             }
           },
@@ -9932,7 +9933,8 @@
                 "TIMER_RETRY",
                 "INSTANCE_PAUSE",
                 "INSTANCE_RESUME",
-                "EVENT_RECEIVED"
+                "EVENT_RECEIVED",
+                "SUBPROCESS_COMPLETED"
               ]
             }
           },
@@ -11459,7 +11461,8 @@
                 "TIMER_RETRY",
                 "INSTANCE_PAUSE",
                 "INSTANCE_RESUME",
-                "EVENT_RECEIVED"
+                "EVENT_RECEIVED",
+                "SUBPROCESS_COMPLETED"
               ]
             }
           },

@@ -3,6 +3,7 @@ package io.agentflow.approval.process;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.CountersignMembership;
 import io.agentflow.approval.model.SubmissionRound;
@@ -42,13 +43,15 @@ public class CountersignMembershipService {
     private final TaskRecipientDirectory recipients;
     private final TaskAuditPort audit;
     private final ApprovalNotificationService notifications;
+    private final SubprocessExecutionLocks executionLocks;
 
     /** 跨聚合和外部事实由应用层编排，成员自身规则仍由领域模型判断。 */
     public CountersignMembershipService(CurrentActor actors, FlowableTaskAuthorization authorization,
             ApplicationRepository applications, SubmissionRoundRepository rounds, FlowableCountersignRuntime runtime,
-            TaskRecipientDirectory recipients, TaskAuditPort audit, ApprovalNotificationService notifications) {
+            TaskRecipientDirectory recipients, TaskAuditPort audit, ApprovalNotificationService notifications, SubprocessExecutionLocks executionLocks) {
         this.actors = actors; this.authorization = authorization; this.applications = applications; this.rounds = rounds;
         this.runtime = runtime; this.recipients = recipients; this.audit = audit; this.notifications = notifications;
+        this.executionLocks = executionLocks;
     }
 
     /** 成功回执重放也要求当前资格，不能要求已经结束的原任务仍然存活。 */
@@ -92,7 +95,7 @@ public class CountersignMembershipService {
         Actor actor = actors.actor();
         Task initial = authorization.require(taskId, actor);
         Application found = authorization.application(actor, initial);
-        Application application = applications.lockById(actor.tenantId(), found.id()).orElseThrow(CountersignMembershipService::changed);
+        Application application = executionLocks.lock(found);
         Task task = authorization.require(taskId, actor);
         requireBinding(application, task);
         var state = runtime.read(task).membership();

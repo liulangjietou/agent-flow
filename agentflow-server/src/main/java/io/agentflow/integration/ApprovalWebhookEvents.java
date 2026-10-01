@@ -38,6 +38,7 @@ public class ApprovalWebhookEvents {
             case INSTANCE_PAUSE -> "ApplicationPaused";
             case INSTANCE_RESUME -> "ApplicationResumed";
             case EVENT_RECEIVED -> "EventWaitReceived";
+            case SUBPROCESS_COMPLETED -> "SubprocessCompleted";
             default -> null;
         };
         if (type == null) return;

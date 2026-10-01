@@ -2,6 +2,7 @@ package io.agentflow.approval.process;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.approval.ApprovalApplicationFacade;
+import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -18,7 +19,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import org.flowable.engine.HistoryService;
 import org.flowable.engine.ManagementService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.impl.util.CommandContextUtil;
@@ -46,27 +46,28 @@ public class TimerWaitService {
     private static final String EXECUTION_FAILED = "TIMER_EXECUTION_FAILED";
     private final ManagementService jobs;
     private final RuntimeService runtime;
-    private final HistoryService history;
     private final ApplicationRepository applications;
     private final SubmissionRoundRepository rounds;
     private final DefinitionDraftRepository definitions;
     private final ApprovalApplicationFacade reads;
     private final ApprovalCompletionService completion;
+    private final SubprocessProgressService subprocesses;
     private final ApprovalNotificationService notifications;
     private final ApplicationAuditPort audit;
     private final CurrentActor actors;
     private final JdbcTemplate jdbc;
 
     /** 原生异步执行器不得绕过申请事务；等待调度始终经本用例推进。 */
-    public TimerWaitService(ManagementService jobs, RuntimeService runtime, HistoryService history,
+    public TimerWaitService(ManagementService jobs, RuntimeService runtime,
             ApplicationRepository applications, SubmissionRoundRepository rounds, DefinitionDraftRepository definitions,
             ApprovalApplicationFacade reads, ApprovalCompletionService completion, ApprovalNotificationService notifications,
-            ApplicationAuditPort audit, CurrentActor actors, JdbcTemplate jdbc,
+            ApplicationAuditPort audit, CurrentActor actors, JdbcTemplate jdbc, SubprocessProgressService subprocesses,
             @Value("${flowable.async-executor-activate:false}") boolean nativeAsync) {
         if (nativeAsync) throw new IllegalStateException("Timer waits require the platform dispatcher and flowable.async-executor-activate=false");
-        this.jobs = jobs; this.runtime = runtime; this.history = history; this.applications = applications;
+        this.jobs = jobs; this.runtime = runtime; this.applications = applications;
         this.rounds = rounds; this.definitions = definitions; this.reads = reads; this.completion = completion;
         this.notifications = notifications; this.audit = audit; this.actors = actors; this.jdbc = jdbc;
+        this.subprocesses = subprocesses;
     }
 
     /** 到期与标识共同分页，无关或不可执行的引擎任务不会阻塞后续页面。 */
@@ -171,7 +172,9 @@ public class TimerWaitService {
         try { found = applications.findById(tenant, UUID.fromString(id)).orElse(null); }
         catch (IllegalArgumentException invalid) { return null; }
         if (found == null) return null;
-        var application = completion.lock(found);
+        var locked = completion.lockForProgress(found);
+        if (locked.ancestors() == SubprocessExecutionLocks.AncestorState.STALE) return null;
+        var application = locked.application();
         var instance = runtime.createProcessInstanceQuery().processInstanceId(job.getProcessInstanceId()).includeProcessVariables().singleResult();
         var round = rounds.findByRound(tenant, application.id(), application.roundNo()).orElse(null);
         if (instance == null || application.status() != ApplicationStatus.IN_APPROVAL || round == null
@@ -184,21 +187,23 @@ public class TimerWaitService {
                 .filter(n -> n.id().equals(job.getElementId()) && n.type() == DefinitionModels.NodeType.TIMER_WAIT).findFirst().orElse(null);
         var execution = runtime.createExecutionQuery().executionId(job.getExecutionId()).singleResult();
         if (node == null || execution == null || !node.id().equals(execution.getActivityId())) return null;
-        return new Binding(application, round, node, instance.isSuspended());
+        return new Binding(application, round, node, instance.isSuspended()
+                || locked.ancestors() == SubprocessExecutionLocks.AncestorState.PAUSED);
     }
 
     private Receipt advance(Binding binding, Job job, boolean retry, long expectedVersion, String actor, String reason) {
+        var before = subprocesses.before(binding.application());
         var application = binding.application(); application.recordRuntimeAction(expectedVersion);
         var previousTasks = notifications.pendingTaskIds(application);
         var executable = retry ? jobs.moveDeadLetterJobToExecutableJob(job.getId(), 1) : jobs.moveTimerToExecutableJob(job.getId());
         jobs.executeJob(executable.getId());
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(binding.round().processInstanceId()).singleResult() == null;
-        if (ended && history.createHistoricTaskInstanceQuery().processInstanceId(binding.round().processInstanceId()).finished().list().stream()
-                .noneMatch(task -> task.getDeleteReason() == null && task.getAssignee() != null)) {
+        if (ended && !subprocesses.hasApprovalEvidence(application, binding.round().processInstanceId())) {
             throw new DomainException("TIMER_REQUIRES_APPROVAL", "A timer wait cannot substitute for human approval");
         }
         completion.persistProgress(application, expectedVersion, binding.round().processInstanceId(), ended, actor, reason);
         record(binding, actor, retry ? ApplicationAuditPort.Action.TIMER_RETRY : ApplicationAuditPort.Action.TIMER_ELAPSED, reason);
+        subprocesses.afterAdvance(before, application);
         notifications.processAdvanced(application, actor, null, binding.node().name(), previousTasks);
         return new Receipt(application.id(), application.roundNo(), application.version(), job.getId(), binding.node().id(), application.status());
     }

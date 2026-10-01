@@ -46,6 +46,7 @@ public class FlowableTaskFacade {
     private final ExpenseApprovalService expenses;
     private final ExpenseReleaseService expenseReleases;
     private final ApprovalCompletionService completion;
+    private final SubprocessProgressService subprocesses;
     private final ProcurementPayableReservations procurementReservations;
 
     /** 创建任务服务。 */
@@ -54,7 +55,8 @@ public class FlowableTaskFacade {
                               TaskAuditPort auditPort, SubmissionRoundRepository rounds, TaskRecipientDirectory recipients,
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
                               ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases,
-                              ProcurementPayableReservations procurementReservations, ApprovalCompletionService completion) {
+                              ProcurementPayableReservations procurementReservations, ApprovalCompletionService completion,
+                              SubprocessProgressService subprocesses) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -65,6 +67,7 @@ public class FlowableTaskFacade {
         this.notifications = notifications;
         this.authorization = authorization; this.expenses = expenses; this.expenseReleases = expenseReleases;
         this.completion = completion;
+        this.subprocesses = subprocesses;
         this.procurementReservations = procurementReservations;
     }
 
@@ -131,9 +134,9 @@ public class FlowableTaskFacade {
         }
         Task task = authorization.require(taskId, actor);
         Application application = authorization.application(actor, task);
-        completion.lock(application);
+        application = completion.lock(application);
+        application.checkVersion(expectedVersion);
         task = authorization.require(taskId, actor);
-        application = authorization.application(actor, task);
         ApplicationStatus previousStatus = application.status();
         TaskAction normalized = TaskAction.parse(action);
         delegation(task).requireAction(normalized);
@@ -206,6 +209,7 @@ public class FlowableTaskFacade {
             }
             case APPROVE -> {
                 expenses.requireApproval(application, task);
+                var before = subprocesses.before(application);
                 application.recordTaskAction(expectedVersion);
                 recordDecisionAssignee(task, actor);
                 ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
@@ -213,6 +217,7 @@ public class FlowableTaskFacade {
                 completion.persistProgress(application, expectedVersion, task.getProcessInstanceId(),
                         completed.processEnded(), actor.userId(), comment);
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
+                subprocesses.afterAdvance(before, application);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
         }

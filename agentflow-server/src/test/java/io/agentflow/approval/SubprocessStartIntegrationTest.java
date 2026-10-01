@@ -5,6 +5,9 @@ import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.model.SubprocessCall;
 import io.agentflow.approval.process.FlowableTaskFacade;
+import io.agentflow.approval.process.TimerWaitService;
+import io.agentflow.approval.process.EventWaitService;
+import io.agentflow.approval.process.InstanceControlService;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.repository.SubprocessCallRepository;
@@ -18,6 +21,9 @@ import io.agentflow.definition.DefinitionAvailabilityService;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.SubprocessPolicy;
 import io.agentflow.form.FormSchema;
+import io.agentflow.event.EventContractService;
+import io.agentflow.notification.InboxMessage;
+import io.agentflow.notification.InboxRepository;
 import io.agentflow.organization.LocalOrganizationDirectory;
 import io.agentflow.organization.OrganizationService;
 import io.agentflow.organization.OrganizationUnit;
@@ -31,10 +37,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
+import org.flowable.engine.ManagementService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,10 +61,14 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 
 /**
- * 实际申请提交和任务办理驱动原生调用；父子结论协调仍单独验收，当前发布入口保持关闭。
+ * 实际提交、人工批准及等待驱动父子调用；覆盖正常接续和同事务结论，发布入口保持关闭。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.sla.reminders-enabled=false"})
+@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.sla.reminders-enabled=false",
+        "agentflow.timers.enabled=false",
+        "agentflow.webhooks.worker-enabled=false", "agentflow.webhooks.targets.subprocess.tenant-id=demo",
+        "agentflow.webhooks.targets.subprocess.label=子流程合成验收", "agentflow.webhooks.targets.subprocess.url=https://example.invalid/webhook",
+        "agentflow.webhooks.targets.subprocess.enabled=true", "agentflow.webhooks.targets.subprocess.signing-secret=whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 class SubprocessStartIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN"));
     private static final Path FILES = Path.of("/fyoung/tmp/agentflow-subprocess-start-" + UUID.randomUUID());
@@ -75,7 +89,13 @@ class SubprocessStartIntegrationTest {
     @Autowired AttachmentService attachments;
     @Autowired JdbcAttachmentRepository files;
     @Autowired JdbcTemplate jdbc;
+    @Autowired TimerWaitService timers;
+    @Autowired EventWaitService events;
+    @Autowired EventContractService contracts;
+    @Autowired InstanceControlService instances;
+    @Autowired ManagementService jobs;
     @MockitoSpyBean SubprocessStartService starts;
+    @MockitoSpyBean InboxRepository inbox;
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
@@ -279,6 +299,232 @@ class SubprocessStartIntegrationTest {
     }
 
     @Test
+    void childApprovalAdvancesTheParentVersionAndNotifiesItsNewHumanTask() {
+        var child = child(key(), schema("total"), "user:manager");
+        var parent = parent(child, schema("amount"), Map.of("total", "amount"), false, false);
+        var application = create(parent, Map.of("amount", "9"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "子审批通过", null, 2L));
+        var continued = repository.findById("demo", application.id()).orElseThrow();
+        assertThat(continued.status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(continued.version()).isEqualTo(3);
+        assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(tasks.createTaskQuery().processInstanceId(call.parentProcessInstanceId()).singleResult().getTaskDefinitionKey()).isEqualTo("after");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='SUBPROCESS_COMPLETED' AND actor_id=?", Integer.class,
+                application.id().toString(), SubprocessStartService.SYSTEM_ACTOR)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='TASK_PENDING'", Integer.class,
+                application.id().toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='TASK_PENDING'", Integer.class,
+                call.childApplicationId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void childApprovalCompletesAllEndedAncestorsWithoutInventingParentHumanDecisions() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var middle = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var root = parent(middle, schema("rootAmount"), Map.of("amount", "rootAmount"), false, false, nativeId(middle), false);
+        var application = create(root, Map.of("rootAmount", "3"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var first = onlyCall(application.id()); var second = onlyCall(first.childApplicationId());
+        var task = tasks.createTaskQuery().processInstanceId(second.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "唯一真实人工意见", null, 2L));
+        for (UUID id : List.of(application.id(), first.childApplicationId(), second.childApplicationId())) {
+            assertThat(repository.findById("demo", id).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+            assertThat(rounds.findByRound("demo", id, 1).orElseThrow().status()).isEqualTo(SubmissionRound.Status.APPROVED);
+            assertThat(runtime.createProcessInstanceQuery().variableValueEquals("applicationId", id.toString()).count()).isZero();
+        }
+        for (UUID id : List.of(application.id(), first.childApplicationId())) {
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='SUBPROCESS_COMPLETED'", Integer.class, id.toString())).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class, id.toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='APPLICATION_APPROVED'", Integer.class, id.toString())).isEqualTo(1);
+            assertThat(jdbc.queryForList("SELECT event_type FROM webhook_delivery WHERE application_id=?", String.class, id.toString()))
+                    .containsExactlyInAnyOrder("ApplicationSubmitted", "SubprocessCompleted", "ApplicationApproved");
+        }
+    }
+
+    @Test
+    void parentNotificationFailureRollsBackTheChildDecisionEngineAndAllAncestorConclusions() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var parent = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var application = create(parent, Map.of("amount", "10"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        int auditBefore = count("audit_event"); int notificationsBefore = count("notification_inbox"); int outboxBefore = count("webhook_delivery");
+        InboxRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(inbox);
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            InboxMessage message = invocation.getArgument(1);
+            if (message.applicationId().equals(application.id()) && message.kind() == InboxMessage.Kind.APPLICATION_APPROVED) {
+                throw new IllegalStateException("Injected failure after parent notification");
+            }
+            return null;
+        }).when(target).append(anyString(), any());
+        try {
+            assertThatThrownBy(() -> as("manager", () -> actions.action(task.getId(), "APPROVE", "真实审批意见", null, 2L)))
+                    .hasStackTraceContaining("Injected failure after parent notification");
+        } finally { doCallRealMethod().when(target).append(anyString(), any()); }
+        for (UUID id : List.of(application.id(), call.childApplicationId())) {
+            assertThat(repository.findById("demo", id).orElseThrow().status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+            assertThat(repository.findById("demo", id).orElseThrow().version()).isEqualTo(2);
+            assertThat(rounds.findByRound("demo", id, 1).orElseThrow().status()).isEqualTo(SubmissionRound.Status.IN_APPROVAL);
+        }
+        assertThat(tasks.createTaskQuery().taskId(task.getId()).count()).isEqualTo(1);
+        assertThat(count("audit_event")).isEqualTo(auditBefore);
+        assertThat(count("notification_inbox")).isEqualTo(notificationsBefore);
+        assertThat(count("webhook_delivery")).isEqualTo(outboxBefore);
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "原任务重试", null, 2L));
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='SUBPROCESS_COMPLETED'", Integer.class,
+                application.id().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void parallelChildrenKeepTheParentWaitingForTheOtherRealDecision() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var parent = parallelParent(leaf);
+        var application = create(parent, Map.of("amount", "4"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var children = calls.findByParentRound("demo", application.id(), 1);
+        assertThat(children).hasSize(2);
+        var first = tasks.createTaskQuery().processInstanceId(children.get(0).childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(first.getId(), "APPROVE", "第一条实际意见", null, 2L));
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(repository.findById("demo", application.id()).orElseThrow().version()).isEqualTo(3);
+        assertThat(tasks.createTaskQuery().processInstanceId(children.get(1).childProcessInstanceId()).count()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='APPLICATION_APPROVED'", Integer.class,
+                application.id().toString())).isZero();
+    }
+
+    @Test
+    void concurrentChildDecisionsSerializeAtTheRootAndProduceOneFinalConclusion() throws Exception {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parallelParent(leaf), Map.of("amount", "5"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var children = calls.findByParentRound("demo", application.id(), 1);
+        var taskIds = children.stream().map(call -> tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult().getId()).toList();
+        var barrier = new CyclicBarrier(2); var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> { barrier.await(); return as("manager", () -> actions.action(taskIds.get(0), "APPROVE", "并行意见一", null, 2L)); });
+            var second = pool.submit(() -> { barrier.await(); return as("manager", () -> actions.action(taskIds.get(1), "APPROVE", "并行意见二", null, 2L)); });
+            first.get(20, TimeUnit.SECONDS); second.get(20, TimeUnit.SECONDS);
+        } finally { pool.shutdownNow(); }
+        var root = repository.findById("demo", application.id()).orElseThrow();
+        assertThat(root.status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(root.version()).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='SUBPROCESS_COMPLETED'", Integer.class,
+                application.id().toString())).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='APPLICATION_APPROVED'", Integer.class,
+                application.id().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void aChildTimerCompletesTheParentAfterTheChildHumanDecision() {
+        var leaf = waitingChild(NodeType.TIMER_WAIT, null);
+        var parent = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var application = create(parent, Map.of("amount", "6"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "批准后等待原到期", null, 2L));
+        var job = jobs.createTimerJobQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        actors.set(ADMIN);
+        try { instances.pause(application.id(), 1, new InstanceControlService.Input(2L, "原根流程暂停")); }
+        finally { actors.clear(); }
+        assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
+        actors.set(ADMIN);
+        try { instances.resume(application.id(), 1, new InstanceControlService.Input(3L, "原根流程恢复")); }
+        finally { actors.clear(); }
+        assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='TIMER_ELAPSED'", Integer.class,
+                call.childApplicationId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void aChildEventCompletesTheParentUsingTheSameRoundAndCannotRepeat() {
+        String contract = "sub-event-" + UUID.randomUUID();
+        contracts.publish(ADMIN, contract, 0, "子流程事件", "erp", "GoodsAccepted", "明确事件版本");
+        var leaf = waitingChild(NodeType.EVENT_WAIT, contract);
+        var parent = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
+        var application = create(parent, Map.of("amount", "7"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "批准后等待实际事件", null, 2L));
+        var subscription = runtime.createEventSubscriptionQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        var command = new EventWaitService.Command("demo", "erp", "GoodsAccepted", 1, UUID.randomUUID().toString(), call.childApplicationId(), 1,
+                subscription.getId(), contract, 1);
+        actors.set(ADMIN);
+        try { instances.pause(application.id(), 1, new InstanceControlService.Input(2L, "等待来源期间暂停")); }
+        finally { actors.clear(); }
+        assertThat(events.advance(command)).isEqualTo(EventWaitService.Outcome.PAUSED);
+        actors.set(ADMIN);
+        try { instances.resume(application.id(), 1, new InstanceControlService.Input(3L, "继续原等待")); }
+        finally { actors.clear(); }
+        assertThat(events.advance(command)).isEqualTo(EventWaitService.Outcome.ADVANCED);
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(events.advance(command)).isEqualTo(EventWaitService.Outcome.STALE);
+    }
+
+    @Test
+    void childCannotBeWithdrawnIndependentlyAndCannotAdvanceWhileItsRootIsPaused() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parent(leaf, schema("amount"), Map.of("total", "amount"), false, false), Map.of("amount", "8"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        failure(() -> as("alice", () -> applications.withdraw(call.childApplicationId(), 2, "不能拆开原调用")), "SUBPROCESS_PARENT_CONTROL_REQUIRED");
+        actors.set(ADMIN);
+        try {
+            instances.pause(application.id(), 1, new InstanceControlService.Input(2L, "暂停原根流程"));
+            assertThat(instances.read(call.childApplicationId(), 1).canPause()).isFalse();
+        } finally { actors.clear(); }
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        failure(() -> as("manager", () -> actions.action(task.getId(), "APPROVE", "根流程未恢复", null, 2L)), "SUBPROCESS_PARENT_CHANGED");
+        actors.set(ADMIN);
+        try { instances.resume(application.id(), 1, new InstanceControlService.Input(3L, "恢复原根流程")); }
+        finally { actors.clear(); }
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "恢复后办理", null, 2L));
+        assertThat(repository.findById("demo", application.id()).orElseThrow().version()).isEqualTo(5);
+    }
+
+    @Test
+    void rootTimerAfterAnApprovedChildKeepsThatRealApprovalEvidence() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parentWithTimer(leaf, false), Map.of("amount", "9"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        var call = onlyCall(application.id());
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "子审批是真实批准依据", null, 2L));
+        var job = jobs.createTimerJobQuery().processInstanceId(call.parentProcessInstanceId()).singleResult();
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class,
+                application.id().toString())).isZero();
+    }
+
+    @Test
+    void rootTimerStartsTheChildWithoutARequestActorAndSendsItsPendingNotification() {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var application = create(parentWithTimer(leaf, true), Map.of("amount", "10"));
+        as("alice", () -> applications.submit(application.id(), 1));
+        assertThat(calls.findByParentRound("demo", application.id(), 1)).isEmpty();
+        var instance = rounds.findByRound("demo", application.id(), 1).orElseThrow().processInstanceId();
+        var job = jobs.createTimerJobQuery().processInstanceId(instance).singleResult();
+        assertThat(timers.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
+        var call = onlyCall(application.id());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='TASK_PENDING'", Integer.class,
+                call.childApplicationId().toString())).isEqualTo(1);
+        var task = tasks.createTaskQuery().processInstanceId(call.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "等待后实际人工办理", null, 2L));
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.APPROVED);
+    }
+
+    @Test
     void publicDraftEntryStaysClosedUntilTheWholeRuntimeLifecycleIsImplemented() {
         var child = child(key(), schema("total"), "user:manager");
         var graph = parentGraph(new SubprocessPolicy(child.key(), 1, Map.of("total", "amount")), false);
@@ -296,14 +542,82 @@ class SubprocessStartIntegrationTest {
         return definitions.publish(new Actor(tenant, "admin", Set.of("ADMIN")), draft.id(), draft.revision(), "实际启动验收");
     }
 
+    private DefinitionDraft waitingChild(NodeType waitType, String contract) {
+        Map<String, String> settings = waitType == NodeType.TIMER_WAIT ? Map.of("timerDelaySeconds", "1")
+                : Map.of("eventContractKey", contract, "eventContractVersion", "1");
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("review", "真实人工审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")),
+                new Node("wait", "等待原始信号", waitType, settings), new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "review", ""), new Edge("b", "review", "wait", ""), new Edge("c", "wait", "end", "")));
+        var draft = definitions.create("demo", key(), "子流程等待", graph, schema("total"));
+        return definitions.publish(ADMIN, draft.id(), draft.revision(), "等待结束仍需保留真实审批依据");
+    }
+
+    private DefinitionDraft parallelParent(DefinitionDraft child) {
+        var policy = new SubprocessPolicy(child.key(), child.version(), Map.of("total", "amount"));
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("fork", "并行", NodeType.PARALLEL_GATEWAY, Map.of()),
+                new Node("one", "第一条独立子审批", NodeType.SUB_PROCESS, policy.properties()),
+                new Node("two", "第二条独立子审批", NodeType.SUB_PROCESS, policy.properties()),
+                new Node("join", "全部实际完成", NodeType.PARALLEL_GATEWAY, Map.of()), new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "fork", ""), new Edge("b", "fork", "one", ""), new Edge("c", "fork", "two", ""),
+                        new Edge("d", "one", "join", ""), new Edge("e", "two", "join", ""), new Edge("f", "join", "end", "")));
+        var draft = DefinitionDraft.create(UUID.randomUUID(), "demo", key(), "并行子审批", graph, schema("amount"));
+        drafts.save(draft); draft.publish(0, 1); drafts.save(draft);
+        String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" targetNamespace="http://agentflow.io/test">
+                  <process id="%s" isExecutable="true"><startEvent id="start"/><parallelGateway id="fork"/>
+                    <callActivity id="one" calledElement="%s" flowable:calledElementType="id" flowable:fallbackToDefaultTenant="false"/>
+                    <callActivity id="two" calledElement="%s" flowable:calledElementType="id" flowable:fallbackToDefaultTenant="false"/>
+                    <parallelGateway id="join"/><endEvent id="end"/>
+                    <sequenceFlow id="a" sourceRef="start" targetRef="fork"/><sequenceFlow id="b" sourceRef="fork" targetRef="one"/>
+                    <sequenceFlow id="c" sourceRef="fork" targetRef="two"/><sequenceFlow id="d" sourceRef="one" targetRef="join"/>
+                    <sequenceFlow id="e" sourceRef="two" targetRef="join"/><sequenceFlow id="f" sourceRef="join" targetRef="end"/>
+                  </process>
+                </definitions>
+                """.formatted(draft.key(), nativeId(child), nativeId(child));
+        engine.createDeployment().tenantId("demo").addString(draft.key() + ".bpmn20.xml", xml).deploy();
+        return draft;
+    }
+
+    private DefinitionDraft parentWithTimer(DefinitionDraft child, boolean before) {
+        var policy = new SubprocessPolicy(child.key(), child.version(), Map.of("total", "amount"));
+        var first = before ? "wait" : "call"; var second = before ? "call" : "wait";
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("call", "实际子审批", NodeType.SUB_PROCESS, policy.properties()),
+                new Node("wait", "根流程等待", NodeType.TIMER_WAIT, Map.of("timerDelaySeconds", "1")),
+                new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", first, ""), new Edge("b", first, second, ""), new Edge("c", second, "end", "")));
+        var draft = DefinitionDraft.create(UUID.randomUUID(), "demo", key(), "子流程与根等待", graph, schema("amount"));
+        drafts.save(draft); draft.publish(0, 1); drafts.save(draft);
+        String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" targetNamespace="http://agentflow.io/test">
+                  <process id="%s" isExecutable="true"><startEvent id="start"/>
+                    <callActivity id="call" calledElement="%s" flowable:calledElementType="id" flowable:fallbackToDefaultTenant="false"/>
+                    <intermediateCatchEvent id="wait"><timerEventDefinition><timeDuration>PT1S</timeDuration></timerEventDefinition></intermediateCatchEvent>
+                    <endEvent id="end"/><sequenceFlow id="a" sourceRef="start" targetRef="%s"/>
+                    <sequenceFlow id="b" sourceRef="%s" targetRef="%s"/><sequenceFlow id="c" sourceRef="%s" targetRef="end"/>
+                  </process>
+                </definitions>
+                """.formatted(draft.key(), nativeId(child), first, first, second, second);
+        engine.createDeployment().tenantId("demo").addString(draft.key() + ".bpmn20.xml", xml).deploy();
+        return draft;
+    }
+
     private DefinitionDraft parent(DefinitionDraft child, FormSchema schema, Map<String, String> inputs, boolean before, boolean inherit) {
         return parent(child, schema, inputs, before, inherit, nativeId(child));
     }
 
     /** 内部固定夹具绕过尚未开放的发布入口，运行时仍必须核对实际引擎标识和平台定义。 */
     private DefinitionDraft parent(DefinitionDraft child, FormSchema schema, Map<String, String> inputs, boolean before, boolean inherit, String calledId) {
+        return parent(child, schema, inputs, before, inherit, calledId, true);
+    }
+
+    private DefinitionDraft parent(DefinitionDraft child, FormSchema schema, Map<String, String> inputs, boolean before, boolean inherit, String calledId, boolean after) {
         var policy = new SubprocessPolicy(child.key(), child.version(), inputs);
-        var draft = DefinitionDraft.create(UUID.randomUUID(), tenant, key(), "父流程", parentGraph(policy, before), schema);
+        var draft = DefinitionDraft.create(UUID.randomUUID(), tenant, key(), "父流程", parentGraph(policy, before, after), schema);
         drafts.save(draft); draft.publish(0, 1); drafts.save(draft);
         String preceding = before ? "<userTask id=\"before\" name=\"父流程先审\" flowable:assignee=\"manager\"/><sequenceFlow id=\"toCall\" sourceRef=\"before\" targetRef=\"call\"/>" : "";
         String xml = """
@@ -312,23 +626,27 @@ class SubprocessStartIntegrationTest {
                   <process id="%s" isExecutable="true"><startEvent id="start"/>
                     <sequenceFlow id="a" sourceRef="start" targetRef="%s"/>%s
                     <callActivity id="call" calledElement="%s" flowable:calledElementType="id" flowable:inheritVariables="%s" flowable:fallbackToDefaultTenant="false"/>
-                    <sequenceFlow id="b" sourceRef="call" targetRef="after"/>
-                    <userTask id="after" name="父流程后审" flowable:assignee="finance"/>
-                    <sequenceFlow id="c" sourceRef="after" targetRef="end"/><endEvent id="end"/>
+                    %s<endEvent id="end"/>
                   </process>
                 </definitions>
-                """.formatted(draft.key(), before ? "before" : "call", preceding, calledId, inherit);
+                """.formatted(draft.key(), before ? "before" : "call", preceding, calledId, inherit, after
+                    ? "<sequenceFlow id=\"b\" sourceRef=\"call\" targetRef=\"after\"/><userTask id=\"after\" name=\"父流程后审\" flowable:assignee=\"finance\"/><sequenceFlow id=\"c\" sourceRef=\"after\" targetRef=\"end\"/>"
+                    : "<sequenceFlow id=\"b\" sourceRef=\"call\" targetRef=\"end\"/>");
         engine.createDeployment().tenantId(tenant).addString(draft.key() + ".bpmn20.xml", xml).deploy();
         return draft;
     }
 
     private Graph parentGraph(SubprocessPolicy policy, boolean before) {
+        return parentGraph(policy, before, true);
+    }
+
+    private Graph parentGraph(SubprocessPolicy policy, boolean before, boolean after) {
         var nodes = new ArrayList<>(List.of(new Node("start", "发起", NodeType.START, Map.of()),
                 new Node("call", "独立材料核对", NodeType.SUB_PROCESS, policy.properties()),
-                new Node("after", "父流程后审", NodeType.USER_TASK, Map.of("assigneeRule", "user:finance")),
                 new Node("end", "结束", NodeType.END, Map.of())));
         var edges = new ArrayList<>(List.of(new Edge("a", "start", before ? "before" : "call", ""),
-                new Edge("b", "call", "after", ""), new Edge("c", "after", "end", "")));
+                new Edge("b", "call", after ? "after" : "end", "")));
+        if (after) { nodes.add(new Node("after", "父流程后审", NodeType.USER_TASK, Map.of("assigneeRule", "user:finance"))); edges.add(new Edge("c", "after", "end", "")); }
         if (before) { nodes.add(new Node("before", "父流程先审", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager"))); edges.add(new Edge("toCall", "before", "call", "")); }
         return new Graph(nodes, edges);
     }

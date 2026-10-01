@@ -47,7 +47,7 @@ class ApplicationCancellationIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired RuntimeService runtime;
     @Autowired TaskService tasks;
-    @Autowired ApplicationRepository applications;
+    @MockitoSpyBean ApplicationRepository applications;
     @MockitoSpyBean ApplicationAuditPort audit;
     @MockitoSpyBean ProcessRuntimePort processRuntime;
 
@@ -177,30 +177,53 @@ class ApplicationCancellationIntegrationTest {
         }
     }
 
-    @Test
-    void cancellationWinningAfterEngineStartRollsBackTheLosingSubmissionRuntime() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void cancellationWaitsForSubmissionAndDoesNotLeaveAnOrphanedRuntime(boolean failSubmission) throws Exception {
         String id = draft().path("id").asText();
         var engineStarted = new CountDownLatch(1); var continueSubmission = new CountDownLatch(1);
+        var cancellationWaiting = new CountDownLatch(1); var submissionLocked = new AtomicBoolean();
+        ApplicationRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(applications);
+        doAnswer(invocation -> {
+            if (!submissionLocked.compareAndSet(false, true)) cancellationWaiting.countDown();
+            return invocation.callRealMethod();
+        }).when(target).lockById("demo", UUID.fromString(id));
         doAnswer(invocation -> {
             var result = invocation.callRealMethod();
             ProcessRuntimePort.StartProcessCommand command = invocation.getArgument(0);
             if (command.applicationId().toString().equals(id)) {
                 engineStarted.countDown();
                 if (!continueSubmission.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Submission barrier timed out");
+                if (failSubmission) throw new DomainException("DEPENDENCY_UNAVAILABLE", "Injected failure after engine start");
             }
             return result;
         }).when(processRuntime).start(any());
-        var executor = Executors.newSingleThreadExecutor();
+        var executor = Executors.newFixedThreadPool(2);
         try {
             var submission = executor.submit(() -> mvc.perform(write(post("/api/v1/applications/" + id + "/submit"), "alice", UUID.randomUUID().toString(), Map.of("expectedVersion", 1))).andReturn());
             assertThat(engineStarted.await(15, TimeUnit.SECONDS)).isTrue();
-            assertThat(cancel(id, "alice", 1, "并发作废先提交", UUID.randomUUID().toString()).getResponse().getStatus()).isEqualTo(200);
+            var cancellation = executor.submit(() -> cancel(id, "alice", 1, "并发作废", UUID.randomUUID().toString()));
+            assertThat(cancellationWaiting.await(15, TimeUnit.SECONDS)).isTrue();
+            assertThat(cancellation.isDone()).isFalse();
             continueSubmission.countDown();
-            assertThat(submission.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(409);
-        } finally { continueSubmission.countDown(); executor.shutdownNow(); }
-        assertNoProcess(id); assertThat(rounds(id)).isEmpty(); assertThat(auditCount(id)).isEqualTo(1);
-        assertThat(read("/api/v1/applications/" + id).path("status").asText()).isEqualTo("CANCELLED");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='SUBMIT'", Integer.class, id)).isZero();
+            assertThat(submission.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(failSubmission ? 503 : 200);
+            assertThat(cancellation.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(failSubmission ? 200 : 409);
+        } finally {
+            continueSubmission.countDown(); executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+        if (failSubmission) {
+            assertNoProcess(id); assertThat(rounds(id)).isEmpty(); assertThat(auditCount(id)).isEqualTo(1);
+        } else {
+            assertThat(runtime.createProcessInstanceQuery().variableValueEquals("applicationId", id).count()).isEqualTo(1);
+            assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", id).count()).isEqualTo(1);
+            assertThat(rounds(id)).hasSize(1); assertThat(auditCount(id)).isZero();
+        }
+        var application = read("/api/v1/applications/" + id);
+        assertThat(application.path("status").asText()).isEqualTo(failSubmission ? "CANCELLED" : "IN_APPROVAL");
+        assertThat(application.path("version").asLong()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='SUBMIT'", Integer.class, id))
+                .isEqualTo(failSubmission ? 0 : 1);
     }
 
     private JsonNode draft() throws Exception {
