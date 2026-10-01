@@ -1,0 +1,47 @@
+{
+  "status": "PASS_DOMAIN_AND_ENGINE_ADAPTER",
+  "recordedAt": "2026-10-01T02:33:06.614125+00:00",
+  "baseCommit": "49b65de6e21862d3cbd20e4c7a721382d76714f8",
+  "newDomainTests": 7,
+  "newEngineTests": 7,
+  "h2": {
+    "domainTests": 7,
+    "serverTests": 51,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-foundation-h2.log"
+  },
+  "postgresql": {
+    "domainTests": 7,
+    "engineTests": 7,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-postgres.log",
+    "database": {
+      "database": "countersign_membership_10450b0d7127",
+      "container": "agentflow-attachments-postgres-20260928"
+    },
+    "actualDatabase": {
+      "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+      "schema": "86",
+      "applications": 8,
+      "historicalTasks": 21,
+      "canceledTasks": 2
+    }
+  },
+  "testScopesOverlap": true,
+  "authors": "Java files=1132, named types=2185, missing author tags=0, parse errors=0",
+  "migrationAdded": false,
+  "runtimeReplaced": false,
+  "runtimeSchema": 86,
+  "publicWorkflowComplete": false,
+  "actualBrowserAcceptance": false,
+  "originalMemberSnapshotPreserved": true,
+  "removalDoesNotCountAsApproval": true,
+  "completedOpinionsPreserved": true,
+  "outerFailureRollsBackEngineAndHistory": true,
+  "noCallWithoutOuterTransaction": true,
+  "scope": "Current platform ALL nodes only. Existing graph forbids loops and subprocesses; repeated activation requires an explicit historical activation binding before it is enabled.",
+  "pending": [
+    "Current task/round/organization permissions and application version orchestration",
+    "Named change audit, idempotent recovery, notification and history",
+    "Public API/OpenAPI and complete user interface",
+    "Full workflow PostgreSQL/HTTP/browser/old task/SLA/field/attachment/restart acceptance"
+  ]
+}
