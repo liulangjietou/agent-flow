@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createRenderer, reactive } from 'vue'
+import { createRenderer, createSSRApp, reactive } from 'vue'
+import { renderToString } from 'vue/server-renderer'
 const rules = await import(process.env.AGENTFLOW_TEST_EXPENSE_PARTIAL_ADJUSTMENT)
 const { default: Component } = await import(process.env.AGENTFLOW_TEST_EXPENSEPARTIALADJUSTMENT)
 const { default: Parent } = await import(process.env.AGENTFLOW_TEST_EXPENSESETTLEMENTSTATUS)
+const { render: partialRender } = await import(process.env.AGENTFLOW_TEST_EXPENSE_PARTIAL_RENDER)
 const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
 const originalApi = { ...api }, originalFetch = global.fetch
 global.localStorage = { getItem: () => 'test-token', setItem() {}, removeItem() {} }
@@ -58,6 +60,31 @@ function mount(component = Component) {
   return { props, state: instance.$.setupState, changed, busy, close() { app.unmount(); Object.assign(api, originalApi); global.fetch = originalFetch; bindAuthenticationActor(null) } }
 }
 function confirm(item, intent, target = '', side = 'BUDGET') { item.state.prepare(intent, target, side); item.state.reference = 'proof'; item.state.comment = '核对并办理本次调整'; item.state.accountingDate = at().slice(0, 10); item.state.acknowledged = true }
+
+test('已消费授权的查无结果只开放原号恢复，不提示重新准备', async () => {
+  const value = prepared(), entry = value.adjustments[0]
+  entry.budget = operation(entry, 'BUDGET', 'NOT_FOUND')
+  entry.budget.accepted = { status: 'NOT_FOUND', observedAt: entry.updatedAt, rejection: null, reference: null, reducedAmount: null, appliedAt: null }
+  entry.budgetPreparation.status = 'AUTHORIZED'; entry.budgetPreparation.canAuthorize = false; entry.budgetPreparation.authorizationIssue = 'PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT'
+  entry.availableActions = ['QUERY_BUDGET']; entry.canRetire = false
+  assert.equal(rules.partialCanPrepare(value, entry, 'BUDGET'), false)
+  assert.throws(() => rules.partialPrepareInput(value, entry.id, 'BUDGET', at().slice(0, 10), 'proof', '不能替换查无命令'))
+  api.expensePartialAdjustments = async () => value
+  const item = mount()
+  try {
+    await settle()
+    const html = await renderToString(createSSRApp({ setup: () => ({ ...item.state }), render: partialRender }, item.props))
+    assert.match(html, /本次准备已授权/)
+    assert.match(html, /原命令查无/)
+    assert.doesNotMatch(html, /本侧准备已失效或尚未就绪，请刷新后重新准备/)
+    const expired = prepared()
+    expired.adjustments[0].budgetPreparation.canAuthorize = false
+    expired.adjustments[0].budgetPreparation.authorizationIssue = 'PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT'
+    item.state.view = expired
+    const expiredHtml = await renderToString(createSSRApp({ setup: () => ({ ...item.state }), render: partialRender }, item.props))
+    assert.match(expiredHtml, /本侧准备已失效或尚未就绪，请刷新后重新准备/)
+  } finally { item.close() }
+})
 
 test('原批准、已完成剩余和未完成意图分别核对，拒绝错单与虚构完成', () => {
   for (const value of [view(), active(), prepared(), completed(), disputed(), disputed('ACCRUAL')]) assert.equal(rules.validatePartial(value, binding()), value)

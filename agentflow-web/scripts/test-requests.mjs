@@ -3,12 +3,20 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import ts from 'typescript'
-import { parse, compileScript } from 'vue/compiler-sfc'
+import { parse, compileScript, compileTemplate } from 'vue/compiler-sfc'
 
 // 测试产物只写入约定的临时目录，不改变应用构建配置。
 const root = fileURLToPath(new URL('../', import.meta.url))
 const output = mkdtempSync('/fyoung/tmp/agentflow-web-requests-')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
+// 财务状态提示必须使用真实模板验证，避免已消费授权继续提示重新准备。
+const partialTemplate = parse(readFileSync(resolve(root, 'src/components/ExpensePartialAdjustment.vue'), 'utf8')).descriptor.template.content
+const partialRender = compileTemplate({ source: partialTemplate, id: 'partial-render', filename: 'ExpensePartialAdjustment.vue', compilerOptions: { expressionPlugins: ['typescript'] } })
+if (partialRender.errors.length) throw new Error(String(partialRender.errors))
+writeFileSync(resolve(output, 'expensePartialRender.js'), ts.transpileModule(partialRender.code.replaceAll('from "vue"', `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText)
+process.env.AGENTFLOW_TEST_EXPENSE_PARTIAL_RENDER = resolve(output, 'expensePartialRender.js')
 // 编译实际任务面板的 setup，验证按钮行为，避免只测试请求构造而遗漏直接提交。
 const { descriptor } = parse(readFileSync(resolve(root, 'src/components/TaskActions.vue'), 'utf8'), { filename: 'TaskActions.vue' })
 const component = compileScript(descriptor, { id: 'task-actions-test' }).content

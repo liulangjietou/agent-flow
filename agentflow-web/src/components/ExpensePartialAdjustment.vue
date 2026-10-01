@@ -130,7 +130,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
               <strong>{{ adjustmentPreparationLabels[partialPreparation(entry, currentSide)!.status] }}</strong>
               <p>本人准备 · 记账日 {{ partialPreparation(entry, currentSide)!.accountingDate }}<br />材料 {{ partialPreparation(entry, currentSide)!.evidenceReference }} · {{ partialPreparation(entry, currentSide)!.reason }}</p>
               <p v-if="partialPreparation(entry, currentSide)!.periodReference">期间 {{ partialPreparation(entry, currentSide)!.periodReference }} · 有效至 {{ time(partialPreparation(entry, currentSide)!.expiresAt) }}</p>
-              <p v-if="partialPreparation(entry, currentSide)!.issue || partialPreparation(entry, currentSide)!.authorizationIssue">{{ partialIssue((partialPreparation(entry, currentSide)!.issue || partialPreparation(entry, currentSide)!.authorizationIssue)!) }}</p>
+              <p v-if="partialPreparation(entry, currentSide)!.status !== 'AUTHORIZED' && (partialPreparation(entry, currentSide)!.issue || partialPreparation(entry, currentSide)!.authorizationIssue)">{{ partialIssue((partialPreparation(entry, currentSide)!.issue || partialPreparation(entry, currentSide)!.authorizationIssue)!) }}</p>
               <button v-if="partialPreparation(entry, currentSide)!.canAuthorize && !pending" type="button" class="primary" :disabled="blocked" @click="prepare('AUTHORIZE', entry.id, currentSide)">核对并授权本侧调整</button>
             </div>
             <button v-if="partialCanPrepare(view, entry, currentSide) && !pending" type="button" class="quiet" :disabled="blocked" @click="prepare('PREPARE', entry.id, currentSide)">准备本侧原件与期间</button>
