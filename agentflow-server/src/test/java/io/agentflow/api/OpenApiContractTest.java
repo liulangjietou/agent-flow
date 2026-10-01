@@ -393,6 +393,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("AssigneeOption", io.agentflow.definition.DefinitionAssigneeDirectory.Option.class),
                 java.util.Map.entry("ApplicationComment", io.agentflow.approval.comment.ApplicationComment.class),
                 java.util.Map.entry("CommentPage", io.agentflow.approval.comment.ApplicationCommentService.Page.class),
+                java.util.Map.entry("CommentMentionPage", io.agentflow.approval.comment.CommentMentionDirectory.Page.class),
                 java.util.Map.entry("AssistReference", io.agentflow.agent.AssistInput.Reference.class),
                 java.util.Map.entry("AssistSource", io.agentflow.agent.AssistModelPort.Source.class),
                 java.util.Map.entry("AssistInputOptions", io.agentflow.agent.AssistExecutionService.InputOptions.class),

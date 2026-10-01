@@ -1,0 +1,336 @@
+{
+  "feature": "本轮已有读取关系的评论 @ 提醒",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "recordedAt": "2026-10-01T16:47:40.768216+00:00",
+  "baseCommit": "3d92ca1fe24610e3e2796f875aa1c1da251dbb11",
+  "branch": "codex/governance-identifier-integration",
+  "migration": "V91__comment_mentions.sql",
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-server-final.jar",
+    "sha256": "00c79a9b925ac483b59d72bea4784b46716b92bd37eb27b468983982ea85b1a0"
+  },
+  "rules": {
+    "maxRecipients": 20,
+    "explicitSelection": true,
+    "currentRoundOnly": true,
+    "noNewReadPermissions": true,
+    "copyOnlyExcluded": true,
+    "notificationExcludesCommentBody": true,
+    "applicationVersionUnchanged": true,
+    "atomicCommentInboxIdempotency": true,
+    "replayDoesNotResend": true
+  },
+  "verification": {
+    "h2Tests": 50,
+    "h2Classes": [
+      {
+        "name": "io.agentflow.approval.ApplicationCommentTest",
+        "tests": "10",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "0.107"
+      },
+      {
+        "name": "io.agentflow.approval.comment.CommentQueryParametersTest",
+        "tests": "4",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "0.011"
+      },
+      {
+        "name": "io.agentflow.approval.comment.ApplicationCommentIntegrationTest",
+        "tests": "13",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "1.977"
+      },
+      {
+        "name": "io.agentflow.notification.InboxIntegrationTest",
+        "tests": "9",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "8.164"
+      },
+      {
+        "name": "io.agentflow.approval.comment.CommentMentionMigrationTest",
+        "tests": "1",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "0.392"
+      },
+      {
+        "name": "io.agentflow.approval.comment.CommentMentionIntegrationTest",
+        "tests": "7",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "4.944"
+      },
+      {
+        "name": "io.agentflow.api.OpenApiContractTest",
+        "tests": "6",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "time": "7.96"
+      }
+    ],
+    "postgresTests": 7,
+    "postgresOverlapsH2": true,
+    "frontendTests": 65,
+    "frontendScope": [
+      "comment-mentions",
+      "comments",
+      "requests",
+      "notifications",
+      "task-batch"
+    ],
+    "typeCheck": "PASS",
+    "build": "PASS",
+    "openApi": {
+      "operations": 284,
+      "schemas": 555,
+      "requestExamples": 109
+    },
+    "http": {
+      "results": [
+        {
+          "source": "comment-mentions-http-legacy",
+          "responses": 2,
+          "validUpstreamResponses": 2,
+          "intentionallyInvalidBrowserResponses": 0
+        },
+        {
+          "source": "comment-mentions-http-upgraded",
+          "responses": 9,
+          "validUpstreamResponses": 9,
+          "intentionallyInvalidBrowserResponses": 0
+        },
+        {
+          "source": "comment-mentions-http-restart1",
+          "responses": 5,
+          "validUpstreamResponses": 5,
+          "intentionallyInvalidBrowserResponses": 0
+        },
+        {
+          "source": "comment-mentions-http-restart2",
+          "responses": 5,
+          "validUpstreamResponses": 5,
+          "intentionallyInvalidBrowserResponses": 0
+        },
+        {
+          "source": "comment-mentions-browser-http",
+          "responses": 34,
+          "validUpstreamResponses": 34,
+          "intentionallyInvalidBrowserResponses": 1
+        }
+      ],
+      "commentWrites": 3,
+      "invalidSuccessResponses": 1,
+      "recoveryOriginalKey": true
+    },
+    "upgrade": {
+      "from": 90,
+      "to": 91,
+      "legacyCommentPreserved": true,
+      "historicalMentionsNotBackfilled": true
+    },
+    "restarts": [
+      {
+        "name": "restart1",
+        "tables": 221,
+        "rows": 1243,
+        "files": 3
+      },
+      {
+        "name": "restart2",
+        "tables": 221,
+        "rows": 1243,
+        "files": 3
+      }
+    ],
+    "mobile": {
+      "client": 480,
+      "panels": [
+        {
+          "class": "comments-panel",
+          "scrollWidth": 392,
+          "width": 392
+        },
+        {
+          "class": "comment-compose",
+          "scrollWidth": 391,
+          "width": 391
+        },
+        {
+          "class": "comment-mentions",
+          "scrollWidth": 365,
+          "width": 365
+        }
+      ],
+      "scrollWidth": 480,
+      "viewport": 500
+    },
+    "data": {
+      "status": "PASS",
+      "sourceTablesUnchanged": 221,
+      "sourceRowsUnchanged": 1231,
+      "oldRowsRetained": 1231,
+      "changedTables": [
+        "application_comment",
+        "flyway_schema_history",
+        "notification_inbox",
+        "request_idempotency"
+      ],
+      "finalRows": 1243,
+      "filesUnchanged": 3,
+      "commentCount": 4,
+      "mentionCount": 3,
+      "recipients": {
+        "alice": 1,
+        "manager": 2
+      },
+      "approvalVersionsUnchanged": true,
+      "auditUnchanged": true
+    }
+  },
+  "defectsReproducedBeforeFix": [
+    "HTTP success with invalid comment receipt cleared original request recovery",
+    "Refreshing same mention query retained recipients absent from refreshed directory"
+  ],
+  "browser": [
+    "Explicit sender selection performed only reads before submission",
+    "One invalid success response retained original comment and recipients, replay used same key and created one reminder",
+    "Recipient inbox used generic text without comment body and opened original authorized application",
+    "Recipient normal reply reminded applicant once",
+    "Session expired after local demo restart, comment content cleared; normal relogin read all four records",
+    "500 CSS pixel viewport and inner panels had no horizontal overflow"
+  ],
+  "limitations": [
+    "Local demo identities and isolated PostgreSQL only",
+    "Email and enterprise IM are not implemented by this feature",
+    "No Git remote or PR/CI delivery",
+    "Temporary runtime uses demo login; prior login invalidates across restart"
+  ],
+  "sources": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-h2-initial.log",
+      "sha256": "1e539cadf58eb3e3b7e7eb1984395f822d82783c9ec7bdf28087e5eee79799de"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-h2-final.log",
+      "sha256": "2137dad9f774643d5a4355a7b9c98bc941c22c1af2e2c2d64e2eb16726485aa4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-h2-initial-results.json",
+      "sha256": "afcab7fcd3283fb57de5eab72616c509502c9cb500452eb6db81a908d4273d17"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-h2-final-results.json",
+      "sha256": "724dbbac342f7db32e79c66c7c2e86c519bed75e03fe28c8ecaa63f07c4f3fbd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-postgres.log",
+      "sha256": "b462bd3cdc91589377a95abff194fe0cdcb4c6a21e900b55c937dd9d1fb562a6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-postgres-results.json",
+      "sha256": "d6826d59e9d84f7afcc3429f4f36d790030856c4b6690e3cc3c2b1d1061e6c2a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-frontend-red.log",
+      "sha256": "983394dffb25449d8a917ee5222fc887fa77ef61036135ff96488e8ae31b26d1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-refresh-red.log",
+      "sha256": "0f36a52311d75ad4eebcf87c7a8d956b08ef8f3c457a9a0d4b7a0768dc1dee48"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-frontend-final.log",
+      "sha256": "64f1e90f08e5d05fe8866279241430137c5995f333b46a9de6783ab2d5c83aed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-web-build.log",
+      "sha256": "ee77ade84281b03c9635448e2bac7da5ea18b4efba8a94a33dfd28f62ad0097c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-openapi.log",
+      "sha256": "41e948198c10dbd63c4a9aa7eb3d659d465d58a8714ebdbfed8d3683c9b84288"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-package.log",
+      "sha256": "bb4da90b7b4b93d658a0c2f4b078729b7f685a28ea6141daad425b6c050e33de"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-http-legacy.json",
+      "sha256": "769fb2a6db1fc8c1b6279b22d29a26783454c336c10bb9e029c7f8cff93ef8d4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-http-upgraded.json",
+      "sha256": "ceca033af0a9fdcbe3b0af7f6084a9e9fc92c32d63fda41d508f3b1bd94e2434"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-http-restart1.json",
+      "sha256": "feeba49cfba25dc8d72560f5ff7cdabdae0b24ea845c00eb6507ec12bf79788c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-http-restart2.json",
+      "sha256": "feeba49cfba25dc8d72560f5ff7cdabdae0b24ea845c00eb6507ec12bf79788c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-browser-http.json",
+      "sha256": "882cf556358cab5f6a3bfe85bb25395531303330e8ede9234fa28330dd5b8158"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-contract.json",
+      "sha256": "2b86982ce0c35dcc63c29dcf2f10d083fd84932020b64d9358acb817ad614be5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-upgrade-preservation.json",
+      "sha256": "421976ea1a359fc27dca2a6b9dbe75dded419e984bd5ff526e1399624eab13b1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-restart1-preservation.json",
+      "sha256": "74b3390571e848d57da43de6ef4fb71ff276eace8e77b1f1a2434d2ff4863d7c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-restart2-preservation.json",
+      "sha256": "10454525574b4656996ea95d8d818268a792b2152e0e4f70e4c2ab33b26d37ca"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-final-data.json",
+      "sha256": "2bc9addedebf9fbe8787f88b1d64fd1ab33e46ea4cb51020c7fafd1dcd81844e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-mobile.json",
+      "sha256": "2b03e3c14b290d7a588348636babdfe312735bb06295ebd7f8fbd878a21c976a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-unknown.jpg",
+      "sha256": "9e0f875d8be39b14878990b4821c919e936a834740cfc00f9d79b12019af376e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-inbox.jpg",
+      "sha256": "86c102f786628fb77ee6ec444ee1b77fc09e72e5f6bb0402d4f47a55a4818609"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-success.jpg",
+      "sha256": "682a0941752838a50ffb2a1f776020a5bc2cf7d37deb750cebaa6beadc3032bc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-500px.jpg",
+      "sha256": "77e16f11ee412eb51e5f7f84395571cb989494f7dc2c4405d1210dae72be9fc2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/comment-mentions-final.jpg",
+      "sha256": "75f02cc5a5874f42f3fad8d3ed7cb69484f57d0defc7c14f70828e9f9a344b55"
+    }
+  ],
+  "overallGoalComplete": false,
+  "remainingPackages": 3
+}

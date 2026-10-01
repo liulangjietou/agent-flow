@@ -76,6 +76,18 @@ public class JdbcWorkspaceReadAdapter implements WorkspaceReadPort, ApplicationP
                 """ + HANDLED_ACTIONS + ")", Boolean.class, tenantId, applicationId.toString(), actor.userId()));
     }
 
+    /** 评论选人只包含本轮真实办理者，复用建立申请读取关系的动作范围。 */
+    public java.util.Set<String> participantsInRound(String tenantId, UUID applicationId, int roundNo) {
+        var result = new java.util.HashSet<String>();
+        jdbc.query("SELECT actor_id,payload_json FROM audit_event WHERE tenant_id=? AND application_id=? "
+                        + "AND aggregate_type='Task' AND action IN " + HANDLED_ACTIONS,
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> {
+                    var payload = json.map(row.getString("payload_json"));
+                    if (payload.get("roundNo") instanceof Number value && value.intValue() == roundNo) result.add(row.getString("actor_id"));
+                }, tenantId, applicationId.toString());
+        return java.util.Set.copyOf(result);
+    }
+
     private static void appendText(StringBuilder sql, List<Object> parameters, String text) {
         if (text.isEmpty()) return;
         String pattern = "%" + text.toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";

@@ -26,6 +26,7 @@ import type { AuditExportFilters } from './auditSearch'
 import type { BusinessCalendar, CalendarInput, CalendarUpdate, CalendarPage, CalendarVersionPage, CalendarCalculationInput, CalendarCalculation, CalendarSummary } from './businessCalendars'
 import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
+import { readCommentMentionPage, validateCommentReceipt, type CommentMentionFilter, type CommentMentionPage } from './commentMentions.js'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
@@ -179,7 +180,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -248,6 +249,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       CALENDAR_AMBIGUOUS_START: '此当地钟点出现两次，请选择第一次或第二次后试算。',
       CALENDAR_HORIZON_EXCEEDED: '未来 3660 天内没有足够工作时间，请核对规则或缩短时长。',
       INVALID_COMMENT_QUERY: '评论筛选或分页已失效，请重新查询。',
+      COMMENT_MENTION_UNAVAILABLE: '提醒对象已不在本轮可提醒范围，请刷新名单后重新选择。',
   INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
       COUNTERSIGN_ASSIGNMENT_FIXED: '会签任务不能转交、释放或重新领取；可委派协助后回交，或使用独立加减签入口。',
@@ -328,6 +330,8 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  const comment = /^\/applications\/([^/?]+)\/comments$/.exec(operation.path)
+  if (comment) validateCommentReceipt(result, decodeURIComponent(comment[1]!), JSON.parse(operation.body!) as CommentDraft)
   const taskAction = /^\/tasks\/([^/?]+)\/actions$/.exec(operation.path)
   if (taskAction) validateTaskAssignmentReceipt(result, decodeURIComponent(taskAction[1]!), JSON.parse(operation.body!) as TaskActionInput)
   validateEventMutation(result, operation.path, operation.body ?? '{}')
@@ -577,6 +581,7 @@ export const api = {
   generateAssist: (id: string, body: AssistGenerateRequest) => write<AssistReceipt>('/applications/' + encodeURIComponent(id) + '/assist-runs', 'POST', '生成 Agent 摘要', body),
   reviewAssist: (id: string, runId: string, body: AssistReviewRequest) => write<AssistReceipt>('/applications/' + encodeURIComponent(id) + '/assist-runs/' + encodeURIComponent(runId) + '/review', 'POST', '复核 Agent 摘要', body),
   applicationComments: (id: string, query: CommentQuery, signal: AbortSignal) => request<CommentPage>('/applications/' + encodeURIComponent(id) + '/comments' + historyQuery(query), { signal }),
+  commentMentionOptions: (id: string, query: CommentMentionFilter, signal: AbortSignal) => request<CommentMentionPage>('/applications/' + encodeURIComponent(id) + '/comments/mention-options' + historyQuery(query), { signal, cache: 'no-store' }).then(value => readCommentMentionPage(value, id, query)),
   addApplicationComment: (id: string, body: CommentDraft) => write<ApplicationComment>('/applications/' + encodeURIComponent(id) + '/comments', 'POST', '追加申请评论', body),
   applicationAudit: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/audit' + historyQuery(query)),
   login: (body: { tenantId: string; username: string; password: string }) => request<{ token: string; user: Actor }>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
