@@ -259,6 +259,11 @@ public final class Application {
 
     /** 父调用停止时取消尚未决定的子申请；已经形成的结论不可被连带操作覆盖。 */
     public void cancelWithParent(long expectedVersion) {
+        terminateApproval(expectedVersion);
+    }
+
+    /** 终止当前在审轮次并进入不可重提的终态；已形成的结论不可被运维操作覆盖。 */
+    public void terminateApproval(long expectedVersion) {
         checkVersion(expectedVersion);
         requireInApproval();
         status = ApplicationStatus.CANCELLED;

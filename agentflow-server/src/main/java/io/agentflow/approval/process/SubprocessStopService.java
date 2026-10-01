@@ -88,7 +88,8 @@ public class SubprocessStopService {
     public void after(Plan plan, Application source, String sourceActor) {
         if (plan.nodes.isEmpty()) return;
         if (!plan.sourceId.equals(source.id()) || source.status() != ApplicationStatus.REJECTED
-                && source.status() != ApplicationStatus.RETURNED && source.status() != ApplicationStatus.WITHDRAWN) throw changed();
+                && source.status() != ApplicationStatus.RETURNED && source.status() != ApplicationStatus.WITHDRAWN
+                && source.status() != ApplicationStatus.CANCELLED) throw changed();
         for (var node : plan.nodes) {
             if (node.application().status() == ApplicationStatus.IN_APPROVAL) requireStopped(node);
         }
@@ -99,7 +100,7 @@ public class SubprocessStopService {
         for (var node : plan.nodes) {
             var application = node.application();
             if (application.id().equals(source.id())) {
-                if (source.status() != ApplicationStatus.WITHDRAWN) {
+                if (source.status() != ApplicationStatus.WITHDRAWN && source.status() != ApplicationStatus.CANCELLED) {
                     notifications.subprocessStopped(source, sourceActor, node.audience(), false);
                 }
                 continue;
@@ -141,7 +142,7 @@ public class SubprocessStopService {
         if (application.status() == ApplicationStatus.IN_APPROVAL && (instance == null
                 || !tenant.equals(instance.getTenantId()) || !application.runtimeDefinitionId().equals(instance.getProcessDefinitionId()))) throw changed();
         if (application.status() != ApplicationStatus.IN_APPROVAL && instance != null) throw changed();
-        nodes.put(id, new Node(application, round, notifications.pendingAudience(application)));
+        nodes.put(id, new Node(application, round, notifications.unfinishedAudience(application)));
         for (var call : calls.findByParentRound(tenant, id, roundNo)) {
             if (!call.parentProcessInstanceId().equals(round.processInstanceId())
                     || !call.parentRuntimeDefinitionId().equals(application.runtimeDefinitionId())) throw changed();

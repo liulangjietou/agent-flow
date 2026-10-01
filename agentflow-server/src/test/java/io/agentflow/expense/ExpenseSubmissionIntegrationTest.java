@@ -473,6 +473,34 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void terminatingPausedExpenseDuringUnknownFreezeReleasesLocalResourcesAndReconcilesTheOriginalCommand() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); submit(report);
+        budgetStatus = BudgetObservation.Status.PENDING; budgetWorker.poll();
+        UUID pending = occupations.find("demo", report.id()).orElseThrow().pendingOperationId();
+        var original = current(report).currentRound();
+        String path = "/api/v1/applications/" + report.applicationId() + "/rounds/1/runtime";
+        ok(send(path + "/pause", "admin", Map.of("expectedVersion", app(report).version(), "reason", "原费用暂停")), 200);
+        ok(send(path + "/terminate", "admin", Map.of("expectedVersion", app(report).version(), "reason", "费用申请重复")), 200);
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(current(report).currentRound()).isEqualTo(original);
+        assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
+        assertThat(requests.find("demo", fixture.prior()).orElseThrow().balance(1).available()).isEqualTo(money("200"));
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().available()).isEqualTo(money("200"));
+        assertThat(operations.find("demo", pending).orElseThrow().status()).isEqualTo(BudgetOperation.Status.UNKNOWN);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().pendingOperationId()).isEqualTo(pending);
+        assertThat(writes).isEqualTo(1); assertThat(queries).isZero();
+        budgetStatus = BudgetObservation.Status.APPLIED; drive(pending);
+        UUID release = occupations.find("demo", report.id()).orElseThrow().pendingOperationId();
+        assertThat(release).isNotNull().isNotEqualTo(pending);
+        assertThat(queries).isEqualTo(1); assertThat(writes).isEqualTo(1);
+        assertThat(operations.find("demo", release).orElseThrow().input().command().action()).isEqualTo(BudgetCommand.Action.RELEASE);
+        drive(release);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.RELEASED);
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(writes).isEqualTo(2);
+    }
+
+    @Test
     void delegatedReceiptCannotSignAndCancellationIgnoresUnsubmittedResourceReferences() throws Exception {
         var fixture = fixture(true); var report = fixture.report(); submit(report); budgetWorker.poll();
         ok(act(report, "manager", "APPROVE"), 200);

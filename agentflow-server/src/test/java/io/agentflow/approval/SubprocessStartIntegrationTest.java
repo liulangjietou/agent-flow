@@ -63,6 +63,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -753,8 +754,9 @@ class SubprocessStartIntegrationTest {
         assertThat(count("webhook_delivery")).isEqualTo(outboxCount);
     }
 
-    @Test
-    void rootWithdrawalWinningBeforeChildApprovalLeavesNoApprovedOrOrphanedChild() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void rootStopWinningBeforeChildApprovalLeavesNoApprovedOrOrphanedChild(boolean administrator) throws Exception {
         var leaf = child(key(), schema("total"), "user:manager");
         var definition = parent(leaf, schema("amount"), Map.of("total", "amount"), false, false, nativeId(leaf), false);
         var application = create(definition, Map.of("amount", "9"));
@@ -777,7 +779,8 @@ class SubprocessStartIntegrationTest {
                 catch (DomainException conflict) { return conflict.code(); }
             });
             assertThat(approvalReady.await(15, TimeUnit.SECONDS)).isTrue();
-            as("alice", () -> applications.withdraw(application.id(), 2, "明确先撤回"));
+            if (administrator) terminate(application.id(), 2, "明确先终止");
+            else as("alice", () -> applications.withdraw(application.id(), 2, "明确先撤回"));
             withdrawalCommitted.countDown();
             assertThat(approval.get(15, TimeUnit.SECONDS)).isEqualTo(SubprocessExecutionLocks.PARENT_CHANGED);
         } finally {
@@ -785,7 +788,8 @@ class SubprocessStartIntegrationTest {
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
             doCallRealMethod().when(target).lockById("demo", application.id());
         }
-        assertThat(repository.findById("demo", application.id()).orElseThrow().status()).isEqualTo(ApplicationStatus.WITHDRAWN);
+        assertThat(repository.findById("demo", application.id()).orElseThrow().status())
+                .isEqualTo(administrator ? ApplicationStatus.CANCELLED : ApplicationStatus.WITHDRAWN);
         assertThat(repository.findById("demo", call.childApplicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.CANCELLED);
         assertThat(runtime.createProcessInstanceQuery().processInstanceId(call.childProcessInstanceId()).count()).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class,
@@ -1035,6 +1039,97 @@ class SubprocessStartIntegrationTest {
                 .content(json.write(Map.of("expectedVersion", 4, "reason", "不能从子调用控制"))))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnprocessableEntity())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("code").value("SUBPROCESS_PARENT_CONTROL_REQUIRED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void namedTerminationCancelsUnfinishedDescendantsAndKeepsCompletedBranchOpinions(boolean paused) {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var middle = parent(leaf, schema("total"), Map.of("total", "total"), false, false, nativeId(leaf), false);
+        var definition = parallelParent(middle);
+        var root = create(definition, Map.of("amount", "37"));
+        as("alice", () -> applications.submit(root.id(), 1));
+        var branches = calls.findByParentRound("demo", root.id(), 1);
+        var completed = branches.get(0); var active = branches.get(1);
+        var completedLeaf = onlyCall(completed.childApplicationId());
+        var activeLeaf = onlyCall(active.childApplicationId());
+        var task = tasks.createTaskQuery().processInstanceId(completedLeaf.childProcessInstanceId()).singleResult();
+        as("manager", () -> actions.action(task.getId(), "APPROVE", "已经真实批准的意见", null, 2L));
+        var completedRound = rounds.findByRound("demo", completed.childApplicationId(), 1).orElseThrow();
+        var completedLeafRound = rounds.findByRound("demo", completedLeaf.childApplicationId(), 1).orElseThrow();
+        long completedVersion = repository.findById("demo", completed.childApplicationId()).orElseThrow().version();
+        var remaining = List.of(root.id(), active.childApplicationId(), activeLeaf.childApplicationId());
+        if (paused) control(root.id(), true, repository.findById("demo", root.id()).orElseThrow().version(), "原树暂停");
+        failure(() -> terminate(active.childApplicationId(), repository.findById("demo", active.childApplicationId()).orElseThrow().version(), "禁止子流程单独终止"),
+                "SUBPROCESS_PARENT_CONTROL_REQUIRED");
+        String privateReason = "根申请独有的敏感终止原因";
+        var result = terminate(root.id(), repository.findById("demo", root.id()).orElseThrow().version(), privateReason);
+        assertThat(result.state()).isEqualTo(InstanceControlService.State.ENDED);
+        assertThat(result.canTerminate()).isFalse();
+        for (var id : remaining) {
+            var application = repository.findById("demo", id).orElseThrow();
+            var round = rounds.findByRound("demo", id, 1).orElseThrow();
+            assertThat(application.status()).isEqualTo(ApplicationStatus.CANCELLED);
+            assertThat(round.status()).isEqualTo(SubmissionRound.Status.CANCELLED);
+            assertThat(runtime.createProcessInstanceQuery().processInstanceId(round.processInstanceId()).count()).isZero();
+            var history = processEngine.getHistoryService().createHistoricProcessInstanceQuery().processInstanceId(round.processInstanceId()).singleResult();
+            assertThat(history.getEndTime()).isNotNull();
+            assertThat(history.getDeleteReason()).isNotBlank().doesNotContain(privateReason);
+            if (id.equals(root.id())) {
+                assertThat(round.reason()).isEqualTo(privateReason); assertThat(round.completedBy()).isEqualTo("admin");
+            } else {
+                assertThat(round.reason()).doesNotContain(privateReason); assertThat(round.completedBy()).isEqualTo(SubprocessStartService.SYSTEM_ACTOR);
+            }
+        }
+        assertThat(rounds.findByRound("demo", completed.childApplicationId(), 1).orElseThrow()).isEqualTo(completedRound);
+        assertThat(rounds.findByRound("demo", completedLeaf.childApplicationId(), 1).orElseThrow()).isEqualTo(completedLeafRound);
+        assertThat(repository.findById("demo", completed.childApplicationId()).orElseThrow().version()).isEqualTo(completedVersion);
+        assertThat(tasks.getTaskComments(task.getId())).singleElement().extracting(org.flowable.engine.task.Comment::getFullMessage).isEqualTo("已经真实批准的意见");
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE application_id=? AND kind='APPLICATION_CANCELLED' ORDER BY recipient_id",
+                String.class, activeLeaf.childApplicationId().toString())).containsExactly("alice", "manager");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void failedDescendantTerminationNotificationRestoresTheOriginalWholeTree(boolean paused) {
+        var leaf = child(key(), schema("total"), "user:manager");
+        var root = create(parallelParent(leaf), Map.of("amount", "19"));
+        as("alice", () -> applications.submit(root.id(), 1));
+        var branches = calls.findByParentRound("demo", root.id(), 1);
+        if (paused) control(root.id(), true, 2, "保持原暂停状态");
+        long version = paused ? 3 : 2;
+        var ids = List.of(root.id(), branches.get(0).childApplicationId(), branches.get(1).childApplicationId());
+        var originalRounds = ids.stream().map(id -> rounds.findByRound("demo", id, 1).orElseThrow()).toList();
+        int auditCount = count("audit_event"), inboxCount = count("notification_inbox"), outboxCount = count("webhook_delivery");
+        InboxRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(inbox);
+        doAnswer(invocation -> {
+            var result = invocation.callRealMethod(); InboxMessage message = invocation.getArgument(1);
+            if (message.applicationId().equals(branches.get(1).childApplicationId()) && message.kind() == InboxMessage.Kind.APPLICATION_CANCELLED) {
+                throw new IllegalStateException("Injected termination notification failure");
+            }
+            return result;
+        }).when(target).append(anyString(), any());
+        try {
+            assertThatThrownBy(() -> terminate(root.id(), version, "不能留下未提交的终止"))
+                    .hasStackTraceContaining("Injected termination notification failure");
+        } finally { doCallRealMethod().when(target).append(anyString(), any()); }
+        for (var round : originalRounds) {
+            assertThat(rounds.findByRound("demo", round.applicationId(), 1).orElseThrow()).isEqualTo(round);
+            var application = repository.findById("demo", round.applicationId()).orElseThrow();
+            assertThat(application.status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+            assertThat(application.version()).isEqualTo(version);
+            assertThat(runtime.createProcessInstanceQuery().processInstanceId(round.processInstanceId()).singleResult().isSuspended()).isEqualTo(paused);
+        }
+        assertThat(count("audit_event")).isEqualTo(auditCount);
+        assertThat(count("notification_inbox")).isEqualTo(inboxCount);
+        assertThat(count("webhook_delivery")).isEqualTo(outboxCount);
+        terminate(root.id(), version, "依赖恢复后重新确认");
+    }
+
+    private InstanceControlService.View terminate(UUID application, long version, String reason) {
+        actors.set(ADMIN);
+        try { return instances.terminate(application, 1, new InstanceControlService.Input(version, reason)); }
+        finally { actors.clear(); }
     }
 
     private BusinessCalendar calendar() {

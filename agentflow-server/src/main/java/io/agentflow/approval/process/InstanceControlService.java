@@ -18,6 +18,8 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.notification.ApprovalNotificationService;
+import io.agentflow.expense.ExpenseReleaseService;
+import io.agentflow.procurement.ProcurementPayableReservations;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -38,7 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 当前审批轮次的具名暂停与恢复；引擎状态、期限、申请版本和审计在同一事务保存。
+ * 当前审批轮次的具名暂停、恢复与终止；引擎、业务资源、版本和审计在同一事务保存。
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -57,17 +59,27 @@ public class InstanceControlService {
     private final ProcessEngine engine;
     private final SubprocessExecutionLocks executionLocks;
     private final SubprocessCallRepository calls;
+    private final ApprovalCompletionService completion;
+    private final SubprocessStopService stops;
+    private final ExpenseReleaseService expenses;
+    private final ProcurementPayableReservations procurement;
 
-    /** 只协调已绑定的原轮次，不提供替换审批人、跳节点或形成业务结论的能力。 */
+    /** 原轮次控制复用既有资源锁与停止联动，不替换审批人或生成批准意见。 */
     public InstanceControlService(ApplicationRepository applications, SubmissionRoundRepository rounds,
             ApprovalApplicationFacade reads, RuntimeService runtime, TaskService tasks,
             BusinessCalendarRepository calendars, ApplicationAuditPort audit, ApprovalNotificationService notifications,
-            CurrentActor actors, ProcessEngine engine, SubprocessExecutionLocks executionLocks, SubprocessCallRepository calls) {
+            CurrentActor actors, ProcessEngine engine, SubprocessExecutionLocks executionLocks, SubprocessCallRepository calls,
+            ApprovalCompletionService completion, SubprocessStopService stops, ExpenseReleaseService expenses,
+            ProcurementPayableReservations procurement) {
         this.applications = applications; this.rounds = rounds; this.reads = reads; this.runtime = runtime;
         this.tasks = tasks; this.calendars = calendars; this.audit = audit; this.notifications = notifications;
         this.actors = actors; this.engine = engine;
         this.executionLocks = executionLocks;
         this.calls = calls;
+        this.completion = completion;
+        this.stops = stops;
+        this.expenses = expenses;
+        this.procurement = procurement;
     }
 
     /** 幂等回放仍检查当前管理员身份，不能借旧回执绕过角色撤销。 */
@@ -140,6 +152,37 @@ public class InstanceControlService {
         return view(binding.application(), roundNo, State.RUNNING, null, true);
     }
 
+    /** 终止运行或暂停中的原轮次，保留已有意见，并按实际财务状态释放或继续对账。 */
+    @Transactional
+    public View terminate(UUID id, int roundNo, Input input) {
+        var actor = requireAdministrator();
+        var binding = lock(actor, id, roundNo);
+        var application = binding.application();
+        application.checkVersion(input.expectedVersion());
+        completion.lock(application);
+        var plan = stops.before(application);
+        var audience = notifications.unfinishedAudience(application);
+        String instanceId = binding.round().processInstanceId();
+        String reason = input.reason().strip();
+        Instant completedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        application.terminateApproval(input.expectedVersion());
+        // 引擎删除原因会传入后代历史，因此只包含来源编号；具名自由文本仅保存在根轮次和根审计。
+        runtime.deleteProcessInstance(plan.instanceToStop(instanceId), "Approval terminated through root application " + id);
+        var history = engine.getHistoryService().createHistoricProcessInstanceQuery().processInstanceId(instanceId).singleResult();
+        if (runtime.createProcessInstanceQuery().processInstanceId(instanceId).count() != 0
+                || history == null || history.getEndTime() == null || history.getDeleteReason() == null) throw unavailable();
+        applications.update(application, input.expectedVersion());
+        rounds.complete(application.tenantId(), id, roundNo, instanceId, SubmissionRound.Status.CANCELLED, reason, actor.userId(), completedAt);
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), id, application.version(), roundNo,
+                instanceId, actor.userId(), ApplicationAuditPort.Action.INSTANCE_TERMINATE, ApplicationStatus.IN_APPROVAL,
+                ApplicationStatus.CANCELLED, reason));
+        stops.after(plan, application, actor.userId());
+        expenses.release(application, actor.userId(), completedAt);
+        procurement.releaseStopped(application, actor.userId(), completedAt);
+        notifications.instanceTerminated(application, actor.userId(), audience);
+        return view(application, roundNo, State.ENDED, null, false);
+    }
+
     private List<Binding> family(Binding root) {
         var active = new ArrayList<Binding>();
         collect(root, true, new HashSet<>(), active);
@@ -208,7 +251,8 @@ public class InstanceControlService {
     }
     private View view(Application application, int round, State state, Instant pausedAt, boolean administrator) {
         return new View(application.id(), round, application.version(), state, pausedAt,
-                administrator && state == State.RUNNING, administrator && state == State.PAUSED && pausedAt != null);
+                administrator && state == State.RUNNING, administrator && state == State.PAUSED && pausedAt != null,
+                administrator && (state == State.RUNNING || state == State.PAUSED));
     }
     private String save(Binding binding, UUID rootId, Actor actor, Input input, ApplicationAuditPort.Action action, long previousVersion) {
         var application = binding.application(); applications.update(application, previousVersion);
@@ -233,7 +277,7 @@ public class InstanceControlService {
     /** @author owlzhangfq@gmail.com */
     public enum State { RUNNING, PAUSED, ENDED, UNAVAILABLE }
     /** @author owlzhangfq@gmail.com */
-    public record View(UUID applicationId, int roundNo, long applicationVersion, State state, Instant pausedAt, boolean canPause, boolean canResume) { }
+    public record View(UUID applicationId, int roundNo, long applicationVersion, State state, Instant pausedAt, boolean canPause, boolean canResume, boolean canTerminate) { }
     /** @author owlzhangfq@gmail.com */
     public record Input(@NotNull @Positive Long expectedVersion, @NotBlank @Size(max = 2000) String reason) {
         /** 禁止客户端传入计时、审批人或跳转位置。 */

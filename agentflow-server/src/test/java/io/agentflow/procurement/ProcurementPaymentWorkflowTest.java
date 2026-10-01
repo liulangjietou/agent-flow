@@ -292,6 +292,44 @@ class ProcurementPaymentWorkflowTest {
         UUID draft = create(); ok(send(path(draft) + "/cancel", "alice", lifecycle(draft)), 200); assertThat(reservations.history("demo", draft)).isEmpty();
     }
 
+    @Test void terminatingPausedProcurementReleasesOnlyTheOriginalHoldAndPreservesTheFinancialRound() throws Exception {
+        UUID id = create(); submit(id);
+        var original = current(id); var held = reservations.active("demo", id).orElseThrow();
+        String runtime = "/api/v1/applications/" + app(id).id() + "/rounds/1/runtime";
+        ok(send(runtime + "/pause", "admin", Map.of("expectedVersion", app(id).version(), "reason", "原采购暂停")), 200);
+        ok(send(runtime + "/terminate", "admin", Map.of("expectedVersion", app(id).version(), "reason", "本次应付申请重复")), 200);
+        assertThat(app(id).status()).isEqualTo(ApplicationStatus.CANCELLED);
+        assertThat(reservations.active("demo", id)).isEmpty();
+        var released = reservations.history("demo", id).get(0);
+        assertThat(released.id()).isEqualTo(held.id());
+        assertThat(released.source()).isEqualTo(held.source());
+        assertThat(released.release().reason()).isEqualTo(ProcurementPayableReservation.ReleaseReason.CANCELLED);
+        assertThat(current(id).version()).isEqualTo(original.version());
+        assertThat(current(id).currentRound()).isEqualTo(original.currentRound());
+        assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app(id).id().toString()).count()).isZero();
+    }
+
+    @Test void failedTerminationReleaseRestoresPausedProcurementAndItsOriginalHold() throws Exception {
+        UUID id = create(); submit(id);
+        var held = reservations.active("demo", id).orElseThrow();
+        String runtime = "/api/v1/applications/" + app(id).id() + "/rounds/1/runtime";
+        ok(send(runtime + "/pause", "admin", Map.of("expectedVersion", app(id).version(), "reason", "保留原暂停")), 200);
+        long version = app(id).version();
+        String taskId = tasks.createTaskQuery().processVariableValueEquals("applicationId", app(id).id().toString()).singleResult().getId();
+        jdbc.execute("ALTER TABLE procurement_payable_reservation_revision ADD CONSTRAINT ck_procurement_termination_fixture CHECK (reservation_id <> '" + held.id() + "' OR version <> 2)");
+        try {
+            assertThatThrownBy(() -> send(runtime + "/terminate", "admin", Map.of("expectedVersion", version, "reason", "释放失败必须整体回滚")))
+                    .isInstanceOf(jakarta.servlet.ServletException.class).hasRootCauseInstanceOf(java.sql.SQLException.class);
+            assertThat(app(id).status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+            assertThat(app(id).version()).isEqualTo(version);
+            assertThat(tasks.createTaskQuery().taskId(taskId).singleResult().isSuspended()).isTrue();
+            assertThat(reservations.active("demo", id).orElseThrow()).isEqualTo(held);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='INSTANCE_TERMINATE'", Integer.class, app(id).id().toString())).isZero();
+        } finally { jdbc.execute("ALTER TABLE procurement_payable_reservation_revision DROP CONSTRAINT ck_procurement_termination_fixture"); }
+        ok(send(runtime + "/terminate", "admin", Map.of("expectedVersion", version, "reason", "恢复后重新明确终止")), 200);
+        assertThat(reservations.active("demo", id)).isEmpty();
+    }
+
     @Test void concurrentSubmissionsForOnePayableStartOnlyOneApproval() throws Exception {
         UUID first = create(), second = create(); var firstInput = submission(first, ready(first)); var secondInput = submission(second, ready(second));
         var start = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);

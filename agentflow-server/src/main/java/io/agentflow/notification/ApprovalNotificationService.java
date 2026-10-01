@@ -48,6 +48,16 @@ public class ApprovalNotificationService {
         return audience.pending(application.tenantId(), application.id());
     }
 
+    /** 终止前包含暂停任务，避免原审批人漏收本轮结束通知。 */
+    public List<TaskAudiencePort.Audience> unfinishedAudience(Application application) {
+        return audience.unfinished(application.tenantId(), application.id());
+    }
+
+    /** 具名终止通知使用实际取消结论，不复制操作原因或新增读取授权。 */
+    public void instanceTerminated(Application application, String actor, List<TaskAudiencePort.Audience> previous) {
+        instanceChanged(application, actor, Kind.APPLICATION_CANCELLED, previous);
+    }
+
     /** 撤回通知不赋予历史候选人新的申请读取权限。 */
     public void withdrawn(Application application, String actor, List<TaskAudiencePort.Audience> previous) {
         send(application, actor, application.createdBy(), Kind.APPLICATION_WITHDRAWN, null, null);

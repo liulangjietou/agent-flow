@@ -20,7 +20,7 @@ const heading = computed(() => isAudit.value ? '操作审计' : '审批轨迹')
 const actionOptions = [
   ['CREATE', '创建草稿'], ['EXPENSE_REDUCE', '费用核减'], ['REVISE', '修改申请'], ['SUBMIT', '提交申请'], ['WITHDRAW', '撤回申请'], ['CANCEL', '作废申请'],
   ['CLAIM', '领取任务'], ['RELEASE', '释放任务'], ['TRANSFER', '转交任务'], ['DELEGATE', '委派任务'], ['RESOLVE', '回交任务'],
-  ['INSTANCE_PAUSE', '暂停审批'], ['INSTANCE_RESUME', '恢复审批'],
+  ['INSTANCE_PAUSE', '暂停审批'], ['INSTANCE_RESUME', '恢复审批'], ['INSTANCE_TERMINATE', '终止审批'],
   ['TIMER_ELAPSED', '定时等待已到期'], ['TIMER_FAILED', '定时推进失败'], ['TIMER_RETRY', '重试原定时等待'],
   ['EVENT_RECEIVED', '事件已推进等待'],
   ['SUBPROCESS_COMPLETED', '子审批完成并接续'],

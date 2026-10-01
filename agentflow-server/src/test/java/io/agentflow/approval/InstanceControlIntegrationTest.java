@@ -22,6 +22,8 @@ import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
@@ -65,6 +67,7 @@ class InstanceControlIntegrationTest {
     @Autowired ProcessEngine engine;
     @Autowired FlowableTaskDeadlineReminders reminders;
     @Autowired JdbcTemplate jdbc;
+    @Autowired io.agentflow.approval.repository.SubmissionRoundRepository rounds;
     @MockitoSpyBean InboxRepository inbox;
     @MockitoSpyBean io.agentflow.approval.repository.ApplicationRepository applications;
 
@@ -77,6 +80,89 @@ class InstanceControlIntegrationTest {
     }
     @AfterEach
     void resetClock() { engine.getProcessEngineConfiguration().getClock().reset(); }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void administratorTerminatesRunningAndPausedRoundsWithoutInventingAnApproval(boolean paused) throws Exception {
+        setTime("2026-09-23T09:00:00Z");
+        String id = submitted(calendar(), false);
+        String instanceId = instance(id);
+        var original = task(id);
+        var frozen = rounds.findByRound("demo", UUID.fromString(id), 1).orElseThrow();
+        assertThat(read(control(id), "admin").path("canTerminate").asBoolean()).isTrue();
+        assertThat(read(control(id), "manager").path("canTerminate").asBoolean()).isFalse();
+        if (paused) action(id, "pause", 2, "核对后终止");
+        int version = paused ? 3 : 2;
+        var receipt = action(id, "terminate", version, "  申请重复，管理员明确终止  ");
+        assertThat(receipt.path("state").asText()).isEqualTo("ENDED");
+        assertThat(receipt.path("applicationVersion").asLong()).isEqualTo(version + 1);
+        assertThat(receipt.path("canTerminate").asBoolean()).isFalse();
+        assertThat(runtime.createProcessInstanceQuery().processInstanceId(instanceId).count()).isZero();
+        assertThat(tasks.createTaskQuery().taskId(original.getId()).count()).isZero();
+        var history = engine.getHistoryService().createHistoricProcessInstanceQuery().processInstanceId(instanceId).singleResult();
+        assertThat(history.getEndTime()).isNotNull();
+        assertThat(history.getDeleteReason()).isNotBlank().doesNotContain("申请重复");
+        assertThat(read("/applications/" + id, "alice").path("status").asText()).isEqualTo("CANCELLED");
+        assertThat(read("/applications/" + id, "alice").path("payload").path("amount").asText()).isEqualTo("123.45");
+        assertThat(audits(id, "INSTANCE_TERMINATE")).isEqualTo(1);
+        assertThat(audits(id, "APPROVE")).isZero();
+        var ended = rounds.findByRound("demo", UUID.fromString(id), 1).orElseThrow();
+        assertThat(ended.status()).isEqualTo(io.agentflow.approval.model.SubmissionRound.Status.CANCELLED);
+        assertThat(ended.completedBy()).isEqualTo("admin");
+        assertThat(ended.reason()).isEqualTo("申请重复，管理员明确终止");
+        assertThat(ended.payload()).isEqualTo(frozen.payload());
+        assertThat(ended.initiatorContext()).isEqualTo(frozen.initiatorContext());
+        assertThat(engine.getHistoryService().createHistoricTaskInstanceQuery().taskId(original.getId()).singleResult().getDeleteReason()).isNotBlank();
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE application_id=? AND kind='APPLICATION_CANCELLED' ORDER BY recipient_id", String.class, id))
+                .containsExactly("alice", "manager");
+        write(control(id) + "/resume", "admin", Map.of("expectedVersion", version + 1, "reason", "终止后不能恢复"), 404, null);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void terminationNotificationFailureRestoresNativeRoundAuditAndOriginalPause(boolean paused) throws Exception {
+        String id = submitted(calendar(), false);
+        if (paused) action(id, "pause", 2, "原暂停必须保持");
+        long version = paused ? 3 : 2;
+        var original = task(id);
+        var round = rounds.findByRound("demo", UUID.fromString(id), 1).orElseThrow();
+        Object pauseAt = runtime.getVariable(instance(id), InstanceControlService.PAUSED_AT);
+        int outbox = jdbc.queryForObject("SELECT COUNT(*) FROM webhook_delivery WHERE application_id=?", Integer.class, id);
+        failNotification(InboxMessage.Kind.APPLICATION_CANCELLED);
+        write(control(id) + "/terminate", "admin", Map.of("expectedVersion", version, "reason", "末尾失败必须整体回滚"), 503, null);
+        assertThat(task(id).getId()).isEqualTo(original.getId());
+        assertThat(task(id).isSuspended()).isEqualTo(paused);
+        assertThat(task(id).getDueDate()).isEqualTo(original.getDueDate());
+        assertThat(runtime.getVariable(instance(id), InstanceControlService.PAUSED_AT)).isEqualTo(pauseAt);
+        assertThat(rounds.findByRound("demo", UUID.fromString(id), 1).orElseThrow()).isEqualTo(round);
+        assertThat(audits(id, "INSTANCE_TERMINATE")).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM webhook_delivery WHERE application_id=?", Integer.class, id)).isEqualTo(outbox);
+        doCallRealMethod().when(inbox).append(anyString(), any());
+        action(id, "terminate", (int) version, "依赖恢复后明确终止");
+    }
+
+    @Test
+    void terminationRejectsUnauthorizedStaleAndWrongRoundsAndReplaysOnlyForCurrentAdministrator() throws Exception {
+        String id = submitted(calendar(), false);
+        String path = control(id) + "/terminate";
+        var input = Map.of("expectedVersion", 2, "reason", "管理员终止原轮次");
+        for (String user : List.of("alice", "manager")) write(path, user, input, 403, null);
+        write(path, "admin", Map.of("expectedVersion", 1, "reason", "过期请求"), 409, null);
+        write(path, "admin", Map.of("expectedVersion", 2, "reason", " "), 400, null);
+        write(path, "admin", Map.of("expectedVersion", 2, "reason", "不能跳转", "nodeId", "end"), 400, null);
+        write(path.replace("/1/", "/2/"), "admin", input, 404, null);
+        doReturn(new Actor("other", "admin", Set.of("ADMIN"))).when(auth).authenticate("foreign-termination-admin");
+        mvc.perform(post("/api/v1" + path).header("Authorization", "Bearer foreign-termination-admin").contentType(MediaType.APPLICATION_JSON)
+                .content(json.write(input))).andExpect(status().isNotFound());
+        String key = UUID.randomUUID().toString();
+        var first = write(path, "admin", input, 200, key);
+        assertThat(write(path, "admin", input, 200, key)).isEqualTo(first);
+        assertThat(audits(id, "INSTANCE_TERMINATE")).isEqualTo(1);
+        String bearer = token("admin");
+        doReturn(new Actor("demo", "admin", Set.of("EMPLOYEE"))).when(auth).authenticate(bearer.substring(7));
+        mvc.perform(post("/api/v1" + path).header("Authorization", bearer).header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(input))).andExpect(status().isForbidden());
+    }
 
     @Test
     void controlledPauseBlocksActionsAndPreservesFrozenCalendarAndFractionalRemainingTime() throws Exception {

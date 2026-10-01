@@ -13,15 +13,48 @@ globalThis.localStorage = { getItem: () => 'instance-test-token', setItem() {}, 
 const box = value => ({ value })
 const settle = () => new Promise(resolve => setImmediate(resolve))
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
-const view = () => ({ applicationId: 'application', roundNo: 1, applicationVersion: 3, state: 'RUNNING', canPause: true, canResume: false })
+const view = () => ({ applicationId: 'application', roundNo: 1, applicationVersion: 3, state: 'RUNNING', canPause: true, canResume: false, canTerminate: true })
 const paused = () => ({ ...view(), applicationVersion: 4, state: 'PAUSED', pausedAt: '2026-10-01T08:00:00Z', canPause: false, canResume: true })
 const input = () => ({ expectedVersion: 3, reason: '核对当前审批资料' })
+const ended = version => ({ ...view(), applicationVersion: version, state: 'ENDED', canPause: false, canResume: false, canTerminate: false })
 const panelProps = () => reactive({ applicationId: 'application', roundNo: 1, version: 3, scopeKey: 'demo:admin', locked: false })
 function mount(Component, props, handlers = {}) {
   const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, ...handlers })
   const instance = app.mount({})
   return { state: instance.$.setupState, close: () => { app.unmount(); Object.assign(api, originalApi) } }
 }
+
+test('终止要求本轮管理权限和明确原因，只接受无后续操作能力的终态回执', () => {
+  for (const initial of [view(), paused()]) {
+    const command = rules.instanceControlInput(initial, initial.applicationVersion, 'terminate', '  明确终止原审批  ')
+    assert.deepEqual(command, { expectedVersion: initial.applicationVersion, reason: '明确终止原审批' })
+    rules.validateInstanceReceipt(ended(initial.applicationVersion + 1), 'application', 1, 'terminate', command)
+    for (const invalid of [initial, { ...ended(initial.applicationVersion + 1), canTerminate: true },
+      { ...ended(initial.applicationVersion + 1), pausedAt: paused().pausedAt }, ended(initial.applicationVersion)]) {
+      assert.throws(() => rules.validateInstanceReceipt(invalid, 'application', 1, 'terminate', command), e => e.code === 'RESPONSE_UNREADABLE')
+    }
+    assert.throws(() => rules.instanceControlInput({ ...initial, canTerminate: false }, initial.applicationVersion, 'terminate', '原因'))
+  }
+})
+
+test('运行和暂停中的终止面板均先确认，取消不发送，成功只刷新原申请', async () => {
+  for (const initial of [view(), paused()]) {
+    const props = panelProps(), sent = [], changed = []
+    props.version = initial.applicationVersion
+    api.instanceControl = async () => initial
+    api.controlInstance = async (...args) => { sent.push(args); return ended(initial.applicationVersion + 1) }
+    const p = mount(Panel, props, { onChanged: () => changed.push(true) })
+    try {
+      await settle(); await p.state.prepare('terminate'); assert.equal(p.state.selected, 'terminate')
+      assert.equal(p.state.actionLabel, '终止审批'); assert.equal(sent.length, 0)
+      p.state.cancel(); await p.state.execute(); assert.equal(sent.length, 0)
+      await p.state.prepare('terminate'); await p.state.execute(); assert.equal(sent.length, 0)
+      p.state.reason = '管理员确认不再办理'; await p.state.execute()
+      assert.deepEqual(sent, [['application', 1, 'terminate', { expectedVersion: initial.applicationVersion, reason: '管理员确认不再办理' }]])
+      assert.equal(changed.length, 1)
+    } finally { p.close() }
+  }
+})
 
 test('运行状态读取严格绑定申请、轮次和操作能力，原生暂停缺少依据时仅可读', () => {
   rules.validateInstanceView(view(), 'application', 1)
@@ -178,15 +211,36 @@ test('HTTP 200 串轮回执保留原请求，不能修改原因后重发', async
   } finally { globalThis.fetch = originalFetch; bindAuthenticationActor(null) }
 })
 
-test('暂停或恢复原回执按申请子操作重读详情，不将运行回执当成完整申请', async () => {
+test('终止响应丢失或终态回执不完整时保留原键，恢复不会创建第二次终止', async () => {
+  const calls = []; writeRequests.setActor({ tenantId: 'demo', userId: 'termination-unreadable' })
+  try {
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url, ...init })
+      if (calls.length === 1) throw new Error('lost termination response')
+      return Response.json(calls.length === 2 ? { ...ended(4), canTerminate: true } : ended(4))
+    }
+    await assert.rejects(api.controlInstance('application', 1, 'terminate', input()))
+    const original = writeRequests.pending()[0]
+    assert.match(original.label, /终止/)
+    await assert.rejects(writeRequests.recover(original.id), e => e.code === 'RESPONSE_UNREADABLE')
+    assert.equal(writeRequests.pending()[0].id, original.id)
+    await writeRequests.recover(original.id)
+    assert.equal(writeRequests.pending().length, 0)
+    assert.equal(new Set(calls.map(call => call.headers.get('Idempotency-Key'))).size, 1)
+    assert.equal(new Set(calls.map(call => call.body)).size, 1)
+    assert.ok(calls.every(call => call.url.endsWith('/runtime/terminate')))
+  } finally { globalThis.fetch = originalFetch; bindAuthenticationActor(null) }
+})
+
+test('暂停恢复或终止原回执按申请子操作重读详情，不将运行回执当成完整申请', async () => {
   const before = globalThis.document; globalThis.document = { querySelector: () => null }
   try {
-    for (const action of ['pause', 'resume']) {
+    for (const action of ['pause', 'resume', 'terminate']) {
       let cleared = 0
       const pending = { id: 'original', path: `/applications/application%2Fencoded/rounds/1/runtime/${action}`, sending: false }
       const deps = { pendingWrites: box([pending]), draftScope: box(''), confirmReplaceDefinition: async (_label, work) => work(),
         busy: box(false), recoveryError: box(''), writeRequests: { recover: async () => ({ request: pending,
-          result: { applicationId: 'application', roundNo: 1, applicationVersion: 4, state: action === 'pause' ? 'PAUSED' : 'RUNNING' } }) },
+          result: { applicationId: 'application', roundNo: 1, applicationVersion: 4, state: action === 'pause' ? 'PAUSED' : action === 'resume' ? 'RUNNING' : 'ENDED' } }) },
         notice: box(''), createdApplication: box(null), newApplicationOpen: box(false), recordApplicationId: box('application/encoded'),
         activeTask: box({ applicationId: 'application/encoded' }), clearTaskSelection: () => { cleared++ }, recordRefresh: box(0), templateRefresh: box(0), statusLabel: value => value, refreshWorkspace: async () => {},
         nextTick: async () => {}, workspace: box(null), errorMessage: e => e.message }

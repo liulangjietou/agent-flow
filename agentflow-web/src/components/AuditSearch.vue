@@ -12,7 +12,7 @@ const query = reactive(new AuditSearchQuery((filters, signal) => api.searchAudit
 const exporter = reactive(new WorkbookExportQuery<AuditExportFilters>((filters, signal) => api.exportAudit(filters, signal)))
 const appliedFilters = ref<AuditExportFilters>({}), downloadUrl = ref('')
 const submitted = ref(''), validation = ref('')
-const actions: Record<string, string> = { INSTANCE_PAUSE: '暂停审批', INSTANCE_RESUME: '恢复审批', TIMER_ELAPSED: '定时等待已到期', TIMER_FAILED: '定时推进失败', TIMER_RETRY: '重试原定时等待', EVENT_RECEIVED: '事件已推进等待', SUBPROCESS_COMPLETED: '子审批完成并接续', SUBPROCESS_STOPPED: '父子审批停止联动', CREATE: '创建申请', EXPENSE_REDUCE: '费用核减', REVISE: '修改申请', SUBMIT: '提交审批', WITHDRAW: '撤回申请', CANCEL: '作废申请', CLAIM: '认领任务', RELEASE: '释放任务', TRANSFER: '转办', DELEGATE: '委派', RESOLVE: '完成委派', RETURN: '退回', REJECT: '驳回', APPROVE: '同意', ADD_SIGNER: '增加会签人', REMOVE_SIGNER: '移除会签人' }
+const actions: Record<string, string> = { INSTANCE_PAUSE: '暂停审批', INSTANCE_RESUME: '恢复审批', INSTANCE_TERMINATE: '终止审批', TIMER_ELAPSED: '定时等待已到期', TIMER_FAILED: '定时推进失败', TIMER_RETRY: '重试原定时等待', EVENT_RECEIVED: '事件已推进等待', SUBPROCESS_COMPLETED: '子审批完成并接续', SUBPROCESS_STOPPED: '父子审批停止联动', CREATE: '创建申请', EXPENSE_REDUCE: '费用核减', REVISE: '修改申请', SUBMIT: '提交审批', WITHDRAW: '撤回申请', CANCEL: '作废申请', CLAIM: '认领任务', RELEASE: '释放任务', TRANSFER: '转办', DELEGATE: '委派', RESOLVE: '完成委派', RETURN: '退回', REJECT: '驳回', APPROVE: '同意', ADD_SIGNER: '增加会签人', REMOVE_SIGNER: '移除会签人' }
 const sources: Record<string, string> = { Application: '申请操作', Task: '任务操作' }
 const snapshot = () => JSON.stringify(fields)
 const changed = computed(() => submitted.value !== snapshot())

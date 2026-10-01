@@ -330,7 +330,7 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
   const timer = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/timers\/([^/?]+)\/retry$/.exec(operation.path)
   if (timer) validateTimerReceipt(result as TimerReceipt, decodeURIComponent(timer[1]!), Number(timer[2]), decodeURIComponent(timer[3]!), JSON.parse(operation.body!) as TimerRetryInput)
-  const instance = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/runtime\/(pause|resume)$/.exec(operation.path)
+  const instance = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/runtime\/(pause|resume|terminate)$/.exec(operation.path)
   if (instance) validateInstanceReceipt(result as InstanceControlView, decodeURIComponent(instance[1]!), Number(instance[2]), instance[3] as InstanceControlAction, JSON.parse(operation.body!) as InstanceControlInput)
   return result
 })
@@ -354,7 +354,7 @@ export const api = {
   retryEvent: (id: string, input: EventRetryInput) => write<EventInboxItem>(`/integrations/events/${encodeURIComponent(id)}/retry`, 'POST', '重新处理原事件', input),
   eventWaits: (id: string, round: number, signal: AbortSignal) => request<EventWaitView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/event-waits`, { signal, cache: 'no-store' }).then(value => readEventWaits(value, id, round)),
   instanceControl: (id: string, round: number, signal: AbortSignal) => request<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime`, { signal, cache: 'no-store' }),
-  controlInstance: (id: string, round: number, action: InstanceControlAction, input: InstanceControlInput) => write<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime/${action}`, 'POST', action === 'pause' ? '暂停本轮审批' : '恢复本轮审批', input),
+  controlInstance: (id: string, round: number, action: InstanceControlAction, input: InstanceControlInput) => write<InstanceControlView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/runtime/${action}`, 'POST', action === 'pause' ? '暂停本轮审批' : action === 'resume' ? '恢复本轮审批' : '终止本轮审批', input),
   timerWaits: (id: string, round: number, signal: AbortSignal) => request<TimerView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers`, { signal, cache: 'no-store' }),
   retryTimer: (id: string, round: number, jobId: string, input: TimerRetryInput) => write<TimerReceipt>(`/applications/${encodeURIComponent(id)}/rounds/${round}/timers/${encodeURIComponent(jobId)}/retry`, 'POST', '重试原定时等待', input),
   vouchers: (id: string, roundNo: number, signal: AbortSignal) => request<VoucherView>(`/applications/${encodeURIComponent(id)}/vouchers` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

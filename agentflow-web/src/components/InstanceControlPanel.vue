@@ -7,16 +7,20 @@ const emit = defineEmits<{ changed: []; state: [value: InstanceControlView | nul
 const query = reactive(new InstanceControlQuery(api.instanceControl))
 const selected = ref<InstanceControlAction | null>(null), reason = ref(''), error = ref(''), busy = ref(false)
 const reasonInput = ref<HTMLTextAreaElement | null>(null), trigger = ref<HTMLButtonElement | null>(null)
+const terminationTrigger = ref<HTMLButtonElement | null>(null)
 const fresh = computed(() => query.value?.applicationVersion === props.version)
 const blocked = computed(() => props.locked || busy.value || query.loading || !fresh.value)
 const labels = { RUNNING: '正常办理', PAUSED: '审批已暂停', ENDED: '本轮已结束', UNAVAILABLE: '运行状态不可用' }
-const actionLabel = computed(() => selected.value === 'pause' ? '暂停审批' : '恢复审批')
+const actionLabel = computed(() => selected.value === 'pause' ? '暂停审批' : selected.value === 'resume' ? '恢复审批' : '终止审批')
 const time = (value: string) => new Date(value).toLocaleString('zh-CN')
 let generation = 0
 
-function cancel() { selected.value = null; reason.value = ''; error.value = ''; void nextTick(() => trigger.value?.focus()) }
+function cancel() {
+  const origin = selected.value === 'terminate' ? terminationTrigger.value : trigger.value
+  selected.value = null; reason.value = ''; error.value = ''; void nextTick(() => origin?.focus())
+}
 async function prepare(action: InstanceControlAction) {
-  if (blocked.value || !query.value || !(action === 'pause' ? query.value.canPause : query.value.canResume)) return
+  if (blocked.value || !query.value || !(action === 'pause' ? query.value.canPause : action === 'resume' ? query.value.canResume : query.value.canTerminate)) return
   cancel(); selected.value = action
   await nextTick(); reasonInput.value?.focus()
 }
@@ -61,12 +65,16 @@ onUnmounted(() => { generation++; query.clear(); emit('busy', false) })
       <form v-else-if="selected" @submit.prevent="execute">
         <h4>确认{{ actionLabel }}</h4>
         <p v-if="selected === 'pause'">本轮审批与定时推进将暂停，人工任务保留剩余办理时长。原审批意见和财务占用保留。</p>
-        <p v-else>接续原任务与剩余工作时长，已经超时的任务仍保持超时。原定时等待若已到期，将继续推进。</p>
-        <label>{{ selected === 'pause' ? '暂停原因' : '恢复原因' }}<textarea ref="reasonInput" v-model="reason" required maxlength="2000" rows="3" :disabled="busy || locked" /></label>
+        <p v-else-if="selected === 'resume'">接续原任务与剩余工作时长，已经超时的任务仍保持超时。原定时等待若已到期，将继续推进。</p>
+        <p v-else>本轮及未完成的子审批将取消，终止后不能恢复或重新提交。已完成的审批意见保留。相关财务占用按实际状态释放，外部结果未知时继续对账。</p>
+        <label>操作原因<textarea ref="reasonInput" v-model="reason" required maxlength="2000" rows="3" :disabled="busy || locked" /></label>
         <p v-if="error" class="instance-error" role="alert">{{ error }}</p>
         <div class="instance-actions"><button type="button" class="secondary" :disabled="busy" @click="cancel">取消操作</button><button type="submit" class="primary" :disabled="blocked || !reason.trim()">{{ busy ? '正在处理…' : `确认${actionLabel}` }}</button></div>
       </form>
-      <div v-else-if="query.value.canPause || query.value.canResume" class="instance-actions"><button ref="trigger" type="button" class="secondary" :disabled="blocked" @click="prepare(query.value.canPause ? 'pause' : 'resume')">{{ query.value.canPause ? '暂停本轮审批' : '恢复本轮审批' }}</button></div>
+      <div v-else-if="query.value.canPause || query.value.canResume || query.value.canTerminate" class="instance-actions">
+        <button v-if="query.value.canPause || query.value.canResume" ref="trigger" type="button" class="secondary" :disabled="blocked" @click="prepare(query.value.canPause ? 'pause' : 'resume')">{{ query.value.canPause ? '暂停本轮审批' : '恢复本轮审批' }}</button>
+        <button v-if="query.value.canTerminate" ref="terminationTrigger" type="button" class="secondary" :disabled="blocked" @click="prepare('terminate')">终止本轮审批</button>
+      </div>
     </template>
   </section>
 </template>

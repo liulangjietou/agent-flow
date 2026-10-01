@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 /**
- * 当前轮次的显式暂停与恢复，原请求未知结果通过共享幂等机制恢复。
+ * 当前轮次的显式暂停、恢复与终止，原请求未知结果通过共享幂等机制恢复。
  * @author owlzhangfq@gmail.com
  */
 @RestController
@@ -44,6 +44,14 @@ public class InstanceControlController {
             @Valid @RequestBody InstanceControlService.Input input, HttpServletRequest request) {
         int number = round(roundNo, request); instances.requireAdministrator();
         return result(idempotency.execute(request, HttpStatus.OK, () -> instances.resume(id, number, input)));
+    }
+
+    /** 终止只针对当前在审根轮次；原回执重放仍要求当前管理员身份。 */
+    @PostMapping("/terminate")
+    public ResponseEntity<String> terminate(@PathVariable UUID id, @PathVariable String roundNo,
+            @Valid @RequestBody InstanceControlService.Input input, HttpServletRequest request) {
+        int number = round(roundNo, request); instances.requireAdministrator();
+        return result(idempotency.execute(request, HttpStatus.OK, () -> instances.terminate(id, number, input)));
     }
 
     private ResponseEntity<String> result(ResponseEntity<String> value) {

@@ -2,10 +2,10 @@
 export interface InstanceControlView {
   applicationId: string; roundNo: number; applicationVersion: number
   state: 'RUNNING' | 'PAUSED' | 'ENDED' | 'UNAVAILABLE'
-  pausedAt?: string | null; canPause: boolean; canResume: boolean
+  pausedAt?: string | null; canPause: boolean; canResume: boolean; canTerminate: boolean
 }
 /** @author owlzhangfq@gmail.com */
-export type InstanceControlAction = 'pause' | 'resume'
+export type InstanceControlAction = 'pause' | 'resume' | 'terminate'
 /** @author owlzhangfq@gmail.com */
 export interface InstanceControlInput { expectedVersion: number; reason: string }
 const positive = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) > 0
@@ -15,7 +15,8 @@ const time = (value: unknown): value is string => typeof value === 'string' && !
 export function validateInstanceView(value: InstanceControlView, id: string, round: number) {
   if (!value || value.applicationId !== id || value.roundNo !== round || !positive(value.applicationVersion)
       || !['RUNNING', 'PAUSED', 'ENDED', 'UNAVAILABLE'].includes(value.state)
-      || typeof value.canPause !== 'boolean' || typeof value.canResume !== 'boolean'
+      || typeof value.canPause !== 'boolean' || typeof value.canResume !== 'boolean' || typeof value.canTerminate !== 'boolean'
+      || value.canTerminate && !['RUNNING', 'PAUSED'].includes(value.state)
       || value.canPause && value.state !== 'RUNNING' || value.canResume && (value.state !== 'PAUSED' || !time(value.pausedAt))
       || value.pausedAt != null && (value.state !== 'PAUSED' || !time(value.pausedAt))) {
     throw new Error('运行状态与当前轮次不一致，请重新读取。')
@@ -26,7 +27,9 @@ export function validateInstanceView(value: InstanceControlView, id: string, rou
 /** 确认必须使用当前详情版本、当前能力与明确原因，不能传入新期限或审批结论。 */
 export function instanceControlInput(view: InstanceControlView, version: number, action: InstanceControlAction, reason: string): InstanceControlInput {
   if (!view || view.applicationVersion !== version || !positive(version)
-      || !(action === 'pause' ? view.state === 'RUNNING' && view.canPause : action === 'resume' && view.state === 'PAUSED' && view.canResume)) {
+      || !(action === 'pause' ? view.state === 'RUNNING' && view.canPause
+        : action === 'resume' ? view.state === 'PAUSED' && view.canResume
+        : action === 'terminate' && ['RUNNING', 'PAUSED'].includes(view.state) && view.canTerminate)) {
     throw new Error('当前状态已变化，请刷新申请详情后核对。')
   }
   const comment = reason.trim()
@@ -40,7 +43,8 @@ export function validateInstanceReceipt(value: InstanceControlView, id: string, 
     validateInstanceView(value, id, round)
     if (value.applicationVersion !== input.expectedVersion + 1 || (action === 'pause'
       ? value.state !== 'PAUSED' || !value.canResume || !time(value.pausedAt)
-      : value.state !== 'RUNNING' || !value.canPause)) throw new Error('Invalid instance receipt')
+      : action === 'resume' ? value.state !== 'RUNNING' || !value.canPause
+      : action !== 'terminate' || value.state !== 'ENDED')) throw new Error('Invalid instance receipt')
     return value
   } catch {
     throw { status: 0, code: 'RESPONSE_UNREADABLE', message: '运行操作回执未能核实，请恢复上次操作确认结果。' }

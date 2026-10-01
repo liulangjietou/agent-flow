@@ -37,6 +37,7 @@ public class ApprovalWebhookEvents {
             case TIMER_RETRY -> "TimerWaitRetried";
             case INSTANCE_PAUSE -> "ApplicationPaused";
             case INSTANCE_RESUME -> "ApplicationResumed";
+            case INSTANCE_TERMINATE -> "ApplicationCancelled";
             case EVENT_RECEIVED -> "EventWaitReceived";
             case SUBPROCESS_COMPLETED -> "SubprocessCompleted";
             case SUBPROCESS_STOPPED -> "SubprocessStopped";
