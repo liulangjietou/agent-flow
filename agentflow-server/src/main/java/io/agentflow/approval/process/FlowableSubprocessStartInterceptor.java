@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.flowable.bpmn.model.CallActivity;
+import org.flowable.engine.impl.util.CommandContextUtil;
 import org.flowable.engine.interceptor.StartProcessInstanceAfterContext;
 import org.flowable.engine.interceptor.StartProcessInstanceBeforeContext;
 import org.flowable.engine.interceptor.StartProcessInstanceInterceptor;
@@ -65,8 +66,11 @@ public class FlowableSubprocessStartInterceptor implements StartProcessInstanceI
         Object frozen = parent.getVariableLocal(FlowableProcessRuntimeAdapter.INITIATOR_CONTEXT);
         if (frozen != null && !(frozen instanceof String)) throw invalidContext();
         var initiator = frozen == null ? null : json.read((String) frozen, InitiatorContext.class);
+        // 执行令牌会跨顺序节点复用；活动实例才标识本次调用，且可从当前命令缓存读取。
+        var activation = CommandContextUtil.getActivityInstanceEntityManager().findUnfinishedActivityInstance(execution);
+        if (activation == null || !StringUtils.hasText(activation.getId())) throw invalidContext();
         var source = new SubprocessStartService.Parent(tenant, parentId, round, parent.getId(), execution.getProcessDefinitionId(),
-                activity.getId(), execution.getId(), (Map<String, Object>) payload, initiator);
+                activity.getId(), activation.getId(), (Map<String, Object>) payload, initiator);
         var prepared = starts.getObject().prepare(source, context.getProcessDefinition().getId());
         var child = prepared.child(); var variables = new HashMap<String, Object>();
         variables.put("tenantId", tenant); variables.put("applicationId", child.id().toString());
