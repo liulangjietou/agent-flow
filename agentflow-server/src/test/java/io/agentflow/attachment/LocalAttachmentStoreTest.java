@@ -68,4 +68,25 @@ class LocalAttachmentStoreTest {
         return new Attachment(UUID.randomUUID(), "demo", UUID.randomUUID(), "proof", "验证.bin", bytes.length,
                 HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)), "alice", Instant.now(), Attachment.Status.READY);
     }
+
+    @Test
+    void sharedReferencesReadTheOriginalAndCannotUploadThroughTheChildIdentity() throws Exception {
+        Path root = Files.createTempDirectory(Path.of("/fyoung/tmp"), "agentflow-shared-attachment-");
+        var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore(root.toString(), 1024), 2048, 3);
+        byte[] bytes = {1, 3, 5}; var source = file(bytes);
+        var staged = store.stage(source, new ByteArrayInputStream(bytes)); store.publish(source, staged); store.discard(staged);
+        var child = source.rebind(UUID.randomUUID(), UUID.randomUUID(), "details.proof", "system", Instant.now());
+        var grandchild = child.rebind(UUID.randomUUID(), UUID.randomUUID(), "proof", "system", Instant.now());
+        assertThat(child.contentId()).isEqualTo(source.id());
+        assertThat(grandchild.contentId()).isEqualTo(source.id());
+        assertThat(store.read(child)).isEqualTo(bytes);
+        assertThat(store.read(grandchild)).isEqualTo(bytes);
+        assertThatThrownBy(() -> store.stage(child, new ByteArrayInputStream(bytes))).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("ATTACHMENT_SHARED_CONTENT"));
+        assertThatThrownBy(() -> store.publish(grandchild, root.resolve("unopened"))).isInstanceOf(DomainException.class);
+        try (var files = Files.list(root)) { assertThat(files.map(Path::getFileName).toList()).containsExactly(Path.of(source.id() + ".bin")); }
+        Files.write(root.resolve(source.id() + ".bin"), new byte[]{2, 4, 6});
+        assertThatThrownBy(() -> store.read(child)).isInstanceOfSatisfying(DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("ATTACHMENT_INTEGRITY_FAILED"));
+    }
 }

@@ -35,10 +35,14 @@ public class LocalAttachmentStore {
     public int maxApplicationUploads() { return maxApplicationUploads; }
 
     /** 附件身份只转换为字节指纹，传输仍在事务外进行。 */
-    public Path stage(Attachment attachment, InputStream input) { return originalContract(() -> documents.stage(content(attachment), input)); }
+    public Path stage(Attachment attachment, InputStream input) {
+        attachment.requireUploadOwner();
+        return originalContract(() -> documents.stage(content(attachment), input));
+    }
 
     /** 发布不允许覆盖，同一内容重试保持原义。 */
     public void publish(Attachment attachment, Path staged) {
+        attachment.requireUploadOwner();
         originalContract(() -> { documents.publish(content(attachment), staged); return null; });
     }
 
@@ -51,7 +55,7 @@ public class LocalAttachmentStore {
     /** 配置检查不公开实际目录。 */
     public boolean available() { return documents.available(); }
 
-    private static LocalDocumentStore.Content content(Attachment value) { return new LocalDocumentStore.Content(value.id(), value.size(), value.sha256()); }
+    private static LocalDocumentStore.Content content(Attachment value) { return new LocalDocumentStore.Content(value.contentId(), value.size(), value.sha256()); }
     private static <T> T originalContract(Supplier<T> operation) {
         try { return operation.get(); }
         catch (DomainException failure) { throw new DomainException(failure.code().replace("FILE_", "ATTACHMENT_"), failure.getMessage()); }

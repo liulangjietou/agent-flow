@@ -1,6 +1,7 @@
 package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.attachment.AttachmentReferences;
 import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import org.junit.jupiter.api.Test;
@@ -107,7 +108,7 @@ class SubprocessInputsTest {
     }
 
     @Test
-    void attachmentTransferPlanPreservesSourceAndTargetPathsIncludingRows() {
+    void attachmentTransferPlanPreservesSourceAndTargetFieldPaths() {
         var a = UUID.randomUUID(); var b = UUID.randomUUID();
         var source = schema(field("file", ATTACHMENT, true), table("lines", field("proof", ATTACHMENT, true)));
         var target = schema(field("document", ATTACHMENT, true), table("details", field("proof", ATTACHMENT, true)));
@@ -117,9 +118,26 @@ class SubprocessInputsTest {
         ids.clear();
         assertThat(projected.values().get("document")).isEqualTo(List.of(a.toString()));
         assertThat(projected.attachments()).containsExactlyInAnyOrder(new SubprocessInputs.AttachmentInput("file", "document", a),
-                new SubprocessInputs.AttachmentInput("lines[0].proof", "details[0].proof", b));
+                new SubprocessInputs.AttachmentInput("lines.proof", "details.proof", b));
         failure(() -> bind(Map.of("document", "file"), source, schema(field("document", ATTACHMENT, true)))
                 .project(Map.of("file", List.of("not-an-id"))), "SUBPROCESS_INPUT_VALUE_INVALID");
+    }
+
+    @Test
+    void detailTransferPlanUsesThePersistedAttachmentIdentityAcrossRepeatedRows() {
+        var id = UUID.randomUUID();
+        var source = schema(table("lines", field("proof", ATTACHMENT, true)));
+        var target = schema(table("details", field("proof", ATTACHMENT, true)));
+        var rows = List.of(Map.of("proof", List.of(id.toString())), Map.of("proof", List.of(id.toString())));
+        var payload = Map.<String, Object>of("lines", rows);
+        var projected = bind(Map.of("details", "lines"), source, target).project(payload);
+        var sourceReferences = AttachmentReferences.collect(source, payload);
+        var targetReferences = AttachmentReferences.collect(target, projected.values());
+        assertThat(projected.attachments()).hasSize(1).allSatisfy(input -> {
+            assertThat(sourceReferences).contains(new AttachmentReferences.Reference(input.sourceFieldPath(), input.sourceAttachmentId()));
+            assertThat(targetReferences).contains(new AttachmentReferences.Reference(input.targetFieldPath(), input.sourceAttachmentId()));
+        });
+        assertThat(projected.values().get("details")).isEqualTo(rows);
     }
 
     private SubprocessInputs bind(Map<String, String> inputs, FormSchema source, FormSchema target) {

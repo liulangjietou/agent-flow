@@ -34,9 +34,10 @@ public class JdbcAttachmentRepository {
 
     /** 登记固定内容身份，上传不能更换所属字段或摘要。 */
     public void insert(Attachment file) {
-        jdbc.update("INSERT INTO approval_attachment (id,tenant_id,application_id,field_path,filename,byte_size,sha256,created_by,created_at,status) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO approval_attachment (id,tenant_id,application_id,field_path,filename,byte_size,sha256,created_by,created_at,status,content_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 file.id().toString(), file.tenantId(), file.applicationId().toString(), file.fieldPath(), file.filename(), file.size(), file.sha256(),
-                file.createdBy(), OffsetDateTime.ofInstant(file.createdAt(), ZoneOffset.UTC), file.status().name());
+                file.createdBy(), OffsetDateTime.ofInstant(file.createdAt(), ZoneOffset.UTC), file.status().name(),
+                file.contentId().equals(file.id()) ? null : file.contentId().toString());
     }
 
     /** 先由调用方验证申请访问权限，再读取该申请内的附件。 */
@@ -44,7 +45,8 @@ public class JdbcAttachmentRepository {
         return jdbc.query("SELECT * FROM approval_attachment WHERE tenant_id=? AND application_id=? AND id=?", (row, index) ->
                 new Attachment(UUID.fromString(row.getString("id")), row.getString("tenant_id"), UUID.fromString(row.getString("application_id")),
                         row.getString("field_path"), row.getString("filename"), row.getLong("byte_size"), row.getString("sha256"),
-                        row.getString("created_by"), row.getObject("created_at", OffsetDateTime.class).toInstant(), Attachment.Status.valueOf(row.getString("status"))),
+                        row.getString("created_by"), row.getObject("created_at", OffsetDateTime.class).toInstant(), Attachment.Status.valueOf(row.getString("status")),
+                        row.getString("content_id") == null ? null : UUID.fromString(row.getString("content_id"))),
                 tenant, application.toString(), id.toString()).stream().findFirst().orElseThrow(() -> new DomainException("NOT_FOUND", "Attachment not found"));
     }
 

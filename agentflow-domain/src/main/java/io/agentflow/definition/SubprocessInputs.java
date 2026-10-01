@@ -6,6 +6,7 @@ import io.agentflow.form.FormSchema;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +41,7 @@ public final class SubprocessInputs {
 
     /** 激活时冻结候选输入；附件转移清单须由应用服务完成受控重新绑定后才能提交子申请。 */
     public Projection project(Map<String, Object> sourceValues) {
-        var values = new LinkedHashMap<String, Object>(); var attachments = new ArrayList<AttachmentInput>();
+        var values = new LinkedHashMap<String, Object>(); var attachments = new LinkedHashSet<AttachmentInput>();
         for (var binding : bindings) {
             if (sourceValues.containsKey(binding.source().key())) {
                 values.put(binding.target().key(), copy(binding, sourceValues.get(binding.source().key()),
@@ -74,18 +75,18 @@ public final class SubprocessInputs {
         return new Binding(source, target, List.copyOf(columns));
     }
 
-    private static Object copy(Binding binding, Object value, String sourcePath, String targetPath, List<AttachmentInput> attachments) {
+    private static Object copy(Binding binding, Object value, String sourcePath, String targetPath, Set<AttachmentInput> attachments) {
         if (value == null) return null;
         if (binding.target().type() == FormSchema.FieldType.TABLE) {
             if (!(value instanceof List<?> rows)) throw invalid("SUBPROCESS_INPUT_VALUE_INVALID", "Mapped detail input must be a row collection");
             var result = new ArrayList<Map<String, Object>>();
-            for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
-                if (!(rows.get(rowIndex) instanceof Map<?, ?> row)) throw invalid("SUBPROCESS_INPUT_VALUE_INVALID", "Mapped detail rows must be objects");
+            for (var item : rows) {
+                if (!(item instanceof Map<?, ?> row)) throw invalid("SUBPROCESS_INPUT_VALUE_INVALID", "Mapped detail rows must be objects");
                 var mapped = new LinkedHashMap<String, Object>();
                 for (var column : binding.columns()) if (row.containsKey(column.source().key())) {
                     mapped.put(column.target().key(), copy(column, row.get(column.source().key()),
-                            sourcePath + "[" + rowIndex + "]." + column.source().key(),
-                            targetPath + "[" + rowIndex + "]." + column.target().key(), attachments));
+                            sourcePath + "." + column.source().key(),
+                            targetPath + "." + column.target().key(), attachments));
                 }
                 result.add(Collections.unmodifiableMap(mapped));
             }
