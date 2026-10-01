@@ -1,0 +1,207 @@
+{
+  "recordedAt": "2026-10-01T16:15:55.391310+00:00",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "baseCommit": "d809fcb8eb7f271754cfd434e33db9daa7db5f25",
+  "backendJarSha256": "1b4dc1494a2e1f31a4e4b10577d4c1bbaacc22f50a7bdedc7c7ca1b60bf6cf10",
+  "backendChanged": false,
+  "migrationAdded": false,
+  "scope": [
+    "bounded CLAIM and RELEASE batches",
+    "individual permission and version checks",
+    "per-item existing transaction idempotency and audit",
+    "unknown result stops further sends",
+    "original request recovery never continues remaining batch"
+  ],
+  "red": {
+    "passed": 10,
+    "failed": 1,
+    "failure": "HTTP 200 empty assignment receipt was accepted"
+  },
+  "frontendTests": {
+    "passed": 68,
+    "failed": 0,
+    "newBatchCases": 13,
+    "typecheck": "PASS",
+    "productionBuild": "PASS",
+    "openapi": {
+      "operations": 283,
+      "schemas": 554,
+      "examples": 109
+    }
+  },
+  "http": {
+    "results": [
+      {
+        "source": "task-batch-http-prepare",
+        "responses": 16,
+        "validUpstreamResponses": 16,
+        "intentionallyInvalidBrowserResponses": 0
+      },
+      {
+        "source": "task-batch-http-resume-prepare",
+        "responses": 1,
+        "validUpstreamResponses": 1,
+        "intentionallyInvalidBrowserResponses": 0
+      },
+      {
+        "source": "task-batch-http-conflict",
+        "responses": 2,
+        "validUpstreamResponses": 2,
+        "intentionallyInvalidBrowserResponses": 0
+      },
+      {
+        "source": "task-batch-http-verify-final",
+        "responses": 6,
+        "validUpstreamResponses": 6,
+        "intentionallyInvalidBrowserResponses": 0
+      },
+      {
+        "source": "task-batch-browser-http",
+        "responses": 42,
+        "validUpstreamResponses": 42,
+        "intentionallyInvalidBrowserResponses": 1
+      }
+    ],
+    "taskActionWrites": 13,
+    "conflictResponses": 1,
+    "invalidSuccessResponses": 1
+  },
+  "browser": [
+    "3 independent claims",
+    "3 independent releases",
+    "1 conflict plus 2 successful claims",
+    "1 release succeeded, 1 invalid receipt, 1 unsent",
+    "same task body key and receipt during original recovery",
+    "remaining task reselected and released",
+    "500 CSS pixels without horizontal overflow"
+  ],
+  "data": {
+    "sourceTablesUnchanged": 221,
+    "sourceRowsUnchanged": 1059,
+    "originalFilesUnchanged": 3,
+    "unchangedTables": 200,
+    "originalRowsPresentInTarget": 1059,
+    "finalRows": 1231,
+    "auditCount": 12
+  },
+  "finalApplications": {
+    "count": 3,
+    "status": "IN_APPROVAL",
+    "roundNo": 1,
+    "version": 6,
+    "unclaimed": 3
+  },
+  "recoveryInventory": {
+    "timer": "same failed due job, current round, ADMIN reason and version",
+    "event": "original signed inbox, ADMIN reason and version, original source trust checks",
+    "synchronousCommand": "transaction rollback; unknown original request recovery",
+    "arbitraryServiceTasks": "rejected during validation; native async executor disabled",
+    "result": "no additional undeveloped failure recovery for currently supported workflow nodes"
+  },
+  "remainingWorkPackages": [
+    "notifications and collaboration",
+    "real enterprise finance integration",
+    "enterprise model identity deployment and remote delivery"
+  ],
+  "remotePr": null,
+  "remoteCi": "NOT_RUN_NO_REMOTE",
+  "limitations": [
+    "local synthetic task fixtures",
+    "no batch approval transfer or delegation",
+    "pending request recovery is page-memory only",
+    "external systems not contacted"
+  ],
+  "sourceSha256": {
+    "src/taskBatch.ts": "48953708febc97f67ea4a5857545a285868c451709ff0cc3708de82bed8aa49e",
+    "src/pendingWrites.ts": "b4690b30d6f0fb908d1be17f1d71f70350fe91b32eae84de6d3f42dc1f37b85b",
+    "src/taskActions.ts": "66a42ccf269e4ca6bb0f47991e75bd908371a5f61af9839f655f30b8d08119bd",
+    "src/api.ts": "716c43da61a0b618558983e5c1d04fed0506063647118a3bb9fc0c969fc5e17e",
+    "src/components/TaskBatchPanel.vue": "5f0d049ee9e6066e5c169ffc50c7a7411b7f05e1c69d966bae843bda5fe29b64",
+    "src/components/PendingTaskQueue.vue": "33e9d27e3bbc283675317d28e98a5b5934818e14ff22e68bef0783be0d90f75e",
+    "src/App.vue": "0e617c039e3d660662be51327062dcfc68f0880b25de5fea1320edfecacc7242",
+    "scripts/test-requests.mjs": "ea7b0db47bdf93047fe7c724b249a8b8f3c15f791c5b816527d832282cae98c4",
+    "tests/task-batch.test.mjs": "2b323a68d13ad37e965ace891e26df6abe7febc728b2e3c6a5531623959c9486"
+  },
+  "evidence": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-initial-tests.log",
+      "sha256": "8e4ce93c888b76768a5443fbbad4b8fe3e44d0759dd6b366781788a2cc8a510a",
+      "bytes": 1855
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-regression-tests.log",
+      "sha256": "bc11f3bd580ca068fd21c2db8bd808426553b8d33971842d22b489fd4784cb0c",
+      "bytes": 6801
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-build.log",
+      "sha256": "c217f6eb2ebe8f3de53569cdd280c6b86c81358490459a009c431397dd7da2e7",
+      "bytes": 781
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-openapi.log",
+      "sha256": "091af7fe5cd311586246dc630e7476e91415c57984d689e81929ca3126c6d871",
+      "bytes": 141
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-http-prepare.json",
+      "sha256": "7e179b7d298c7b29d48f94f1bdb393cfb17e9b1aced6463aafd8a2930186bf21",
+      "bytes": 13669
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-http-resume-prepare.json",
+      "sha256": "362535b802ed61cee5176d30ecab085cee6b9fab2401587effb17d68ea8a88c7",
+      "bytes": 381
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-http-conflict.json",
+      "sha256": "7677abea96a59fa921161f9743df8c58eb4bf1232d025b4b7f3337eef2b6af78",
+      "bytes": 941
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-http-verify-final.json",
+      "sha256": "388ef00a8b986bcc84e4a497ac8a3f690be91a962957aede5d681f920d8f4307",
+      "bytes": 3300
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-browser-http.json",
+      "sha256": "987eae4951c89ef73ad587cb0b0e70a41078f243e3efc6f3a076e5ed850c8ce7",
+      "bytes": 36177
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-recovery-evidence.json",
+      "sha256": "e21965dbab5d418b09b8dd26f150d4d17245caaa82ce0d17d5041981d1292dbf",
+      "bytes": 360
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-contract.json",
+      "sha256": "d08f2c9823fd5e983ce22d4269980a4730befabf381ca511d4a17cf4087fb803",
+      "bytes": 928
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-data.json",
+      "sha256": "0e6a3407476263c283f4d34ef8877d08b41541c7a55556f8ef17e05fc0e13b07",
+      "bytes": 33404
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-final.jpg",
+      "sha256": "403ccf5e7375147fe809ba2c1aa13f586591ebcbb70ec35fbdbaf18ffca4322b",
+      "bytes": 74328
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-conflict.jpg",
+      "sha256": "8eb936ca6e649e76c079d7b430ef8f260732549af13b58ea29657f33614d9564",
+      "bytes": 68043
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-unknown.jpg",
+      "sha256": "df321f6a43f9c1a020a0a367c81ad94cca55df9287159ac5ea352571865dd493",
+      "bytes": 73811
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-batch-500px.jpg",
+      "sha256": "20e2412b1e8eb1f7f717b50e5c726544e845fd7037a8f2e64ecb2dcaf1f34ad0",
+      "bytes": 42198
+    }
+  ]
+}

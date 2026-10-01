@@ -7,6 +7,16 @@ export const taskActionLabels: Record<TaskAction, string> = {
 export const needsRecipient = (action: TaskAction) => action === 'TRANSFER' || action === 'DELEGATE'
 export const needsComment = (action: TaskAction) => ['RETURN', 'REJECT', 'RESOLVE'].includes(action)
 
+/** 领取与释放只增加一个版本；回执无法绑定原命令时保留原幂等键供用户恢复。 */
+export function validateTaskAssignmentReceipt(value: unknown, taskId: string, input: TaskActionInput) {
+  if (input.action !== 'CLAIM' && input.action !== 'RELEASE') return
+  const receipt = value as { taskId?: string; action?: string; applicationStatus?: string; version?: number } | null
+  if (!receipt || receipt.taskId !== taskId || receipt.action !== input.action
+      || receipt.applicationStatus !== 'IN_APPROVAL' || receipt.version !== input.expectedVersion + 1) {
+    throw { status: 0, code: 'RESPONSE_UNREADABLE', message: '任务办理回执未能核实，请恢复上次操作确认结果。' }
+  }
+}
+
 /** 只按当前任务快照提交，回交接收人由服务端解析，不能通过表单伪造。 */
 export function taskActionInput(task: Task, action: TaskAction, comment: string, target: string, recipients: string[]): TaskActionInput {
   if (!task.allowedActions?.includes(action)) throw new Error('任务当前不允许此操作，请刷新后重新选择。')

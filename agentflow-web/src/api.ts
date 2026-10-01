@@ -30,6 +30,7 @@ import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
+import { validateTaskAssignmentReceipt } from './taskActions.js'
 import { validateCountersignReceipt, type CountersignInput, type CountersignReceipt, type CountersignView } from './countersignMembership.js'
 import type { PaymentCallbackPage, PaymentCallbackDetail, PaymentCallbackView } from './paymentCallbacks'
 import { readEventDirectory, readEventVersions, readEventOption, readEventContract, readEventContractHistory, readEventInboxItem, readEventInboxPage, readEventInboxHistory, readEventWaits, validateEventMutation, type EventDirectory, type EventVersions, type EventOption, type EventContract, type EventContractHistory, type EventPublication, type EventAvailabilityInput, type EventInboxItem, type EventInboxPage, type EventInboxHistory, type EventRetryInput, type EventWaitView } from './events.js'
@@ -327,6 +328,8 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  const taskAction = /^\/tasks\/([^/?]+)\/actions$/.exec(operation.path)
+  if (taskAction) validateTaskAssignmentReceipt(result, decodeURIComponent(taskAction[1]!), JSON.parse(operation.body!) as TaskActionInput)
   validateEventMutation(result, operation.path, operation.body ?? '{}')
   const membership = /^\/tasks\/([^/?]+)\/countersign-changes$/.exec(operation.path)
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)

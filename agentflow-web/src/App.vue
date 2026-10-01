@@ -1218,7 +1218,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
 
           <div class="work-grid" :class="{ 'board-work-grid': taskQueueView === 'board' }">
-            <PendingTaskQueue ref="taskQueuePanel" v-model:view="taskQueueView" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" @select="selectTask" @clear-selection="clearTaskSelection" />
+            <PendingTaskQueue ref="taskQueuePanel" v-model:view="taskQueueView" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" @select="selectTask" @clear-selection="clearTaskSelection" @changed="refreshWorkspace" />
             <div ref="taskDetailPanel" class="detail panel" tabindex="-1" aria-label="当前待办详情">
               <div v-if="taskQueueView === 'board'" class="board-return"><button type="button" class="quiet" @click="taskQueuePanel?.focusTask(activeTask?.taskId)">↑ 返回待办看板</button></div>
               <div v-if="activeTask" class="detail-body">
