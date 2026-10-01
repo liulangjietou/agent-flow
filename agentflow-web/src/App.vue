@@ -11,6 +11,7 @@ import ApplicationSearch from './components/ApplicationSearch.vue'
 import IntegrationWorkspace from './components/IntegrationWorkspace.vue'
 import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
+import type { CountersignInput, CountersignView } from './countersignMembership'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
 import CashierWorkspace from './components/CashierWorkspace.vue'
 import PaymentBatchWorkspace from './components/PaymentBatchWorkspace.vue'
@@ -517,6 +518,24 @@ async function performAction(input: TaskActionInput) {
     await refreshWorkspace(); notice.value = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
   } catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
+}
+/** 人员变更后重读原任务版本，不能沿旧名单继续批准或自动重提。 */
+async function performMembershipChange(input: CountersignInput, view: CountersignView) {
+  const task = activeTask.value, scope = actorScope.value
+  if (!task || busy.value || writesBlocked.value || task.taskId !== view.taskId || task.version !== input.expectedVersion) return
+  busy.value = true
+  let changed = false
+  try {
+    const result = await api.changeCountersignMembers(task.taskId, input)
+    if (scope !== actorScope.value) return
+    changed = true
+    clearTaskSelection()
+    await refreshWorkspace()
+    notice.value = `${input.action === 'ADD' ? '已增加会签人' : '已移除未决任务'} ${result.targetUser}，当前必要审批人数 ${result.totalAfter}，已有 ${result.completed} 人同意。`
+  } catch (cause) { if (scope === actorScope.value) notice.value = errorMessage(cause) }
+  finally { busy.value = false }
+  // 详情读取遵守已有 busy 保护，必须等写入阶段结束，旧表单已在成功时清除。
+  if (changed && scope === actorScope.value) await selectTask(task)
 }
 /** 标记已读只更新消息；结果不确定时由原请求恢复入口处理。 */
 async function readNotification(message: InboxMessage) {
@@ -1153,7 +1172,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" :task-id="activeTask.taskId" :locked="busy || writesBlocked" :refresh-version="assistRefresh" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
                 <TaskDeadlineStatus :due-at="activeTask.dueAt" />
-                <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" />
+                <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" @membership="performMembershipChange" @refresh="expenseTaskChanged" />
               </div>
               <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
             </div>

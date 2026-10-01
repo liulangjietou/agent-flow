@@ -57,6 +57,13 @@ public class JdbcApplicationRepository implements ApplicationRepository {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Optional<Application> lockById(String tenantId, UUID id) {
+        return jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE",
+                this::map, tenantId, id.toString()).stream().findFirst();
+    }
+
+    @Override
     public Optional<Application> findByBusinessNo(String tenantId, String businessNo) {
         List<Application> rows = jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND business_no=?",
                 this::map, tenantId, businessNo);

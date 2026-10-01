@@ -66,6 +66,16 @@ public class ApprovalNotificationService {
         send(application, actor, application.createdBy(), Kind.EXPENSE_ADJUSTED, null, null);
     }
 
+    /** 加签只通知本次实际新增待办，已有会签人不重复收到提醒。 */
+    public void countersignAdded(Application application, String actor, String targetTaskId) {
+        pending(application, actor, Kind.TASK_PENDING, task -> targetTaskId.equals(task.taskId()));
+    }
+
+    /** 减签通知保留原任务入口，不复制原因、名单或表单，也不授予新的读取权限。 */
+    public void countersignRemoved(Application application, String actor, String targetUser, String targetTaskId, String nodeName) {
+        send(application, actor, targetUser, Kind.TASK_COUNTERSIGN_REMOVED, targetTaskId, nodeName);
+    }
+
     /** 通知内容取已成功执行后的事实；领取不重复提醒，释放提醒恢复的候选人。 */
     public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName,
                           Set<String> previousTaskIds) {

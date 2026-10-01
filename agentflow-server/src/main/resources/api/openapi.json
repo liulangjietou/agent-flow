@@ -6541,7 +6541,9 @@
                 "REJECT",
                 "APPROVE",
                 "CANCEL",
-                "EXPENSE_REDUCE"
+                "EXPENSE_REDUCE",
+                "ADD_SIGNER",
+                "REMOVE_SIGNER"
               ]
             }
           },
@@ -7333,7 +7335,9 @@
                 "REJECT",
                 "TRANSFER",
                 "DELEGATE",
-                "RESOLVE"
+                "RESOLVE",
+                "ADD_SIGNER",
+                "REMOVE_SIGNER"
               ]
             }
           },
@@ -9910,7 +9914,9 @@
                 "RETURN",
                 "REJECT",
                 "APPROVE",
-                "EXPENSE_REDUCE"
+                "EXPENSE_REDUCE",
+                "ADD_SIGNER",
+                "REMOVE_SIGNER"
               ]
             }
           },
@@ -11429,7 +11435,9 @@
                 "RETURN",
                 "REJECT",
                 "APPROVE",
-                "EXPENSE_REDUCE"
+                "EXPENSE_REDUCE",
+                "ADD_SIGNER",
+                "REMOVE_SIGNER"
               ]
             }
           },
@@ -34042,6 +34050,284 @@
           }
         }
       }
+    },
+    "/api/v1/tasks/{taskId}/countersign-members": {
+      "get": {
+        "operationId": "taskCountersignMembers",
+        "tags": [
+          "任务"
+        ],
+        "summary": "读取当前会签责任名单",
+        "description": "仅全员会签；绑定实际当前轮次、定义和多实例。原组织快照不变，未决和完成成员分开展示。查询参数一律拒绝；委派中可以读取但不能增减。",
+        "x-access": "APPROVER、同租户当前有效审批资格及实际当前会签任务关系；管理员没有额外增减权限。",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountersignMembershipView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存任务成员及操作回执。"
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}/countersign-changes": {
+      "post": {
+        "operationId": "changeCountersignMembers",
+        "tags": [
+          "任务"
+        ],
+        "summary": "明确增加或移除会签责任",
+        "description": "当前责任人提交原因及申请版本；加签形成必要实际任务，减签只能取消其他未决且非委派任务，保留已有意见及最后责任。引擎、版本、具名审计、Webhook outbox 和通知同事务。成功回放重新核对当前资格，不要求原任务仍然存在。禁止查询参数。",
+        "x-access": "APPROVER、同租户当前有效审批资格及实际当前会签任务关系；管理员没有额外增减权限。",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountersignMembershipReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存任务成员及操作回执。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CountersignMembershipInput"
+              },
+              "example": {
+                "action": "ADD",
+                "targetUser": "bob",
+                "reason": "补充必要复核",
+                "expectedVersion": 2
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -39552,7 +39838,9 @@
               "RESOLVE",
               "RETURN",
               "REJECT",
-              "APPROVE"
+              "APPROVE",
+              "ADD_SIGNER",
+              "REMOVE_SIGNER"
             ]
           },
           "handledAt": {
@@ -39682,6 +39970,9 @@
           },
           "currentStatus": {
             "type": "string"
+          },
+          "membershipChange": {
+            "$ref": "#/components/schemas/CountersignMembershipChange"
           }
         },
         "required": [
@@ -39755,7 +40046,8 @@
               "TASK_RESOLVED",
               "TASK_OVERDUE",
               "APPLICATION_COPIED",
-              "EXPENSE_ADJUSTED"
+              "EXPENSE_ADJUSTED",
+              "TASK_COUNTERSIGN_REMOVED"
             ]
           },
           "actor": {
@@ -59279,6 +59571,337 @@
             "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           }
         }
+      },
+      "CountersignMember": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1
+          },
+          "assignee": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delegated": {
+            "type": "boolean"
+          },
+          "canRemove": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taskId",
+          "user",
+          "assignee",
+          "delegated",
+          "canRemove"
+        ]
+      },
+      "CountersignMembershipChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targetTaskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "totalBefore": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "totalAfter": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "executionId",
+          "targetTaskId",
+          "totalBefore",
+          "totalAfter",
+          "completed"
+        ]
+      },
+      "CountersignMembershipView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "processInstanceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originalMembers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/CountersignMember"
+            }
+          },
+          "completedUsers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "canChange": {
+            "type": "boolean"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "TASK_DELEGATION_PENDING",
+              null
+            ]
+          },
+          "canAdd": {
+            "type": "boolean"
+          },
+          "additions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "taskId",
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "processInstanceId",
+          "nodeId",
+          "executionId",
+          "originalMembers",
+          "total",
+          "completed",
+          "pending",
+          "completedUsers",
+          "canChange",
+          "canAdd",
+          "additions"
+        ]
+      },
+      "CountersignMembershipReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "processInstanceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "executionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ADD",
+              "REMOVE"
+            ]
+          },
+          "targetTaskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "totalBefore": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "totalAfter": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "targetUser": {
+            "type": "string",
+            "minLength": 1
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "taskId",
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "processInstanceId",
+          "nodeId",
+          "executionId",
+          "action",
+          "targetTaskId",
+          "totalBefore",
+          "totalAfter",
+          "completed",
+          "targetUser",
+          "auditEventId"
+        ]
+      },
+      "CountersignMembershipInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ADD",
+              "REMOVE"
+            ]
+          },
+          "targetUser": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "targetTaskId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": ".*\\S.*"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "action",
+          "reason",
+          "expectedVersion"
+        ],
+        "oneOf": [
+          {
+            "properties": {
+              "action": {
+                "const": "ADD"
+              },
+              "targetUser": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": ".*\\S.*"
+              },
+              "targetTaskId": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "targetUser"
+            ]
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "REMOVE"
+              },
+              "targetTaskId": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": ".*\\S.*"
+              },
+              "targetUser": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "targetTaskId"
+            ]
+          }
+        ]
       }
     }
   }

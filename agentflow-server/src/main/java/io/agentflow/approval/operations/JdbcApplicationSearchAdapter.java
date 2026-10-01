@@ -35,7 +35,7 @@ public class JdbcApplicationSearchAdapter implements ApplicationSearchPort {
             sql.append("""
                     OR EXISTS (SELECT 1 FROM audit_event e WHERE e.tenant_id=a.tenant_id AND e.application_id=a.id
                         AND e.actor_id=? AND e.aggregate_type='Task'
-                        AND e.action IN ('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE')))
+                        AND e.action IN ('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE','ADD_SIGNER','REMOVE_SIGNER')))
                     """);
             parameters.add(actor.userId());
         }

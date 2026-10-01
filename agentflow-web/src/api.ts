@@ -26,6 +26,7 @@ import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
 import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
+import { validateCountersignReceipt, type CountersignInput, type CountersignReceipt, type CountersignView } from './countersignMembership.js'
 import type { PaymentCallbackPage, PaymentCallbackDetail, PaymentCallbackView } from './paymentCallbacks'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
@@ -148,6 +149,7 @@ export interface HistoryEvent {
   aggregateVersion?: number; roundNo?: number; actor?: string; targetUser?: string; comment?: string
   nodeId?: string; nodeName?: string; nodeType?: string; taskId?: string; processInstanceId?: string; definitionVersion?: number
   previousStatus?: string; currentStatus?: string
+  membershipChange?: { executionId: string; targetTaskId: string; totalBefore: number; totalAfter: number; completed: number }
 }
 export interface HistoryPage { items: HistoryEvent[]; nextCursor?: string | null }
 export interface HistoryQuery { roundNo?: number; action?: string; from?: string; to?: string; cursor?: string; limit?: number }
@@ -171,7 +173,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED'
+  kind: 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -242,10 +244,15 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       INVALID_COMMENT_QUERY: '评论筛选或分页已失效，请重新查询。',
   INVALID_OPERATIONS_QUERY: '统计筛选无效：请检查 UTC 日期范围、流程标识和版本，范围最多 366 天。',
       CONCURRENCY_CONFLICT: '数据已被其他操作更新，请重新加载并核对后再操作。',
-      COUNTERSIGN_ASSIGNMENT_FIXED: '会签名单已固定，不能转交、释放或重新领取；可委派协助后回交。',
+      COUNTERSIGN_ASSIGNMENT_FIXED: '会签任务不能转交、释放或重新领取；可委派协助后回交，或使用独立加减签入口。',
       COUNTERSIGN_NO_MEMBERS: '会签节点当前没有有效审批人，本次操作未生效，请联系管理员补齐审批名单。',
-      COUNTERSIGN_STATE_INVALID: '会签执行状态异常，本次操作未生效，请联系管理员核对。',
       TASK_DELEGATION_PENDING: '这项任务处于受托处理阶段，请填写意见并回交给原审批人。',
+      COUNTERSIGN_STATE_INVALID: '当前会签事实无法核实，请刷新任务并核对流程状态。',
+      COUNTERSIGN_MEMBER_UNAVAILABLE: '所选未决会签任务已变化，请重新读取名单。',
+      COUNTERSIGN_MEMBER_LIMIT: '当前会签责任人数已达 100 人，不能继续增加。',
+      COUNTERSIGN_MEMBER_EXISTS: '该人员已在当前节点承担审批责任，不能重复添加。',
+      COUNTERSIGN_LAST_MEMBER: '最后一张必要审批任务不能移除。',
+      COUNTERSIGN_SELF_REMOVAL: '不能移除自己的审批责任。',
       TASK_NOT_DELEGATED: '任务已不在待回交状态，请刷新后重新选择。',
       TASK_DELEGATION_OWNER_MISSING: '原委派责任人缺失，请联系流程管理员核对。',
       INVALID_TASK_QUERY: '待办筛选无效，请检查金额范围并重新查询。',
@@ -313,9 +320,12 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
   } catch { throw { status: 0, code: 'RESPONSE_UNREADABLE', message: businessWrite ? '操作响应未完整接收，请恢复上次操作确认结果。' : '服务响应无法读取，请重试。' } satisfies ApiError }
 }
 
-export const writeRequests = new PendingWrites((operation, key) => request(operation.path, {
-  method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }
-}))
+export const writeRequests = new PendingWrites(async (operation, key) => {
+  const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  const membership = /^\/tasks\/([^/?]+)\/countersign-changes$/.exec(operation.path)
+  if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
+  return result
+})
 function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
   return writeRequests.run<T>({ path, method, label, body: body === undefined ? undefined : JSON.stringify(body) })
 }
@@ -563,6 +573,8 @@ export const api = {
   },
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
+  taskCountersignMembers: (taskId: string, signal: AbortSignal) => request<CountersignView>(`/tasks/${encodeURIComponent(taskId)}/countersign-members`, { signal, cache: 'no-store' }),
+  changeCountersignMembers: (taskId: string, body: CountersignInput) => write<CountersignReceipt>(`/tasks/${encodeURIComponent(taskId)}/countersign-changes`, 'POST', body.action === 'ADD' ? '增加必要会签人' : '移除未决会签任务', body),
   taskAction: (taskId: string, body: TaskActionInput) => write<{ taskId: string; action: string; applicationStatus: string; version: number }>(`/tasks/${encodeURIComponent(taskId)}/actions`, 'POST', '处理审批任务', body),
   searchAudit: (filters: AuditSearchFilters, signal: AbortSignal) => request<AuditSearchPage>('/operations/audit' + historyQuery(filters), { signal }),
   searchApplications: (filters: ApplicationSearchFilters, signal: AbortSignal) => request<ApplicationSearchPage>('/operations/applications' + historyQuery(filters), { signal }),

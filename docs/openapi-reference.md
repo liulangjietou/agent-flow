@@ -50,6 +50,8 @@
 
 会签模式使用人工节点 `properties.approvalMode=ALL`，默认 SINGLE。任务详情可返回 `countersign.total/completed`，并限制固定责任动作。全员规则、空名单回滚与并发处理见[全员会签](all-countersign.md)。
 
+全员会签的加减签使用独立入口：`GET /api/v1/tasks/{taskId}/countersign-members` 读取实际责任集合，`POST /api/v1/tasks/{taskId}/countersign-changes` 明确增加或移除未决责任。请求携带 `action=ADD/REMOVE`、唯一目标、原因、申请版本及原幂等键，不接受查询参数或客户端提供的轮次与人数。管理员不能越过实际任务关系；委派期间不能增减。响应为 `no-store`，结果未知按原请求恢复，成功不代表该节点已同意。申请审计、管理员审计及本人已办支持 `ADD_SIGNER`、`REMOVE_SIGNER`，取消通知为 `TASK_COUNTERSIGN_REMOVED`。完整边界见[加减签办理](countersign-membership.md)。
+
 审批运营接口仅允许 ADMIN。轮次按 UTC 提交窗口统计，当前积压独立于日期窗口；退回率排除撤回。详见 [审批运营统计](approval-operations.md)。
 
 首次流程进度通过 `/system/first-workflow` 查询当前租户精确发布版本的实际轮次，不从旧版本或本地步骤勾选推断完成。详见[首次流程使用引导](first-workflow-guide.md)。

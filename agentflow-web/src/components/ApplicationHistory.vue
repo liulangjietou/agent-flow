@@ -20,6 +20,7 @@ const heading = computed(() => isAudit.value ? '操作审计' : '审批轨迹')
 const actionOptions = [
   ['CREATE', '创建草稿'], ['EXPENSE_REDUCE', '费用核减'], ['REVISE', '修改申请'], ['SUBMIT', '提交申请'], ['WITHDRAW', '撤回申请'], ['CANCEL', '作废申请'],
   ['CLAIM', '领取任务'], ['RELEASE', '释放任务'], ['TRANSFER', '转交任务'], ['DELEGATE', '委派任务'], ['RESOLVE', '回交任务'],
+  ['ADD_SIGNER', '增加会签人'], ['REMOVE_SIGNER', '移除会签人'],
   ['RETURN', '退回申请'], ['REJECT', '驳回申请'], ['APPROVE', '审批通过']
 ]
 const actionLabels: Record<string, string> = Object.fromEntries([
@@ -122,6 +123,7 @@ onUnmounted(() => { requestSequence++ })
           <p v-if="event.actor || event.targetUser" class="history-actor"><template v-if="event.actor">操作人 {{ event.actor }}</template><template v-if="event.targetUser"> → {{ event.targetUser }}</template></p>
           <p v-if="event.currentStatus && event.currentStatus !== event.previousStatus" class="history-transition"><template v-if="event.previousStatus">{{ stateLabel(event.previousStatus) }} → </template>{{ stateLabel(event.currentStatus) }}</p>
           <p v-if="event.comment" class="history-comment">{{ event.comment }}</p>
+          <p v-if="event.membershipChange" class="history-transition">必要审批人数 {{ event.membershipChange.totalBefore }} → {{ event.membershipChange.totalAfter }}，已同意 {{ event.membershipChange.completed }} 人；本次操作不产生审批意见。</p>
           <p v-if="event.nodeName && event.source !== 'PROCESS_HISTORY'" class="history-node">{{ event.nodeName }}</p>
           <details v-if="isAudit" class="history-reference"><summary>查看记录标识</summary><dl><dt>记录标识</dt><dd>{{ event.id }}</dd><template v-if="event.aggregateVersion != null"><dt>申请版本</dt><dd>{{ event.aggregateVersion }}</dd></template><template v-if="event.taskId"><dt>任务标识</dt><dd>{{ event.taskId }}</dd></template></dl></details>
         </article>
