@@ -31,6 +31,11 @@ public final class DefinitionValidator {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (n.type() == NodeType.EVENT_WAIT) {
+                if (n.id().length() > 128 || n.name().length() > 200) errors.add("EVENT_NODE_LIMIT_EXCEEDED:" + n.id());
+                try { EventWaitPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            } else if (EventWaitPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) errors.add("EVENT_REQUIRES_WAIT_NODE:" + n.id());
             if (n.type() == NodeType.TIMER_WAIT) {
                 try { TimerWaitPolicy.fromProperties(n.properties()); }
                 catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
@@ -62,7 +67,7 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.SERVICE_TASK) {
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
             }
-            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT) {
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
                     errors.add("TASK_NAME_EXPRESSION_FORBIDDEN:" + n.id());
@@ -135,7 +140,7 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
             // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
             if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY
-                    || n.type() == NodeType.TIMER_WAIT) && outgoingCount > 1) {
+                    || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
@@ -175,13 +180,16 @@ public final class DefinitionValidator {
         if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
         if (errors.isEmpty()) errors.addAll(new ParallelStructureValidator().validate(graph));
         if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.TIMER_WAIT)) {
-            validateTimerApprovalPaths(graph, errors);
+            validateWaitApprovalPaths(graph, errors, "TIMER_REQUIRES_APPROVAL_PATH");
+        }
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.EVENT_WAIT)) {
+            validateWaitApprovalPaths(graph, errors, "EVENT_REQUIRES_APPROVAL_PATH");
         }
         return List.copyOf(errors);
     }
 
     /** 并行汇合要求全部入口到达，因此另一分支的人工审批不能被误判为可绕过。 */
-    private void validateTimerApprovalPaths(Graph graph, List<String> errors) {
+    private void validateWaitApprovalPaths(Graph graph, List<String> errors, String errorCode) {
         Map<String, Boolean> withoutApproval = new HashMap<>();
         Set<String> remaining = new LinkedHashSet<>(graph.nodes().stream().map(Node::id).toList());
         while (!remaining.isEmpty()) {
@@ -193,7 +201,7 @@ public final class DefinitionValidator {
                         && (node.type() == NodeType.PARALLEL_GATEWAY && parents.size() > 1
                             ? parents.stream().allMatch(withoutApproval::get) : parents.stream().anyMatch(withoutApproval::get));
                 withoutApproval.put(id, bypass); remaining.remove(id);
-                if (node.type() == NodeType.END && bypass) errors.add("TIMER_REQUIRES_APPROVAL_PATH:" + id);
+                if (node.type() == NodeType.END && bypass) errors.add(errorCode + ":" + id);
             }
         }
     }

@@ -37,6 +37,7 @@ public class ApprovalWebhookEvents {
             case TIMER_RETRY -> "TimerWaitRetried";
             case INSTANCE_PAUSE -> "ApplicationPaused";
             case INSTANCE_RESUME -> "ApplicationResumed";
+            case EVENT_RECEIVED -> "EventWaitReceived";
             default -> null;
         };
         if (type == null) return;

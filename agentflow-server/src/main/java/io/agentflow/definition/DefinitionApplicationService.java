@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.event.EventContractBindings;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
@@ -27,6 +28,7 @@ public class DefinitionApplicationService {
     private final DefinitionPublicationRepository publications;
     private final DefinitionAssigneeDirectory assignees;
     private final BusinessCalendarRepository calendars;
+    private final EventContractBindings eventContracts;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
@@ -35,12 +37,13 @@ public class DefinitionApplicationService {
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
                                         DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees,
-                                        BusinessCalendarRepository calendars) {
+                                        BusinessCalendarRepository calendars, EventContractBindings eventContracts) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
         this.assignees = assignees;
         this.calendars = calendars;
+        this.eventContracts = eventContracts;
     }
 
     /** 校验流程图，不改变持久化状态。 */
@@ -53,11 +56,11 @@ public class DefinitionApplicationService {
         return validator.validate(graph, formSchema);
     }
 
-    /** 结构通过后核对身份源与明确日历修订；跨上下文读取由应用层编排。 */
+    /** 结构通过后核对身份源、明确日历修订与事件契约；跨上下文读取由应用层编排。 */
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
         List<String> errors = validator.validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
-        return unavailableAssigneesAndCalendars(tenantId, graph);
+        return unavailableReferences(tenantId, graph);
     }
 
     /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
@@ -75,16 +78,16 @@ public class DefinitionApplicationService {
         return new Validation(routingErrors, diagnostics);
     }
 
-    /** 发布检查在纯领域结果之外核对当前租户审批人及固定日历修订。 */
+    /** 发布检查在纯领域结果之外核对当前租户审批人、固定日历修订及事件契约。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema) {
         return inspect(tenantId, graph, formSchema, null);
     }
 
-    /** 先检查标识和图结构，再核对当前租户审批人及固定日历修订，发布与设计预检共用。 */
+    /** 先检查标识和图结构，再核对当前租户审批人、固定日历修订及事件契约，发布与设计预检共用。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
         Validation result = inspect(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
-        var errors = unavailableAssigneesAndCalendars(tenantId, graph);
+        var errors = unavailableReferences(tenantId, graph);
         return new Validation(errors, result.branchDiagnostics());
     }
 
@@ -153,6 +156,7 @@ public class DefinitionApplicationService {
         DefinitionDraft draft = get(publisher.tenantId(), id);
         Validation validation = inspect(publisher.tenantId(), draft.graph(), draft.formSchema(), draft.key());
         if (!validation.errors().isEmpty()) throw new DefinitionValidationException(validation.errors());
+        eventContracts.requireAvailable(publisher.tenantId(), draft.graph());
         long version = repository.nextVersion(publisher.tenantId(), draft.key());
         DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now(), validation.branchDiagnostics());
         draft.publish(expectedRevision, version);
@@ -216,7 +220,7 @@ public class DefinitionApplicationService {
         return repository.findAll(tenantId, status);
     }
 
-    private List<String> unavailableAssigneesAndCalendars(String tenantId, Graph graph) {
+    private List<String> unavailableReferences(String tenantId, Graph graph) {
         var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0 || option.contextual())
                 .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
         var errors = new java.util.ArrayList<>(graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
@@ -237,6 +241,7 @@ public class DefinitionApplicationService {
                 }
             });
         }
+        errors.addAll(eventContracts.inspect(tenantId, graph));
         return List.copyOf(errors);
     }
 

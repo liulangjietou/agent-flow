@@ -6552,7 +6552,8 @@
                 "TIMER_FAILED",
                 "TIMER_RETRY",
                 "INSTANCE_PAUSE",
-                "INSTANCE_RESUME"
+                "INSTANCE_RESUME",
+                "EVENT_RECEIVED"
               ]
             }
           },
@@ -9930,7 +9931,8 @@
                 "TIMER_FAILED",
                 "TIMER_RETRY",
                 "INSTANCE_PAUSE",
-                "INSTANCE_RESUME"
+                "INSTANCE_RESUME",
+                "EVENT_RECEIVED"
               ]
             }
           },
@@ -11456,7 +11458,8 @@
                 "TIMER_FAILED",
                 "TIMER_RETRY",
                 "INSTANCE_PAUSE",
-                "INSTANCE_RESUME"
+                "INSTANCE_RESUME",
+                "EVENT_RECEIVED"
               ]
             }
           },
@@ -36211,6 +36214,102 @@
           }
         ]
       }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/event-waits": {
+      "get": {
+        "operationId": "roundEventWaits",
+        "tags": [
+          "申请"
+        ],
+        "summary": "读取本轮事件等待",
+        "description": "读取本申请精确轮次的实际消息订阅身份及冻结契约版本。只有可信收件编排可推进等待；本接口不能发送事件、写变量或创建授权。暂停或契约停用均保留原等待。禁止查询参数。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventWaitView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "(^|.*,\\s*)no-store(\\s*,.*|$)"
+                },
+                "description": "禁止缓存等待状态与操作能力。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -40165,7 +40264,8 @@
               "EXCLUSIVE_GATEWAY",
               "PARALLEL_GATEWAY",
               "COPY",
-              "TIMER_WAIT"
+              "TIMER_WAIT",
+              "EVENT_WAIT"
             ]
           },
           "properties": {
@@ -40173,7 +40273,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）、ALL（全员会签）、ANY（任一人同意）和 PERCENT（按比例通过）。PERCENT 必须明确提供 approvalPercentage，为 1..100 的整数文本；其他方式禁止残留该属性。会签在激活时固定有效成员，ANY/PERCENT 同时固定所需人数，比例向上取整。达标结束其他待办但不伪造同意；任一驳回结束整轮。空名单回滚本次操作；增减签仅限 ALL。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。 TIMER_WAIT 必须明确配置 timerDelaySeconds，为 1..31536000 的规范正整数文本，从实际激活时计时。禁止表达式、重复或 cron；其他节点不可配置该属性。重启保留原到期时间。含等待的每条结束路径必须包含人工审批。"
+            "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）、ALL（全员会签）、ANY（任一人同意）和 PERCENT（按比例通过）。PERCENT 必须明确提供 approvalPercentage，为 1..100 的整数文本；其他方式禁止残留该属性。会签在激活时固定有效成员，ANY/PERCENT 同时固定所需人数，比例向上取整。达标结束其他待办但不伪造同意；任一驳回结束整轮。空名单回滚本次操作；增减签仅限 ALL。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。 TIMER_WAIT 必须明确配置 timerDelaySeconds，为 1..31536000 的规范正整数文本，从实际激活时计时。禁止表达式、重复或 cron；其他节点不可配置该属性。重启保留原到期时间。含等待的每条结束路径必须包含人工审批。 EVENT_WAIT 必须明确配置 eventContractKey 和 eventContractVersion，绑定同租户已发布且启用的白名单契约精确版本。发布及每次新轮次发起均复核；停用期间在审等待保留且不消费。外部事件不能传入流程变量或代替人工审批。"
           }
         },
         "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。仅列出的节点类型支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。",
@@ -43259,7 +43359,8 @@
               "EXCLUSIVE_GATEWAY",
               "PARALLEL_GATEWAY",
               "OTHER",
-              "TIMER_WAIT"
+              "TIMER_WAIT",
+              "EVENT_WAIT"
             ]
           },
           "state": {
@@ -62299,6 +62400,82 @@
           "expectedRevision",
           "enabled",
           "reason"
+        ]
+      },
+      "EventWaitEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "waitId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contractKey": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "contractVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "suspended": {
+            "type": "boolean"
+          },
+          "contractEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "waitId",
+          "nodeId",
+          "nodeName",
+          "contractKey",
+          "contractVersion",
+          "createdAt",
+          "suspended",
+          "contractEnabled"
+        ]
+      },
+      "EventWaitView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventWaitEntry"
+            }
+          }
+        },
+        "required": [
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "items"
         ]
       }
     }

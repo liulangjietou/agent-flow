@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.event.EventContractBindings;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -34,18 +35,20 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final HistoryService historyService;
     private final DefinitionDraftRepository platformDefinitions;
     private final JsonUtil json;
+    private final EventContractBindings eventContracts;
     public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
 
     /** 注入 Flowable 运行服务。 */
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
                                          TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
-                                         JsonUtil json) {
+                                         JsonUtil json, EventContractBindings eventContracts) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.historyService = historyService;
         this.platformDefinitions = platformDefinitions;
         this.json = json;
+        this.eventContracts = eventContracts;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -65,6 +68,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
             platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion())
                     .ifPresent(published -> {
                         published.requireStartEnabled();
+                        eventContracts.requireAvailable(command.tenantId(), published.graph());
                         // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
                         if (command.initiatorContext() == null && published.graph().nodes().stream().anyMatch(node ->
                                 LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule"))

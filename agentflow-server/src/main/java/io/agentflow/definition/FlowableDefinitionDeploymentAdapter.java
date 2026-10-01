@@ -58,11 +58,13 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
 
         static String write(DefinitionDraft draft) {
             Graph graph = draft.graph();
+            var eventMessages = eventMessages(graph, draft.key());
             StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
                     .append("<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" ")
                     .append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ")
-                    .append("xmlns:flowable=\"http://flowable.org/bpmn\" targetNamespace=\"http://agentflow.io/process\">")
-                    .append("<process id=\"").append(escape(draft.key())).append("\" name=\"")
+                    .append("xmlns:flowable=\"http://flowable.org/bpmn\" targetNamespace=\"http://agentflow.io/process\">");
+            eventMessages.values().forEach(id -> xml.append("<message id=\"").append(id).append("\" name=\"").append(id).append("\"/>"));
+            xml.append("<process id=\"").append(escape(draft.key())).append("\" name=\"")
                     .append(escape(draft.name())).append("\" isExecutable=\"true\">");
             for (Node node : graph.nodes()) {
                 switch (node.type()) {
@@ -71,6 +73,9 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                     case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
                             .append(escape(node.name())).append("\"/>");
                     case USER_TASK -> appendUserTask(xml, node);
+                    case EVENT_WAIT -> xml.append("<intermediateCatchEvent id=\"").append(escape(node.id()))
+                            .append("\" name=\"").append(escape(node.name())).append("\"><messageEventDefinition messageRef=\"")
+                            .append(eventMessages.get(node.id())).append("\"/></intermediateCatchEvent>");
                     case TIMER_WAIT -> xml.append("<intermediateCatchEvent id=\"").append(escape(node.id()))
                             .append("\" name=\"").append(escape(node.name())).append("\"><timerEventDefinition><timeDuration>")
                             .append(TimerWaitPolicy.fromProperties(node.properties()).duration())
@@ -99,6 +104,21 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 xml.append("</sequenceFlow>");
             }
             return xml.append("</process></definitions>").toString();
+        }
+
+        /** 消息标识完全由适配器生成，并避开同一 BPMN 文档的业务标识，不对外提供广播名称。 */
+        private static java.util.Map<String, String> eventMessages(Graph graph, String processKey) {
+            var used = new java.util.HashSet<String>(); used.add(processKey);
+            graph.nodes().forEach(node -> used.add(node.id())); graph.edges().forEach(edge -> used.add(edge.id()));
+            var messages = new java.util.LinkedHashMap<String, String>();
+            int sequence = 1;
+            for (Node node : graph.nodes()) {
+                if (node.type() != NodeType.EVENT_WAIT) continue;
+                String id;
+                do { id = "agentflowEventMessage" + sequence++; } while (!used.add(id));
+                messages.put(node.id(), id);
+            }
+            return messages;
         }
 
         private static void appendGateway(StringBuilder xml, Node node, Graph graph) {

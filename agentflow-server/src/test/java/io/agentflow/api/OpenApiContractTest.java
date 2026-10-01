@@ -82,6 +82,8 @@ class OpenApiContractTest {
                 java.util.Map.entry("InstanceControlView", io.agentflow.approval.process.InstanceControlService.View.class),
                 java.util.Map.entry("TimerWaitEntry", io.agentflow.approval.process.TimerWaitService.Entry.class),
                 java.util.Map.entry("TimerWaitView", io.agentflow.approval.process.TimerWaitService.View.class),
+                java.util.Map.entry("EventWaitEntry", io.agentflow.approval.process.EventWaitService.Entry.class),
+                java.util.Map.entry("EventWaitView", io.agentflow.approval.process.EventWaitService.View.class),
                 java.util.Map.entry("TimerWaitReceipt", io.agentflow.approval.process.TimerWaitService.Receipt.class),
                 java.util.Map.entry("CountersignMember", io.agentflow.approval.process.CountersignMembershipService.Member.class),
                 java.util.Map.entry("CountersignMembershipView", io.agentflow.approval.process.CountersignMembershipService.View.class),

@@ -14,6 +14,8 @@ public interface EventContractRepository {
     void changeAvailability(EventContractAvailability availability, long expectedRevision);
     /** 读取指定发布版本；绝不回退到最新版。 */
     Optional<Version> find(String tenantId, String key, long version);
+    /** 在调用方事务中锁定精确版本，与发布、发起及事件推进的可用性判断保持原子性。 */
+    Optional<Version> lockVersion(String tenantId, String key, long version);
     /** 读取该契约最新发布版本，不跳过已停用的版本。 */
     Optional<Version> latest(String tenantId, String key);
     /** 按业务键读取最新版本，返回 limit+1 条供调用方构造游标。 */

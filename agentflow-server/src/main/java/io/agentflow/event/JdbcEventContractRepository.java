@@ -5,6 +5,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.util.List;
@@ -67,6 +68,13 @@ public class JdbcEventContractRepository implements EventContractRepository {
     @Override
     public Optional<Version> find(String tenantId, String key, long version) {
         return jdbc.query("SELECT * FROM event_contract_version WHERE tenant_id=? AND contract_key=? AND contract_version=?",
+                versionMapper(), tenantId, key, version).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Version> lockVersion(String tenantId, String key, long version) {
+        return jdbc.query("SELECT * FROM event_contract_version WHERE tenant_id=? AND contract_key=? AND contract_version=? FOR UPDATE",
                 versionMapper(), tenantId, key, version).stream().findFirst();
     }
 
