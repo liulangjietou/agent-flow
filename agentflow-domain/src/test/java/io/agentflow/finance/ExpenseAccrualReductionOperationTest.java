@@ -98,6 +98,75 @@ class ExpenseAccrualReductionOperationTest {
                 0, NOW, NOW.plusSeconds(1), null, null, observed, null, 2, null)).isInstanceOf(DomainException.class);
     }
 
+    @Test void disputeResolvesRecentOriginalPostingWithoutRenewingAnExpiredCommand() {
+        var accepted = queued().claim(NOW, LEASE).complete(new FinanceResult.Success<>(observation(ExpenseAccrualReductionObservation.Status.PENDING, 1, NOW.plusSeconds(1))), NOW.plusSeconds(1));
+        var disputed = accepted.claim(NOW.plusSeconds(6), LEASE).complete(new FinanceResult.Success<>(observation(ExpenseAccrualReductionObservation.Status.NOT_FOUND, 0, NOW.plusSeconds(7))), NOW.plusSeconds(7));
+        var history = new ExpenseAccrualReductionOperation.ResolutionHistory(null, false, NOW.plusSeconds(7));
+        assertThat(disputed.resolutionIssue(history, NOW.plusSeconds(8))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.NON_TERMINAL);
+        var candidate = disputed.requestQuery(NOW.plusSeconds(400)).claim(NOW.plusSeconds(400), LEASE)
+                .complete(new FinanceResult.Success<>(posted(2, NOW.plusSeconds(401), "actual")), NOW.plusSeconds(401));
+        var resolved = candidate.resolveDispute(ExpenseAccrualReductionObservation.Status.POSTED, history, NOW.plusSeconds(402));
+        assertThat(resolved.status()).isEqualTo(ExpenseAccrualReductionOperation.Status.POSTED); assertThat(resolved.input()).isEqualTo(input);
+        assertThat(resolved.highestRevision()).isEqualTo(2); assertThat(resolved.attempts()).isEqualTo(candidate.attempts());
+        assertThat(candidate.acceptsSuccessor(resolved)).isFalse();
+        assertThat(candidate.resolutionIssue(history, NOW.plusSeconds(701))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.EXPIRED_EVIDENCE);
+        assertThatThrownBy(() -> candidate.resolveDispute(ExpenseAccrualReductionObservation.Status.FAILED, history, NOW.plusSeconds(402))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void disputeCannotReplaceAcceptedVoucherOrEraseHistoricalPostedEffect() {
+        var done = queued().claim(NOW, LEASE).complete(new FinanceResult.Success<>(posted(2, NOW.plusSeconds(1), "original")), NOW.plusSeconds(1));
+        var query = done.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE);
+        var history = new ExpenseAccrualReductionOperation.ResolutionHistory(done.observation(), true, NOW.plusSeconds(1));
+        var failed = query.complete(new FinanceResult.Success<>(observation(ExpenseAccrualReductionObservation.Status.FAILED, 3, NOW.plusSeconds(3))), NOW.plusSeconds(3));
+        assertThat(failed.resolutionIssue(history, NOW.plusSeconds(4))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.EFFECT_ALREADY_OBSERVED);
+        var different = query.complete(new FinanceResult.Success<>(posted(3, NOW.plusSeconds(3), "different")), NOW.plusSeconds(3));
+        assertThat(different.resolutionIssue(history, NOW.plusSeconds(4))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.DIFFERENT_POSTING);
+        var candidate = different.requestQuery(NOW.plusSeconds(5)).claim(NOW.plusSeconds(5), LEASE).complete(new FinanceResult.Success<>(posted(4, NOW.plusSeconds(6), "original")), NOW.plusSeconds(6));
+        assertThat(candidate.resolveDispute(ExpenseAccrualReductionObservation.Status.POSTED, history, NOW.plusSeconds(7)).observation().posting().voucher()).isEqualTo(done.observation().posting().voucher());
+    }
+
+    @Test void disputeRequiresHighestRevisionLatestTimeAndOriginalAcceptanceIdentity() {
+        var accepted = queued().claim(NOW, LEASE).complete(new FinanceResult.Success<>(observation(ExpenseAccrualReductionObservation.Status.PENDING, 5, NOW.plusSeconds(1))), NOW.plusSeconds(1));
+        var query = accepted.claim(NOW.plusSeconds(6), LEASE); var history = new ExpenseAccrualReductionOperation.ResolutionHistory(null, false, NOW.plusSeconds(1));
+        var stale = query.complete(new FinanceResult.Success<>(posted(4, NOW.plusSeconds(7), "actual")), NOW.plusSeconds(7));
+        assertThat(stale.resolutionIssue(history, NOW.plusSeconds(8))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.STALE_EVIDENCE);
+        var fact = posted(6, NOW.plusSeconds(7), "actual");
+        var foreignAcceptance = new ExpenseAccrualReductionObservation(fact.operationId(), fact.adjustmentId(), fact.commandDigest(), fact.status(), fact.revision(), fact.observedAt(), "different-acceptance", fact.posting(), null);
+        var changed = query.complete(new FinanceResult.Success<>(foreignAcceptance), NOW.plusSeconds(7));
+        assertThat(changed.resolutionIssue(history, NOW.plusSeconds(8))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.DIFFERENT_ACCEPTANCE);
+        assertThat(changed.resolutionIssue(new ExpenseAccrualReductionOperation.ResolutionHistory(null, true, NOW.plusSeconds(9)), NOW.plusSeconds(10)))
+                .isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.STALE_EVIDENCE);
+    }
+
+    @Test void disputePreservesAnOverwrittenCandidateSuccessAndCanAcceptAnActualEffectFreeFailure() {
+        var first = queued().claim(NOW, LEASE).complete(new FinanceResult.Success<>(observation(ExpenseAccrualReductionObservation.Status.FAILED, 1, NOW.plusSeconds(1))), NOW.plusSeconds(1));
+        var seen = first.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE).complete(new FinanceResult.Success<>(posted(2, NOW.plusSeconds(3), "effect")), NOW.plusSeconds(3));
+        var failed = seen.requestQuery(NOW.plusSeconds(4)).claim(NOW.plusSeconds(4), LEASE)
+                .complete(new FinanceResult.Success<>(observation(ExpenseAccrualReductionObservation.Status.FAILED, 3, NOW.plusSeconds(5))), NOW.plusSeconds(5));
+        assertThat(failed.resolutionIssue(new ExpenseAccrualReductionOperation.ResolutionHistory(null, true, NOW.plusSeconds(3)), NOW.plusSeconds(6)))
+                .isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.EFFECT_ALREADY_OBSERVED);
+        var refusal = new ExpenseAccrualReductionObservation(command.id(), command.adjustmentId(), command.digest(), ExpenseAccrualReductionObservation.Status.FAILED,
+                2, NOW.plusSeconds(3), "accepted", null, ExpenseAccrualReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED);
+        var candidate = first.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE).complete(new FinanceResult.Success<>(refusal), NOW.plusSeconds(3));
+        var resolved = candidate.resolveDispute(ExpenseAccrualReductionObservation.Status.FAILED, new ExpenseAccrualReductionOperation.ResolutionHistory(null, false, NOW.plusSeconds(1)), NOW.plusSeconds(4));
+        assertThat(resolved.retirementBasis()).isEqualTo(ExpenseAccrualReductionOperation.RetirementBasis.CONFIRMED_FAILED);
+        assertThat(candidate.acceptsSuccessor(resolved)).isFalse();
+    }
+
+    @Test void disputeCannotRollBackARecentlyAcceptedOriginalVoucherRevision() {
+        var first = queued().claim(NOW, LEASE).complete(new FinanceResult.Success<>(posted(2, NOW.plusSeconds(1), "original")), NOW.plusSeconds(1));
+        var incoming = posted(3, NOW.plusSeconds(3), "original"); var original = incoming.posting().original();
+        var newerOriginal = new VoucherObservation(original.operationId(), original.commandDigest(), original.status(), original.revision() + 2, original.observedAt(),
+                original.postingReference(), original.voucherReference(), original.periodReference(), original.accountingDate(), original.debitTotal(), original.creditTotal(), original.postedAt(), null);
+        var newerPosting = new ExpenseAccrualReductionObservation.Posting(newerOriginal, incoming.posting().adjustmentRevision(), incoming.posting().beforeDigest(), incoming.posting().afterDigest(), incoming.posting().voucher());
+        var newest = new ExpenseAccrualReductionObservation(incoming.operationId(), incoming.adjustmentId(), incoming.commandDigest(), incoming.status(), incoming.revision(), incoming.observedAt(), incoming.acceptanceReference(), newerPosting, null);
+        var accepted = first.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE).complete(new FinanceResult.Success<>(newest), NOW.plusSeconds(3));
+        assertThat(accepted.status()).isEqualTo(ExpenseAccrualReductionOperation.Status.POSTED);
+        var staleOriginal = accepted.requestQuery(NOW.plusSeconds(4)).claim(NOW.plusSeconds(4), LEASE).complete(new FinanceResult.Success<>(posted(4, NOW.plusSeconds(5), "original")), NOW.plusSeconds(5));
+        var history = new ExpenseAccrualReductionOperation.ResolutionHistory(first.observation(), true, accepted.observation().observedAt());
+        assertThat(staleOriginal.resolutionIssue(history, NOW.plusSeconds(6))).isEqualTo(ExpenseAccrualReductionOperation.ResolutionIssue.DIFFERENT_POSTING);
+    }
+
     private ExpenseAccrualReductionObservation posted(long revision, Instant observedAt, String reference) {
         var original = ExpenseAccrualReductionTest.posted(command, NOW.plusSeconds(1), reference);
         var accepted = original.posting().original();

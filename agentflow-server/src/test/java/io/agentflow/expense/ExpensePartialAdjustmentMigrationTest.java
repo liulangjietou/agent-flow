@@ -12,7 +12,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * 非空 V82 到 V85 的原财务修订不被改写；调整、完成与授权必须引用实际同租户修订。
+ * 非空 V82 到 V86 的原财务修订不被改写；调整、完成、授权与裁决必须引用实际同租户修订。
  * @author owlzhangfq@gmail.com
  */
 class ExpensePartialAdjustmentMigrationTest {
@@ -116,5 +116,31 @@ class ExpensePartialAdjustmentMigrationTest {
         assertThatThrownBy(() -> jdbc.update("DELETE FROM expense_partial_adjustment_preparation_revision WHERE tenant_id=? AND preparation_id=?", tenant, operation)).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("DELETE FROM expense_partial_adjustment_operation WHERE tenant_id=? AND id=?", tenant, operation)).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(prepared.migrate().migrationsExecuted).isZero(); assertThat(prepared.validateWithResult().validationSuccessful).isTrue();
+
+        for (String table : List.of("expense_partial_adjustment_preparation", "expense_partial_adjustment_preparation_revision", "expense_partial_adjustment_authorization"))
+            before.put(table, jdbc.queryForList("SELECT * FROM " + table));
+        var disputed = Flyway.configure().dataSource(source).target("86").load(); assertThat(disputed.migrate().migrationsExecuted).isEqualTo(1);
+        before.forEach((table, rows) -> {
+            var migrated = jdbc.queryForList("SELECT * FROM " + table);
+            if (table.equals("expense_partial_adjustment")) migrated.forEach(row -> row.entrySet().removeIf(entry -> entry.getKey().equalsIgnoreCase("resolution_count")));
+            assertThat(migrated).as(table).containsExactlyInAnyOrderElementsOf(rows);
+        });
+        assertThat(jdbc.queryForObject("SELECT resolution_count FROM expense_partial_adjustment WHERE tenant_id=? AND id=?", Integer.class, tenant, id)).isZero();
+        for (String invalidCount : List.of("-1", "1")) assertThatThrownBy(() -> jdbc.update("UPDATE expense_partial_adjustment SET resolution_count=" + invalidCount + " WHERE tenant_id=? AND id=?", tenant, id))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        String decisionId = UUID.randomUUID().toString();
+        String decision = """
+                INSERT INTO expense_partial_adjustment_dispute(tenant_id,id,adjustment_id,side,operation_id,sequence_no,before_version,after_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+                VALUES(?,?,?,'BUDGET',?,1,1,2,'APPLIED','finance',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'{}')
+                """;
+        assertThatThrownBy(() -> jdbc.update(decision, "foreign", decisionId, id, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(decision, tenant, decisionId, id, UUID.randomUUID().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update(decision, tenant, decisionId, id, operation);
+        assertThatThrownBy(() -> jdbc.update(decision, tenant, UUID.randomUUID().toString(), id, operation)).isInstanceOf(DataIntegrityViolationException.class);
+        for (String mutation : List.of("after_version=1", "before_version=2,after_version=3", "outcome='POSTED'", "side='ACCRUAL',outcome='POSTED'", "sequence_no=0"))
+            assertThatThrownBy(() -> jdbc.update("UPDATE expense_partial_adjustment_dispute SET " + mutation + " WHERE tenant_id=? AND id=?", tenant, decisionId))
+                    .as(mutation).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM expense_partial_adjustment_revision WHERE tenant_id=? AND adjustment_id=? AND version=2", tenant, id)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(disputed.migrate().migrationsExecuted).isZero(); assertThat(disputed.validateWithResult().validationSuccessful).isTrue();
     }
 }

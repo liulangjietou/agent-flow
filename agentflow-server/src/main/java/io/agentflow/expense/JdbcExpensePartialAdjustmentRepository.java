@@ -30,11 +30,12 @@ public class JdbcExpensePartialAdjustmentRepository {
     private final ExpenseReportRepository reports;
     private final ExpensePartialAdjustmentSources sources;
     private final ExpensePartialAdjustmentGuard guard;
+    private final JdbcExpensePartialDisputeRepository disputes;
 
     /** 源事实核对与互斥沿用实际业务仓储，网络调用不进入本仓储。 */
     public JdbcExpensePartialAdjustmentRepository(JdbcTemplate jdbc, JsonUtil json, ExpenseReportRepository reports,
-            ExpensePartialAdjustmentSources sources, ExpensePartialAdjustmentGuard guard) {
-        this.jdbc = jdbc; this.json = json; this.reports = reports; this.sources = sources; this.guard = guard;
+            ExpensePartialAdjustmentSources sources, ExpensePartialAdjustmentGuard guard, JdbcExpensePartialDisputeRepository disputes) {
+        this.jdbc = jdbc; this.json = json; this.reports = reports; this.sources = sources; this.guard = guard; this.disputes = disputes;
     }
 
     /** 新建只接受无外部操作的初态；前次依据从真正完成的当前记录恢复，不能采用客户端准备。 */
@@ -70,7 +71,7 @@ public class JdbcExpensePartialAdjustmentRepository {
         var basis = value.input().basis(); reports.lock(basis.tenantId(), basis.reportId());
         var before = find(basis.tenantId(), value.id()).orElseThrow(JdbcExpensePartialAdjustmentRepository::conflict);
         if (!before.input().equals(value.input()) || before.version() == Long.MAX_VALUE || value.version() != before.version() + 1
-                || !Objects.equals(before.completion(), value.completion())) throw conflict();
+                || before.resolutionCount() != value.resolutionCount() || !Objects.equals(before.completion(), value.completion())) throw conflict();
         ExpensePartialAdjustment expected;
         ExpenseAdjustmentFundingSource authorizationSource = null;
         String newSide = null;
@@ -121,6 +122,16 @@ public class JdbcExpensePartialAdjustmentRepository {
                     timestamp(value.retirement().at()), basis.tenantId(), value.id().toString());
             if (released != basis.funding().selectedReturns().size()) throw conflict();
         }
+    }
+
+    /** 财务裁决只保存原号终态与具名证明；当前来源或历史前次变化仍由后续确认和新效果入口复核。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ExpensePartialAdjustment resolve(ExpensePartialDisputeResolution decision) {
+        var initial = find(decision.tenantId(), decision.adjustmentId()).orElseThrow(JdbcExpensePartialAdjustmentRepository::conflict);
+        reports.lock(decision.tenantId(), initial.input().basis().reportId());
+        var before = find(decision.tenantId(), decision.adjustmentId()).orElseThrow(JdbcExpensePartialAdjustmentRepository::conflict);
+        if (before.version() != decision.beforeVersion()) throw conflict();
+        var after = disputes.resolve(decision, before); save(after); disputes.record(decision, before, after); return after;
     }
 
     /** 资源执行前在原报销锁内复核全部完成历史和当前来源；查询恢复不受此新效果守卫限制。 */
@@ -221,14 +232,14 @@ public class JdbcExpensePartialAdjustmentRepository {
         var basis = value.input().basis(); var budget = value.budget(); var accrual = value.accrual();
         int changed = jdbc.update("""
                 UPDATE expense_partial_adjustment SET state_json=?,version=?,status=?,active_report_id=?,budget_operation_id=?,budget_status=?,budget_next_at=?,budget_lease_until=?,
-                accrual_operation_id=?,accrual_status=?,accrual_next_at=?,accrual_lease_until=?,completed_at=?,completed_sequence=?,retired_at=?,updated_at=?
+                accrual_operation_id=?,accrual_status=?,accrual_next_at=?,accrual_lease_until=?,completed_at=?,completed_sequence=?,retired_at=?,updated_at=?,resolution_count=?
                 WHERE tenant_id=? AND id=? AND version=? AND input_json=? AND retired_at IS NULL
                 """, json.write(value), value.version(), value.status().name(), activeReport(value), budget == null ? null : budget.input().command().id().toString(),
                 budget == null ? null : budget.status().name(), budget == null ? null : timestamp(budget.nextAttemptAt()), budget == null ? null : timestamp(budget.leaseUntil()),
                 accrual == null ? null : accrual.input().command().id().toString(), accrual == null ? null : accrual.status().name(),
                 accrual == null ? null : timestamp(accrual.nextAttemptAt()), accrual == null ? null : timestamp(accrual.leaseUntil()),
                 value.completion() == null ? null : timestamp(value.completion().at()), value.completion() == null ? null : sequence(basis),
-                value.retirement() == null ? null : timestamp(value.retirement().at()), timestamp(value.updatedAt()), basis.tenantId(), value.id().toString(), value.version() - 1, json.write(value.input()));
+                value.retirement() == null ? null : timestamp(value.retirement().at()), timestamp(value.updatedAt()), value.resolutionCount(), basis.tenantId(), value.id().toString(), value.version() - 1, json.write(value.input()));
         if (changed != 1) throw conflict(); append(value);
     }
     private void registerOperation(ExpensePartialAdjustment value, String side, ExpenseAdjustmentFundingSource source) {
@@ -279,6 +290,7 @@ public class JdbcExpensePartialAdjustmentRepository {
                     || !Objects.equals(basis.previous() == null ? null : basis.previous().id().toString(), row.getString("previous_id"))
                     || !Objects.equals(basis.previous() == null ? null : basis.previous().version(), row.getObject("previous_version", Long.class))
                     || !value.input().equals(json.read(row.getString("input_json"), ExpensePartialAdjustment.Input.class)) || value.version() != row.getLong("version")
+                    || value.resolutionCount() != row.getInt("resolution_count")
                     || !value.status().name().equals(row.getString("status")) || !Objects.equals(activeReport(value), row.getString("active_report_id"))
                     || !Objects.equals(budget == null ? null : budget.input().command().id().toString(), row.getString("budget_operation_id"))
                     || !Objects.equals(budget == null ? null : budget.status().name(), row.getString("budget_status"))
@@ -292,7 +304,7 @@ public class JdbcExpensePartialAdjustmentRepository {
                     || !Objects.equals(value.completion() == null ? null : sequence(basis), row.getObject("completed_sequence", Long.class))
                     || !Objects.equals(value.retirement() == null ? null : value.retirement().at(), instant(row.getTimestamp("retired_at")))
                     || !value.input().createdAt().equals(instant(row.getTimestamp("created_at"))) || !value.updatedAt().equals(instant(row.getTimestamp("updated_at")))) throw inconsistent();
-            requireRegisteredOperations(value); requireRecordedCompletion(value); return value;
+            requireRegisteredOperations(value); requireRecordedCompletion(value); disputes.recorded(value); return value;
         };
     }
     /** 历史完成引用真实相邻修订，后续查询不能换掉原接受凭据，也不能仅凭 JSON 标记完成。 */

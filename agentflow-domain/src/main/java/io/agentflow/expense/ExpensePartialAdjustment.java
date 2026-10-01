@@ -11,10 +11,15 @@ import org.apache.commons.lang3.StringUtils;
  * @author owlzhangfq@gmail.com
  */
 public record ExpensePartialAdjustment(Input input, long version, BudgetConsumptionReductionOperation budget,
-        ExpenseAccrualReductionOperation accrual, Completion completion, Retirement retirement, String issue, Instant updatedAt) {
+        ExpenseAccrualReductionOperation accrual, Completion completion, Retirement retirement, String issue, int resolutionCount, Instant updatedAt) {
+    /** 旧快照和未曾裁决的调用保留零条决定，不虚构历史证明。 */
+    public ExpensePartialAdjustment(Input input, long version, BudgetConsumptionReductionOperation budget,
+            ExpenseAccrualReductionOperation accrual, Completion completion, Retirement retirement, String issue, Instant updatedAt) {
+        this(input, version, budget, accrual, completion, retirement, issue, 0, updatedAt);
+    }
     /** 恢复快照也核对原意图、两侧操作及不可变完成事实，不凭总状态推断已释放资源。 */
     public ExpensePartialAdjustment {
-        if (input == null || version < 1 || updatedAt == null || updatedAt.isBefore(input.createdAt())
+        if (input == null || version < 1 || resolutionCount < 0 || resolutionCount >= version || updatedAt == null || updatedAt.isBefore(input.createdAt())
                 || issue != null && !issue.matches("[A-Z][A-Z0-9_]{0,63}")) throw invalid();
         if (budget != null) {
             input.basis().requireBudget(input.id(), budget.input());
@@ -99,6 +104,24 @@ public record ExpensePartialAdjustment(Input input, long version, BudgetConsumpt
         return changed(budget, accrual, completion, null, null, at);
     }
 
+    /** 预算裁决单独增加决定计数，已有资源完成和来源复核问题均保留。 */
+    public ExpensePartialAdjustment resolveBudget(BudgetConsumptionReductionObservation.Status outcome,
+            BudgetConsumptionReductionOperation.ResolutionHistory history, Instant at) {
+        requireOpenTime(at); if (budget == null) throw conflict();
+        var resolved = budget.resolveDispute(outcome, history, at);
+        if (completion != null && !completion.budget().posting().equals(resolved.observation().posting())) throw conflict();
+        return new ExpensePartialAdjustment(input, Math.incrementExact(version), resolved, accrual, completion, null, issue, Math.incrementExact(resolutionCount), at);
+    }
+
+    /** ERP 裁决不能替换本地完成已采用的实际反向凭证，另一侧继续独立办理。 */
+    public ExpensePartialAdjustment resolveAccrual(ExpenseAccrualReductionObservation.Status outcome,
+            ExpenseAccrualReductionOperation.ResolutionHistory history, Instant at) {
+        requireOpenTime(at); if (accrual == null) throw conflict();
+        var resolved = accrual.resolveDispute(outcome, history, at);
+        if (completion != null && !sameAccrual(completion.accrual(), resolved.observation())) throw conflict();
+        return new ExpensePartialAdjustment(input, Math.incrementExact(version), budget, resolved, completion, null, issue, Math.incrementExact(resolutionCount), at);
+    }
+
     /** 两侧均未产生效果才允许具名结束；停止尚未发送的队列和结束事实必须一起提交。 */
     public ExpensePartialAdjustment retire(String actor, String evidence, String reason, Instant at) {
         requireOpenTime(at); input.basis().funding().requireAuthorization(actor, at);
@@ -120,14 +143,17 @@ public record ExpensePartialAdjustment(Input input, long version, BudgetConsumpt
             && accrual != null && accrual.status() == ExpenseAccrualReductionOperation.Status.POSTED; }
     private boolean sameCompletion() {
         if (!financeReady()) return false;
-        var before = completion.accrual().posting(); var after = accrual.observation().posting();
-        return completion.budget().posting().equals(budget.observation().posting()) && before.voucher().equals(after.voucher())
+        return completion.budget().posting().equals(budget.observation().posting()) && sameAccrual(completion.accrual(), accrual.observation());
+    }
+    private static boolean sameAccrual(ExpenseAccrualReductionObservation original, ExpenseAccrualReductionObservation current) {
+        var before = original.posting(); var after = current.posting();
+        return after != null && before.voucher().equals(after.voucher())
                 && before.adjustmentRevision() == after.adjustmentRevision() && before.beforeDigest().equals(after.beforeDigest()) && before.afterDigest().equals(after.afterDigest())
                 && after.original().revision() >= before.original().revision() && !after.original().observedAt().isBefore(before.original().observedAt());
     }
     private ExpensePartialAdjustment changed(BudgetConsumptionReductionOperation nextBudget, ExpenseAccrualReductionOperation nextAccrual,
             Completion nextCompletion, Retirement nextRetirement, String nextIssue, Instant at) {
-        return new ExpensePartialAdjustment(input, Math.incrementExact(version), nextBudget, nextAccrual, nextCompletion, nextRetirement, nextIssue, at);
+        return new ExpensePartialAdjustment(input, Math.incrementExact(version), nextBudget, nextAccrual, nextCompletion, nextRetirement, nextIssue, resolutionCount, at);
     }
     private void requireOpenTime(Instant at) { if (at == null || at.isBefore(updatedAt) || retirement != null) throw conflict(); }
     private void requireAuthorizationTime(Instant at) { requireOpenTime(at); if (completion != null || issue != null) throw conflict(); }

@@ -102,8 +102,11 @@ public class JdbcExpensePartialPreparationRepository {
     }
     private void save(ExpensePartialAdjustmentPreparation value) {
         var input = value.input(); var tenant = input.adjustment().input().basis().tenantId();
+        // 已在原报销锁内核对输入语义；比较实际原文，兼容旧快照缺少新增的默认字段。
+        var originalInput = jdbc.query("SELECT input_json FROM expense_partial_adjustment_preparation WHERE tenant_id=? AND id=? AND version=?",
+                (row, index) -> row.getString("input_json"), tenant, input.id().toString(), value.version() - 1).stream().findFirst().orElseThrow(JdbcExpensePartialPreparationRepository::conflict);
         int changed = jdbc.update("UPDATE expense_partial_adjustment_preparation SET state_json=?,version=?,status=?,active_slot=?,lease_until=?,updated_at=? WHERE tenant_id=? AND id=? AND version=? AND input_json=? AND status<>'AUTHORIZED'",
-                json.write(value), value.version(), value.status().name(), value.active() ? 1 : null, timestamp(value.leaseUntil()), timestamp(value.updatedAt()), tenant, input.id().toString(), value.version() - 1, json.write(input));
+                json.write(value), value.version(), value.status().name(), value.active() ? 1 : null, timestamp(value.leaseUntil()), timestamp(value.updatedAt()), tenant, input.id().toString(), value.version() - 1, originalInput);
         if (changed != 1) throw conflict(); append(value);
     }
     private RowMapper<ExpensePartialAdjustmentPreparation> row() {

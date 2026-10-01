@@ -111,6 +111,70 @@ class BudgetConsumptionReductionOperationTest {
         assertThat(changed.safelyUnexecuted()).isFalse();
     }
 
+    @Test void disputeAcceptsOnlyExplicitFreshTerminalEvidenceEvenAfterSendExpiry() {
+        var running = queue().claim(NOW, LEASE);
+        var pending = running.complete(observed(running, BudgetConsumptionReductionObservation.Status.PENDING, NOW.plusSeconds(1)), NOW.plusSeconds(1));
+        var missingQuery = pending.claim(NOW.plusSeconds(6), LEASE);
+        var disputed = missingQuery.complete(observed(missingQuery, BudgetConsumptionReductionObservation.Status.NOT_FOUND, NOW.plusSeconds(7)), NOW.plusSeconds(7));
+        var empty = new BudgetConsumptionReductionOperation.ResolutionHistory(null, false, NOW.plusSeconds(7));
+        assertThat(disputed.resolutionIssue(empty, NOW.plusSeconds(8))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.NON_TERMINAL);
+        var query = disputed.requestQuery(NOW.plusSeconds(400)).claim(NOW.plusSeconds(400), LEASE);
+        var candidate = query.complete(applied(query, NOW.plusSeconds(401), "actual-reduction"), NOW.plusSeconds(401));
+        var resolved = candidate.resolveDispute(BudgetConsumptionReductionObservation.Status.APPLIED, empty, NOW.plusSeconds(402));
+        assertThat(resolved.status()).isEqualTo(BudgetConsumptionReductionOperation.Status.APPLIED);
+        assertThat(resolved.input()).isEqualTo(running.input()); assertThat(resolved.attempts()).isEqualTo(candidate.attempts());
+        assertThat(candidate.acceptsSuccessor(resolved)).isFalse(); assertThat(resolved.conflictingObservation()).isNull();
+        assertThat(candidate.resolutionIssue(empty, NOW.plusSeconds(701))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.EXPIRED_EVIDENCE);
+        assertThatThrownBy(() -> candidate.resolveDispute(BudgetConsumptionReductionObservation.Status.REJECTED, empty, NOW.plusSeconds(402))).isInstanceOf(DomainException.class);
+    }
+
+    @Test void disputeKeepsOriginalAppliedPostingAndRejectsLaterNoEffect() {
+        var running = queue().claim(NOW, LEASE); var applied = running.complete(applied(running, NOW.plusSeconds(1), "original"), NOW.plusSeconds(1));
+        var query = applied.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE);
+        var rejected = query.complete(rejected(query, NOW.plusSeconds(3), BudgetConsumptionReductionObservation.Rejection.LEDGER_VERSION_CONFLICT), NOW.plusSeconds(3));
+        var history = new BudgetConsumptionReductionOperation.ResolutionHistory(applied.observation(), true, NOW.plusSeconds(1));
+        assertThat(rejected.resolutionIssue(history, NOW.plusSeconds(4))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.EFFECT_ALREADY_OBSERVED);
+        var other = query.complete(applied(query, NOW.plusSeconds(3), "other"), NOW.plusSeconds(3));
+        assertThat(other.resolutionIssue(history, NOW.plusSeconds(4))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.DIFFERENT_POSTING);
+        var requery = other.requestQuery(NOW.plusSeconds(5)).claim(NOW.plusSeconds(5), LEASE);
+        var restored = requery.complete(applied(requery, NOW.plusSeconds(6), "original"), NOW.plusSeconds(6));
+        assertThat(restored.resolveDispute(BudgetConsumptionReductionObservation.Status.APPLIED, history, NOW.plusSeconds(7)).observation().posting()).isEqualTo(applied.observation().posting());
+    }
+
+    @Test void disputeCannotEraseAnEarlierConflictingSuccessOrUseOlderCandidate() {
+        var running = queue().claim(NOW, LEASE);
+        var failed = running.complete(rejected(running, NOW.plusSeconds(1), BudgetConsumptionReductionObservation.Rejection.LEDGER_VERSION_CONFLICT), NOW.plusSeconds(1));
+        var query = failed.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE);
+        var seen = query.complete(applied(query, NOW.plusSeconds(3), "observed-effect"), NOW.plusSeconds(3));
+        var laterQuery = seen.requestQuery(NOW.plusSeconds(4)).claim(NOW.plusSeconds(4), LEASE);
+        var later = laterQuery.complete(rejected(laterQuery, NOW.plusSeconds(5), BudgetConsumptionReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED), NOW.plusSeconds(5));
+        var history = new BudgetConsumptionReductionOperation.ResolutionHistory(null, true, NOW.plusSeconds(3));
+        assertThat(later.resolutionIssue(history, NOW.plusSeconds(6))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.EFFECT_ALREADY_OBSERVED);
+        var older = laterQuery.complete(applied(laterQuery, NOW.plusSeconds(2), "observed-effect"), NOW.plusSeconds(5));
+        assertThat(older.resolutionIssue(history, NOW.plusSeconds(6))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.STALE_EVIDENCE);
+    }
+
+    @Test void disputeCanAdoptTerminalRejectionOnlyWithoutAnyHistoricalEffect() {
+        var running = queue().claim(NOW, LEASE);
+        var failed = running.complete(rejected(running, NOW.plusSeconds(1), BudgetConsumptionReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED), NOW.plusSeconds(1));
+        var query = failed.requestQuery(NOW.plusSeconds(2)).claim(NOW.plusSeconds(2), LEASE);
+        var candidate = query.complete(rejected(query, NOW.plusSeconds(3), BudgetConsumptionReductionObservation.Rejection.BUDGET_POLICY_UNAVAILABLE), NOW.plusSeconds(3));
+        var history = new BudgetConsumptionReductionOperation.ResolutionHistory(null, false, NOW.plusSeconds(1));
+        var resolved = candidate.resolveDispute(BudgetConsumptionReductionObservation.Status.REJECTED, history, NOW.plusSeconds(4));
+        assertThat(resolved.safelyUnexecuted()).isTrue(); assertThat(candidate.acceptsSuccessor(resolved)).isFalse();
+        var ambiguous = query.complete(rejected(query, NOW.plusSeconds(3), BudgetConsumptionReductionObservation.Rejection.CONSUMPTION_ALREADY_REVERSED), NOW.plusSeconds(3));
+        assertThat(ambiguous.resolutionIssue(history, NOW.plusSeconds(4))).isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.EFFECT_ALREADY_OBSERVED);
+        var foreign = queue(); var foreignEvidence = applied(foreign, NOW.plusSeconds(1), "foreign").requireValue();
+        assertThat(candidate.resolutionIssue(new BudgetConsumptionReductionOperation.ResolutionHistory(foreignEvidence, true, NOW.plusSeconds(1)), NOW.plusSeconds(4)))
+                .isEqualTo(BudgetConsumptionReductionOperation.ResolutionIssue.HISTORY_CHANGED);
+    }
+
+    private FinanceResult<BudgetConsumptionReductionObservation> rejected(BudgetConsumptionReductionOperation operation, Instant at, BudgetConsumptionReductionObservation.Rejection reason) {
+        var command = operation.input().command();
+        return new FinanceResult.Success<>(new BudgetConsumptionReductionObservation(command.id(), command.adjustmentId(), command.digest(),
+                BudgetConsumptionReductionObservation.Status.REJECTED, at, null, reason));
+    }
+
     private BudgetConsumptionReductionOperation queue() {
         var entity = UUID.randomUUID();
         var position = new BudgetPrecheckPort.Request(UUID.randomUUID(), 1, 2, "alice", entity, "CNY", DATE.minusDays(1),

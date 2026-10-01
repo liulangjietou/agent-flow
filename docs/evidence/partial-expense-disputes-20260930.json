@@ -1,0 +1,112 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_PARTIAL_DISPUTE_DOMAIN_AND_V86_PERSISTENCE",
+  "baseCommit": "d5b475c711816cc87540243add7e4f3ad2d09c6d",
+  "scope": "Independent budget and accrual dispute decisions with actual historical effects, immutable completion and named adjacent-revision proofs",
+  "schema": {
+    "newMigration": "V86__expense_partial_adjustment_disputes.sql",
+    "testSchema": 86,
+    "nonEmptyMigrationRange": "V82 -> V83 -> V84 -> V85 -> V86",
+    "repeatMigrateAndValidate": true,
+    "runtimeHealth": "UP",
+    "runtimeSchema": 82,
+    "runtimeUpgradedThisStage": false
+  },
+  "validation": {
+    "newDomainTests": 13,
+    "newIntegrationTests": 10,
+    "extendedMigrationTests": 1,
+    "domainTests": 55,
+    "h2ServerTests": 135,
+    "h2WorkflowTests": 127,
+    "h2MigrationTests": 1,
+    "h2ContractTests": 6,
+    "h2StartupTests": 1,
+    "postgresTests": 128,
+    "postgresWorkflowTests": 127,
+    "postgresMigrationTests": 1,
+    "h2LegacyPreparationFocusedTests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "scopesOverlap": true
+  },
+  "authorCheck": {
+    "javaFiles": 1127,
+    "namedTypes": 2175,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-final-verification-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-final-postgres.log",
+    "postgresDatabase": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-final-postgres-database.json",
+    "legacyPreparationFocused": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-legacy-preparation-green.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-final-authors.log",
+    "runtimePreservation": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-runtime-preserved.json"
+  },
+  "checks": [
+    "Only an exact stored original-id terminal candidate less than five minutes old can be explicitly accepted; ERP additionally preserves highest revision, original acceptance and latest accepted original-voucher revision",
+    "Both accepted and conflicting historical success remain visible even after a later candidate overwrites the current conflict; actual effects cannot be resolved as effect-free failures",
+    "Budget and ERP decisions are independent; fixed commands, other side, resource versions, immutable completion and existing source review remain unchanged",
+    "Unknown original bank does not prevent recording actual independent finance evidence; explicit current-source confirmation still refuses while originals are unknown",
+    "Root count, side-bound operation, named proof, consecutive sequence and actual before/after adjacent revisions are verified together on reads",
+    "Ordinary root update and finance transition replay cannot impersonate an explicit dispute decision",
+    "Decision-proof insertion failure rolls back root and revision; retrying the same decision succeeds; concurrent decisions yield one proof and one conflict",
+    "Proof reads are bounded by the root revision already read, excluding newer concurrent decisions while still rejecting missing proofs and altered actual adjacent state",
+    "External nanosecond evidence remains intact in JSON; normalized SQL timestamps are truncated to microseconds for writes and comparisons",
+    "V85 preparation with an embedded pre-count root can be claimed, completed and explicitly authorized without rewriting original input or its old first revision",
+    "Zero-payable adjustment preserves original employee-advance offset completion and creates no bank payment",
+    "Nonempty segmented migration preserves original finance, partial state, command registry, completion, preparation and authorization records; tenant, side, real revisions, unique sequences and outcomes are constrained",
+    "Related preparation, public actions, read projections, completion, full reversal, resource, contract and startup regressions pass"
+  ],
+  "redEvidence": [
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-original-revision-red.log",
+      "test": "disputeCannotRollBackARecentlyAcceptedOriginalVoucherRevision",
+      "cause": "Checking only first historical posting allowed a newer adjustment revision to carry an older already-accepted original voucher revision",
+      "fix": "Also preserve the current most recently accepted posting"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-persistence-first.log",
+      "tests": 6,
+      "errors": 5,
+      "cause": "SQL timestamp precision differed from nanosecond evidence; test cleanup also violated the new proof foreign key",
+      "fix": "Normalize separate SQL timestamps to microseconds while keeping full evidence JSON; clean proof rows before parent test records"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-snapshot-red.log",
+      "test": "partialDisputeOlderRootReadExcludesANewerConcurrentDecision",
+      "cause": "Unbounded proof query treated a concurrently committed newer decision as corruption of an older root snapshot",
+      "fix": "Select only decisions whose after_version is at or below the root revision already read"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-legacy-preparation-red.log",
+      "tests": 1,
+      "errors": 1,
+      "test": "partialPreparationLegacySnapshotContinuesWithoutRewritingOriginalInput",
+      "testGap": "Old root JSON was covered but old preparation input embedded that root snapshot and was not covered",
+      "cause": "Re-serializing old preparation input added resolutionCount=0 and failed the original input_json text predicate",
+      "fix": "After locked semantic validation, use the original stored input text bound to the previous version; keep optimistic input/version checks without rewriting history"
+    }
+  ],
+  "acceptanceBoundary": {
+    "domainAndPersistentDecisions": true,
+    "publicDisputeEndpoint": false,
+    "currentFinanceDisputeApiPermissionAndAudit": false,
+    "publicWorkflowComplete": false,
+    "completeFrontend": false,
+    "actualBrowserAcceptance": false,
+    "longLivedRuntimeUpgrade": false,
+    "realEnterpriseFinance": false,
+    "originalMainUnchanged": true,
+    "remoteConfigured": false
+  },
+  "remaining": [
+    "Public independent dispute API with current field/role checks, named audit, idempotency and pure per-side capability projection",
+    "Complete frontend handling workflow",
+    "Long-lived V82 to V86 nonempty upgrade, actual HTTP, browser, restart and old data/file preservation acceptance",
+    "Real enterprise budget and ERP integration",
+    "Other advanced-workflow, notification and external-delivery work packages remain incomplete"
+  ]
+}

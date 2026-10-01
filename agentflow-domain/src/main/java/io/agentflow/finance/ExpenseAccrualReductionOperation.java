@@ -14,6 +14,7 @@ public record ExpenseAccrualReductionOperation(Input input, long version, Status
                                        ExpenseAccrualReductionObservation conflictingObservation, long highestRevision, Failure failure) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
     /** 恢复快照也执行不变量检查，曾发送的命令不能重建为首次发送。 */
     public ExpenseAccrualReductionOperation {
         if (input == null || version < 1 || status == null || attempts < 0 || createdAt == null || updatedAt == null
@@ -112,6 +113,51 @@ public record ExpenseAccrualReductionOperation(Input input, long version, Status
         requireTime(now); if (retirementBasis() == null) throw new DomainException("EXPENSE_ACCRUAL_REDUCTION_RETIREMENT_UNSAFE", "Accrual reduction is not proven safely finished");
         return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
+
+    /** 近期最高修订的终态候选仍须保留原受理编号和历史反向凭证。 */
+    public ResolutionIssue resolutionIssue(ResolutionHistory history, Instant now) {
+        var candidate = conflictingObservation;
+        if (status != Status.RECONCILING || candidate == null) return ResolutionIssue.NOT_DISPUTED;
+        if (candidate.status() != ExpenseAccrualReductionObservation.Status.POSTED
+                && candidate.status() != ExpenseAccrualReductionObservation.Status.FAILED) return ResolutionIssue.NON_TERMINAL;
+        if (history == null || history.firstPosted() != null && !history.firstPosted().matches(input.command(), true, now)) return ResolutionIssue.HISTORY_CHANGED;
+        if (candidate.revision() != highestRevision || observation != null && candidate.observedAt().isBefore(observation.observedAt())
+                || history.latestObservedAt() != null && candidate.observedAt().isBefore(history.latestObservedAt())) return ResolutionIssue.STALE_EVIDENCE;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EXPIRED_EVIDENCE;
+        if (observation != null && observation.acceptanceReference() != null && !observation.acceptanceReference().equals(candidate.acceptanceReference())) return ResolutionIssue.DIFFERENT_ACCEPTANCE;
+        if (candidate.status() == ExpenseAccrualReductionObservation.Status.FAILED && (history.postingObserved() || posted(observation))) return ResolutionIssue.EFFECT_ALREADY_OBSERVED;
+        if (posted(observation) && !samePosting(observation, candidate)) return ResolutionIssue.DIFFERENT_POSTING;
+        var original = history.firstPosted() != null ? history.firstPosted() : posted(observation) ? observation : null;
+        if (original != null && (!Objects.equals(original.acceptanceReference(), candidate.acceptanceReference()) || !samePosting(original, candidate))) return ResolutionIssue.DIFFERENT_POSTING;
+        return null;
+    }
+
+    /** 原号候选经具名决定采用，不外发 ERP，不续期，不改变原命令或最高修订。 */
+    public ExpenseAccrualReductionOperation resolveDispute(ExpenseAccrualReductionObservation.Status outcome, ResolutionHistory history, Instant now) {
+        requireTime(now);
+        if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome)
+            throw new DomainException("EXPENSE_ACCRUAL_REDUCTION_DISPUTE_UNRESOLVABLE", "Accrual reduction resolution requires recent terminal evidence preserving the original acceptance and postings");
+        return changed(Status.valueOf(outcome.name()), now, null, conflictingObservation, null, highestRevision, null);
+    }
+
+    /** 历史接受与冲突中的实际过账都不能被后来失败回执抹掉。 */
+    public static boolean posted(ExpenseAccrualReductionObservation value) { return value != null && value.status() == ExpenseAccrualReductionObservation.Status.POSTED; }
+
+    /**
+     * 只由原操作连续修订提取成功和最新观察事实。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ResolutionHistory(ExpenseAccrualReductionObservation firstPosted, boolean postingObserved, Instant latestObservedAt) {
+        /** 接受过账必须同时保留效果标志及覆盖该观察的时间。 */
+        public ResolutionHistory {
+            if (firstPosted != null && (!posted(firstPosted) || !postingObserved || latestObservedAt == null || latestObservedAt.isBefore(firstPosted.observedAt()))) throw invalid();
+        }
+    }
+    /**
+     * ERP 原件身份、外部修订和实际效果分别约束裁决。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, HISTORY_CHANGED, STALE_EVIDENCE, EXPIRED_EVIDENCE, DIFFERENT_ACCEPTANCE, EFFECT_ALREADY_OBSERVED, DIFFERENT_POSTING }
 
     /** 所属调整按实际领域事件校验相邻修订，不能由传入快照直接制造成功或抹除冲突。 */
     public boolean acceptsSuccessor(ExpenseAccrualReductionOperation next) {

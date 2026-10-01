@@ -14,6 +14,7 @@ public record BudgetConsumptionReductionOperation(Input input, long version, Sta
         BudgetConsumptionReductionObservation conflictingObservation, Failure failure) {
     private static final long INITIAL_BACKOFF_SECONDS = 5;
     private static final long MAX_BACKOFF_SECONDS = 300;
+    public static final Duration DISPUTE_EVIDENCE_LIFETIME = Duration.ofMinutes(5);
 
     /** 快照中的接收证据与状态必须一致，不能把已发送操作恢复成未经发送。 */
     public BudgetConsumptionReductionOperation {
@@ -107,6 +108,55 @@ public record BudgetConsumptionReductionOperation(Input input, long version, Sta
         return attempts == 0 && observation == null && (status == Status.QUEUED || status == Status.EXPIRED || status == Status.VOIDED)
                 || status == Status.REJECTED;
     }
+
+    /** 只允许采用近期原号终态，任何历史成功或已冲回提示都不能改判成无效果。 */
+    public ResolutionIssue resolutionIssue(ResolutionHistory history, Instant now) {
+        var candidate = conflictingObservation;
+        if (status != Status.RECONCILING || candidate == null) return ResolutionIssue.NOT_DISPUTED;
+        if (candidate.status() != BudgetConsumptionReductionObservation.Status.APPLIED
+                && candidate.status() != BudgetConsumptionReductionObservation.Status.REJECTED) return ResolutionIssue.NON_TERMINAL;
+        if (history == null || history.firstApplied() != null && !history.firstApplied().matches(input.command(), true, now)) return ResolutionIssue.HISTORY_CHANGED;
+        if (observation != null && candidate.observedAt().isBefore(observation.observedAt())
+                || history.latestObservedAt() != null && candidate.observedAt().isBefore(history.latestObservedAt())) return ResolutionIssue.STALE_EVIDENCE;
+        if (now.isBefore(updatedAt) || !now.isBefore(candidate.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) return ResolutionIssue.EXPIRED_EVIDENCE;
+        if (candidate.status() == BudgetConsumptionReductionObservation.Status.REJECTED
+                && (history.appliedObserved() || applicationRisk(observation) || applicationRisk(candidate))) return ResolutionIssue.EFFECT_ALREADY_OBSERVED;
+        var original = history.firstApplied() != null ? history.firstApplied()
+                : observation != null && observation.status() == BudgetConsumptionReductionObservation.Status.APPLIED ? observation : null;
+        if (original != null && !original.posting().equals(candidate.posting())) return ResolutionIssue.DIFFERENT_POSTING;
+        return null;
+    }
+
+    /** 显式采用已保存候选，原命令、发送次数和期限保持；普通执行回放不接受这种转换。 */
+    public BudgetConsumptionReductionOperation resolveDispute(BudgetConsumptionReductionObservation.Status outcome, ResolutionHistory history, Instant now) {
+        requireTime(now);
+        if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome)
+            throw new DomainException("BUDGET_REDUCTION_DISPUTE_UNRESOLVABLE", "Budget reduction resolution requires recent terminal evidence preserving all historical effects");
+        return changed(Status.valueOf(outcome.name()), now, null, conflictingObservation, null, null);
+    }
+
+    /** 已生效和原消费已冲回均不能证明本次账本无变化。 */
+    public static boolean applicationRisk(BudgetConsumptionReductionObservation value) {
+        return value != null && (value.status() == BudgetConsumptionReductionObservation.Status.APPLIED
+                || value.rejection() == BudgetConsumptionReductionObservation.Rejection.CONSUMPTION_ALREADY_REVERSED);
+    }
+
+    /**
+     * 仓储从原操作连续修订提取历史；冲突候选中的成功同样保留风险。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ResolutionHistory(BudgetConsumptionReductionObservation firstApplied, boolean appliedObserved, Instant latestObservedAt) {
+        /** 首次接受事实和最新观察时间必须相容，不能同时声明未出现过效果。 */
+        public ResolutionHistory {
+            if (firstApplied != null && (firstApplied.status() != BudgetConsumptionReductionObservation.Status.APPLIED || !appliedObserved
+                    || latestObservedAt == null || latestObservedAt.isBefore(firstApplied.observedAt()))) throw invalid();
+        }
+    }
+    /**
+     * 能力投影使用同一业务边界，不能通过客户端备注豁免。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ResolutionIssue { NOT_DISPUTED, NON_TERMINAL, HISTORY_CHANGED, STALE_EVIDENCE, EXPIRED_EVIDENCE, EFFECT_ALREADY_OBSERVED, DIFFERENT_POSTING }
 
     /** 所属调整保存状态前回放一次领域转换，禁止快照跳过发送或替换已接受事实。 */
     public boolean acceptsSuccessor(BudgetConsumptionReductionOperation next) {
