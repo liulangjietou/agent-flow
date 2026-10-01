@@ -39,8 +39,41 @@ public final class BusinessDeadline {
     }
 
     private static Result calculateFrom(CalendarRules rules, Instant start, int workingMinutes) {
+        var result = addWorkingTime(rules, start, Duration.ofMinutes(workingMinutes));
+        return new Result(start, result.dueAt(), rules.zoneId(), workingMinutes, result.usedPeriods());
+    }
+
+    /**
+     * 恢复暂停的任务，只接续原到期时刻前尚未消耗的工作时长，保留小于一分钟的精度。
+     * 暂停前已到期的任务保留原到期事实，不重新获得办理时间；调用方必须提供原绑定日历修订。
+     */
+    public static Instant resume(CalendarRules rules, Instant pausedAt, Instant originalDueAt, Instant resumedAt) {
+        if (pausedAt == null || originalDueAt == null || resumedAt == null || resumedAt.isBefore(pausedAt)) {
+            throw new DomainException("INVALID_DEADLINE_RESUME", "Resume time must not precede the recorded pause");
+        }
+        if (!originalDueAt.isAfter(pausedAt) || resumedAt.equals(pausedAt)) return originalDueAt;
+        ZoneId zone = ZoneId.of(rules.zoneId());
+        LocalDate date = pausedAt.atZone(zone).toLocalDate();
+        LocalDate last = originalDueAt.atZone(zone).toLocalDate();
+        Duration remaining = Duration.ZERO;
+        for (int day = 0; day < MAX_LOOKAHEAD_DAYS && !date.isAfter(last); day++, date = date.plusDays(1)) {
+            for (var period : rules.instantPeriodsOn(date)) {
+                Instant from = pausedAt.isAfter(period.start()) ? pausedAt : period.start();
+                Instant until = originalDueAt.isBefore(period.end()) ? originalDueAt : period.end();
+                if (from.isBefore(until)) remaining = remaining.plus(Duration.between(from, until));
+            }
+        }
+        if (!date.isAfter(last)) throw horizonExceeded();
+        if (remaining.isZero()) {
+            throw new DomainException("DEADLINE_STATE_INVALID", "The original deadline has no remaining bound working time");
+        }
+        int year = resumedAt.atZone(zone).getYear();
+        if (year < 1 || year > 9998) throw horizonExceeded();
+        return addWorkingTime(rules, resumedAt, remaining).dueAt();
+    }
+
+    private static Calculation addWorkingTime(CalendarRules rules, Instant start, Duration remaining) {
         LocalDate date = start.atZone(ZoneId.of(rules.zoneId())).toLocalDate();
-        Duration remaining = Duration.ofMinutes(workingMinutes);
         int usedPeriods = 0;
         for (int day = 0; day < MAX_LOOKAHEAD_DAYS && date.getYear() <= 9999; day++, date = date.plusDays(1)) {
             for (var period : rules.instantPeriodsOn(date)) {
@@ -52,7 +85,7 @@ public final class BusinessDeadline {
                     Instant dueAt = from.plus(remaining);
                     // API 时间戳使用四位年份，边界计算也不能输出无法被客户端解析的扩展年份。
                     if (!dueAt.isBefore(MAX_RESULT_EXCLUSIVE)) throw horizonExceeded();
-                    return new Result(start, dueAt, rules.zoneId(), workingMinutes, usedPeriods);
+                    return new Calculation(dueAt, usedPeriods);
                 }
                 remaining = remaining.minus(available);
             }
@@ -63,6 +96,9 @@ public final class BusinessDeadline {
     private static DomainException horizonExceeded() {
         return new DomainException("CALENDAR_HORIZON_EXCEEDED", "Insufficient working time within the supported calendar horizon");
     }
+
+    /** @author owlzhangfq@gmail.com */
+    private record Calculation(Instant dueAt, int usedPeriods) { }
 
     /**
      * 到期值为真实时间轴上的时刻；usedPeriods 可用于解释跨午休、跨日或重复钟点。

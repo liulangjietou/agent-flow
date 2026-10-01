@@ -174,7 +174,7 @@ public class ApprovalApplicationFacade {
     private Application withdrawBound(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         Actor actor = currentActor.actor();
         requireWriteBinding(requireApplicant(actor, id), reference);
-        var previous = notifications.beforeWithdrawal(service.get(actor.tenantId(), id));
+        var previous = notifications.pendingAudience(service.get(actor.tenantId(), id));
         Application application = service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
         notifications.withdrawn(application, actor.userId(), previous);
         return application;

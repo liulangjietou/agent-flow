@@ -61,16 +61,21 @@ public class FlowableTaskDeadlineReminders {
     /** 锁后重查真实任务与当前轮次，完成、撤回及旧轮次不再投递。 */
     @Transactional
     public boolean remind(String taskId, Instant now) {
+        var initial = tasks.createTaskQuery().taskId(taskId).includeProcessVariables().singleResult();
+        if (initial == null) return false;
+        var variables = initial.getProcessVariables();
+        String tenantId = (String) variables.get("tenantId");
+        if (tenantId == null || !(variables.get("applicationId") instanceof String id)) return false;
+        // 与审批、暂停和恢复共用申请优先的锁顺序，锁后重新检查任务及其期限。
+        var application = applications.lockById(tenantId, UUID.fromString(id)).orElse(null);
+        if (application == null) return false;
         if (jdbc.queryForList("SELECT ID_ FROM ACT_RU_TASK WHERE ID_=? FOR UPDATE", String.class, taskId).isEmpty()) return false;
         var task = tasks.createTaskQuery().taskId(taskId).active().includeProcessVariables().includeTaskLocalVariables().singleResult();
         if (task == null || task.getDueDate() == null || task.getDueDate().toInstant().isAfter(now)
                 || !task.getTaskLocalVariables().containsKey(FlowableTaskDeadlineListener.CALENDAR_ID)
                 || task.getTaskLocalVariables().containsKey(FlowableTaskDeadlineListener.REMINDED_AT)) return false;
-        var variables = task.getProcessVariables();
-        String tenantId = (String) variables.get("tenantId");
-        var application = applications.findById(tenantId, UUID.fromString((String) variables.get("applicationId"))).orElse(null);
-        if (application == null || application.status() != ApplicationStatus.IN_APPROVAL
-                || application.roundNo() != ((Number) variables.get("roundNo")).intValue()) return false;
+        if (application.status() != ApplicationStatus.IN_APPROVAL
+                || application.roundNo() != ((Number) task.getProcessVariables().get("roundNo")).intValue()) return false;
         if (!notifications.overdue(application, taskId, now)) return false;
         tasks.setVariableLocal(taskId, FlowableTaskDeadlineListener.REMINDED_AT, now.toString());
         return true;

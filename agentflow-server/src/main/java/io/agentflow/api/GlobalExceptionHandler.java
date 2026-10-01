@@ -76,7 +76,7 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
-            case "INVALID_COUNTERSIGN_QUERY", "INVALID_TIMER_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "INVALID_COUNTERSIGN_QUERY", "INVALID_TIMER_QUERY", "INVALID_INSTANCE_QUERY" -> HttpStatus.BAD_REQUEST;
             case "COUNTERSIGN_STATE_INVALID", "COUNTERSIGN_MEMBER_UNAVAILABLE", "COUNTERSIGN_MEMBER_LIMIT", "COUNTERSIGN_MEMBER_EXISTS",
                     "COUNTERSIGN_LAST_MEMBER", "COUNTERSIGN_SELF_REMOVAL" -> HttpStatus.CONFLICT;
             case "PAYMENT_CALLBACK_INVALID", "INVALID_PAYMENT_BATCH" -> HttpStatus.BAD_REQUEST;

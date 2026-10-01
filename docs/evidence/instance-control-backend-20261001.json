@@ -1,0 +1,148 @@
+{
+  "status": "BACKEND_SCOPED_VERIFICATION_PASSED_UI_AND_RUNTIME_PENDING",
+  "recordedAt": "2026-10-01T06:03:36.408585+00:00",
+  "baseCommit": "73a2ee8e1e7300ea6f27c3585f757057554155fe",
+  "branch": "codex/governance-identifier-integration",
+  "migrationVersion": 86,
+  "newMigration": false,
+  "scope": "Audited current-round ADMIN pause/resume, fixed-calendar remaining SLA, native timer preservation, original-request idempotency, audit/inbox/webhook transactions",
+  "h2": {
+    "domainUniqueTests": 15,
+    "serverRelatedUniqueTests": 48,
+    "executedInBatches": true,
+    "classes": {
+      "io.agentflow.calendar.BusinessDeadlineTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-second-h2.log"
+      },
+      "io.agentflow.calendar.BusinessDeadlineResumeTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-second-h2.log"
+      },
+      "io.agentflow.api.OpenApiContractTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-contract-green.log"
+      },
+      "io.agentflow.approval.InstanceControlIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-contract-green.log"
+      },
+      "io.agentflow.approval.TimerWaitIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-second-h2.log"
+      },
+      "io.agentflow.approval.FieldPermissionsIntegrationTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-second-h2.log"
+      },
+      "io.agentflow.approval.process.TaskDeadlineIntegrationTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-final-h2.log"
+      },
+      "io.agentflow.approval.ApplicationResubmissionIntegrationTest": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "lastLog": "instance-control-final-h2.log"
+      }
+    },
+    "logs": [
+      "instance-control-second-h2.log",
+      "instance-control-final-h2.log",
+      "instance-control-verified-h2.log",
+      "instance-control-contract-green.log"
+    ]
+  },
+  "postgres": {
+    "domainTests": 15,
+    "serverCoreTests": 8,
+    "database": {
+      "database": "instance_control_3ebbcd53f717",
+      "container": "agentflow-attachments-postgres-20260928",
+      "schemaExpected": 86
+    },
+    "log": "instance-control-postgres.log",
+    "note": "The later serialization-contract-only test was run on H2; the 8 core scenarios ran on PostgreSQL"
+  },
+  "frontend": {
+    "notificationAuditWebhookTests": 17,
+    "typeCheck": "PASS",
+    "build": "PASS",
+    "logs": [
+      "instance-control-web.log",
+      "instance-control-web-build.log"
+    ],
+    "operationsPanelImplemented": false
+  },
+  "openapi": {
+    "result": "PASS",
+    "operations": 264,
+    "schemas": 534,
+    "requestExamples": 104
+  },
+  "redReproductions": [
+    {
+      "test": "controlledPauseBlocksActionsAndPreservesFrozenCalendarAndFractionalRemainingTime",
+      "log": "instance-control-first-h2.log",
+      "cause": "Readable nodes excluded suspended tasks; existing coverage only exercised active or finished tasks",
+      "fix": "Retain suspended task read participation; mutation authorization still rejects suspension"
+    },
+    {
+      "test": "realReadAndWriteResponsesContainEveryRequiredContractField",
+      "log": "instance-control-contract-red.log",
+      "cause": "Contract required pausedAt although configured serialization omits absent null fields",
+      "fix": "Mark pausedAt optional while validating actual read and write serialization"
+    }
+  ],
+  "checks": [
+    "Same original task, instance and submission round remain",
+    "Sub-minute precision, lunches, holidays, DST and repeated pauses",
+    "Already overdue due/reminder facts unchanged",
+    "Current original calendar revision survives newer calendar publication",
+    "Native timers retain original due and do not execute while suspended",
+    "Both notification failure paths roll back engine, due times, app versions, audit and outbox",
+    "Application-first lock and post-lock reminder recheck, with deterministic concurrent transaction barriers",
+    "Role, tenant, round, version, original idempotency key and unsafe input boundaries",
+    "Parallel countersign deadlines and no-deadline tasks",
+    "After resume only actual human decision approves"
+  ],
+  "remaining": [
+    "Application-detail control UI and client original-request recovery",
+    "Actual HTTP response contract, browser confirmation/cancel, narrow viewport",
+    "In-flight runtime upgrade and restart preservation; financial occupancy acceptance"
+  ],
+  "liveRuntimesUpgraded": false,
+  "preservedLiveBackendPorts": [
+    18214,
+    18215,
+    18216
+  ],
+  "timerLiveCodeCommit": "73a2ee8e1e7300ea6f27c3585f757057554155fe",
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "remainingWorkPackages": 4,
+  "goalStatus": "active",
+  "remoteConfigured": false,
+  "remoteCi": "not_run"
+}

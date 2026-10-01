@@ -6546,7 +6546,9 @@
                 "REMOVE_SIGNER",
                 "TIMER_ELAPSED",
                 "TIMER_FAILED",
-                "TIMER_RETRY"
+                "TIMER_RETRY",
+                "INSTANCE_PAUSE",
+                "INSTANCE_RESUME"
               ]
             }
           },
@@ -9922,7 +9924,9 @@
                 "REMOVE_SIGNER",
                 "TIMER_ELAPSED",
                 "TIMER_FAILED",
-                "TIMER_RETRY"
+                "TIMER_RETRY",
+                "INSTANCE_PAUSE",
+                "INSTANCE_RESUME"
               ]
             }
           },
@@ -11446,7 +11450,9 @@
                 "REMOVE_SIGNER",
                 "TIMER_ELAPSED",
                 "TIMER_FAILED",
-                "TIMER_RETRY"
+                "TIMER_RETRY",
+                "INSTANCE_PAUSE",
+                "INSTANCE_RESUME"
               ]
             }
           },
@@ -34627,6 +34633,470 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/runtime": {
+      "get": {
+        "operationId": "roundInstanceControl",
+        "tags": [
+          "申请"
+        ],
+        "summary": "读取本轮运行状态",
+        "description": "读取原绑定实例的运行、暂停、结束或不可用状态，不返回引擎变量。当前管理员仅可操作本轮在审实例；历史轮次只读。暂停前字段权限保持，办理权限停止；禁止查询参数。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceControlView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存当前运行状态与运维权限。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/runtime/pause": {
+      "post": {
+        "operationId": "pauseApprovalInstance",
+        "tags": [
+          "申请"
+        ],
+        "summary": "明确暂停本轮审批",
+        "description": "同租户管理员填写原因并确认申请版本，暂停或恢复原绑定轮次。申请保持在审，原财务占用和审批意见保留。人工任务按原日历修订冻结并接续剩余工作时长，保留小于一分钟的精度；暂停前已超时的任务仍保持原到期和提醒事实。定时等待保留原到期时刻，暂停期间不推进。引擎状态、任务期限、版本、具名审计、站内通知与 Webhook outbox 同事务；失败全部回滚。幂等成功回放仍核对当前管理员身份。禁止查询参数。",
+        "x-access": "同租户 ADMIN；精确当前在审轮次和运行状态。",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceControlView"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存当前运行状态与运维权限。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖暂不可用；本次状态、计时和审计变更已回滚。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceControlInput"
+              },
+              "example": {
+                "expectedVersion": 2,
+                "reason": "维护期间暂停，保留当前待办"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/runtime/resume": {
+      "post": {
+        "operationId": "resumeApprovalInstance",
+        "tags": [
+          "申请"
+        ],
+        "summary": "明确恢复本轮审批",
+        "description": "同租户管理员填写原因并确认申请版本，暂停或恢复原绑定轮次。申请保持在审，原财务占用和审批意见保留。人工任务按原日历修订冻结并接续剩余工作时长，保留小于一分钟的精度；暂停前已超时的任务仍保持原到期和提醒事实。定时等待保留原到期时刻，暂停期间不推进。引擎状态、任务期限、版本、具名审计、站内通知与 Webhook outbox 同事务；失败全部回滚。幂等成功回放仍核对当前管理员身份。禁止查询参数。",
+        "x-access": "同租户 ADMIN；精确当前在审轮次和运行状态。",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceControlView"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "禁止缓存当前运行状态与运维权限。"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖暂不可用；本次状态、计时和审计变更已回滚。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "已提交轮次；不接受查询参数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceControlInput"
+              },
+              "example": {
+                "expectedVersion": 3,
+                "reason": "维护完成，接续原审批任务"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -40348,7 +40818,9 @@
               "APPLICATION_COPIED",
               "EXPENSE_ADJUSTED",
               "TASK_COUNTERSIGN_REMOVED",
-              "TASK_COUNTERSIGN_COMPLETED"
+              "TASK_COUNTERSIGN_COMPLETED",
+              "APPLICATION_PAUSED",
+              "APPLICATION_RESUMED"
             ]
           },
           "actor": {
@@ -60355,6 +60827,74 @@
         ]
       },
       "TimerWaitRetryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": ".*\\S.*"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason"
+        ]
+      },
+      "InstanceControlView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "PAUSED",
+              "ENDED",
+              "UNAVAILABLE"
+            ]
+          },
+          "pausedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "canPause": {
+            "type": "boolean"
+          },
+          "canResume": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "applicationId",
+          "roundNo",
+          "applicationVersion",
+          "state",
+          "canPause",
+          "canResume"
+        ]
+      },
+      "InstanceControlInput": {
         "type": "object",
         "additionalProperties": false,
         "properties": {

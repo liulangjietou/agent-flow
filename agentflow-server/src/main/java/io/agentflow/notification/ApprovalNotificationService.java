@@ -43,8 +43,8 @@ public class ApprovalNotificationService {
                 .map(TaskAudiencePort.Audience::taskId).collect(Collectors.toSet());
     }
 
-    /** 撤回前保留当前处理人，避免实例终止后无法定位需要通知的账号。 */
-    public List<TaskAudiencePort.Audience> beforeWithdrawal(Application application) {
+    /** 状态变更前保留当前处理人，暂停或终止后仍可通知原办理人员。 */
+    public List<TaskAudiencePort.Audience> pendingAudience(Application application) {
         return audience.pending(application.tenantId(), application.id());
     }
 
@@ -54,6 +54,22 @@ public class ApprovalNotificationService {
         for (var task : previous) for (String user : task.recipients()) {
             if (!user.equals(application.createdBy())) send(application, actor, user, Kind.APPLICATION_WITHDRAWN, task.taskId(), task.nodeName());
         }
+    }
+
+    /** 暂停通知保留实际接收人；入口指向申请，暂停任务不再提供办理操作。 */
+    public void instancePaused(Application application, String actor, List<TaskAudiencePort.Audience> previous) {
+        instanceChanged(application, actor, Kind.APPLICATION_PAUSED, previous);
+    }
+
+    /** 恢复按当前有效人员重新解析通知，不将被停用人员重新加入办理范围。 */
+    public void instanceResumed(Application application, String actor) {
+        instanceChanged(application, actor, Kind.APPLICATION_RESUMED, audience.pending(application.tenantId(), application.id()));
+    }
+
+    private void instanceChanged(Application application, String actor, Kind kind, List<TaskAudiencePort.Audience> pending) {
+        var recipients = new java.util.HashSet<String>(); recipients.add(application.createdBy());
+        for (var task : pending) recipients.addAll(task.recipients());
+        for (String recipient : recipients) send(application, actor, recipient, kind, null, null);
     }
 
     /** 系统退回没有人工任务编号，通知沿用真实申请轮次及系统身份。 */

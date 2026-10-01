@@ -26,8 +26,9 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
     @Override
     public java.util.Set<String> readableNodes(String tenantId, String processInstanceId, Actor actor) {
         if (!tenantId.equals(actor.tenantId()) || !actor.hasRole("APPROVER")) return java.util.Set.of();
+        // 暂停不会移除原任务参与事实；办理权限另由实时任务授权严格检查暂停状态。
         var active = taskService.createTaskQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
-                .active().includeIdentityLinks().list().stream()
+                .includeIdentityLinks().list().stream()
                 .filter(task -> actor.userId().equals(task.getAssignee()) || actor.userId().equals(task.getOwner())
                         || task.getAssignee() == null && task.getIdentityLinks().stream().anyMatch(link -> "candidate".equals(link.getType())
                             && (actor.userId().equals(link.getUserId()) || link.getGroupId() != null && actor.hasRole(link.getGroupId()))))
