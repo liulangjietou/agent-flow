@@ -13,9 +13,26 @@ export interface OperationsTask {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
   definitionVersion: number; roundNo: number; assignee?: string; createdAt: string; waitingSeconds: number; dueAt?: string | null
 }
+/** 已办理任务的历史期限事实，缺失和取消不会记作按时完成。@author owlzhangfq@gmail.com */
+export interface OperationsSla {
+  decidedTasks: number; timedTasks: number; violatedTasks: number; withoutDeadlineTasks: number
+  invalidTimingTasks: number; cancelledTasks: number; unfinishedTasks: number; unrecordedDecisionTasks: number; unverifiedRounds: number
+  violationRatePercent?: number
+}
+/** 按投递记录及追加历史去重汇总，不展示收件人和正文。@author owlzhangfq@gmail.com */
+export interface OperationsNotifications {
+  deliveries: number; accepted: number; failed: number; retryWaiting: number; unknown: number
+  suppressed: number; pending: number; inFlight: number; previouslyFailed: number
+}
+/** 人工采纳率只使用已经复核的运行。@author owlzhangfq@gmail.com */
+export interface OperationsAgent {
+  runs: number; queued: number; running: number; awaitingReview: number; failed: number
+  adopted: number; dismissed: number; reviewedRuns: number; adoptionRatePercent?: number
+}
 /** 提交窗口与当前积压来自同一查询快照，但日期口径分别标明。@author owlzhangfq@gmail.com */
 export interface OperationsReport extends OperationsFilter {
   generatedAt: string; timeZone: 'UTC'; metrics: OperationsMetrics
+  sla: OperationsSla; notifications: OperationsNotifications; agent: OperationsAgent
   daily: Array<{ date: string; submittedRounds: number }>
   processes: OperationsProcess[]; moreProcesses: boolean; pendingTasks: number; overdueTasks: number
   waitingNodes: Array<{ processKey: string; definitionVersion: number; nodeId: string; nodeName: string; tasks: number; oldestCreatedAt: string; oldestWaitSeconds: number; overdueTasks: number }>

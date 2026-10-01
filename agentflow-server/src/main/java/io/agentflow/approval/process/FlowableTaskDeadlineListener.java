@@ -12,6 +12,7 @@ import org.flowable.common.engine.api.delegate.event.FlowableEvent;
 import org.flowable.common.engine.api.delegate.event.FlowableEventListener;
 import org.flowable.common.engine.api.delegate.event.FlowableEventType;
 import org.flowable.engine.RepositoryService;
+import org.flowable.engine.TaskService;
 import org.flowable.task.service.delegate.DelegateTask;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -35,14 +36,16 @@ public class FlowableTaskDeadlineListener implements FlowableEventListener {
     private final BusinessCalendarRepository calendars;
     private final ObjectProvider<RepositoryService> engine;
     private final TaskEscalationBindings escalations;
+    private final ObjectProvider<TaskService> tasks;
 
     /** 引擎服务延迟获取，配置监听器时不反向初始化引擎。 */
     public FlowableTaskDeadlineListener(DefinitionDraftRepository definitions, BusinessCalendarRepository calendars,
-                                       ObjectProvider<RepositoryService> engine, TaskEscalationBindings escalations) {
+                                       ObjectProvider<RepositoryService> engine, TaskEscalationBindings escalations, ObjectProvider<TaskService> tasks) {
         this.definitions = definitions;
         this.calendars = calendars;
         this.engine = engine;
         this.escalations = escalations;
+        this.tasks = tasks;
     }
 
     /** 每张新任务独立起算，会签和并行分支也保留各自的创建时刻。 */
@@ -61,7 +64,8 @@ public class FlowableTaskDeadlineListener implements FlowableEventListener {
                     var calendar = calendars.findVersion(tenantId, policy.calendarId(), policy.calendarRevision())
                             .orElseThrow(() -> new DomainException("DEADLINE_CALENDAR_UNAVAILABLE", "Bound deadline calendar is unavailable"));
                     var deadline = BusinessDeadline.calculate(calendar.rules(), task.getCreateTime().toInstant(), policy.workingMinutes());
-                    task.setDueDate(Date.from(deadline.dueAt()));
+                    // 创建事件发生时历史任务已建立；公开命令同时更新运行与历史期限，终止路径也能保留原事实。
+                    tasks.getObject().setDueDate(task.getId(), Date.from(deadline.dueAt()));
                     task.setVariableLocal(CALENDAR_ID, policy.calendarId().toString());
                     task.setVariableLocal(CALENDAR_REVISION, policy.calendarRevision());
                     task.setVariableLocal(WORKING_MINUTES, policy.workingMinutes());

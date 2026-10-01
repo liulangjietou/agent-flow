@@ -1,0 +1,248 @@
+{
+  "recordedAt": "2026-10-01T20:49:24.447603+00:00",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "fullProductComplete": false,
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "90044617ec0d79a27f98a119242d01548a3787cf",
+  "scope": [
+    "Historical task SLA outcomes",
+    "External notification current failures and historical failure counts",
+    "Human Agent adoption outcomes",
+    "Task deadline history consistency on task creation"
+  ],
+  "redBeforeFix": {
+    "missingMetrics": "operations-metrics-red.log: 2 failing tests before implementation",
+    "realReturnAndReject": "operations-metrics-lifecycle-red.xml: historical due date missing despite runtime deadline",
+    "rootCause": "TASK_CREATED listener mutated runtime task after history creation; public TaskService.setDueDate now updates both in the creation transaction"
+  },
+  "tests": {
+    "h2": {
+      "total": 31,
+      "suites": {
+        "ApprovalOperationsIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "OpenApiContractTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "TaskDeadlineIntegrationTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "TaskEscalationIntegrationTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "postgres": {
+      "total": 11,
+      "sameOperationsScopeAsH2": true,
+      "database": "operations_metrics_c0846375cf"
+    },
+    "frontend": 7,
+    "build": "PASS",
+    "openapi": {
+      "operations": 290,
+      "schemas": 567,
+      "requestExamples": 110
+    },
+    "authorGate": {
+      "javaFiles": 1266,
+      "namedTypes": 2435,
+      "missingTags": 0,
+      "parseErrors": 0
+    }
+  },
+  "actualResponses": {
+    "total": 42,
+    "direct": 41,
+    "browser": 1,
+    "contracts": "PASS",
+    "assistOriginalWorkflowAdditionalRequests": 32,
+    "originalAssistWorkflowResponsesNotCountedAsContractValidated": true
+  },
+  "runtime": {
+    "database": "operations_runtime_89b1d2fcb5",
+    "sourceDatabase": "wecom_runtime_2b15e5e1e1",
+    "backendPort": 18249,
+    "frontendPort": 15337,
+    "modelPort": 18250,
+    "jarSha256": "8b1fe359d6944c1ddb30cc8904b2e246716b6e72d4d6388679661e2e52f7222f",
+    "boot": 2,
+    "schemaVersion": 93,
+    "newMigrations": false,
+    "existingServicesReplaced": false,
+    "realEnterpriseModelOrChannels": false,
+    "notificationAndFinanceWorkersEnabled": false
+  },
+  "outcomes": {
+    "slaNewProcess": {
+      "decidedTasks": 3,
+      "timedTasks": 3,
+      "violatedTasks": 1,
+      "withoutDeadlineTasks": 0,
+      "invalidTimingTasks": 0,
+      "cancelledTasks": 0,
+      "unfinishedTasks": 0,
+      "unrecordedDecisionTasks": 0,
+      "unverifiedRounds": 0,
+      "violationRatePercent": 33.3
+    },
+    "notificationAll": {
+      "deliveries": 58,
+      "accepted": 14,
+      "failed": 26,
+      "retryWaiting": 0,
+      "unknown": 1,
+      "suppressed": 4,
+      "pending": 13,
+      "inFlight": 0,
+      "previouslyFailed": 32
+    },
+    "agentAll": {
+      "runs": 3,
+      "queued": 0,
+      "running": 0,
+      "awaitingReview": 0,
+      "failed": 0,
+      "adopted": 2,
+      "dismissed": 1,
+      "reviewedRuns": 3,
+      "adoptionRatePercent": 66.7
+    },
+    "firstTwoTasksCompletedBeforeActualDeadline": true,
+    "thirdTaskCompletedOnlyAfterRecordedDeadline": true,
+    "fixturePreparationAdjustment": "Cloned tenant uses local organization rules; an unpublished draft with a demo user rule was retained after the expected publish rejection."
+  },
+  "preservation": {
+    "status": "PASS",
+    "boot": 2,
+    "sourceUnchanged": true,
+    "tables": 225,
+    "rows": 2150,
+    "files": 3,
+    "snapshotUnchangedAfterRestart": true,
+    "snapshotUnchangedAfterReads": true,
+    "modelCalls": 3,
+    "externalWorkersEnabled": false,
+    "reportQueriesAfterRestart": 3
+  },
+  "sourcePreserved": {
+    "tables": 225,
+    "rows": 1891,
+    "files": 3
+  },
+  "browser": {
+    "status": "PASS",
+    "emptyRatesUseDash": true,
+    "viewport": {
+      "cards": [
+        {
+          "left": 14,
+          "right": 466,
+          "width": 452
+        },
+        {
+          "left": 14,
+          "right": 466,
+          "width": 452
+        },
+        {
+          "left": 14,
+          "right": 466,
+          "width": 452
+        }
+      ],
+      "clientWidth": 480,
+      "height": 900,
+      "scrollWidth": 480,
+      "width": 500
+    },
+    "consoleWarningsAndErrors": 0,
+    "restartRequiredDemoRelogin": true,
+    "afterReloginMetricsUnchanged": true,
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-final.png"
+  },
+  "limitations": [
+    "Missing old task deadlines are disclosed, not reconstructed",
+    "Channel acceptance does not prove final delivery",
+    "Human adoption does not approve an application",
+    "Submitted-round cohort differs from current backlog",
+    "Target enterprise acceptance and production capacity remain pending",
+    "Full product requirement-to-evidence mapping is incomplete; initialization wizard and risk filtering are confirmed local gaps"
+  ],
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java": "6636a341536bcb5f6c6b4cd9658853da8a5f91ba8293791daeb74343b669ac86",
+    "agentflow-server/src/main/java/io/agentflow/approval/operations/JdbcApprovalOperationsReadAdapter.java": "84c4287b8542f8c9b249d08366d8b8678ddf675c27097fd26fff4eefd7747e93",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskDeadlineListener.java": "1a90de93f315b309e18a501a085a081b4aa3e10cf26fde645222625d2c5bf52d",
+    "agentflow-server/src/main/resources/api/openapi.json": "a0dc25778d788bb564295115a9b2c23c0563f14257227f524b26e87f66230c29",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "11341e1360b0df4b6d229a1c5cff29ccec3abb1836b0aa643b55cc79d871aeb1",
+    "agentflow-server/src/test/java/io/agentflow/approval/operations/ApprovalOperationsIntegrationTest.java": "22e447e1b35455b40e9d40805918dccc584a68fe5cc4687c9f39bb4900d28c14",
+    "agentflow-web/scripts/test-requests.mjs": "59396c72816f14c4019712b283145e201e6f3f3c094924afc837a9b0e926a126",
+    "agentflow-web/src/approvalOperations.ts": "8d2680fa73e073dbd46b814ffd8dea16ed50d173284f1c5df66e3a93e40955da",
+    "agentflow-web/src/components/ApprovalOperations.vue": "b721dcf16aa870111f95c1dfbfc0c1a9ccd113bb8287f2dd2bcf1be82e9c8f0d",
+    "agentflow-web/tests/operations.test.mjs": "09ba65e2332eb933e4889f4ea70a90519c4f9c48237c629befb678e6093539fd",
+    "docs/approval-operations.md": "3daaaed9ff3fd646d57304ed2d970e6c3c9fa920daade13742a494b94f41cc40",
+    "docs/remaining-implementation-plan.md": "f5700c268693abed77d21e3394e364d42a9146489443d5cfd0ac37462432a052",
+    "docs/remaining-local-work.md": "e2ea440ded4570d9ccff5e8d806b2b59a905e2d9dc66c9167e64c33a23f7749d",
+    "agentflow-web/src/components/OperationsOutcomeMetrics.vue": "5fff41dfc7a1e188c0305565f46b5bcc9a99c734c6e3b7fcf8fe154736b2501a",
+    "docs/operations-outcome-metrics.md": "9abc3c1feebbb41f57ddcbaed0ebba2373eaac56992f2d895a7a29eb6fcc68e6",
+    "docs/product-goal-gap-audit.md": "3e3fd7f6bf38c45a06748fefd079230e05c489545cb1d04a56376bf23908fbad"
+  },
+  "artifactSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-assist-result.json": "ba946bcd8298ffa55cf0d09c5a60f510bb6eda7a2836da28069de2865167392c",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-authors.log": "e147e94703e1b80624d4935c0d0d95d2f6d1075f5f2783fccd56d072df68fe37",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-before-restart.json": "743de9d47e1ef5e0182009124b686f58dc6270fed9e4479d0f0cb60be875eaac",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-500.json": "92ac2afd22f5e20e4b275ec32698870fa069f04341ef4512937529ff1b1b54c6",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-500.png": "5e975654ceb6305bea104c4ef1748dcb3e6dc894c23b5b3eb8e36fd601345e12",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-console.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-empty.txt": "8c9f6deeab4044494bc596dac19c35cd29514f54266b6a07935237b6e901fd4e",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-final.png": "d5fdacf92f50f895491c29cf8e5610f6f333cffaca12a4f9d256a5df06cbf4c6",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-final.txt": "c225d336ab95e6902dc4cc2b3f732e299c15667fec41713a4555d30bb06f2280",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-browser-http.json": "4174cd97f00d5d1d3c09574f1285b8915325961d16bb7bd740a66b3e4392c5b9",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-build-final.log": "6d984f683e846b692a419d13316bd890bf84c6e842178f6a567e05ca6efc2d5c",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-build.log": "467ea96b675f1029be26fd517b95e0d2a39c7402d2e140df8c9255eb5e1d68f5",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-frontend-final.log": "51676500c6563b1e15f795135f2f22425c040c205e1653595187ec841878da2b",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-frontend-final2.log": "c44506cb28e11c06e642571abf81d72a4825a27d5e9806cef46dc6f8c33b03b7",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-frontend.log": "e01fe718d81857928ff176a79e3fcd608805cc54782384d0729d8ad1c58e8f21",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-green.log": "bf5ed38c9657ebbf20fdf81b5c2427671fc1228fc4203cf3cd6ea4da38f65a90",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-h2-ApprovalOperationsIntegrationTest.xml": "25c7c185de02444ff3b1f8ecb1d72081e928470477b9fa5de7f9537896df8022",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-h2-OpenApiContractTest.xml": "07c6fc49c36f1fbe65c083c40c8df2c167b1c6d2e0a56ccc3fc3d80270429d01",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-h2-TaskDeadlineIntegrationTest.xml": "28b5d796e703c1b3aa2c9e1c3a061c5554d69f8474914dc8639e77ba0a4618e2",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-h2-TaskEscalationIntegrationTest.xml": "217acd86d3713e385310db49ff01233df8d323a4520d28eb7b7394bd07d8953c",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-h2-package-final.log": "360119ac2af2f5b2089445ce5334e288aba5ae4e962232d009fcbfe1ff4b2253",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-history-fix.log": "18acffe004b480e5b72c836dbc32cf9d9f87d5d72a6c339ae469d62e266b92f9",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-http-assist.json": "72afc517d9b52434da431d24428c1a0a916ac8f034bee2b3f5be74b942ecda12",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-http-contracts.json": "45c645e3b95e7390705e80359bdf0001d53a2d3910cc01bd17ee5cb6be532375",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-http-finish.json": "1b1a60bf1169a84d66ff5dad2bc36b3edd6e22c54ce11379f8d69ec4a413f7a0",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-http-late-sample.json": "8d72659234d0942ca80e0e93c9e5b92d53798d474bfc17eb7b4cae4313385a3e",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-http-prepare.json": "d836f32ffab7c7ef3bf557b6695cc428c07c2b2dd9b56e9e5fa88e8e5856ba03",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-http-restart.json": "3d883cf195884943bf801c2a780c9a6bb9461ed4b6a92fbedaa7c622d36c62fa",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-lifecycle-diagnostic.log": "0e4e7e4b7538acdfbedf70924ba718cd69e990b2271dedb60d001cb755f39742",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-lifecycle-red.xml": "e2b93212318624f39074e43269ac62fbab68d8c1af110d705fb3e4cd17094a6f",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-lifecycle.log": "5541d37d3bcb0bd168978d2c09fb0211dcb621b6fe87b9b7c8016e5aaab14863",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-openapi-final.log": "65c3aa46f82657121c4ca4476a551cb68f8595b5ba75fc83a972cb9fa495b764",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-openapi.log": "65c3aa46f82657121c4ca4476a551cb68f8595b5ba75fc83a972cb9fa495b764",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-postgres-report.xml": "b6e30901a83dbcfa40081e90fb8b4da517affcd2129d74faf9be0942adce65c1",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-postgres.json": "4b21c8e25d69b9b8cd4f9e13467a97555140b3717edecd93a6681621cf1dbf75",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-postgres.log": "d4407c82867f73f90595ae099c5cc457bfaed25ed7428988e6e464df9947b2a9",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-preservation.json": "54870273249644e2b0b75f9da68670fddbcdb52aaea5c978bce5c537071ccfd0",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-red.log": "9d0ea003e4a7df0cfc1415838b4b3793c57abdc7f7b8df972583c646a0e689c5",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-restore.log": "87908adbcba5d8693094b85cca369ce29c1169d71fa6dcb6df6c462806650ee0",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-runtime-boot1.log": "7e4bbe10f3578971a5ecb11c78cbe7797951b907ae2c8b5fc088f1cc5a5f9d41",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-runtime-boot2.log": "d04d36c00c97ba40a587380c9f17a7304574d6b6b026f5f84d410d3d796a42df",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-server.jar": "8b1fe359d6944c1ddb30cc8904b2e246716b6e72d4d6388679661e2e52f7222f",
+    "/fyoung/tmp/agentflow-remaining-20260928/operations-metrics-workflow.json": "f424dfe69f0ed883e2ca844e19a3b4d386d6d8d7c235b903fd3eb3c4154fd8e4"
+  }
+}

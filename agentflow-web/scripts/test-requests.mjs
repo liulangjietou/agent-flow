@@ -10,6 +10,14 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const output = mkdtempSync('/fyoung/tmp/agentflow-web-requests-')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 
+// 编译真实统计卡片，验证零分母、未知投递与采纳边界的展示。
+const outcomeDescriptor = parse(readFileSync(resolve(root, 'src/components/OperationsOutcomeMetrics.vue'), 'utf8'), { filename: 'OperationsOutcomeMetrics.vue' }).descriptor
+const outcomeSource = compileScript(outcomeDescriptor, { id: 'operations-outcomes', inlineTemplate: true }).content
+  .replaceAll('from "vue"', `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
+  .replaceAll("from 'vue'", `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
+writeFileSync(resolve(output, 'OperationsOutcomeMetrics.js'), ts.transpileModule(outcomeSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
+process.env.AGENTFLOW_TEST_OUTCOME_METRICS = resolve(output, 'OperationsOutcomeMetrics.js')
+
 // 个人设置使用实际组件，覆盖原请求恢复和切换身份时的迟到响应。
 const preferenceDescriptor = parse(readFileSync(resolve(root, 'src/components/NotificationPreferencesPanel.vue'), 'utf8'), { filename: 'NotificationPreferencesPanel.vue' }).descriptor
 for (const [name, inlineTemplate] of [['NotificationPreferencesPanel', false], ['NotificationPreferencesRendered', true]]) {

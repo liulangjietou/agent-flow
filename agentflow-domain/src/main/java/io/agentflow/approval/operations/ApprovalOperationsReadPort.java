@@ -40,10 +40,52 @@ public interface ApprovalOperationsReadPort {
         public static Metrics of(long submitted, long applications, long inApproval, long approved, long returned,
                                  long rejected, long withdrawn, long durationSamples, Long averageApprovalSeconds) {
             long decided = approved + returned + rejected;
-            BigDecimal rate = decided == 0 ? null : BigDecimal.valueOf(returned).multiply(BigDecimal.valueOf(100))
-                    .divide(BigDecimal.valueOf(decided), 1, RoundingMode.HALF_UP);
+            BigDecimal rate = percentage(returned, decided);
             return new Metrics(submitted, applications, inApproval, approved, returned, rejected, withdrawn,
                     durationSamples, averageApprovalSeconds, decided, rate);
+        }
+    }
+
+    /** 无样本时省略比例，已确认的零样本结果不能伪装为零百分比。 */
+    private static BigDecimal percentage(long numerator, long denominator) {
+        return denominator == 0 ? null : BigDecimal.valueOf(numerator).multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(denominator), 1, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 历史人工任务的实际决定与期限；取消和缺失事实不作为按时完成。
+     * @author owlzhangfq@gmail.com
+     */
+    record SlaMetrics(long decidedTasks, long timedTasks, long violatedTasks, long withoutDeadlineTasks,
+                      long invalidTimingTasks, long cancelledTasks, long unfinishedTasks, long unrecordedDecisionTasks, long unverifiedRounds,
+                      BigDecimal violationRatePercent) {
+        /** 只有具备有效时刻和期限的已办理任务进入违约率分母。 */
+        public static SlaMetrics of(long onTime, long violated, long withoutDeadline, long invalidTiming,
+                                    long cancelled, long unfinished, long unrecordedDecision, long unverifiedRounds) {
+            long timed = onTime + violated;
+            return new SlaMetrics(timed + withoutDeadline + invalidTiming, timed, violated, withoutDeadline,
+                    invalidTiming, cancelled, unfinished, unrecordedDecision, unverifiedRounds, percentage(violated, timed));
+        }
+    }
+
+    /**
+     * 外部投递按原记录计数，受理不代表送达，曾失败依据追加历史去重。
+     * @author owlzhangfq@gmail.com
+     */
+    record NotificationMetrics(long deliveries, long accepted, long failed, long retryWaiting, long unknown,
+                               long suppressed, long pending, long inFlight, long previouslyFailed) { }
+
+    /**
+     * 人工采纳与模型生成分开，未复核运行和执行失败不进入采纳率分母。
+     * @author owlzhangfq@gmail.com
+     */
+    record AgentMetrics(long runs, long queued, long running, long awaitingReview, long failed, long adopted,
+                        long dismissed, long reviewedRuns, BigDecimal adoptionRatePercent) {
+        /** 已采纳和已拒绝构成人工复核样本，采纳不产生审批结论。 */
+        public static AgentMetrics of(long queued, long running, long awaitingReview, long failed, long adopted, long dismissed) {
+            long reviewed = adopted + dismissed;
+            return new AgentMetrics(queued + running + awaitingReview + failed + reviewed, queued, running,
+                    awaitingReview, failed, adopted, dismissed, reviewed, percentage(adopted, reviewed));
         }
     }
 
@@ -77,5 +119,6 @@ public interface ApprovalOperationsReadPort {
     record Report(Instant generatedAt, LocalDate from, LocalDate to, String timeZone, String processKey,
                   Long definitionVersion, String organization, Metrics metrics, List<Daily> daily, List<ProcessSummary> processes,
                   boolean moreProcesses, long pendingTasks, long overdueTasks, List<WaitingNode> waitingNodes, boolean moreWaitingNodes,
-                  List<WaitingTask> oldestTasks, boolean moreOldestTasks, long unrecordedHistoricalRounds) { }
+                  List<WaitingTask> oldestTasks, boolean moreOldestTasks, long unrecordedHistoricalRounds,
+                  SlaMetrics sla, NotificationMetrics notifications, AgentMetrics agent) { }
 }

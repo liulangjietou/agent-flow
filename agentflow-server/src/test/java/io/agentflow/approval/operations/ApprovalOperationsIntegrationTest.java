@@ -56,6 +56,196 @@ class ApprovalOperationsIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
     @Autowired TaskService tasks;
     @Autowired RuntimeService runtime;
+    @Autowired org.flowable.spring.SpringProcessEngineConfiguration engine;
+    @Autowired io.agentflow.calendar.BusinessCalendarRepository calendars;
+
+    @Test
+    void outcomeMetricsUseHistoricalCohortAndNeverReadNotificationOrModelBodies() throws Exception {
+        String key = "quality-" + UUID.randomUUID();
+        String app = seed("demo", key, "RETURNED", "2020-01-01T00:00:00Z", "2020-01-01T01:00:00Z");
+        organization("demo", app, 1, "研发%_!部");
+        seedRound("demo", app, 2, "IN_APPROVAL", "2020-01-04T00:00:00Z", null);
+        organization("demo", app, 2, "另一部门");
+        jdbc.update("UPDATE approval_application SET round_no=2 WHERE id=?", app);
+        String recovered = delivery("demo", app, 1, "ACCEPTED", "EMAIL");
+        jdbc.update("INSERT INTO notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,occurred_at) VALUES(?,1,'RETRY_WAIT',1,1,?)",
+                recovered, Timestamp.from(Instant.parse("2020-01-05T00:00:00Z")));
+        jdbc.update("INSERT INTO notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,occurred_at) VALUES(?,2,'FAILED',3,3,?)",
+                recovered, Timestamp.from(Instant.parse("2020-01-05T00:01:00Z")));
+        for (String status : List.of("FAILED", "RETRY_WAIT", "UNKNOWN", "SUPPRESSED", "PENDING", "IN_FLIGHT")) delivery("demo", app, 1, status, "ENTERPRISE_IM");
+        for (String status : List.of("ADOPTED", "ADOPTED", "DISMISSED", "COMPLETED", "FAILED", "QUEUED", "RUNNING")) assist("demo", app, 1, status);
+        delivery("demo", app, 2, "FAILED", "EMAIL"); assist("demo", app, 2, "ADOPTED");
+        delivery("foreign", app, 1, "FAILED", "EMAIL"); assist("foreign", app, 1, "ADOPTED");
+        var before = jdbc.queryForList("SELECT * FROM notification_dispatch ORDER BY id");
+        var report = report(key, "%_!");
+        var notifications = report.path("notifications");
+        assertThat(notifications.path("deliveries").asLong()).isEqualTo(7);
+        for (String field : List.of("accepted", "failed", "retryWaiting", "unknown", "suppressed", "pending", "inFlight", "previouslyFailed"))
+            assertThat(notifications.path(field).asLong()).as(field).isEqualTo(1);
+        var agent = report.path("agent");
+        assertThat(agent.path("runs").asLong()).isEqualTo(7);
+        assertThat(agent.path("adopted").asLong()).isEqualTo(2);
+        assertThat(agent.path("dismissed").asLong()).isEqualTo(1);
+        assertThat(agent.path("reviewedRuns").asLong()).isEqualTo(3);
+        assertThat(agent.path("adoptionRatePercent").decimalValue()).isEqualByComparingTo("66.7");
+        for (String field : List.of("awaitingReview", "failed", "queued", "running")) assertThat(agent.path(field).asLong()).as(field).isEqualTo(1);
+        assertThat(report.toString()).doesNotContain("sensitive-body", "recipient@example.invalid", "state_json", "context_json");
+        assertThat(report(key, "另一部门").path("notifications").path("deliveries").asLong()).isZero();
+        assertThat(report(key, "不存在").path("agent").has("adoptionRatePercent")).isFalse();
+        assertThat(jdbc.queryForList("SELECT * FROM notification_dispatch ORDER BY id")).isEqualTo(before);
+    }
+
+    @Test
+    void historicalSlaDistinguishesDecisionsCancellationsMissingAndInvalidTimes() throws Exception {
+        String key = "sla-history-" + UUID.randomUUID();
+        String app = seed("demo", key, "APPROVED", "2020-01-01T00:00:00Z", "2020-01-01T01:00:00Z");
+        historicalTask(app, "2020-01-01T00:05:00Z", "2020-01-01T00:10:00Z", null, "APPROVE");
+        historicalTask(app, "2020-01-01T00:10:00Z", "2020-01-01T00:10:00Z", null, "APPROVE");
+        historicalTask(app, "2020-01-01T00:11:00Z", "2020-01-01T00:10:00Z", "RETURN by finance", "RETURN");
+        historicalTask(app, "2020-01-01T00:11:00Z", "2020-01-01T00:10:00Z", "REJECT by finance", "REJECT");
+        historicalTask(app, "2020-01-01T00:11:00Z", "2020-01-01T00:10:00Z", "RETURN by finance", null);
+        historicalTask(app, "2020-01-01T00:11:00Z", null, null, "APPROVE");
+        historicalTask(app, "2019-12-31T23:59:00Z", "2020-01-01T00:10:00Z", null, "APPROVE");
+        historicalTask(app, "2020-01-01T00:11:00Z", "2020-01-01T00:10:00Z", null, null);
+        historicalTask(app, null, "2020-01-01T00:10:00Z", null, null);
+        var sla = report(key).path("sla");
+        assertThat(sla.path("decidedTasks").asLong()).isEqualTo(6);
+        assertThat(sla.path("timedTasks").asLong()).isEqualTo(4);
+        assertThat(sla.path("violatedTasks").asLong()).isEqualTo(2);
+        assertThat(sla.path("violationRatePercent").decimalValue()).isEqualByComparingTo("50.0");
+        for (String field : List.of("withoutDeadlineTasks", "invalidTimingTasks", "cancelledTasks", "unfinishedTasks", "unrecordedDecisionTasks"))
+            assertThat(sla.path(field).asLong()).as(field).isEqualTo(1);
+        String instance = jdbc.queryForObject("SELECT process_instance_id FROM approval_submission_round WHERE application_id=?", String.class, app);
+        jdbc.update("UPDATE ACT_HI_VARINST SET TEXT_='foreign' WHERE PROC_INST_ID_=? AND NAME_='tenantId'", instance);
+        var invalidBinding = report(key).path("sla");
+        assertThat(invalidBinding.path("decidedTasks").asLong()).isZero();
+        assertThat(invalidBinding.has("violationRatePercent")).isFalse();
+        assertThat(invalidBinding.path("unverifiedRounds").asLong()).isEqualTo(1);
+    }
+
+    @Test
+    void realReturnAndRejectCountTheDecisionButNotCancelledCountersignPeers() throws Exception {
+        try {
+            for (String action : List.of("RETURN", "REJECT")) {
+                engineTime("2020-01-01T09:00:00Z");
+                var flow = timedCountersign();
+                engineTime("2020-01-01T09:11:00Z");
+                liveAction(flow.get("app"), "finance", action);
+                var sla = report(flow.get("key")).path("sla");
+                assertThat(sla.path("decidedTasks").asLong()).isEqualTo(1);
+                assertThat(sla.path("timedTasks").asLong()).as("sla=%s, tasks=%s", sla, jdbc.queryForList("SELECT h.START_TIME_,h.END_TIME_,h.DUE_DATE_,h.DELETE_REASON_ FROM ACT_HI_TASKINST h JOIN approval_submission_round r ON r.process_instance_id=h.PROC_INST_ID_ WHERE r.application_id=?", flow.get("app"))).isEqualTo(1);
+                assertThat(sla.path("violatedTasks").asLong()).isEqualTo(1);
+                assertThat(sla.path("cancelledTasks").asLong()).isEqualTo(1);
+                assertThat(sla.path("unrecordedDecisionTasks").asLong()).isZero();
+            }
+        } finally { engine.getClock().reset(); }
+    }
+
+    @Test
+    void realPauseResumeUsesTheRetainedTaskDeadlineAndPartialApprovalSample() throws Exception {
+        try {
+            engineTime("2020-01-01T09:00:00Z");
+            var flow = timedCountersign(); String app = flow.get("app");
+            engineTime("2020-01-01T09:05:00Z"); control(app, "pause");
+            assertThat(report(flow.get("key")).path("sla").path("unfinishedTasks").asLong()).isEqualTo(2);
+            assertThat(report(flow.get("key")).path("sla").has("violationRatePercent")).isFalse();
+            engineTime("2020-01-01T10:05:00Z"); control(app, "resume");
+            assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", app).list())
+                    .allSatisfy(task -> assertThat(task.getDueDate().toInstant()).isEqualTo(Instant.parse("2020-01-01T10:10:00Z")));
+            engineTime("2020-01-01T10:09:00Z"); liveAction(app, "finance", "APPROVE");
+            var partial = report(flow.get("key")).path("sla");
+            assertThat(partial.path("timedTasks").asLong()).isEqualTo(1);
+            assertThat(partial.path("violatedTasks").asLong()).isZero();
+            assertThat(partial.path("violationRatePercent").decimalValue()).isEqualByComparingTo("0.0");
+            assertThat(partial.path("unfinishedTasks").asLong()).isEqualTo(1);
+            engineTime("2020-01-01T10:11:00Z"); liveAction(app, "admin", "APPROVE");
+            assertThat(report(flow.get("key")).path("sla").path("violationRatePercent").decimalValue()).isEqualByComparingTo("50.0");
+        } finally { engine.getClock().reset(); }
+    }
+
+    private Map<String, String> timedCountersign() throws Exception {
+        var hours = new java.util.EnumMap<java.time.DayOfWeek, List<io.agentflow.calendar.CalendarRules.Period>>(java.time.DayOfWeek.class);
+        for (var day : java.time.DayOfWeek.values()) hours.put(day, List.of(new io.agentflow.calendar.CalendarRules.Period("09:00", "17:00")));
+        var calendar = io.agentflow.calendar.BusinessCalendar.create("demo", "metrics-" + UUID.randomUUID(), "统计日历",
+                new io.agentflow.calendar.CalendarRules("UTC", hours, List.of()), "admin", Instant.now());
+        calendars.create(calendar);
+        String key = "metrics-live-" + UUID.randomUUID();
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("review", "财务会签", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE", "approvalMode", "ALL",
+                        "deadlineCalendarId", calendar.id().toString(), "deadlineCalendarRevision", "1", "deadlineWorkingMinutes", "10")),
+                new Node("end", "结束", NodeType.END, Map.of())), List.of(new Edge("a", "start", "review", ""), new Edge("b", "review", "end", "")));
+        var definition = definitions.create("demo", key, "历史办理统计", graph);
+        definitions.publish(new Actor("demo", "admin", Set.of("ADMIN")), definition.id(), 0, "历史办理验收");
+        String app = json.read(mvc.perform(post("/api/v1/applications").header("Authorization", token("alice"))
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("processKey", key, "definitionVersion", 1,
+                        "businessNo", key, "title", "历史办理验收", "payload", Map.of()))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), JsonNode.class).path("id").asText();
+        mvc.perform(post("/api/v1/applications/" + app + "/submit").header("Authorization", token("alice"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":1}")).andExpect(status().isOk());
+        // 只调整提交窗口夹具；任务期限及后续办理均来自真实引擎和公开接口。
+        jdbc.update("UPDATE approval_submission_round SET submitted_at=? WHERE application_id=?", Timestamp.from(Instant.parse("2020-01-01T09:00:00Z")), app);
+        assertThat(jdbc.queryForList("SELECT h.DUE_DATE_ FROM ACT_HI_TASKINST h JOIN approval_submission_round r ON r.process_instance_id=h.PROC_INST_ID_ WHERE r.application_id=?", Timestamp.class, app))
+                .hasSize(2).allSatisfy(due -> assertThat(due.toInstant()).isEqualTo(Instant.parse("2020-01-01T09:10:00Z")));
+        return Map.of("app", app, "key", key);
+    }
+
+    private void liveAction(String app, String user, String action) throws Exception {
+        var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", app).taskAssignee(user).singleResult();
+        long version = jdbc.queryForObject("SELECT version FROM approval_application WHERE id=?", Long.class, app);
+        mvc.perform(post("/api/v1/tasks/" + task.getId() + "/actions").header("Authorization", token(user))
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("expectedVersion", version, "action", action, "comment", "统计验证"))))
+                .andExpect(status().isOk());
+    }
+
+    private void control(String app, String action) throws Exception {
+        long version = jdbc.queryForObject("SELECT version FROM approval_application WHERE id=?", Long.class, app);
+        mvc.perform(post("/api/v1/applications/" + app + "/rounds/1/runtime/" + action).header("Authorization", token("admin"))
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("expectedVersion", version, "reason", "统计验证"))))
+                .andExpect(status().isOk());
+    }
+    private void engineTime(String time) { engine.getClock().setCurrentTime(java.util.Date.from(Instant.parse(time))); }
+
+    private String delivery(String tenant, String app, int round, String status, String channel) {
+        String inbox = UUID.randomUUID().toString(), id = UUID.randomUUID().toString();
+        jdbc.update("""
+                INSERT INTO notification_inbox(id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,round_no,created_at)
+                VALUES(?,?,'recipient@example.invalid',?,?,'sensitive-body',?,'APPROVED','actor',?,?)
+                """, inbox, tenant, inbox, app, app, round, Timestamp.from(Instant.parse("2020-01-05T00:00:00Z")));
+        jdbc.update("""
+                INSERT INTO notification_dispatch(id,tenant_id,recipient_id,inbox_id,channel,consent_generation,status,created_at,updated_at)
+                VALUES(?,?,'recipient@example.invalid',?,?,1,?,?,?)
+                """, id, tenant, inbox, channel, status, Timestamp.from(Instant.now()), Timestamp.from(Instant.now()));
+        return id;
+    }
+
+    private void assist(String tenant, String app, int round, String status) {
+        int version = switch (status) { case "QUEUED" -> 1; case "RUNNING" -> 2; case "COMPLETED", "FAILED" -> 3; default -> 4; };
+        jdbc.update("""
+                INSERT INTO agent_assist_run(id,tenant_id,application_id,application_version,round_no,status,version,context_json,state_json,created_at)
+                VALUES(?,?,?,1,?,?,?, 'sensitive-body','sensitive-body',?)
+                """, UUID.randomUUID().toString(), tenant, app, round, status, version, Timestamp.from(Instant.now()));
+    }
+
+    private void historicalTask(String app, String completed, String due, String deleted, String decision) {
+        String instance = jdbc.queryForObject("SELECT process_instance_id FROM approval_submission_round WHERE application_id=?", String.class, app);
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM ACT_HI_VARINST WHERE PROC_INST_ID_=?", Long.class, instance) == 0) {
+            for (var entry : Map.of("tenantId", "demo", "applicationId", app).entrySet())
+                jdbc.update("INSERT INTO ACT_HI_VARINST(ID_,PROC_INST_ID_,EXECUTION_ID_,NAME_,VAR_TYPE_,TEXT_) VALUES(?,?,?,?,'string',?)",
+                        UUID.randomUUID().toString(), instance, instance, entry.getKey(), entry.getValue());
+            jdbc.update("INSERT INTO ACT_HI_VARINST(ID_,PROC_INST_ID_,EXECUTION_ID_,NAME_,VAR_TYPE_,LONG_) VALUES(?,?,?,'roundNo','integer',1)",
+                    UUID.randomUUID().toString(), instance, instance);
+        }
+        String task = UUID.randomUUID().toString();
+        jdbc.update("""
+                INSERT INTO ACT_HI_TASKINST(ID_,PROC_INST_ID_,TENANT_ID_,START_TIME_,END_TIME_,DUE_DATE_,DELETE_REASON_)
+                VALUES(?,?,'demo',?,?,?,?)
+                """, task, instance, Timestamp.from(Instant.parse("2020-01-01T00:00:00Z")),
+                completed == null ? null : Timestamp.from(Instant.parse(completed)), due == null ? null : Timestamp.from(Instant.parse(due)), deleted);
+        if (decision != null) jdbc.update("""
+                INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)
+                VALUES(?,'demo',?,'Task',?,1,?,?,'finance','sensitive-body',?)
+                """, UUID.randomUUID().toString(), UUID.randomUUID().toString(), task, app, decision, Timestamp.from(Instant.now()));
+    }
 
     @Test
     void organizationMetricsFollowEachHistoricalRoundAndKeepUnknownHistoryExplicit() throws Exception {

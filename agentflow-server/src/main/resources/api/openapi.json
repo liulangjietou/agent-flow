@@ -7764,7 +7764,7 @@
           "工作台"
         ],
         "summary": "审批运营统计",
-        "description": "ADMIN 租户内只读快照。按 UTC 提交日期统计轮次，默认近 30 天，含首尾且最多 366 天；结论取查询时状态。重提独立计轮次。当前积压不受日期范围影响，会签按成员任务计数。旧轮次缺失量独立披露。组织名称按各自提交轮次的冻结快照匹配；当前积压按当前在审轮次匹配。缺失历史量仍只按流程范围披露，不推断未知组织归属。仅接收声明的查询参数。",
+        "description": "ADMIN 租户内只读快照。按 UTC 提交日期统计轮次，默认近 30 天，含首尾且最多 366 天；结论取查询时状态。重提独立计轮次。当前积压不受日期范围影响，会签按成员任务计数。旧轮次缺失量独立披露。组织名称按各自提交轮次的冻结快照匹配；当前积压按当前在审轮次匹配。缺失历史量仍只按流程范围披露，不推断未知组织归属。仅接收声明的查询参数。 历史 SLA、外部通知和 Agent 复核按同一提交轮次队列汇总当前结果；不读取正文。当前积压仍不受提交日期窗口限制。",
         "x-access": "ADMIN",
         "x-idempotency": false,
         "responses": {
@@ -44505,6 +44505,15 @@
           "organization": {
             "type": "string",
             "description": "本次已应用的组织名称条件；空字符串表示不限。历史缺口提示不受此条件限制。"
+          },
+          "sla": {
+            "$ref": "#/components/schemas/OperationsSlaMetrics"
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/OperationsNotificationMetrics"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/OperationsAgentMetrics"
           }
         },
         "required": [
@@ -44523,7 +44532,10 @@
           "oldestTasks",
           "moreOldestTasks",
           "unrecordedHistoricalRounds",
-          "overdueTasks"
+          "overdueTasks",
+          "sla",
+          "notifications",
+          "agent"
         ]
       },
       "FirstWorkflowDefinition": {
@@ -65607,6 +65619,202 @@
             "pattern": "\\S"
           }
         }
+      },
+      "OperationsSlaMetrics": {
+        "type": "object",
+        "description": "按提交轮次队列汇总历史实际办理任务，等于期限不算违约；取消及缺失不进入分母。",
+        "properties": {
+          "decidedTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "timedTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "violatedTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "withoutDeadlineTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "invalidTimingTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cancelledTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unfinishedTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unrecordedDecisionTasks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "violationRatePercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "分母为零时省略，不能解释为零百分比。"
+          },
+          "unverifiedRounds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "所选提交轮次中无法核实引擎租户、申请及轮次绑定的数量，未纳入任务样本。"
+          }
+        },
+        "required": [
+          "decidedTasks",
+          "timedTasks",
+          "violatedTasks",
+          "withoutDeadlineTasks",
+          "invalidTimingTasks",
+          "cancelledTasks",
+          "unfinishedTasks",
+          "unrecordedDecisionTasks",
+          "unverifiedRounds"
+        ],
+        "additionalProperties": false
+      },
+      "OperationsNotificationMetrics": {
+        "type": "object",
+        "description": "按原投递记录计数；曾失败按追加历史去重，受理不代表送达，未知独立披露。",
+        "properties": {
+          "deliveries": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "retryWaiting": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "suppressed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "inFlight": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "previouslyFailed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "deliveries",
+          "accepted",
+          "failed",
+          "retryWaiting",
+          "unknown",
+          "suppressed",
+          "pending",
+          "inFlight",
+          "previouslyFailed"
+        ],
+        "additionalProperties": false
+      },
+      "OperationsAgentMetrics": {
+        "type": "object",
+        "description": "采纳率为已采纳除以已采纳及已拒绝；执行失败及未复核不进入分母。",
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "queued": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "running": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "awaitingReview": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "adopted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "dismissed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reviewedRuns": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "adoptionRatePercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "分母为零时省略，不能解释为零百分比。"
+          }
+        },
+        "required": [
+          "runs",
+          "queued",
+          "running",
+          "awaitingReview",
+          "failed",
+          "adopted",
+          "dismissed",
+          "reviewedRuns"
+        ],
+        "additionalProperties": false
       }
     }
   }
