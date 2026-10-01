@@ -174,21 +174,22 @@ class SubprocessDeploymentIntegrationTest {
     }
 
     @Test
-    void publicCreationRemainsClosedUntilTheCompleteSubprocessFeatureIsAccepted() {
+    void publicPublicationUsesTheVerifiedFixedChildDefinition() {
         var child = child(key(), "total");
-        assertThatThrownBy(() -> definitions.create("demo", key(), "待完整验收", callGraph(child.key(), 1, "amount", "total"), schema("amount")))
-                .isInstanceOfSatisfying(DefinitionValidationException.class,
-                        error -> assertThat(error.errors()).contains("SUBPROCESS_RUNTIME_NOT_READY:call"));
+        var draft = definitions.create("demo", key(), "公开固定子版本", callGraph(child.key(), 1, "amount", "total"), schema("amount"));
+        var published = definitions.publish(ADMIN, draft.id(), draft.revision(), "核对固定子版本后发布");
+        assertThat(((CallActivity) engine.getBpmnModel(nativeId(published)).getMainProcess().getFlowElement("call")).getCalledElement())
+                .isEqualTo(nativeId(child));
         assertThat(definitions.validate("demo", callGraph(child.key(), 1, "amount", "total"), schema("amount")))
-                .contains("SUBPROCESS_RUNTIME_NOT_READY:call");
+                .isEmpty();
     }
 
     @Test
-    void designPreflightReportsMissingDependenciesWhileKeepingThePublicationGateClosed() {
+    void designPreflightReportsMissingDependenciesOnlyToTheCurrentTenantDesigner() {
         var graph = callGraph(key(), 1, "amount", "total");
         var result = definitions.inspect("demo", graph, schema("amount"), key());
-        assertThat(result.errors()).contains("SUBPROCESS_DEFINITION_UNAVAILABLE:call", "SUBPROCESS_RUNTIME_NOT_READY:call");
-        assertThat(definitions.inspect(graph, schema("amount"), key()).errors()).containsExactly("SUBPROCESS_RUNTIME_NOT_READY:call");
+        assertThat(result.errors()).contains("SUBPROCESS_DEFINITION_UNAVAILABLE:call");
+        assertThat(definitions.inspect(graph, schema("amount"), key()).errors()).isEmpty();
     }
 
     @Test

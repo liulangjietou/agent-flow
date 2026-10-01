@@ -48,17 +48,16 @@ class DefinitionPreviewIntegrationTest {
         var before = snapshot();
         mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("admin"))
                         .contentType(MediaType.APPLICATION_JSON).content(json.write(body)))
-                .andExpect(status().isOk()).andExpect(jsonPath("errors", org.hamcrest.Matchers.containsInAnyOrder(
-                        "SUBPROCESS_DEFINITION_UNAVAILABLE:call", "SUBPROCESS_RUNTIME_NOT_READY:call")));
+                .andExpect(status().isOk()).andExpect(jsonPath("errors", org.hamcrest.Matchers.contains("SUBPROCESS_DEFINITION_UNAVAILABLE:call")));
         mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token("employee"))
                         .contentType(MediaType.APPLICATION_JSON).content(json.write(body)))
-                .andExpect(status().isOk()).andExpect(jsonPath("errors", org.hamcrest.Matchers.contains("SUBPROCESS_RUNTIME_NOT_READY:call")));
+                .andExpect(status().isOk()).andExpect(jsonPath("errors", org.hamcrest.Matchers.empty()));
         assertThat(snapshot()).isEqualTo(before);
         mvc.perform(post("/api/v1/process-definitions").header("Authorization", token("admin"))
                         .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)
-                        .content(json.write(Map.of("key", key, "name", "公开门禁验证", "graph", graph))))
-                .andExpect(status().isUnprocessableEntity());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition WHERE process_key=?", Integer.class, key)).isZero();
+                        .content(json.write(Map.of("key", key, "name", "草稿待完善依赖", "graph", graph))))
+                .andExpect(status().isOk()).andExpect(jsonPath("status").value("DRAFT"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition WHERE process_key=?", Integer.class, key)).isEqualTo(1);
     }
 
     @Test

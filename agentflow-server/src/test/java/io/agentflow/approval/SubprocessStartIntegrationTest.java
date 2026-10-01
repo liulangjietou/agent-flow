@@ -560,15 +560,6 @@ class SubprocessStartIntegrationTest {
     }
 
     @Test
-    void publicDraftEntryStaysClosedUntilTheWholeRuntimeLifecycleIsImplemented() {
-        var child = child(key(), schema("total"), "user:manager");
-        var graph = parentGraph(new SubprocessPolicy(child.key(), 1, Map.of("total", "amount")), false);
-        assertThatThrownBy(() -> definitions.create("demo", key(), "尚未开放", graph, schema("amount")))
-                .isInstanceOf(io.agentflow.definition.DefinitionValidationException.class);
-        assertThat(definitions.validate(graph, schema("amount"))).contains("SUBPROCESS_RUNTIME_NOT_READY:call");
-    }
-
-    @Test
     void rootWithdrawalCancelsOnlyActiveChildrenAndPreservesAnAlreadyApprovedSibling() {
         var leaf = child(key(), schema("total"), "user:manager");
         var application = create(parallelParent(leaf), Map.of("amount", "7"));

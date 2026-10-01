@@ -12,6 +12,20 @@ ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
+// 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
+const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
+validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })
+validate(assigneeSchema, { rule: 'user:bob', label: 'Bob', memberCount: 1 })
+validate(assigneeSchema, { rule: 'role:FINANCE', label: '财务', memberCount: 2, contextual: false })
+for (const value of [
+  { rule: 'user:bob', label: 'Bob', memberCount: 0 },
+  { rule: 'user:bob', label: 'Bob', memberCount: 0, contextual: false },
+  { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: -1, contextual: true }
+]) assert.equal(validator(assigneeSchema)(value), false, 'invalid assignee count must be rejected')
+validate({ $ref: '#/components/schemas/GraphNode' }, {
+  id: 'call', name: '固定版本子审批', type: 'SUB_PROCESS',
+  properties: { subprocessKey: 'child-approval', subprocessVersion: '1', 'subprocessInput.total': 'amount' }
+})
 const ids = new Set()
 let examples = 0
 for (const methods of Object.values(spec.paths)) for (const operation of Object.values(methods)) {

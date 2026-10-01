@@ -55,9 +55,7 @@ public class DefinitionApplicationService {
 
     /** 联合校验流程图与表单，不改变持久化状态。 */
     public List<String> validate(Graph graph, FormSchema formSchema) {
-        var errors = new java.util.ArrayList<>(validator.validate(graph, formSchema));
-        errors.addAll(unreadyNodes(graph));
-        return List.copyOf(errors);
+        return List.copyOf(validator.validate(graph, formSchema));
     }
 
     /** 结构通过后核对身份源、明确日历修订与事件契约；跨上下文读取由应用层编排。 */
@@ -74,10 +72,7 @@ public class DefinitionApplicationService {
 
     /** 预检携带当前流程标识时，同图元素一起验证，不查询或修改流程定义。 */
     public Validation inspect(Graph graph, FormSchema formSchema, String processKey) {
-        var result = inspectStructure(graph, formSchema, processKey);
-        var errors = new java.util.ArrayList<>(result.errors());
-        errors.addAll(unreadyNodes(graph));
-        return new Validation(errors, result.branchDiagnostics());
+        return inspectStructure(graph, formSchema, processKey);
     }
 
     private Validation inspectStructure(Graph graph, FormSchema formSchema, String processKey) {
@@ -100,7 +95,6 @@ public class DefinitionApplicationService {
         if (!result.errors().isEmpty()) return result;
         var errors = new java.util.ArrayList<>(references.inspect(tenantId, graph));
         errors.addAll(subprocesses.inspect(tenantId, graph, formSchema));
-        errors.addAll(unreadyNodes(graph));
         return new Validation(errors, result.branchDiagnostics());
     }
 
@@ -234,16 +228,10 @@ public class DefinitionApplicationService {
     }
 
     private void requireValid(Graph graph, FormSchema formSchema, String processKey) {
-        var errors = new java.util.ArrayList<>(validator.validate(graph, formSchema, processKey));
-        errors.addAll(unreadyNodes(graph));
+        var errors = validator.validate(graph, formSchema, processKey);
         if (!errors.isEmpty()) {
             throw new DefinitionValidationException(errors);
         }
     }
 
-    private List<String> unreadyNodes(Graph graph) {
-        // 完整公开验收前仍禁止保存和发布，纯领域结构及只读设计检查可以继续验证。
-        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.SUB_PROCESS)
-                .map(node -> "SUBPROCESS_RUNTIME_NOT_READY:" + node.id()).toList();
-    }
 }
