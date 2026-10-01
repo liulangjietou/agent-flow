@@ -1,5 +1,8 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.approval.service.TaskRecipientDirectory;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -20,10 +23,13 @@ import java.util.Locale;
 @Repository
 public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
     private final JdbcTemplate jdbc;
-    private final io.agentflow.approval.service.TaskRecipientDirectory recipients;
+    private final JsonUtil json;
+    private final TaskRecipientDirectory recipients;
 
     /** 共享审批与引擎数据源；所有写入仍通过原审批应用服务。 */
-    public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc, io.agentflow.approval.service.TaskRecipientDirectory recipients) { this.jdbc = jdbc; this.recipients = recipients; }
+    public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc, TaskRecipientDirectory recipients, JsonUtil json) {
+        this.jdbc = jdbc; this.recipients = recipients; this.json = json;
+    }
 
     /** 将授权分页和完整计数组合读取，空的后续页在同一只读事务内补取计数。 */
     @Override
@@ -36,7 +42,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                 SELECT p.* FROM (
                     SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.OWNER_,t.DELEGATION_,t.CREATE_TIME_,t.DUE_DATE_,
                            a.id,a.business_no,a.title,a.process_key,a.definition_version,a.created_by,a.search_amount,a.round_no,
-                           r.initiator_legal_entity_name,r.initiator_department_name,r.initiator_position_name,
+                           r.initiator_legal_entity_name,r.initiator_department_name,r.initiator_position_name,r.risk_json,
                            COUNT(*) OVER () AS matching_total
                 """).append(where(actor, query, parameters)).append(") p");
         if (query.afterTime() != null) {
@@ -70,7 +76,9 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                 row.getString("ASSIGNEE_"), row.getString("OWNER_"), delegation == null ? "NONE" : delegation,
                 row.getTimestamp("CREATE_TIME_").toInstant(),
                 row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant(),
-                row.getString("initiator_legal_entity_name"), row.getString("initiator_department_name"), row.getString("initiator_position_name"));
+                row.getString("initiator_legal_entity_name"), row.getString("initiator_department_name"), row.getString("initiator_position_name"),
+                row.getString("risk_json") == null ? SubmissionRisk.unassessed()
+                        : json.read(row.getString("risk_json"), SubmissionRisk.class));
     }
 
     private StringBuilder where(Actor actor, Query query, List<Object> parameters) {
@@ -94,6 +102,10 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
             case PENDING -> { sql.append(" AND t.DUE_DATE_>?"); parameters.add(Timestamp.from(query.deadlineAt())); }
             case UNRECORDED -> sql.append(" AND t.DUE_DATE_ IS NULL");
             case ALL -> { }
+        }
+        if (query.risk() != null) {
+            sql.append(" AND COALESCE(r.risk_level,'UNASSESSED')=?");
+            parameters.add(query.risk().name());
         }
         if (!query.text().isEmpty()) {
             String pattern = literalPattern(query.text());

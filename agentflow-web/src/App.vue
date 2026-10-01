@@ -84,6 +84,9 @@ import { DraftAutosave } from './draftAutosave'
 import type { GraphNode } from './api'
 import QuickDesigner from './components/QuickDesigner.vue'
 import ConditionEditor from './components/ConditionEditor.vue'
+import DefinitionRiskPolicy from './components/DefinitionRiskPolicy.vue'
+import { copyRiskPolicy } from './submissionRisk'
+import type { RiskPolicy } from './api'
 import { describeBranch, branchTooltip } from './conditionPresentation'
 import { editQuickGraph, type QuickCommand } from './quickDesigner'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode, type DesignerDeadline } from './designerGraph'
@@ -220,9 +223,10 @@ const applicationFieldErrors = ref<FieldErrors>({})
 const applicationFormError = ref('')
 const applicationFormSchema = computed(() => createdApplication.value ? createdApplication.value.formSchema ?? null : applicationSelection.definition?.formSchema ?? null)
 const conditionLanguageVersion = ref<1 | 2>(2)
+const definitionRiskPolicy = ref<RiskPolicy | null>(null)
 const designerMode = ref<'quick' | 'advanced'>('quick')
 // 编辑视图保留输入中的空格，提交时才调用 graphPayload 规范化。
-const quickGraph = computed<Graph>(() => ({ conditionLanguageVersion: conditionLanguageVersion.value, nodes: serializeDesignerNodes(nodes.value), edges: edges.value.map(edge => ({ ...edge })) }))
+const quickGraph = computed<Graph>(() => ({ conditionLanguageVersion: conditionLanguageVersion.value, riskPolicy: copyRiskPolicy(definitionRiskPolicy.value), nodes: serializeDesignerNodes(nodes.value), edges: edges.value.map(edge => ({ ...edge })) }))
 const nodes = ref<FlowNode[]>([])
 const edges = ref<GraphEdge[]>([])
 const selectedId = ref('')
@@ -268,6 +272,7 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 
 function defaultGraph() {
   conditionLanguageVersion.value = 2
+  definitionRiskPolicy.value = null
   nodes.value = [
     { id: 'start', name: '开始', type: 'START', x: 40, y: 180, assigneeRule: '' },
     { id: 'manager', name: '部门审批', type: 'USER_TASK', x: 190, y: 180, assigneeRule: 'role:MANAGER' },
@@ -285,16 +290,17 @@ function defaultGraph() {
   selectedId.value = 'amount'
   selectedEdgeId.value = ''
 }
-function snapshot() { return JSON.stringify({ key: definitionKey.value, name: definitionName.value, conditionLanguageVersion: conditionLanguageVersion.value, nodes: nodes.value, edges: edges.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }) }
+function snapshot() { return JSON.stringify({ key: definitionKey.value, name: definitionName.value, riskPolicy: copyRiskPolicy(definitionRiskPolicy.value), conditionLanguageVersion: conditionLanguageVersion.value, nodes: nodes.value, edges: edges.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }) }
 function remember() { history.value.push(snapshot()); if (history.value.length > 50) history.value.shift(); future.value = [] }
 // 首次保存前的撤销快照可能尚无标识；已落库草稿的身份不能随内容撤销。
-function restore(raw: string) { const value = JSON.parse(raw); conditionLanguageVersion.value = value.conditionLanguageVersion ?? 1; if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null); definitionNotificationTexts.value = copyNotificationTexts(value.notificationTexts) }
+function restore(raw: string) { const value = JSON.parse(raw); definitionRiskPolicy.value = copyRiskPolicy(value.riskPolicy); conditionLanguageVersion.value = value.conditionLanguageVersion ?? 1; if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null); definitionNotificationTexts.value = copyNotificationTexts(value.notificationTexts) }
 function undo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
 function redo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
 function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; clearValidation(true) }
 function graphPayload(): Graph {
   return {
     conditionLanguageVersion: conditionLanguageVersion.value,
+    riskPolicy: copyRiskPolicy(definitionRiskPolicy.value),
     nodes: serializeDesignerNodes(nodes.value),
     edges: edges.value.map(edge => ({ ...edge, condition: edge.defaultBranch ? '' : edge.condition.trim() }))
   }
@@ -306,6 +312,7 @@ function applyDefinition(definition: Definition) {
   definitionRevision.value = definition.revision; definitionVersion.value = definition.version; definitionStatus.value = definition.status
   definitionStartEnabled.value = definition.startEnabled; availabilityError.value = ''
   conditionLanguageVersion.value = definition.graph.conditionLanguageVersion ?? 1
+  definitionRiskPolicy.value = copyRiskPolicy(definition.graph.riskPolicy)
   nodes.value = loadDesignerNodes(definition.graph.nodes)
   edges.value = definition.graph.edges.map(edge => ({ ...edge, defaultBranch: edge.defaultBranch ?? false }))
   selectedId.value = nodes.value[0]?.id ?? ''; resetEditor(); savedSnapshot.value = snapshot()
@@ -624,6 +631,7 @@ async function upgradeConditions() {
     const upgraded = await api.upgradeConditions(graphPayload(), controller.signal)
     if (!viewActive || scope !== draftScope.value || before !== snapshot()) return
     remember(); conditionLanguageVersion.value = upgraded.conditionLanguageVersion ?? 1
+    definitionRiskPolicy.value = copyRiskPolicy(upgraded.riskPolicy)
     edges.value = upgraded.edges.map(edge => ({ ...edge }))
     notice.value = '已启用组合条件，原条件含义保留。可撤销此次更改。'
   } catch (error) { if (viewActive && scope === draftScope.value) notice.value = controller.signal.aborted ? '条件升级超时，请重试。' : errorMessage(error) }
@@ -975,7 +983,7 @@ watch([definitionId, definitionKey], () => { if (!publicationOpen.value) publica
 watch([() => snapshot(), draftScope, page, loggedIn, canManageDefinitions, autosaveEnabled, readonlyDefinition,
   busy, writesBlocked, confirmationOpen, publicationOpen, logoutOpen, dragging, composing, savedSnapshot], () => autosave.observe())
 
-watch([nodes, edges, definitionKey, definitionName, definitionFormSchema, conditionLanguageVersion], () => {
+watch([nodes, edges, definitionKey, definitionName, definitionFormSchema, conditionLanguageVersion, definitionRiskPolicy], () => {
   clearValidation()
   if (validationOpened.value && page.value === 'designer' && loggedIn.value) {
     validationTimer = setTimeout(() => { void validateGraph() }, 450)
@@ -1282,6 +1290,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <div v-if="!canManageDefinitions" class="unavailable">当前账号只能查看流程。请使用流程管理员账号编辑和发布。</div>
           <fieldset class="definition-fields" :disabled="editorLocked || !canManageDefinitions"><label>流程标识<input v-model="definitionKey" :disabled="!!definitionId || autosave.saving" placeholder="如 expense-reimbursement" /></label><label>流程名称<input v-model="definitionName" /></label></fieldset>
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
+          <DefinitionRiskPolicy v-model="definitionRiskPolicy" :form-schema="definitionFormSchema" :language-version="conditionLanguageVersion" :locked="editorLocked || !canManageDefinitions" @before-change="remember" />
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
           <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @policy="patchApprovalPolicy" @event-contract="patchEventContract" @subprocess="patchSubprocess" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">

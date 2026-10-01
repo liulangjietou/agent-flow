@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -21,7 +22,7 @@ import java.util.Set;
  * @author owlzhangfq@gmail.com
  */
 public record TaskQueryParameters(PendingTaskReadPort.Query query, String context) {
-    private static final Set<String> KEYS = Set.of("q", "processKey", "applicant", "organization", "assignment", "deadline", "minAmount", "maxAmount", "limit", "cursor");
+    private static final Set<String> KEYS = Set.of("q", "processKey", "applicant", "organization", "assignment", "deadline", "risk", "minAmount", "maxAmount", "limit", "cursor");
     private static final Set<String> ASSIGNMENTS = Set.of("all", "assigned", "unclaimed", "delegated");
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 100;
@@ -40,6 +41,15 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
                 case "unrecorded" -> PendingTaskReadPort.DeadlineFilter.UNRECORDED;
                 default -> throw invalid();
             };
+            var risk = switch (raw.getOrDefault("risk", "all")) {
+                case "all" -> null;
+                case "high" -> SubmissionRisk.Level.HIGH;
+                case "medium" -> SubmissionRisk.Level.MEDIUM;
+                case "low" -> SubmissionRisk.Level.LOW;
+                case "unmatched" -> SubmissionRisk.Level.UNMATCHED;
+                case "unassessed" -> SubmissionRisk.Level.UNASSESSED;
+                default -> throw invalid();
+            };
             int limit = raw.containsKey("limit") ? Integer.parseInt(raw.get("limit")) : DEFAULT_LIMIT;
             BigDecimal min = number(raw, "minAmount"), max = number(raw, "maxAmount");
             if (!ASSIGNMENTS.contains(assignment) || limit < 1 || limit > MAX_LIMIT || min != null && max != null && min.compareTo(max) > 0) throw invalid();
@@ -49,6 +59,8 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
             if (deadline != PendingTaskReadPort.DeadlineFilter.ALL) context = digest(json.write(List.of("deadline-v1", context, deadline.name())));
             // 未设置组织条件时兼容已有游标；历史名称匹配不读取当前组织目录。
             if (!organization.isEmpty()) context = digest(json.write(List.of("organization-v1", context, organization)));
+            // 风险筛选也绑定游标；未设置时继续兼容原游标。
+            if (risk != null) context = digest(json.write(List.of("risk-v1", context, risk.name())));
             Instant time = null; String id = null;
             if (raw.containsKey("cursor")) {
                 String cursor = raw.get("cursor");
@@ -58,7 +70,7 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
                 time = Instant.parse(parts[1]); id = parts[2];
                 if (time.isBefore(Instant.parse("0001-01-01T00:00:00Z")) || time.isAfter(Instant.parse("9999-12-31T23:59:59Z"))) throw invalid();
             }
-            return new TaskQueryParameters(new PendingTaskReadPort.Query(text, process, applicant, organization, assignment, deadline, now, min, max, limit, time, id), context);
+            return new TaskQueryParameters(new PendingTaskReadPort.Query(text, process, applicant, organization, assignment, deadline, now, min, max, limit, time, id, risk), context);
         } catch (IllegalArgumentException | DateTimeParseException exception) { throw invalid(); }
     }
 

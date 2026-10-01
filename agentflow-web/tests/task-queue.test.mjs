@@ -9,12 +9,12 @@ test('查询保存已提交筛选，编辑中的金额、账号、组织和期�
     calls.push(params)
     return params.cursor ? { items: [item('second')], total: 2 } : { items: [item('first')], total: 2, nextCursor: 'cursor' }
   })
-  const filters = { q: '发票', applicant: 'alice', organization: '审核部', minAmount: '999.123456789012345678', deadline: 'overdue' }
+  const filters = { q: '发票', applicant: 'alice', organization: '审核部', minAmount: '999.123456789012345678', deadline: 'overdue', risk: 'high' }
   await query.load('demo:finance', filters)
-  filters.applicant = 'bob'; filters.minAmount = '0'; filters.deadline = 'pending'; filters.organization = '研发部'
+  filters.risk = 'low'; filters.applicant = 'bob'; filters.minAmount = '0'; filters.deadline = 'pending'; filters.organization = '研发部'
   await query.more()
   assert.equal(calls[1].applicant, 'alice'); assert.equal(calls[1].minAmount, '999.123456789012345678')
-  assert.equal(calls[1].deadline, 'overdue')
+  assert.equal(calls[1].deadline, 'overdue'); assert.equal(calls[1].risk, 'high')
   assert.equal(calls[1].organization, '审核部')
   assert.equal(query.total, 2); assert.deepEqual(query.items, [item('first'), item('second')])
 })
@@ -57,12 +57,12 @@ test('分页和单项任务查询只读、可取消并保留精确数值与特�
   const requests = []
   globalThis.fetch = async (url, init) => { requests.push({ url, ...init }); return Response.json({ items: [], total: 0 }) }
   const controller = new AbortController()
-  await api.taskPage({ q: '%_ !', processKey: '流程/x', organization: 'R&D%_!室', assignment: 'delegated', deadline: 'unrecorded', minAmount: '999.123456789012345678', cursor: 'a+/=' }, controller.signal)
+  await api.taskPage({ q: '%_ !', processKey: '流程/x', organization: 'R&D%_!室', assignment: 'delegated', deadline: 'unrecorded', risk: 'unassessed', minAmount: '999.123456789012345678', cursor: 'a+/=' }, controller.signal)
   await api.task('task/id', controller.signal)
   const params = new URL(requests[0].url, 'http://localhost').searchParams
   assert.equal(params.get('q'), '%_ !'); assert.equal(params.get('processKey'), '流程/x')
   assert.equal(params.get('minAmount'), '999.123456789012345678'); assert.equal(params.get('cursor'), 'a+/=')
-  assert.equal(params.get('deadline'), 'unrecorded')
+  assert.equal(params.get('deadline'), 'unrecorded'); assert.equal(params.get('risk'), 'unassessed')
   assert.equal(params.get('organization'), 'R&D%_!室')
   assert.ok(requests[1].url.endsWith('/tasks/task%2Fid'))
   for (const request of requests) {

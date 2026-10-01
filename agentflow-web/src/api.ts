@@ -109,7 +109,15 @@ export interface SimulationResult {
 export interface Actor { tenantId: string; userId: string; roles: string[] }
 export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
 export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
-export interface Graph { nodes: GraphNode[]; edges: GraphEdge[]; conditionLanguageVersion?: 1 | 2 }
+/** 提交时规则的明确分级，未知与未命中不等于低风险。@author owlzhangfq@gmail.com */
+export type SubmissionRiskLevel = 'UNASSESSED' | 'UNMATCHED' | 'LOW' | 'MEDIUM' | 'HIGH'
+/** 随流程版本发布的公共规则。@author owlzhangfq@gmail.com */
+export interface RiskRule { id: string; label: string; level: 'LOW' | 'MEDIUM' | 'HIGH'; condition: string }
+/** 有界、显式的风险规则集合。@author owlzhangfq@gmail.com */
+export interface RiskPolicy { rules: RiskRule[] }
+/** 本轮固定的风险结果及定义来源，不携带字段取值。@author owlzhangfq@gmail.com */
+export interface SubmissionRisk { level: SubmissionRiskLevel; definitionId?: string | null; definitionVersion: number; matches: { ruleId: string; label: string; level: 'LOW' | 'MEDIUM' | 'HIGH' }[] }
+export interface Graph { nodes: GraphNode[]; edges: GraphEdge[]; conditionLanguageVersion?: 1 | 2; riskPolicy?: RiskPolicy | null }
 export interface Definition { id: string; key: string; name: string; revision: number; version: number; status: string; graph: Graph; formSchema: FormSchema | null; startEnabled?: boolean; notificationTexts?: NotificationTexts }
 /** 版本停用恢复的实际操作依据。@author owlzhangfq@gmail.com */
 export interface DefinitionAvailabilityChange { tenantId: string; definitionId: string; revision: number; previousEnabled: boolean; startEnabled: boolean; changedBy: string; authorizedRole: string; changedAt: string; reason: string }
@@ -140,11 +148,13 @@ export interface PendingTaskItem {
   definitionVersion: number; applicant: string; amount: string | null; roundNo: number; assignee?: string
   owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; createdAt: string; dueAt?: string | null
   legalEntityName?: string | null; departmentName?: string | null; positionName?: string | null
+  risk: SubmissionRisk
 }
 /** 服务端筛选与分页参数。@author owlzhangfq@gmail.com */
 export interface PendingTaskQuery {
   q?: string; processKey?: string; applicant?: string; organization?: string; assignment?: 'all' | 'assigned' | 'unclaimed' | 'delegated'
   deadline?: 'all' | 'overdue' | 'pending' | 'unrecorded'
+  risk?: 'all' | 'unassessed' | 'unmatched' | 'low' | 'medium' | 'high'
   minAmount?: string; maxAmount?: string; limit?: number; cursor?: string
 }
 /** 当前筛选计数不会被已加载条数替代。@author owlzhangfq@gmail.com */
@@ -152,7 +162,7 @@ export interface PendingTaskPage { items: PendingTaskItem[]; nextCursor?: string
 /** 提交时保留任务快照版本，不在冲突后自动更新版本。@author owlzhangfq@gmail.com */
 export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number; businessReference?: { type: string; id: string } | null }
-export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null; initiatorContext?: InitiatorContext | null }
+export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null; initiatorContext?: InitiatorContext | null; risk: SubmissionRisk }
 export interface HistoryEvent {
   id: string; sequence: number; occurredAt: string; source: string; action: string
   aggregateVersion?: number; roundNo?: number; actor?: string; targetUser?: string; comment?: string
@@ -276,6 +286,8 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       FORBIDDEN: '当前账号没有执行此操作的权限，本次未重新执行。原操作结果请查询业务状态。',
       UNAUTHENTICATED: '登录已失效，请重新登录。',
       FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
+      INVALID_RISK_POLICY: '风险规则配置无效，请核对唯一标识、公开说明、等级和条件。',
+      INVALID_SUBMISSION_RISK: '风险规则的标识、公开说明或等级不合法。',
       INVALID_FORM_SCHEMA: '表单配置未通过校验，请检查字段标识、类型、选项与约束。',
       WEBHOOK_DELIVERY_CONFLICT: '投递状态已变化，请刷新详情后再操作。',
       WEBHOOK_TARGET_UNAVAILABLE: '原目的地已停用、移除或改址，请联系部署管理员核对配置。',

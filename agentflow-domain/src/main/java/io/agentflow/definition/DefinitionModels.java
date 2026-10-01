@@ -73,7 +73,9 @@ public final class DefinitionModels {
      * 不可变的流程图。
      * @author owlzhangfq@gmail.com
      */
-    public record Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion) {
+    public record Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion, ApprovalRiskPolicy riskPolicy) {
+        /** 旧图没有显式风险策略，不能给它补造默认风险等级。 */
+        public Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion) { this(nodes, edges, conditionLanguageVersion, null); }
         /** 历史调用方使用 v1，不能因服务升级而改变文本含义。 */
         public Graph(List<Node> nodes, List<Edge> edges) { this(nodes, edges, 1); }
         public Graph {

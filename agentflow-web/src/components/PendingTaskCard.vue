@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PendingTaskItem } from '../api'
 import TaskDeadlineStatus from './TaskDeadlineStatus.vue'
+import SubmissionRiskStatus from './SubmissionRiskStatus.vue'
 defineProps<{ item: PendingTaskItem; selected: boolean; locked: boolean }>()
 const emit = defineEmits<{ select: [item: PendingTaskItem] }>()
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
@@ -15,6 +16,7 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { h
     <span class="pending-organization">{{ item.departmentName ? `本轮组织：${item.legalEntityName} / ${item.departmentName} / ${item.positionName}` : '未记录本轮组织' }}</span>
     <span v-if="item.delegationState === 'PENDING' && item.owner" class="pending-owner">回交给 {{ item.owner }}</span>
     <time :datetime="item.createdAt">{{ dateLabel(item.createdAt) }} 进入待办</time>
+    <SubmissionRiskStatus :risk="item.risk" compact />
     <TaskDeadlineStatus :due-at="item.dueAt" />
   </button>
 </template>

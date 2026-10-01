@@ -95,7 +95,7 @@ public class ApprovalApplicationService {
                 application.definitionVersion(), application.roundNo(), application.businessNo(), application.payload(), application.formSchema(),
                 application.runtimeDefinitionId(), previousRound == null ? null : previousRound.processInstanceId(), initiatorContext));
         repository.update(application, expectedVersion);
-        rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now(), initiatorContext));
+        rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now(), initiatorContext, started.risk()));
         recordApplicationOperation(application, submittedBy, ApplicationAuditPort.Action.SUBMIT, previousStatus,
                 started.processInstanceId(), null);
         return application;

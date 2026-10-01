@@ -58,7 +58,7 @@ public class ApplicationFieldViews {
         var view = project(application, round.formSchema(), round.payload(), round.processInstanceId());
         return new SubmissionRoundResponse(round.roundNo(), round.processInstanceId(), round.definitionVersion(), round.title(),
                 view.payload(), round.submittedBy(), round.submittedAt(), round.status(), round.reason(), round.completedBy(),
-                round.completedAt(), view.schema(), round.initiatorContext());
+                round.completedAt(), view.schema(), round.initiatorContext(), round.risk());
     }
 
     /** 自由文本模型结果无法可靠逐字段脱敏；看不到完整输入的身份不能读取这次完整运行记录。 */

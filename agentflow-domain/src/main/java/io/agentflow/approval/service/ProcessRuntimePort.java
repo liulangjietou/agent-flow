@@ -1,5 +1,6 @@
 package io.agentflow.approval.service;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import java.util.UUID;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.InitiatorContext;
@@ -84,7 +85,12 @@ public interface ProcessRuntimePort {
     /**
      * @author owlzhangfq@gmail.com
      */
-    record StartedProcess(String processInstanceId, String firstTaskId) { }
+    record StartedProcess(String processInstanceId, String firstTaskId, SubmissionRisk risk) {
+        /** 未提供策略的旧运行适配器保持未评估。 */
+        public StartedProcess(String processInstanceId, String firstTaskId) {
+            this(processInstanceId, firstTaskId, SubmissionRisk.unassessed());
+        }
+    }
 
     /**
      * @author owlzhangfq@gmail.com

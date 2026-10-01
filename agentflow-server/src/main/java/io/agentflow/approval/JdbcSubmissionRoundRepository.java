@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
@@ -42,13 +43,14 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
                     INSERT INTO approval_submission_round
                     (tenant_id, application_id, round_no, process_instance_id, definition_version,
                      title, payload_json, submitted_by, submitted_at, form_schema_json, initiator_context_json,
-                     initiator_legal_entity_name, initiator_department_name, initiator_position_name, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL')
+                     initiator_legal_entity_name, initiator_department_name, initiator_position_name, risk_level, risk_json, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_APPROVAL')
                     """, round.tenantId(), round.applicationId().toString(), round.roundNo(), round.processInstanceId(),
                     round.definitionVersion(), round.title(), jsonUtil.write(round.payload()), round.submittedBy(),
                     round.submittedAt().atOffset(ZoneOffset.UTC), round.formSchema() == null ? null : jsonUtil.write(round.formSchema()),
                     initiator == null ? null : jsonUtil.write(initiator), initiator == null ? null : initiator.legalEntityName(),
-                    initiator == null ? null : initiator.departmentName(), initiator == null ? null : initiator.positionName());
+                    initiator == null ? null : initiator.departmentName(), initiator == null ? null : initiator.positionName(),
+                    round.risk().level().name(), jsonUtil.write(round.risk()));
         } catch (DuplicateKeyException exception) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Submission round already exists");
         }
@@ -93,6 +95,8 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
                 SubmissionRound.Status.valueOf(row.getString("status")), row.getString("reason"),
                 row.getString("completed_by"), completedAt == null ? null : completedAt.toInstant(),
                 row.getString("form_schema_json") == null ? null : jsonUtil.read(row.getString("form_schema_json"), FormSchema.class),
-                row.getString("initiator_context_json") == null ? null : jsonUtil.read(row.getString("initiator_context_json"), InitiatorContext.class));
+                row.getString("initiator_context_json") == null ? null : jsonUtil.read(row.getString("initiator_context_json"), InitiatorContext.class),
+                row.getString("risk_json") == null ? SubmissionRisk.unassessed()
+                        : jsonUtil.read(row.getString("risk_json"), SubmissionRisk.class));
     }
 }

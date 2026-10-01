@@ -69,10 +69,29 @@ class OpenApiContractTest {
     }
 
     @Test
+    void riskRequiredFieldsMatchActualSerializationIncludingUnassessedLegacyRounds() throws Exception {
+        var schema = document().path("components").path("schemas").path("SubmissionRisk");
+        var classified = io.agentflow.approval.model.SubmissionRisk.assessed(java.util.UUID.randomUUID(), 1,
+                java.util.List.of(new io.agentflow.approval.model.SubmissionRisk.Match("large", "公开规则", io.agentflow.approval.model.SubmissionRisk.Level.HIGH)));
+        for (var risk : java.util.List.of(classified, io.agentflow.approval.model.SubmissionRisk.unassessed())) {
+            JsonNode actual = json.read(json.write(risk), JsonNode.class);
+            schema.path("required").forEach(field -> assertThat(actual.has(field.asText()))
+                    .as("Required risk field %s for %s", field.asText(), risk.level()).isTrue());
+            assertThat(actual.has("payload")).isFalse();
+            assertThat(actual.has("condition")).isFalse();
+        }
+    }
+
+    @Test
     void responseSchemasMatchPublishedRecordFields() throws Exception {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("Graph", io.agentflow.definition.DefinitionModels.Graph.class),
+                java.util.Map.entry("ApprovalRiskPolicy", io.agentflow.definition.ApprovalRiskPolicy.class),
+                java.util.Map.entry("ApprovalRiskRule", io.agentflow.definition.ApprovalRiskPolicy.Rule.class),
+                java.util.Map.entry("SubmissionRisk", io.agentflow.approval.model.SubmissionRisk.class),
+                java.util.Map.entry("SubmissionRiskMatch", io.agentflow.approval.model.SubmissionRisk.Match.class),
                 java.util.Map.entry("SubprocessRelationsPage", io.agentflow.approval.SubprocessRelationsService.Page.class),
                 java.util.Map.entry("SubprocessRelationChild", io.agentflow.approval.SubprocessRelationsService.Child.class),
                 java.util.Map.entry("SubprocessRoundReference", io.agentflow.approval.SubprocessRelationsService.Reference.class),

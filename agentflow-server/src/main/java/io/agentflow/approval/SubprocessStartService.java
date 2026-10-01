@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -81,7 +82,10 @@ public class SubprocessStartService {
         var preparedFiles = attachments.prepare(application, childId, bound.formSchema(), bound.inputs().project(parent.payload()), SYSTEM_ACTOR, at);
         var child = Application.draft(childId, parent.tenantId(), "subprocess-" + childId, bound.processKey(), bound.version(),
                 application.createdBy(), node.name(), preparedFiles.values(), bound.formSchema(), bound.runtimeDefinitionId(), bound.notificationTexts());
-        return new Prepared(UUID.randomUUID(), parent, policy, bound.definitionId(), node.name(), child, preparedFiles, at);
+        var risk = bound.graph().riskPolicy() == null ? SubmissionRisk.unassessed()
+                : bound.graph().riskPolicy().assess(bound.definitionId(), bound.version(), bound.formSchema(),
+                        bound.graph().conditionLanguageVersion(), child.payload());
+        return new Prepared(UUID.randomUUID(), parent, policy, bound.definitionId(), node.name(), child, preparedFiles, at, risk);
     }
 
     /** 拿到实际子实例标识后，在首个节点激活前保存全部业务身份、首轮、来源和系统审计。 */
@@ -92,7 +96,7 @@ public class SubprocessStartService {
         record(child, null, ApplicationAuditPort.Action.CREATE, null);
         child.submit(child.version());
         applications.update(child, child.version() - 1);
-        rounds.append(SubmissionRound.submitted(child, childInstanceId, SYSTEM_ACTOR, prepared.at(), parent.initiatorContext()));
+        rounds.append(SubmissionRound.submitted(child, childInstanceId, SYSTEM_ACTOR, prepared.at(), parent.initiatorContext(), prepared.risk()));
         var call = new SubprocessCall(prepared.callId(), parent.tenantId(), parent.applicationId(), parent.roundNo(),
                 parent.processInstanceId(), parent.runtimeDefinitionId(), parent.nodeId(), prepared.nodeName(), parent.activationId(),
                 child.id(), childInstanceId, prepared.childDefinitionId(), child.runtimeDefinitionId(), prepared.policy(), prepared.at());
@@ -154,5 +158,5 @@ public class SubprocessStartService {
      * @author owlzhangfq@gmail.com
      */
     public record Prepared(UUID callId, Parent parent, SubprocessPolicy policy, UUID childDefinitionId,
-                           String nodeName, Application child, SubprocessAttachmentService.Prepared attachments, Instant at) { }
+                           String nodeName, Application child, SubprocessAttachmentService.Prepared attachments, Instant at, SubmissionRisk risk) { }
 }

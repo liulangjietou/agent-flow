@@ -49,8 +49,22 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
   const p = object(value, fields, fields, '流程')
   if (version === 2) p.notificationTexts = readNotificationTexts(p.notificationTexts)
   text(p.key, '来源流程标识', 128); text(p.name, '流程名称', 128)
-  const g = object(p.graph, ['nodes', 'edges', 'conditionLanguageVersion'], ['nodes', 'edges'], '流程图')
+  const g = object(p.graph, ['nodes', 'edges', 'conditionLanguageVersion', 'riskPolicy'], ['nodes', 'edges'], '流程图')
   if (g.conditionLanguageVersion !== undefined && g.conditionLanguageVersion !== 1 && g.conditionLanguageVersion !== 2) throw new Error('条件语言版本不受支持。')
+  if (g.riskPolicy != null) {
+    const policy = object(g.riskPolicy, ['rules'], ['rules'], '风险策略')
+    list(policy.rules, '风险规则', 10)
+    if (!policy.rules.length) throw new Error('风险策略必须包含规则，未配置时请移除策略。')
+    const ids = new Set<string>()
+    for (const rawRule of policy.rules) {
+      const rule = object(rawRule, ['id', 'label', 'level', 'condition'], ['id', 'label', 'level', 'condition'], '风险规则')
+      text(rule.id, '风险规则标识', 64); text(rule.label, '风险公开说明', 120); text(rule.condition, '风险条件', 4000)
+      if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(rule.id) || ids.has(rule.id)) throw new Error('风险规则标识必须合法且唯一。')
+      if (/[\u0000-\u001f\u007f-\u009f]/.test(rule.label)) throw new Error('风险公开说明不能包含控制字符。')
+      if (!['LOW', 'MEDIUM', 'HIGH'].includes(rule.level as string)) throw new Error('风险命中等级只能为低、中、高。')
+      ids.add(rule.id)
+    }
+  }
   list(g.nodes, '节点', 200); list(g.edges, '连线', 400)
   for (const raw of g.nodes) {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')

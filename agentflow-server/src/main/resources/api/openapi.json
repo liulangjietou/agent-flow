@@ -7109,6 +7109,24 @@
             }
           },
           {
+            "name": "risk",
+            "in": "query",
+            "required": false,
+            "description": "仅筛选当前轮次的提交时风险；旧记录归 unassessed，不读当前表单重新推断；游标绑定该条件。",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "unassessed",
+                "unmatched",
+                "low",
+                "medium",
+                "high"
+              ],
+              "default": "all"
+            }
+          },
+          {
             "name": "minAmount",
             "in": "query",
             "required": false,
@@ -42223,6 +42241,17 @@
             ],
             "default": 1,
             "description": "缺省按 v1 保留旧语义；v2 支持括号、取反、符号连接符与单选枚举 IN，限制 4000 字符、16 层嵌套、100 项比较、50 个集合值。"
+          },
+          "riskPolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalRiskPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "随定义发布的提交时风险规则；省略或 null 表示未配置。不会改变路由或审批权限。"
           }
         },
         "required": [
@@ -43297,6 +43326,9 @@
                 "type": "null"
               }
             ]
+          },
+          "risk": {
+            "$ref": "#/components/schemas/SubmissionRisk"
           }
         },
         "required": [
@@ -43312,7 +43344,8 @@
           "completedBy",
           "completedAt",
           "formSchema",
-          "initiatorContext"
+          "initiatorContext",
+          "risk"
         ]
       },
       "Task": {
@@ -43551,6 +43584,9 @@
           "positionName": {
             "type": "string",
             "description": "本轮提交时冻结的岗位名称；未记录任职时省略。"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/SubmissionRisk"
           }
         },
         "required": [
@@ -43564,7 +43600,8 @@
           "applicant",
           "roundNo",
           "delegationState",
-          "createdAt"
+          "createdAt",
+          "risk"
         ]
       },
       "PendingTaskPage": {
@@ -65815,6 +65852,138 @@
           "reviewedRuns"
         ],
         "additionalProperties": false
+      },
+      "ApprovalRiskRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "maxLength": 64
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "管理员发布的公共说明，不含控制字符或求值时字段取值。"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          },
+          "condition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "使用所属流程条件语言版本；只能引用全部节点均可公开读取的非敏感字段。"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "level",
+          "condition"
+        ]
+      },
+      "ApprovalRiskPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRiskRule"
+            },
+            "description": "标识唯一；全部命中保留，最高明确等级用于分类。"
+          }
+        },
+        "required": [
+          "rules"
+        ]
+      },
+      "SubmissionRiskMatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ruleId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "maxLength": 64
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "管理员发布的公共说明，不含控制字符或求值时字段取值。"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          }
+        },
+        "required": [
+          "ruleId",
+          "label",
+          "level"
+        ]
+      },
+      "SubmissionRisk": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "UNASSESSED",
+              "UNMATCHED",
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "description": "UNASSESSED 缺少原始规则或快照；UNMATCHED 配置的规则均未命中；两者均非低风险。"
+          },
+          "definitionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "本轮实际绑定的发布定义标识；未评估时省略，不从当前版本补写。"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "实际发布版本；未评估时为 0。"
+          },
+          "matches": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/SubmissionRiskMatch"
+            }
+          }
+        },
+        "required": [
+          "level",
+          "definitionVersion",
+          "matches"
+        ]
       }
     }
   }

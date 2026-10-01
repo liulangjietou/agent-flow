@@ -272,7 +272,7 @@ class PendingTaskQueueIntegrationTest {
         var statements = new ArrayList<String>();
         var actor = mock(CurrentActor.class);
         when(actor.actor()).thenReturn(new Actor("demo", "manager", Set.of("APPROVER", "MANAGER")));
-        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements), auth), json);
+        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements), auth, json), json);
         var first = controller.list(Map.of("processKey", key, "limit", "2"));
         assertThat(first.items()).hasSize(2);
         assertThat(first.total()).isEqualTo(5);
@@ -339,12 +339,103 @@ class PendingTaskQueueIntegrationTest {
         return new JdbcTemplate(source);
     }
 
+    @Test
+    void riskFiltersOnlyCurrentAuthorizedSnapshotsAndDistinguishesMissingEvidence() throws Exception {
+        String key = riskDefinition();
+        String high = submit(key, "alice", "风险高", "101").path("id").asText();
+        String medium = submit(key, "alice", "风险中", "50").path("id").asText();
+        String low = submit(key, "alice", "风险低", "0").path("id").asText();
+        String unmatched = submit(key, "alice", "规则未命中", "1").path("id").asText();
+        String legacy = submit(key, "alice", "旧轮次", "102").path("id").asText();
+        jdbc.update("UPDATE approval_submission_round SET risk_level=NULL,risk_json=NULL WHERE application_id=?", legacy);
+        String unrelated = submit(key, "alice", "他人高风险", "103").path("id").asText();
+        tasks.setAssignee(task(unrelated), "finance");
+        for (var expected : Map.of("high", high, "medium", medium, "low", low, "unmatched", unmatched, "unassessed", legacy).entrySet()) {
+            var page = query("manager", Map.of("processKey", key, "risk", expected.getKey()));
+            assertThat(page.path("total").asInt()).isEqualTo(1);
+            assertThat(page.path("items").get(0).path("applicationId").asText()).isEqualTo(expected.getValue());
+            assertThat(page.toString()).doesNotContain("condition", "payload", "private-body");
+        }
+        var actual = query("manager", Map.of("processKey", key, "risk", "high")).path("items").get(0).path("risk");
+        assertThat(actual.path("level").asText()).isEqualTo("HIGH");
+        assertThat(actual.path("definitionVersion").asInt()).isEqualTo(1);
+        assertThat(actual.path("matches").findValuesAsText("ruleId")).containsExactly("medium", "high");
+        assertThat(query("alice", Map.of("processKey", key, "risk", "high")).path("total").asInt()).isZero();
+        assertThat(query("manager", Map.of("processKey", key, "risk", "high", "maxAmount", "100")).path("total").asInt()).isZero();
+        var hiddenBinding = tasks.createTaskQuery().taskId(task(high)).singleResult().getProcessInstanceId();
+        runtime.setVariable(hiddenBinding, "tenantId", "another-tenant");
+        assertThat(query("manager", Map.of("processKey", key, "risk", "high")).path("total").asInt()).isZero();
+        runtime.setVariable(hiddenBinding, "tenantId", "demo");
+        request("manager", Map.of("risk", "unknown")).andExpect(status().isBadRequest());
+        request("manager", Map.of("risk", "HIGH")).andExpect(status().isBadRequest());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
+                "UPDATE approval_submission_round SET risk_level=NULL WHERE application_id=?", high))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void riskCursorBindsFilterAndKeepsTotalWhenLastPageDisappears() throws Exception {
+        String key = riskDefinition();
+        for (int i = 0; i < 3; i++) submit(key, "alice", "风险分页 " + i, "101");
+        var first = query("manager", Map.of("processKey", key, "risk", "high", "limit", "2"));
+        assertThat(first.path("total").asInt()).isEqualTo(3);
+        String cursor = first.path("nextCursor").asText();
+        for (String changed : List.of("all", "medium", "unassessed")) {
+            request("manager", Map.of("processKey", key, "risk", changed, "cursor", cursor)).andExpect(status().isBadRequest());
+        }
+        var second = query("manager", Map.of("processKey", key, "risk", "high", "limit", "2", "cursor", cursor));
+        assertThat(second.path("items")).hasSize(1);
+        assertThat(second.path("total").asInt()).isEqualTo(3);
+        act(second.path("items").get(0).path("taskId").asText(), "manager", "APPROVE", null, 2);
+        var empty = query("manager", Map.of("processKey", key, "risk", "high", "cursor", cursor));
+        assertThat(empty.path("items")).isEmpty();
+        assertThat(empty.path("total").asInt()).isEqualTo(2);
+    }
+
+    @Test
+    void resubmissionFreezesNewAssessmentWhileHistoryAndOriginalVersionRemain() throws Exception {
+        String key = riskDefinition();
+        String id = submit(key, "alice", "风险重提", "101").path("id").asText();
+        String original = jdbc.queryForObject("SELECT risk_json FROM approval_submission_round WHERE application_id=?", String.class, id);
+        act(task(id), "manager", "RETURN", null, 2);
+        mvc.perform(put("/api/v1/applications/" + id).header("Authorization", token("alice"))
+                .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)
+                .content(json.write(Map.of("expectedVersion", 3, "title", "风险重提", "payload", Map.of("amount", "0")))))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/applications/" + id + "/submit").header("Authorization", token("alice"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":4}")).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT risk_json FROM approval_submission_round WHERE application_id=? AND round_no=1", String.class, id))
+                .isEqualTo(original);
+        assertThat(query("manager", Map.of("processKey", key, "risk", "high")).path("total").asInt()).isZero();
+        var second = query("manager", Map.of("processKey", key, "risk", "low")).path("items").get(0);
+        assertThat(second.path("roundNo").asInt()).isEqualTo(2);
+        var rounds = json.read(mvc.perform(get("/api/v1/applications/" + id + "/rounds").header("Authorization", token("manager")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), JsonNode.class);
+        assertThat(rounds.get(0).path("risk").path("level").asText()).isEqualTo("HIGH");
+        assertThat(rounds.get(1).path("risk").path("level").asText()).isEqualTo("LOW");
+        assertThat(rounds.get(1).path("risk").path("definitionId")).isEqualTo(rounds.get(0).path("risk").path("definitionId"));
+    }
+
+    private String riskDefinition() {
+        var schema = new io.agentflow.form.FormSchema(1, List.of(
+                new io.agentflow.form.FormSchema.Field("amount", "金额", io.agentflow.form.FormSchema.FieldType.NUMBER, false, null, null, null, null, null),
+                new io.agentflow.form.FormSchema.Field("secret", "说明", io.agentflow.form.FormSchema.FieldType.TEXT, false, null, null, null, null, null)));
+        var policy = new io.agentflow.definition.ApprovalRiskPolicy(List.of(
+                new io.agentflow.definition.ApprovalRiskPolicy.Rule("low", "零金额", io.agentflow.approval.model.SubmissionRisk.Level.LOW, "amount == 0"),
+                new io.agentflow.definition.ApprovalRiskPolicy.Rule("medium", "需复核", io.agentflow.approval.model.SubmissionRisk.Level.MEDIUM, "amount >= 50"),
+                new io.agentflow.definition.ApprovalRiskPolicy.Rule("high", "重点复核", io.agentflow.approval.model.SubmissionRisk.Level.HIGH, "amount > 100")));
+        return definition("user:manager", schema, policy);
+    }
+
     private String definition(String rule) { return definition(rule, null); }
     private String definition(String rule, io.agentflow.form.FormSchema schema) {
+        return definition(rule, schema, null);
+    }
+    private String definition(String rule, io.agentflow.form.FormSchema schema, io.agentflow.definition.ApprovalRiskPolicy riskPolicy) {
         String key = "queue-" + UUID.randomUUID();
         var draft = definitions.create("demo", key, "待办检索流程", new Graph(List.of(
                 new Node("start", "开始", NodeType.START, Map.of()), new Node("manager", "经理审批", NodeType.USER_TASK, Map.of("assigneeRule", rule)),
-                new Node("end", "结束", NodeType.END, Map.of())), List.of(new Edge("begin", "start", "manager", ""), new Edge("finish", "manager", "end", ""))), schema);
+                new Node("end", "结束", NodeType.END, Map.of())), List.of(new Edge("begin", "start", "manager", ""), new Edge("finish", "manager", "end", "")), 2, riskPolicy), schema);
         definitions.publish(new Actor("demo", "admin", Set.of("ADMIN")), draft.id(), 0, "待办队列验收发布");
         return key;
     }

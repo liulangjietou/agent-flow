@@ -128,6 +128,9 @@ const ruleLabels: Record<string, string> = {
   EXPENSE_STAGE_REQUIRES_EXPENSE_FORM: '费用审批职责需要结构化费用表单',
   ASSIGNEE_NOT_AVAILABLE: '该节点当前匹配不到有效审批人，请重新选择',
   ASSIGNEE_RULE_REQUIRED: '审批节点尚未配置审批人', ASSIGNEE_RULE_INVALID: '审批人配置不合法',
+  RISK_FIELD_RESTRICTED: '风险规则不能引用敏感、隐藏或脱敏字段',
+  RISK_REQUIRES_FORM_SCHEMA: '风险规则需要已声明的表单字段',
+  INVALID_RISK_POLICY: '风险规则配置不合法',
   UNSUPPORTED_NODE_TYPE: '当前版本不支持此节点类型', INVALID_CONDITION: '分支条件或引用字段不合法',
   GATEWAY_MERGE_EDGE_UNCONDITIONAL: '条件汇合的出线不能设置条件或默认分支',
   GATEWAY_BRANCH_REQUIRED: '条件网关需要多条出线，或作为多入单出的汇合节点', GATEWAY_BRANCH_CONDITION_REQUIRED: '分支缺少条件',
@@ -139,6 +142,11 @@ const ruleLabels: Record<string, string> = {
 
 /** 规则只解析第一个冒号，节点或连线标识中的后续字符保持原样。 */
 export function simulationIssue(error: string) {
+  const risk = error.indexOf(':risk:')
+  if (risk >= 0) {
+    const code = error.slice(0, risk)
+    return { label: `风险规则 ${error.slice(risk + 6)}：${ruleLabels[code] ?? '条件语法或引用字段不合法'}`, target: '' }
+  }
   if (error.startsWith('INVALID_CONDITION_AT:')) {
     const last = error.lastIndexOf(':')
     return { label: `条件语法错误，第 ${error.slice(last + 1)} 个字符附近，请检查运算符、括号和取值`, target: error.slice('INVALID_CONDITION_AT:'.length, last) }

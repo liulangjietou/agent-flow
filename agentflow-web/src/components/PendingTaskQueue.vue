@@ -8,7 +8,7 @@ import TaskBatchPanel from './TaskBatchPanel.vue'
 const props = defineProps<{ view: 'list' | 'board'; scopeKey: string; refreshVersion: number; locked: boolean; selectedId?: string }>()
 const emit = defineEmits<{ select: [item: PendingTaskItem]; clearSelection: []; changed: []; 'update:view': [view: 'list' | 'board'] }>()
 const query = reactive(new PendingTaskQueueQuery(api.taskPage))
-const filters = reactive({ q: '', processKey: '', applicant: '', organization: '', assignment: 'all', deadline: 'all', minAmount: '', maxAmount: '' })
+const filters = reactive({ q: '', processKey: '', applicant: '', organization: '', assignment: 'all', deadline: 'all', risk: 'all', minAmount: '', maxAmount: '' })
 const applied = ref<PendingTaskQuery>({})
 const expanded = ref(false)
 const batchOpen = ref(false)
@@ -31,11 +31,11 @@ function refresh() { void query.load(props.scopeKey, applied.value) }
 /** 打开批量清单前关闭旧任务详情，办理完成后刷新实际工作台。 */
 function openBatch() { if (!props.locked && !query.loading && query.items.length) { emit('clearSelection'); batchOpen.value = true } }
 function search() {
-  applied.value = { ...filters, q: filters.q.trim(), applicant: filters.applicant.trim(), organization: filters.organization.trim(), assignment: filters.assignment as PendingTaskQuery['assignment'], deadline: filters.deadline as PendingTaskQuery['deadline'] }
+  applied.value = { ...filters, q: filters.q.trim(), applicant: filters.applicant.trim(), organization: filters.organization.trim(), assignment: filters.assignment as PendingTaskQuery['assignment'], deadline: filters.deadline as PendingTaskQuery['deadline'], risk: filters.risk as PendingTaskQuery['risk'] }
   filterDirty.value = false; emit('clearSelection'); refresh()
 }
 function reset() {
-  Object.assign(filters, { q: '', processKey: '', applicant: '', organization: '', assignment: 'all', deadline: 'all', minAmount: '', maxAmount: '' })
+  Object.assign(filters, { q: '', processKey: '', applicant: '', organization: '', assignment: 'all', deadline: 'all', risk: 'all', minAmount: '', maxAmount: '' })
   search()
 }
 watch([() => props.scopeKey, () => props.refreshVersion], refresh, { immediate: true, flush: 'sync' })
@@ -56,6 +56,8 @@ onUnmounted(() => query.clear())
           <label>申请人账号<input v-model="filters.applicant" maxlength="128" placeholder="输入完整账号" /></label>
           <label>本轮组织<input v-model="filters.organization" maxlength="128" placeholder="法人、部门或岗位名称" /></label>
           <label>处理期限<select v-model="filters.deadline"><option value="all">全部期限状态</option><option value="overdue">已超时</option><option value="pending">未到期</option><option value="unrecorded">未记录期限</option></select></label>
+          <label>提交时风险<select v-model="filters.risk"><option value="all">全部风险状态</option><option value="high">高风险</option><option value="medium">中风险</option><option value="low">低风险</option><option value="unmatched">规则未命中</option><option value="unassessed">未评估</option></select></label>
+          <p>风险依据本轮提交时的流程规则；未评估和规则未命中均不代表低风险。</p>
           <div class="amount-range"><label>最低金额<input v-model="filters.minAmount" inputmode="decimal" maxlength="80" placeholder="不限" /></label><span aria-hidden="true">—</span><label>最高金额<input v-model="filters.maxAmount" inputmode="decimal" maxlength="80" placeholder="不限" /></label></div>
           <p>金额范围仅匹配可识别的数值金额；未提供金额的申请不会计入。</p>
           <p>组织按本轮提交时的名称匹配；未记录任职的申请不参与组织筛选。</p>

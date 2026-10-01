@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.event.EventContractBindings;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
@@ -65,17 +66,22 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     @Transactional
     public StartedProcess start(StartProcessCommand command) {
         ProcessDefinition definition = boundDefinition(command.definitionBinding());
+        var risk = SubmissionRisk.unassessed();
         // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
         if (command.tenantId().equals(definition.getTenantId())) {
-            platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion())
-                    .ifPresent(published -> {
-                        published.requireStartEnabled();
-                        eventContracts.requireAvailable(command.tenantId(), published.graph());
-                        // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
-                        if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
-                            throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
-                        }
-                    });
+            var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
+            if (published != null) {
+                published.requireStartEnabled();
+                eventContracts.requireAvailable(command.tenantId(), published.graph());
+                // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
+                if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
+                    throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+                }
+                if (published.graph().riskPolicy() != null) {
+                    risk = published.graph().riskPolicy().assess(published.id(), published.version(), published.formSchema(),
+                            published.graph().conditionLanguageVersion(), command.payload());
+                }
+            }
         }
         Map<String, Object> variables = new HashMap<>();
         variables.put("tenantId", command.tenantId());
@@ -93,7 +99,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         // 会签会同时产生多张待办；兼容端口只提供首个标识，不把它作为全部运行任务。
         List<Task> firstTasks = taskService.createTaskQuery().processInstanceId(instance.getId())
                 .orderByTaskCreateTime().asc().orderByTaskId().asc().listPage(0, 1);
-        return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId());
+        return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId(), risk);
     }
 
     /** 路由更新复查唯一活跃实例和实际轮次，保留原任务与历史提交快照。 */

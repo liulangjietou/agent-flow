@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -26,7 +27,7 @@ public interface PendingTaskReadPort {
     record Item(String taskId, String taskName, String applicationId, String businessNo, String title,
                 String processKey, long definitionVersion, String applicant, String amount, int roundNo,
                 String assignee, String owner, String delegationState, Instant createdAt, Instant dueAt,
-                String legalEntityName, String departmentName, String positionName) { }
+                String legalEntityName, String departmentName, String positionName, SubmissionRisk risk) { }
 
     /**
      * 仅筛选引擎记录的期限事实；到达截止时刻即超时，缺失期限不推定为未到期。
@@ -39,5 +40,6 @@ public interface PendingTaskReadPort {
      * @author owlzhangfq@gmail.com
      */
     record Query(String text, String processKey, String applicant, String organization, String assignment, DeadlineFilter deadline,
-                 Instant deadlineAt, BigDecimal minAmount, BigDecimal maxAmount, int limit, Instant afterTime, String afterId) { }
+                 Instant deadlineAt, BigDecimal minAmount, BigDecimal maxAmount, int limit, Instant afterTime, String afterId,
+                 SubmissionRisk.Level risk) { }
 }
