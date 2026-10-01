@@ -9,6 +9,7 @@ import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Component;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * 通用审批与财务任务操作共用的实时任务授权，不能以历史参与或管理员身份代替当前候选关系。
@@ -19,10 +20,12 @@ public class FlowableTaskAuthorization {
     private final TaskService tasks;
     private final TaskRecipientDirectory recipients;
     private final ApplicationRepository applications;
+    private final FlowableApprovalResponsibilities responsibilities;
 
     /** 候选事实来自运行引擎，组织资格仍由当前权威目录决定。 */
-    public FlowableTaskAuthorization(TaskService tasks, TaskRecipientDirectory recipients, ApplicationRepository applications) {
-        this.tasks = tasks; this.recipients = recipients; this.applications = applications;
+    public FlowableTaskAuthorization(TaskService tasks, TaskRecipientDirectory recipients, ApplicationRepository applications,
+                                     FlowableApprovalResponsibilities responsibilities) {
+        this.tasks = tasks; this.recipients = recipients; this.applications = applications; this.responsibilities = responsibilities;
     }
 
     /** 每次操作重新读取任务，锁等待后也必须重新授权。 */
@@ -33,7 +36,9 @@ public class FlowableTaskAuthorization {
         if (task == null || task.isSuspended() || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
             throw new DomainException("NOT_FOUND", "Active task not found");
         }
-        if (!canAct(actor, task)) throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
+        if (!canAct(actor, task) || !responsibilities.allows(task, actor.userId())) {
+            throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
+        }
         return task;
     }
 
@@ -45,7 +50,7 @@ public class FlowableTaskAuthorization {
         } catch (IllegalArgumentException invalid) { throw new DomainException("NOT_FOUND", "Application not found"); }
     }
 
-    /** 列表已批量读取身份链接，继续复用相同的租户与候选判断。 */
+    /** 列表复用已受职责约束的原生候选，不逐条查引擎变量；实际办理由 require 再复核。 */
     public boolean canAct(Actor actor, Task task) {
         if (!actor.hasRole("APPROVER") || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) return false;
         if (actor.userId().equals(task.getAssignee())) return true;
@@ -53,4 +58,12 @@ public class FlowableTaskAuthorization {
         return task.getIdentityLinks().stream().anyMatch(link -> actor.userId().equals(link.getUserId())
                 || link.getGroupId() != null && actor.hasRole(link.getGroupId()));
     }
+
+    /** 展示和执行共用原节点职责约束，不以组织资格代替职责分离。 */
+    public List<String> allowedTargets(Task task, List<String> subjects) {
+        return responsibilities.allowedTargets(task, subjects);
+    }
+
+    /** 被排除人员不能借责任变更取得新的待办。 */
+    public void requireTargetAllowed(Task task, String subject) { responsibilities.requireAllowed(task, subject); }
 }

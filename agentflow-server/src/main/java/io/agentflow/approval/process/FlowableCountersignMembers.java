@@ -26,9 +26,13 @@ public class FlowableCountersignMembers {
     static final String REQUIRED = "agentflowCountersignRequired";
     private final TaskRecipientDirectory directory;
     private final FlowableOrganizationMembers organization;
+    private final FlowableApprovalResponsibilities responsibilities;
 
     /** 注入当前租户的有效审批账号来源。 */
-    public FlowableCountersignMembers(TaskRecipientDirectory directory, FlowableOrganizationMembers organization) { this.directory = directory; this.organization = organization; }
+    public FlowableCountersignMembers(TaskRecipientDirectory directory, FlowableOrganizationMembers organization,
+                                     FlowableApprovalResponsibilities responsibilities) {
+        this.directory = directory; this.organization = organization; this.responsibilities = responsibilities;
+    }
 
     /** Flowable 会为基数和每个子执行反复求集合，本轮始终复用根执行中的首次快照。 */
     public List<String> resolve(DelegateExecution execution, String encodedRule) {
@@ -37,6 +41,17 @@ public class FlowableCountersignMembers {
 
     /** 任一及比例方式同时冻结人数门槛，后续目录变化不能改变当前节点的分母。 */
     public List<String> resolve(DelegateExecution execution, String encodedRule, String mode, Integer percentage) {
+        return resolveMembers(execution, encodedRule, mode, percentage, false, null);
+    }
+
+    /** 新规则在冻结名单和分母之前执行，旧发布表达式不受新增规则影响。 */
+    public List<String> resolveWithResponsibilities(DelegateExecution execution, String encodedRule, String mode,
+                                                   Integer percentage, boolean excludeApplicant, String encodedReferences) {
+        return resolveMembers(execution, encodedRule, mode, percentage, excludeApplicant, encodedReferences);
+    }
+
+    private List<String> resolveMembers(DelegateExecution execution, String encodedRule, String mode, Integer percentage,
+                                        boolean excludeApplicant, String encodedReferences) {
         DelegateExecution root = execution;
         while (!root.isMultiInstanceRoot() && root.getParent() != null) root = root.getParent();
         String tenant = root.getTenantId();
@@ -47,8 +62,11 @@ public class FlowableCountersignMembers {
         String rule = new String(Base64.getDecoder().decode(encodedRule), StandardCharsets.UTF_8);
         Set<String> users = rule.startsWith("user:") ? Set.of(rule.substring("user:".length())) : Set.of();
         Set<String> roles = rule.startsWith("role:") ? Set.of(rule.substring("role:".length())) : Set.of();
-        List<String> members = new ArrayList<>((io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
-                ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles)).stream().distinct().sorted().toList());
+        List<String> selected = encodedReferences != null
+                ? responsibilities.resolve(root, encodedRule, excludeApplicant, encodedReferences)
+                : io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
+                    ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles);
+        List<String> members = new ArrayList<>(selected.stream().distinct().sorted().toList());
         if (members.isEmpty()) throw new DomainException("COUNTERSIGN_NO_MEMBERS", "No active approvers are available for the countersign node");
         ApprovalPolicy policy = new ApprovalPolicy(ApprovalMode.valueOf(mode), percentage);
         if (policy.mode() != ApprovalMode.ALL) {

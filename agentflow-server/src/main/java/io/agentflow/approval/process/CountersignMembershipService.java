@@ -74,7 +74,7 @@ public class CountersignMembershipService {
         var operator = state.pending().stream().filter(member -> taskId.equals(member.taskId())).findFirst().orElseThrow(CountersignMembershipService::changed);
         boolean canChange = !operator.delegated() && operator.user().equals(actor.userId());
         var available = canChange && state.total() < CountersignMembership.MAX_MEMBERS
-                ? recipients.approvers(actor.tenantId()).stream().filter(user -> !state.completedUsers().contains(user)
+                ? authorization.allowedTargets(task, recipients.approvers(actor.tenantId())).stream().filter(user -> !state.completedUsers().contains(user)
                     && state.pending().stream().noneMatch(member -> member.user().equals(user))).distinct().sorted().toList()
                 : List.<String>of();
         var pending = state.pending().stream().sorted(Comparator.comparing(CountersignMembership.Member::taskId))
@@ -107,6 +107,7 @@ public class CountersignMembershipService {
         application.recordTaskAction(input.expectedVersion());
         FlowableCountersignRuntime.Change change;
         if (input.action() == Action.ADD) {
+            authorization.requireTargetAllowed(task, input.targetUser());
             if (!recipients.approvers(actor.tenantId()).contains(input.targetUser())) {
                 throw new DomainException("INVALID_TASK_RECIPIENT", "The selected user is not an eligible approver");
             }

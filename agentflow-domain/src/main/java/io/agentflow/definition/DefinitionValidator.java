@@ -76,6 +76,13 @@ public final class DefinitionValidator {
                     catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
                 }
             }
+            if (ApprovalResponsibilityPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
+                if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_RESPONSIBILITY_REQUIRES_USER_TASK:" + n.id());
+                else {
+                    try { ApprovalResponsibilityPolicy.fromProperties(n.properties()); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                }
+            }
             if (nodes.put(n.id(), n) != null) errors.add("DUPLICATE_NODE:" + n.id());
             if (n.type() == NodeType.COPY && (n.id().length() > 128 || n.name().length() > 200)) {
                 errors.add("COPY_NODE_LIMIT_EXCEEDED:" + n.id());
@@ -195,6 +202,13 @@ public final class DefinitionValidator {
         }
         if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
         if (errors.isEmpty()) errors.addAll(new ParallelStructureValidator().validate(graph));
+        if (errors.isEmpty()) {
+            for (Node node : graph.nodes()) {
+                if (node.type() == NodeType.USER_TASK && !ApprovalResponsibilityPolicy.fromProperties(node.properties()).referencesValid(graph, node.id())) {
+                    errors.add("APPROVAL_RESPONSIBILITY_REFERENCE_INVALID:" + node.id());
+                }
+            }
+        }
         if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.SUB_PROCESS)) {
             validateWaitApprovalPaths(graph, errors, "SUBPROCESS_REQUIRES_APPROVAL_PATH");
         }

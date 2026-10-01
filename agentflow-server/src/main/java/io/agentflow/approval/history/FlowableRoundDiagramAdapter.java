@@ -5,6 +5,7 @@ import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.approval.process.FlowableOrganizationMembers;
+import io.agentflow.approval.process.FlowableApprovalResponsibilities;
 import io.agentflow.organization.OrganizationAssigneeResolver;
 import java.util.Map;
 import java.util.ArrayList;
@@ -100,6 +101,17 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
     /** 已核对申请及轮次后读取历史快照，绝不查询当前组织来补写责任。 */
     private Map<String, List<CandidateSnapshot>> candidateSnapshots(String instanceId) {
         var result = new HashMap<String, List<CandidateSnapshot>>();
+        // 目录命中与职责过滤是两份原始事实，展示时按同一执行和节点取实际生效名单。
+        var effective = new HashMap<String, Map<String, List<String>>>();
+        String responsibilityPrefix = FlowableApprovalResponsibilities.SNAPSHOT_PREFIX;
+        for (var value : history.createHistoricVariableInstanceQuery().processInstanceId(instanceId)
+                .variableNameLike(responsibilityPrefix + "%").list()) {
+            if (!value.getVariableName().startsWith(responsibilityPrefix) || value.getTaskId() != null) continue;
+            if (!(value.getValue() instanceof String text)) throw unavailable();
+            var snapshot = json.read(text, FlowableApprovalResponsibilities.Snapshot.class);
+            effective.computeIfAbsent(value.getExecutionId(), ignored -> new HashMap<>())
+                    .put(value.getVariableName().substring(responsibilityPrefix.length()), snapshot.candidateSubjects());
+        }
         String prefix = FlowableOrganizationMembers.SNAPSHOT_PREFIX;
         var values = history.createHistoricVariableInstanceQuery().processInstanceId(instanceId)
                 .variableNameLike(prefix + "%").list();
@@ -110,8 +122,9 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
             var snapshot = json.read(text, OrganizationAssigneeResolver.Selection.class);
             if (snapshot.directoryRevision() < 1 || snapshot.subjects().isEmpty()) throw unavailable();
             String nodeId = value.getVariableName().substring(prefix.length());
+            var subjects = effective.getOrDefault(value.getExecutionId(), Map.of()).getOrDefault(nodeId, snapshot.subjects());
             result.computeIfAbsent(nodeId, ignored -> new ArrayList<>())
-                    .add(new CandidateSnapshot(value.getId(), snapshot.directoryRevision(), snapshot.subjects()));
+                    .add(new CandidateSnapshot(value.getId(), snapshot.directoryRevision(), subjects));
         }
         result.replaceAll((node, records) -> records.stream().sorted(Comparator.comparing(CandidateSnapshot::id)).toList());
         return result;

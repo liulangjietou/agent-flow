@@ -1,0 +1,188 @@
+{
+  "recordedAt": "2026-10-01T22:50:55.745429+00:00",
+  "scope": "approval responsibility backend, publication, authorization and effective candidate history",
+  "baseCommit": "e1341e5e881207130d39664a76cabb5a7092a9ea",
+  "fullFeatureComplete": false,
+  "goalComplete": false,
+  "firstRed": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-red.log",
+    "tests": 5,
+    "failures": 5,
+    "errors": 0,
+    "reason": "Configured responsibility rules were ignored during activation"
+  },
+  "completionTimingRed": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-green.log",
+    "tests": 5,
+    "failures": 2,
+    "reason": "Current completed task is not visible in history until the native command finishes; new referenced nodes now record actual approvers in the completion transaction"
+  },
+  "historyRed": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-history-red.log",
+    "tests": 8,
+    "failures": 1,
+    "reason": "Historical organization roster still contained the excluded applicant; projection now combines both immutable snapshots"
+  },
+  "domain": {
+    "tests": 4,
+    "status": "PASS"
+  },
+  "h2": {
+    "tests": 78,
+    "totalWithDomain": 82,
+    "suites": [
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.definition.ApprovalResponsibilityPolicyTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.approval.process.CountersignMembershipApiTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.approval.CountersignPolicyIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.approval.RoundDiagramIntegrationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.definition.DefinitionDeploymentIntegrationTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.organization.OrganizationApprovalIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.approval.TaskDelegationIntegrationTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "status": "PASS",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-regression.log"
+  },
+  "finalAuthorizationRegression": {
+    "tests": 25,
+    "suites": [
+      {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "class": "io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest"
+      },
+      {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "class": "io.agentflow.approval.TaskDelegationIntegrationTest"
+      }
+    ],
+    "overlapWithH2": true,
+    "status": "PASS",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-authorization.log",
+    "change": "Avoid per-row engine-variable queries for legacy task listing while rechecking frozen constraints in actual task authorization"
+  },
+  "postgres": {
+    "tests": 19,
+    "suites": [
+      {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "class": "io.agentflow.organization.OrganizationApprovalIntegrationTest"
+      },
+      {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "class": "io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest"
+      }
+    ],
+    "overlapWithH2": true,
+    "status": "PASS",
+    "database": "approval_responsibilities_84f814c1fd",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-responsibilities-postgres.log",
+    "existingDatabaseReusedForFinalCheck": true
+  },
+  "authorGate": {
+    "javaFiles": 1283,
+    "namedTypes": 2463,
+    "missingAuthors": 0,
+    "parseErrors": 0,
+    "status": "PASS"
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalResponsibilityPolicy.java": "9df3d8f2771cc515d177f1b67d2414ee3f6caef323833c54277c092edf6a8cfc",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "068f96eaa55db735738c349054689e1b5af1a4114e199be9d2ca1493feff4462",
+    "agentflow-domain/src/test/java/io/agentflow/definition/ApprovalResponsibilityPolicyTest.java": "b82a72d373f9e2477b431951310543d1a7396f156bd7ccc9df98fb7b1cb39940",
+    "agentflow-server/src/main/java/io/agentflow/approval/history/FlowableRoundDiagramAdapter.java": "09d858ae225cd17ad77729a383cd82870c5694109854746b8a9a22d04854f790",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/CountersignMembershipService.java": "ca3ee63a3f38c34b8ff498d2b30f9b0f57292e4ad60c124c9c866693e41ba70a",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java": "5c349be75c8b653df56bf3fad4857f525a43435f37f5b5222f91e4cd347d0bcc",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableCountersignMembers.java": "7e6f92426387b07550121e45dbf5024bfd00b6cbd5281582b1debfb544fc4403",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java": "b7c99c31e1e8c6dde22f3522b0f2d9d093e3e05fa900e44d3d08c45e5e93b969",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java": "b775813822e12b238b771c65ccfd54cc9b8593051eaed8d2a43430fb8cac8ff1",
+    "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java": "6386ab6662996b3ed0e4d8ee7a837780b93cdae317c428713c27bb6380530f8a",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalResponsibilitiesIntegrationTest.java": "cba30721892dea860e6afa68399256e89440e4afb05c7e5d673ad854a775faee"
+  },
+  "migrationsAdded": false,
+  "existingAcceptanceServicesReplaced": false,
+  "frontendChanged": false,
+  "remaining": [
+    "Designer and policy differences",
+    "Template import and export",
+    "Localized errors and actual browser acceptance",
+    "Bound legacy-version upgrade and restart acceptance",
+    "Timed organization proxies",
+    "Form relationship assignees",
+    "Other active product work packages"
+  ],
+  "compatibility": [
+    "No implicit new policy for published BPMN",
+    "No completion listener on old definitions or unreferenced nodes",
+    "Applicant and prior approvers are separate explicit policy options",
+    "Native approval, assignment, audit and notification share rollback",
+    "No generic mutual exclusion between parallel sibling nodes or across parent/child processes"
+  ]
+}

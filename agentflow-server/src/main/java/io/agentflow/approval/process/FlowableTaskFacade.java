@@ -168,6 +168,7 @@ public class FlowableTaskFacade {
             }
             case TRANSFER -> {
                 requireTarget(actor, targetUser);
+                authorization.requireTargetAllowed(task, targetUser);
                 // 转交后原委派关系结束，不能让下一次委派沿用陈旧的 owner。
                 task.setOwner(null);
                 task.setDelegationState(null);
@@ -179,6 +180,7 @@ public class FlowableTaskFacade {
             }
             case DELEGATE -> {
                 requireTarget(actor, targetUser);
+                authorization.requireTargetAllowed(task, targetUser);
                 // 候选组任务还没有 assignee，显式记录实际发起委派的责任人。
                 taskService.setOwner(taskId, actor.userId());
                 taskService.delegateTask(taskId, targetUser);
@@ -240,7 +242,8 @@ public class FlowableTaskFacade {
         actor.requireRole("APPROVER");
         Task task = authorization.require(taskId, actor);
         delegation(task).requireAction(TaskAction.TRANSFER);
-        return recipients.approvers(actor.tenantId()).stream().filter(user -> !actor.userId().equals(user)).toList();
+        return authorization.allowedTargets(task, recipients.approvers(actor.tenantId())).stream()
+                .filter(user -> !actor.userId().equals(user)).toList();
     }
 
     private TaskDelegation delegation(Task task) {
