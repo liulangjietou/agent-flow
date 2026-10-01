@@ -1,0 +1,260 @@
+{
+  "feature": "个人通知偏好与外发意向",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "recordedAt": "2026-10-01T17:19:11.410662+00:00",
+  "baseCommit": "612dc0469394bfdf7503b8d43b6a3e2896b97054",
+  "branch": "codex/governance-identifier-integration",
+  "migration": "V92",
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-server.jar",
+    "sha256": "f1d29cab09d05ae63aec2c23f1c810bfcc5752f4e6b9f202be106f094ee0a95e"
+  },
+  "rules": [
+    "仅本人设置，站内常开，外部默认关闭",
+    "各渠道独立同意代次，开启不补发历史消息",
+    "外发意向与站内事实同事务且不复制业务正文",
+    "原键恢复历史回执后重新读取当前设置"
+  ],
+  "verification": {
+    "h2": 46,
+    "postgres": 13,
+    "postgresOverlapsH2": true,
+    "frontend": 51,
+    "openApi": {
+      "operations": 286,
+      "schemas": 557,
+      "requestExamples": 109
+    },
+    "http": 35,
+    "browserUpstream": 20,
+    "intentionalInvalidBrowserReceipt": 1,
+    "oldTables": 221,
+    "oldRowsRetained": 1243,
+    "files": 3,
+    "finalTables": 224,
+    "finalRows": 1274,
+    "exactRestarts": 2,
+    "preferences": 2,
+    "changes": 8,
+    "intents": {
+      "pending": 1,
+      "suppressed": 3
+    },
+    "approvalVersionsAndAuditUnchanged": true
+  },
+  "defectsReproducedBeforeFix": [
+    {
+      "issue": "未知写入之后旧默认值提示容易被当作当前状态",
+      "testGap": "原请求与状态测试未覆盖实际模板中的默认值提示",
+      "redEvidence": "notification-preferences-unknown-label-red.log",
+      "fix": "将默认值明确标记为上次读取结果"
+    }
+  ],
+  "testFixtureCorrection": "首次事务失败注入误调用 Spring MANDATORY 代理；改为对真实目标设置 spy，不放宽生产事务约束。",
+  "browser": {
+    "url": "http://127.0.0.1:15332/",
+    "unknownRequestRecoveredWithoutReenablingLaterDisabledChannels": true,
+    "normalEnableAndDisable": true,
+    "restartReloginAndRead": true,
+    "viewportCssWidth": 500,
+    "documentClientWidth": 480,
+    "documentScrollWidth": 480,
+    "panelClientWidth": 451,
+    "panelScrollWidth": 451,
+    "viewportReset": true,
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-final.jpg"
+  },
+  "limitations": [
+    "没有外部发送器、收件账号绑定或真实渠道回执；PENDING 只是意向",
+    "后续发送器须在开始发送前复核原同意代次、人员及读取权限",
+    "超时升级及暂停期间升级抑制待完成",
+    "真实企业接口、环境、模型和 IdP 独立验收",
+    "无 Git remote，未创建 PR 或执行远端 CI"
+  ],
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationChannel.java",
+      "sha256": "441c30fd0eb9e01bec314d3e7fdcf946c8e054f0047811985ceb4602e6c4eb7e"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationPreferences.java",
+      "sha256": "e4df45488191e7a7868a6a8bab073341d4b6473e5f482965a75edb7025a91aec"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationPreferencesRepository.java",
+      "sha256": "a7b1891ea544d460eadf9d4032a4300be5b739a52b5f03aaa0caf7df89d661ea"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/notification/NotificationPreferencesTest.java",
+      "sha256": "169ddb9ad2d624b24fa3aa95b0b4ef6b0ded496e9c9eb7155c2197d1482f75ac"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java",
+      "sha256": "7448488e13288bbe1a036874b7d2ced4dff9e36578a01c2c91b17be50fa7fae3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/JdbcInboxRepository.java",
+      "sha256": "5f9d8ccb20f91503c3d1505659afe1062f382c616edeff2724b9daf6258ff565"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/JdbcNotificationPreferencesRepository.java",
+      "sha256": "2eb8731d9d037e55058522a79daf99eae23b770940a0707e5bb93c5c5f9d6fa9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDispatchPlanner.java",
+      "sha256": "788d1ba1182098f2e7fce894ca47841a9ccd2c416f437923e3713335d071c798"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationPreferencesController.java",
+      "sha256": "4ee4e0d5b6b54ffb8e9a80d0711b47f4497a58d056f2a1232b3d3835e2eed135"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationPreferencesService.java",
+      "sha256": "e81491aafaf7f2caa5d270c566b97f06a93e7f490928efbef94e1ec8f79bbec2"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "67c99a66eba529ba42d355f7fe481173db5824472d2a1bfd720c3a30c79b90fc"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V92__notification_preferences.sql",
+      "sha256": "3d42552a77a0c0d697d653ddfed9bd0690eb01a4decdf3d9ac6bb4d4f2d36a0b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "65d6f0732e81de56c704761ee3700f1ea26b5f67f9d5f7fe22c296c49817637a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationPreferencesIntegrationTest.java",
+      "sha256": "3df5c502de94c7a7e45a90fa1a18922836a50a28ceeaf1e505203ab375e36438"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationPreferencesMigrationTest.java",
+      "sha256": "a628c0f9115383f70dc95239f1df5e6e61d70414c3249c68a269e90a622fa5f2"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "98e2dd768ed0c2bcc2c9744ce3cdbca44da951d7c0ae9b458ea310116088c9d1"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "5582e82c6a1d36dd663f936cceab53f99a99b11cf22b7a0ef01936e35805e65b"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "b3c3d062b672b4c2e0a16bda2d1488d554765c59b0f2bc152862283de3d6b1bd"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "6f5cd5d4a95325a1561801225b08d231a11ed33b897c4952422854b29b1e7d58"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationPreferencesPanel.vue",
+      "sha256": "54e9aff4f66d2619e9541c55c0f715e4e9bcd3aa93d184e710be137233ad727f"
+    },
+    {
+      "path": "agentflow-web/src/notificationPreferences.ts",
+      "sha256": "cf315804393f591ebd7893a247bf0715ed72c625e7aa35790b5b9fc1868aeffb"
+    },
+    {
+      "path": "agentflow-web/tests/notification-preferences.test.mjs",
+      "sha256": "d001eb67672b2cf029e4b8eb2bcc24bfb07bd62659dca489a2336af6e08fe6f4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-h2.json",
+      "sha256": "630021698e7470b374d340242e2c5761fe29ffa25614ab8d436884060a635412"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-postgres-results.json",
+      "sha256": "30aa777ee98a7e6a30bce2aab09489312831872d26b214c48fd44e2a37fe3054"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-frontend.log",
+      "sha256": "cf495d130a13c67ac56b4fa7ef0fa931bbfef3344ed2d686cb2f5349025f5be5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-build.log",
+      "sha256": "5424ad24236dec3901f3ece1e8e8921941a4b7b5e4bfdb07efc9a200614aab42"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-openapi.log",
+      "sha256": "f6c0e424ecbff70728c1124644195edc317968e3e2b9ab2b81a9df99b3f330a5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-package.log",
+      "sha256": "aaf7fefc6f0e1717bf7dce7ccca3947c239ff8b54ce818d0a7bf1878aac52d2c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-upgrade.json",
+      "sha256": "daa161833b31108a4299bcce242b04d2b6a35480b3b3653ef5ab64d929017ea1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-final-data.json",
+      "sha256": "ee4a76f80373ea4bbc4cd1a9852907e6f48b9b84ba1d21ca97ea1bfd52a74971"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-restart1-preservation.json",
+      "sha256": "05b45e835f22cd918cabb44b8fd76876f864fa697856767bcc101f70c9a47903"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-restart2-preservation.json",
+      "sha256": "b599c5d6723d157e4231be2dc9572fc6c0b39a8b8a87f8624762b2ad3eae3f27"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-contract.json",
+      "sha256": "ddfde454000ee0a70548b7a1aacd38b285bff7b13a7abbf22c50ccbf73b5f20f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-viewport.json",
+      "sha256": "03294d102d738c282ecdcadb2f1163f3c641fe9043ce96512133297a6177a69b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-unknown-label-red.log",
+      "sha256": "9b08aacd6921b4eeea45bf23c314e67d60d15551ba00a4f5ebb669d80ea24164"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-h2-fixture-failure.log",
+      "sha256": "dee2ab6f2cf0d66054efc37182a2f67cd3f3754f13b04d8f6051cffe79b4a916"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-final.jpg",
+      "sha256": "bdfbda9b26b77c58a49c12ebbe71e32ac9c479d171cc8d264af7480fe9bed4c2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-mobile.jpg",
+      "sha256": "15db2f4fe8e48dc41a14bfd66135a60d23c7cdd3dfaf648fb07461530b134a63"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-unknown.jpg",
+      "sha256": "65a47059c76228ed7e91cb3ae7b719fdc9ad99d717f7b8aecd080e49e98a7074"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-recovered.jpg",
+      "sha256": "14b2750e134be8ba9d7a5f0118b7b0279fcbc48f6465737f5f1e23a2f9fdd12b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-browser-http.json",
+      "sha256": "0ea7fa547245ea9290994c2171a9fd2313912120ab95fabeff06dcb95890e178"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-http-workflow.json",
+      "sha256": "7fb8acbbc2e23b11b076025b489024161d6d803149659e9eee219690243a5686"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-http-other-session-close.json",
+      "sha256": "de47008b917ecf0690651eb1ad2ad0bd2d88a54fe60fa8f786d974aff7e5501f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-http-restart1.json",
+      "sha256": "cf24e3c0ce895cd84f75947c90ec0a3b0e5281977d14f6d0eeb2a012ec986ea7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-preferences-http-restart2.json",
+      "sha256": "cf24e3c0ce895cd84f75947c90ec0a3b0e5281977d14f6d0eeb2a012ec986ea7"
+    }
+  ],
+  "overallGoalComplete": false,
+  "remainingPackages": 3
+}

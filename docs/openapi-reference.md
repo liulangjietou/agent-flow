@@ -78,3 +78,5 @@
 
 
 供应商采购付款办理使用 `/api/v1/procurement-payments/{id}/supplier-payment` 读取原轮次状态，`/reviews` 登记新鲜应付复核，`/authorizations` 消费同一财务的证据并登记固定预留。`/api/v1/supplier-payments/{id}/finance-actions` 只恢复同一原授权；`QUERY`、`RETRY`、`RETIRE` 分别受原状态和展示版本约束。FINANCE 角色、非申请人、原轮次敏感字段可读与当前法人任职缺一不可，幂等回放也重新检查。202 不是银行付款或 ERP 结算成功，完整规则见 [供应商付款](supplier-payments.md)。
+
+本人通知偏好使用 `GET/PUT /api/v1/notifications/preferences`：默认关闭外部开关，站内提醒常开，不接受其他人的身份或外部地址。PUT 显式携带两个开关与 `expectedVersion`，响应禁止缓存，原键恢复回放历史回执后应重新读取当前设置。保存成功不代表外部渠道接通或消息送达，见[个人通知偏好](notification-preferences.md)。

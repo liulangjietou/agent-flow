@@ -37544,6 +37544,180 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/preferences": {
+      "get": {
+        "operationId": "notificationPreferences",
+        "tags": [
+          "消息"
+        ],
+        "summary": "我的通知偏好",
+        "description": "只读取当前登录人的外部通知偏好，默认关闭邮件和企业 IM；站内业务提醒始终开启。无查询参数，响应不可缓存。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "reviseNotificationPreferences",
+        "tags": [
+          "消息"
+        ],
+        "summary": "修改我的通知偏好",
+        "description": "显式提供两个外部开关与当前版本。开启不补发旧消息；关闭抑制原代次未发送意向。保存成功表示偏好生效，不能据此认定渠道已经接通或消息已经送达。同键恢复回放原回执，最新设置须重新读取。无查询参数，响应不可缓存。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencesInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -64276,6 +64450,63 @@
               "null"
             ],
             "maxLength": 128
+          }
+        }
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "inAppEnabled",
+          "emailEnabled",
+          "enterpriseImEnabled",
+          "version",
+          "updatedAt"
+        ],
+        "properties": {
+          "inAppEnabled": {
+            "type": "boolean",
+            "const": true
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "enterpriseImEnabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "NotificationPreferencesInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "emailEnabled",
+          "enterpriseImEnabled",
+          "expectedVersion"
+        ],
+        "properties": {
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "enterpriseImEnabled": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       }

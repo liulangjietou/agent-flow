@@ -1014,6 +1014,9 @@ async function recoverOperation(id: string) {
       } else if (request.path.startsWith('/integrations/webhooks/deliveries/')) {
         templateRefresh.value++
         notice.value = '已确认原投递重试请求，请刷新投递状态查看发送结果。'
+      } else if (request.path === '/notifications/preferences') {
+        templateRefresh.value++
+        notice.value = '已确认原通知偏好保存结果，请重新读取当前设置。'
       } else if (request.path.startsWith('/notifications/') && request.path.endsWith('/read')) {
         templateRefresh.value++
         notice.value = '已确认消息的已读状态。'

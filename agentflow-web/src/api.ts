@@ -1,3 +1,4 @@
+import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
 import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
 import type { SupplierAdjustmentView, SupplierAdjustmentPrepareInput, SupplierAdjustmentActionInput, SupplierAdjustmentReceipt } from './supplierAdjustment'
 import type { PaymentBatchInput, PaymentBatchReceipt, PaymentBatchPage, PaymentBatchDetail } from './paymentBatches'
@@ -330,6 +331,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  if (operation.path === '/notifications/preferences') validateNotificationPreferencesReceipt(result, JSON.parse(operation.body!) as NotificationPreferencesInput)
   const comment = /^\/applications\/([^/?]+)\/comments$/.exec(operation.path)
   if (comment) validateCommentReceipt(result, decodeURIComponent(comment[1]!), JSON.parse(operation.body!) as CommentDraft)
   const taskAction = /^\/tasks\/([^/?]+)\/actions$/.exec(operation.path)
@@ -607,6 +609,8 @@ export const api = {
     for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value))
     return request<InboxPage>(`/notifications?${params}`, { signal })
   },
+  notificationPreferences: (signal: AbortSignal) => request<NotificationPreferences>('/notifications/preferences', { signal, cache: 'no-store' }).then(readNotificationPreferences),
+  reviseNotificationPreferences: (input: NotificationPreferencesInput) => write<NotificationPreferences>('/notifications/preferences', 'PUT', '保存通知偏好', input),
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskCountersignMembers: (taskId: string, signal: AbortSignal) => request<CountersignView>(`/tasks/${encodeURIComponent(taskId)}/countersign-members`, { signal, cache: 'no-store' }),
