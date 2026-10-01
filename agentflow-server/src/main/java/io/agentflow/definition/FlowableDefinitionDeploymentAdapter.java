@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Base64;
+import java.util.Map;
 import java.util.Objects;
 
 import static io.agentflow.definition.DefinitionDeploymentPort.DeploymentResult;
@@ -20,21 +21,24 @@ import static io.agentflow.definition.DefinitionModels.*;
 public class FlowableDefinitionDeploymentAdapter implements DefinitionDeploymentPort {
     private static final String DEPLOYMENT_CONFLICT = "DEFINITION_DEPLOYMENT_CONFLICT";
     private final RepositoryService repositoryService;
+    private final SubprocessDeploymentBindings subprocesses;
 
     /** 使用与流程定义仓储共用事务的数据源发布流程。 */
-    public FlowableDefinitionDeploymentAdapter(RepositoryService repositoryService) {
+    public FlowableDefinitionDeploymentAdapter(RepositoryService repositoryService, SubprocessDeploymentBindings subprocesses) {
         this.repositoryService = repositoryService;
+        this.subprocesses = subprocesses;
     }
 
     @Override
     @Transactional
     public DeploymentResult deploy(DefinitionDraft draft) {
         String resourceName = draft.key() + "-v" + draft.version() + ".bpmn20.xml";
+        var bindings = subprocesses.bind(draft);
         var deployment = repositoryService.createDeployment()
                 .name(draft.name())
                 .key(draft.key())
                 .tenantId(draft.tenantId())
-                .addString(resourceName, RestrictedBpmnWriter.write(draft))
+                .addString(resourceName, RestrictedBpmnWriter.write(draft, bindings))
                 .deploy();
         ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
                 .deploymentId(deployment.getId()).singleResult();
@@ -57,6 +61,10 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
         private RestrictedBpmnWriter() { }
 
         static String write(DefinitionDraft draft) {
+            return write(draft, Map.of());
+        }
+
+        static String write(DefinitionDraft draft, Map<String, String> subprocesses) {
             Graph graph = draft.graph();
             var eventMessages = eventMessages(graph, draft.key());
             StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
@@ -73,6 +81,11 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                     case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
                             .append(escape(node.name())).append("\"/>");
                     case USER_TASK -> appendUserTask(xml, node);
+                    case SUB_PROCESS -> xml.append("<callActivity id=\"").append(escape(node.id()))
+                            .append("\" name=\"").append(escape(node.name())).append("\" calledElement=\"")
+                            .append(escape(Objects.requireNonNull(subprocesses.get(node.id()), "Bound subprocess definition is required")))
+                            .append("\" flowable:calledElementType=\"id\" flowable:inheritVariables=\"false\" ")
+                            .append("flowable:inheritBusinessKey=\"false\" flowable:fallbackToDefaultTenant=\"false\"/>");
                     case EVENT_WAIT -> xml.append("<intermediateCatchEvent id=\"").append(escape(node.id()))
                             .append("\" name=\"").append(escape(node.name())).append("\"><messageEventDefinition messageRef=\"")
                             .append(eventMessages.get(node.id())).append("\"/></intermediateCatchEvent>");

@@ -33,6 +33,19 @@ public class SubprocessDefinitionResolver {
     public Bound resolve(String tenantId, SubprocessPolicy policy, String nodeId, FormSchema parentSchema) {
         var target = definitions.lockPublished(tenantId, policy.processKey(), policy.version()).orElseThrow(
                 () -> new DomainException("SUBPROCESS_DEFINITION_UNAVAILABLE", "The referenced published subprocess version is unavailable"));
+        return bind(tenantId, target, policy, nodeId, parentSchema);
+    }
+
+    /** 发布预检读取固定内容；启停状态仍在每次实际激活时加锁复核，发布不授予永久启动权限。 */
+    @Transactional(readOnly = true)
+    public Bound inspect(String tenantId, SubprocessPolicy policy, String nodeId, FormSchema parentSchema) {
+        var target = definitions.findPublished(tenantId, policy.processKey(), policy.version()).orElseThrow(
+                () -> new DomainException("SUBPROCESS_DEFINITION_UNAVAILABLE", "The referenced published subprocess version is unavailable"));
+        return bind(tenantId, target, policy, nodeId, parentSchema);
+    }
+
+    private Bound bind(String tenantId, DefinitionModels.DefinitionDraft target, SubprocessPolicy policy,
+                       String nodeId, FormSchema parentSchema) {
         target.requireStartEnabled();
         var schema = target.formSchema();
         // 与普通申请入口保持同一业务归属：映射表单不能伪造财务预检、资源占用或业务单据。

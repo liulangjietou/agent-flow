@@ -5,7 +5,6 @@ import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
-import io.agentflow.calendar.BusinessCalendarRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +26,7 @@ public class DefinitionApplicationService {
     private final DefinitionDeploymentPort deploymentPort;
     private final DefinitionPublicationRepository publications;
     private final DefinitionAssigneeDirectory assignees;
-    private final BusinessCalendarRepository calendars;
+    private final DefinitionReferenceInspector references;
     private final EventContractBindings eventContracts;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
@@ -37,12 +36,12 @@ public class DefinitionApplicationService {
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
                                         DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees,
-                                        BusinessCalendarRepository calendars, EventContractBindings eventContracts) {
+                                        DefinitionReferenceInspector references, EventContractBindings eventContracts) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
         this.assignees = assignees;
-        this.calendars = calendars;
+        this.references = references;
         this.eventContracts = eventContracts;
     }
 
@@ -60,7 +59,7 @@ public class DefinitionApplicationService {
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
         List<String> errors = validator.validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
-        return unavailableReferences(tenantId, graph);
+        return references.inspect(tenantId, graph);
     }
 
     /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
@@ -87,7 +86,7 @@ public class DefinitionApplicationService {
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
         Validation result = inspect(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
-        var errors = unavailableReferences(tenantId, graph);
+        var errors = references.inspect(tenantId, graph);
         return new Validation(errors, result.branchDiagnostics());
     }
 
@@ -218,31 +217,6 @@ public class DefinitionApplicationService {
     /** 查询定义列表。 */
     public List<DefinitionDraft> list(String tenantId, String status) {
         return repository.findAll(tenantId, status);
-    }
-
-    private List<String> unavailableReferences(String tenantId, Graph graph) {
-        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0 || option.contextual())
-                .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
-        var errors = new java.util.ArrayList<>(graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
-                .filter(node -> !available.contains(node.properties().get("assigneeRule")))
-                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList());
-        if (graph.nodes().stream().anyMatch(node -> node.type() == DefinitionModels.NodeType.COPY)) {
-            var copyRules = assignees.copyOptions(tenantId).stream().filter(option -> option.contextual()
-                    || option.memberCount() > 0 && option.memberCount() <= io.agentflow.approval.copy.CopyRecipient.MAX_RECIPIENTS)
-                    .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
-            graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.COPY)
-                    .filter(node -> !copyRules.contains(node.properties().get("recipientRule")))
-                    .forEach(node -> errors.add("COPY_RECIPIENT_UNAVAILABLE:" + node.id()));
-        }
-        for (var node : graph.nodes()) {
-            TaskDeadlinePolicy.fromProperties(node.properties()).ifPresent(policy -> {
-                if (calendars.findVersion(tenantId, policy.calendarId(), policy.calendarRevision()).isEmpty()) {
-                    errors.add("DEADLINE_CALENDAR_UNAVAILABLE:" + node.id());
-                }
-            });
-        }
-        errors.addAll(eventContracts.inspect(tenantId, graph));
-        return List.copyOf(errors);
     }
 
     private void requireValid(Graph graph, FormSchema formSchema, String processKey) {

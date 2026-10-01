@@ -6,6 +6,7 @@ import io.agentflow.approval.model.SubprocessCall;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubprocessCallRepository;
 import io.agentflow.common.DomainException;
+import io.agentflow.definition.SubprocessPolicy;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -78,7 +79,7 @@ public class SubprocessExecutionLocks {
         var seen = new HashSet<UUID>();
         UUID current = applicationId;
         while (true) {
-            if (!seen.add(current) || result.size() > SubprocessStartService.MAX_CALL_DEPTH) {
+            if (!seen.add(current) || result.size() > SubprocessPolicy.MAX_CALL_DEPTH) {
                 throw new DomainException("SUBPROCESS_RELATION_INVALID", "The subprocess origin chain is invalid");
             }
             var origin = calls.findByChild(tenant, current);

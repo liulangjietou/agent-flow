@@ -31,7 +31,7 @@ public final class DefinitionValidator {
         List<String> errors = new ArrayList<>();
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
-            // 父子结论与实例控制尚未接通前，不开放草稿或发布入口；内部运行验收直接使用持久化夹具。
+            // 设计器、授权读取和完整运行验收完成前，不开放草稿或发布入口；内部验证使用持久化夹具。
             if (n.type() == NodeType.SUB_PROCESS) errors.add("SUBPROCESS_RUNTIME_NOT_READY:" + n.id());
             else if (SubprocessPolicy.hasProperties(n.properties())) errors.add("SUBPROCESS_REQUIRES_CALL_NODE:" + n.id());
             if (n.type() == NodeType.EVENT_WAIT) {

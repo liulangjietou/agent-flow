@@ -33,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SubprocessStartService {
     public static final String SYSTEM_ACTOR = "system:subprocess";
-    public static final int MAX_CALL_DEPTH = 16;
     private final ApplicationRepository applications;
     private final SubmissionRoundRepository rounds;
     private final SubprocessCallRepository calls;
@@ -125,7 +124,7 @@ public class SubprocessStartService {
             if (!ancestors.add(current) || definitionId.equals(childDefinitionId)) {
                 throw new DomainException("SUBPROCESS_RECURSION_FORBIDDEN", "A subprocess cannot recursively call an active ancestor version");
             }
-            if (depth > MAX_CALL_DEPTH) throw new DomainException("SUBPROCESS_DEPTH_EXCEEDED", "Subprocess nesting exceeds the supported depth");
+            if (depth > SubprocessPolicy.MAX_CALL_DEPTH) throw new DomainException("SUBPROCESS_DEPTH_EXCEEDED", "Subprocess nesting exceeds the supported depth");
             var origin = calls.findByChild(parent.tenantId(), current);
             if (origin.isEmpty()) return;
             current = origin.get().parentApplicationId(); definitionId = origin.get().parentRuntimeDefinitionId(); depth++;
