@@ -18,7 +18,17 @@ public class JdbcNotificationPreferencesRepository implements NotificationPrefer
 
     @Override
     public NotificationPreferences get(String tenant, String recipient) {
-        return jdbc.query("SELECT * FROM notification_preferences WHERE tenant_id=? AND recipient_id=?",
+        return read(tenant, recipient, false);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public NotificationPreferences lock(String tenant, String recipient) {
+        return read(tenant, recipient, true);
+    }
+
+    private NotificationPreferences read(String tenant, String recipient, boolean lock) {
+        return jdbc.query("SELECT * FROM notification_preferences WHERE tenant_id=? AND recipient_id=?" + (lock ? " FOR UPDATE" : ""),
                 (row, index) -> new NotificationPreferences(row.getString("tenant_id"), row.getString("recipient_id"),
                         row.getBoolean("email_enabled"), row.getBoolean("enterprise_im_enabled"), row.getLong("version"),
                         row.getLong("email_generation"), row.getLong("enterprise_im_generation"), row.getTimestamp("updated_at").toInstant()),

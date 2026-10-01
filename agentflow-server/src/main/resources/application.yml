@@ -24,6 +24,11 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  notifications:
+    delivery-worker-enabled: ${AGENTFLOW_NOTIFICATION_DELIVERY_WORKER_ENABLED:false}
+    public-url: ${AGENTFLOW_NOTIFICATION_PUBLIC_URL:}
+    smtp-servers: {}
+    bindings: {}
   events:
     enabled: ${AGENTFLOW_EVENTS_ENABLED:false}
     worker-enabled: ${AGENTFLOW_EVENTS_WORKER_ENABLED:true}

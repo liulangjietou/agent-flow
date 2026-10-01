@@ -4,6 +4,8 @@ package io.agentflow.notification;
 public interface NotificationPreferencesRepository {
     /** 只返回指定身份的设置或全关闭默认值。 */
     NotificationPreferences get(String tenant, String recipient);
+    /** 发送事务先锁定本人偏好，再锁定投递，与关闭设置的锁顺序一致。 */
+    NotificationPreferences lock(String tenant, String recipient);
     /** 保存版本变化和同事务历史，竞争的旧版本不能覆盖新设置。 */
     void save(NotificationPreferences previous, NotificationPreferences current);
 }

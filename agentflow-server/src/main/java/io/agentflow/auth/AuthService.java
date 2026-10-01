@@ -65,6 +65,11 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
                 .map(Map.Entry::getKey).sorted().toList();
     }
 
+    /** 普通员工和出纳也可以接收本人提醒，通知资格不要求审批角色。 */
+    public boolean activeAccount(String tenantId, String username) {
+        return demoEnabled && demoTenant.equals(tenantId) && DEMO_ROLES.containsKey(username);
+    }
+
     /** 任务候选人与候选组取并集；与登录共享同一租户、账号和角色来源。 */
     @Override
     public List<String> members(String tenantId, Set<String> users, Set<String> roles) {
