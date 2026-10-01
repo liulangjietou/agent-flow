@@ -1,0 +1,85 @@
+{
+  "recordedAt": "2026-10-01T23:29:22.868794+00:00",
+  "status": "STORAGE_VERIFIED_TASK_INTEGRATION_PENDING",
+  "baseCommit": "37ac42aa6be290c841fe573ed858df0325aca224",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "有期限代理的领域、管理服务、持久化与独立迁移；尚未公开或接入任务授权",
+  "tests": {
+    "h2": {
+      "domain": 6,
+      "server": 11,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-storage-h2.log"
+    },
+    "postgres": {
+      "server": 11,
+      "database": "approval_proxy_storage_0732d35dc7",
+      "migrationDatabase": "approval_proxy_migration_0732d35dc7",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-storage-postgres-0732d35dc7.log",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    "sameServerCasesAcrossDatabases": true,
+    "reports": [
+      {
+        "name": "ApprovalProxyTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0
+      },
+      {
+        "name": "ApprovalProxyPersistenceIntegrationTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0
+      },
+      {
+        "name": "ApprovalProxyMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0
+      }
+    ]
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/organization/ApprovalProxy.java": "b3f779bafbd2c0e02eb167e4e375f86f601e725176ab7858792c916bbe7ef1de",
+    "agentflow-domain/src/main/java/io/agentflow/organization/ApprovalProxyRepository.java": "406658b3f4b2a0f922c30eeb8427c8deac42782f8d63ca606f71eceeaf09ec9e",
+    "agentflow-domain/src/test/java/io/agentflow/organization/ApprovalProxyTest.java": "436a4cae31b14b22655fd25e01dd2dbb2b07c9f8721a634c9360e44315204e81",
+    "agentflow-server/src/main/java/io/agentflow/organization/ApprovalProxyService.java": "f6c481e0881a166e3d958647d42988145db317d1007c7c557425ad8d98920c17",
+    "agentflow-server/src/main/java/io/agentflow/organization/JdbcApprovalProxyRepository.java": "dba5c0e596f8491b47dba843939d4d9d5cc9cfd621680b2d1101da7fe861c917",
+    "agentflow-server/src/main/resources/db/migration/V96__approval_proxies.sql": "1d2f88d709072d4eae22c1fe7f9796450ee7a18efb37f576495b631b5a6ff0c5",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyMigrationTest.java": "49d5acc552520beb966e3a64da138adaa17bb88c0ecbac9666f07634695900e5",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyPersistenceIntegrationTest.java": "0024cb2c3ee0b97a9b4f9bd3c30ddd880d8bb4d5ae0a1e1a0e54fe7aae2c5297"
+  },
+  "logSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-storage-h2.log": "7c9c6d7076797b6310250c9b83bb5abd75226c9c708aeb14c8ec51c7fe1b1042",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-storage-postgres-0732d35dc7.log": "94cd6e5d3b14afa955c00da6d7c8ec324cd3c6c4debd24d8a1582dd78a8486c3"
+  },
+  "verified": [
+    "微秒时间边界及创建前无追溯授权",
+    "同租户已发布版本与双方本地审批资格",
+    "重叠并发单一成功和相邻区间",
+    "仅直接代理，不继承代理链",
+    "撤销锁及修订冲突",
+    "创建与撤销的审计失败回滚",
+    "V95到V96非空迁移、六张旧业务表和旧Flyway历史保持",
+    "复合外键与撤销完整性数据库约束"
+  ],
+  "notVerified": [
+    "任务和字段授权",
+    "代理下的会签和财务动作",
+    "实际办理人与代理依据审计",
+    "公开API和幂等",
+    "浏览器页面",
+    "旧运行库升级、在审接续和重启"
+  ],
+  "javaAuthorCheck": {
+    "files": 1290,
+    "namedTypes": 2473,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "existingRuntimeReplaced": false,
+  "existingRuntimeSchema": "V95",
+  "remoteConfigured": false,
+  "overallGoalComplete": false
+}
