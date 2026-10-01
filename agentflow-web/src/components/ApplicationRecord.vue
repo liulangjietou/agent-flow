@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import RoundDiagram from './RoundDiagram.vue'
+import SubprocessRelations from './SubprocessRelations.vue'
+import type { RelatedRound } from '../subprocessRelations'
 import InstanceControlPanel from './InstanceControlPanel.vue'
 import type { InstanceControlView } from '../instanceControl'
 import ExpenseDetail from './ExpenseDetail.vue'
@@ -22,8 +24,8 @@ import { validatePayload, type FieldErrors } from '../formSchema'
 import { api, type ApiError, type Application, type SubmissionRound } from '../api'
 import type { PendingWrite } from '../pendingWrites.js'
 
-const props = defineProps<{ applicationId: string; userId: string; scopeKey: string; commentRefreshVersion: number; pendingWrites: PendingWrite[]; recoveryError: string }>()
-const emit = defineEmits<{ close: []; changed: []; commentPosted: []; recover: [id: string] }>()
+const props = defineProps<{ applicationId: string; initialRoundNo?: number | null; userId: string; scopeKey: string; commentRefreshVersion: number; pendingWrites: PendingWrite[]; recoveryError: string }>()
+const emit = defineEmits<{ close: []; changed: []; commentPosted: []; recover: [id: string]; openRelated: [target: RelatedRound] }>()
 const writesBlocked = computed(() => props.pendingWrites.length > 0)
 const dialog = ref<HTMLElement | null>(null)
 const application = ref<Application | null>(null)
@@ -34,7 +36,7 @@ const runtimeBlocked = computed(() => application.value?.status === 'IN_APPROVAL
   || runtimeState.value.applicationVersion !== application.value.version || runtimeState.value.state !== 'RUNNING'))
 const businessLocked = computed(() => saving.value || writesBlocked.value || runtimeBusy.value || runtimeBlocked.value)
 const rounds = ref<SubmissionRound[]>([])
-const historyTab = ref<'rounds' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist'>('rounds')
+const historyTab = ref<'rounds' | 'relations' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist'>('rounds')
 const title = ref('')
 const initiatorAppointmentId = ref('')
 const initiatorRequirements = reactive(new InitiatorRequirements(api.definitionInitiatorRequirements, api.applicationInitiatorRequirements))
@@ -63,12 +65,16 @@ const cancellationOpen = ref(false)
 const cancellationComment = ref('')
 const cancellationInput = ref<HTMLTextAreaElement | null>(null)
 const cancellationTrigger = ref<HTMLButtonElement | null>(null)
+let initialRoundFocused = false
 let returnFocus: HTMLElement | null = null
 const statusLabels: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '已批准', CANCELLED: '已作废', REVOKED: '已撤销' }
 const canEdit = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && ['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(application.value.status))
 const canWithdraw = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL' && !runtimeBlocked.value && !runtimeBusy.value)
 const conclusionLabel = computed(() => application.value?.status === 'WITHDRAWN' ? '撤回说明' : '退回原因')
 const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
+const relatedNavigationLocked = computed(() => loading.value || saving.value || uploading.value || expenseBusy.value || runtimeBusy.value || writesBlocked.value || dirty.value || withdrawalOpen.value || cancellationOpen.value)
+/** 关联链接不丢弃未保存内容，也不绕过未知写入恢复。 */
+function openRelated(target: RelatedRound) { if (!relatedNavigationLocked.value) emit('openRelated', target) }
 const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
 const conclusionReason = computed(() => {
   if (currentRound.value?.reason) return currentRound.value.reason
@@ -106,6 +112,13 @@ async function load() {
     setApplication(value); rounds.value = [...history].sort((a, b) => b.roundNo - a.roundNo)
   } catch (cause) { showError(cause) }
   finally { loading.value = false }
+  // loading 结束后才会挂载历史节点，提前定位会永久错过原轮次。
+  if (!error.value && !initialRoundFocused && props.initialRoundNo) {
+    historyTab.value = 'rounds'
+    await nextTick()
+    const target = dialog.value?.querySelector<HTMLElement>(`[data-round-no="${props.initialRoundNo}"]`)
+    if (target) { target.scrollIntoView?.({ block: 'start' }); initialRoundFocused = true }
+  }
 }
 function editPayload(): Record<string, unknown> {
   if (application.value!.formSchema) return { ...payload.value }
@@ -298,15 +311,17 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
             <div class="form-actions"><button type="button" class="secondary" :disabled="uploading || saving || writesBlocked" @click="cancelWithdrawal">暂不撤回</button><button class="return" :disabled="uploading || saving || writesBlocked">{{ saving ? '正在撤回…' : '确认撤回审批' }}</button></div>
           </form>
         </section>
-        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button></div>
+        <p v-if="initialRoundNo" class="field-help">关联入口指向第 {{ initialRoundNo }} 轮提交记录；上方显示申请当前状态。</p>
+        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'relations'" @click="historyTab = 'relations'">父子流程</button><button type="button" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button></div>
         <section v-if="historyTab === 'rounds'" class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
-          <details v-for="round in rounds" :key="round.roundNo" class="round-card">
+          <details v-for="round in rounds" :key="round.roundNo" class="round-card" :data-round-no="round.roundNo" :open="round.roundNo === initialRoundNo">
             <summary><span class="round-index">{{ round.roundNo }}</span><span class="round-summary"><strong>第 {{ round.roundNo }} 轮 · {{ stateLabel(round.status) }}</strong><small>{{ timeLabel(round.submittedAt) }} · {{ round.submittedBy }} 提交</small></span><span class="round-version">v{{ round.definitionVersion }}</span></summary>
             <div class="round-content"><h4>{{ round.title }}</h4><p class="field-help">发起任职：{{ round.initiatorContext ? initiatorContextLabel(round.initiatorContext) : '本轮未记录任职上下文' }}</p><template v-if="expenseId"><button type="button" class="secondary" @click="selectedExpenseRound = selectedExpenseRound === round.roundNo ? null : round.roundNo">{{ selectedExpenseRound === round.roundNo ? '收起本轮费用' : '查看本轮费用与核减记录' }}</button><ExpenseDetail v-if="selectedExpenseRound === round.roundNo" :report-id="expenseId" :application-id="application.id" :scope-key="scopeKey" :version="application.version"  :round-no="round.roundNo"><template #restricted><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /></template></ExpenseDetail></template><template v-else-if="planId"><button type="button" class="secondary" @click="selectedExpenseRound = selectedExpenseRound === round.roundNo ? null : round.roundNo">{{ selectedExpenseRound === round.roundNo ? '收起本轮计划' : '查看本轮冻结计划' }}</button><ExpensePlanDetail v-if="selectedExpenseRound === round.roundNo" :plan-id="planId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="round.roundNo"><template #restricted><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /></template></ExpensePlanDetail></template><template v-else-if="advanceRequestId"><button type="button" class="secondary" @click="selectedExpenseRound = selectedExpenseRound === round.roundNo ? null : round.roundNo">{{ selectedExpenseRound === round.roundNo ? '收起本轮借款约定' : '查看本轮冻结借款约定' }}</button><AdvanceRequestDetail v-if="selectedExpenseRound === round.roundNo" :request-id="advanceRequestId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="round.roundNo"><template #restricted><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /></template></AdvanceRequestDetail></template><template v-else-if="procurementPaymentId"><button type="button" class="secondary" @click="selectedExpenseRound = selectedExpenseRound === round.roundNo ? null : round.roundNo">{{ selectedExpenseRound === round.roundNo ? '收起本轮采购付款依据' : '查看本轮冻结采购付款依据' }}</button><ProcurementPaymentDetail v-if="selectedExpenseRound === round.roundNo" :request-id="procurementPaymentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="round.roundNo"><template #restricted><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /></template></ProcurementPaymentDetail></template><template v-else-if="budgetAdjustmentId"><button type="button" class="secondary" @click="selectedExpenseRound = selectedExpenseRound === round.roundNo ? null : round.roundNo">{{ selectedExpenseRound === round.roundNo ? '收起本轮预算调整依据' : '查看本轮冻结预算调整依据' }}</button><BudgetAdjustmentDetail v-if="selectedExpenseRound === round.roundNo" :request-id="budgetAdjustmentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="round.roundNo"><template #restricted><FormFields :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /></template></BudgetAdjustmentDetail></template><FormFields v-else :schema="round.formSchema" :model-value="round.payload" :attachment-context="{ applicationId: application.id, roundNo: round.roundNo, scopeKey }" readonly /><div v-if="round.reason" class="round-reason"><strong>{{ round.status === 'RETURNED' ? '退回原因' : round.status === 'WITHDRAWN' ? '撤回说明' : '处理意见' }}</strong><p>{{ round.reason }}</p></div><p v-if="round.completedAt" class="unavailable">{{ round.completedBy }} · {{ timeLabel(round.completedAt) }} · {{ stateLabel(round.status) }}</p><small class="round-footnote">本轮提交时的内容，后续修改不会覆盖。</small></div>
           </details>
         </section>
+        <SubprocessRelations v-else-if="historyTab === 'relations'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" :initial-round-no="initialRoundNo" :locked="relatedNavigationLocked" @open="openRelated" />
         <RoundComparison v-else-if="historyTab === 'compare'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" />
         <RoundDiagram v-else-if="historyTab === 'diagram'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" :locked="writesBlocked" @changed="load(); emit('changed')" />
         <AssistRunRecords v-else-if="historyTab === 'assist'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="application.roundNo" />

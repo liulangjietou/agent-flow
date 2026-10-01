@@ -121,6 +121,12 @@ async function exercise(base) {
   assert.ok(diagram.nodes.some(node => node.state === 'ACTIVE' && node.activeTasks > 0))
   await call('GET', diagramTemplate, { user: 'bob', path: diagramPath, status: 404 })
   await call('GET', diagramTemplate, { user: 'alice', path: appPath + '/rounds/0/diagram', status: 400 })
+  const relationsTemplate = apps + '/{id}/rounds/{roundNo}/subprocesses', relationsPath = appPath + '/rounds/1/subprocesses'
+  const relations = await call('GET', relationsTemplate, { user: 'alice', path: relationsPath })
+  assert.equal(relations.applicationId, application.id); assert.equal(relations.roundNo, 1)
+  assert.deepEqual(relations.children, []); assert.equal(relations.childApplication, false)
+  await call('GET', relationsTemplate, { user: 'bob', path: relationsPath, status: 404 })
+  await call('GET', relationsTemplate, { user: 'alice', path: relationsPath + '?limit=0', status: 400 })
   const commentTemplate = apps + '/{id}/comments', commentPath = appPath + '/comments', commentKey = randomUUID()
   const commentBody = { content: '契约验收：补充审批依据', expectedVersion: application.version }
   const comment = await call('POST', commentTemplate, { user: 'alice', path: commentPath, status: 201, body: commentBody, key: commentKey })

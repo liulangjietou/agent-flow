@@ -68,6 +68,18 @@ public class JdbcSubprocessCallRepository implements SubprocessCallRepository {
                 this::map, tenantId, parentApplicationId.toString(), roundNo);
     }
 
+    @Override
+    public List<SubprocessCall> pageByParentRound(String tenantId, UUID parentApplicationId, int roundNo, UUID afterId, int limit) {
+        String query = "SELECT * FROM approval_subprocess_call WHERE tenant_id=? AND parent_application_id=? AND parent_round_no=?";
+        if (afterId == null) return jdbc.query(query + " ORDER BY created_at,id LIMIT ?", this::map, tenantId, parentApplicationId.toString(), roundNo, limit);
+        var position = jdbc.query("SELECT created_at FROM approval_subprocess_call WHERE tenant_id=? AND parent_application_id=? AND parent_round_no=? AND id=?",
+                (row, index) -> row.getObject("created_at", OffsetDateTime.class), tenantId, parentApplicationId.toString(), roundNo, afterId.toString());
+        if (position.isEmpty()) throw new DomainException("INVALID_SUBPROCESS_QUERY", "Cursor does not belong to this application round");
+        var time = position.get(0);
+        return jdbc.query(query + " AND (created_at>? OR (created_at=? AND id>?)) ORDER BY created_at,id LIMIT ?",
+                this::map, tenantId, parentApplicationId.toString(), roundNo, time, time, afterId.toString(), limit);
+    }
+
     private SubprocessCall map(ResultSet row, int index) throws SQLException {
         return new SubprocessCall(UUID.fromString(row.getString("id")), row.getString("tenant_id"),
                 UUID.fromString(row.getString("parent_application_id")), row.getInt("parent_round_no"),

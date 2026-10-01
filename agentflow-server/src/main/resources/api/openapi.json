@@ -37314,6 +37314,125 @@
           }
         ]
       }
+    },
+    "/api/v1/applications/{id}/rounds/{roundNo}/subprocesses": {
+      "get": {
+        "operationId": "subprocessRelations",
+        "tags": [
+          "申请"
+        ],
+        "summary": "原轮次父子流程关系",
+        "description": "按原提交轮次分页读取实际直接子调用和来源父轮次。每个目标申请独立授权，不可见或缺失时引用为 null，不返回其标识、表单、审批意见或附件。关联不创建读取权限。afterId 必须属于同租户、同父申请和同轮次；不接受重复、未知或不规范参数。Cache-Control: no-store；可重复读事务；查询不触发任何流程推进。",
+        "x-access": "同租户管理员、发起人或实际流程参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubprocessRelationsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原调用身份与已保存轮次不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "path",
+            "required": true,
+            "description": "原已提交轮次，不能以当前轮次替换",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "每页直接子调用数，默认 30",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "afterId",
+            "in": "query",
+            "required": false,
+            "description": "上一页最后一个实际调用编号，绑定原父轮次",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -63820,6 +63939,144 @@
           },
           "appointmentRequired": {
             "type": "boolean"
+          }
+        }
+      },
+      "SubprocessRoundReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "businessNo",
+          "processKey",
+          "definitionVersion",
+          "roundNo",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "processKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_APPROVAL",
+              "RETURNED",
+              "REJECTED",
+              "APPROVED",
+              "WITHDRAWN",
+              "CANCELLED"
+            ]
+          }
+        }
+      },
+      "SubprocessRelationChild": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "nodeId",
+          "nodeName",
+          "createdAt",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubprocessRoundReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SubprocessRelationsPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationId",
+          "roundNo",
+          "observedAt",
+          "childApplication",
+          "parent",
+          "children",
+          "nextAfterId"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "childApplication": {
+            "type": "boolean"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubprocessRoundReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/SubprocessRelationChild"
+            }
+          },
+          "nextAfterId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         }
       }

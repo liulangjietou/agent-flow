@@ -3,6 +3,7 @@ import DefinitionNotificationTexts from './components/DefinitionNotificationText
 import { copyNotificationTexts } from './notificationTexts'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ApplicationRecord from './components/ApplicationRecord.vue'
+import type { RelatedRound } from './subprocessRelations'
 import WorkspaceNavigation from './components/WorkspaceNavigation.vue'
 import type { WorkspacePage as Page } from './workspaceNavigation'
 import BranchDiagnostics from './components/BranchDiagnostics.vue'
@@ -200,6 +201,10 @@ const validationMessage = computed(() => validation.loading ? '正在检查最�
     : validationOpened.value ? '内容已修改，正在等待重新校验。' : '尚未校验，发布前将运行服务端校验。'))
 const newApplicationOpen = ref(false)
 const recordApplicationId = ref('')
+const recordInitialRoundNo = ref<number | null>(null)
+watch(recordApplicationId, () => { recordInitialRoundNo.value = null }, { flush: 'sync' })
+/** 从已授权关联进入固定轮次；目标详情仍重新检查自身权限。 */
+function openRelatedRound(target: RelatedRound) { recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo }
 const selectedCopy = ref<{ applicationId: string; roundNo: number } | null>(null)
 watch(actorScope, () => { selectedCopy.value = null }, { flush: 'sync' })
 const applicationDefinitionId = computed(() => applicationSelection.definition?.id ?? '')
@@ -1337,7 +1342,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>
       <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />
-      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="applicationRecordChanged" />
+      <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :initial-round-no="recordInitialRoundNo" @open-related="openRelatedRound" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="applicationRecordChanged" />
       <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
           <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>

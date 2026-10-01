@@ -21,4 +21,7 @@ public interface SubprocessCallRepository {
 
     /** 查询指定父轮次的直接后代，旧轮次不混入当前办理。 */
     List<SubprocessCall> findByParentRound(String tenantId, UUID parentApplicationId, int roundNo);
+
+    /** 按激活时间和编号稳定分页；游标必须属于同一租户、父申请和原轮次。 */
+    List<SubprocessCall> pageByParentRound(String tenantId, UUID parentApplicationId, int roundNo, UUID afterId, int limit);
 }
