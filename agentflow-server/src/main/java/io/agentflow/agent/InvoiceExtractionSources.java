@@ -22,13 +22,13 @@ public class InvoiceExtractionSources {
     private static final long MAX_IMAGE_PIXELS = 20_000_000;
     private static final int MAX_IMAGE_SIDE = 12_000;
     private static final List<InvoiceOriginal.Format> SUPPORTED = List.of(
-            InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML);
+            InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF);
     private final InvoiceOriginalFiles files;
 
     /** 保留原有不可变文件读取和摘要校验，不额外复制文件到业务记录。 */
     public InvoiceExtractionSources(InvoiceOriginalFiles files) { this.files = files; }
 
-    /** 只公布已经实现的内容适配器；PDF 和 OFD 在适配完成前不接受外发。 */
+    /** 只公布已经实现的内容适配器；OFD 在适配完成前不接受外发。 */
     public List<InvoiceOriginal.Format> supportedFormats() { return SUPPORTED; }
 
     /** 完整原件一次性限额，超限或不可读直接失败，不能静默丢弃内容后发送。 */
@@ -39,7 +39,12 @@ public class InvoiceExtractionSources {
         original.requireReady();
         if (!SUPPORTED.contains(original.format())) throw new DomainException("INVOICE_EXTRACTION_FORMAT_UNSUPPORTED", "Invoice extraction format is not supported");
         byte[] bytes = files.read(original);
-        var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), 1);
+        int pages = original.format() == InvoiceOriginal.Format.PDF ? new InvoicePdfInspector().pageCount(bytes) : 1;
+        var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), pages);
+        if (original.format() == InvoiceOriginal.Format.PDF) {
+            String data = "data:application/pdf;base64," + Base64.getEncoder().encodeToString(bytes);
+            return new Prepared(input, List.of(Map.of("type", "file", "file", Map.of("filename", "invoice.pdf", "file_data", data))), null, null);
+        }
         if (original.format() == InvoiceOriginal.Format.XML) {
             var xml = InvoiceExtractionXml.read(input, bytes);
             if (xml.structured() != null) return new Prepared(input, List.of(), null, xml.structured());

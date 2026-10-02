@@ -216,9 +216,36 @@ class InvoiceExtractionModelTest {
     }
 
     @Test
+    void pdfUsesCompleteInlineFileAndModelEvidenceCannotExceedTheInspectedPageCount() throws Exception {
+        byte[] bytes = InvoicePdfSourceTest.pdf(2, doc -> { });
+        var original = original(InvoiceOriginal.Format.PDF, bytes);
+        output.set(result(original, "001234", "001234", 2));
+        var suggestion = extraction.generate(context(original, 2));
+        assertThat(suggestion.proposals().get(0).evidence().get(0).page()).isEqualTo(2);
+        var content = request.get().path("messages").get(1).path("content");
+        assertThat(content.size()).isEqualTo(2);
+        assertThat(content.get(1).path("type").asText()).isEqualTo("file");
+        assertThat(content.get(1).path("file").path("filename").asText()).isEqualTo("invoice.pdf");
+        assertThat(content.get(1).path("file").path("file_data").asText())
+                .isEqualTo("data:application/pdf;base64," + Base64.getEncoder().encodeToString(bytes));
+        assertThat(request.get().toString()).doesNotContain(original.filename(), original.ownerId(), original.tenantId());
+        output.set(result(original, "001234", "001234", 3));
+        assertFailure(() -> extraction.generate(context(original, 2)), AssistRun.Failure.INVALID_MODEL_OUTPUT);
+    }
+
+    @Test
+    void invalidPdfAndChangedRealPageCountNeverReachTheModel() throws Exception {
+        var invalid = original(InvoiceOriginal.Format.PDF, "%PDF-1.7 invalid".getBytes(StandardCharsets.US_ASCII));
+        assertFailure(() -> extraction.generate(context(invalid)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        var twoPages = original(InvoiceOriginal.Format.PDF, InvoicePdfSourceTest.pdf(2, doc -> { }));
+        assertFailure(() -> extraction.generate(context(twoPages)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        assertThat(calls.get()).isZero();
+    }
+
+    @Test
     void unimplementedFormatsAreNotAdvertisedOrSilentlyTreatedAsText() throws Exception {
-        assertThat(sources.supportedFormats()).containsExactly(InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML);
-        for (var format : List.of(InvoiceOriginal.Format.PDF, InvoiceOriginal.Format.OFD)) {
+        assertThat(sources.supportedFormats()).containsExactly(InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF);
+        for (var format : List.of(InvoiceOriginal.Format.OFD)) {
             var original = original(format, new byte[]{1}); clearInvocations(files);
             assertThatThrownBy(() -> sources.prepare(original)).isInstanceOfSatisfying(DomainException.class,
                     failure -> assertThat(failure.code()).isEqualTo("INVOICE_EXTRACTION_FORMAT_UNSUPPORTED"));
@@ -247,7 +274,10 @@ class InvoiceExtractionModelTest {
         return original;
     }
     private InvoiceExtractionRun.Context context(InvoiceOriginal original) {
-        var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), 1);
+        return context(original, 1);
+    }
+    private InvoiceExtractionRun.Context context(InvoiceOriginal original, int pageCount) {
+        var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), pageCount);
         return new InvoiceExtractionRun.Context(UUID.randomUUID(), original.tenantId(), original.ownerId(), Instant.now(), input, InvoiceExtractionSuggestion.Method.MODEL, configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION));
     }
     private InvoiceExtractionRun.Context localContext(InvoiceOriginal original) {
