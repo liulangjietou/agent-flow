@@ -15,6 +15,7 @@ import RoundComparison from './RoundComparison.vue'
 import ApplicationHistory from './ApplicationHistory.vue'
 import ApplicationComments from './ApplicationComments.vue'
 import AssistRunRecords from './AssistRunRecords.vue'
+import DraftAssistPanel from './DraftAssistPanel.vue'
 import RequestRecovery from './RequestRecovery.vue'
 import FormFields from './FormFields.vue'
 import InitiatorAppointmentPicker from './InitiatorAppointmentPicker.vue'
@@ -47,6 +48,7 @@ const payload = ref<Record<string, unknown>>({})
 const fieldErrors = ref<FieldErrors>({})
 const loading = ref(true)
 const expenseBusy = ref(false)
+const draftAssistBusy = ref(false), draftAssistDirty = ref(false)
 const selectedExpenseRound = ref<number | null>(null)
 const advanceRequestId = computed(() => application.value?.businessReference?.type === 'ADVANCE_REQUEST' ? application.value.businessReference.id : null)
 const procurementPaymentId = computed(() => application.value?.businessReference?.type === 'PROCUREMENT_PAYMENT' ? application.value.businessReference.id : null)
@@ -73,7 +75,7 @@ const canEdit = computed(() => !application.value?.businessReference && applicat
 const canWithdraw = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL' && !runtimeBlocked.value && !runtimeBusy.value)
 const conclusionLabel = computed(() => application.value?.status === 'WITHDRAWN' ? '撤回说明' : '退回原因')
 const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
-const relatedNavigationLocked = computed(() => loading.value || saving.value || uploading.value || expenseBusy.value || runtimeBusy.value || writesBlocked.value || dirty.value || withdrawalOpen.value || cancellationOpen.value)
+const relatedNavigationLocked = computed(() => loading.value || saving.value || uploading.value || expenseBusy.value || draftAssistBusy.value || draftAssistDirty.value || runtimeBusy.value || writesBlocked.value || dirty.value || withdrawalOpen.value || cancellationOpen.value)
 /** 关联链接不丢弃未保存内容，也不绕过未知写入恢复。 */
 function openRelated(target: RelatedRound) { if (!relatedNavigationLocked.value) emit('openRelated', target) }
 const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
@@ -151,7 +153,7 @@ async function saveChanges() {
   emit('changed')
 }
 async function save(submit = false) {
-  if (!canEdit.value || uploading.value || saving.value || loading.value || writesBlocked.value || cancellationOpen.value) return
+  if (!canEdit.value || uploading.value || saving.value || draftAssistBusy.value || draftAssistDirty.value || loading.value || writesBlocked.value || cancellationOpen.value) return
   error.value = ''; notice.value = ''
   if (submit && (error.value = initiatorRequirements.submissionError(initiatorAppointmentId.value))) return
   if (!validate(submit)) return
@@ -172,7 +174,7 @@ async function save(submit = false) {
   }
 }
 async function openWithdrawal() {
-  if (!canWithdraw.value || writesBlocked.value || saving.value || loading.value) return
+  if (!canWithdraw.value || writesBlocked.value || saving.value || loading.value || draftAssistBusy.value || draftAssistDirty.value) return
   withdrawalOpen.value = true
   await nextTick(); withdrawalInput.value?.focus()
 }
@@ -181,7 +183,7 @@ async function cancelWithdrawal() {
   await nextTick(); withdrawalTrigger.value?.focus()
 }
 async function withdraw() {
-  if (!application.value || !canWithdraw.value || saving.value || loading.value || writesBlocked.value) return
+  if (!application.value || !canWithdraw.value || saving.value || loading.value || writesBlocked.value || draftAssistBusy.value || draftAssistDirty.value) return
   saving.value = true; error.value = ''; notice.value = ''
   try {
     const value = await api.withdrawApplication(application.value.id, {
@@ -197,14 +199,21 @@ async function withdraw() {
   }
 }
 function close() {
-  if (!runtimeBusy.value && !expenseBusy.value && !uploading.value && !saving.value && !dirty.value) emit('close')
+  if (!runtimeBusy.value && !expenseBusy.value && !draftAssistBusy.value && !draftAssistDirty.value && !uploading.value && !saving.value && !dirty.value) emit('close')
+}
+/** 已确认保存后重新读取申请，读取失败不继续呈现旧版本可编辑正文。 */
+async function draftAssistSaved() {
+  application.value = null
+  await load()
+  if (!error.value) notice.value = '勾选字段已保存到草稿，尚未提交审批。'
+  emit('changed')
 }
 function runtimeUpdated(value: InstanceControlView | null) {
   runtimeState.value = value
   if (runtimeBlocked.value) { withdrawalOpen.value = false; withdrawalComment.value = '' }
 }
 async function openCancellation() {
-  if (!canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
+  if (!canEdit.value || dirty.value || draftAssistBusy.value || draftAssistDirty.value || saving.value || loading.value || writesBlocked.value) return
   cancellationOpen.value = true
   await nextTick(); cancellationInput.value?.focus()
 }
@@ -213,7 +222,7 @@ async function dismissCancellation() {
   await nextTick(); cancellationTrigger.value?.focus()
 }
 async function cancelApplication() {
-  if (!application.value || !canEdit.value || dirty.value || saving.value || loading.value || writesBlocked.value) return
+  if (!application.value || !canEdit.value || dirty.value || draftAssistBusy.value || draftAssistDirty.value || saving.value || loading.value || writesBlocked.value) return
   saving.value = true; error.value = ''; notice.value = ''
   try {
     const value = await api.cancelApplication(application.value.id, {
@@ -258,7 +267,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
     <section ref="dialog" class="modal application-record" role="dialog" aria-modal="true" aria-labelledby="record-title" tabindex="-1" @keydown="trapFocus">
       <div class="modal-heading">
         <div><p class="eyebrow">APPLICATION RECORD</p><h2 id="record-title">申请详情与轮次</h2></div>
-        <button aria-label="关闭申请详情" :disabled="runtimeBusy || expenseBusy || uploading || saving || dirty" @click="close">×</button>
+        <button aria-label="关闭申请详情" :disabled="runtimeBusy || expenseBusy || draftAssistBusy || draftAssistDirty || uploading || saving || dirty" @click="close">×</button>
       </div>
       <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
@@ -279,23 +288,25 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
         <ProcurementPaymentDetail v-else-if="procurementPaymentId" :request-id="procurementPaymentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></ProcurementPaymentDetail>
         <BudgetAdjustmentDetail v-else-if="budgetAdjustmentId" :request-id="budgetAdjustmentId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :owner="application.createdBy === userId" :locked="businessLocked" @busy="expenseBusy = $event" @changed="load(); emit('changed')"><template #restricted><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /></template></BudgetAdjustmentDetail>
         <form v-else-if="canEdit" novalidate @submit.prevent="save(true)">
-          <fieldset :disabled="saving || writesBlocked || cancellationOpen">
+          <p v-if="draftAssistDirty" class="record-notice">草稿助手有未完成的填写或核对，请先发送、保存或清空助手输入，再修改或提交申请。</p>
+          <fieldset :disabled="saving || draftAssistBusy || draftAssistDirty || writesBlocked || cancellationOpen">
             <label>申请标题<input v-model="title" required maxlength="256" /></label>
             <label>流程版本<input :value="`v${application.definitionVersion}（沿用原版本）`" disabled /></label>
-            <FormFields v-if="application.formSchema" v-model="payload" :attachment-context="{ applicationId: application.id, expectedVersion: application.version, scopeKey }" @uploading="uploading = $event" :schema="application.formSchema" :disabled="saving || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
+            <FormFields v-if="application.formSchema" v-model="payload" :attachment-context="{ applicationId: application.id, expectedVersion: application.version, scopeKey }" @uploading="uploading = $event" :schema="application.formSchema" :disabled="saving || draftAssistBusy || draftAssistDirty || writesBlocked" :errors="fieldErrors" @update:model-value="fieldErrors = {}" />
             <template v-else><label>申请金额<input v-model="amount" type="number" min="0" step="0.01" :required="application.payload.amount != null" /></label><label>申请说明<textarea v-model="description" rows="3" /></label></template>
           </fieldset>
           <InitiatorRequirementNotice :state="initiatorRequirements" :disabled="saving || writesBlocked || cancellationOpen" @retry="loadInitiatorRequirements" />
           <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="scopeKey" :required="initiatorRequirements.required === true" :disabled="saving || writesBlocked || cancellationOpen" />
           <dl v-if="!application.formSchema && extraFields.length" class="payload-list"><template v-for="[key, value] in extraFields" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ valueLabel(value) }}</dd></template></dl>
-          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="uploading || saving || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="uploading || saving || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
+          <div class="record-actions"><span>{{ dirty ? '有未保存的修改' : '当前内容已保存' }}</span><button type="button" class="secondary" :disabled="uploading || saving || draftAssistBusy || draftAssistDirty || writesBlocked || !dirty || cancellationOpen" @click="save()">保存修改</button><button class="primary" :disabled="uploading || saving || draftAssistBusy || draftAssistDirty || writesBlocked || cancellationOpen">{{ saving ? '处理中…' : application.status === 'DRAFT' ? '提交申请' : '重新提交审批' }}</button></div>
         </form>
         <template v-else><h3 class="record-section-title">{{ application.title }}</h3><FormFields :schema="application.formSchema" :model-value="application.payload" :attachment-context="{ applicationId: application.id, scopeKey }" readonly /><p class="unavailable">{{ application.createdBy !== userId ? '只有申请人可在草稿、退回或撤回状态下修改内容。' : '当前申请不可编辑，可查看下方提交记录。' }}</p></template>
+        <DraftAssistPanel v-if="!application.businessReference && application.formSchema && application.createdBy === userId" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :editable="canEdit" :application-dirty="dirty" :locked="saving || uploading || writesBlocked || cancellationOpen || withdrawalOpen" @busy="draftAssistBusy = $event" @dirty="draftAssistDirty = $event" @saved="draftAssistSaved" />
         <section v-if="canEdit" class="withdrawal-panel" aria-label="作废申请">
           <template v-if="!cancellationOpen">
             <p>不再需要这份申请时可以作废。作废后不能修改或重新提交，原内容与历史记录会保留。</p>
             <p v-if="dirty">请先保存修改，或重新加载已保存的内容，再作废申请。</p>
-            <button ref="cancellationTrigger" type="button" class="return" :disabled="uploading || saving || loading || writesBlocked || dirty" @click="openCancellation">作废申请</button>
+            <button ref="cancellationTrigger" type="button" class="return" :disabled="uploading || saving || draftAssistBusy || draftAssistDirty || loading || writesBlocked || dirty" @click="openCancellation">作废申请</button>
           </template>
           <form v-else @submit.prevent="cancelApplication">
             <h3>确认作废这份申请</h3><p>作废后将结束这份申请，不能恢复编辑或重新提交。历史审批意见和轮次不会删除。</p>
@@ -305,7 +316,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
         </section>
         <p v-if="application.status === 'CANCELLED'" class="return-context">此申请已作废，不能再修改或提交。作废人、说明和时间可在操作审计中查看。</p>
         <section v-if="canWithdraw" class="withdrawal-panel" aria-label="撤回审批">
-          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="uploading || saving || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
+          <template v-if="!withdrawalOpen"><p>需要修改这份申请？先撤回当前审批，再补正并重新提交。</p><button ref="withdrawalTrigger" type="button" class="return" :disabled="uploading || saving || draftAssistBusy || draftAssistDirty || writesBlocked" @click="openWithdrawal">撤回审批</button></template>
           <form v-else @submit.prevent="withdraw">
             <h3>撤回当前审批</h3><p>撤回后，当前待办将停止，已经产生的审批意见会保留。再次提交会开始新一轮审批。</p>
             <label>撤回说明（选填）<textarea ref="withdrawalInput" v-model="withdrawalComment" rows="3" maxlength="2000" :disabled="saving || writesBlocked" placeholder="例如：需要补充申请材料" /></label>
@@ -329,7 +340,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />
       </template>
-      <div class="form-actions"><button v-if="dirty" type="button" class="return" :disabled="uploading || saving" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="expenseBusy || uploading || saving || loading" @click="load">{{ dirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="expenseBusy || uploading || saving || dirty" @click="close">关闭</button></div>
+      <div class="form-actions"><button v-if="dirty || draftAssistDirty" type="button" class="return" :disabled="uploading || saving || draftAssistBusy" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="expenseBusy || draftAssistBusy || writesBlocked || uploading || saving || loading" @click="load">{{ dirty || draftAssistDirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="expenseBusy || draftAssistBusy || draftAssistDirty || uploading || saving || dirty" @click="close">关闭</button></div>
     </section>
   </div>
 </template>

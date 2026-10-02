@@ -47431,6 +47431,29 @@
                 "type": "null"
               }
             ]
+          },
+          "sensitive": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "敏感字段向非申请人默认脱敏；有效审批节点可显式配置读取权限。"
+          },
+          "nodeAccess": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "maxProperties": 200,
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "READ_ONLY",
+                "MASKED",
+                "HIDDEN"
+              ]
+            },
+            "description": "节点标识到只读可见性，须引用当前图中的人工审批节点。并行冲突时取更严格权限。"
           }
         },
         "additionalProperties": false,

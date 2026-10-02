@@ -102,6 +102,7 @@ import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
+import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 
 type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
@@ -1063,6 +1064,11 @@ async function recoverOperation(id: string) {
         if (request.body) calendarDrafts.acknowledge(actorScope.value, request.path, request.body, result as BusinessCalendar)
         templateRefresh.value++
         notice.value = '已确认原日历保存结果，旧版本保持不变。'
+      } else if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(request.path)) {
+        const applicationId = decodeURIComponent(request.path.split('/')[2]!)
+        rememberDraftRun(actorScope.value, applicationId, (result as DraftAssistReceipt).id)
+        if (recordApplicationId.value === applicationId) recordRefresh.value++
+        notice.value = '原草稿建议操作已确认，请核对这条建议和申请的最新内容；尚未自动提交审批。'
       } else if (/^\/applications\/[^/]+\/assist-runs(?:\/[^/]+\/review)?$/.test(request.path)) {
         assistRefresh.value++
         notice.value = '原摘要操作已确认，请刷新记录核对执行或复核结果。'

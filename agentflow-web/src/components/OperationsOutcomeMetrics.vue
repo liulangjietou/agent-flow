@@ -40,7 +40,7 @@ const percent = (value?: number) => value == null ? '—' : value.toFixed(1) + '
         <p class="boundary">每条收件人／渠道投递计一次，重试不新增样本。未知不计为明确失败，渠道受理不代表最终送达。</p>
       </article>
       <article aria-labelledby="agent-metric-title">
-        <h4 id="agent-metric-title">Agent 人工采纳率</h4>
+        <h4 id="agent-metric-title">审批摘要人工采纳率</h4>
         <strong>{{ percent(agent.adoptionRatePercent) }}</strong>
         <p>{{ number(agent.adopted) }} 次采纳 / {{ number(agent.reviewedRuns) }} 次人工复核</p>
         <dl>
@@ -51,7 +51,7 @@ const percent = (value?: number) => value == null ? '—' : value.toFixed(1) + '
           <div><dt>排队中</dt><dd>{{ number(agent.queued) }}</dd></div>
           <div><dt>执行中</dt><dd>{{ number(agent.running) }}</dd></div>
         </dl>
-        <p class="boundary">采纳包含人工修改后采纳，不等于审批通过。未复核和执行失败不进入分母；无有效样本时比例显示“—”。</p>
+        <p class="boundary">仅统计所选审批轮次的摘要，不含申请草稿建议。采纳包含人工修改后采纳，不等于审批通过。未复核和执行失败不进入分母；无有效样本时比例显示“—”。</p>
       </article>
     </div>
   </section>

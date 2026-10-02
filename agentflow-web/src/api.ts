@@ -1,3 +1,4 @@
+import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
 import { approvalProxyPath, readApprovalProxy, readApprovalProxyPage, validateApprovalProxyReceipt, type ApprovalProxyInput, type ApprovalProxyReceipt } from './approvalProxies.js'
 import { readInitializationState, validateInitializationReceipt, type InitializationReceipt, type InitializationRequest } from './tenantInitialization.js'
@@ -392,6 +393,7 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   if (timer) validateTimerReceipt(result as TimerReceipt, decodeURIComponent(timer[1]!), Number(timer[2]), decodeURIComponent(timer[3]!), JSON.parse(operation.body!) as TimerRetryInput)
   const instance = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/runtime\/(pause|resume|terminate)$/.exec(operation.path)
   if (instance) validateInstanceReceipt(result as InstanceControlView, decodeURIComponent(instance[1]!), Number(instance[2]), instance[3] as InstanceControlAction, JSON.parse(operation.body!) as InstanceControlInput)
+  if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) validateDraftReceipt(result, operation.path, operation.body!)
   return result
 })
 function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
@@ -635,6 +637,11 @@ export const api = {
   initializeTenant: (input: InitializationRequest) => write<InitializationReceipt>('/system/initialization', 'POST', '初始化工作区', input),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
+  draftAssistInput: (id: string, signal: AbortSignal) => request(draftAssistPath(id) + '/input', { signal, cache: 'no-store' }).then(readDraftInput),
+  draftAssistRuns: (id: string, page: number, signal: AbortSignal) => request(draftAssistPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readDraftPage(value, page)),
+  draftAssistRun: (id: string, runId: string, signal: AbortSignal) => request(draftAssistPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readDraftDetail(value, runId)),
+  generateDraftAssist: (id: string, body: GenerateDraftInput) => write<DraftAssistReceipt>(draftAssistPath(id), 'POST', '生成草稿字段建议', body),
+  reviewDraftAssist: (id: string, runId: string, body: ReviewDraftInput) => write<DraftAssistReceipt>(draftAssistPath(id) + '/' + encodeURIComponent(runId) + '/review', 'POST', '确认草稿字段建议', body),
   assistRuns: (id: string, query: AssistRunFilter, signal: AbortSignal) => request<AssistRunPage>('/applications/' + encodeURIComponent(id) + '/assist-runs' + historyQuery(query), { signal }),
   assistRun: (id: string, runId: string, signal: AbortSignal) => request<AssistRunDetail>('/applications/' + encodeURIComponent(id) + '/assist-runs/' + encodeURIComponent(runId), { signal }),
   assistInput: (id: string, taskId: string, signal: AbortSignal) => request<AssistInputOptions>('/applications/' + encodeURIComponent(id) + '/assist-runs/input?taskId=' + encodeURIComponent(taskId), { signal }),
