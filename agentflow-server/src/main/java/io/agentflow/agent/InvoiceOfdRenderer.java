@@ -7,7 +7,6 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,13 +32,11 @@ final class InvoiceOfdRenderer {
     private static final int MAX_OBJECTS = 20_000;
     private static final int MAX_SEGMENTS = 1_000_000;
     private static final Set<String> OBJECTS = Set.of("PageBlock", "PathObject", "TextObject", "ImageObject");
-    private static final Set<String> PATH_ATTRIBUTES = Set.of("ID", "Boundary", "CTM", "Alpha", "Visible", "Fill", "Stroke", "Rule");
-    private static final Set<String> TEXT_ATTRIBUTES = Set.of("ID", "Boundary", "CTM", "Alpha", "Visible", "Fill", "Stroke", "Font", "Size",
-            "HScale", "CharDirection", "ReadDirection", "Italic", "Weight");
-    private static final Set<String> IMAGE_ATTRIBUTES = Set.of("ID", "Boundary", "CTM", "Alpha", "Visible", "ResourceID");
+    private static final Set<String> IMAGE_ATTRIBUTES = InvoiceOfdVector.attributes("ResourceID");
     private static final List<String> LAYER_ORDER = List.of("Background", "Body", "Foreground");
     private int objects;
     private int segments;
+    private final InvoiceOfdClips clips = new InvoiceOfdClips();
 
     private InvoiceOfdRenderer() { }
 
@@ -58,7 +55,7 @@ final class InvoiceOfdRenderer {
         return List.copyOf(result);
     }
 
-    /** 尚未实现的模板、批注、签章和绘制参数在入口拒绝，不能输出少内容的“成功”图片。 */
+    /** 尚未实现的模板、批注和签章在入口拒绝，不能输出少内容的“成功”图片。 */
     private static void inspectDrawingScope(InvoiceOfdDocument.Contents contents) throws IOException {
         Element ofd = contents.root("OFD.xml", "OFD");
         shape(ofd, Set.of("Version", "DocType"), Set.of("DocBody"));
@@ -74,7 +71,7 @@ final class InvoiceOfdRenderer {
                 Element document = contents.root(page.documentFile(), "Document");
                 shape(document, Set.of(), Set.of("CommonData", "Pages", "Attachments", "CustomTags"));
                 Element common = child(document, "CommonData", true);
-                shape(common, Set.of(), Set.of("MaxUnitID", "PageArea", "PublicRes", "DocumentRes"));
+                shape(common, Set.of(), Set.of("MaxUnitID", "PageArea", "PublicRes", "DocumentRes", "DefaultCS"));
                 area(child(common, "PageArea", false));
                 Element definitions = child(document, "Pages", true);
                 shape(definitions, Set.of(), Set.of("Page"));
@@ -117,82 +114,70 @@ final class InvoiceOfdRenderer {
         shape(content, Set.of(), Set.of("Layer"));
         List<Element> layers = children(content);
         for (Element layer : layers) {
-            shape(layer, Set.of("ID", "Type"), OBJECTS);
+            shape(layer, Set.of("ID", "Type", "DrawParam"), OBJECTS);
             id(layer, "ID");
             if (!LAYER_ORDER.contains(layerType(layer))) throw invalid();
         }
         // 同类型保持文档顺序；背景、正文、前景分层绘制，不依赖文件恰好已经排序。
         for (String type : LAYER_ORDER) {
-            for (Element layer : layers) if (type.equals(layerType(layer))) block(graphics, layer, resources);
+            for (Element layer : layers) if (type.equals(layerType(layer))) {
+                block(graphics, layer, resources, InvoiceOfdStyle.resolve(layer, resources, InvoiceOfdStyle.DEFAULT));
+            }
         }
     }
 
     private static String layerType(Element layer) { return layer.hasAttribute("Type") ? layer.getAttribute("Type") : "Body"; }
 
-    private void block(Graphics2D graphics, Element block, InvoiceOfdResources resources) throws IOException {
+    private void block(Graphics2D graphics, Element block, InvoiceOfdResources resources, InvoiceOfdStyle style) throws IOException {
         for (Element object : children(block)) {
             if (++objects > MAX_OBJECTS) throw invalid();
             if (object.getLocalName().equals("PageBlock")) {
                 shape(object, Set.of("ID"), OBJECTS);
                 if (object.hasAttribute("ID")) id(object, "ID");
-                block(graphics, object, resources);
-            } else draw(graphics, object, resources);
+                block(graphics, object, resources, style);
+            } else draw(graphics, object, resources, style);
         }
     }
 
-    private void draw(Graphics2D parent, Element object, InvoiceOfdResources resources) throws IOException {
-        switch (object.getLocalName()) {
-            case "PathObject" -> shape(object, PATH_ATTRIBUTES, Set.of("FillColor", "AbbreviatedData"));
-            case "TextObject" -> shape(object, TEXT_ATTRIBUTES, Set.of("FillColor", "CGTransform", "TextCode"));
-            case "ImageObject" -> shape(object, IMAGE_ATTRIBUTES, Set.of());
-            default -> throw invalid();
-        }
+    private void draw(Graphics2D parent, Element object, InvoiceOfdResources resources, InvoiceOfdStyle inherited) throws IOException {
+        boolean image = object.getLocalName().equals("ImageObject");
+        if (image) shape(object, IMAGE_ATTRIBUTES, Set.of("Clips"));
         id(object, "ID");
-        double[] box = numbers(required(object, "Boundary"), 4);
-        if (box[2] < 0 || box[3] < 0) throw invalid();
+        var box = InvoiceOfdVector.boundary(object);
+        var style = InvoiceOfdStyle.resolve(object, resources, inherited);
         int alpha = object.hasAttribute("Alpha") ? (int) integer(object.getAttribute("Alpha"), 0, 255) : 255;
         if (!bool(object, "Visible", true)) alpha = 0;
         Graphics2D graphics = (Graphics2D) parent.create();
         try {
             // Boundary 属于父对象坐标；先裁剪再应用自身 CTM，不能让放大操作扩大边界。
-            graphics.clip(new Rectangle2D.Double(box[0], box[1], box[2], box[3]));
-            graphics.translate(box[0], box[1]);
-            graphics.transform(transform(object));
+            graphics.clip(box);
+            graphics.translate(box.x, box.y);
+            Element clipping = child(object, "Clips", false);
+            boolean transformClip = clipping != null && bool(clipping, "TransFlag", false);
+            if (transformClip) graphics.transform(transform(object));
+            if (clipping != null) graphics.clip(clips.read(clipping, resources, style, graphics.getTransform()));
+            if (!transformClip) graphics.transform(transform(object));
             double[] matrix = new double[6]; graphics.getTransform().getMatrix(matrix);
             for (double value : matrix) bounded(value);
             graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
-            if (object.getLocalName().equals("ImageObject")) image(graphics, resources, object);
-            else fill(graphics, resources, object);
+            if (image) image(graphics, resources, object);
+            else paint(graphics, resources, object, style);
         } finally { graphics.dispose(); }
     }
 
-    private void fill(Graphics2D graphics, InvoiceOfdResources resources, Element object) throws IOException {
-        boolean textObject = object.getLocalName().equals("TextObject");
-        // 描边、继承绘制参数和复杂颜色的解释尚未接通；先阻断，不能按 Java 默认样式猜测。
-        if (bool(object, "Stroke", !textObject)) throw invalid();
+    private void paint(Graphics2D graphics, InvoiceOfdResources resources, Element object, InvoiceOfdStyle style) throws IOException {
+        boolean textObject = InvoiceOfdVector.isText(object);
         boolean fill = bool(object, "Fill", textObject);
-        Color color = color(child(object, "FillColor", false), textObject ? Color.BLACK : new Color(0, true));
-        Shape shape;
-        if (textObject) shape = InvoiceOfdText.outline(object, resources.font(id(object, "Font")));
-        else {
-            String rule = object.hasAttribute("Rule") ? object.getAttribute("Rule") : "NonZero";
-            if (!rule.equals("NonZero") && !rule.equals("Even-Odd")) throw invalid();
-            Element data = child(object, "AbbreviatedData", true);
-            shape(data, Set.of(), Set.of());
-            shape = InvoiceOfdPath.parse(text(data), rule.equals("Even-Odd"));
-        }
+        boolean stroke = bool(object, "Stroke", !textObject);
+        Color fillColor = style.fillColor(resources, textObject), strokeColor = style.strokeColor(resources, textObject);
+        Shape shape = InvoiceOfdVector.outline(object, resources);
         inspectOutline(shape, graphics.getTransform());
-        if (fill) { graphics.setColor(color); graphics.fill(shape); }
-    }
-
-    private static Color color(Element color, Color defaultValue) throws IOException {
-        if (color == null) return defaultValue;
-        shape(color, Set.of("Value", "Alpha"), Set.of());
-        String[] channels = required(color, "Value").trim().split("\\s+");
-        if (channels.length != 3) throw invalid();
-        int alpha = color.hasAttribute("Alpha") ? (int) integer(color.getAttribute("Alpha"), 0, 255) : 255;
-        return new Color((int) integer(channels[0], 0, 255), (int) integer(channels[1], 0, 255),
-                (int) integer(channels[2], 0, 255), alpha);
+        if (fill) { graphics.setColor(fillColor); graphics.fill(shape); }
+        if (stroke) {
+            Shape outline = style.stroke(shape, graphics.getTransform());
+            inspectOutline(outline, graphics.getTransform());
+            graphics.setColor(strokeColor); graphics.fill(outline);
+        }
     }
 
     private void inspectOutline(Shape shape, AffineTransform transform) throws IOException {

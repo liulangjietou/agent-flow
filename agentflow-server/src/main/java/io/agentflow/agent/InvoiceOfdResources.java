@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.Closeable;
 import java.io.IOException;
@@ -26,6 +27,7 @@ final class InvoiceOfdResources implements Closeable {
     private final InvoiceOfdArchive archive;
     private final Map<Long, Resource> resources = new HashMap<>();
     private final Map<Long, InvoiceOfdFont> fonts = new HashMap<>();
+    private final InvoiceOfdColors colors;
 
     InvoiceOfdResources(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, InvoiceOfdDocument.Page page) throws IOException {
         this.archive = archive;
@@ -35,6 +37,18 @@ final class InvoiceOfdResources implements Closeable {
             for (Element location : children(common, name)) load(contents, archive.file(parent(page.documentFile()), text(location).trim()), loaded);
         }
         for (Element location : children(contents.root(page.file(), "Page"), "PageRes")) load(contents, archive.file(parent(page.file()), text(location).trim()), loaded);
+        Element defaultColor = child(common, "DefaultCS", false);
+        Long defaultId = defaultColor == null ? null : Long.valueOf(integer(text(defaultColor).trim(), 1, 0xffff_ffffL));
+        colors = new InvoiceOfdColors(this, defaultId);
+    }
+
+    Element element(long id, String type) throws IOException { return resource(id, type).element(); }
+    Color color(Element element, Color fallback) throws IOException { return colors.read(element, fallback); }
+
+    byte[] colorProfile(long id) throws IOException {
+        Resource resource = resource(id, "ColorSpace");
+        String file = archive.file(resource.base(), required(resource.element(), "Profile"));
+        try (var input = archive.open(file)) { return input.readAllBytes(); }
     }
 
     private void load(InvoiceOfdDocument.Contents contents, String file, Set<String> loaded) throws IOException {

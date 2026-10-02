@@ -182,8 +182,7 @@ class InvoiceOfdRendererTest {
 
     @Test
     void rejectsUnimplementedVisualFeaturesBeforeReturningPages() throws Exception {
-        for (String content : List.of(path("0 0 5 5", "0 0 0", "").replace("Stroke=\"false\"", "Stroke=\"true\""),
-                path("0 0 5 5", "0 0 0", "DrawParam=\"10\""),
+        for (String content : List.of(path("0 0 5 5", "0 0 0", "DrawParam=\"10\""),
                 path("0 0 5 5", "0 0 0", "").replace("</ofd:PathObject>", "<ofd:Clips/></ofd:PathObject>"))) {
             var files = fixture(1); page(files, 0, "", content);
             assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
@@ -246,24 +245,24 @@ class InvoiceOfdRendererTest {
         Path source=Files.write(directory.resolve(UUID.randomUUID()+".ofd"),zip(files));return InvoiceOfdRenderer.render(InvoiceOfdArchive.read(source));
     }
     private static BufferedImage decode(byte[] png) throws IOException { return ImageIO.read(new ByteArrayInputStream(png)); }
-    private static int pixel(byte[] png,double x,double y) throws IOException {
+    static int pixel(byte[] png,double x,double y) throws IOException {
         var image=decode(png);try{return image.getRGB((int)Math.floor(x*144/25.4),(int)Math.floor(y*144/25.4));}finally{image.flush();}
     }
-    private static Map<String,byte[]> fixture(int pages) throws IOException {
+    static Map<String,byte[]> fixture(int pages) throws IOException {
         var files=InvoiceOfdDocumentTest.fixture(pages);replace(files,"Doc_0/Document.xml","210 297","20 20");
         replace(files,"Doc_0/Document.xml","<ofd:MaxUnitID>100</ofd:MaxUnitID>","<ofd:MaxUnitID>100000</ofd:MaxUnitID>");
         replace(files,"Doc_0/Document.xml","</ofd:CommonData>","<ofd:PublicRes>Resources.xml</ofd:PublicRes></ofd:CommonData>");
         files.put("Doc_0/Resources.xml",bytes("<ofd:Res xmlns:ofd=\""+NS+"\" BaseLoc=\"Res\"><ofd:Fonts><ofd:Font ID=\"10\" FontName=\"AgentFlowSyntheticA\"><ofd:FontFile>a.ttf</ofd:FontFile></ofd:Font></ofd:Fonts></ofd:Res>"));
         files.put("Doc_0/Res/a.ttf",InvoiceOfdFontTest.bytes("a.ttf"));return files;
     }
-    private static void page(Map<String,byte[]> files,int index,String before,String objects){
-        var identifiers=java.util.regex.Pattern.compile("ID=\"(?:20|21)\"").matcher(objects);
+    static void page(Map<String,byte[]> files,int index,String before,String objects){
+        var identifiers=java.util.regex.Pattern.compile("\\bID=\"(?:20|21)\"").matcher(objects);
         var counter=new java.util.concurrent.atomic.AtomicInteger(200+index*100);
         String distinct=identifiers.replaceAll(match->"ID=\""+counter.getAndIncrement()+"\"");
         files.put("Doc_0/Pages/P"+index+".xml",xml("Page",before+"<ofd:Content><ofd:Layer ID=\""+(100+index)+"\">"+distinct+"</ofd:Layer></ofd:Content>"));
     }
-    private static String path(String boundary,String color,String extra){return "<ofd:PathObject ID=\"20\" Boundary=\""+boundary+"\" Fill=\"true\" Stroke=\"false\" "+extra+"><ofd:FillColor Value=\""+color+"\"/><ofd:AbbreviatedData>M 0 0 L 10 0 L 10 10 L 0 10 C</ofd:AbbreviatedData></ofd:PathObject>";}
-    private static String text(String extra,String content){return "<ofd:TextObject ID=\"21\" Font=\"10\" Size=\"4\" Boundary=\"0 0 20 20\" "+extra+">"+content+"</ofd:TextObject>";}
-    private static byte[] xml(String name,String body){return bytes("<ofd:"+name+" xmlns:ofd=\""+NS+"\">"+body+"</ofd:"+name+">");}
-    private static void replace(Map<String,byte[]> files,String file,String from,String to){String value=new String(files.get(file),java.nio.charset.StandardCharsets.UTF_8);if(!value.contains(from))throw new IllegalArgumentException("Fixture replacement missing");files.put(file,bytes(value.replace(from,to)));}
+    static String path(String boundary,String color,String extra){return "<ofd:PathObject ID=\"20\" Boundary=\""+boundary+"\" Fill=\"true\" Stroke=\"false\" "+extra+"><ofd:FillColor Value=\""+color+"\"/><ofd:AbbreviatedData>M 0 0 L 10 0 L 10 10 L 0 10 C</ofd:AbbreviatedData></ofd:PathObject>";}
+    static String text(String extra,String content){return "<ofd:TextObject ID=\"21\" Font=\"10\" Size=\"4\" Boundary=\"0 0 20 20\" "+extra+">"+content+"</ofd:TextObject>";}
+    static byte[] xml(String name,String body){return bytes("<ofd:"+name+" xmlns:ofd=\""+NS+"\">"+body+"</ofd:"+name+">");}
+    static void replace(Map<String,byte[]> files,String file,String from,String to){String value=new String(files.get(file),java.nio.charset.StandardCharsets.UTF_8);if(!value.contains(from))throw new IllegalArgumentException("Fixture replacement missing");files.put(file,bytes(value.replace(from,to)));}
 }
