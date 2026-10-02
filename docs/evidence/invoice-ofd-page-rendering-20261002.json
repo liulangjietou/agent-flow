@@ -1,0 +1,294 @@
+{
+  "recordedAt": "2026-10-02T09:22:25.522890+00:00",
+  "status": "BASIC_PAGE_RENDERING_SCOPE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "d25152d7a524bb9e8b7f86474b6340576a5c348f",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceExtractionSources -> archive/document preflight -> complete page rendering -> bounded process -> ordered model images (public OFD wiring remains pending)",
+  "responsibility": "Content adapter infrastructure; no approval or expense domain changes",
+  "standard": {
+    "document": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    },
+    "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/GBT_33190-2016_电子文件存储与交换格式版式文档.pdf",
+    "printedPagesInspected": [
+      25,
+      26,
+      27,
+      28,
+      48,
+      49,
+      50,
+      51,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70
+    ],
+    "findings": [
+      "TextCode coordinate inheritance uses the previous segment origin",
+      "CGTransform groups apply to the following TextCode with local character positions",
+      "Boundary clipping precedes the object CTM",
+      "TextCode offsets are explicit object-coordinate displacements"
+    ]
+  },
+  "implemented": [
+    "Reuse the preflight DOM and original aggregate XML limits",
+    "Embedded document/page fonts and resources resolved relative to the owning resource file",
+    "Unicode code points, strict hexadecimal escapes, explicit glyph ids, per-segment glyph transforms and coordinates",
+    "Solid RGB filled paths, fill rules, object and color alpha, local boundary clipping and CTM",
+    "PNG/JPEG images with format and decoded-size checks, fail on decoder warnings",
+    "Background/body/foreground order, stable order within a layer type and nested page blocks",
+    "All document/page order, reject the whole call when any page fails"
+  ],
+  "limits": {
+    "dpi": 144,
+    "pagePixels": 8000000,
+    "totalPagePixels": 40000000,
+    "totalPngBytes": 20971520,
+    "objectsAndPageBlocks": 20000,
+    "totalOutlineSegments": 1000000,
+    "glyphsPerTextObject": 25000,
+    "outlineSegmentsPerTextObject": 100000,
+    "imageSide": 12000,
+    "imagePixels": 20000000,
+    "coordinateMagnitude": 1000000
+  },
+  "red": {
+    "newFeatureScaffold": {
+      "tests": 11,
+      "errors": 7,
+      "failures": 0
+    },
+    "initialScope": {
+      "tests": 45,
+      "failures": 1,
+      "reason": "Missing first X unboxed a null origin before reporting an invalid source"
+    },
+    "inputLimits": {
+      "tests": 2,
+      "failures": 2,
+      "reason": "Non-ASCII hexadecimal escape and over-budget text outline accepted"
+    },
+    "truncatedImage": {
+      "tests": 1,
+      "failures": 1,
+      "reason": "ImageIO returned decoded JPEG pixels with only a warning after the EOI marker was removed"
+    },
+    "boundary": "These are new internal renderer cases, not claims of defects exposed through the current public application."
+  },
+  "tests": {
+    "scopedTotal": 53,
+    "newPageTests": 19,
+    "priorPrimitiveAndPreflightOverlap": 34,
+    "suites": [
+      {
+        "name": "InvoiceOfdRendererTest",
+        "tests": 19,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45351,
+          "sha256": "9fa565e8f4618d69facb688cdd03a63a1aea6439fd15570602e2c7fa8e79af9c"
+        }
+      },
+      {
+        "name": "InvoiceOfdFontTest",
+        "tests": 7,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43588,
+          "sha256": "7d1ecfa386bc1887e492d75927ef47d1770c0085ba59ba5402e091432a1dfa27"
+        }
+      },
+      {
+        "name": "InvoiceOfdPathTest",
+        "tests": 7,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43545,
+          "sha256": "d695e91950471257ae687c6ded23d70ffd119d0eca78f8c31925d0f72fff74ad"
+        }
+      },
+      {
+        "name": "InvoiceOfdArchiveTest",
+        "tests": 8,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43729,
+          "sha256": "eb36d2ba47a0349f79919f296ea3114f2a314237d20c08535c258b86e9745b9d"
+        }
+      },
+      {
+        "name": "InvoiceOfdDocumentTest",
+        "tests": 12,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44381,
+          "sha256": "4c7f81298e3c9616cb2a745096aef3e05f33096a31b3893229bb4d0589ce357b"
+        }
+      }
+    ],
+    "fullApplicationSuiteRun": false,
+    "reason": "Internal renderer is not connected to application services; the complete OFD scope including original archive, document, font and path tests was run."
+  },
+  "syntheticOutput": {
+    "pages": 2,
+    "sizeEach": [
+      227,
+      227
+    ],
+    "dpi": 144,
+    "visuallyInspectedBoth": true,
+    "observed": [
+      "First page: clipped red, isolated blue and half-alpha grey blocks",
+      "First page: three synthetic rectangular glyphs and inherited next-segment origin",
+      "Second page: interpolated four-colour image and filled circular path"
+    ],
+    "fontBoundary": "The original rectangle fixtures demonstrate geometry, not natural Chinese invoice text quality.",
+    "invalidLastPageRejected": true
+  },
+  "publicSamples": {
+    "count": 4,
+    "allPreflightPreviouslyPassed": true,
+    "fullPagesAcceptedByCurrentRenderer": 0,
+    "outsideCurrentRenderingScope": 4,
+    "files": [
+      "helloworld.ofd",
+      "chineseDir.ofd",
+      "draw_param_ref.ofd",
+      "DigitalSign.ofd"
+    ]
+  },
+  "application": {
+    "sourceAdapterConnected": false,
+    "ofdAdvertisedAsSupported": false,
+    "boundedWorkerConnected": false,
+    "modelCalled": false,
+    "databaseMigrationAdded": false,
+    "runtimeReplaced": false,
+    "dependenciesChanged": false,
+    "remoteConfigured": false
+  },
+  "remaining": [
+    "Deployment font mapping and CFF CID font dictionary matrices",
+    "Text weight/italic styles, strokes, draw-parameter inheritance, colour spaces and complex clipping",
+    "Templates, annotations, composite objects and nested seal images",
+    "Bounded worker, complete output validation and public source integration",
+    "Model and queued/running lifecycle acceptance",
+    "Other five top-level categories remain open"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-red.log",
+      "bytes": 20336,
+      "sha256": "64ac20199eedd9e7a1f59ebd628c2f13027f26b97a02f4363f88cdd3e99c7d57"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-scope.log",
+      "bytes": 16828,
+      "sha256": "eef4b09312e65bb24913bef11b71326c24581d34f54039925d576a20dfe33af5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-input-red.log",
+      "bytes": 15523,
+      "sha256": "4c8e4dcc63b544120028e06e30595ba32642d015a7f02635b84711cfce9ef5ca"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-image-red.log",
+      "bytes": 14351,
+      "sha256": "ca5721575d493d861c21e6a186af02e95af7e61c048ba69ca9ea092c94f2a6aa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-final-scope.log",
+      "bytes": 13853,
+      "sha256": "e8a09164f3859c4c1f9b0804ae3df9e1e5cb49c2eb7a56f331aaad7c4310bcdf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-authors.log",
+      "bytes": 131,
+      "sha256": "22a1421ea7c75b47e17437b859ee887999ac9e91d172c8291832a614140802f9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdRendererProbe.java",
+      "bytes": 5574,
+      "sha256": "7dc8229fa355c85e09b3ea02896f3e1c19c350dc16cc4aad9ff36e317142b5f0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-probe.log",
+      "bytes": 88,
+      "sha256": "1ae5057f00ab693c8d518c51b9adb718e5e59a3b161e5124c459f60a3a113763"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-synthetic/synthetic.ofd",
+      "bytes": 2541,
+      "sha256": "c2eb47619cc894e0bb652bc78d2c897fa324416a2963baeac2f99d8b5fc7c4b0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-synthetic/invalid-last-page.ofd",
+      "bytes": 2629,
+      "sha256": "b5062102f7cdc7cb7c987fec7e69068d4a2279e267c454cd61ff1935d848afe1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-synthetic/page-1.png",
+      "bytes": 1331,
+      "sha256": "d8d0cb5a1a316375a81d8dbfe59b9aa43071926982a329ce54a2e9897507ee2c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-renderer-synthetic/page-2.png",
+      "bytes": 12652,
+      "sha256": "ec3bd3a26713a0766c052d40d6bee2167d9660dbcf753d81306c81347912f1d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java",
+      "bytes": 14645,
+      "sha256": "b3e7e64c26ece63f747e1434a2edc3acc246e751ce95780de2bd40c902f6c698"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdXml.java",
+      "bytes": 4949,
+      "sha256": "7cbd13f739009eb9d8946dfa4dfb89c2786892fec4b4783d112bab76e0e8b482"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java",
+      "bytes": 6410,
+      "sha256": "258d75e1b780d32eea13bbfb23bff583acbdf32a1fd2f25ffc6af6bf30def046"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdText.java",
+      "bytes": 9321,
+      "sha256": "c85f1c85b4a2d6512ca48eba6f98c5fbddf3cb815eaaf2d03426e5331ec31b41"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java",
+      "bytes": 12620,
+      "sha256": "5d361636a8ef8c46272ec31bee285076c9b4f6cc582808703b6ef2dd51d41617"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java",
+      "bytes": 18567,
+      "sha256": "ef039af2e4a7ba05e089c621246e187f61845bf7c39dace0168f5aba1514feda"
+    }
+  ]
+}

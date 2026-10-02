@@ -48,6 +48,11 @@ final class InvoiceOfdDocument {
 
     /** 按 DocBody 和 Pages 的原始顺序核对全部页面，不默认只取第一个文档。 */
     static List<Page> inspect(InvoiceOfdArchive archive) throws IOException {
+        return read(archive).pages();
+    }
+
+    /** 绘制复用同一次预检的 DOM 和预算，不在下游重新放宽 XML 解析设置。 */
+    static Contents read(InvoiceOfdArchive archive) throws IOException {
         var xml = new XmlFiles(archive);
         for (String file : archive.files()) {
             if (file.toLowerCase(Locale.ROOT).endsWith(".xml")) xml.read(file);
@@ -86,7 +91,7 @@ final class InvoiceOfdDocument {
                 if (checked.add(file)) references(archive, xml, file);
             }
         }
-        return List.copyOf(pages);
+        return new Contents(xml, List.copyOf(pages));
     }
 
     private static void references(InvoiceOfdArchive archive, XmlFiles xml, String file) throws IOException {
@@ -251,4 +256,16 @@ final class InvoiceOfdDocument {
      * @author owlzhangfq@gmail.com
      */
     record Page(String documentFile, String file, double x, double y, double width, double height) { }
+
+    /**
+     * 渲染期间持有已预检内容；访问仍受原来的包内路径及 XML 总预算约束。
+     * @author owlzhangfq@gmail.com
+     */
+    static final class Contents {
+        private final XmlFiles xml;
+        private final List<Page> pages;
+        private Contents(XmlFiles xml, List<Page> pages) { this.xml = xml; this.pages = pages; }
+        List<Page> pages() { return pages; }
+        Element root(String file, String name) throws IOException { return InvoiceOfdDocument.root(xml.read(file), name); }
+    }
 }
