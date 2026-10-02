@@ -8,7 +8,7 @@ export const deliveryChannels = { EMAIL: '邮件', ENTERPRISE_IM: '企业 IM' } 
 export type DeliveryChannel = keyof typeof deliveryChannels
 export const deliveryErrors = {
   CONSENT_REVOKED: '原通知偏好已关闭或重新设置，旧消息不会恢复发送。', RECIPIENT_INACTIVE: '当前收件账号已停用。',
-  MESSAGE_UNAVAILABLE: '原站内消息已不属于当前账号。', BINDING_NOT_CAPTURED: '原消息没有固定收件绑定，不能补绑后重发。',
+  MESSAGE_UNAVAILABLE: '原消息归属或代理资格已失效，请查看当前业务状态。', BINDING_NOT_CAPTURED: '原消息没有固定收件绑定，不能补绑后重发。',
   BINDING_UNAVAILABLE: '原收件绑定或发送服务已停用，请联系部署管理员核对。', BINDING_CHANGED: '原收件目标已变更，不能转发旧消息到新地址。',
   CHANNEL_UNAVAILABLE: '当前渠道尚未接通。', SMTP_CONNECT_FAILED: '连接发送服务失败，本次尚未提交邮件。',
   SMTP_AUTH_FAILED: '发送服务认证失败，请联系部署管理员核对。', SMTP_TEMPORARY_REJECTION: '发送服务明确临时拒绝了本次邮件。',

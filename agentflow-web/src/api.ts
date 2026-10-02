@@ -1,4 +1,5 @@
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
+import { approvalProxyPath, readApprovalProxy, readApprovalProxyPage, validateApprovalProxyReceipt, type ApprovalProxyInput, type ApprovalProxyReceipt } from './approvalProxies.js'
 import { readInitializationState, validateInitializationReceipt, type InitializationReceipt, type InitializationRequest } from './tenantInitialization.js'
 import { readDeliveryPage, readDeliveryDetail, readDeliveryHistory, validateDeliveryRetryReceipt, type NotificationDelivery, type NotificationDeliveryFilters, type NotificationDeliveryRetryInput } from './notificationDeliveries.js'
 import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
@@ -370,6 +371,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
 export const writeRequests = new PendingWrites(async (operation, key) => {
   const actor = requestActor ? { ...requestActor } : null
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  if (operation.path === approvalProxyPath || /^\/organization\/approval-proxies\/[^/?]+\/revoke$/.test(operation.path)) validateApprovalProxyReceipt(result, operation.path, operation.body!)
   if (operation.path === '/system/initialization') validateInitializationReceipt(result, JSON.parse(operation.body!) as InitializationRequest, actor)
   if (operation.path === '/notifications/preferences') validateNotificationPreferencesReceipt(result, JSON.parse(operation.body!) as NotificationPreferencesInput)
   const notificationRetry = /^\/notifications\/deliveries\/([^/?]+)\/retry$/.exec(operation.path)
@@ -590,6 +592,10 @@ export const api = {
   webhookDelivery: (id: string, signal: AbortSignal) => request<WebhookDetail>('/integrations/webhooks/deliveries/' + encodeURIComponent(id), { signal }),
   retryWebhook: (id: string, expectedVersion: number) => write<WebhookItem>('/integrations/webhooks/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '重新排队 Webhook 投递', { expectedVersion }),
   organizationStatus: (signal: AbortSignal) => request<{ initialized: boolean }>('/organization', { signal }),
+  approvalProxies: async (personId: string | undefined, afterId: string | undefined, signal: AbortSignal) => readApprovalProxyPage(await request(approvalProxyPath + historyQuery({ personId, afterId, limit: 30 }), { signal, cache: 'no-store' })),
+  approvalProxy: async (id: string, signal: AbortSignal) => readApprovalProxy(await request(approvalProxyPath + '/' + encodeURIComponent(id), { signal, cache: 'no-store' }), id),
+  createApprovalProxy: (body: ApprovalProxyInput) => write<ApprovalProxyReceipt>(approvalProxyPath, 'POST', '创建审批代理', body),
+  revokeApprovalProxy: (id: string, body: { expectedRevision: number; reason: string }) => write<ApprovalProxyReceipt>(approvalProxyPath + '/' + encodeURIComponent(id) + '/revoke', 'POST', '撤销审批代理', body),
   initializeOrganization: () => write<{ initialized: boolean }>('/organization/initialize', 'POST', '启用本地组织目录'),
   organizationUnits: (kind: OrganizationUnit['kind'], afterId: string | undefined, signal: AbortSignal) => request<OrganizationPage<OrganizationUnit>>('/organization/units' + historyQuery({ kind, afterId, limit: 30 }), { signal }),
   organizationPeople: (afterId: string | undefined, signal: AbortSignal) => request<OrganizationPage<OrganizationPerson>>('/organization/people' + historyQuery({ afterId, limit: 30 }), { signal }),

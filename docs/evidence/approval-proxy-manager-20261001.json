@@ -1,0 +1,213 @@
+{
+  "recordedAt": "2026-10-02T01:43:03.826087+00:00",
+  "stage": "审批代理管理页面与普通流程基础运行验收",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "a886f6ae234f93c40168cd040029929dbe898f11",
+  "scope": [
+    "管理员按参与人员筛选、单版本有期限创建、原号读取和具名撤销",
+    "明确时区及 UTC 偏移、有限期限、双方资格、版本选择与确认",
+    "原键恢复、损坏回执保留、原号读取失败恢复、账号草稿隔离和权限拒绝清理",
+    "独立安装包 V95→V97 升级，普通代理创建、撤销与实际批准，最小站内提醒及两次重启"
+  ],
+  "callChain": {
+    "callers": [
+      "WorkspaceNavigation",
+      "ApprovalProxyManager",
+      "App.recoverOperation"
+    ],
+    "downstream": [
+      "api / PendingWrites",
+      "ApprovalProxyController",
+      "ApprovalProxyService",
+      "既有组织与已发布流程查询"
+    ],
+    "affectedScenarios": [
+      "ADMIN 管理授权",
+      "本人当前角色下代理任务",
+      "未知结果恢复与权限切换"
+    ],
+    "responsibility": "页面承载选择、展示和确认；授权状态及实际办理资格仍由既有领域和应用服务核对。"
+  },
+  "regressions": [
+    {
+      "previousCoverageGap": "响应夹具显式填写 null，未覆盖真实 Jackson 省略空字段。",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-wire-red.log",
+      "fix": "把省略的 revocation 和 nextAfterId 归一为 null，保留关系、状态和回执约束。"
+    },
+    {
+      "previousCoverageGap": "时间格式测试没有检查时区偏移与时分的可读分隔。",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-time-red.log",
+      "fix": "本地日期时间与明确括号 UTC 偏移分别格式化。"
+    },
+    {
+      "previousCoverageGap": "组件逻辑测试不检查工作台共享容器的实际页面边距。",
+      "redMeasurement": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-layout-red.json",
+      "fix": "采用已有 content 容器；500 CSS 像素实测边距 14，零溢出和零控件越界。"
+    }
+  ],
+  "validation": {
+    "frontend": {
+      "result": "PASS",
+      "tests": 64,
+      "newProxyTests": 16,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-ui-final.log",
+      "files": [
+        "approval-proxies.test.mjs",
+        "organization-panel.test.mjs",
+        "organization.test.mjs",
+        "requests.test.mjs",
+        "notification-deliveries.test.mjs",
+        "definition-catalog.test.mjs"
+      ]
+    },
+    "typecheckAndBuild": {
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-build.log",
+      "existingWarning": "主包超过 500 kB 的体积提示仍在，本次不扩展为架构改造。"
+    },
+    "openApi": {
+      "result": "PASS",
+      "operations": 296,
+      "schemas": 590,
+      "requestExamples": 113,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-openapi.log"
+    },
+    "httpContracts": {
+      "status": "PASS",
+      "files": {
+        "approval-proxy-http-browser-approved.json": {
+          "responses": 3,
+          "successfulRequests": 0
+        },
+        "approval-proxy-http-created.json": {
+          "responses": 4,
+          "successfulRequests": 0
+        },
+        "approval-proxy-http-fixture.json": {
+          "responses": 6,
+          "successfulRequests": 4
+        },
+        "approval-proxy-http-restart1.json": {
+          "responses": 3,
+          "successfulRequests": 0
+        },
+        "approval-proxy-http-restart2.json": {
+          "responses": 5,
+          "successfulRequests": 0
+        },
+        "approval-proxy-http-revoked-and-restart.json": {
+          "responses": 4,
+          "successfulRequests": 1
+        },
+        "approval-proxy-http-wire-shape.json": {
+          "responses": 3,
+          "successfulRequests": 1
+        }
+      },
+      "totalResponses": 28
+    },
+    "packaging": {
+      "result": "PASS",
+      "javaTestsRerun": false,
+      "reason": "本阶段没有 Java 生产改动；后台已通过前一阶段的范围验证。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-runtime-package.log"
+    }
+  },
+  "upgrade": {
+    "from": 95,
+    "to": 97,
+    "preservedOldTables": 225,
+    "preservedRows": 2608,
+    "preservedFiles": 3,
+    "addedTables": [
+      "approval_proxy_notification",
+      "organization_approval_proxy"
+    ],
+    "changedTables": [
+      "flyway_schema_history"
+    ],
+    "sourceUnchanged": true,
+    "oldGrantsBackfilled": false,
+    "health": "UP"
+  },
+  "restarts": [
+    {
+      "number": 1,
+      "result": "PASS",
+      "unchangedTables": 228,
+      "unchangedRows": 2776,
+      "unchangedFiles": 3,
+      "before": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-restart1-before.json",
+      "after": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-restart1-after.json"
+    },
+    {
+      "number": 2,
+      "result": "PASS",
+      "unchangedTables": 228,
+      "unchangedRows": 2773,
+      "unchangedFiles": 3,
+      "before": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-restart2-before.json",
+      "after": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-restart2-after.json"
+    }
+  ],
+  "runtime": {
+    "metadata": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-runtime.json",
+    "database": "approval_proxy_runtime_9439518b65",
+    "sourceDatabase": "approval_responsibilities_runtime_46c956a446",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-server.jar",
+    "jarSha256": "fb3380e6fffc99e8edf2012c454e2679482cbe2565ea6018624955e750e84831",
+    "backendPort": 18254,
+    "frontendPort": 15341,
+    "boot": 3,
+    "sourceUnchanged": true,
+    "proxyReminderWorker": true,
+    "slaReminderWorker": false,
+    "externalWorkers": false
+  },
+  "browser": {
+    "createdProxy": "c31da718-89bf-49ba-b2db-829a0dbb4455",
+    "revokedSameProxy": true,
+    "revocationRevision": 2,
+    "postRevokeTaskReadStatus": 403,
+    "historicalMinimalInboxPreserved": true,
+    "approvedApplication": "d154b4d3-facd-4bb5-ab2b-ccbf3bc79515",
+    "approvedWithProxy": "9f6f2557-c6a7-426e-8421-1861ba81261d",
+    "actualActor": "finance",
+    "principal": "manager",
+    "decisionCount": 1,
+    "applicationStatus": "APPROVED",
+    "proxyAuthorityPreservedInAudit": true,
+    "nonAdminManagementMenuAbsent": true,
+    "layout": {
+      "contentLeft": 0,
+      "controlsOutside": 0,
+      "gutter": 14,
+      "headingLeft": 14,
+      "overflow": false,
+      "viewport": 500
+    },
+    "screenshots": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-final.png",
+        "sha256": "f641f36be76c734875e4b362cd351cc5673209af0c39f2d66a4b6f17f70aa8ad"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-manager-500.png",
+        "sha256": "5fb72bc0e77c32c1510972abfdbad64cbbc57ea9da49dd6000b11f6e2113d7f5"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decision-final.png",
+        "sha256": "efc1d6a63378fd919b2ec627c229d4f1f759286faa4023cbf33664b932f9af97"
+      }
+    ]
+  },
+  "limits": [
+    "普通新流程未配置 SLA 日历，真实原 SLA 计时与暂停接续继续验收。",
+    "财务代理、多原审批人、原 V95 在审实际办理及其余生命周期通知仍需完整运行验收。",
+    "浏览器验证创建、撤销和普通批准；未知回执、分页、取消、账号变化和权限丢失由真实组件和请求层覆盖，没有声称全部浏览器故障注入通过。",
+    "站内提醒由实际后台生成；没有代理场景外部网络发送，真实企业通知另验收。",
+    "原服务与源数据库保留，没有升级 main 或生产。",
+    "整体代理和至少六类剩余范围保持；全量需求证据核对仍是独立待办。",
+    "提交前已确认 Git remote 为空，未创建 PR。"
+  ]
+}
