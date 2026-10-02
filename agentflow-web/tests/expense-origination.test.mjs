@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRenderer, reactive } from 'vue'
-const { emptyExpense, expenseContent, expenseDefinition, newExpenseLine, usablePrecheck, invoiceSelectable, ExpenseDrafts, expenseDrafts } = await import(process.env.AGENTFLOW_TEST_EXPENSE_DRAFT)
+const { emptyExpense, expenseContent, expenseDefinition, newExpenseLine, usablePrecheck, invoiceSelectable, fillExpenseLineFromInvoice, ExpenseDrafts, expenseDrafts } = await import(process.env.AGENTFLOW_TEST_EXPENSE_DRAFT)
 const { default: Editor } = await import(process.env.AGENTFLOW_TEST_EXPENSEEDITOR)
 const { default: Submission } = await import(process.env.AGENTFLOW_TEST_EXPENSESUBMISSION)
 const { default: Funding } = await import(process.env.AGENTFLOW_TEST_EXPENSEFUNDINGPICKER)
@@ -105,6 +105,28 @@ test('版本冲突保留本地内容，阻止再次写入，用户明确读服�
     await settle(); p.state.state.content.title = '不能自动覆盖'; await p.state.save(); await p.state.save()
     assert.equal(writes, 1); assert.equal(p.state.state.content.title, '不能自动覆盖'); assert.equal(p.state.state.detail.applicationVersion, 2)
     await p.state.reloadSaved(); assert.equal(p.state.state.detail.applicationVersion, 9); assert.equal(p.state.state.requiresRefresh, false); assert.equal(writes, 1)
+  } finally { p.close() }
+})
+
+test('票面复核期间不能保存或离开；带入后仍需通过原分摊校验再明确保存', async () => {
+  const p = editor(), calls = []; let catalogReads = 0, unexpected = 0
+  api.financeCatalog = async () => { catalogReads++; return catalog() }
+  api.queueExpensePrecheck = api.submitExpense = async () => { unexpected++ }
+  api.createExpense = async body => { calls.push(body); return { ...detail(), content: body.content } }
+  try {
+    await settle(); p.state.state.content = content(); p.state.state.businessNo = 'EXP-FILL'; p.state.state.definition = definition()
+    p.state.assistBusy = true
+    await p.state.save(); p.state.close(); p.state.leave(); await p.state.loadCatalog()
+    assert.equal(calls.length, 0); assert.equal(catalogReads, 0); assert.deepEqual(p.events, []); assert.equal(p.state.blocked, true)
+    p.state.assistBusy = false
+    const original = { id: 'invoice', original: { id: 'original', status: 'READY', sha256: 'a'.repeat(64), size: 128, format: 'XML' } }
+    const source = { status: 'CONFIRMED', input: { invoiceId: 'invoice', originalId: 'original', originalDigest: 'a'.repeat(64), originalBytes: 128, format: 'XML' }, review: { selected: [{ field: 'GROSS_AMOUNT', value: '105.50' }] } }
+    p.state.state.content.lines[0] = fillExpenseLineFromInvoice(p.state.state.content.lines[0], original, source, ['GROSS_AMOUNT'], true)
+    assert.equal(p.state.dirty, true); await p.state.save()
+    assert.equal(calls.length, 0); assert.match(p.state.error, /分摊之和/)
+    p.state.state.content.lines[0].allocations[0].amount.value = '105.50'; await p.state.save()
+    assert.equal(calls.length, 1); assert.equal(calls[0].content.lines[0].claimedGross.value, '105.50'); assert.equal(calls[0].content.lines[0].claimedTax.value, '6.00')
+    assert.deepEqual(calls[0].content.lines[0].invoiceIds, []); assert.equal(p.state.dirty, false); assert.equal(unexpected, 0)
   } finally { p.close() }
 })
 

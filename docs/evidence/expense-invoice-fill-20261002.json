@@ -1,0 +1,282 @@
+{
+  "recordedAt": "2026-10-02T08:28:02.656805+00:00",
+  "baseCommit": "f8621ecf5a1c1928a392bc6caf8fd9efbb4cd544",
+  "scope": "本人已确认票面金额及币种辅助填入费用草稿，沿用原保存流程；不代表票据整体或结构化财务 Agent 完成",
+  "implemented": [
+    "明确选择费用行、本人原件、已确认记录和字段",
+    "采用人工确认值并保留原候选对照",
+    "只映射含税金额与币种，日期和可抵扣税额不自动推断",
+    "金额精度、红字和币种确认边界；分摊数额不自动修改",
+    "来源新鲜读取、账号和单据隔离、目标行变更保护、读取超时和权限撤销清理",
+    "费用编辑器保存与预检互斥，仍须本人明确保存和提交"
+  ],
+  "ownership": "来源仍保存在独立确认运行；前端填报只改本地输入，后台费用领域与数据库模型未改，不新增费用来源关联。",
+  "redBeforeImplementation": {
+    "log": "expense-invoice-fill-red.log",
+    "failed": 2,
+    "reason": "两个新增填报映射函数尚未实现，期望 function 实际 undefined"
+  },
+  "frontendScoped": {
+    "tests": 57,
+    "newPanelTests": 15,
+    "expenseEditorNewTest": 1,
+    "failures": 0,
+    "skipped": 0,
+    "command": "node scripts/test-requests.mjs expense-invoice-fill.test.mjs expense-origination.test.mjs invoice-extraction.test.mjs",
+    "log": "expense-invoice-fill-scope.log"
+  },
+  "build": {
+    "status": "PASS",
+    "command": "npm run build",
+    "log": "expense-invoice-fill-build.log",
+    "warning": "既有前端压缩包大于 500 kB"
+  },
+  "productionJavaChanged": false,
+  "databaseMigrationAdded": false,
+  "newPublicApi": false,
+  "actualContracts": {
+    "status": "PASS",
+    "files": {
+      "expense-invoice-fill-browser-responses.json": {
+        "responses": 31,
+        "successfulRequests": 1
+      },
+      "expense-invoice-fill-http-restart.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "expense-invoice-fill-http-saved-continue.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "expense-invoice-fill-http-saved.json": {
+        "responses": 1,
+        "successfulRequests": 0
+      }
+    },
+    "totalResponses": 38,
+    "successfulRequests": 1,
+    "browserCaptureGaps": 0
+  },
+  "browser": {
+    "beforeCurrencyConsentEnabled": false,
+    "valuesBeforeExplicitSave": {
+      "分摊金额": "100.00",
+      "发生日期": "2026-09-30",
+      "可抵扣税额": "0.00",
+      "含税金额": "105.50",
+      "费用说明": "使用本人已确认票面，仅带入金额"
+    },
+    "noWriteBeforeUserSave": true,
+    "allocationMismatchBlocked": true,
+    "oneCreateExpense": true,
+    "reportId": "e9e8f24c-c8f6-4284-92c4-11a9197422b1",
+    "afterRestartDraftVisible": true,
+    "afterRestartAmount": "105.50",
+    "afterRestartTax": "0.00",
+    "noSubmittedRound": true,
+    "sourceRecordPreserved": true,
+    "layout": {
+      "clientWidth": 480,
+      "columns": "389.333px",
+      "headingHeight": 29.59375,
+      "panelWidth": 418.6666870117187,
+      "scrollWidth": 480,
+      "width": 500
+    },
+    "capturedResponses": 31,
+    "captureGaps": 0
+  },
+  "runtime": {
+    "sourceDatabase": "invoice_extraction_ui_dce2fa6c72",
+    "database": "expense_invoice_fill_814f400f78",
+    "backendPort": 18262,
+    "frontendPort": 15346,
+    "catalogPort": 18261,
+    "catalogOnlySyntheticFixture": true,
+    "workersEnabled": false,
+    "clone": {
+      "tables": 232,
+      "rows": 4059,
+      "files": 6,
+      "allSourceRowsAndFilesPreserved": true
+    },
+    "restart": {
+      "status": "PASS",
+      "boot": 2,
+      "pid": 69220,
+      "previousPid": 68680,
+      "differentProcess": true,
+      "tables": 232,
+      "rows": 4064,
+      "files": 6,
+      "unchangedAllTablesAndFiles": true,
+      "sourceV100Unchanged": true,
+      "jarSha256": "4b197d3206e3620d107a8bc56566ef80863a2a47d780e8aa5d14cd274b6fbe3b",
+      "reportId": "e9e8f24c-c8f6-4284-92c4-11a9197422b1",
+      "reportUnchanged": true,
+      "invoiceStillPendingAndAvailable": true,
+      "confirmedRunUnchanged": true
+    },
+    "changedTables": {
+      "expense_report": {
+        "before": 4,
+        "after": 5
+      },
+      "expense_report_revision": {
+        "before": 10,
+        "after": 11
+      },
+      "approval_application": {
+        "before": 63,
+        "after": 64
+      },
+      "audit_event": {
+        "before": 233,
+        "after": 234
+      },
+      "request_idempotency": {
+        "before": 435,
+        "after": 436
+      }
+    },
+    "protectedTablesUnchanged": 85,
+    "sourceDatabaseAndFilesUnchanged": true,
+    "existingServicesReplaced": false,
+    "externalModelCalled": false,
+    "realEnterpriseFinanceCalled": false
+  },
+  "verificationNotes": [
+    "验收脚本首次读取费用草稿时将可省略的 financialRound 当成必有字段；改用缺省空值判断，保留首次成功 GET 的契约记录。这是夹具断言修正，应用接口未改。",
+    "币种变更、大额、红字、迟到结果、账号切换及拒绝读取由组件与纯函数测试覆盖；真实页面验收使用未确认币种的合成 XML 金额路径。",
+    "后端未改，复用已验收安装包；本轮未重新执行 Java 全量测试。"
+  ],
+  "remaining": [
+    "OFD 全页渲染及模型内容适配",
+    "模型路径和排队或执行中重启的完整运行验收",
+    "模型预检建议和结构化财务业务 Agent 入口",
+    "组织同步与电子签本地开发",
+    "三类实际企业接入验收及全量需求证据核对"
+  ],
+  "goalStatus": "active",
+  "topLevelRemaining": 6,
+  "preciseSmallTaskCountKnown": false,
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "artifacts": [
+    {
+      "path": "expense-invoice-fill-red.log",
+      "sha256": "b27b85d0161f042b372dbd4c987f9b02ab3566d2f1b6fee819e959e6aba22437",
+      "bytes": 2150
+    },
+    {
+      "path": "expense-invoice-fill-scope.log",
+      "sha256": "e1c496cab802c941f7a5ebbdeae7318badd294d28cf39e8f7e8616e248f3cfff",
+      "bytes": 5933
+    },
+    {
+      "path": "expense-invoice-fill-build.log",
+      "sha256": "da52ae4fd22f8d2b2aed858bca6c2a1b825c55bd537291b62875a9828e26aadc",
+      "bytes": 781
+    },
+    {
+      "path": "expense-invoice-fill-contracts.json",
+      "sha256": "17803b3b54eafc707197971177778453437f556502710b2bec21213e597d527c",
+      "bytes": 557
+    },
+    {
+      "path": "expense-invoice-fill-browser-responses.json",
+      "sha256": "d20d86b8f236a705b6ef663d0263a25973fa50416c9b5ea1e8c05a0f8e5438d7",
+      "bytes": 81550
+    },
+    {
+      "path": "expense-invoice-fill-browser-checks.json",
+      "sha256": "2d611086f0c9a543085c32b4589fa133784ea2e2a9d3153dacb532d24dda51c1",
+      "bytes": 812
+    },
+    {
+      "path": "expense-invoice-fill-layout.json",
+      "sha256": "9cc1e005e1c42336223f97fd6471f42569370819f324e5047c4b9c3cd1a37bbc",
+      "bytes": 152
+    },
+    {
+      "path": "expense-invoice-fill-saved-check.json",
+      "sha256": "62f0126a2cc18fa16f9b363f6b07b516dad08a6b255b2d5e827da4b61796ba01",
+      "bytes": 5064
+    },
+    {
+      "path": "expense-invoice-fill-restart-check.json",
+      "sha256": "6af4bae5e4156e5eb352243ef2d6181c9605f486f98242e50a002130e530a451",
+      "bytes": 460
+    },
+    {
+      "path": "expense-invoice-fill-before-boot2.json",
+      "sha256": "37f7ae9cb45c11ed47c3db8da83c8ca181623326d84caaf54dc5e6d678b7c55d",
+      "bytes": 25437
+    },
+    {
+      "path": "expense-invoice-fill-catalog-calls.jsonl",
+      "sha256": "2541f30a7f40c86f237bd02c159388d6c5dcc1b779dc1fce6e173e8309f0dab1",
+      "bytes": 863
+    },
+    {
+      "path": "expense-invoice-fill-http-saved.json",
+      "sha256": "955d86f68a4a6e3ae0c0879bddbfefc30377e1700be1ad797ccf95ac20887fd1",
+      "bytes": 1484
+    },
+    {
+      "path": "expense-invoice-fill-http-saved-continue.json",
+      "sha256": "76c694a907a585fdb8c22b54b3b85f519de5a1051e5b29df23574b45241d7019",
+      "bytes": 8588
+    },
+    {
+      "path": "expense-invoice-fill-http-restart.json",
+      "sha256": "76c694a907a585fdb8c22b54b3b85f519de5a1051e5b29df23574b45241d7019",
+      "bytes": 8588
+    },
+    {
+      "path": "expense-invoice-fill-source.png",
+      "sha256": "89fa6046c5f43b2a85ad77e02ad8c5ec17f55f0a84b8493e24358ee8a5060b0b",
+      "bytes": 75429
+    },
+    {
+      "path": "expense-invoice-fill-narrow.png",
+      "sha256": "7e2098b9e0b6b73a9622847e4fa4c5a4fcddfef1edcd9dc3177f36e973b4aae9",
+      "bytes": 164656
+    },
+    {
+      "path": "expense-invoice-fill-saved-final.png",
+      "sha256": "a62eb38cbe476e23d3a6e393a9d95db92b1db6fc79552e2e6f7b0528b10161b9",
+      "bytes": 80907
+    },
+    {
+      "path": "prepare-expense-invoice-fill-runtime.py",
+      "sha256": "1a1caed4d1b7e1352c3c67fa69a3c4529f66ba84e903fdb1cf2e2c8517620272",
+      "bytes": 2167
+    },
+    {
+      "path": "run-expense-invoice-fill-runtime.py",
+      "sha256": "0528f043f4216ecaa9e9bab7dadf8ba38a156df2ae190869f80e39817884d009",
+      "bytes": 3890
+    },
+    {
+      "path": "expense-invoice-fill-catalog.py",
+      "sha256": "bce0c22f3f8ac40e0d7ef5fb3c6248f8d98a34a049db58788bc4d73b6cbfce69",
+      "bytes": 2108
+    },
+    {
+      "path": "check-expense-invoice-fill-saved.py",
+      "sha256": "2756d349f84f910b4fc2221bb6a5e680738b739b1ec3f366b74dbb2786922434",
+      "bytes": 2781
+    },
+    {
+      "path": "check-expense-invoice-fill-restart.py",
+      "sha256": "3e214bfde297a76867a1b9058f858404df0a95cecb3396e99086aaf20978058e",
+      "bytes": 1608
+    },
+    {
+      "path": "verify-expense-invoice-fill-contracts.mjs",
+      "sha256": "e76c022a58584a88e6280457f76fec6dceae5319b8f31fa60c6a3b1883ff8f21",
+      "bytes": 2732
+    }
+  ]
+}

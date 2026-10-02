@@ -3,6 +3,7 @@ import type { InitiatorContext } from './initiatorContext'
 import type { InvoiceItem } from './invoiceWallet'
 export type { InvoiceItem } from './invoiceWallet'
 import { amountMinor, type ExpenseContent, type ExpenseDetail, type ExpenseLine, type ExpenseVersions, type FinancialRound, type Money } from './expenses.js'
+import { extractionMatches, type ExtractionDetail } from './invoiceExtraction.js'
 
 export interface FinanceCatalog {
   employeeId: string; sourceVersion: string; validUntil: string
@@ -116,6 +117,53 @@ export function nextExpenseRound(detail: ExpenseDetail): number { return detail.
 export function invoiceSelectable(item: InvoiceItem, legalEntityId: string, reportId?: string, now = Date.now()): boolean {
   return item.original.status === 'READY' && item.verification === 'VERIFIED' && !!item.facts && item.facts.legalEntityId === legalEntityId
     && Date.parse(item.facts.validUntil) > now && (item.occupation === 'AVAILABLE' || item.occupation === 'OCCUPIED' && !!reportId && item.use?.reportId === reportId)
+}
+
+export type InvoiceFillField = 'GROSS_AMOUNT' | 'CURRENCY'
+export interface InvoiceFillChoice { field: InvoiceFillField; label: string; current: string; value: string; unavailable: string | null }
+const invoiceFillLabels: Record<InvoiceFillField, string> = { GROSS_AMOUNT: '本行含税金额', CURRENCY: '本行原币币种（含税额和分摊）' }
+
+/** 只映射同义字段；开票日期和票面税额不能推导发生日期及可抵扣税额。 */
+export function invoiceFillChoices(run: ExtractionDetail, line: ExpenseLine): InvoiceFillChoice[] {
+  if (run.status !== 'CONFIRMED') return []
+  return (Object.keys(invoiceFillLabels) as InvoiceFillField[]).flatMap(field => {
+    const selected = run.review?.selected?.find(item => item.field === field)
+    if (!selected) return []
+    let unavailable = null
+    if (field === 'GROSS_AMOUNT') {
+      try { if (amountMinor(selected.value) <= 0n) unavailable = '红字或零金额不能作为正数报销金额带入。' }
+      catch { unavailable = '金额超出费用填报范围，不能直接带入。' }
+    }
+    return [{ field, label: invoiceFillLabels[field], current: field === 'GROSS_AMOUNT' ? line.claimedGross.value : line.claimedGross.currency, value: selected.value, unavailable }]
+  })
+}
+
+/** 没有已确认币种或需要改变整行币种时，必须由本人核对金额的单位。 */
+export function invoiceFillCurrencyConfirmation(line: ExpenseLine, run: ExtractionDetail, selected: InvoiceFillField[]): boolean {
+  const currency = run.review?.selected?.find(item => item.field === 'CURRENCY')?.value
+  return selected.includes('GROSS_AMOUNT') && !currency || selected.includes('CURRENCY') && currency !== line.claimedGross.currency
+}
+
+/** 仅更新本地费用输入，既不引用发票，也不保存、查验或提交；分摊金额由本人核对。 */
+export function fillExpenseLineFromInvoice(line: ExpenseLine, invoice: InvoiceItem, run: ExtractionDetail,
+    selected: InvoiceFillField[], currencyConfirmed: boolean): ExpenseLine {
+  if (run.status !== 'CONFIRMED' || !extractionMatches(run.input, invoice)) throw new Error('本人确认记录或原件已变化，请重新选择来源。')
+  const choices = invoiceFillChoices(run, line)
+  if (!selected.length || new Set(selected).size !== selected.length || selected.some(field => !choices.some(choice => choice.field === field))) throw new Error('请逐项勾选已确认的金额或币种。')
+  const unavailable = choices.find(choice => selected.includes(choice.field) && choice.unavailable)
+  if (unavailable) throw new Error(unavailable.unavailable!)
+  const sourceCurrency = run.review?.selected?.find(item => item.field === 'CURRENCY')?.value
+  const currency = selected.includes('CURRENCY') ? sourceCurrency! : line.claimedGross.currency
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error('请先核对本行三位大写币种代码。')
+  if (selected.includes('GROSS_AMOUNT') && sourceCurrency && currency !== sourceCurrency) throw new Error('已确认票面币种与本行不同，请同时选择币种并核对整行金额；这里不会换算汇率。')
+  if (invoiceFillCurrencyConfirmation(line, run, selected) && !currencyConfirmed) throw new Error('请明确核对本行币种及金额单位；这里不会换算汇率。')
+  const result = copy(line)
+  if (selected.includes('GROSS_AMOUNT')) result.claimedGross.value = choices.find(choice => choice.field === 'GROSS_AMOUNT')!.value
+  if (selected.includes('CURRENCY')) {
+    result.claimedGross.currency = currency; result.claimedTax.currency = currency
+    result.allocations.forEach(allocation => { allocation.amount.currency = currency })
+  }
+  return result
 }
 
 export interface ExpenseDraftState {

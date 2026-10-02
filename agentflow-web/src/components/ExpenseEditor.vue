@@ -9,22 +9,24 @@ import DefinitionPicker from './DefinitionPicker.vue'
 import ExpenseLineEditor from './ExpenseLineEditor.vue'
 import ExpenseFundingPicker from './ExpenseFundingPicker.vue'
 import ExpenseSubmission from './ExpenseSubmission.vue'
+import ExpenseInvoiceAssist from './ExpenseInvoiceAssist.vue'
 
 const props = defineProps<{ scopeKey: string; initial?: ExpenseDetail; locked?: boolean }>()
 const emit = defineEmits<{ close: []; submitted: [applicationId: string]; busy: [value: boolean] }>()
 const state = ref<ExpenseDraftState>({ detail: null, content: emptyExpense(), businessNo: '', definition: null, baseline: JSON.stringify(emptyExpense()), pending: null, requiresRefresh: false })
 const catalog = ref<FinanceCatalog | null>(null), loading = ref(false), saving = ref(false), childBusy = ref(false), error = ref(''), notice = ref(''), discard = ref(false)
+const assistBusy = ref(false)
 const selection = reactive(new DefinitionSelection(api.searchDefinitions, api.getDefinition))
 const sessionKey = computed(() => props.initial?.id ?? '')
 const dirty = computed(() => JSON.stringify(state.value.content) !== state.value.baseline || !state.value.detail && !!state.value.businessNo.trim())
-const blocked = computed(() => props.locked || saving.value || childBusy.value || state.value.requiresRefresh)
+const blocked = computed(() => props.locked || saving.value || childBusy.value || assistBusy.value || state.value.requiresRefresh)
 const entity = computed(() => catalog.value?.legalEntities.find(value => value.id === state.value.content.legalEntityId))
 let epoch = 0, controller: AbortController | null = null, leaving = false
 function preserve() { expenseDrafts.put(props.scopeKey, sessionKey.value, state.value) }
 function stop() { epoch++; controller?.abort(); controller = null; selection.clear() }
 function initialize() {
   leaving = false
-  stop(); loading.value = false; saving.value = false; childBusy.value = false; discard.value = false; error.value = ''; notice.value = ''; catalog.value = null
+  stop(); loading.value = false; saving.value = false; childBusy.value = false; assistBusy.value = false; discard.value = false; error.value = ''; notice.value = ''; catalog.value = null
   const restored = expenseDrafts.get(props.scopeKey, sessionKey.value)
   const detail = props.initial ? JSON.parse(JSON.stringify(props.initial)) as ExpenseDetail : null
   state.value = restored ?? { detail, content: detail?.content ?? emptyExpense(), businessNo: detail?.businessNo ?? '', definition: null,
@@ -33,7 +35,7 @@ function initialize() {
   if (props.scopeKey) void loadCatalog()
 }
 async function loadCatalog() {
-  if (loading.value || saving.value || childBusy.value) return
+  if (loading.value || saving.value || childBusy.value || assistBusy.value) return
   controller?.abort(); const version = ++epoch, request = new AbortController(); controller = request
   loading.value = true; catalog.value = null; error.value = ''
   const timeout = setTimeout(() => { if (version === epoch) { epoch++; request.abort(); loading.value = false; error.value = '财务目录读取超时，请重试。' } }, 12_000)
@@ -84,15 +86,15 @@ async function save() {
   } finally { if (version === epoch) { saving.value = false; preserve() } }
 }
 function close() {
-  if (saving.value || childBusy.value || props.locked) return
+  if (saving.value || childBusy.value || assistBusy.value || props.locked) return
   if (dirty.value || state.value.pending) { discard.value = true; return }
   leave()
 }
-function leave() { if (!saving.value && !childBusy.value && !props.locked) { leaving = true; expenseDrafts.clear(props.scopeKey, sessionKey.value); emit('close') } }
+function leave() { if (!saving.value && !childBusy.value && !assistBusy.value && !props.locked) { leaving = true; expenseDrafts.clear(props.scopeKey, sessionKey.value); emit('close') } }
 function submitted(applicationId: string) { leaving = true; expenseDrafts.clear(props.scopeKey, sessionKey.value); emit('submitted', applicationId) }
 /** 冲突后明确放弃本地内容并读取服务器版本，不自动用新版本再次写入。 */
 async function reloadSaved() {
-  if (saving.value || childBusy.value || props.locked || state.value.pending || !state.value.detail) return
+  if (saving.value || childBusy.value || assistBusy.value || props.locked || state.value.pending || !state.value.detail) return
   const version = epoch, id = state.value.detail.id, applicationId = state.value.detail.applicationId, request = new AbortController()
   controller = request; saving.value = true; error.value = ''
   const timeout = setTimeout(() => { if (version === epoch) { epoch++; request.abort(); saving.value = false; error.value = '服务器版本读取超时，请重试。' } }, 12_000)
@@ -112,19 +114,19 @@ const unsubscribe = expenseDrafts.subscribe((scope, key) => {
 })
 watch(() => [props.scopeKey, props.initial?.id], initialize, { immediate: true, flush: 'sync' })
 watch(state, preserve, { deep: true, flush: 'sync' })
-watch(() => [saving.value, childBusy.value, dirty.value, !!state.value.pending], () => emit('busy', saving.value || childBusy.value || dirty.value || !!state.value.pending), { immediate: true, flush: 'sync' })
+watch(() => [saving.value, childBusy.value, assistBusy.value, dirty.value, !!state.value.pending], () => emit('busy', saving.value || childBusy.value || assistBusy.value || dirty.value || !!state.value.pending), { immediate: true, flush: 'sync' })
 onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy', false) })
 </script>
 
 <template>
   <section class="expense-editor" aria-label="报销填报">
-    <div class="editor-heading"><div><p class="eyebrow">EXPENSE APPLICATION</p><h3>{{ state.detail ? '编辑报销与提交' : '填写新的报销单' }}</h3><p>{{ state.detail ? `${state.businessNo} · 保存后沿用原流程版本` : '先填写费用并保存，再核对本轮财务事实。' }}</p></div><button type="button" class="secondary" :disabled="saving || childBusy || locked" @click="close">返回</button></div>
+    <div class="editor-heading"><div><p class="eyebrow">EXPENSE APPLICATION</p><h3>{{ state.detail ? '编辑报销与提交' : '填写新的报销单' }}</h3><p>{{ state.detail ? `${state.businessNo} · 保存后沿用原流程版本` : '先填写费用并保存，再核对本轮财务事实。' }}</p></div><button type="button" class="secondary" :disabled="saving || childBusy || assistBusy || locked" @click="close">返回</button></div>
     <p v-if="notice" class="editor-notice" role="status">{{ notice }}</p>
     <p v-if="error || selection.error" class="editor-error" role="alert">{{ error || selection.error }}</p>
     <div v-if="discard" class="discard-confirmation" role="group" aria-label="处理未保存的费用内容"><p>本地内容尚未保存。返回会放弃这些修改；已经保存的单据和待恢复请求仍保留。</p><button type="button" class="secondary" @click="discard = false">继续填写</button><button type="button" class="return" :disabled="saving || childBusy || locked" @click="leave">放弃本地修改并返回</button></div>
     <div v-if="state.requiresRefresh && !state.pending" class="editor-notice"><p>请先核对服务器当前版本。读取会替换本地未保存内容，不会自动再次保存。</p><button v-if="state.detail" type="button" class="secondary" :disabled="saving || childBusy || locked" @click="reloadSaved">放弃本地修改并读取服务器版本</button><button v-else type="button" class="secondary" :disabled="locked" @click="state.requiresRefresh = false">修正填报内容</button></div>
     <p v-if="loading" class="editor-help" role="status">正在读取本人可用的财务目录…</p>
-    <button type="button" class="quiet catalog-refresh" :disabled="loading || saving || childBusy || locked" @click="loadCatalog">{{ catalog ? '刷新财务目录' : '重试财务目录' }}</button>
+    <button type="button" class="quiet catalog-refresh" :disabled="loading || saving || childBusy || assistBusy || locked" @click="loadCatalog">{{ catalog ? '刷新财务目录' : '重试财务目录' }}</button>
     <form v-if="catalog" novalidate @submit.prevent="save">
       <fieldset :disabled="blocked || loading || selection.loading">
         <div v-if="!state.detail" class="definition-choice"><label>费用单编号<input v-model="state.businessNo" maxlength="128" required placeholder="填写业务编号" /></label><DefinitionPicker label="费用流程" :scope-key="scopeKey" :selected-id="state.definition?.id" :selected-label="state.definition ? `${state.definition.name} · v${state.definition.version}` : undefined" start-enabled-only published-only :locked="blocked || selection.loading" @select="selectDefinition" /><p v-if="selection.loading" class="editor-help">正在核对所选版本…</p></div>
@@ -133,11 +135,12 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
         <p v-if="entity" class="editor-help">{{ entity.paperReceiptRequired ? '该法人要求提交纸质原件，后续需在收单节点签收。' : '该法人当前不要求纸质原件签收。' }}</p>
         <ExpenseLineEditor v-for="(line, index) in state.content.lines" :key="line.lineNo" v-model="state.content.lines[index]!" :catalog="catalog" :legal-entity-id="state.content.legalEntityId" :locked="!!blocked" @remove="state.content.lines.splice(index, 1)" />
         <button type="button" class="secondary" :disabled="blocked || !entity || state.content.lines.length >= 200" @click="addLine">＋ 添加费用行</button>
+        <ExpenseInvoiceAssist v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :locked="!!locked || saving || childBusy || loading || state.requiresRefresh" @busy="assistBusy = $event" />
         <ExpenseFundingPicker v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :base-currency="entity?.baseCurrency ?? ''" :locked="!!blocked" />
         <div class="save-toolbar"><span>{{ dirty ? '有未保存的内容' : state.detail ? '当前费用内容已保存' : '允许先保存不含费用行的草稿' }}</span><button class="primary" :disabled="blocked || loading || selection.loading || !state.detail && !state.definition">{{ saving ? '正在保存…' : '保存费用草稿' }}</button></div>
       </fieldset>
     </form>
-    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving" @busy="childBusy = $event" @submitted="submitted" />
+    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy" @busy="childBusy = $event" @submitted="submitted" />
     <p v-else-if="state.detail && dirty" class="editor-help">请先保存当前修改，再执行费用预检或提交。</p>
   </section>
 </template>
