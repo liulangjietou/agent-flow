@@ -1,4 +1,5 @@
 import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
+import { extractionPath, readExtractionOptions, readExtractionPage, readExtractionDetail, validateExtractionReceipt, type ExtractionReceipt, type ExtractionGenerate, type ExtractionReview } from './invoiceExtraction.js'
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
 import { approvalProxyPath, readApprovalProxy, readApprovalProxyPage, validateApprovalProxyReceipt, type ApprovalProxyInput, type ApprovalProxyReceipt } from './approvalProxies.js'
 import { readInitializationState, validateInitializationReceipt, type InitializationReceipt, type InitializationRequest } from './tenantInitialization.js'
@@ -374,7 +375,24 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
   } catch { throw { status: 0, code: 'RESPONSE_UNREADABLE', message: businessWrite ? '操作响应未完整接收，请恢复上次操作确认结果。' : '服务响应无法读取，请重试。' } satisfies ApiError }
 }
 
+/** 票据准备包含事务外原件读取；超时只结束等待，原请求继续留给本人恢复。 */
+async function sendExtraction(operation: WriteRequest, key: string): Promise<ExtractionReceipt> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject({ status: 0, code: 'REQUEST_TIMEOUT', message: '提取操作结果尚未确认，请恢复上次操作。' } satisfies ApiError)
+    }, 25_000)
+  })
+  try {
+    const value = await Promise.race([request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal }), timeout])
+    return validateExtractionReceipt(value, operation.path, operation.body!)
+  } finally { clearTimeout(timer) }
+}
+
 export const writeRequests = new PendingWrites(async (operation, key) => {
+  if (/^\/invoices\/[^/?]+\/extraction-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) return sendExtraction(operation, key)
   const actor = requestActor ? { ...requestActor } : null
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
   if (operation.path === approvalProxyPath || /^\/organization\/approval-proxies\/[^/?]+\/revoke$/.test(operation.path)) validateApprovalProxyReceipt(result, operation.path, operation.body!)
@@ -553,6 +571,11 @@ export const api = {
   invoices: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceItem>>('/invoices' + historyQuery(filter), { signal, cache: 'no-store' }),
   invoice: (id: string, signal: AbortSignal) => request<InvoiceItem>(`/invoices/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   invoiceWalletOptions: (signal: AbortSignal) => request<InvoiceWalletOptions>('/invoices/options', { signal, cache: 'no-store' }),
+  invoiceExtractionInput: (id: string, signal: AbortSignal) => request(extractionPath(id) + '/input', { signal, cache: 'no-store' }).then(value => readExtractionOptions(value, id)),
+  invoiceExtractionRuns: (id: string, page: number, signal: AbortSignal) => request(extractionPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readExtractionPage(value, page)),
+  invoiceExtractionRun: (id: string, runId: string, signal: AbortSignal) => request(extractionPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readExtractionDetail(value, id, runId)),
+  generateInvoiceExtraction: (id: string, body: ExtractionGenerate) => write<ExtractionReceipt>(extractionPath(id), 'POST', '发起本人票据提取', body),
+  reviewInvoiceExtraction: (id: string, runId: string, body: ExtractionReview) => write<ExtractionReceipt>(extractionPath(id) + '/' + encodeURIComponent(runId) + '/review', 'POST', '保存本人票面复核', body),
   reserveInvoice: (input: InvoiceUploadInput, key: string, signal: AbortSignal) => request<{ id: string }>('/invoices', { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key }, signal }),
   uploadInvoice: (id: string, file: Blob, signal: AbortSignal) => request<InvoiceOriginal>(`/invoices/${encodeURIComponent(id)}/content`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream' }, signal }),
   downloadInvoice: (id: string, signal: AbortSignal) => request<Blob>(`/invoices/${encodeURIComponent(id)}/content`, { signal, cache: 'no-store' }, 'binary'),

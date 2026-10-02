@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { fileDigest, fileSize } from '../attachments'
 import { moneyLabel } from '../expenses'
 import { invoiceError, invoiceIssue, occupationStatuses, verificationStatuses, type InvoiceItem, type InvoiceWalletOptions } from '../invoiceWallet'
 import InvoiceUploader from './InvoiceUploader.vue'
 import InvoiceVerification from './InvoiceVerification.vue'
+import InvoiceExtraction from './InvoiceExtraction.vue'
 const props = defineProps<{ invoiceId: string; scopeKey: string; refreshVersion: number; options: InvoiceWalletOptions | null; locked?: boolean }>()
 const emit = defineEmits<{ uploaded: [invoiceId: string]; changed: []; busy: [value: boolean] }>()
 const item = ref<InvoiceItem | null>(null), loading = ref(false), downloading = ref(false), error = ref(''), actionBusy = ref(false), verificationRefresh = ref(0)
+const extractionBusy = ref(false), extractionDirty = ref(false)
+const interactionsBusy = computed(() => actionBusy.value || extractionBusy.value || extractionDirty.value)
 let epoch = 0, readSequence = 0, readController: AbortController | null = null, downloadController: AbortController | null = null
 const urls = new Set<string>()
 function stop() { epoch++; readSequence++; readController?.abort(); downloadController?.abort(); loading.value = false; downloading.value = false; for (const url of urls) URL.revokeObjectURL(url); urls.clear() }
@@ -45,14 +48,14 @@ async function download() {
 function refreshed() { void load(); emit('changed') }
 watch(() => [props.scopeKey, props.invoiceId], () => { stop(); item.value = null; error.value = ''; if (props.scopeKey) void load() }, { immediate: true, flush: 'sync' })
 watch(() => props.refreshVersion, () => { void load(); verificationRefresh.value++ })
-watch(actionBusy, value => emit('busy', value))
+watch(interactionsBusy, value => emit('busy', value), { flush: 'sync' })
 onUnmounted(() => { stop(); emit('busy', false) })
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 </script>
 
 <template>
   <section class="invoice-detail" aria-label="本人票据详情">
-    <div class="detail-toolbar"><p class="eyebrow">INVOICE RECORD</p><button type="button" class="secondary" :disabled="loading || actionBusy || downloading" @click="load(); verificationRefresh++">刷新票据</button></div>
+    <div class="detail-toolbar"><p class="eyebrow">INVOICE RECORD</p><button type="button" class="secondary" :disabled="loading || interactionsBusy || downloading" @click="load(); verificationRefresh++">刷新票据</button></div>
     <p v-if="loading" class="invoice-help" role="status">正在核对本人票据…</p><p v-if="error" class="invoice-error" role="alert">{{ error }}</p>
     <template v-if="item">
       <h3>{{ item.original.filename }}</h3><p class="invoice-help">{{ item.original.format }} · {{ fileSize(item.original.size) }} · {{ dateLabel(item.original.createdAt) }} 保存</p>
@@ -63,7 +66,10 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
       <p v-if="item.facts && item.verification !== 'VERIFIED'" class="invoice-help">上方保留历史已确认票面；当前查验未通过，不能据此新增报销占用。</p>
       <p v-if="item.use" class="invoice-help">关联报销 {{ item.use.reportId }} · 第 {{ item.use.roundNo }} 轮 · 第 {{ item.use.lineNo }} 行</p>
       <InvoiceUploader v-if="item.original.status !== 'READY'" :scope-key="scopeKey" :options="options" :restore-id="item.id" :locked="locked || loading" @uploaded="emit('uploaded', $event)" @busy="actionBusy = $event" />
-      <InvoiceVerification v-else :item="item" :scope-key="scopeKey" :refresh-version="verificationRefresh" :locked="locked || loading" @changed="refreshed" @busy="actionBusy = $event" />
+      <template v-else>
+        <InvoiceExtraction :item="item" :scope-key="scopeKey" :refresh-version="verificationRefresh" :locked="locked || loading || actionBusy" @busy="extractionBusy = $event" @dirty="extractionDirty = $event" />
+        <InvoiceVerification :item="item" :scope-key="scopeKey" :refresh-version="verificationRefresh" :locked="locked || loading || extractionBusy || extractionDirty" @changed="refreshed" @busy="actionBusy = $event" />
+      </template>
     </template>
   </section>
 </template>

@@ -1,0 +1,310 @@
+{
+  "recordedAt": "2026-10-02T08:04:53.235040+00:00",
+  "baseCommit": "50a317cc6ac598eb0a344377c562ca97bc46bcf1",
+  "scope": "票夹提取与本人复核页面、本地 XML 实际运行、原键恢复、独立 V100 副本升级及终态进程重启；不代表整体票据抽取完成",
+  "implemented": [
+    "来源预览按实际方式和完整外发范围展示，模型授权默认关闭",
+    "逐项选择与编辑字符串值，原候选、来源和人工值分别保留",
+    "读取超时与迟到响应隔离，权限失效清除可见内容",
+    "写入超时或不可信回执保留原请求，恢复后只刷新原运行",
+    "按账号和票据隔离的内存修订、版本冲突保留、离页提醒",
+    "与原票据查验、占用及财务写入职责分离"
+  ],
+  "redBeforeFix": [
+    {
+      "case": "本人五个前端 API 尚未实现",
+      "evidence": "invoice-extraction-ui-red.log",
+      "observed": "预期 function，实际 undefined"
+    },
+    {
+      "case": "提取标题继承全局 header 高度和内边距导致重叠",
+      "evidence": "invoice-extraction-ui-heading-red.png",
+      "observed": "header 高 72 CSS px，标签底部 825.44、提示顶部 800.05",
+      "testGap": "原组件测试未渲染浏览器 CSS",
+      "fix": "使用组件自己的 div 容器，保留局部样式"
+    },
+    {
+      "case": "全局恢复成功后仍显示请求未知的旧错误",
+      "evidence": "invoice-extraction-ui-recovery-error-red.log",
+      "observed": "23 项中 22 通过、1 失败；实际浏览器同步复现",
+      "testGap": "原测试分别覆盖全局恢复与面板刷新，未断言连续执行后旧提示状态",
+      "fix": "面板刷新清除旧写入提示，后续读取错误独立显示"
+    }
+  ],
+  "frontendScoped": {
+    "tests": 83,
+    "newPanelTests": 23,
+    "command": "node scripts/test-requests.mjs invoice-extraction.test.mjs invoice-wallet.test.mjs draft-assist.test.mjs requests.test.mjs",
+    "failures": 0,
+    "skipped": 0,
+    "log": "invoice-extraction-ui-scope.log"
+  },
+  "build": {
+    "status": "PASS",
+    "command": "npm run build",
+    "warning": "既有前端压缩包大于 500 kB",
+    "log": "invoice-extraction-ui-build.log"
+  },
+  "backendPackaging": {
+    "status": "PASS",
+    "testsSkipped": true,
+    "productionJavaChanged": false,
+    "jarSha256": "4b197d3206e3620d107a8bc56566ef80863a2a47d780e8aa5d14cd274b6fbe3b",
+    "log": "invoice-extraction-ui-package.log"
+  },
+  "staticContract": {
+    "status": "PASS",
+    "operations": 307,
+    "schemas": 615,
+    "examples": 117,
+    "log": "invoice-extraction-ui-openapi.log"
+  },
+  "actualContracts": {
+    "status": "PASS",
+    "files": {
+      "invoice-extraction-ui-browser-responses.json": {
+        "responses": 63,
+        "successfulRequests": 4
+      },
+      "invoice-extraction-ui-http-journey.json": {
+        "responses": 22,
+        "successfulRequests": 4
+      },
+      "invoice-extraction-ui-http-recovery.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "invoice-extraction-ui-http-restart.json": {
+        "responses": 7,
+        "successfulRequests": 0
+      },
+      "invoice-extraction-ui-http-setup-continue.json": {
+        "responses": 7,
+        "successfulRequests": 2
+      },
+      "invoice-extraction-ui-http-setup.json": {
+        "responses": 3,
+        "successfulRequests": 1
+      }
+    },
+    "totalResponses": 105,
+    "successfulRequests": 11,
+    "browserCaptureGaps": 0
+  },
+  "httpChecks": {
+    "duplicateKeySingleRun": true,
+    "adminAndOtherOwnerDenied": true,
+    "decimalVersionAndNumericBooleanRejected": true,
+    "reviewReplayed": true,
+    "disabledModelDidNotSend": true,
+    "browserReviewPreserved": true,
+    "financeRowsUnchanged": true,
+    "originalSourceUnchanged": true
+  },
+  "browserChecks": {
+    "localXmlGeneration": true,
+    "explicitTwoFieldConfirmation": true,
+    "originalProposalsPreserved": true,
+    "sameOriginalKeyAndBodyOnGenerateRecovery": true,
+    "sameOriginalKeyAndBodyOnDismissRecovery": true,
+    "singleBusinessEffect": true,
+    "staleErrorCleared": true,
+    "modelDisabledDoesNotEnableSend": true,
+    "afterRestartOriginalActorRead": true,
+    "captureGaps": 0,
+    "observedResponses": 63
+  },
+  "layout": {
+    "clientWidth": 480,
+    "fieldColumns": "417.333px",
+    "headerBottom": 142.1041717529297,
+    "headerHeight": 109.38542175292967,
+    "overlap": false,
+    "scrollWidth": 480,
+    "sourceTop": 162.1041717529297,
+    "tagBottom": 142.1041717529297,
+    "width": 500
+  },
+  "runtime": {
+    "sourceDatabase": "draft_assist_runtime_2067ac411f",
+    "database": "invoice_extraction_ui_dce2fa6c72",
+    "backendPort": 18260,
+    "frontendPort": 15345,
+    "upgrade": {
+      "oldTables": 230,
+      "oldRows": 4019,
+      "newTables": 232,
+      "files": 3,
+      "oldRowsAndFilesPreserved": true
+    },
+    "restart": {
+      "status": "PASS",
+      "boot": 2,
+      "pid": 66329,
+      "previousPid": 64814,
+      "differentProcess": true,
+      "tables": 232,
+      "rows": 4059,
+      "files": 6,
+      "unchangedAllTablesAndFiles": true,
+      "sourceV99Unchanged": true,
+      "jarSha256": "4b197d3206e3620d107a8bc56566ef80863a2a47d780e8aa5d14cd274b6fbe3b",
+      "responses": 7,
+      "snapshotBefore": "invoice-extraction-ui-before-boot2.json"
+    },
+    "financeResourceRowsUnchanged": 12,
+    "sourceDatabaseAndFilesUnchanged": true,
+    "sourceJarUnchanged": true,
+    "existingServicesReplaced": false,
+    "health": {
+      "sourceBackend": {
+        "url": "http://127.0.0.1:18258/actuator/health/readiness",
+        "status": 200
+      },
+      "sourceFrontend": {
+        "url": "http://127.0.0.1:15344/",
+        "status": 200
+      },
+      "isolatedBackend": {
+        "url": "http://127.0.0.1:18260/actuator/health/readiness",
+        "status": 200
+      },
+      "isolatedFrontend": {
+        "url": "http://127.0.0.1:15345/",
+        "status": 200
+      }
+    },
+    "externalModelCalled": false,
+    "realEnterpriseEndpointUsed": false
+  },
+  "deviations": [
+    "首份上传成功后夹具错误地要求 null facts 必须有键；记录按原编号接续，未重复上传。",
+    "实际 CSS 视口按 DOM 测得 500；浏览器既有缩放导致设置宽度与 CSS 宽度不同，已恢复临时视口。",
+    "演示认证在 AuthService 进程内保存令牌，重启后的旧会话返回 401；可见正文清除，原账号重新登录后读取原记录。",
+    "故意丢弃的两份响应不计作已送达；临时拦截规则均已清除。"
+  ],
+  "remaining": [
+    "确认结果辅助填报",
+    "OFD 完整渲染与模型输入",
+    "模型路径及排队或执行中重启的完整运行验收",
+    "真实企业模型识别质量",
+    "其余五类顶层工作与全量证据核对保持"
+  ],
+  "remainingTopLevelCategories": 6,
+  "exactSmallTaskCount": null,
+  "fullGoalCompleted": false,
+  "evidenceFiles": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-red.log",
+      "sha256": "52b6227f83e76a8a819af77f761eff49a41279d338f4d32162f469f8fe66668e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-heading-red.png",
+      "sha256": "8dd76404ba65282ccb733904c39211e20fdbc4f17382708a8cc38520ee56de39"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-recovery-error-red.log",
+      "sha256": "f0bf816af5c234609877df021ba0b0f064b118368019ad43fe9c041ea314ad3a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-recovery-error-red.txt",
+      "sha256": "bbf733c213d233cc69d845ec326b08bef10354bff9d264f11d89e1158f5a1d79"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-scope.log",
+      "sha256": "1f5dc74d6d4cf6f2d9b565cc31626b22ecef9eec7f5cc4b21ee4f15bab21b5a7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-build.log",
+      "sha256": "fcd30ca701bceca688b114a3e5a8cfc7a709ada1daeca0d180586a8651f33bc9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-openapi.log",
+      "sha256": "3700b51b48e379ee32af3d6938e43ef910dda9e6e29ad7ea7d0856ed8630bd10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-package.log",
+      "sha256": "031afe8648b57a8321a0a10f2536e717a493809e8c8b86900c47c9cd8297bf9e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-layout.json",
+      "sha256": "c9c06ee79149713aa252a14ed48cf2bc0fd986a63a7d0b74bcb990dfce1b45c0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-confirmed-500css.png",
+      "sha256": "6379d36cbfb98fe6a3304e0e067e60077332451dc8be850ed937266e6a9a760d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-confirmed-final.png",
+      "sha256": "e70b34dd581c44e2848cdee28e6707506e5b93acb7b1ee562f29955f8ffe7f0b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-queue-recovery.json",
+      "sha256": "d8cf3af2048644b06f55ce686b5b205bf1f53d9bec40b88f3dd358905c130dfb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-review-recovery.json",
+      "sha256": "278aa792452472a76fa180bab6d0f9f6a23d1ab0836b9e037af19b9cdbd5f2ac"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-restart.json",
+      "sha256": "81c6f6acfbfd9d9a9732b748b3e81e9c7c82c741a376eed026c80eeea8600afb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-before-boot2.json",
+      "sha256": "47ac32a965dc78bbaf44d0489c6960b24b7d0b73bafb5891591c55b615a21399"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-disabled-model.txt",
+      "sha256": "4ac30716d9bfee796da49a0dbbcdf497736cbee9657418816762d7d6dc2c7921"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-after-restart.txt",
+      "sha256": "00f1b41e3e361dda3298b8ea356cfc114e34f5607732c18dcc9f00dee098484c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-contracts.json",
+      "sha256": "4d9033f2030f5505441f00231d393706e73ebf4f3ad9e34287d09db77a0ad1d7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-browser-responses.json",
+      "sha256": "c569ecbf39cefac4fd8128e6e0c847b61a8c752ea540b84a959c27089a04e720"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/check-invoice-extraction-ui-recovery.py",
+      "sha256": "4e0f35d13217e0a2a062aa3b8d0c9b023f1f5ee7bc76d1fea855eaa4ce973b22"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/check-invoice-extraction-ui-restart.py",
+      "sha256": "f80c12ddec5a787e7b1f56be44e1bc10d74950e8f1479d621ed7699aba1aa2a9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/exercise-invoice-extraction-ui-http.py",
+      "sha256": "76d731236823c7a77eb1dfe085bda1ab1bb0acbcec4019e8576e4bf8bf4f7034"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-invoice-extraction-ui-contracts.mjs",
+      "sha256": "0e2c546702ed42a9490db2483ae5112844f3bc76ae4a9b6ae9df7ad5f4b9d654"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-http-journey.json",
+      "sha256": "6d688be8193d594189283eb1ed90f891621a34d1e1b887b4222f1504efb5b57f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-http-recovery.json",
+      "sha256": "f9d5775378095f5dba9d35ca7f75e1fb9e608c23f70688265c518b72271ef989"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-http-restart.json",
+      "sha256": "1fe7d2ae68963b07e39b6e501bc846f74da6b2f9ef1b2923fb883e4460b75c1b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-http-setup-continue.json",
+      "sha256": "d86231704beb296187eea84138eca6cb713216937b023ccae6502d4867120b40"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-ui-http-setup.json",
+      "sha256": "2d827c0741ebecc9659ef5a65419d623f92e612daccb57f02779f252b296c7a5"
+    }
+  ]
+}

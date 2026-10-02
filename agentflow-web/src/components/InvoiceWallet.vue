@@ -26,14 +26,14 @@ onUnmounted(() => { epoch++; controller?.abort(); records.clear() })
 
 <template>
   <div class="invoice-wallet">
-    <div class="wallet-heading"><div><h3>个人票夹</h3><p>保留本人原件，查验票面，再用于费用报销。</p></div><button v-if="selectedId" class="secondary" :disabled="busy" @click="selectedId = ''; refresh()">返回票夹</button><button v-else class="secondary" :disabled="busy || records.loading" @click="refresh">刷新票夹</button></div>
+    <div class="wallet-heading"><div><h3>个人票夹</h3><p>保留本人原件，提取并核对票面，查验后用于费用报销。</p></div><button v-if="selectedId" class="secondary" :disabled="busy" @click="selectedId = ''; refresh()">返回票夹</button><button v-else class="secondary" :disabled="busy || records.loading" @click="refresh">刷新票夹</button></div>
     <p v-if="error" class="invoice-error" role="alert">{{ error }}</p>
     <InvoiceDetail v-if="selectedId" :key="selectedId" :invoice-id="selectedId" :scope-key="scopeKey" :refresh-version="refreshVersion" :options="options" :locked="locked" @uploaded="uploaded" @changed="records.load(scopeKey)" @busy="busy = $event" />
     <template v-else>
       <InvoiceUploader :scope-key="scopeKey" :options="options" :locked="locked" @uploaded="uploaded" @busy="busy = $event" />
       <p class="wallet-count">已加载 {{ records.items.length }} 份 · 原件、查验和占用分别记录</p>
       <p v-if="records.error" class="invoice-error" role="alert">票夹读取失败，请刷新后核对。</p>
-      <div class="invoice-ledger"><article v-for="invoice in records.items" :key="invoice.id"><div class="invoice-name"><strong>{{ invoice.original.filename }}</strong><small>{{ invoice.original.format }} · {{ fileSize(invoice.original.size) }} · {{ invoice.original.status === 'READY' ? '原件已保存' : '原件待上传' }}</small></div><div class="invoice-status"><span>{{ verificationStatuses[invoice.verification] }}</span><small>{{ occupationStatuses[invoice.occupation] }}</small></div><strong class="invoice-amount">{{ invoice.facts ? moneyLabel(invoice.facts.gross) : '票面待查验' }}</strong><button type="button" class="secondary" :disabled="busy" :aria-label="`查看票据 ${invoice.original.filename}`" @click="selectedId = invoice.id">查看与查验</button></article></div>
+      <div class="invoice-ledger"><article v-for="invoice in records.items" :key="invoice.id"><div class="invoice-name"><strong>{{ invoice.original.filename }}</strong><small>{{ invoice.original.format }} · {{ fileSize(invoice.original.size) }} · {{ invoice.original.status === 'READY' ? '原件已保存' : '原件待上传' }}</small></div><div class="invoice-status"><span>{{ verificationStatuses[invoice.verification] }}</span><small>{{ occupationStatuses[invoice.occupation] }}</small></div><strong class="invoice-amount">{{ invoice.facts ? moneyLabel(invoice.facts.gross) : '票面待查验' }}</strong><button type="button" class="secondary" :disabled="busy" :aria-label="`查看票据 ${invoice.original.filename}`" @click="selectedId = invoice.id">查看与处理</button></article></div>
       <p v-if="records.loading" class="wallet-empty" role="status">正在读取本人票夹…</p><p v-else-if="!records.error && !records.items.length" class="wallet-empty">票夹还没有原件，从上方添加第一份。</p>
       <button v-if="records.nextBeforeId" type="button" class="secondary" :disabled="records.loading" @click="records.load(scopeKey, undefined, true)">加载更多票据</button>
     </template>
