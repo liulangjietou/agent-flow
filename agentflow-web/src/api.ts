@@ -242,6 +242,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
     let details: ApiError['details']
     try { const body = await response.json() as { message?: string; code?: string; details?: ApiError['details'] }; message = body.message ?? message; code = body.code ?? code; details = body.details } catch { /* 已收到明确状态码，保留错误分类。 */ }
     const messages: Record<string, string> = {
+      NOT_FOUND: '记录不存在或当前账号无权查看，请刷新列表或返回原入口。',
       ATTACHMENT_NOT_READY: '附件尚未上传完成，请恢复上传后再提交。',
       ATTACHMENT_TOO_LARGE: '文件超过当前部署的大小上限，请选择其他文件。',
       ATTACHMENT_QUOTA_EXCEEDED: '本申请累计上传已达到限制，请联系管理员核对存储配置。移除引用不会释放历史文件占用。',

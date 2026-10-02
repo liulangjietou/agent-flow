@@ -7,6 +7,25 @@ globalThis.localStorage = { getItem: () => currentToken }
 const { api, writeRequests } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_API))
 const body = { key: 'expense', name: '费用审批', graph: { nodes: [], edges: [] } }
 
+test('历史通知或任务已不可读时用中文说明不可访问，保留404而不透露记录是否存在', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'missing-record-notice' })
+  const paths = []
+  globalThis.fetch = async url => {
+    paths.push(url)
+    return Response.json({ code: 'NOT_FOUND', message: 'Application not found' }, { status: 404 })
+  }
+  for (const read of [() => api.application('past-app'), () => api.applicationRounds('past-app'), () => api.task('past-task', new AbortController().signal)]) {
+    await assert.rejects(read(), failure => {
+      assert.equal(failure.status, 404)
+      assert.equal(failure.code, 'NOT_FOUND')
+      assert.equal(failure.message, '记录不存在或当前账号无权查看，请刷新列表或返回原入口。')
+      return true
+    })
+  }
+  assert.deepEqual(paths, ['/api/v1/applications/past-app', '/api/v1/applications/past-app/rounds', '/api/v1/tasks/past-task'])
+  assert.equal(writeRequests.pending().length, 0)
+})
+
 test('版本停用响应丢失后保留原修订、原因与幂等键，禁止改成恢复请求', async () => {
   writeRequests.setActor({ tenantId: 'demo', userId: 'availability-recovery' })
   const sent = [], body = { expectedRevision: 3, startEnabled: false, reason: '制度调整' }
