@@ -103,7 +103,7 @@ test('财务 API 编码路径、只读无缓存，写入保持双版本与精确
   await api.expenseReport('report/id', 2, signal); await api.expenseWorkflow('report/id', 'task/id', signal)
   assert.ok(calls[3].url.endsWith('/report%2Fid?roundNo=2')); assert.equal(new URL(calls[4].url, 'http://localhost').searchParams.get('taskId'), 'task/id')
   for (const call of calls) { assert.equal(call.signal, signal); assert.equal(call.cache, 'no-store'); assert.equal(call.headers.has('Idempotency-Key'), false) }
-  const input = { applicationVersion: 2, financialVersion: 5, comment: '明确核减', reasonCode: 'OTHER', lines: [{ lineNo: 1, approvedGross: '999999999999999.98', approvedTax: '0.01' }] }
+  const input = { applicationVersion: 2, financialVersion: 5, comment: '明确核减', reasonCode: 'OTHER', proxyId: 'original-proxy', lines: [{ lineNo: 1, approvedGross: '999999999999999.98', approvedTax: '0.01' }] }
   fail = true; await assert.rejects(api.reduceExpense('report/id', 'task/id', input))
   const pending = writeRequests.pending(); assert.equal(pending.length, 1); assert.equal('body' in pending[0], false)
   await writeRequests.recover(pending[0].id)

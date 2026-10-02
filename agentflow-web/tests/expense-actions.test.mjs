@@ -22,6 +22,49 @@ function panel(Component = Actions, initial = { scopeKey: 'demo/alice', detail: 
   return { state: mounted.$.setupState, props, events, close: () => { app.unmount(); Object.assign(api, originals) } }
 }
 
+const proxy = id => ({ proxyId: id, revision: 1, definitionId: 'published', principalId: id, principal: id,
+  startsAt: new Date(Date.now() - 60_000).toISOString(), endsAt: new Date(Date.now() + 60_000).toISOString() })
+
+test('代理签收和核减必须固定本次原审批人，多项依据不能静默选择', async () => {
+  for (const [action, method] of [['RECEIVE', 'receiveExpense'], ['REDUCE', 'reduceExpense']]) {
+    const calls = []; api[method] = async (...args) => { calls.push(args); return receipt() }; const p = panel()
+    try {
+      Object.assign(p.props.workflow.task, { canActDirectly: false, proxyOptions: [proxy('first'), proxy('second')] })
+      p.state.prepare(action); p.state.comment = '已核对'; p.state.reason = 'OTHER'
+      if (action === 'REDUCE') p.state.inputs[0].approvedGross = '80.00'
+      await p.state.execute(); assert.equal(calls.length, 0); assert.match(p.state.error, /选择.*代理/)
+      p.state.selectedProxy = 'second'; await p.state.execute()
+      assert.equal(calls.length, 1); assert.equal(calls[0][2].proxyId, 'second')
+      assert.equal(calls[0][2].applicationVersion, 2); assert.equal(calls[0][2].financialVersion, 5)
+    } finally { p.close() }
+  }
+})
+
+test('单一代理自动填入确认，同版本撤销或变更权限清空原意图，过期依据不提交', async () => {
+  const calls = []; api.receiveExpense = async (...args) => { calls.push(args); return receipt() }; const p = panel()
+  try {
+    Object.assign(p.props.workflow.task, { canActDirectly: false, proxyOptions: [proxy('first')] })
+    p.state.prepare('RECEIVE'); assert.equal(p.state.selectedProxy, 'first'); p.state.comment = '旧说明'
+    p.props.workflow.task.proxyOptions = []
+    assert.equal(p.state.pending, null); assert.equal(p.state.comment, ''); assert.equal(p.state.selectedProxy, '')
+    p.props.workflow.task.proxyOptions = [{ ...proxy('expired'), endsAt: new Date(Date.now() - 1_000).toISOString() }]
+    p.state.prepare('RECEIVE'); p.state.comment = '签收'; await p.state.execute()
+    assert.equal(calls.length, 0); assert.match(p.state.error, /代理.*失效|代理.*不可用/)
+  } finally { p.close() }
+})
+
+test('本人职责默认不带代理，失效的显式选择不得改为本人或另一条代理', async () => {
+  const calls = []; api.receiveExpense = async (...args) => { calls.push(args); return receipt() }; const p = panel()
+  try {
+    Object.assign(p.props.workflow.task, { canActDirectly: true, proxyOptions: [proxy('valid')] })
+    p.state.prepare('RECEIVE'); assert.equal(p.state.selectedProxy, '')
+    p.state.selectedProxy = 'invalid'; p.state.comment = '签收'; await p.state.execute()
+    assert.equal(calls.length, 0); assert.match(p.state.error, /代理.*失效|代理.*不可用/)
+    p.state.selectedProxy = ''; await p.state.execute()
+    assert.equal(calls.length, 1); assert.equal(Object.hasOwn(calls[0][2], 'proxyId'), false)
+  } finally { p.close() }
+})
+
 test('收单、撤回、作废先确认且说明必填，只发送当前双版本', async () => {
   for (const [action, method] of [['RECEIVE', 'receiveExpense'], ['WITHDRAW', 'withdrawExpense'], ['CANCEL', 'cancelExpense']]) {
     const calls = []; api[method] = async (...args) => { calls.push(args); return receipt() }; const p = panel()

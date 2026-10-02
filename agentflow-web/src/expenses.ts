@@ -1,3 +1,5 @@
+import type { ApprovalProxyOption, ApprovalProxyUse } from './api'
+
 /** 所有金额以十进制字符串传输；币种来自服务端财务事实。 */
 export interface Money { value: string; currency: string }
 export interface CostAllocation { costCenter: string; projectCode: string | null; amount: Money }
@@ -30,13 +32,15 @@ export interface ExpenseDetail { id: string; applicationId: string; businessNo: 
 export interface ExpenseVersions { applicationVersion: number; financialVersion: number }
 export interface ExpenseCommand extends ExpenseVersions { comment: string }
 export interface ReductionLine { lineNo: number; approvedGross: string; approvedTax: string }
-export interface ExpenseReduction extends ExpenseCommand { lines: ReductionLine[]; reasonCode: ReductionReason }
+/** 财务任务操作可明确选用直接代理，申请人撤回和作废不接受该依据。 */
+export interface ExpenseTaskCommand extends ExpenseCommand { proxyId?: string }
+export interface ExpenseReduction extends ExpenseTaskCommand { lines: ReductionLine[]; reasonCode: ReductionReason }
 export interface ExpenseReceipt extends ExpenseVersions { reportId: string; applicationId: string }
 export interface ExpenseWorkflow extends ExpenseReceipt {
   roundNo: number; canWithdraw: boolean; canCancel: boolean
-  paper: null | { roundNo: number; required: boolean; received: boolean; receivedBy: string | null; receivedAt: string | null }
+  paper: null | { roundNo: number; required: boolean; received: boolean; receivedBy: string | null; receivedAt: string | null; proxyUse?: ApprovalProxyUse | null }
   budget: { ledgerStatus: string | null; confirmedCurrent: boolean; operationId: string | null; operationStatus: string | null; issue: string | null }
-  task: null | { taskId: string; stage: 'BUSINESS' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null }
+  task: null | { taskId: string; stage: 'BUSINESS' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
 }
 export interface ExpenseItem extends ExpenseVersions { id: string; applicationId: string; businessNo: string; title: string; status: string; roundNo: number; createdAt: string }
 export interface ExpensePage<T> { items: T[]; nextBeforeId: string | null }

@@ -40,7 +40,7 @@ import type { PaymentCallbackPage, PaymentCallbackDetail, PaymentCallbackView } 
 import { readEventDirectory, readEventVersions, readEventOption, readEventContract, readEventContractHistory, readEventInboxItem, readEventInboxPage, readEventInboxHistory, readEventWaits, validateEventMutation, type EventDirectory, type EventVersions, type EventOption, type EventContract, type EventContractHistory, type EventPublication, type EventAvailabilityInput, type EventInboxItem, type EventInboxPage, type EventInboxHistory, type EventRetryInput, type EventWaitView } from './events.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
-import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
+import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseTaskCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
@@ -556,7 +556,7 @@ export const api = {
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReport: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseWorkflow: (id: string, taskId: string | undefined, signal: AbortSignal) => request<ExpenseWorkflow>(`/expense-reports/${encodeURIComponent(id)}/workflow` + historyQuery({ taskId }), { signal, cache: 'no-store' }),
-  receiveExpense: (id: string, taskId: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/receive`, 'POST', '确认费用原件签收', input),
+  receiveExpense: (id: string, taskId: string, input: ExpenseTaskCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/receive`, 'POST', '确认费用原件签收', input),
   reduceExpense: (id: string, taskId: string, input: ExpenseReduction) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/reduce`, 'POST', '确认财务核减', input),
   withdrawExpense: (id: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回费用审批', input),
   cancelExpense: (id: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/cancel`, 'POST', '作废费用单', input),

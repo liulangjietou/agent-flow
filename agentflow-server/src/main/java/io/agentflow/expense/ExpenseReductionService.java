@@ -49,9 +49,8 @@ public class ExpenseReductionService {
     @Transactional
     public Receipt reduce(UUID reportId, String taskId, Input input) {
         var actor = actors.actor();
-        var context = approvals.requireReduction(reportId, taskId, input.applicationVersion(), input.financialVersion());
+        var context = approvals.requireReduction(reportId, taskId, input.applicationVersion(), input.financialVersion(), input.proxyId());
         var report = context.report(); var application = context.application(); var before = ExpenseReport.restore(report.state());
-        resources.lockReferences(actor.tenantId(), ExpensePrecheckResources.versions(resources.loadReserved(report)));
         var loaded = resources.loadReserved(report); var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         String currency = report.currentRound().baseCurrency();
         var lines = input.lines().stream().map(line -> new ExpenseReport.Reduction(line.lineNo(),
@@ -65,7 +64,7 @@ public class ExpenseReductionService {
         var operation = budgets.reserve(actor.tenantId(), reportId, report.version(), context.control().input().accountingDate(), context.targetDigest(), now);
         audit.record(new TaskAuditPort.TaskOperation(actor.tenantId(), context.taskId(), application.id(), application.version(),
                 application.roundNo(), context.processInstanceId(), actor.userId(), AUDIT_ACTION, input.comment(), null,
-                context.nodeId(), context.nodeName(), application.status(), application.status()));
+                context.nodeId(), context.nodeName(), application.status(), application.status(), null, context.proxyUse()));
         notifications.expenseAdjusted(application, actor.userId());
         return new Receipt(reportId, application.id(), application.version(), report.version(), application.roundNo(), adjustment.id(), operation.input().command().id());
     }
@@ -76,7 +75,7 @@ public class ExpenseReductionService {
      */
     public record Input(@NotNull @Positive Long applicationVersion, @NotNull @Positive Long financialVersion,
             @NotEmpty @Size(max = ExpenseContent.MAX_LINES) List<@NotNull @Valid LineInput> lines,
-            @NotNull Reason reasonCode, @NotBlank @Size(max = 2000) String comment) {
+            @NotNull Reason reasonCode, @NotBlank @Size(max = 2000) String comment, UUID proxyId) {
         /** 伪造审批人或金融对象的字段必须显式失败。 */
         @com.fasterxml.jackson.annotation.JsonAnySetter
         public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown expense reduction request field"); }

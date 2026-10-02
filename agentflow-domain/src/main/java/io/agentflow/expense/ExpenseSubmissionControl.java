@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.organization.ApprovalProxyUse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import java.time.Instant;
@@ -27,10 +28,15 @@ public record ExpenseSubmissionControl(Input input, long version, Instant submit
 
     /** 当前签收任务人工确认原件；普通审批同意不能替代签收。 */
     public ExpenseSubmissionControl receive(String taskId, String nodeId, String actor, String comment, Instant at) {
+        return receive(taskId, nodeId, actor, comment, at, null);
+    }
+
+    /** 有期限代理签收同时保留实际人员和当时授权，不替换原节点审批责任。 */
+    public ExpenseSubmissionControl receive(String taskId, String nodeId, String actor, String comment, Instant at, ApprovalProxyUse proxyUse) {
         if (!input.paperReceiptRequired() || receipt != null || stage(nodeId) != ExpenseProcessPolicy.Stage.RECEIPT) {
             throw new DomainException("EXPENSE_RECEIPT_NOT_ALLOWED", "Paper receipt is not required or has already been recorded for this round");
         }
-        return new ExpenseSubmissionControl(input, 2, submittedAt, new PaperReceipt(taskId, nodeId, actor, comment, at));
+        return new ExpenseSubmissionControl(input, 2, submittedAt, new PaperReceipt(taskId, nodeId, actor, comment, at, proxyUse));
     }
 
     /** 节点必须来自本轮冻结的已发布流程，未知任务没有默认财务职责。 */
@@ -67,7 +73,11 @@ public record ExpenseSubmissionControl(Input input, long version, Instant submit
      * 可审计的人工原件签收，任务与人员由实时任务授权取得。
      * @author owlzhangfq@gmail.com
      */
-    public record PaperReceipt(String taskId, String nodeId, String receivedBy, String comment, Instant receivedAt) {
+    public record PaperReceipt(String taskId, String nodeId, String receivedBy, String comment, Instant receivedAt, ApprovalProxyUse proxyUse) {
+        /** 旧签收和原生责任签收不补造代理来源。 */
+        public PaperReceipt(String taskId, String nodeId, String receivedBy, String comment, Instant receivedAt) {
+            this(taskId, nodeId, receivedBy, comment, receivedAt, null);
+        }
         /** 没有任务、操作者、说明和时刻不能确认实物签收。 */
         public PaperReceipt {
             if (StringUtils.isBlank(taskId) || taskId.length() > 128 || StringUtils.isBlank(nodeId) || nodeId.length() > 128

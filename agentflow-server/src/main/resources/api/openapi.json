@@ -50267,6 +50267,14 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 2000
+          },
+          "proxyId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "可选的直接代理依据。唯一代理可自动选择，多份依据必须明确指定；显式失效依据不能回退为本人权限。"
           }
         },
         "required": [
@@ -50456,6 +50464,14 @@
               "TAX_CORRECTION",
               "OTHER"
             ]
+          },
+          "proxyId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "可选的直接代理依据。唯一代理可自动选择，多份依据必须明确指定；显式失效依据不能回退为本人权限。"
           }
         },
         "required": [
@@ -50848,6 +50864,17 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "proxyUse": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalProxyUse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "实际签收时核实的直接代理依据，旧记录和本人签收为空。"
           }
         },
         "required": [
@@ -50936,13 +50963,24 @@
               "string",
               "null"
             ]
+          },
+          "canActDirectly": {
+            "type": "boolean"
+          },
+          "proxyOptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalProxyOption"
+            }
           }
         },
         "required": [
           "taskId",
           "stage",
           "canReceive",
-          "canReduce"
+          "canReduce",
+          "canActDirectly",
+          "proxyOptions"
         ],
         "additionalProperties": false
       },
@@ -67743,7 +67781,7 @@
       },
       "ApprovalProxyUse": {
         "type": "object",
-        "description": "当次操作锁后已核实的代理依据；实际办理人保存在事件 actor，后续撤销不改写该事实。",
+        "description": "当次操作锁后已核实的代理依据；实际办理人由对应操作记录保存，后续撤销不改写该事实。",
         "properties": {
           "proxyId": {
             "type": "string",

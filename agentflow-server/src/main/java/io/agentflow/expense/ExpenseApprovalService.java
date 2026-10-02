@@ -11,6 +11,7 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetPrecheckPort;
 import io.agentflow.finance.JdbcBudgetOccupationRepository;
+import io.agentflow.organization.ApprovalProxyUse;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -38,13 +39,15 @@ public class ExpenseApprovalService {
     private final CurrentActor actors;
     private final ApplicationRepository applications;
     private final TaskService tasks;
+    private final ExpensePrecheckResources resources;
 
     /** 通用审批和财务动作共享申请锁、当前任务授权和财务版本。 */
     public ExpenseApprovalService(ExpenseReportRepository reports, JdbcExpenseSubmissionControlRepository controls,
             JdbcBudgetOccupationRepository budgets, FlowableTaskAuthorization authorization, CurrentActor actors,
-            ApplicationRepository applications, TaskService tasks) {
+            ApplicationRepository applications, TaskService tasks, ExpensePrecheckResources resources) {
         this.reports = reports; this.controls = controls; this.budgets = budgets; this.authorization = authorization;
         this.actors = actors; this.applications = applications; this.tasks = tasks;
+        this.resources = resources;
     }
 
     /** 审批动作先固定财务上下文，再重新读取任务，避免等待锁期间任务已经被撤回。 */
@@ -69,23 +72,30 @@ public class ExpenseApprovalService {
         var actor = actors.actor();
         var authorized = authorize(reportId, taskId, input.applicationVersion(), input.financialVersion());
         var task = authorized.task(); var application = authorized.application(); var context = authorized.context();
+        var decision = authorization.requireAction(taskId, actor, TaskAction.APPROVE, input.proxyId());
         application.recordTaskAction(input.applicationVersion());
-        var received = context.control().receive(taskId, task.getTaskDefinitionKey(), actor.userId(), input.comment(), Instant.now().truncatedTo(ChronoUnit.MICROS));
-        if (task.getAssignee() == null) tasks.claim(taskId, actor.userId());
+        var received = context.control().receive(taskId, task.getTaskDefinitionKey(), actor.userId(), input.comment(),
+                Instant.now().truncatedTo(ChronoUnit.MICROS), decision.proxyUse());
+        // 签收不是最终审批；纯代理不能通过领取留下超过授权期限的任务权利。
+        if (decision.proxyUse() == null && task.getAssignee() == null) tasks.claim(taskId, actor.userId());
         controls.update(received); applications.update(application, input.applicationVersion());
         return new Receipt(reportId, application.id(), application.version(), context.report().version(), application.roundNo(), received.version());
     }
 
     /** 核减入口按当前任务重新授权；只有本轮实际财务节点且预算已确认才能改变核定金额。 */
     @Transactional(propagation = Propagation.MANDATORY)
-    public FinanceTask requireReduction(UUID reportId, String taskId, long applicationVersion, long financialVersion) {
+    public FinanceTask requireReduction(UUID reportId, String taskId, long applicationVersion, long financialVersion, UUID proxyId) {
         var authorized = authorize(reportId, taskId, applicationVersion, financialVersion);
         var application = authorized.application(); var task = authorized.task(); var context = authorized.context();
         if (!context.control().stage(task.getTaskDefinitionKey()).finance()) {
             throw new DomainException("EXPENSE_FINANCE_TASK_REQUIRED", "Only a current financial review task may reduce expense amounts");
         }
         requirePaper(context); var budget = requireBudget(context);
-        return new FinanceTask(application, context.report(), context.control(), budget.targetDigest(), task.getId(), task.getTaskDefinitionKey(), task.getName(), task.getProcessInstanceId());
+        // 先等齐核减会修改的资源锁，再观察代理有效期；旧的读取快照不能授权等待后的金额变更。
+        resources.lockReferences(application.tenantId(), ExpensePrecheckResources.versions(resources.loadReserved(context.report())));
+        var decision = authorization.requireAction(taskId, actors.actor(), TaskAction.APPROVE, proxyId);
+        return new FinanceTask(application, context.report(), context.control(), budget.targetDigest(), task.getId(), task.getTaskDefinitionKey(),
+                task.getName(), task.getProcessInstanceId(), decision.proxyUse());
     }
 
     /**
@@ -93,14 +103,14 @@ public class ExpenseApprovalService {
      * @author owlzhangfq@gmail.com
      */
     public record FinanceTask(Application application, ExpenseReport report, ExpenseSubmissionControl control, String targetDigest,
-                              String taskId, String nodeId, String nodeName, String processInstanceId) { }
+                              String taskId, String nodeId, String nodeName, String processInstanceId, ApprovalProxyUse proxyUse) { }
 
     private AuthorizedTask authorize(UUID reportId, String taskId, long applicationVersion, long financialVersion) {
         var actor = actors.actor();
-        var task = authorization.require(taskId, actor); var application = authorization.application(actor, task);
+        var task = authorization.requireReadable(taskId, actor); var application = authorization.application(actor, task);
         if (!structured(application) || !application.businessReference().id().equals(reportId)) throw notFound();
         reports.lock(actor.tenantId(), reportId);
-        task = authorization.require(taskId, actor); application = authorization.application(actor, task);
+        task = authorization.requireReadable(taskId, actor); application = authorization.application(actor, task);
         var context = context(application, task);
         if (application.version() != applicationVersion || context.report().version() != financialVersion) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Application or financial version changed");
@@ -154,7 +164,7 @@ public class ExpenseApprovalService {
      * @author owlzhangfq@gmail.com
      */
     public record ReceiveInput(@NotNull @Positive Long applicationVersion, @NotNull @Positive Long financialVersion,
-            @NotBlank @Size(max = 2000) String comment) {
+            @NotBlank @Size(max = 2000) String comment, UUID proxyId) {
         /** 拒绝无法解释的额外财务字段。 */
         @com.fasterxml.jackson.annotation.JsonAnySetter
         public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown expense receipt request field"); }

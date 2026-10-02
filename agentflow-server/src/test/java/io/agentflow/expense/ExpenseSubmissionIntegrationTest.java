@@ -28,6 +28,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -42,6 +44,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
@@ -120,7 +126,7 @@ class ExpenseSubmissionIntegrationTest {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> "true");
-        registry.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_SUBMISSION_TEST_URL", "jdbc:h2:mem:expense-submission;DB_CLOSE_DELAY=-1"));
+        registry.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_SUBMISSION_TEST_URL", "jdbc:h2:mem:expense-submission;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000"));
         registry.add("spring.datasource.driver-class-name", () -> System.getenv().getOrDefault("AGENTFLOW_SUBMISSION_TEST_DRIVER", "org.h2.Driver"));
         registry.add("spring.datasource.username", () -> System.getenv().getOrDefault("AGENTFLOW_SUBMISSION_TEST_USER", "sa"));
         registry.add("spring.datasource.password", () -> System.getenv().getOrDefault("AGENTFLOW_SUBMISSION_TEST_PASSWORD", ""));
@@ -222,12 +228,15 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcBudgetConsumptionReversalRepository budgetReversals;
     @Autowired AccountingPeriodPort accountingPeriods;
     @Autowired ExpenseResourceAdjustmentExecution resourceAdjustmentExecution;
-    @Autowired ExpensePrecheckResources financialResources;
+    @MockitoSpyBean ExpensePrecheckResources financialResources;
+    @MockitoSpyBean io.agentflow.api.idempotency.JdbcIdempotencyRepository idempotency;
     @Autowired ExpenseResourceChanges resourceChanges;
     @Autowired ExpenseResourceAdjustmentPreparationService resourcePreparing;
     @Autowired ExpenseResourceAdjustmentActionService resourceActions;
     @Autowired ExpenseResourceAdjustmentBudgetExecution resourceBudgetExecution;
     @Autowired ExpenseResourceAdjustmentWorker resourceWorker;
+    @Autowired io.agentflow.organization.ApprovalProxyService approvalProxies;
+    @Autowired io.agentflow.definition.DefinitionDraftRepository definitionRecords;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
@@ -307,6 +316,200 @@ class ExpenseSubmissionIntegrationTest {
         }
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @Test
+    void timedProxyReceiptKeepsOriginalResponsibilityAndRecordsActualSigner() throws Exception {
+        var report = fixture(false).report(); submit(report); ok(act(report, "manager", "APPROVE"), 200);
+        var task = task(report); String originalAssignee = task.getAssignee();
+        var proxy = proxy(report, "admin");
+        var workflow = ok(read(path(report) + "/workflow?taskId=" + task.getId(), "admin"), 200);
+        assertThat(workflow.at("/task/canReceive").asBoolean()).isTrue();
+        assertThat(workflow.at("/task/canActDirectly").asBoolean()).isFalse();
+        assertThat(workflow.at("/task/proxyOptions/0/proxyId").asText()).isEqualTo(proxy.id().toString());
+        String key = UUID.randomUUID().toString(); var input = receiveInput(report);
+        var first = ok(send(path(report) + "/tasks/" + task.getId() + "/receive", "admin", key, input), 200);
+        assertThat(task(report).getAssignee()).isEqualTo(originalAssignee);
+        var control = controls.find("demo", report.id(), 1).orElseThrow();
+        assertThat(control.receipt().receivedBy()).isEqualTo("admin");
+        var recorded = json.read(json.write(control), JsonNode.class).at("/receipt/proxyUse");
+        assertThat(recorded.path("proxyId").asText()).isEqualTo(proxy.id().toString());
+        assertThat(recorded.path("principal").asText()).isEqualTo("finance");
+        approvalProxies.revoke(admin, proxy.id(), 1, "签收后结束代理");
+        assertThat(ok(send(path(report) + "/tasks/" + task.getId() + "/receive", "admin", key, input), 200)).isEqualTo(first);
+        assertThat(act(report, "admin", "APPROVE").getStatus()).isEqualTo(403);
+        assertThat(controls.find("demo", report.id(), 1)).contains(control);
+        ok(act(report, "finance", "APPROVE"), 200);
+    }
+
+    @Test
+    void timedProxyReductionUsesOwnFinanceRoleAndRetainsActualOperatorAndOriginalAuthority() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report);
+        var proxy = proxy(report, "admin"); var task = task(report); var before = current(report);
+        var workflow = ok(read(path(report) + "/workflow?taskId=" + task.getId(), "admin"), 200);
+        assertThat(workflow.at("/task/canReduce").asBoolean()).isTrue();
+        assertThat(workflow.at("/task/canActDirectly").asBoolean()).isFalse();
+        var input = new HashMap<String, Object>(reductionInput(report, "25", "1"));
+        input.put("proxyId", UUID.randomUUID());
+        assertThat(send(reductionPath(report), "admin", input).getStatus()).isEqualTo(403);
+        input.put("proxyId", proxy.id());
+        // 原生财务也不能以无效的显式依据降级为本人办理。
+        assertThat(send(reductionPath(report), "finance", input).getStatus()).isEqualTo(403);
+        String key = UUID.randomUUID().toString();
+        var receipt = ok(send(reductionPath(report), "admin", key, input), 200);
+        assertThat(ok(send(reductionPath(report), "admin", key, input), 200)).isEqualTo(receipt);
+        var reduced = current(report);
+        assertThat(reduced.version()).isEqualTo(before.version() + 1);
+        assertThat(reduced.currentRound().adjustments()).singleElement().satisfies(adjustment -> assertThat(adjustment.adjustedBy()).isEqualTo("admin"));
+        assertThat(reduced.currentRound().approvedGross()).isEqualTo(money("25"));
+        assertThat(requests.find("demo", fixture.prior()).orElseThrow().balance(1).reservedFor(new ExpenseUse(report.id(), 1, 1))).isEqualTo(money("25"));
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().reservedFor(new ExpenseUse(report.id(), 1, 0))).isEqualTo(money("25"));
+        assertThat(task(report).getId()).isEqualTo(task.getId());
+        assertThat(task(report).getAssignee()).isEqualTo(task.getAssignee());
+        var audit = json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE application_id=? AND action='EXPENSE_REDUCE' AND actor_id='admin'",
+                String.class, report.applicationId().toString()), JsonNode.class);
+        assertThat(audit.at("/proxyUse/proxyId").asText()).isEqualTo(proxy.id().toString());
+        assertThat(audit.at("/proxyUse/principal").asText()).isEqualTo("finance");
+        assertThat(Instant.parse(audit.at("/proxyUse/authorizedAt").asText())).isBefore(proxy.endsAt());
+        assertCode(act(report, "admin", "APPROVE"), "EXPENSE_BUDGET_NOT_CONFIRMED");
+        approvalProxies.revoke(admin, proxy.id(), 1, "核减后结束代理");
+        budgetWorker.poll();
+        assertThat(act(report, "admin", "APPROVE").getStatus()).isEqualTo(403);
+        ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.APPROVED);
+    }
+
+    @Test
+    void timedProxyReceiptDoesNotBorrowFinanceRoleOrBypassPaperAndBudgetGuards() throws Exception {
+        var report = fixture(false).report(); submit(report); ok(act(report, "manager", "APPROVE"), 200);
+        var bobProxy = proxy(report, "bob");
+        assertCode(act(report, "bob", "APPROVE"), "EXPENSE_PAPER_RECEIPT_REQUIRED");
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "bob", receiveInput(report)), 200);
+        ok(act(report, "bob", "APPROVE"), 200);
+        assertThat(read(path(report) + "/workflow?taskId=" + task(report).getId(), "bob").getStatus()).isEqualTo(403);
+        assertThat(send(reductionPath(report), "bob", reductionInput(report, "50", "3")).getStatus()).isEqualTo(403);
+        assertThat(act(report, "bob", "APPROVE").getStatus()).isEqualTo(403);
+        approvalProxies.revoke(admin, bobProxy.id(), 1, "改由具备财务角色的人员代理");
+        proxy(report, "admin");
+        assertCode(send(reductionPath(report), "admin", reductionInput(report, "50", "3")), "EXPENSE_BUDGET_NOT_CONFIRMED");
+        budgetWorker.poll();
+        assertThat(act(report, "bob", "APPROVE").getStatus()).isEqualTo(403);
+        ok(act(report, "admin", "APPROVE"), 200);
+    }
+
+    @Test
+    void timedProxyRevokedWhileWaitingForFinancialResourcesCannotReduce() throws Exception {
+        timedProxyResourceWait(false);
+    }
+
+    @Test
+    void timedProxyExpiredWhileWaitingForFinancialResourcesCannotReduce() throws Exception {
+        timedProxyResourceWait(true);
+    }
+
+    private void timedProxyResourceWait(boolean expire) throws Exception {
+        var report = fixture(true).report(); enterFinance(report);
+        var before = current(report).state(); var versions = resourceVersions(report); long applicationVersion = app(report).version();
+        var proxy = proxy(report, "admin", Instant.now().plusSeconds(expire ? 6 : 3600));
+        var input = new HashMap<String, Object>(reductionInput(report, "25", "1")); input.put("proxyId", proxy.id());
+        String path = reductionPath(report);
+        var held = new java.util.concurrent.CountDownLatch(1);
+        var waiting = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(3);
+        try {
+            var blocker = pool.submit(() -> tx().execute(status -> {
+                financialResources.lockReferences("demo", versions); held.countDown();
+                try { assertThat(release.await(15, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+                return null;
+            }));
+            assertThat(held.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            // 此探针只标记进入真实行锁等待；数据库锁和最终写入均执行真实实现。
+            doAnswer(invocation -> { waiting.countDown(); return invocation.callRealMethod(); })
+                    .when(AopTestUtils.<ExpensePrecheckResources>getUltimateTargetObject(financialResources)).lockReferences(eq("demo"), anyList());
+            var decision = pool.submit(() -> send(path, "admin", input));
+            assertThat(waiting.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(decision.isDone()).isFalse();
+            assertThat(Instant.now()).isBefore(proxy.endsAt());
+            if (expire) {
+                Thread.sleep(java.time.Duration.between(Instant.now(), proxy.endsAt()).toMillis() + 50);
+            } else {
+                // 撤销必须能在财务资源尚未释放时完成，避免先持有代理行锁形成反向等待。
+                pool.submit(() -> approvalProxies.revoke(admin, proxy.id(), 1, "等待资源期间撤销"))
+                        .get(5, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            release.countDown(); blocker.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(decision.get(10, java.util.concurrent.TimeUnit.SECONDS).getStatus()).isEqualTo(403);
+        } finally { release.countDown(); pool.shutdownNow(); pool.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS); }
+        assertThat(current(report).state()).isEqualTo(before);
+        assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThat(app(report).version()).isEqualTo(applicationVersion);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_REDUCE'", Integer.class, report.applicationId().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void timedProxyReceiptResponseFailureRollsBackProofAndSameKeyCanRecoverOnce() throws Exception {
+        var report = fixture(false).report(); submit(report); ok(act(report, "manager", "APPROVE"), 200);
+        var proxy = proxy(report, "admin"); var original = controls.find("demo", report.id(), 1).orElseThrow();
+        var task = task(report); long applicationVersion = app(report).version();
+        var input = receiveInput(report); String key = UUID.randomUUID().toString();
+        String path = path(report) + "/tasks/" + task.getId() + "/receive";
+        doThrow(new IllegalStateException("Synthetic proxy receipt response failure")).when(idempotency).complete(eq("demo"), eq(key), anyInt(), anyString());
+        assertThatThrownBy(() -> send(path, "admin", key, input)).hasRootCauseMessage("Synthetic proxy receipt response failure");
+        assertThat(controls.find("demo", report.id(), 1)).contains(original);
+        assertThat(app(report).version()).isEqualTo(applicationVersion);
+        assertThat(task(report).getAssignee()).isEqualTo(task.getAssignee());
+        assertThat(idempotency.find("demo", key)).isEmpty();
+        doCallRealMethod().when(idempotency).complete(eq("demo"), eq(key), anyInt(), anyString());
+        var first = ok(send(path, "admin", key, input), 200);
+        assertThat(ok(send(path, "admin", key, input), 200)).isEqualTo(first);
+        assertThat(controls.find("demo", report.id(), 1).orElseThrow().receipt().proxyUse().proxyId()).isEqualTo(proxy.id());
+        assertThat(app(report).version()).isEqualTo(applicationVersion + 1);
+    }
+
+    @Test
+    void timedProxyReductionResponseFailureRollsBackAllFinancialFactsAndRecoversSameKey() throws Exception {
+        var report = fixture(true).report(); enterFinance(report); proxy(report, "admin");
+        var before = current(report).state(); var versions = resourceVersions(report); long applicationVersion = app(report).version();
+        var input = reductionInput(report, "25", "1"); String key = UUID.randomUUID().toString(); String path = reductionPath(report);
+        doThrow(new IllegalStateException("Synthetic proxy reduction response failure")).when(idempotency).complete(eq("demo"), eq(key), anyInt(), anyString());
+        assertThatThrownBy(() -> send(path, "admin", key, input)).hasRootCauseMessage("Synthetic proxy reduction response failure");
+        assertThat(current(report).state()).isEqualTo(before); assertThat(resourceVersions(report)).isEqualTo(versions);
+        assertThat(app(report).version()).isEqualTo(applicationVersion); assertThat(idempotency.find("demo", key)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_REDUCE'", Integer.class, report.applicationId().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='EXPENSE_ADJUSTED'", Integer.class, report.applicationId().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+        assertThat(((Map<?, ?>) runtime.getVariable(task(report).getProcessInstanceId(), "formData")).get("amount")).isEqualTo("100.00");
+        doCallRealMethod().when(idempotency).complete(eq("demo"), eq(key), anyInt(), anyString());
+        var first = ok(send(path, "admin", key, input), 200);
+        assertThat(ok(send(path, "admin", key, input), 200)).isEqualTo(first);
+        assertThat(current(report).currentRound().adjustments()).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(2);
+    }
+
+    @Test
+    void timedProxyAdditionKeepsLegacyReceiptJsonReadableWithoutInventingAuthority() throws Exception {
+        var report = fixture(false).report(); enterFinance(report);
+        var original = controls.find("demo", report.id(), 1).orElseThrow();
+        var encoded = json.read(json.write(original), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) encoded.path("receipt")).remove("proxyUse");
+        jdbc.update("UPDATE expense_submission_control SET state_json=? WHERE tenant_id='demo' AND report_id=?", json.write(encoded), report.id().toString());
+        var restored = controls.find("demo", report.id(), 1).orElseThrow();
+        assertThat(restored).isEqualTo(original); assertThat(restored.receipt().proxyUse()).isNull();
+        ok(act(report, "finance", "APPROVE"), 200);
+    }
+
+    private io.agentflow.organization.ApprovalProxy proxy(ExpenseReport report, String substitute) {
+        return proxy(report, substitute, Instant.now().plusSeconds(3600));
+    }
+
+    private io.agentflow.organization.ApprovalProxy proxy(ExpenseReport report, String substitute, Instant endsAt) {
+        var application = app(report);
+        var scope = definitionRecords.findPublished("demo", application.processKey(), application.definitionVersion()).orElseThrow();
+        return approvalProxies.create(admin, scope.id(), finance, person(substitute, true), Instant.now(),
+                endsAt, "真实费用流程代理验证");
+    }
 
     @Test
     void formalSubmissionReplaysOnceAndRequiresExplicitReceiptThenActualBudgetFreeze() throws Exception {

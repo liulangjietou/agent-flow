@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
+import { selectedApprovalProxy } from '../taskActions'
 import { changedReductions, expenseError, moneyLabel, reductionReasons, type ExpenseDetail, type ExpenseWorkflow, type ReductionLine, type ReductionReason } from '../expenses'
 
 const props = defineProps<{ detail: ExpenseDetail; workflow: ExpenseWorkflow; scopeKey: string; locked?: boolean }>()
@@ -8,23 +9,29 @@ const emit = defineEmits<{ changed: []; busy: [value: boolean]; refresh: [] }>()
 type Action = 'RECEIVE' | 'REDUCE' | 'WITHDRAW' | 'CANCEL'
 const labels: Record<Action, string> = { RECEIVE: '确认原件签收', REDUCE: '确认财务核减', WITHDRAW: '确认撤回审批', CANCEL: '确认作废费用单' }
 const pending = ref<Action | null>(null), comment = ref(''), reason = ref<ReductionReason | ''>(''), inputs = ref<ReductionLine[]>([])
+const selectedProxy = ref('')
+const proxyOptions = computed(() => props.workflow.task?.proxyOptions ?? [])
+const proxy = computed(() => proxyOptions.value.find(option => option.proxyId === selectedProxy.value))
+const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
 const saving = ref(false), error = ref(''), requiresRefresh = ref(false)
 const formElement = ref<HTMLFormElement | null>(null)
 let epoch = 0
 const allowed = computed(() => ({ RECEIVE: props.workflow.task?.canReceive === true, REDUCE: props.workflow.task?.canReduce === true && !!props.detail.financialRound,
   WITHDRAW: props.workflow.canWithdraw, CANCEL: props.workflow.canCancel }))
 const blocked = computed(() => props.locked || saving.value || requiresRefresh.value)
-function reset() { pending.value = null; comment.value = ''; reason.value = ''; inputs.value = []; error.value = '' }
-watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion, props.workflow.task?.taskId], () => {
+function reset() { pending.value = null; comment.value = ''; reason.value = ''; inputs.value = []; selectedProxy.value = ''; error.value = '' }
+watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion, props.workflow.task?.taskId,
+  JSON.stringify([props.workflow.task?.canActDirectly, props.workflow.task?.proxyOptions, allowed.value])], () => {
   epoch++; reset(); requiresRefresh.value = false; saving.value = false; emit('busy', false)
 }, { flush: 'sync' })
 onUnmounted(() => { epoch++; emit('busy', false) })
 function prepare(action: Action) {
   if (blocked.value || !allowed.value[action]) return
   reset(); pending.value = action
+  if ((action === 'RECEIVE' || action === 'REDUCE') && props.workflow.task?.canActDirectly === false && proxyOptions.value.length === 1) selectedProxy.value = proxyOptions.value[0].proxyId
   if (action === 'REDUCE') inputs.value = props.detail.financialRound!.approvedLines.map(line => ({ lineNo: line.lineNo, approvedGross: line.gross.value, approvedTax: line.tax.value }))
   const generation = epoch
-  void nextTick(() => { if (generation === epoch && pending.value === action) formElement.value?.querySelector<HTMLElement>('input, textarea')?.focus() })
+  void nextTick(() => { if (generation === epoch && pending.value === action) formElement.value?.querySelector<HTMLElement>('select, input, textarea')?.focus() })
 }
 function cancel() { if (!saving.value) reset() }
 async function execute() {
@@ -39,7 +46,13 @@ async function execute() {
     catch (cause) { error.value = (cause as Error).message; return }
   }
   const generation = epoch, id = props.detail.id, taskId = props.workflow.task?.taskId
-  const input = { applicationVersion: props.detail.applicationVersion, financialVersion: props.detail.financialVersion, comment: comment.value.trim() }
+  let proxyId: string | undefined
+  if (action === 'RECEIVE' || action === 'REDUCE') {
+    try { proxyId = selectedApprovalProxy(props.workflow.task!, selectedProxy.value)?.proxyId }
+    catch (cause) { error.value = (cause as Error).message; return }
+  }
+  const input = { applicationVersion: props.detail.applicationVersion, financialVersion: props.detail.financialVersion,
+    comment: comment.value.trim(), ...(proxyId ? { proxyId } : {}) }
   saving.value = true; emit('busy', true)
   try {
     const result = action === 'RECEIVE' ? await api.receiveExpense(id, taskId!, input)
@@ -69,6 +82,14 @@ async function execute() {
       <p v-if="pending === 'RECEIVE'">请核对本轮纸质原件与费用明细。签收会记录办理人和时间，随后仍需完成当前节点审批。</p>
       <p v-if="pending === 'WITHDRAW'">撤回会停止本轮待办，保留现有占用供补正。重新提交将开始新一轮审批。</p>
       <p v-if="pending === 'CANCEL'">作废后不能再编辑或提交。已预留资金将安排释放，原内容和历史记录保留。</p>
+      <template v-if="(pending === 'RECEIVE' || pending === 'REDUCE') && proxyOptions.length">
+        <label>办理身份<select v-model="selectedProxy" :disabled="blocked" :required="workflow.task?.canActDirectly === false">
+          <option v-if="workflow.task?.canActDirectly !== false" value="">以本人审批职责办理</option>
+          <option v-else value="" disabled>请选择本次代理的原审批人</option>
+          <option v-for="option in proxyOptions" :key="option.proxyId" :value="option.proxyId">代理 {{ option.principal }} 办理</option>
+        </select></label>
+        <p v-if="proxy">代理有效至 {{ timeLabel(proxy.endsAt) }}。本次操作保留实际办理人和原审批依据，当前节点仍需另行审批。</p>
+      </template>
       <template v-if="pending === 'REDUCE'">
         <p>只填写核减后的金额。原始提交内容保留；借款抵扣随总额减少，预算调整确认前不能批准本节点。</p>
         <div class="reduction-table" role="group" aria-label="核减后金额">
