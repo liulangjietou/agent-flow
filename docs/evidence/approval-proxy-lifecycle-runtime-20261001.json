@@ -1,0 +1,107 @@
+{
+  "recordedAt": "2026-10-02T02:24:14.181829+00:00",
+  "stage": "V98 非空运行升级、首批生命周期 HTTP 与一次重启；完整代理验收继续",
+  "codeCommit": "538060c90765e86725a3e3a1084bfd2f61e8c8aa",
+  "branch": "codex/governance-identifier-integration",
+  "package": {
+    "result": "PASS",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-package.log",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-server.jar",
+    "sha256": "1897a355b43b2a2a9046ec486dc4ca897d87bd1b14e801a3413b6f2c30fdb6ed",
+    "tests": "打包使用已通过 197 项 H2 和 51 项 PostgreSQL 范围验证的同一代码；不重复执行测试"
+  },
+  "upgrade": {
+    "status": "PASS",
+    "sourceDatabase": "approval_proxy_runtime_9439518b65",
+    "database": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "fromVersion": 97,
+    "toVersion": 98,
+    "originalBusinessTables": 227,
+    "preservedBusinessRows": 2676,
+    "preservedProxySources": 2,
+    "preservedFiles": 3,
+    "sourceUnchanged": true,
+    "changedTables": [
+      "approval_proxy_notification",
+      "flyway_schema_history"
+    ],
+    "newMessagesBackfilled": false,
+    "readiness": "UP",
+    "proxyReminderWorkerEnabled": false,
+    "slaWorkerEnabled": false,
+    "note": "来源表仅新增 event_version=0；按旧列比较原行摘要，其他原业务表与文件全部保持。尚未验收新业务 HTTP、页面或在审重启。"
+  },
+  "http": {
+    "status": "PASS",
+    "applicationId": "d2d33a58-5e2e-4eac-ad7d-4a57b248faa7",
+    "definitionId": "7ecfb7a4-71de-4339-a905-4a93c24833d1",
+    "proxyId": "34473af8-3191-46e5-9114-d3934b7e8f71",
+    "events": [
+      "APPLICATION_WITHDRAWN",
+      "APPLICATION_RESUMED",
+      "APPLICATION_PAUSED",
+      "APPLICATION_RESUMED",
+      "APPLICATION_PAUSED"
+    ],
+    "proxyMessages": 5,
+    "pauseRequestsReplayed": 2,
+    "duplicateMessages": 0,
+    "businessContentCopied": false,
+    "historicalReadGranted": false,
+    "recordedResponses": 15,
+    "httpEvidence": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-http-pause-resume-withdraw.json",
+    "externalDeliveryVerified": false,
+    "browserVerified": false
+  },
+  "contracts": {
+    "status": "PASS",
+    "files": {
+      "approval-proxy-lifecycle-http-pause-resume-withdraw.json": {
+        "responses": 15,
+        "successfulRequests": 12
+      }
+    },
+    "totalResponses": 15
+  },
+  "restart": {
+    "status": "PASS",
+    "database": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "boot": 2,
+    "tables": 228,
+    "rows": 2872,
+    "files": 3,
+    "allRowsAndFilesPreserved": true,
+    "sourceUnchanged": true,
+    "jarSha256": "1897a355b43b2a2a9046ec486dc4ca897d87bd1b14e801a3413b6f2c30fdb6ed",
+    "health": "UP"
+  },
+  "runtime": {
+    "stateFile": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-runtime.json",
+    "database": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "sourceDatabase": "approval_proxy_runtime_9439518b65",
+    "schemaVersion": 98,
+    "backendPort": 18255,
+    "backendPid": 17715,
+    "backendSession": 8041,
+    "boot": 2,
+    "externalWorkersEnabled": false,
+    "proxyRemindersEnabled": false,
+    "slaRemindersEnabled": false,
+    "frontendStarted": false
+  },
+  "preservedOriginalRuntime": {
+    "database": "approval_proxy_runtime_9439518b65",
+    "schemaVersion": 97,
+    "backendPort": 18254,
+    "frontendPort": 15341,
+    "replaced": false,
+    "sourceDataAndFilesUnchanged": true
+  },
+  "limits": [
+    "本次 HTTP 覆盖两次暂停／恢复、撤回、原键重放、最小文案及结束后无新增读取权；不是全部生命周期场景。",
+    "新增运行未打开页面；没有浏览器验收。",
+    "为精确比较迁移与重启数据，副本的代理扫描和 SLA worker 暂时关闭；未完成原 SLA 真实计时和提醒接续。",
+    "财务代理、多原审批人、旧 V95 在审任务实际办理及其余边界继续；没有企业通知外发。",
+    "整体仍有至少六类工作及一项全量需求证据核对。"
+  ]
+}
