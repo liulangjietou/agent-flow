@@ -50,7 +50,10 @@ public class AssistConfiguration {
     }
 
     /** 冻结服务目标，配置改变后不能将旧授权内容发送到新目的地。 */
-    public String targetDigest() { return digest(endpoint + "\n" + providerId + "\n" + model + "\n" + PROMPT_VERSION); }
+    public String targetDigest() { return targetDigest(PROMPT_VERSION); }
+
+    /** 不同业务提示分别冻结授权；旧摘要调用保持原指纹。 */
+    public String targetDigest(String promptVersion) { return digest(endpoint + "\n" + providerId + "\n" + model + "\n" + promptVersion); }
 
     /** 指纹只用于内容与目标绑定，不存储明文凭据。 */
     static String digest(String value) {

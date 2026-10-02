@@ -87,6 +87,15 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("DraftAssistSelection", io.agentflow.agent.DraftSuggestion.Selection.class),
+                java.util.Map.entry("DraftAssistProposal", io.agentflow.agent.DraftSuggestion.Proposal.class),
+                java.util.Map.entry("DraftAssistSuggestion", io.agentflow.agent.DraftSuggestion.class),
+                java.util.Map.entry("DraftAssistReview", io.agentflow.agent.DraftAssistRun.Review.class),
+                java.util.Map.entry("DraftAssistReceipt", io.agentflow.agent.DraftAssistService.Receipt.class),
+                java.util.Map.entry("DraftAssistInputOptions", io.agentflow.agent.DraftAssistService.InputOptions.class),
+                java.util.Map.entry("DraftAssistSummary", io.agentflow.agent.JdbcDraftAssistRunRepository.Summary.class),
+                java.util.Map.entry("DraftAssistPage", io.agentflow.agent.JdbcDraftAssistRunRepository.Page.class),
+                java.util.Map.entry("DraftAssistDetail", io.agentflow.agent.DraftAssistService.Detail.class),
                 java.util.Map.entry("FormAssigneeOption", io.agentflow.definition.DefinitionAssigneeDirectory.FormOption.class),
                 java.util.Map.entry("ApprovalProxy", io.agentflow.organization.ApprovalProxy.class),
                 java.util.Map.entry("ApprovalProxyOption", io.agentflow.approval.process.FlowableApprovalProxyAccess.Option.class),
