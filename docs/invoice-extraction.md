@@ -45,6 +45,12 @@ OFD 预检分为两个职责：`InvoiceOfdArchive` 完整读取 ZIP 中央目录
 
 此预检尚未接入公开请求；OFD 请求仍在内容适配入口明确拒绝。后续还须实现独立处理进程、字体／图像解码、模板和图元完整性、嵌套印章内容、全页渲染与模型输入。当前候选库 OFDRW 2.4.0 的 [转换模块依赖](https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/pom.xml)、[字体初始化](https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/FontLoader.java)及[局部渲染错误处理](https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/AWTMaker.java)仍需解决，尚未添加该依赖。预检不证明页面已完整渲染、数字签名有效或发票真实。
 
+2026-10-02 的独立渲染实验将依赖疑点落实为可复现结果：原 converter 二进制搭配 PDFBox／FontBox 3.0.8 时，两个公开样本均因缺少 `SeparableBlendMode` 退出。只排除 iText 也不足以接入，字体初始化和 `CommonUtil` 的 PDF 颜色方法签名仍会触发类加载。实验在临时目录、独立命名空间中改编三份上游源文件，保留现有 PDFBox 版本，移除图片路径不需要的 PDF 字体导出及工具类调用；这不是应用依赖或生产实现的变更。
+
+初次实验能输出五页图片，但视觉检查发现中文缺失。默认字体实际为 `Trattatello`，对“中文金额税0123456789”的字形检查有五字缺失；仅改用支持 TTC 的加载方式仍失败。显式指定本机 `STHeiti Light.ttc` 后，该检查通过，实际选中的是 `STHeitiTC-Light`；五页重新输出，检查的前两页恢复了中文票面和明细文字。字体文件没有复制进项目，也没有外发或分发；最终部署仍须明确字体及具体字体面，不能依赖本机扫描结果。
+
+这些结果只支持图片路径和字体配置的可行性判断，不证明全页视觉等价或真实发票识别质量。缺字与局部绘制错误必须阻断输出，嵌套印章需受相同文件包和 XML 限制；弧线、裁剪、透明度、字形编号与补充平面字符仍待核对。实验只使用已通过预检的公开样本，未调用模型，未启用 OFD 适配器；日志、源改动差异、样本及图片摘要见[实验记录](evidence/invoice-ofd-renderer-probe-20261002.json)。
+
 图片请求采用 Chat Completions 的 `image_url` 内联图片格式，协议依据为 [OpenAI 图片输入文档](https://developers.openai.com/api/docs/guides/images-vision)。PDF 使用 [OpenAI 文件输入文档](https://developers.openai.com/api/docs/guides/file-inputs)中的内联文件格式；XML 内容以文本块处理，不能据此认为模型文件接口原生支持 XML 或 OFD。最终配置的模型仍需实际图片／PDF 能力与质量验收。
 
 模型只接收原件引用和白名单字段，不发送归属人、租户、原文件名或文件系统路径作为请求元数据；PDF 请求使用固定名 `invoice.pdf`。图片与 PDF 的全部原始字节会外发，包括原件内部元数据及 PDF 内嵌内容。固定文件名不能消除原件内部的个人信息，公开入口和页面必须明确说明完整发送范围，默认不勾选；尚未开放这些入口。模型只能返回封闭候选结构，额外动作、未知字段、数值类型票号、伪造原件、不存在页码和 XML 虚假摘录均拒绝。
