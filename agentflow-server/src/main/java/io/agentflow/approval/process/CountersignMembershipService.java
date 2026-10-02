@@ -106,6 +106,9 @@ public class CountersignMembershipService {
             throw new DomainException("FORBIDDEN", "Only the current countersign responsibility holder can change membership");
         }
         application.recordTaskAction(input.expectedVersion());
+        var removedAudience = input.action() == Action.REMOVE
+                ? notifications.beforeCountersignCompletion(application, java.util.Set.of(input.targetTaskId()))
+                : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
         FlowableCountersignRuntime.Change change;
         if (input.action() == Action.ADD) {
             authorization.requireTargetAllowed(task, input.targetUser());
@@ -121,7 +124,7 @@ public class CountersignMembershipService {
                 input.reason().strip(), change.targetUser(), task.getTaskDefinitionKey(), task.getName(),
                 ApplicationStatus.IN_APPROVAL, ApplicationStatus.IN_APPROVAL, facts));
         if (input.action() == Action.ADD) notifications.countersignAdded(application, actor.userId(), change.targetTaskId());
-        else notifications.countersignRemoved(application, actor.userId(), change.targetUser(), change.targetTaskId(), task.getName());
+        else notifications.countersignRemoved(application, actor.userId(), change.targetUser(), change.targetTaskId(), task.getName(), removedAudience);
         return new Receipt(taskId, application.id(), application.roundNo(), application.version(), task.getProcessInstanceId(),
                 task.getTaskDefinitionKey(), input.action(), change.executionId(), change.targetTaskId(), change.targetUser(),
                 change.totalBefore(), change.totalAfter(), change.completed(), eventId);

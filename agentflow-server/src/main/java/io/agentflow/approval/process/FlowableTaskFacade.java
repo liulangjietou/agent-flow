@@ -166,6 +166,8 @@ public class FlowableTaskFacade {
         CountersignProgress countersign = countersign(task);
         if (countersign != null) countersign.requireAction(normalized);
         var previousTaskIds = normalized == TaskAction.APPROVE ? notifications.pendingTaskIds(application) : java.util.Set.<String>of();
+        var stoppedAudience = normalized == TaskAction.RETURN || normalized == TaskAction.REJECT
+                ? notifications.unfinishedAudience(application) : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
         var closedAudience = normalized == TaskAction.APPROVE && countersign != null
                 && countersign.mode() != io.agentflow.definition.DefinitionModels.ApprovalMode.ALL
                 ? notifications.beforeCountersignCompletion(application, taskService.createTaskQuery()
@@ -252,7 +254,7 @@ public class FlowableTaskFacade {
             expenseReleases.release(application, actor.userId(), Instant.now());
             procurementReservations.releaseStopped(application, actor.userId(), Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
         }
-        notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds);
+        notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds, stoppedAudience);
         notifications.countersignCompleted(application, actor.userId(), closedAudience);
         return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }

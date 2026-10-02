@@ -1,10 +1,12 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.SubprocessExecutionLocks;
+import io.agentflow.approval.model.Application;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.notification.InboxMessage;
 import io.agentflow.notification.InboxRepository;
 import io.agentflow.notification.NotificationDelivery;
+import io.agentflow.notification.TaskAudiencePort;
 import io.agentflow.organization.ApprovalProxyRepository;
 import io.agentflow.organization.OrganizationRepository;
 import org.flowable.engine.TaskService;
@@ -17,7 +19,10 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -37,7 +42,7 @@ public class FlowableApprovalProxyNotifications {
                 AND a.definition_version=d.version AND a.status='IN_APPROVAL'
             JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id
                 AND r.round_no=a.round_no AND r.status='IN_APPROVAL'
-            JOIN ACT_RU_TASK t ON t.PROC_INST_ID_=r.process_instance_id AND t.SUSPENSION_STATE_=1
+            JOIN ACT_RU_TASK t ON t.PROC_INST_ID_=r.process_instance_id
             WHERE p.revoked_at IS NULL AND p.created_at<=? AND p.starts_at<=? AND p.ends_at>?
                 AND principal.active=TRUE AND principal.approval_eligible=TRUE
                 AND substitute.active=TRUE AND substitute.approval_eligible=TRUE
@@ -66,8 +71,8 @@ public class FlowableApprovalProxyNotifications {
     public List<Candidate> candidates(Instant now, Candidate after) {
         var parameters = times(now);
         var sql = new StringBuilder(CANDIDATES).append("""
-                 AND NOT EXISTS (SELECT 1 FROM approval_proxy_notification n WHERE n.tenant_id=p.tenant_id
-                     AND n.proxy_id=p.id AND n.task_id=t.ID_)
+                 AND t.SUSPENSION_STATE_=1 AND NOT EXISTS (SELECT 1 FROM approval_proxy_notification n WHERE n.tenant_id=p.tenant_id
+                     AND n.proxy_id=p.id AND n.task_id=t.ID_ AND n.event_version=0)
                 """);
         if (after != null) {
             sql.append(" AND (p.tenant_id>? OR (p.tenant_id=? AND (p.id>? OR (p.id=? AND t.ID_>?))))");
@@ -87,7 +92,7 @@ public class FlowableApprovalProxyNotifications {
     @Transactional(propagation = Propagation.MANDATORY)
     public void overdue(String tenantId, String taskId) {
         var parameters = times(Instant.now()); parameters.add(tenantId); parameters.add(taskId);
-        var candidates = jdbc.query(CANDIDATES + " AND p.tenant_id=? AND t.ID_=? ORDER BY p.id",
+        var candidates = jdbc.query(CANDIDATES + " AND t.SUSPENSION_STATE_=1 AND p.tenant_id=? AND t.ID_=? ORDER BY p.id",
                 (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("proxy_id")),
                         UUID.fromString(row.getString("application_id")), row.getString("task_id")), parameters.toArray());
         for (var candidate : candidates) notify(candidate, InboxMessage.Kind.TASK_OVERDUE);
@@ -106,7 +111,7 @@ public class FlowableApprovalProxyNotifications {
         if (person == null || task == null || !candidate.applicationId().toString().equals(task.getProcessVariables().get("applicationId"))
                 || !access.canNotify(candidate.tenantId(), person.subject(), proxy.id(), task, observedAt)) return false;
         if (kind == InboxMessage.Kind.TASK_OVERDUE && (task.getDueDate() == null || task.getDueDate().toInstant().isAfter(observedAt))) return false;
-        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM approval_proxy_notification WHERE tenant_id=? AND proxy_id=? AND task_id=? AND (kind=? OR ?='TASK_PENDING'))",
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM approval_proxy_notification WHERE tenant_id=? AND proxy_id=? AND task_id=? AND event_version=0 AND (kind=? OR ?='TASK_PENDING'))",
                 Boolean.class, candidate.tenantId(), proxy.id().toString(), task.getId(), kind.name(), kind.name()))) return false;
         String eventKey = "task-proxy:" + proxy.id() + ":" + task.getId() + ":" + kind.name();
         UUID messageId = UUID.nameUUIDFromBytes((candidate.tenantId() + ":" + eventKey + ":" + person.subject()).getBytes(StandardCharsets.UTF_8));
@@ -120,16 +125,85 @@ public class FlowableApprovalProxyNotifications {
         return true;
     }
 
+    /**
+     * 调用方持有申请锁，在暂停或删除任务前保存原生责任范围；此处不先锁代理，避免后续财务收尾反转锁序。
+     * 暂停任务可接收取消事实，但这份快照不允许读取或办理，入库前仍需重新核对原授权。
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<TaskAudiencePort.Audience> capture(Application application, List<TaskAudiencePort.Audience> previous) {
+        if (previous.isEmpty()) return previous;
+        Instant now = Instant.now();
+        var parameters = times(now); parameters.add(application.tenantId()); parameters.add(application.id().toString());
+        var candidates = jdbc.query(CANDIDATES + " AND p.tenant_id=? AND a.id=? ORDER BY p.id,t.ID_",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("proxy_id")),
+                        UUID.fromString(row.getString("application_id")), row.getString("task_id")), parameters.toArray());
+        var targets = new HashMap<String, List<TaskAudiencePort.ProxyRecipient>>();
+        for (var candidate : candidates) {
+            var original = previous.stream().filter(item -> item.taskId().equals(candidate.taskId())).findFirst().orElse(null);
+            if (original == null) continue;
+            var proxy = proxies.find(candidate.tenantId(), candidate.proxyId()).orElse(null);
+            if (proxy == null) continue;
+            var person = organization.person(candidate.tenantId(), proxy.substituteId()).orElse(null);
+            var task = tasks.createTaskQuery().taskId(candidate.taskId()).includeProcessVariables().includeIdentityLinks().singleResult();
+            if (person == null || task == null || original.recipients().contains(person.subject())
+                    || !access.canNotifyUnfinished(candidate.tenantId(), person.subject(), proxy.id(), task, now)) continue;
+            targets.computeIfAbsent(task.getId(), key -> new ArrayList<>()).add(new TaskAudiencePort.ProxyRecipient(proxy.id(), person.subject()));
+        }
+        return previous.stream().map(item -> new TaskAudiencePort.Audience(item.taskId(), item.nodeName(), item.recipients(),
+                List.copyOf(targets.getOrDefault(item.taskId(), List.of())))).toList();
+    }
+
+    /**
+     * 状态事实随业务同事务保存，按原申请版本防重，并在发送前重新观察原授权。
+     * 最小通知不授予权利，不追加其他代理的写锁，避免与另一申请已经选定的办理代理形成环路；外发仍重新鉴权。
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lifecycle(Application application, InboxMessage.Kind kind, List<TaskAudiencePort.Audience> previous, Set<String> nativeRecipients) {
+        String content = switch (kind) {
+            case APPLICATION_PAUSED -> "原代理范围内的申请发生暂停，请登录核对当前状态。";
+            case APPLICATION_RESUMED -> "原代理范围内的申请已恢复，请登录核对当前资格、任务和原处理期限。";
+            case APPLICATION_WITHDRAWN -> "原代理范围内的申请已撤回，本条提醒不表示仍有处理权限。";
+            case APPLICATION_CANCELLED -> "原代理范围内的申请已取消，本条提醒不表示仍有处理权限。";
+            case APPLICATION_RETURNED -> "原代理范围内的申请已退回，本条提醒不表示仍有处理权限。";
+            case APPLICATION_REJECTED -> "原代理范围内的申请已驳回，本条提醒不表示仍有处理权限。";
+            case TASK_COUNTERSIGN_REMOVED -> "原代理范围内的会签责任已移除，本条提醒不表示已经作出审批意见。";
+            case TASK_COUNTERSIGN_COMPLETED -> "原代理范围内的会签待办已随节点结束，本条提醒不表示已经作出审批意见。";
+            default -> throw new IllegalArgumentException("Unsupported approval proxy lifecycle event");
+        };
+        var targets = previous.stream().flatMap(task -> task.proxies().stream().map(proxy -> new LifecycleTarget(task.taskId(), proxy)))
+                .filter(target -> !nativeRecipients.contains(target.proxy().subject()))
+                .sorted(Comparator.comparing((LifecycleTarget target) -> target.proxy().proxyId().toString()).thenComparing(LifecycleTarget::taskId)).toList();
+        for (var target : targets) {
+            UUID proxyId = target.proxy().proxyId();
+            Instant now = Instant.now();
+            if (!originalGrantActive(application.tenantId(), target.proxy().subject(), proxyId, now)) continue;
+            if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM approval_proxy_notification WHERE tenant_id=? AND proxy_id=? AND task_id=? AND kind=? AND event_version=?)",
+                    Boolean.class, application.tenantId(), proxyId.toString(), target.taskId(), kind.name(), application.version()))) continue;
+            String eventKey = "task-proxy:" + proxyId + ":" + target.taskId() + ":" + kind + ":" + application.version();
+            UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + target.proxy().subject()).getBytes(StandardCharsets.UTF_8));
+            inbox.append(eventKey, new InboxMessage(id, application.tenantId(), target.proxy().subject(), application.id(),
+                    "代理审批状态提醒", "", kind, "system:approval-proxy", target.taskId(), null, application.roundNo(), now, null, content));
+            jdbc.update("INSERT INTO approval_proxy_notification(tenant_id,proxy_id,task_id,kind,inbox_id,event_version) VALUES(?,?,?,?,?,?)",
+                    application.tenantId(), proxyId.toString(), target.taskId(), kind.name(), id.toString(), application.version());
+        }
+    }
+
     /** 外发领取和人工恢复只复核原消息的那份代理，新授权不能复活旧的待发提醒。 */
     public boolean deliveryAllowed(NotificationDelivery delivery, Instant now) {
-        var sources = jdbc.query("SELECT proxy_id,task_id,kind FROM approval_proxy_notification WHERE tenant_id=? AND inbox_id=?",
-                (row, index) -> new Source(UUID.fromString(row.getString("proxy_id")), row.getString("task_id"), InboxMessage.Kind.valueOf(row.getString("kind"))),
+        var sources = jdbc.query("SELECT proxy_id,task_id,kind,event_version FROM approval_proxy_notification WHERE tenant_id=? AND inbox_id=?",
+                (row, index) -> new Source(UUID.fromString(row.getString("proxy_id")), row.getString("task_id"), InboxMessage.Kind.valueOf(row.getString("kind")), row.getLong("event_version")),
                 delivery.tenantId(), delivery.inboxId().toString());
         if (sources.isEmpty()) return true;
         var source = sources.get(0);
+        // 状态通知记录已发生事实，任务可能已删除；只保留原授权和双方当前资格，不重新授予任务权利。
+        if (source.eventVersion() > 0) return originalGrantActive(delivery.tenantId(), delivery.recipient(), source.proxyId(), now);
         var task = tasks.createTaskQuery().taskId(source.taskId()).active().includeProcessVariables().includeIdentityLinks().singleResult();
         return task != null && access.canNotify(delivery.tenantId(), delivery.recipient(), source.proxyId(), task, now)
                 && (source.kind() != InboxMessage.Kind.TASK_OVERDUE || task.getDueDate() != null && !task.getDueDate().toInstant().isAfter(now));
+    }
+
+    private boolean originalGrantActive(String tenantId, String recipient, UUID proxyId, Instant now) {
+        return proxies.activeForSubstitute(tenantId, recipient, now).stream().anyMatch(active -> active.proxy().id().equals(proxyId));
     }
 
     private static ArrayList<Object> times(Instant now) {
@@ -145,5 +219,10 @@ public class FlowableApprovalProxyNotifications {
     /** 来源仅用于抑制失效外发，不赋予消息持有人申请或表单读取权。
      * @author owlzhangfq@gmail.com
      */
-    private record Source(UUID proxyId, String taskId, InboxMessage.Kind kind) { }
+    private record Source(UUID proxyId, String taskId, InboxMessage.Kind kind, long eventVersion) { }
+
+    /** 同一事务中捕获的原任务和代理接收人，按代理编号与任务编号稳定排列。
+     * @author owlzhangfq@gmail.com
+     */
+    private record LifecycleTarget(String taskId, TaskAudiencePort.ProxyRecipient proxy) { }
 }

@@ -1,6 +1,7 @@
 package io.agentflow.organization;
 
 import io.agentflow.common.DomainException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -19,9 +20,16 @@ import java.util.UUID;
 @Repository
 public class JdbcApprovalProxyRepository implements ApprovalProxyRepository {
     private final JdbcTemplate jdbc;
+    private final String lockClause;
 
     /** 与组织变更审计和任务办理使用同一业务数据源。 */
-    public JdbcApprovalProxyRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public JdbcApprovalProxyRepository(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+        // 代理主键不可变；PostgreSQL 只排他锁定非键值变更，让其他申请保存通知外键时仍可取得 KEY SHARE。
+        // 办理与撤销继续在同一代理行上互斥，H2 使用其支持的 FOR UPDATE。
+        this.lockClause = jdbc.execute((ConnectionCallback<String>) connection ->
+                "PostgreSQL".equals(connection.getMetaData().getDatabaseProductName()) ? " FOR NO KEY UPDATE" : " FOR UPDATE");
+    }
 
     @Override
     public void insert(String tenantId, ApprovalProxy proxy) {
@@ -41,7 +49,7 @@ public class JdbcApprovalProxyRepository implements ApprovalProxyRepository {
     public Optional<ApprovalProxy> lock(String tenantId, UUID id) { return find(tenantId, id, true); }
 
     private Optional<ApprovalProxy> find(String tenantId, UUID id, boolean lock) {
-        return jdbc.query("SELECT p.* FROM organization_approval_proxy p WHERE tenant_id=? AND id=?" + (lock ? " FOR UPDATE" : ""),
+        return jdbc.query("SELECT p.* FROM organization_approval_proxy p WHERE tenant_id=? AND id=?" + (lock ? lockClause : ""),
                 this::map, tenantId, id.toString()).stream().findFirst();
     }
 

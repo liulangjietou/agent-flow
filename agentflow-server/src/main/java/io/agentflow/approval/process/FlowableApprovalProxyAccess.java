@@ -69,10 +69,19 @@ public class FlowableApprovalProxyAccess {
 
     /** 仅判断最小提醒的本地范围，不推断身份源角色，也不能用于读取表单或办理任务。 */
     public boolean canNotify(String tenantId, String recipient, UUID proxyId, Task task, Instant observedAt) {
+        return canNotify(tenantId, recipient, proxyId, task, observedAt, false);
+    }
+
+    /** 暂停任务仍可接收结束事实；该内部通知路径不开放暂停任务的读取或办理。 */
+    boolean canNotifyUnfinished(String tenantId, String recipient, UUID proxyId, Task task, Instant observedAt) {
+        return canNotify(tenantId, recipient, proxyId, task, observedAt, true);
+    }
+
+    private boolean canNotify(String tenantId, String recipient, UUID proxyId, Task task, Instant observedAt, boolean includeSuspended) {
         if (originalResponsibility(task, recipient)) return false;
         var selected = grants(tenantId, recipient, observedAt).stream()
                 .filter(grant -> grant.active().proxy().id().equals(proxyId)).toList();
-        return !eligibleGrants(tenantId, recipient, task, selected).isEmpty();
+        return !eligibleGrants(tenantId, recipient, task, selected, includeSuspended).isEmpty();
     }
 
     private List<GrantScope> grants(String tenantId, String recipient, Instant observedAt) {
@@ -133,7 +142,7 @@ public class FlowableApprovalProxyAccess {
         }
 
         private List<GrantScope> matching(Task task) {
-            var matching = eligibleGrants(actor.tenantId(), actor.userId(), task, grants);
+            var matching = eligibleGrants(actor.tenantId(), actor.userId(), task, grants, false);
             if (matching.isEmpty()) return List.of();
             var node = matching.get(0).definition().graph().node(task.getTaskDefinitionKey());
             return ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole("FINANCE") ? List.of() : matching;
@@ -153,8 +162,8 @@ public class FlowableApprovalProxyAccess {
 
     }
 
-    private List<GrantScope> eligibleGrants(String tenantId, String recipient, Task task, List<GrantScope> grants) {
-        if (grants.isEmpty() || task.isSuspended() || task.getDelegationState() == DelegationState.PENDING
+    private List<GrantScope> eligibleGrants(String tenantId, String recipient, Task task, List<GrantScope> grants, boolean includeSuspended) {
+        if (grants.isEmpty() || !includeSuspended && task.isSuspended() || task.getDelegationState() == DelegationState.PENDING
                 || !tenantId.equals(task.getProcessVariables().get("tenantId"))
                 || task.getTenantId() != null && !task.getTenantId().isEmpty() && !tenantId.equals(task.getTenantId())) return List.of();
         var matching = grants.stream().filter(grant -> grant.runtimeDefinitionId().equals(task.getProcessDefinitionId())
@@ -190,7 +199,7 @@ public class FlowableApprovalProxyAccess {
     private boolean independentCountersignParticipant(Task task, String recipient) {
         // 同一人已有本节点责任（包括委派出去等待返回的责任）或已批准，不能再代理另一票。
         boolean ownPending = tasks.createTaskQuery().processInstanceId(task.getProcessInstanceId())
-                .taskDefinitionKey(task.getTaskDefinitionKey()).active().list().stream()
+                .taskDefinitionKey(task.getTaskDefinitionKey()).list().stream()
                 .anyMatch(pending -> recipient.equals(pending.getAssignee())
                         || recipient.equals(tasks.getVariable(pending.getId(), FlowableCountersignRuntime.USER)));
         if (ownPending) return false;

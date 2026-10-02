@@ -84,6 +84,7 @@ class ApprovalProxyNotificationsIntegrationTest {
     @MockitoSpyBean AuthService auth;
     @MockitoSpyBean InboxRepository inbox;
     @MockitoSpyBean NotificationDestinations destinations;
+    @MockitoSpyBean JdbcApprovalProxyRepository proxyRecords;
     private Actor admin;
     private OrganizationPerson principal;
     private OrganizationPerson substitute;
@@ -277,19 +278,250 @@ class ApprovalProxyNotificationsIntegrationTest {
         assertThat(sourceCount()).isZero();
     }
 
-    private DefinitionDraft publish() {
+    @Test void repeatedPauseAndResumeNotifyCurrentProxyWithoutBusinessContentOrDuplicateEvent() throws Exception {
+        var task = submit(); var proxy = grant();
+        String application = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+        String administrator = identity(admin.userId(), Set.of("ADMIN"));
+        String path = "/applications/" + application + "/rounds/1/runtime/";
+        for (int cycle = 0; cycle < 2; cycle++) {
+            write(path + "pause", administrator, Map.of("expectedVersion", 2 + cycle * 2, "reason", "私密暂停原因"), 200);
+            assertThat(current(task).isSuspended()).isTrue();
+            write(path + "resume", administrator, Map.of("expectedVersion", 3 + cycle * 2, "reason", "私密恢复原因"), 200);
+        }
+        var messages = read("/notifications", substituteToken, 200).path("items");
+        assertThat(messages).hasSize(4);
+        assertThat(messages.toString()).doesNotContain("私密标题", "PRIVATE-", "私密节点", "private-value", "私密暂停原因", "私密恢复原因");
+        assertThat(messages.findValuesAsText("kind")).containsExactlyInAnyOrder("APPLICATION_PAUSED", "APPLICATION_RESUMED", "APPLICATION_PAUSED", "APPLICATION_RESUMED");
+        assertThat(current(task).getAssignee()).isNull();
+        assertThat(sourceCount()).isEqualTo(4);
+        var pending = candidate(proxy, task);
+        assertThat(notifications.candidates(Instant.now(), null)).contains(pending);
+        assertThat(notifications.pending(pending)).isTrue();
+        assertThat(notifications.pending(pending)).isFalse();
+        assertThat(sourceCount()).isEqualTo(5);
+    }
+
+    @Test void withdrawalNotifiesFormerProxyWithoutGrantingHistoricalApplicationAccess() throws Exception {
+        var task = submit(); grant();
+        String application = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+        write("/applications/" + application + "/withdraw", applicantToken, Map.of("expectedVersion", 2, "comment", "私密撤回原因"), 200);
+        var messages = read("/notifications", substituteToken, 200).path("items");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).path("kind").asText()).isEqualTo("APPLICATION_WITHDRAWN");
+        assertThat(messages.toString()).doesNotContain("私密标题", "PRIVATE-", "私密节点", "private-value", "私密撤回原因");
+        assertThat(read("/applications/" + application, substituteToken, 404).path("code").asText()).isEqualTo("NOT_FOUND");
+        assertThat(sourceCount()).isEqualTo(1);
+    }
+
+    @Test void pausedTerminationKeepsMinimalHistoryAndOriginalGrantGovernsExternalRecovery() throws Exception {
+        enableEmail(); var task = submit(); var proxy = grant();
+        String application = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+        String administrator = identity(admin.userId(), Set.of("ADMIN"));
+        String path = "/applications/" + application + "/rounds/1/runtime/";
+        write(path + "pause", administrator, Map.of("expectedVersion", 2, "reason", "暂停后结束"), 200);
+        write(path + "terminate", administrator, Map.of("expectedVersion", 3, "reason", "私密终止原因"), 200);
+        var messages = read("/notifications", substituteToken, 200).path("items");
+        assertThat(messages.findValuesAsText("kind")).containsExactlyInAnyOrder("APPLICATION_PAUSED", "APPLICATION_CANCELLED");
+        assertThat(messages.toString()).doesNotContain("私密标题", "PRIVATE-", "私密终止原因");
+        assertThat(current(task)).isNull();
+        read("/applications/" + application, substituteToken, 404);
+        var delivery = lifecycleDelivery("APPLICATION_CANCELLED");
+        var claim = deliveries.claim(delivery.id(), Instant.now()); assertThat(claim).isNotNull();
+        deliveries.finish(claim.delivery(), Outcome.unknown(FailureCode.SMTP_RESULT_UNKNOWN), Instant.now());
+        proxies.revoke(admin, proxy.id(), 1, "结束原授权"); grant();
+        var unknown = deliveryStore.find(delivery.id()).orElseThrow();
+        assertThat(deliveries.retryEligibility(unknown).allowed()).isFalse();
+        assertThatThrownBy(() -> deliveries.retry(new Actor(admin.tenantId(), "substitute", Set.of("EMPLOYEE")),
+                unknown.id(), unknown.progress().version(), true, "新授权不能恢复旧消息", Instant.now())).hasMessageContaining("no longer valid");
+        assertThat(deliveries.claim(lifecycleDelivery("APPLICATION_PAUSED").id(), Instant.now())).isNull();
+        assertThat(read("/notifications", substituteToken, 200).path("items")).hasSize(2);
+    }
+
+    @Test void lifecycleAppendFailureRollsBackRuntimeAndSameRequestRecoversOnlyOnce() throws Exception {
+        enableEmail(); var task = submit(); grant();
+        String application = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+        String path = "/applications/" + application + "/rounds/1/runtime/pause", key = UUID.randomUUID().toString();
+        String administrator = identity(admin.userId(), Set.of("ADMIN"));
+        var body = Map.of("expectedVersion", 2, "reason", "原请求恢复");
+        var hit = new java.util.concurrent.atomic.AtomicBoolean();
+        var target = AopTestUtils.<InboxRepository>getUltimateTargetObject(inbox);
+        doAnswer(call -> {
+            Object result = call.callRealMethod();
+            io.agentflow.notification.InboxMessage message = call.getArgument(1);
+            if (message.recipient().equals("substitute") && message.kind() == io.agentflow.notification.InboxMessage.Kind.APPLICATION_PAUSED) {
+                hit.set(true); throw new IllegalStateException("Synthetic lifecycle failure");
+            }
+            return result;
+        }).when(target).append(anyString(), any());
+        assertThatThrownBy(() -> write(path, administrator, body, 200, key));
+        assertThat(hit).isTrue(); assertThat(current(task).isSuspended()).isFalse(); assertThat(version(task)).isEqualTo(2);
+        assertThat(sourceCount()).isZero(); assertThat(read("/notifications", substituteToken, 200).path("items")).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch WHERE tenant_id=?", Integer.class, admin.tenantId())).isZero();
+        doCallRealMethod().when(target).append(anyString(), any());
+        var receipt = write(path, administrator, body, 200, key);
+        assertThat(write(path, administrator, body, 200, key)).isEqualTo(receipt);
+        assertThat(version(task)).isEqualTo(3); assertThat(sourceCount()).isEqualTo(1);
+        assertThat(read("/notifications", substituteToken, 200).path("items")).hasSize(1);
+    }
+
+    @Test void returnAndRejectionNotifyOnlyTheFormerScopeAndDoNotGrantHistory() throws Exception {
+        grant();
+        for (String action : List.of("RETURN", "REJECT")) {
+            var task = submit(); String application = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+            write("/tasks/" + task.getId() + "/actions", principalToken, Map.of("action", action, "expectedVersion", 2, "comment", "私密决定理由"), 200);
+            read("/applications/" + application, substituteToken, 404);
+        }
+        var messages = read("/notifications", substituteToken, 200).path("items");
+        assertThat(messages.findValuesAsText("kind")).containsExactlyInAnyOrder("APPLICATION_RETURNED", "APPLICATION_REJECTED");
+        assertThat(messages.toString()).doesNotContain("私密标题", "PRIVATE-", "私密决定理由");
+        assertThat(sourceCount()).isEqualTo(2);
+    }
+
+    @Test void countersignRemovalAndThresholdCompletionPreserveProxyNoticeWithoutInventingVotes() throws Exception {
+        var other = organization.createPerson(admin, "other", "独立会签人", true, true);
+        String otherToken = identity(other.subject(), Set.of("APPROVER"));
+        for (String mode : List.of("ALL", "ANY")) {
+            definition = shared(mode, List.of(principal, other)); grant();
+            var application = submittedApplication(); var pending = tasksFor(application.path("id").asText());
+            var acting = pending.stream().filter(task -> other.subject().equals(task.getAssignee())).findFirst().orElseThrow();
+            var represented = pending.stream().filter(task -> principal.subject().equals(task.getAssignee())).findFirst().orElseThrow();
+            if (mode.equals("ALL")) write("/tasks/" + acting.getId() + "/countersign-changes", otherToken,
+                    Map.of("action", "REMOVE", "targetTaskId", represented.getId(), "expectedVersion", 2, "reason", "私密减签理由"), 200);
+            else write("/tasks/" + acting.getId() + "/actions", otherToken, Map.of("action", "APPROVE", "expectedVersion", 2), 200);
+            assertThat(current(represented)).isNull();
+        }
+        var messages = read("/notifications", substituteToken, 200).path("items");
+        assertThat(messages.findValuesAsText("kind")).containsExactlyInAnyOrder("TASK_COUNTERSIGN_REMOVED", "TASK_COUNTERSIGN_COMPLETED");
+        assertThat(messages.toString()).doesNotContain("私密减签理由", "私密标题", "PRIVATE-");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id=? AND actor_id='substitute' AND action='APPROVE'", Integer.class, admin.tenantId())).isZero();
+    }
+
+    @Test void pausedCountersignDoesNotAddAnotherProxyResponsibilityForANativeMember() throws Exception {
+        definition = shared("ALL", List.of(principal, substitute)); grant();
+        String application = submittedApplication().path("id").asText();
+        String administrator = identity(admin.userId(), Set.of("ADMIN")), path = "/applications/" + application + "/rounds/1/runtime/";
+        write(path + "pause", administrator, Map.of("expectedVersion", 2, "reason", "暂停会签"), 200);
+        write(path + "terminate", administrator, Map.of("expectedVersion", 3, "reason", "结束会签"), 200);
+        assertThat(sourceCount()).isZero();
+        assertThat(read("/notifications", substituteToken, 200).path("items").findValuesAsText("kind"))
+                .containsExactlyInAnyOrder("TASK_PENDING", "APPLICATION_PAUSED", "APPLICATION_CANCELLED");
+    }
+
+    @Test void expiryAfterAudienceCaptureCannotPersistAnExpiredLifecycleSource() throws Exception {
+        var task = submit(); Instant ends = Instant.now().plusSeconds(6);
+        proxies.create(admin, definition.id(), principal.id(), substitute.id(), Instant.now(), ends, "状态变更期间到期");
+        String application = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+        String administrator = identity(admin.userId(), Set.of("ADMIN"));
+        var waiting = new CountDownLatch(1); var release = new CountDownLatch(1);
+        doAnswer(call -> {
+            var message = call.<io.agentflow.notification.InboxMessage>getArgument(1);
+            if (message.kind() == io.agentflow.notification.InboxMessage.Kind.APPLICATION_PAUSED && !message.recipient().equals(substitute.subject())) {
+                waiting.countDown(); assertThat(release.await(12, TimeUnit.SECONDS)).isTrue();
+            }
+            return call.callRealMethod();
+        }).when(inbox).append(anyString(), any());
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var pausing = executor.submit(() -> write("/applications/" + application + "/rounds/1/runtime/pause", administrator,
+                    Map.of("expectedVersion", 2, "reason", "先捕获接收范围再观察授权"), 200));
+            assertThat(waiting.await(5, TimeUnit.SECONDS)).isTrue(); assertThat(pausing.isDone()).isFalse(); assertThat(Instant.now()).isBefore(ends);
+            Thread.sleep(Math.max(0, java.time.Duration.between(Instant.now(), ends).toMillis()) + 30);
+            release.countDown(); pausing.get(5, TimeUnit.SECONDS);
+        } finally { release.countDown(); executor.shutdownNow(); executor.awaitTermination(10, TimeUnit.SECONDS); }
+        assertThat(current(task).isSuspended()).isTrue(); assertThat(version(task)).isEqualTo(3);
+        assertThat(sourceCount()).isZero(); assertThat(read("/notifications", substituteToken, 200).path("items")).isEmpty();
+    }
+
+    @Test void parentPauseResumeAndTerminationNotifyTheChildProxyOnlyAboutItsOwnApplication() throws Exception {
+        var child = definition; grant();
         var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
-                new Node("review", "私密节点", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + principal.id())),
+                new Node("call", "私密父调用", NodeType.SUB_PROCESS, new io.agentflow.definition.SubprocessPolicy(child.key(), child.version(), Map.of()).properties()),
+                new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "call", ""), new Edge("b", "call", "end", "")));
+        var draft = definitions.create(admin.tenantId(), "parent_" + UUID.randomUUID().toString().replace("-", ""), "父流程", graph);
+        definition = definitions.publish(admin, draft.id(), draft.revision(), "父子代理提醒");
+        String parent = submittedApplication().path("id").asText();
+        var task = tasks.createTaskQuery().processVariableValueEquals("tenantId", admin.tenantId()).singleResult();
+        String childApplication = (String) runtime.getVariable(task.getProcessInstanceId(), "applicationId");
+        assertThat(childApplication).isNotEqualTo(parent);
+        String administrator = identity(admin.userId(), Set.of("ADMIN")), path = "/applications/" + parent + "/rounds/1/runtime/";
+        write(path + "pause", administrator, Map.of("expectedVersion", 2, "reason", "父流程暂停"), 200);
+        write(path + "resume", administrator, Map.of("expectedVersion", 3, "reason", "父流程恢复"), 200);
+        write(path + "terminate", administrator, Map.of("expectedVersion", 4, "reason", "父流程结束"), 200);
+        var messages = read("/notifications", substituteToken, 200).path("items");
+        assertThat(messages).hasSize(3);
+        assertThat(messages.findValuesAsText("applicationId")).containsOnly(childApplication);
+        assertThat(messages.findValuesAsText("kind")).containsExactlyInAnyOrder("APPLICATION_PAUSED", "APPLICATION_RESUMED", "APPLICATION_CANCELLED");
+        read("/applications/" + parent, substituteToken, 404); read("/applications/" + childApplication, substituteToken, 404);
+    }
+
+    @Test void concurrentProxyApprovalsDoNotAcquireEachOthersNotificationGrantLocks() throws Exception {
+        var other = organization.createPerson(admin, "other", "另一原审批人", true, true);
+        var otherSubstitute = organization.createPerson(admin, "other-substitute", "另一代理人", true, true);
+        String otherToken = identity(otherSubstitute.subject(), Set.of("APPROVER"));
+        definition = shared("ANY", List.of(principal, other)); grant();
+        proxies.create(admin, definition.id(), other.id(), otherSubstitute.id(), Instant.now(), Instant.now().plusSeconds(3600), "另一直接代理");
+        String firstApplication = submittedApplication().path("id").asText(), secondApplication = submittedApplication().path("id").asText();
+        var first = tasksFor(firstApplication).stream().filter(task -> principal.subject().equals(task.getAssignee())).findFirst().orElseThrow();
+        var second = tasksFor(secondApplication).stream().filter(task -> other.subject().equals(task.getAssignee())).findFirst().orElseThrow();
+        var held = new CountDownLatch(2); var observed = java.util.concurrent.ConcurrentHashMap.<Thread>newKeySet();
+        doAnswer(call -> {
+            Object result = call.callRealMethod();
+            if (observed.add(Thread.currentThread())) {
+                held.countDown(); assertThat(held.await(8, TimeUnit.SECONDS)).isTrue();
+            }
+            return result;
+        }).when(AopTestUtils.<JdbcApprovalProxyRepository>getUltimateTargetObject(proxyRecords)).lock(eq(admin.tenantId()), any());
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var one = executor.submit(() -> write("/tasks/" + first.getId() + "/actions", substituteToken, Map.of("action", "APPROVE", "expectedVersion", 2), 200));
+            var two = executor.submit(() -> write("/tasks/" + second.getId() + "/actions", otherToken, Map.of("action", "APPROVE", "expectedVersion", 2), 200));
+            assertThat(one.get(20, TimeUnit.SECONDS).path("applicationStatus").asText()).isEqualTo("APPROVED");
+            assertThat(two.get(20, TimeUnit.SECONDS).path("applicationStatus").asText()).isEqualTo("APPROVED");
+        } finally { executor.shutdownNow(); executor.awaitTermination(10, TimeUnit.SECONDS); }
+        assertThat(sourceCount()).isEqualTo(2);
+        var firstMessages = read("/notifications", substituteToken, 200).path("items");
+        var secondMessages = read("/notifications", otherToken, 200).path("items");
+        assertThat(firstMessages.findValuesAsText("kind")).containsExactly("TASK_COUNTERSIGN_COMPLETED");
+        assertThat(secondMessages.findValuesAsText("kind")).containsExactly("TASK_COUNTERSIGN_COMPLETED");
+        assertThat(firstMessages.findValuesAsText("applicationId")).containsExactly(secondApplication);
+        assertThat(secondMessages.findValuesAsText("applicationId")).containsExactly(firstApplication);
+    }
+
+    private NotificationDelivery lifecycleDelivery(String kind) {
+        UUID id = UUID.fromString(jdbc.queryForObject("SELECT d.id FROM notification_dispatch d JOIN approval_proxy_notification n ON n.tenant_id=d.tenant_id AND n.inbox_id=d.inbox_id WHERE d.tenant_id=? AND n.kind=?", String.class, admin.tenantId(), kind));
+        return deliveryStore.find(id).orElseThrow();
+    }
+
+    private DefinitionDraft shared(String mode, List<OrganizationPerson> people) {
+        var legal = organization.createUnit(admin, OrganizationUnit.Kind.LEGAL_ENTITY, "会签法人", null, null, true);
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "会签部门", legal.id(), null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "会签岗位", legal.id(), null, true);
+        for (var person : people) organization.createAppointment(admin, person.id(), department.id(), position.id(), true);
+        return publish(Map.of("assigneeRule", "role:ORG_UNIT_" + department.id(), "approvalMode", mode));
+    }
+
+    private DefinitionDraft publish() {
+        return publish(Map.of("assigneeRule", "role:ORG_PERSON_" + principal.id()));
+    }
+    private DefinitionDraft publish(Map<String, String> properties) {
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("review", "私密节点", NodeType.USER_TASK, properties),
                 new Node("end", "结束", NodeType.END, Map.of())),
                 List.of(new Edge("a", "start", "review", ""), new Edge("b", "review", "end", "")));
         var draft = definitions.create(admin.tenantId(), "proxy_notice_" + UUID.randomUUID().toString().replace("-", ""), "通知范围", graph);
         return definitions.publish(admin, draft.id(), draft.revision(), "代理提醒验证");
     }
     private Task submit() throws Exception {
+        return tasksFor(submittedApplication().path("id").asText()).get(0);
+    }
+    private List<Task> tasksFor(String application) {
+        return tasks.createTaskQuery().processVariableValueEquals("applicationId", application).list();
+    }
+    private JsonNode submittedApplication() throws Exception {
         var created = write("/applications", applicantToken, Map.of("businessNo", "PRIVATE-" + UUID.randomUUID(), "processKey", definition.key(),
                 "definitionVersion", definition.version(), "title", "私密标题", "payload", Map.of("secret", "private-value")), 201);
-        String id = created.path("id").asText(); write("/applications/" + id + "/submit", applicantToken, Map.of("expectedVersion", 1), 200);
-        return tasks.createTaskQuery().processVariableValueEquals("applicationId", id).singleResult();
+        String id = created.path("id").asText(); return write("/applications/" + id + "/submit", applicantToken, Map.of("expectedVersion", 1), 200);
     }
     private ApprovalProxy grant() {
         return proxies.create(admin, definition.id(), principal.id(), substitute.id(), Instant.now(), Instant.now().plusSeconds(3600), "临时代理");
@@ -322,8 +554,13 @@ class ApprovalProxyNotificationsIntegrationTest {
         return json.read(response.getContentAsString(), JsonNode.class);
     }
     private JsonNode write(String path, String token, Object body, int statusCode) throws Exception {
-        var response = mvc.perform(post("/api/v1" + path).header("Authorization", "Bearer " + token).header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(MediaType.APPLICATION_JSON).content(json.write(body))).andExpect(status().is(statusCode)).andReturn().getResponse();
+        return write(path, token, body, statusCode, UUID.randomUUID().toString());
+    }
+    private JsonNode write(String path, String token, Object body, int statusCode, String key) throws Exception {
+        var result = mvc.perform(post("/api/v1" + path).header("Authorization", "Bearer " + token).header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(body))).andReturn();
+        var response = result.getResponse();
+        assertThat(response.getStatus()).as("HTTP %s: %s, cause=%s", path, response.getContentAsString(), result.getResolvedException()).isEqualTo(statusCode);
         return json.read(response.getContentAsString(), JsonNode.class);
     }
 }

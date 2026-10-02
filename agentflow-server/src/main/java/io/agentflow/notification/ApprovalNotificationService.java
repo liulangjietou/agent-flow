@@ -48,12 +48,12 @@ public class ApprovalNotificationService {
 
     /** 状态变更前保留当前处理人，暂停或终止后仍可通知原办理人员。 */
     public List<TaskAudiencePort.Audience> pendingAudience(Application application) {
-        return audience.pending(application.tenantId(), application.id());
+        return proxies.capture(application, audience.pending(application.tenantId(), application.id()));
     }
 
     /** 终止前包含暂停任务，避免原审批人漏收本轮结束通知。 */
     public List<TaskAudiencePort.Audience> unfinishedAudience(Application application) {
-        return audience.unfinished(application.tenantId(), application.id());
+        return proxies.capture(application, audience.unfinished(application.tenantId(), application.id()));
     }
 
     /** 具名终止通知使用实际取消结论，不复制操作原因或新增读取授权。 */
@@ -67,6 +67,8 @@ public class ApprovalNotificationService {
         for (var task : previous) for (String user : task.recipients()) {
             if (!user.equals(application.createdBy())) send(application, actor, user, Kind.APPLICATION_WITHDRAWN, task.taskId(), task.nodeName());
         }
+        var recipients = nativeRecipients(previous); recipients.add(application.createdBy());
+        proxies.lifecycle(application, Kind.APPLICATION_WITHDRAWN, previous, recipients);
     }
 
     /** 暂停通知保留实际接收人；入口指向申请，暂停任务不再提供办理操作。 */
@@ -76,13 +78,14 @@ public class ApprovalNotificationService {
 
     /** 恢复按当前有效人员重新解析通知，不将被停用人员重新加入办理范围。 */
     public void instanceResumed(Application application, String actor) {
-        instanceChanged(application, actor, Kind.APPLICATION_RESUMED, audience.pending(application.tenantId(), application.id()));
+        instanceChanged(application, actor, Kind.APPLICATION_RESUMED, pendingAudience(application));
     }
 
     private void instanceChanged(Application application, String actor, Kind kind, List<TaskAudiencePort.Audience> pending) {
         var recipients = new java.util.HashSet<String>(); recipients.add(application.createdBy());
         for (var task : pending) recipients.addAll(task.recipients());
         for (String recipient : recipients) send(application, actor, recipient, kind, null, null);
+        proxies.lifecycle(application, kind, pending, recipients);
     }
 
     /** 系统退回没有人工任务编号，通知沿用真实申请轮次及系统身份。 */
@@ -103,6 +106,8 @@ public class ApprovalNotificationService {
         else recipients.remove(application.createdBy());
         recipients.remove(actor);
         for (String recipient : recipients) send(application, actor, recipient, kind, null, null);
+        recipients.add(actor); recipients.add(application.createdBy());
+        proxies.lifecycle(application, kind, previous, recipients);
     }
 
     /** 核减通知只提供入口，逐行差额通过财务权限查询展示，不在消息中复制敏感金额。 */
@@ -116,37 +121,49 @@ public class ApprovalNotificationService {
     }
 
     /** 减签通知保留原任务入口，不复制原因、名单或表单，也不授予新的读取权限。 */
-    public void countersignRemoved(Application application, String actor, String targetUser, String targetTaskId, String nodeName) {
+    public void countersignRemoved(Application application, String actor, String targetUser, String targetTaskId, String nodeName,
+                                  List<TaskAudiencePort.Audience> previous) {
         send(application, actor, targetUser, Kind.TASK_COUNTERSIGN_REMOVED, targetTaskId, nodeName);
+        proxies.lifecycle(application, Kind.TASK_COUNTERSIGN_REMOVED, previous, Set.of(targetUser));
     }
 
     /** 达标前保留同一节点其他实际待办的接收人，不能把另一个并行节点当成取消目标。 */
     public List<TaskAudiencePort.Audience> beforeCountersignCompletion(Application application, Set<String> scopeTaskIds) {
-        return audience.pending(application.tenantId(), application.id()).stream().filter(task -> scopeTaskIds.contains(task.taskId())).toList();
+        return proxies.capture(application, audience.pending(application.tenantId(), application.id()).stream()
+                .filter(task -> scopeTaskIds.contains(task.taskId())).toList());
     }
 
     /** 只通知本次实际结束的其他待办；消息不表示这些人员已作出批准意见。 */
     public void countersignCompleted(Application application, String actor, List<TaskAudiencePort.Audience> previous) {
         if (previous.isEmpty()) return;
         Set<String> active = pendingTaskIds(application);
-        for (var task : previous) if (!active.contains(task.taskId())) {
+        var ended = previous.stream().filter(task -> !active.contains(task.taskId())).toList();
+        for (var task : ended) {
             for (String recipient : task.recipients()) send(application, actor, recipient, Kind.TASK_COUNTERSIGN_COMPLETED, task.taskId(), task.nodeName());
         }
+        proxies.lifecycle(application, Kind.TASK_COUNTERSIGN_COMPLETED, ended, nativeRecipients(ended));
     }
 
     /** 通知内容取已成功执行后的事实；领取不重复提醒，释放提醒恢复的候选人。 */
     public void taskActed(Application application, String actor, TaskAction action, String taskId, String nodeName,
-                          Set<String> previousTaskIds) {
+                          Set<String> previousTaskIds, List<TaskAudiencePort.Audience> previousAudience) {
         switch (action) {
             case APPROVE -> processAdvanced(application, actor, taskId, nodeName, previousTaskIds);
-            case RETURN -> send(application, actor, application.createdBy(), Kind.APPLICATION_RETURNED, taskId, nodeName);
-            case REJECT -> send(application, actor, application.createdBy(), Kind.APPLICATION_REJECTED, taskId, nodeName);
+            case RETURN, REJECT -> {
+                Kind kind = action == TaskAction.RETURN ? Kind.APPLICATION_RETURNED : Kind.APPLICATION_REJECTED;
+                send(application, actor, application.createdBy(), kind, taskId, nodeName);
+                proxies.lifecycle(application, kind, previousAudience, java.util.stream.Stream.of(actor, application.createdBy()).collect(Collectors.toSet()));
+            }
             case TRANSFER -> pending(application, actor, Kind.TASK_TRANSFERRED, task -> taskId.equals(task.taskId()));
             case DELEGATE -> pending(application, actor, Kind.TASK_DELEGATED, task -> taskId.equals(task.taskId()));
             case RESOLVE -> pending(application, actor, Kind.TASK_RESOLVED, task -> taskId.equals(task.taskId()));
             case RELEASE -> pending(application, actor, Kind.TASK_PENDING, task -> taskId.equals(task.taskId()));
             case CLAIM -> { /* 领取不生成新提醒，原消息仍保留其发生时事实。 */ }
         }
+    }
+
+    private static Set<String> nativeRecipients(List<TaskAudiencePort.Audience> previous) {
+        return previous.stream().flatMap(task -> task.recipients().stream()).collect(Collectors.toSet());
     }
 
     /** 人工完成或等待推进后只发送实际新待办或最终结论；系统推进没有人工任务编号。 */
