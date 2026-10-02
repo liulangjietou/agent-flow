@@ -1,0 +1,225 @@
+{
+  "recordedAt": "2026-10-02T02:44:02.060288+00:00",
+  "stage": "V98 生命周期页面、真实 SLA 与多原审批人选择增量；整体代理仍在验收",
+  "branch": "codex/governance-identifier-integration",
+  "frontendCommit": "170ccb372f342e0d94b767f4b5623c4a0d024ab9",
+  "backendCommit": "538060c90765e86725a3e3a1084bfd2f61e8c8aa",
+  "uiFix": {
+    "problem": "历史提醒打开无当前读取权的申请时，页面直接显示英文 Application not found",
+    "coverageGap": "原请求层测试未覆盖 NOT_FOUND 的统一用户提示；通知鉴权和 HTTP 404 本身正确",
+    "layer": "NotificationInbox -> ApplicationRecord -> api.ts 请求层统一错误文案，不改变状态码、权限或记录存在性隔离",
+    "red": {
+      "tests": 27,
+      "passed": 26,
+      "failed": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-unavailable-message-red.log"
+    },
+    "green": {
+      "tests": 40,
+      "passed": 40,
+      "failed": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-unavailable-message-green.log"
+    },
+    "build": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-web-build.log",
+    "openApi": {
+      "result": "PASS",
+      "operations": 296,
+      "schemas": 590,
+      "requestExamples": 113
+    },
+    "browserVerified": true,
+    "message": "记录不存在或当前账号无权查看，请刷新列表或返回原入口。"
+  },
+  "sla": {
+    "result": "PASS",
+    "calendarId": "a6e200bf-d0a3-41d0-80a3-b3e36e688167",
+    "calendarRevision": 1,
+    "workingMinutes": 1,
+    "clockModified": false,
+    "normalApplicationId": "c9c36c69-0b16-45ca-9aed-b0c9d037803f",
+    "normalOriginalDueAt": "2026-10-02T02:33:12.649Z",
+    "normalProxyDelayMilliseconds": 475.85499999999996,
+    "pausedApplicationId": "543d3515-cc62-4d6c-bd32-7aa41dbc2c9c",
+    "pausedOriginalDueAt": "2026-10-02T02:33:13.248Z",
+    "pausedOverdueBeforeResume": 0,
+    "remainingWorkingSeconds": 59.635,
+    "resumedDueAt": "2026-10-02T02:38:47.513Z",
+    "resumedProxyDelayMilliseconds": 883.3539999999999,
+    "nativeTaskAndDeadlineHistoryPreserved": true,
+    "perApplicationOverdueMessages": {
+      "manager": 1,
+      "finance": 1
+    },
+    "browserApprovedApplications": 2,
+    "actualOperator": "finance",
+    "originalPrincipal": "manager",
+    "auditApprovalsPerApplication": 1,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-sla-state.json"
+  },
+  "multiplePrincipals": {
+    "result": "PASS",
+    "applicationId": "17550d4a-602c-493a-b64d-13bbdbd1b74c",
+    "options": [
+      "manager",
+      "finance"
+    ],
+    "uiRequiresExplicitSelection": true,
+    "missingSelectionHttpStatus": 422,
+    "invalidSelectionHttpStatus": 403,
+    "rejectedDecisionsMutatedApplication": false,
+    "browserSelectedPrincipal": "finance",
+    "actualOperator": "bob",
+    "auditApprovals": 1,
+    "actualAndSelectedPrincipalReadStatus": 200,
+    "unselectedPrincipalReadStatus": 404,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-multiple-state.json"
+  },
+  "otherLifecycle": {
+    "result": "PASS",
+    "httpScenarios": [
+      "RETURN",
+      "REJECT",
+      "PAUSE_THEN_TERMINATE",
+      "ALL",
+      "ANY"
+    ],
+    "minimalStateMessages": 5,
+    "originalDecisionReplays": 2,
+    "historicalReadGranted": false,
+    "proxyApprovalInvented": false,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-other-lifecycle-state.json",
+    "browserFaultInjection": false
+  },
+  "contracts": {
+    "status": "PASS",
+    "files": {
+      "approval-proxy-lifecycle-browser-responses.json": {
+        "responses": 40,
+        "successfulRequests": 3
+      },
+      "approval-proxy-lifecycle-http-browser-decisions.json": {
+        "responses": 13,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-multiple-setup-bob.json": {
+        "responses": 18,
+        "successfulRequests": 12
+      },
+      "approval-proxy-lifecycle-http-multiple-setup.json": {
+        "responses": 1,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-other-lifecycle.json": {
+        "responses": 49,
+        "successfulRequests": 25
+      },
+      "approval-proxy-lifecycle-http-pause-resume-withdraw.json": {
+        "responses": 15,
+        "successfulRequests": 12
+      },
+      "approval-proxy-lifecycle-http-sla-original-due.json": {
+        "responses": 6,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-sla-resume.json": {
+        "responses": 8,
+        "successfulRequests": 1
+      },
+      "approval-proxy-lifecycle-http-sla-resumed-due-confirmed.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-sla-resumed-due.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-sla-setup.json": {
+        "responses": 14,
+        "successfulRequests": 9
+      }
+    },
+    "totalResponses": 170,
+    "scope": "累计真实请求／响应样本；包含前阶段 15 份，不表示独立测试数"
+  },
+  "browserCapture": {
+    "capturedResponses": 40,
+    "captureGaps": [
+      {
+        "reason": "HMR reload evicted earlier browser events; only captured responses are counted",
+        "at": "2026-10-02T02:34:42.438Z"
+      },
+      {
+        "reason": "Browser event buffer truncated",
+        "at": "2026-10-02T02:34:42.476Z"
+      }
+    ],
+    "limit": "HMR 刷新时事件缓存有两处缺口，仅已保存响应计入契约验证，不声称全程请求完整捕获"
+  },
+  "runtime": {
+    "database": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "sourceDatabase": "approval_proxy_runtime_9439518b65",
+    "backendPort": 18255,
+    "backendPid": 19260,
+    "boot": 3,
+    "jarSha256": "1897a355b43b2a2a9046ec486dc4ca897d87bd1b14e801a3413b6f2c30fdb6ed",
+    "proxyRemindersEnabled": true,
+    "slaRemindersEnabled": true,
+    "externalWorkersEnabled": false,
+    "frontendPort": 15342,
+    "backendSession": 2398,
+    "frontendSession": 34544,
+    "browserTabId": "18",
+    "schemaVersion": 98
+  },
+  "preservation": {
+    "verifiedAt": "2026-10-02T02:43:23.351987+00:00",
+    "sourceUnchanged": true,
+    "sourceBusinessRows": 2676,
+    "sourceFiles": 3,
+    "currentTables": 228,
+    "currentRows": 3394,
+    "currentFiles": 3,
+    "health": {
+      "18254": "UP",
+      "18255": "UP"
+    }
+  },
+  "screenshots": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-unavailable-message-before.png",
+      "sha256": "c3dd044196256acb3a97cee24a2d06dab982fe2ccf584bee1d0cd455e2f9a913"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-unavailable-message-after.png",
+      "sha256": "ff3df6a270b56d01224e0b6a7317f552cc2202fb61be5f91da2ae2402d680023"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-sla-resumed-confirmation.png",
+      "sha256": "78e0ca364a02ae599dbf806dd48285bd6d765e2e4683901f61eea98cd0bf82a6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-sla-approved.png",
+      "sha256": "3b6d59fdbe9d9f51e5646c5db22c9bb81d23b094f7e4bc77fd1483f9268b9adc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-multiple-selected.png",
+      "sha256": "3da47d96eb0ae075fd872ef090f77056edd9452f2e4b974fd3422cf831252542"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-multiple-audit.png",
+      "sha256": "db5081230ebd44344e224ad7a065bc4dca054c16a213a4ded8d18db27651c018"
+    }
+  ],
+  "verificationNotes": [
+    "原生历史的无时区数据库列按实际 JVM America/New_York 归一化后与 UTC HTTP 时间相同；首次验证脚本缺少时区换算，未修改生产时间或历史。",
+    "管理员在此副本没有本地审批资格，夹具前置检查阻止后改用现有认证源支持的 bob；未更改管理员或原人员资格。",
+    "本次只修改前端提示，未修改或重跑上一阶段已通过的 197 项 H2 / 51 项 PostgreSQL 后台范围。"
+  ],
+  "limits": [
+    "财务代理、原 V95 在审任务实际接续以及其余组合边界继续验收。",
+    "本次未再次重启 V98；此前首批状态升级／重启证据单独保留。",
+    "外部投递 worker 关闭；没有真实企业递送或财务接口验收。",
+    "至少六类工作和一项全量需求证据核对仍未全部完成。"
+  ]
+}
