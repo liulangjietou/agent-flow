@@ -1,6 +1,6 @@
 # 流程模板中心
 
-当前目录提供请假、用印、合同审批三个通用表单模板，以及已验收采购付款模板。每个模板包含可编辑的流程图、版本化表单、审批策略说明、示例输入和期望结果；复制后进入当前租户的私有流程草稿，再使用现有设计器校验、模拟和发布。前三个模板为 `businessType=FORM`；采购模板为 `PROCUREMENT_PAYMENT`，发布后从独立采购入口填报和预检，普通申请接口不能绕过财务依据。
+2026-10-02 代码目录核对：当前提供请假、用印、合同审批三个通用表单模板，以及采购付款、预算调整两个结构化模板，共 **5 个模板、21 个场景**。每个模板包含可编辑的流程图、版本化表单、审批策略说明、示例输入和期望结果；复制后进入当前租户的私有流程草稿，再使用现有设计器校验、模拟和发布。通用模板为 `businessType=FORM`，结构化模板分别为 `PROCUREMENT_PAYMENT` 和 `BUDGET_ADJUSTMENT`，发布后须从对应业务入口填报和预检，普通申请接口不能绕过财务依据。预算模板详见[预算调整](budget-adjustments.md)。原目标中的报销、事前费用申请和借款模板仍待补齐，见[台账 F13](remaining-task-ledger.md)。
 
 本文说明资源与接口契约，不作为本地测试、HTTP 或浏览器验收已通过的证明；实际运行结果以本阶段测试日志和验收记录为准。
 
@@ -15,15 +15,15 @@
 
 三个通用表单模板使用相同的受限图结构，节点标识为 `start`、`manager`、`route`、`review`、`end`。短路径为 `start → manager → route → end`；条件满足时为 `start → manager → route → review → end`。网关有显式默认分支，条件分支按图中的顺序保存。各节点的 `properties.x` / `properties.y` 为画布坐标字符串，不影响路由。
 
-`manager` 配置 `role:MANAGER`，`review` 配置 `role:ADMIN`。这些是演示角色，不自动映射为直属上级、部门负责人或法务。`ADMIN` 在这里仅演示额外复核；模板复制后应按本租户制度修改审批人和阈值。复制后的草稿可配置[本地组织及动态任职规则](organization-context-and-field-permissions.md)。原模板保留演示规则，复制后的静态规则在发布时检查有效成员，动态规则在实际节点激活时检查；自审批控制和代理有效期管理仍未接入。
+`manager` 配置 `role:MANAGER`，`review` 配置 `role:ADMIN`。这些是演示角色，不自动映射为直属上级、部门负责人或法务。`ADMIN` 在这里仅演示额外复核；模板复制后应按本租户制度修改审批人和阈值。复制后的草稿可配置[本地组织及动态任职规则](organization-context-and-field-permissions.md)。原模板保留演示规则，复制后的静态规则在发布时检查有效成员，动态规则在实际节点激活时检查；现有[职责分离](approval-responsibilities.md)和[期限代理](approval-proxies.md)按显式规则使用，不为旧模板自动补授权。
 
-通知文案保存在 `notificationTexts`，事件名为 `SUBMITTED`、`RETURNED`、`APPROVED`。三个通用表单模板的版本 2 将 `notificationsAvailable` 设为 `true`：复制时转为流程定义的申请人站内文案，可在设计器修改后发布。文案随申请创建冻结，不替换申请字段；邮件和 IM 尚未接入。详见[版本通知文案](definition-notification-texts.md)。
+通知文案保存在 `notificationTexts`，事件名为 `SUBMITTED`、`RETURNED`、`APPROVED`。三个通用表单模板的版本 2 将 `notificationsAvailable` 设为 `true`：复制时转为流程定义的申请人站内文案，可在设计器修改后发布。文案随申请创建冻结，不替换申请字段。现有[邮件发送](notification-delivery.md)和[企业微信发送](wecom-notifications.md)已有本地协议验收，真实企业投递另行验收。详见[版本通知文案](definition-notification-texts.md)。
 
 ## 采购模板的独立入口
 
 `procurement-payment` 为版本 1、财务分类。`supervisor` 使用 `role:ORG_SUPERVISOR_1`；`finance` 的 `role:FINANCE` 为占位配置，复制后必须绑定本租户具有审批资格的实际人员或岗位，空角色会被发布校验拒绝。两个节点均只读完整的采购敏感组。三个场景验证正额、最小正额及零额拒绝，不能代替实际原应付预检。
 
-当前目录合计 4 个模板、18 个场景。`check-process-templates.py` 的真实通用表单审批仅覆盖前三个 FORM 模板；采购另由 `ProcurementPaymentWorkflowTest` 和采购 HTTP/浏览器证据覆盖。
+当前目录合计 5 个模板、21 个场景，其中预算调整提供 3 个场景。`check-process-templates.py` 的真实通用表单审批仅覆盖前三个 FORM 模板；结构化采购和预算调整由各自专用业务的工作流测试及运行证据验证，不以目录场景数量证明实际财务链路通过。
 
 ## 字段
 

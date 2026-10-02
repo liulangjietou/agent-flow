@@ -1,0 +1,542 @@
+{
+  "recordedAt": "2026-10-02T12:17:29.148982+00:00",
+  "status": "BACKLOG_INDEX_VALIDATED_PARTIAL_REQUIREMENT_AUDIT",
+  "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
+  "scope": "原需求及已确认缺口的静态核对和可计数台账；没有新增业务代码、迁移或运行环境变更。",
+  "knownRemaining": {
+    "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
+    "knownOpenTaskCount": 42,
+    "byKind": {
+      "LOCAL_DEVELOPMENT": 24,
+      "LOCAL_VERIFICATION": 3,
+      "EXTERNAL_ACCEPTANCE": 15
+    },
+    "completeInventory": false,
+    "projectRemainingLowerBound": 42,
+    "completionPercentage": null,
+    "notes": [
+      "42 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
+      "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
+      "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
+    ]
+  },
+  "checks": {
+    "uniqueTaskIds": 42,
+    "countsMatchJsonAndMarkdown": true,
+    "dependencyGraphAcyclic": true,
+    "sourceDocumentsDigestVerified": 6,
+    "sourceSectionGroups": 39,
+    "sourceReferencesInBounds": 100,
+    "fileLineReferencesInBounds": 171,
+    "markdownLinksResolved": 76,
+    "openapiPaths": 272,
+    "openapiOperations": 307,
+    "templateKeys": [
+      "budget-adjustment",
+      "contract-review",
+      "leave-request",
+      "procurement-payment",
+      "seal-application"
+    ],
+    "templateScenarios": 21,
+    "serviceTaskPublishRejected": true,
+    "priorRequestCloseOperationAbsent": true,
+    "gitDiffCheck": true
+  },
+  "references": [
+    {
+      "path": "README.md",
+      "bytes": 24599,
+      "sha256": "2fafd91ad2c686acbe8fe2cb1272638a7f6b9a12c14bec210b801ee7ba03f28a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java",
+      "bytes": 7003,
+      "sha256": "6636a341536bcb5f6c6b4cd9658853da8a5f91ba8293791daeb74343b669ac86"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
+      "bytes": 4211,
+      "sha256": "32db5ddec8567d19ed5af237efd955d117403c399f6521a06205a42d18b8a90d"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+      "bytes": 17387,
+      "sha256": "1de96993cc2ce50d89501e5d2db29f0b005e3ba82bec01caa93db975c8765898"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvance.java",
+      "bytes": 23333,
+      "sha256": "0de18e8043106b741d683cb28090db3b9b8b7a8ed2db5eb7da59c2d90f7d4e81"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java",
+      "bytes": 3083,
+      "sha256": "dde9370410f81879bfc39b06dde51b0df3d5e5783696b731da55e59374a3400b"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseLine.java",
+      "bytes": 3880,
+      "sha256": "2caf45668a9cc29d39b3b45f6c358c7fadae578e12351440bb416ee77382ab50"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java",
+      "bytes": 8677,
+      "sha256": "e629b7ed9c34efa73bb0b6ec460c1388df587233d1b69168f2ce77d2b3124fcd"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySnapshot.java",
+      "bytes": 1573,
+      "sha256": "ff32902dadfbd398ca86bb26f98f5d00188b5f51eee9b6b6a7d56431d39c3481"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java",
+      "bytes": 9033,
+      "sha256": "68e167f258d7549c3c8f7b9098caf13306a22e69d61c88f2c95bd0530b848c30"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java",
+      "bytes": 5077,
+      "sha256": "57ad8d317c78985b3f1730408faf1799524692a51c9949bea902d26eeec38cdc"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/form/FormSchema.java",
+      "bytes": 17842,
+      "sha256": "27fbf41354d4205e15397eb03318c896eb4c8d54031910a83a37ef0074f3c160"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "bytes": 2002,
+      "sha256": "ee7a9e90863c115333cf5c9d153ac2107bbebd86146fc33c2180fc754e941b76"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java",
+      "bytes": 4153,
+      "sha256": "09eb7ed50a6d9535721e3a7c2ab36d9f2551988211c38f39e6e074aab90d755c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java",
+      "bytes": 6077,
+      "sha256": "851a23d5379e2a98d335739b3e2ea81d4a9aa4a72c66ce937db9ee629a0f1177"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
+      "bytes": 7640,
+      "sha256": "b3573646985d414195f17aabb9288b1123b8dd0a6d013dc7f37b18117bdc3d7f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
+      "bytes": 14039,
+      "sha256": "dcb8e3184458dc7a4c8ad8fa39cf66f373cdb786c1552eb458ba15a92b060113"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckEvaluator.java",
+      "bytes": 4762,
+      "sha256": "4356bca5ec303c9249103783f9514690fdc5f87d64864af0827f344a09935384"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetOutcomeHandler.java",
+      "bytes": 3528,
+      "sha256": "b38fe89ab6e9bd40785385179939286a94811ab071e3dea93ba9f2ef23d6ccc0"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+      "bytes": 12810,
+      "sha256": "56876270772e9c40e06e4ddd5a55f0289e1546755a38b06d00d4a74a696ebcb2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java",
+      "bytes": 3347,
+      "sha256": "8a0ecc5a83ff149502d7cf48e8a1706e608a02783d9908566e1da764ea2d8a76"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementRegistration.java",
+      "bytes": 6206,
+      "sha256": "70d7e7472b7beffa9a340b92f9b21182c652ad754c0d95c034d667af0539a976"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseWorkspaceQuery.java",
+      "bytes": 9688,
+      "sha256": "3f9208a63e6f6992614ca59d0927188eb79a9db7bbbaf6ec4905580a46cb4ac5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
+      "bytes": 7622,
+      "sha256": "d7f9d4f614119ba372977078fda657662b317f9c2923a17686c877e166c421a2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayAccounting.java",
+      "bytes": 2719,
+      "sha256": "f4ee850e1a57aef208c7d6326e0af9d34e3072a15577224669b9ed63b7965416"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicies.java",
+      "bytes": 1239,
+      "sha256": "abfd8966db8b451f401dfb652e4c3b1b53c69f282509fb70392f880b7f0fa721"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
+      "bytes": 9842,
+      "sha256": "1032b4deaef2f6deef80864d6b4c209cf8e08859d5d47fd8288a7f9a211b5037"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java",
+      "bytes": 13827,
+      "sha256": "898cec55cb9d5bf336fc372effa1779d4deaf84d7f01df1b08017ca64c7a6794"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java",
+      "bytes": 8840,
+      "sha256": "08792141268bbdbfd16bd0bc3b31570359b75708e6efc7ed5eab9cffd9b31eba"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
+      "bytes": 10970,
+      "sha256": "6f52df8a720c3dbd24d9ba236355b4c33ecf5e33bd5b0ea3ba86b8cc98f643c1"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationService.java",
+      "bytes": 10195,
+      "sha256": "daac548daa2d15a34a2b3c24a3f99dc2745167c5a842981a24f7c83bbe2c3837"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/template/ClasspathProcessTemplateCatalog.java",
+      "bytes": 3571,
+      "sha256": "153c8981dce2aeeca3c49e7012c70010c83f3cd0d6f20bbb0060c84a33209bcf"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "bytes": 2082843,
+      "sha256": "5b2764e25cd2d63999df6eff3acff1f12115221974ef4ef9f4427741b2451480"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseEditor.vue",
+      "bytes": 16513,
+      "sha256": "aac1ffb3ec7b19dd6859df61b370044ddf3640c5342f62774522fe660fb06905"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseFundingPicker.vue",
+      "bytes": 8692,
+      "sha256": "b9686b71270d4a6f4d2c53c3018246bb4e747d36a272bb7567a81588ad41db39"
+    },
+    {
+      "path": "docs/advance-disbursement.md",
+      "bytes": 3405,
+      "sha256": "496093f85d03630022a72157a336d8031d099c5299aad598c2e0101d78884a62"
+    },
+    {
+      "path": "docs/agent-execution.md",
+      "bytes": 6722,
+      "sha256": "c1a8d816afc6eb5ff071bd4c44993812c60a100594cea9d9cb388f7135defc40"
+    },
+    {
+      "path": "docs/approval-proxies.md",
+      "bytes": 31344,
+      "sha256": "8e89b92f2ed6cffc80391bf8407b5e0adede811dd9e4c1d19f2f2ad30f4b90d8"
+    },
+    {
+      "path": "docs/approval-responsibilities.md",
+      "bytes": 6162,
+      "sha256": "d4c75dc8b03fc067bcf63de47d6e5d803626428d1ffc619a83e836dc44fe4b1c"
+    },
+    {
+      "path": "docs/budget-operations.md",
+      "bytes": 8685,
+      "sha256": "0bb8b7f8ccf51536d49dcb3db0970e9d372c7e5e7f438699c3318f4b89ecf735"
+    },
+    {
+      "path": "docs/definition-catalog.md",
+      "bytes": 4572,
+      "sha256": "01aebd377193775665f63ee5eab9cd9c1759cd0c265c900ced63257909ba0b3a"
+    },
+    {
+      "path": "docs/definition-comparison.md",
+      "bytes": 4240,
+      "sha256": "86ecd3850e599ecc1a0901a497266c2e650a146dae09dbcf798150969048057a"
+    },
+    {
+      "path": "docs/draft-assist.md",
+      "bytes": 6938,
+      "sha256": "e378957928a86939b49dcc8d6f904f89a3ce5bac7b2335945eace024eeaa40c8"
+    },
+    {
+      "path": "docs/enterprise-oidc.md",
+      "bytes": 7498,
+      "sha256": "1fcb648d9879874a83c419af7b984492e5de5ac5b134669631d8f6eef5c94046"
+    },
+    {
+      "path": "docs/evidence/expense-invoice-fill-20261002.json",
+      "bytes": 9716,
+      "sha256": "c7fd981e81ecc247a046f8903a60883005e01fcaa72f911f66d34ba4c3b20ca3"
+    },
+    {
+      "path": "docs/evidence/expense-reduction-20260928.json",
+      "bytes": 2679,
+      "sha256": "e36b8bd01bdab412fd0b4d61dc221ab96125cf448cf4f32052f93d8c88be6c7f"
+    },
+    {
+      "path": "docs/evidence/governance-rollback-20260926.json",
+      "bytes": 8517,
+      "sha256": "9837fbfe3c1927cb6b25444f94d2fb29801402bee009e0ea658343488a45df86"
+    },
+    {
+      "path": "docs/evidence/invoice-extraction-ui-20261002.json",
+      "bytes": 12367,
+      "sha256": "89f2095498399215fcef4e14b8c11d0861e93ff840853dd13a533f8bda80361e"
+    },
+    {
+      "path": "docs/evidence/invoice-ofd-composites-20261002.json",
+      "bytes": 43011,
+      "sha256": "c089a9763dac7bfdd21b162694d26420d2e6e670a2da7eecc73c4a6281e87dcd"
+    },
+    {
+      "path": "docs/evidence/postgres-release-gate-20260928.json",
+      "bytes": 5157,
+      "sha256": "444c562bb0d4da5f13df8e8737e4ef264f18590b56e6ea5bb5d7b9050f28689c"
+    },
+    {
+      "path": "docs/evidence/quick-parallel-designer-20260925.json",
+      "bytes": 6306,
+      "sha256": "cc17ac75b616541f61e03c94a347045fee8c050f12ff2b948921093b818df579"
+    },
+    {
+      "path": "docs/evidence/request-binding-errors-20261002.json",
+      "bytes": 3632,
+      "sha256": "66922f0179ba0ff60effcf0e79c00309cc51743ae2eb3ac821032fa5601c8797"
+    },
+    {
+      "path": "docs/evidence/subprocess-designer-20261001.json",
+      "bytes": 16074,
+      "sha256": "673a4990f0a64d18cdd398a02e4d5530e8f941d832a8520827d4474404a65de4"
+    },
+    {
+      "path": "docs/evidence/subprocess-public-20261001.json",
+      "bytes": 19776,
+      "sha256": "8b965c061d39db71a2f639238ec88307c26de16f605db388c97968c1dd82a5ac"
+    },
+    {
+      "path": "docs/evidence/task-escalation-runtime-20261001.json",
+      "bytes": 25322,
+      "sha256": "75dd13d6dc1fd18ff26a35c7b11651dc43bcddd300729aa92b7b7f2c8c793780"
+    },
+    {
+      "path": "docs/evidence/tenant-initialization-wizard-20261001.json",
+      "bytes": 8943,
+      "sha256": "d824482fd17043148dc851e53c7ff4804d46434e77bf141636313f5ecf99b44c"
+    },
+    {
+      "path": "docs/expense-archives.md",
+      "bytes": 5904,
+      "sha256": "28cf763bd10c727ae0a7c2625b9d0a666e68a02ee2c35b54dec55b2ff1e182cc"
+    },
+    {
+      "path": "docs/expense-origination.md",
+      "bytes": 4950,
+      "sha256": "e8497c086e1e5f56935aabfc6ec9170f753712f29edaaa1ad3bd8d45993a1e2a"
+    },
+    {
+      "path": "docs/expense-plan.md",
+      "bytes": 6828,
+      "sha256": "d151f07f3643f50f5ca99beadb8ca877f1f41bb2cf58dec190e8963ac9ab87eb"
+    },
+    {
+      "path": "docs/expense-precheck.md",
+      "bytes": 6572,
+      "sha256": "fead275f32e51675c751012bfb9344192b383be6f9d233519f0e180e4e3c4e18"
+    },
+    {
+      "path": "docs/expense-reduction.md",
+      "bytes": 3983,
+      "sha256": "8baff61ede16c10943a6ac115ec0faa7f27cbeae4d1ce1f75c4a4f5f9a9dcb1d"
+    },
+    {
+      "path": "docs/expense-settlement.md",
+      "bytes": 5200,
+      "sha256": "74d38bb816307bcb2fd7ebd92a1d5808798d0b3d61442f06d7bac0c1d4d91adc"
+    },
+    {
+      "path": "docs/expense-submission.md",
+      "bytes": 6736,
+      "sha256": "ec1f5092b47f29406d586ae9287402aaf0de4caa04bc6f1264aed968ce1643bb"
+    },
+    {
+      "path": "docs/finance-gateway.md",
+      "bytes": 13630,
+      "sha256": "579e787877acbf948f2253777376665a8ce90885cc96287c8e6d98f29c45536e"
+    },
+    {
+      "path": "docs/form-assignees.md",
+      "bytes": 5162,
+      "sha256": "f561ea63462b260d70b73f6109dc2925c4bd90c6955a2e78952d7c873e9136ec"
+    },
+    {
+      "path": "docs/invoice-extraction.md",
+      "bytes": 52366,
+      "sha256": "7b3332ab0e0db747a67c46ed96c450af0f63cdb2e070578f066f214bced12b57"
+    },
+    {
+      "path": "docs/invoice-verification.md",
+      "bytes": 5894,
+      "sha256": "473f4035b31438d22a04d0ade4ad98617d9db6c2eb4d127a405c9e4994cc0838"
+    },
+    {
+      "path": "docs/local-organization.md",
+      "bytes": 10429,
+      "sha256": "72fc3f9ae1ad8349e46a37d2c5aad969220801ac5ce1ccd6e07bd8c8baf3ad4d"
+    },
+    {
+      "path": "docs/notification-delivery.md",
+      "bytes": 11591,
+      "sha256": "5684fdaa290cbc5365946d30048681dc7dacb0659a1f5b4d5afed58d091c2d0a"
+    },
+    {
+      "path": "docs/operations-outcome-metrics.md",
+      "bytes": 4908,
+      "sha256": "9abc3c1feebbb41f57ddcbaed0ebba2373eaac56992f2d895a7a29eb6fcc68e6"
+    },
+    {
+      "path": "docs/organization-context-and-field-permissions.md",
+      "bytes": 16141,
+      "sha256": "c6a03a6bee1589ed7c73dc3d799af528ee6a478e10cb945edb4d1de60e7fd68e"
+    },
+    {
+      "path": "docs/payment-batches.md",
+      "bytes": 6467,
+      "sha256": "e206b8f4114cbb911e0ee94d8308faa12d1da3b0fb48ca23a2924286bf3a4f9b"
+    },
+    {
+      "path": "docs/payment-system-port.md",
+      "bytes": 6460,
+      "sha256": "b2e5a5864f93f6ffe772e478f26ced6f47135a83bff564271104b3969c9b199b"
+    },
+    {
+      "path": "docs/payment-workspace.md",
+      "bytes": 4306,
+      "sha256": "c4b64f3985149839c4d78c0d6b2656ddb1628f1b50182d58606ab49b366060da"
+    },
+    {
+      "path": "docs/postgres-release-gate.md",
+      "bytes": 5597,
+      "sha256": "b3628f1893d0ab238924c87fa26abbdf6d72b231fa8d4f92f35d65862082c33b"
+    },
+    {
+      "path": "docs/process-templates.md",
+      "bytes": 12660,
+      "sha256": "05183086f062d94dac6ad5b666fe50bbdc8bd8ad4d56053888179020a8abf137"
+    },
+    {
+      "path": "docs/product-goal-gap-audit.md",
+      "bytes": 8541,
+      "sha256": "752b8c2b992e2afb036b1bf8bec85fca290da9a4487bd5cf3d8e235346cf26b8"
+    },
+    {
+      "path": "docs/production-backup-recovery.md",
+      "bytes": 7400,
+      "sha256": "0802223840b14b9772e9d2fb1c20da37d90fe3a1db299be3ec22f7d0dc9159c8"
+    },
+    {
+      "path": "docs/production-database-lifecycle.md",
+      "bytes": 8213,
+      "sha256": "468b742edb0f9ae516a6e0c81513350a4da80b5ef8faadac0b34de22b7b68cef"
+    },
+    {
+      "path": "docs/production-monitoring.md",
+      "bytes": 6384,
+      "sha256": "bad08851ba405ba953120092316249bc0d79166a1269ddcf94365e7224eba2cb"
+    },
+    {
+      "path": "docs/remaining-implementation-plan.md",
+      "bytes": 46602,
+      "sha256": "ce9eee8a3370a5f59ebca7e64bc17b36f5a18eff18e93c5d4caa2730d3bfc01f"
+    },
+    {
+      "path": "docs/remaining-task-ledger.json",
+      "bytes": 86066,
+      "sha256": "0865f5b59792f6f43a470c9c552134885cbb7838616a5e7ddce82e3506a45982"
+    },
+    {
+      "path": "docs/remaining-task-ledger.md",
+      "bytes": 27991,
+      "sha256": "6b7484d5fce0df3a8194c3be29ca57a48a0b7658380d9243d1d89060f96f7aca"
+    },
+    {
+      "path": "docs/structured-finance.md",
+      "bytes": 30897,
+      "sha256": "bf50ac73fbea7ffae387ce2615bc9ca2005a1f1c153838e91574df4737acbd6e"
+    },
+    {
+      "path": "docs/submission-risk.md",
+      "bytes": 4414,
+      "sha256": "656d623acc16b94941f028ed3b182656af78bef2494a8404a3c4a6df2413a4af"
+    },
+    {
+      "path": "docs/system-adapter-checks.md",
+      "bytes": 4044,
+      "sha256": "94918576d8b648d577c21ef4ee16db8e11364525894318142e54b93a79e28777"
+    },
+    {
+      "path": "docs/task-batch.md",
+      "bytes": 4886,
+      "sha256": "35b51ad88ebbcd2aba309a1fddba908105a1b752ba9f8a31ba256e467e36d9f8"
+    },
+    {
+      "path": "docs/tenant-initialization.md",
+      "bytes": 8354,
+      "sha256": "386a1b701a8f7c75dedce4735466e9ce3e61569c9b19f224e10addb3ceff29c7"
+    },
+    {
+      "path": "docs/versioned-forms.md",
+      "bytes": 9206,
+      "sha256": "84d77dce71c7729d532d96efaae6007c1e348b73a5394ed0ed4d58b0d462ecec"
+    },
+    {
+      "path": "docs/voucher-operations.md",
+      "bytes": 5134,
+      "sha256": "43e4a50d7b5204bc5183ac9cdfd754a6ca3210f90428a162da3d9d8f8448b830"
+    },
+    {
+      "path": "docs/voucher-preparation.md",
+      "bytes": 4136,
+      "sha256": "6fc60ba43a877fc8b0cadbdbce754f1a6ed2f0bf96f64a26febfe23dbdddbcd3"
+    },
+    {
+      "path": "docs/wecom-notifications.md",
+      "bytes": 7959,
+      "sha256": "43ed2d0e8cb4c9ed26f1a6addc4fe57085b4ffe9d7455e11e3fc790fcacb459c"
+    }
+  ],
+  "auditArtifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/requirement-audit-20261002/build-ledger.py",
+      "bytes": 40155,
+      "sha256": "48ddca67845637c76fd106cde10b4a9389503805575ed01330725b82cb0ed92a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/requirement-audit-20261002/openapi-inventory.json",
+      "bytes": 26500,
+      "sha256": "305a4b66e6b4de6e5f65cd2d828c9ff18128f36b058cb62ef94e88028c3ba68d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/requirement-audit-20261002/source-files.json",
+      "bytes": 98717,
+      "sha256": "357102d2d225bf3787b2e0f1331a5e3bd18bc9d4794d8293e7d5c41d1d0a2b28"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/requirement-audit-20261002/source-index.json",
+      "bytes": 13053,
+      "sha256": "4f619c045bdaba1137eef9d6ad48b9d16da53ba69eaedc9d61971cc8ca8a8ffb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/requirement-audit-20261002/verify-ledger.py",
+      "bytes": 6049,
+      "sha256": "e174b94d30fe10279247ea403d894562f04c3a58c88d27e5708850cbca2b64a8"
+    }
+  ],
+  "historicalTestsRerun": false,
+  "runtimeAcceptanceClaimed": false,
+  "remaining": "V03 的逐条规范证明尚未完成；42 是已确认任务下限，不能给全项目完成比例。",
+  "gitRemoteConfigured": false,
+  "pullRequest": null,
+  "remoteCi": null
+}

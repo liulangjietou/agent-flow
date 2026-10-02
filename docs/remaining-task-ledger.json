@@ -1,0 +1,3264 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-02T12:17:28.996454+00:00",
+  "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
+  "branch": "codex/governance-identifier-integration",
+  "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
+  "counting": {
+    "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
+    "knownOpenTaskCount": 42,
+    "byKind": {
+      "LOCAL_DEVELOPMENT": 24,
+      "LOCAL_VERIFICATION": 3,
+      "EXTERNAL_ACCEPTANCE": 15
+    },
+    "completeInventory": false,
+    "projectRemainingLowerBound": 42,
+    "completionPercentage": null,
+    "notes": [
+      "42 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
+      "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
+      "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "00",
+      "path": "/Volumes/fyoung/code/AI/flow/doc/00-设计评审总览.md",
+      "sha256": "9a9a0a3f15ddff13235333d30400791220e6c6b55588da1ddc2f383e37e39eab",
+      "normativeLines": [
+        1,
+        116
+      ],
+      "lineCount": 169,
+      "sections": [
+        {
+          "line": 7,
+          "title": "## 1. 本轮目标"
+        },
+        {
+          "line": 18,
+          "title": "## 2. 已确认架构"
+        },
+        {
+          "line": 34,
+          "title": "### DDD 约束"
+        },
+        {
+          "line": 48,
+          "title": "## 3. 默认假设（待业务确认）"
+        },
+        {
+          "line": 59,
+          "title": "## 4. 关键业务不变量"
+        },
+        {
+          "line": 73,
+          "title": "## 5. 文档与原型入口"
+        },
+        {
+          "line": 83,
+          "title": "## 6. 评审重点"
+        },
+        {
+          "line": 95,
+          "title": "### 费用报销评审重点"
+        },
+        {
+          "line": 107,
+          "title": "### 流程设计器评审重点"
+        }
+      ]
+    },
+    {
+      "id": "01",
+      "path": "/Volumes/fyoung/code/AI/flow/doc/01-UI设计说明.md",
+      "sha256": "f96a15f0deb96fc8b04e545ac3b9b91ce5d36481d6614aed343d0e309fae3515",
+      "normativeLines": [
+        1,
+        207
+      ],
+      "lineCount": 268,
+      "sections": [
+        {
+          "line": 9,
+          "title": "## 1. 设计定位"
+        },
+        {
+          "line": 15,
+          "title": "## 2. Token"
+        },
+        {
+          "line": 34,
+          "title": "## 3. 页面层级"
+        },
+        {
+          "line": 50,
+          "title": "## 4. 交互说明"
+        },
+        {
+          "line": 61,
+          "title": "### 流程设计器"
+        },
+        {
+          "line": 98,
+          "title": "### 费用报销页面"
+        },
+        {
+          "line": 151,
+          "title": "## 5. 响应式行为"
+        },
+        {
+          "line": 158,
+          "title": "## 6. 无障碍和键盘"
+        },
+        {
+          "line": 167,
+          "title": "## 7. DDD 对齐和接口边界"
+        },
+        {
+          "line": 175,
+          "title": "## 8. 实现边界"
+        },
+        {
+          "line": 183,
+          "title": "## 9. 待确认项"
+        },
+        {
+          "line": 196,
+          "title": "## 10. 评审验收点"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "path": "/Volumes/fyoung/code/AI/flow/doc/02-技术架构与领域模型.md",
+      "sha256": "733b7ed7e1e7187af83ba57bf0aea677765d898bdada50eb821f37d74af6b46c",
+      "normativeLines": [
+        1,
+        389
+      ],
+      "lineCount": 463,
+      "sections": [
+        {
+          "line": 18,
+          "title": "## 1. 设计结论"
+        },
+        {
+          "line": 26,
+          "title": "## 2. 事实、判断和验证标记"
+        },
+        {
+          "line": 36,
+          "title": "## 3. 总体架构"
+        },
+        {
+          "line": 60,
+          "title": "## 4. 模块职责、包与计划目录"
+        },
+        {
+          "line": 88,
+          "title": "## 5. 调用方、下游和业务场景"
+        },
+        {
+          "line": 103,
+          "title": "## 6. 领域边界和状态机"
+        },
+        {
+          "line": 105,
+          "title": "### 6.1 申请单状态"
+        },
+        {
+          "line": 130,
+          "title": "### 6.2 审批任务状态"
+        },
+        {
+          "line": 140,
+          "title": "### 6.3 退回和重提"
+        },
+        {
+          "line": 148,
+          "title": "### 6.4 支付状态"
+        },
+        {
+          "line": 152,
+          "title": "## 7. 流程定义和版本"
+        },
+        {
+          "line": 162,
+          "title": "## 8. Agent 边界和调用路径"
+        },
+        {
+          "line": 170,
+          "title": "## 9. 财务控制和事务边界"
+        },
+        {
+          "line": 186,
+          "title": "## 10. 非功能、安全和观测"
+        },
+        {
+          "line": 197,
+          "title": "## 11. 版本与兼容性原则"
+        },
+        {
+          "line": 256,
+          "title": "## 12. 评审与验收清单"
+        },
+        {
+          "line": 269,
+          "title": "## 13. 开发前待确认问题"
+        },
+        {
+          "line": 283,
+          "title": "## 14. DDD 限界上下文设计"
+        },
+        {
+          "line": 289,
+          "title": "### 14.1 审批申请上下文"
+        },
+        {
+          "line": 297,
+          "title": "### 14.2 流程定义上下文"
+        },
+        {
+          "line": 310,
+          "title": "### 14.3 组织授权上下文"
+        },
+        {
+          "line": 318,
+          "title": "### 14.4 财务控制上下文"
+        },
+        {
+          "line": 326,
+          "title": "### 14.5 Agent 协作上下文"
+        },
+        {
+          "line": 335,
+          "title": "### 14.6 通知审计上下文"
+        },
+        {
+          "line": 343,
+          "title": "### 14.7 费用核算上下文"
+        },
+        {
+          "line": 356,
+          "title": "### 14.8 跨上下文集成与防腐层"
+        },
+        {
+          "line": 362,
+          "title": "### 14.9 DDD 包结构"
+        },
+        {
+          "line": 382,
+          "title": "## 15. DDD 事务与一致性规则"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "path": "/Volumes/fyoung/code/AI/flow/doc/03-数据与接口契约.md",
+      "sha256": "1a869d7f8cbd9810b91c6c7a6d5eea233697864a2b4a6fcc80201f54981a5fbf",
+      "normativeLines": [
+        1,
+        436
+      ],
+      "lineCount": 516,
+      "sections": [
+        {
+          "line": 23,
+          "title": "## 1. 契约原则"
+        },
+        {
+          "line": 32,
+          "title": "## 2. DDD 持久化映射"
+        },
+        {
+          "line": 36,
+          "title": "### 2.1 业务表"
+        },
+        {
+          "line": 59,
+          "title": "### 2.2 状态映射"
+        },
+        {
+          "line": 76,
+          "title": "## 3. API 约定"
+        },
+        {
+          "line": 78,
+          "title": "### 3.1 通用响应和错误"
+        },
+        {
+          "line": 104,
+          "title": "### 3.2 创建申请"
+        },
+        {
+          "line": 146,
+          "title": "### 3.3 提交申请"
+        },
+        {
+          "line": 181,
+          "title": "### 3.4 查询待办"
+        },
+        {
+          "line": 212,
+          "title": "### 3.5 执行任务动作"
+        },
+        {
+          "line": 250,
+          "title": "### 3.6 撤回、作废和撤销"
+        },
+        {
+          "line": 260,
+          "title": "### 3.7 查询申请详情和审计"
+        },
+        {
+          "line": 268,
+          "title": "### 3.8 Agent 辅助"
+        },
+        {
+          "line": 310,
+          "title": "## 4. 开箱即用产品接口"
+        },
+        {
+          "line": 312,
+          "title": "### 4.1 模板中心"
+        },
+        {
+          "line": 320,
+          "title": "### 4.2 表单和规则设计"
+        },
+        {
+          "line": 329,
+          "title": "### 4.3 分支条件契约"
+        },
+        {
+          "line": 362,
+          "title": "## 5. 流程定义管理接口（P0 受限）"
+        },
+        {
+          "line": 373,
+          "title": "## 6. 事件契约"
+        },
+        {
+          "line": 398,
+          "title": "## 7. 外部端口与防腐层"
+        },
+        {
+          "line": 425,
+          "title": "## 8. 评审后开发前检查"
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "path": "/Volumes/fyoung/code/AI/flow/doc/04-产品化与开箱即用目标.md",
+      "sha256": "89d22d334c111cf7d73fdef5eb8acc0282cedb23f49ecf51ddb5317d7dcac083",
+      "normativeLines": [
+        1,
+        166
+      ],
+      "lineCount": 255,
+      "sections": [
+        {
+          "line": 17,
+          "title": "## 1. 产品定义"
+        },
+        {
+          "line": 34,
+          "title": "## 2. 产品用户和工作区"
+        },
+        {
+          "line": 47,
+          "title": "## 3. 开箱即用能力矩阵"
+        },
+        {
+          "line": 49,
+          "title": "### A. 首次安装和初始化"
+        },
+        {
+          "line": 57,
+          "title": "### B. 流程模板中心"
+        },
+        {
+          "line": 72,
+          "title": "### C. 表单、规则和审批人"
+        },
+        {
+          "line": 80,
+          "title": "### D. 可视化流程设计器"
+        },
+        {
+          "line": 96,
+          "title": "### E. 运行工作台"
+        },
+        {
+          "line": 104,
+          "title": "### F. 通知、SLA 和协作"
+        },
+        {
+          "line": 111,
+          "title": "### G. 运营和集成"
+        },
+        {
+          "line": 119,
+          "title": "## 4. DDD 产品化边界"
+        },
+        {
+          "line": 130,
+          "title": "## 5. 产品分层"
+        },
+        {
+          "line": 141,
+          "title": "## 6. “好用”的可量化验收"
+        },
+        {
+          "line": 154,
+          "title": "## 7. 开发节奏调整"
+        },
+        {
+          "line": 163,
+          "title": "## 8. 当前不能宣称的内容"
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "path": "/Volumes/fyoung/code/AI/flow/doc/05-费用报销领域设计.md",
+      "sha256": "979eb560f262ad2bd7439604d21fb14540faa2a230dcb63b2ab6bfc69e9e792c",
+      "normativeLines": [
+        1,
+        640
+      ],
+      "lineCount": 640,
+      "sections": [
+        {
+          "line": 8,
+          "title": "## 0. 为什么需要单独一份"
+        },
+        {
+          "line": 19,
+          "title": "### 0.1 本文采用的默认决策（待业务确认）"
+        },
+        {
+          "line": 30,
+          "title": "## 1. 限界上下文定位"
+        },
+        {
+          "line": 71,
+          "title": "## 2. 聚合与模型"
+        },
+        {
+          "line": 73,
+          "title": "### 2.1 聚合清单"
+        },
+        {
+          "line": 87,
+          "title": "### 2.2 ExpenseReport 结构"
+        },
+        {
+          "line": 117,
+          "title": "### 2.3 收款人"
+        },
+        {
+          "line": 123,
+          "title": "### 2.4 金额规则"
+        },
+        {
+          "line": 129,
+          "title": "## 3. 状态机（修正 02 §6.1）"
+        },
+        {
+          "line": 131,
+          "title": "### 3.1 审批状态（Application，只管审批）"
+        },
+        {
+          "line": 158,
+          "title": "### 3.2 结算状态（ExpenseSettlement）"
+        },
+        {
+          "line": 173,
+          "title": "### 3.3 其他状态机"
+        },
+        {
+          "line": 182,
+          "title": "### 3.4 撤回、作废、撤销规则"
+        },
+        {
+          "line": 193,
+          "title": "## 4. 发票管理"
+        },
+        {
+          "line": 195,
+          "title": "### 4.1 生命周期"
+        },
+        {
+          "line": 209,
+          "title": "### 4.2 防重复报销：数据库级唯一"
+        },
+        {
+          "line": 220,
+          "title": "## 5. 费用标准与超标控制"
+        },
+        {
+          "line": 224,
+          "title": "### 5.1 ExpensePolicy"
+        },
+        {
+          "line": 239,
+          "title": "### 5.2 超标处理"
+        },
+        {
+          "line": 245,
+          "title": "### 5.3 拆单规避（风险规则）"
+        },
+        {
+          "line": 249,
+          "title": "## 6. 事前申请与借款冲销"
+        },
+        {
+          "line": 251,
+          "title": "### 6.1 事前申请核销"
+        },
+        {
+          "line": 258,
+          "title": "### 6.2 借款/备用金冲销"
+        },
+        {
+          "line": 266,
+          "title": "## 7. 财务审核与核减"
+        },
+        {
+          "line": 268,
+          "title": "### 7.1 为什么需要核减"
+        },
+        {
+          "line": 272,
+          "title": "### 7.2 规则"
+        },
+        {
+          "line": 286,
+          "title": "## 8. 提交、预算与事务边界（修正 03 §3.3）"
+        },
+        {
+          "line": 288,
+          "title": "### 8.1 提交链路"
+        },
+        {
+          "line": 312,
+          "title": "### 8.2 预算占用生命周期"
+        },
+        {
+          "line": 324,
+          "title": "## 9. 审批路由模板（费用报销 P0）"
+        },
+        {
+          "line": 341,
+          "title": "### 9.1 审批人去重与自动跳过"
+        },
+        {
+          "line": 352,
+          "title": "## 10. 结算：凭证与付款"
+        },
+        {
+          "line": 354,
+          "title": "### 10.1 凭证"
+        },
+        {
+          "line": 375,
+          "title": "### 10.2 付款"
+        },
+        {
+          "line": 383,
+          "title": "## 11. 归档与留存"
+        },
+        {
+          "line": 389,
+          "title": "## 12. 接口契约"
+        },
+        {
+          "line": 393,
+          "title": "### 12.1 报销单"
+        },
+        {
+          "line": 442,
+          "title": "### 12.2 发票"
+        },
+        {
+          "line": 451,
+          "title": "### 12.3 事前申请与借款"
+        },
+        {
+          "line": 459,
+          "title": "### 12.4 财务审核"
+        },
+        {
+          "line": 478,
+          "title": "### 12.5 结算"
+        },
+        {
+          "line": 488,
+          "title": "### 12.6 管理配置"
+        },
+        {
+          "line": 496,
+          "title": "### 12.7 新增错误码"
+        },
+        {
+          "line": 512,
+          "title": "## 13. 领域事件"
+        },
+        {
+          "line": 529,
+          "title": "## 14. 数据模型"
+        },
+        {
+          "line": 553,
+          "title": "## 15. 端口"
+        },
+        {
+          "line": 595,
+          "title": "## 16. Agent 在报销中的职责"
+        },
+        {
+          "line": 605,
+          "title": "## 17. 报表与指标"
+        },
+        {
+          "line": 613,
+          "title": "## 18. 验收场景"
+        },
+        {
+          "line": 629,
+          "title": "## 19. 开发前待确认问题"
+        }
+      ]
+    }
+  ],
+  "authorizedAdjustments": [
+    {
+      "id": "D01",
+      "rule": "不提供批量批准；已实现批量领取/释放不重复计为待办。",
+      "reference": {
+        "path": "docs/remaining-implementation-plan.md",
+        "line": 49
+      }
+    },
+    {
+      "id": "D02",
+      "rule": "受限白名单条件满足 DMN/受限表达式的选择要求，不因没有 DMN 重开规则能力。",
+      "reference": {
+        "path": "docs/product-goal-gap-audit.md",
+        "line": 33
+      }
+    },
+    {
+      "id": "D03",
+      "rule": "附件采用已确认的单机持久目录；S3 非本次缺失项；历史文件不自动物理删除。",
+      "reference": {
+        "path": "docs/product-goal-gap-audit.md",
+        "line": 34
+      }
+    },
+    {
+      "id": "D04",
+      "rule": "停用版本恢复原版本后才可重提，不按旧设计静默切换最新版本。",
+      "reference": {
+        "path": "docs/evidence/governance-rollback-20260926.json",
+        "line": 1
+      }
+    },
+    {
+      "id": "D05",
+      "rule": "发起任职固定到轮次，申请人只在草稿/退回/撤回编辑，管理员仍受敏感字段约束。",
+      "reference": {
+        "path": "docs/organization-context-and-field-permissions.md",
+        "line": 1
+      }
+    },
+    {
+      "id": "D06",
+      "rule": "财务 D1–D6 与后续推荐已授权；外部权威事实源保留，真实企业数据和阈值不能编造。",
+      "reference": {
+        "path": "docs/remaining-implementation-plan.md",
+        "line": 54
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "A01",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "Agent",
+      "status": "OPEN",
+      "title": "OFD 完整票据渲染与应用抽取入口",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§4.1、§16",
+          "lines": [
+            193,
+            208
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "§16",
+          "lines": [
+            595,
+            604
+          ]
+        }
+      ],
+      "observed": "基础图元、模板、字体、静态批注、复合图元和隔离进程已有范围证据；公开抽取仍未支持 OFD。缺其余绘制能力、数字签章与嵌套内容、应用字体配置及全页模型输入。",
+      "references": [
+        {
+          "path": "docs/invoice-extraction.md",
+          "line": 78
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/invoice-ofd-composites-20261002.json",
+          "line": 1
+        }
+      ],
+      "acceptance": "完整原件逐页对照；签章不能被静默丢弃；受控字体和资源限制经实际安装包验证；公开入口及完整页输入接通。签章图像呈现与签名有效性分别声明。",
+      "dependsOn": []
+    },
+    {
+      "id": "A02",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "Agent",
+      "status": "OPEN",
+      "title": "模型预检解释与补正建议",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§16",
+          "lines": [
+            595,
+            604
+          ]
+        },
+        {
+          "documentId": "04",
+          "section": "§5",
+          "lines": [
+            130,
+            140
+          ]
+        }
+      ],
+      "observed": "现有 ExpensePrecheckEvaluator 执行权威规则预检；现有 Agent 能力为摘要、普通草稿和票据建议，没有模型解释预检结果的专用用例。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+          "line": 1
+        },
+        {
+          "path": "docs/draft-assist.md",
+          "line": 3
+        },
+        {
+          "path": "docs/agent-execution.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "输入绑定当前预检及选定可读事实；解释带来源；过期结果不可采纳；建议不修改规则结论、金额或审批结果。",
+      "dependsOn": []
+    },
+    {
+      "id": "A03",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "Agent",
+      "status": "OPEN",
+      "title": "结构化财务业务填报助手",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§16",
+          "lines": [
+            595,
+            604
+          ]
+        },
+        {
+          "documentId": "04",
+          "section": "§5",
+          "lines": [
+            130,
+            140
+          ]
+        }
+      ],
+      "observed": "普通草稿入口对 businessReference 非空明确返回 AGENT_DRAFT_UNSUPPORTED。票面金额辅助填报已完成，但没有按行程生成费用行、类别和分摊建议的专用入口。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java",
+          "line": 28
+        },
+        {
+          "path": "docs/evidence/expense-invoice-fill-20261002.json",
+          "line": 1
+        }
+      ],
+      "acceptance": "结构化业务建议走各自领域保存服务；报销行程、类别和分摊逐项人工确认；不由模型生成补贴标准、真实余额或批准事实；适用业务边界明确。",
+      "dependsOn": []
+    },
+    {
+      "id": "A04",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "Agent",
+      "status": "OPEN",
+      "title": "费用异常的 Agent 风险提示",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§16",
+          "lines": [
+            595,
+            604
+          ]
+        }
+      ],
+      "observed": "当前 ApprovalRiskPolicy 只评估本次表单白名单条件。没有费用领域同日多笔、节假日消费、连号等事实的专用模型提示与复核链路。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
+          "line": 48
+        },
+        {
+          "path": "docs/agent-execution.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。",
+      "dependsOn": []
+    },
+    {
+      "id": "I01",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "组织与电子签",
+      "status": "OPEN",
+      "title": "外部组织同步的本地完整用例",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.A、§3.G",
+          "lines": [
+            49,
+            56
+          ]
+        },
+        {
+          "documentId": "04",
+          "section": "§3.G",
+          "lines": [
+            111,
+            118
+          ]
+        }
+      ],
+      "observed": "现有组织目录为可信管理员维护单位、人员、任职和关系；已实现 OIDC，但没有同步批次、来源映射、冲突处置及恢复入口。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
+          "line": 1
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationService.java",
+          "line": 1
+        },
+        {
+          "path": "docs/local-organization.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。",
+      "dependsOn": []
+    },
+    {
+      "id": "I02",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "组织与电子签",
+      "status": "OPEN",
+      "title": "电子签业务端口、状态与操作页面",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.G",
+          "lines": [
+            111,
+            118
+          ]
+        },
+        {
+          "documentId": "00",
+          "section": "§6",
+          "lines": [
+            83,
+            94
+          ]
+        }
+      ],
+      "observed": "现有事件和支付 HMAC 验签解决消息完整性；未有文件签署业务用例。OFD 签章渲染也不等于电子签服务。",
+      "references": [
+        {
+          "path": "docs/product-goal-gap-audit.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-archives.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。",
+      "dependsOn": []
+    },
+    {
+      "id": "F01",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "费用制度与费用类别的版本化管理",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§5、§12.6",
+          "lines": [
+            220,
+            244
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "§12.6",
+          "lines": [
+            488,
+            495
+          ]
+        },
+        {
+          "documentId": "04",
+          "section": "§3.B、§6",
+          "lines": [
+            69,
+            70
+          ]
+        }
+      ],
+      "observed": "现有 GatewayExpensePolicies 查询外部判定，ExpensePolicySnapshot 冻结版本；类别来自 FinanceCatalog。当前 307 操作的 OpenAPI 中没有制度/类别管理与发布入口。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicies.java",
+          "line": 1
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySnapshot.java",
+          "line": 1
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java",
+          "line": 64
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+          "line": 96
+        }
+      ],
+      "acceptance": "租户可管理类别和制度版本，覆盖法人、类别、城市等级、职级、日期、币种等条件；发布后不可覆盖；填报反馈与提交结论可追溯到同一权威源；不硬编码企业标准。",
+      "dependsOn": []
+    },
+    {
+      "id": "F02",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "科目映射版本的管理配置",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§10.1",
+          "lines": [
+            354,
+            374
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "§12.6",
+          "lines": [
+            488,
+            495
+          ]
+        }
+      ],
+      "observed": "GatewayAccounting 只查询映射并向 ERP 发送凭证；未有管理草稿、发布或模板样例配置的产品入口。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayAccounting.java",
+          "line": 23
+        },
+        {
+          "path": "docs/voucher-preparation.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "提供类别与法人维度的版本管理或明确的权威系统管理接入；旧凭证保留原映射证据；无有效映射仍阻断；本地演示可配置样例并完成凭证链路。",
+      "dependsOn": []
+    },
+    {
+      "id": "F03",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "按行程自动计算定额补贴",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§5.1、§18",
+          "lines": [
+            224,
+            237
+          ]
+        },
+        {
+          "documentId": "01",
+          "section": "费用报销页面",
+          "lines": [
+            98,
+            121
+          ]
+        }
+      ],
+      "observed": "ExpenseLine 接收 quantity、日期和手填 claimedGross；DAY 单位不等于补贴规则，尚无系统计算的只读补贴行。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseLine.java",
+          "line": 17
+        },
+        {
+          "path": "agentflow-web/src/components/ExpenseEditor.vue",
+          "line": 1
+        }
+      ],
+      "acceptance": "基于固定制度与行程计算天数和金额，页面显示依据且不能手改；服务端拒绝篡改；人工调整行程后重新计算并留存版本。",
+      "dependsOn": [
+        "F01"
+      ]
+    },
+    {
+      "id": "F04",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "跨单拆单风险与合计金额路由",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§5.3",
+          "lines": [
+            245,
+            248
+          ]
+        }
+      ],
+      "observed": "现有风险规则只读当前提交字段，没有同申请人、类别、时间窗口内跨单聚合及审批层级提升。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
+          "line": 48
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java",
+          "line": 1
+        }
+      ],
+      "acceptance": "窗口、阈值和启用状态显式配置；并发提交也按确定口径聚合；冻结风险及路由依据；不伪称未启用规则已经保护业务。",
+      "dependsOn": []
+    },
+    {
+      "id": "F05",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "事前额度 STRICT/TOLERANCE/NONE 控制",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§6.1",
+          "lines": [
+            251,
+            256
+          ]
+        }
+      ],
+      "observed": "ExpenseRequest.ApprovedLine 能表达容差上限，但 ExpensePlan.approve 固定使用 BigDecimal.ZERO；没有按类别的模式、容差说明与额外审批配置。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java",
+          "line": 74
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java",
+          "line": 134
+        },
+        {
+          "path": "docs/expense-plan.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "按已发布类别策略冻结控制模式和容差；超额说明与审批同步验证；并发占用、释放和关闭保持额度不变量。",
+      "dependsOn": [
+        "F01"
+      ]
+    },
+    {
+      "id": "F06",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "手工关闭已批准事前额度",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§6.1、§12.3",
+          "lines": [
+            251,
+            256
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "§12.3",
+          "lines": [
+            451,
+            458
+          ]
+        }
+      ],
+      "observed": "ExpenseRequest.close 已有领域方法，当前服务端无调用方；OpenAPI 的 /expense-requests 只有列表。ExpensePlanEditor.close 是关闭编辑窗口，不是关闭额度。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java",
+          "line": 78
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseWorkspaceQuery.java",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-plan.md",
+          "line": 21
+        }
+      ],
+      "acceptance": "本人或明确财务权限经版本、幂等、原因和审计关闭；页面可操作；关闭后禁止新占用和增额，原占用仍可结算、释放；并发与原请求恢复通过。",
+      "dependsOn": []
+    },
+    {
+      "id": "F07",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "借款冲销 FIFO 建议",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§6.2",
+          "lines": [
+            258,
+            264
+          ]
+        },
+        {
+          "documentId": "01",
+          "section": "费用报销页面",
+          "lines": [
+            98,
+            150
+          ]
+        }
+      ],
+      "observed": "现有本人借款列表按资源游标返回，ExpenseFundingPicker 逐笔选择后手填金额；未按放款日生成先进先出建议。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseWorkspaceQuery.java",
+          "line": 82
+        },
+        {
+          "path": "agentflow-web/src/components/ExpenseFundingPicker.vue",
+          "line": 21
+        }
+      ],
+      "acceptance": "跨分页按放款日期及稳定次序建议，在核定金额和可用余额内分配；申请人可调整，最终提交重验；预留和冻结借款不被错误使用。",
+      "dependsOn": []
+    },
+    {
+      "id": "F08",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "逾期借款提醒与新借款控制配置",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§6.2",
+          "lines": [
+            258,
+            264
+          ]
+        }
+      ],
+      "observed": "EmployeeAdvance.overdue 能判断逾期，服务端生产调用链没有使用；现有 SLA 催办针对审批任务，不能当作借款逾期提醒。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvance.java",
+          "line": 80
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckEvaluator.java",
+          "line": 1
+        }
+      ],
+      "acceptance": "按法人日期和实际未还余额生成一次性/可追溯提醒；还款后停止；是否阻止新借款显式配置并由服务端执行，未配置不声称生效。",
+      "dependsOn": []
+    },
+    {
+      "id": "F09",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "柔性预算超支审批",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§8.1、§9",
+          "lines": [
+            288,
+            311
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "§9",
+          "lines": [
+            324,
+            339
+          ]
+        }
+      ],
+      "observed": "ExpenseBudgetOutcomeHandler 对 BUDGET_INSUFFICIENT 已实现自动退回；不存在区分柔性预算及预算负责人审批的路径，刚性不足不是缺失项。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetOutcomeHandler.java",
+          "line": 50
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+          "line": 114
+        }
+      ],
+      "acceptance": "外部预算明确允许柔性策略才进入指定审批；例外不得伪造冻结成功；审批后重新确认预算，未知和拒绝状态保持阻断。",
+      "dependsOn": []
+    },
+    {
+      "id": "F10",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "退回/撤回保留预算的到期释放",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§8.2",
+          "lines": [
+            312,
+            322
+          ]
+        }
+      ],
+      "observed": "ExpenseReleaseService 明确保留退回和撤回占用，只处理驳回和作废释放；未有按已配置 N 天释放的调度。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java",
+          "line": 35
+        },
+        {
+          "path": "docs/expense-submission.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "显式保留期、可追溯释放队列；重提与过期释放并发不误释放新轮次；未知外部结果对账，重新提交重新预检。",
+      "dependsOn": []
+    },
+    {
+      "id": "F11",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "费用自审批场景自动上溯",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§9.1",
+          "lines": [
+            341,
+            350
+          ]
+        }
+      ],
+      "observed": "通用职责分离已过滤申请人并在无人时阻断；多级主管可显式选择，但遇到费用自审批时不会自动沿任职关系上溯并审计。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
+          "line": 85
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java",
+          "line": 107
+        }
+      ],
+      "acceptance": "仅已发布费用策略启用；固定任职依据、检测环路与空上级，记录原候选和替代人及规则版本；财务职责分离仍强制。",
+      "dependsOn": []
+    },
+    {
+      "id": "F12",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "相邻业务审批人重复的受控自动通过",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§9.1",
+          "lines": [
+            341,
+            350
+          ]
+        }
+      ],
+      "observed": "现有职责分离记录真实批准人以排除冲突，不实现相邻相同审批人自动通过；未有该类审计动作。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
+          "line": 1
+        },
+        {
+          "path": "docs/approval-responsibilities.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "按发布版本识别相邻业务节点，记录自动动作和来源；非相邻默认不跳过；财务签收、审核、复核永不自动跳过；并发和重启不重复推进。",
+      "dependsOn": []
+    },
+    {
+      "id": "F13",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "报销、事前申请和借款模板包",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.B、§6",
+          "lines": [
+            57,
+            70
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "§9",
+          "lines": [
+            324,
+            339
+          ]
+        }
+      ],
+      "observed": "运行入口已有三类专用业务，但 ClasspathProcessTemplateCatalog 仅有请假、用印、合同、采购付款、预算调整 5 个模板；没有这 3 个可复制模板及配套样例。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/template/ClasspathProcessTemplateCatalog.java",
+          "line": 21
+        },
+        {
+          "path": "docs/process-templates.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "3 个模板可复制、验证、模拟、发布并从专用入口提交；附类别、制度、映射、签收开关和超标/核减/冲销/重复票样例；金额矩阵及财务复核阈值可配置。",
+      "dependsOn": [
+        "F01",
+        "F02"
+      ]
+    },
+    {
+      "id": "F14",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "项目分摊驱动的项目负责人会签",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§9",
+          "lines": [
+            324,
+            339
+          ]
+        }
+      ],
+      "observed": "FinanceCatalog.Project 只有法人、代码、名称；ExpenseFormContract 仅有明细入口、金额、币种、超标四类字段，未有项目负责人来源和按所有项目生成的会签。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java",
+          "line": 80
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java",
+          "line": 17
+        }
+      ],
+      "acceptance": "由可信项目目录解析每个实际分摊项目负责人并冻结；去重不丢项目责任；空匹配阻断；多项目必须全部完成且不能绕过字段权限。",
+      "dependsOn": []
+    },
+    {
+      "id": "F15",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "费用财务专用报表",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§17",
+          "lines": [
+            605,
+            612
+          ]
+        }
+      ],
+      "observed": "当前运营统计涵盖审批均时、退回、SLA、通知和 Agent 采纳；没有费用 P50/P90、超标核减、查验重复拦截、借款账龄和计划执行率的读模型。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java",
+          "line": 36
+        },
+        {
+          "path": "docs/operations-outcome-metrics.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "按法人/部门/类别提供提交至批准至付款 P50/P90、超标核减和退回原因、查验失败和重复拦截、借款账龄/计划执行率、凭证/付款失败积压；口径、未知样本与权限可核验。",
+      "dependsOn": []
+    },
+    {
+      "id": "F16",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "出纳工作台法人/账户/到期日筛选",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§10.2",
+          "lines": [
+            375,
+            381
+          ]
+        },
+        {
+          "documentId": "01",
+          "section": "费用报销页面",
+          "lines": [
+            127,
+            150
+          ]
+        }
+      ],
+      "observed": "CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
+          "line": 81
+        },
+        {
+          "path": "docs/payment-batches.md",
+          "line": 1
+        },
+        {
+          "path": "docs/payment-workspace.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。",
+      "dependsOn": []
+    },
+    {
+      "id": "F17",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用与财务产品",
+      "status": "OPEN",
+      "title": "付款结果与财务异常业务通知",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.F",
+          "lines": [
+            104,
+            110
+          ]
+        }
+      ],
+      "observed": "InboxMessage.Kind 已有审批和核减事件，但没有付款结果或异常事件；PaymentOperationChanged 现有监听器用于凭证和结算，不向收件人生成消息。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+          "line": 31
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
+          "line": 127
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementRegistration.java",
+          "line": 1
+        }
+      ],
+      "acceptance": "真实结果/冲突驱动最小站内通知与外发意向；接收人和读取权限实时校验；重复或迟到事件去重；未知不写成成功，核减既有通知保持。",
+      "dependsOn": []
+    },
+    {
+      "id": "W01",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "流程能力",
+      "status": "OPEN",
+      "title": "白名单服务任务的设计与执行",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.D",
+          "lines": [
+            80,
+            94
+          ]
+        },
+        {
+          "documentId": "02",
+          "section": "§7",
+          "lines": [
+            152,
+            161
+          ]
+        }
+      ],
+      "observed": "NodeType 含 SERVICE_TASK，但 DefinitionValidator 明确拒绝，发布适配器没有该分支。抄送使用内部 serviceTask 不代表对用户开放服务任务。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+          "line": 90
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
+          "line": 109
+        }
+      ],
+      "acceptance": "仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。",
+      "dependsOn": []
+    },
+    {
+      "id": "V01",
+      "kind": "LOCAL_VERIFICATION",
+      "group": "本地验收与核对",
+      "status": "OPEN",
+      "title": "票据模型路径及执行中重启的完整运行验收",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§4.1、§16",
+          "lines": [
+            193,
+            208
+          ]
+        },
+        {
+          "documentId": "04",
+          "section": "§6",
+          "lines": [
+            141,
+            152
+          ]
+        }
+      ],
+      "observed": "已完成本地 XML 页面、终态重启及确认结果填报。证据明确未完成模型路径、排队/执行中重启的实际运行；范围测试不能替代。",
+      "references": [
+        {
+          "path": "docs/evidence/invoice-extraction-ui-20261002.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-invoice-fill-20261002.json",
+          "line": 1
+        }
+      ],
+      "acceptance": "使用受控本地模型完成图片、PDF、XML 兜底及接通后的 OFD 实际 HTTP/页面；排队与执行中重启、超时、迟到结果、权限和来源变动、原键恢复通过；不算真实模型准确率。",
+      "dependsOn": [
+        "A01"
+      ]
+    },
+    {
+      "id": "V02",
+      "kind": "LOCAL_VERIFICATION",
+      "group": "本地验收与核对",
+      "status": "OPEN",
+      "title": "最终版本整体验收与发布资料",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§6",
+          "lines": [
+            141,
+            152
+          ]
+        },
+        {
+          "documentId": "02",
+          "section": "§11、§12",
+          "lines": [
+            197,
+            268
+          ]
+        }
+      ],
+      "observed": "现有 256 份分阶段证据，验证对象为各自提交。最新组件范围验证不是所有待开发功能完成后的整体验收，旧部署记录也不等于当前分支已发布。",
+      "references": [
+        {
+          "path": "docs/postgres-release-gate.md",
+          "line": 1
+        },
+        {
+          "path": "docs/production-database-lifecycle.md",
+          "line": 1
+        },
+        {
+          "path": "README.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "全部本地待办完成后，以固定提交和安装包运行适当完整 Java/Web/工具门禁、OpenAPI、非空升级/回退与原在审接续，更新运行文档和验收矩阵。",
+      "dependsOn": []
+    },
+    {
+      "id": "V03",
+      "kind": "LOCAL_VERIFICATION",
+      "group": "本地验收与核对",
+      "status": "OPEN",
+      "title": "余下原始条款的代码与验收证据核对",
+      "sourceRefs": [
+        {
+          "documentId": "00",
+          "section": "§1–§6",
+          "lines": [
+            7,
+            116
+          ]
+        },
+        {
+          "documentId": "01",
+          "section": "§4–§10",
+          "lines": [
+            50,
+            207
+          ]
+        },
+        {
+          "documentId": "03",
+          "section": "§1–§8",
+          "lines": [
+            23,
+            436
+          ]
+        }
+      ],
+      "observed": "本次已建立 00–05 来源摘要、307 操作库存和已确认缺口；尚未逐条关闭所有界面细节、键盘/触屏/无障碍、非功能约束及每条验收断言。",
+      "references": [
+        {
+          "path": "docs/product-goal-gap-audit.md",
+          "line": 1
+        },
+        {
+          "path": "docs/remaining-implementation-plan.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "对尚未证明的每条规范补到代码/准确测试/真实运行证据或已授权调整；发现新缺口追加稳定编号，不能把检索无命中或有类名当成完成证明。",
+      "dependsOn": []
+    },
+    {
+      "id": "E01",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实企业邮件投递",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.F",
+          "lines": [
+            104,
+            110
+          ]
+        }
+      ],
+      "observed": "SMTP/TLS、发件身份、收件权限、超时和最终递送需在企业邮件系统验收；本地受控 SMTP 只证明协议。",
+      "references": [
+        {
+          "path": "docs/notification-delivery.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "真实账号完成发送、退信及未知恢复，核对最终递送与最小通知内容。",
+      "dependsOn": []
+    },
+    {
+      "id": "E02",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实企业 IM 投递",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.F",
+          "lines": [
+            104,
+            110
+          ]
+        }
+      ],
+      "observed": "企业微信已有参考发送器与回环验收；企业应用、账号映射及权限未完成真实验收。",
+      "references": [
+        {
+          "path": "docs/wecom-notifications.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "实际企业应用和成员映射、可见范围、受理/最终可见、限流及错误恢复验证。",
+      "dependsOn": []
+    },
+    {
+      "id": "E03",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实财务主数据与制度",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§15、§19",
+          "lines": [
+            553,
+            594
+          ]
+        }
+      ],
+      "observed": "法人、账户、汇率、目录和制度现有受控端口/夹具；企业权威数据、实际制度版本未接入验收。",
+      "references": [
+        {
+          "path": "docs/finance-gateway.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "核对法人、员工账户、币种、汇率日期与精度、目录和制度事实及失效行为；不把样例金额作为企业标准。",
+      "dependsOn": [
+        "F01"
+      ]
+    },
+    {
+      "id": "E04",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实发票查验",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§4",
+          "lines": [
+            193,
+            218
+          ]
+        }
+      ],
+      "observed": "税务/发票服务当前没有企业凭据和实际回执对照。",
+      "references": [
+        {
+          "path": "docs/invoice-verification.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "购方名称税号、票据身份、金额、作废/红冲、时效、重验与重复占用对照真实回执。",
+      "dependsOn": []
+    },
+    {
+      "id": "E05",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实预算冻结与占用对账",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§8",
+          "lines": [
+            286,
+            322
+          ]
+        }
+      ],
+      "observed": "本地异步预算链路已验收，仍缺企业冻结/释放/消费及未知结果的真实对账。",
+      "references": [
+        {
+          "path": "docs/budget-operations.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "分摊行粒度、重复/迟到结果、核减差额、退回重提、消费及原账对账；企业控制模式明确。",
+      "dependsOn": [
+        "F09",
+        "F10"
+      ]
+    },
+    {
+      "id": "E06",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实 ERP 期间、映射与凭证",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§10.1",
+          "lines": [
+            354,
+            374
+          ]
+        }
+      ],
+      "observed": "已有期间、科目、过账、冲回等端口和本地证据，没有企业 ERP 实际账簿验收。",
+      "references": [
+        {
+          "path": "docs/voucher-operations.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "核对期间、科目映射版本、实际凭证号、过账/冲回、失败重试及审计账与 ERP 一致。",
+      "dependsOn": [
+        "F02"
+      ]
+    },
+    {
+      "id": "E07",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实银行/资金付款与回执",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§10.2、§11",
+          "lines": [
+            375,
+            388
+          ]
+        }
+      ],
+      "observed": "已完成本地支付授权、出纳、回调和对账协议；没有真实资金系统及银行原回单验收。",
+      "references": [
+        {
+          "path": "docs/payment-system-port.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "在企业测试环境核对账户、金额、双人控制、验签、重复/迟到/退票、最终资金事实和归档回单。",
+      "dependsOn": []
+    },
+    {
+      "id": "E08",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "企业模型连接与真实样本质量",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§5、§8",
+          "lines": [
+            130,
+            140
+          ]
+        }
+      ],
+      "observed": "合成回环模型只证明协议；摘要、草稿和真实票据的准确率、证据可靠性及外发范围尚无企业验收。",
+      "references": [
+        {
+          "path": "docs/agent-execution.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "在用户授权的数据集和实际模型端点评估质量、错误和拒答，记录模型/提示版本、费用时延及人工复核结果。",
+      "dependsOn": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "V01"
+      ]
+    },
+    {
+      "id": "E09",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "企业组织源同步联调",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.A、§3.G",
+          "lines": [
+            111,
+            118
+          ]
+        }
+      ],
+      "observed": "本地同步能力尚待 I01，真实人事目录协议、身份映射和冲突处理还需企业源系统验收。",
+      "references": [
+        {
+          "path": "docs/local-organization.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "同步新增/调岗/离职/停用、重复批次、断点恢复，与源目录及旧审批依据逐项对照。",
+      "dependsOn": [
+        "I01"
+      ]
+    },
+    {
+      "id": "E10",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "真实电子签服务联调",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.G",
+          "lines": [
+            111,
+            118
+          ]
+        }
+      ],
+      "observed": "本地签署业务尚待 I02，真实签署服务、授权身份、证书及回执需要企业环境。",
+      "references": [
+        {
+          "path": "docs/expense-archives.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "签署授权、文件摘要、回执、验签结果和归档链完整对照服务方，失败与未知结果可恢复。",
+      "dependsOn": [
+        "I02"
+      ]
+    },
+    {
+      "id": "E11",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "企业 IdP 和 SSO 验收",
+      "sourceRefs": [
+        {
+          "documentId": "02",
+          "section": "§10",
+          "lines": [
+            186,
+            195
+          ]
+        }
+      ],
+      "observed": "已有 OIDC 登录/会话/退出及回环 IdP 证据；企业发行者、声明和会话策略未验收。",
+      "references": [
+        {
+          "path": "docs/enterprise-oidc.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "核对租户隔离、角色声明、实际登录退出/撤销、超时、共享会话和身份停用，不用本地目录替代认证。",
+      "dependsOn": []
+    },
+    {
+      "id": "E12",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "目标环境安装、升级和配套恢复",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§3.A、§6",
+          "lines": [
+            49,
+            56
+          ]
+        }
+      ],
+      "observed": "已有容器、数据库和原件配套备份的本地方案，目标主机/存储、升级和跨环境恢复未实际验收。",
+      "references": [
+        {
+          "path": "docs/production-backup-recovery.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "按固定版本安装和非空升级；数据库及文件一致恢复，原在审继续；记录目标 RPO/RTO 和回退结果。",
+      "dependsOn": [
+        "V02"
+      ]
+    },
+    {
+      "id": "E13",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "目标容量、SLO 与告警",
+      "sourceRefs": [
+        {
+          "documentId": "02",
+          "section": "§10、§13",
+          "lines": [
+            186,
+            195
+          ]
+        }
+      ],
+      "observed": "已有容量基线和告警规则证据，不能替代企业目标负载和真实告警接收链路。",
+      "references": [
+        {
+          "path": "docs/production-monitoring.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "按目标并发、数据量、附件规模测吞吐/延迟/错误及资源上限，演练真实告警并明确容量与 SLO。",
+      "dependsOn": [
+        "E12"
+      ]
+    },
+    {
+      "id": "E14",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "留存、数据位置和电子档案制度验收",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "§11",
+          "lines": [
+            383,
+            388
+          ]
+        }
+      ],
+      "observed": "本地封存、原件保留与权限已实现；企业留存期限、数据位置和档案接入要求尚无目标环境验收，不能由文档年份推定合规。",
+      "references": [
+        {
+          "path": "docs/expense-archives.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "落实已确认留存及数据位置策略并验证访问、恢复和不可覆盖控制；如需企业档案系统，用实际接入证据验收。",
+      "dependsOn": [
+        "E12"
+      ]
+    },
+    {
+      "id": "E15",
+      "kind": "EXTERNAL_ACCEPTANCE",
+      "group": "企业联调与交付",
+      "status": "OPEN",
+      "title": "远端提交、开放 PR 与 CI",
+      "sourceRefs": [
+        {
+          "documentId": "04",
+          "section": "§7",
+          "lines": [
+            154,
+            162
+          ]
+        }
+      ],
+      "observed": "当前 git remote 为空；本地提交存在，没有 GitHub PR 或远程 CI 结果。",
+      "references": [
+        {
+          "path": "docs/remaining-implementation-plan.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "目标仓库可用后以个人身份推送、创建开放 PR、附 PR 链接并验证 CI；无远端不虚构交付。",
+      "dependsOn": [
+        "V02"
+      ]
+    }
+  ],
+  "sourceSectionIndex": [
+    {
+      "source": {
+        "documentId": "00",
+        "section": "§1–§6：架构、共同不变量和评审",
+        "lines": [
+          7,
+          116
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V02",
+        "V03",
+        "E14"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/structured-finance.md",
+          "line": 1
+        },
+        {
+          "path": "docs/remaining-implementation-plan.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "01",
+        "section": "§1–§3：布局和设计 token",
+        "lines": [
+          9,
+          49
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "README.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "01",
+        "section": "§4：设计器交互细则",
+        "lines": [
+          50,
+          97
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V03",
+        "W01"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/evidence/quick-parallel-designer-20260925.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/subprocess-designer-20261001.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "01",
+        "section": "§4：费用/票夹/签收/出纳",
+        "lines": [
+          98,
+          150
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F03",
+        "F07",
+        "F16",
+        "V01"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/expense-origination.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-reduction.md",
+          "line": 1
+        },
+        {
+          "path": "docs/payment-batches.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "01",
+        "section": "§5–§10：响应式、键盘、无障碍、状态和评审",
+        "lines": [
+          151,
+          207
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/evidence/expense-invoice-fill-20261002.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "02",
+        "section": "§1–§6：分层和生命周期",
+        "lines": [
+          18,
+          151
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V02",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "README.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-submission.md",
+          "line": 1
+        },
+        {
+          "path": "docs/structured-finance.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "02",
+        "section": "§7：受限流程定义和服务任务",
+        "lines": [
+          152,
+          161
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "W01",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/evidence/subprocess-public-20261001.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "02",
+        "section": "§8–§9：Agent 和财务边界",
+        "lines": [
+          162,
+          185
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "V01"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/agent-execution.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-submission.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "02",
+        "section": "§10–§13：非功能、兼容性与验收",
+        "lines": [
+          186,
+          282
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V02",
+        "V03",
+        "E11",
+        "E12",
+        "E13",
+        "E14"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/production-database-lifecycle.md",
+          "line": 1
+        },
+        {
+          "path": "docs/enterprise-oidc.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "02",
+        "section": "§14–§15：DDD 边界与一致性",
+        "lines": [
+          283,
+          389
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V02",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/structured-finance.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-submission.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "03",
+        "section": "§1–§3：协议、数据和业务操作",
+        "lines": [
+          23,
+          309
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V02",
+        "V03",
+        "A01",
+        "A02",
+        "A03",
+        "A04"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "agentflow-server/src/main/resources/api/openapi.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/request-binding-errors-20261002.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "03",
+        "section": "§4–§5：模板、表单、规则和发布",
+        "lines": [
+          310,
+          372
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F13",
+        "W01",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/versioned-forms.md",
+          "line": 1
+        },
+        {
+          "path": "docs/process-templates.md",
+          "line": 1
+        },
+        {
+          "path": "docs/definition-comparison.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "03",
+        "section": "§6–§8：事件、端口和检查清单",
+        "lines": [
+          373,
+          436
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "I01",
+        "I02",
+        "V03",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/finance-gateway.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/postgres-release-gate-20260928.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§1–§2：产品用户及职责",
+        "lines": [
+          17,
+          46
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F01",
+        "F02",
+        "F13",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/tenant-initialization.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.A：安装和初始化",
+        "lines": [
+          49,
+          56
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "I01",
+        "E01",
+        "E02",
+        "E08",
+        "E11",
+        "E12"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/evidence/tenant-initialization-wizard-20261001.json",
+          "line": 1
+        },
+        {
+          "path": "docs/system-adapter-checks.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.B：模板及财务配套",
+        "lines": [
+          57,
+          70
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F01",
+        "F02",
+        "F13"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/process-templates.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.C：字段/规则/选人",
+        "lines": [
+          72,
+          78
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/form-assignees.md",
+          "line": 1
+        },
+        {
+          "path": "docs/organization-context-and-field-permissions.md",
+          "line": 1
+        },
+        {
+          "path": "docs/approval-proxies.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.D：设计器",
+        "lines": [
+          80,
+          94
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "W01",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/definition-catalog.md",
+          "line": 1
+        },
+        {
+          "path": "docs/definition-comparison.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/subprocess-designer-20261001.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.E：工作台与失败恢复",
+        "lines": [
+          96,
+          102
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/task-batch.md",
+          "line": 1
+        },
+        {
+          "path": "docs/submission-risk.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.F：通知、SLA 和协作",
+        "lines": [
+          104,
+          110
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F17",
+        "E01",
+        "E02"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/notification-delivery.md",
+          "line": 1
+        },
+        {
+          "path": "docs/wecom-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/task-escalation-runtime-20261001.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§3.G：运营与集成",
+        "lines": [
+          111,
+          118
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "I01",
+        "I02",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07",
+        "E09",
+        "E10"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/operations-outcome-metrics.md",
+          "line": 1
+        },
+        {
+          "path": "docs/finance-gateway.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§4–§5：领域边界和产品层级",
+        "lines": [
+          119,
+          140
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "E14",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/agent-execution.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-archives.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§6：十条整体验收",
+        "lines": [
+          141,
+          152
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F01",
+        "F02",
+        "F13",
+        "V01",
+        "V02",
+        "V03",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/evidence/tenant-initialization-wizard-20261001.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-reduction-20260928.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "04",
+        "section": "§7–§8：交付节奏及声明边界",
+        "lines": [
+          154,
+          166
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V02",
+        "E15"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "README.md",
+          "line": 1
+        },
+        {
+          "path": "docs/remaining-implementation-plan.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§0–§3：决定、聚合、状态和金额",
+        "lines": [
+          8,
+          192
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F05",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/structured-finance.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-submission.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§4：票据原件、查验和查重",
+        "lines": [
+          193,
+          218
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "A01",
+        "V01",
+        "E04"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/invoice-extraction.md",
+          "line": 1
+        },
+        {
+          "path": "docs/invoice-verification.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§5：制度、补贴和拆单",
+        "lines": [
+          220,
+          248
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F01",
+        "F03",
+        "F04"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/expense-precheck.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§6：计划和借款",
+        "lines": [
+          249,
+          264
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F05",
+        "F06",
+        "F07",
+        "F08"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/expense-plan.md",
+          "line": 1
+        },
+        {
+          "path": "docs/advance-disbursement.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§7：财务核减",
+        "lines": [
+          266,
+          284
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/expense-reduction.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-reduction-20260928.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§8：预算与事务",
+        "lines": [
+          286,
+          322
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F09",
+        "F10",
+        "E05"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/budget-operations.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-submission.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§9：模板路由、项目和去重",
+        "lines": [
+          324,
+          350
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F11",
+        "F12",
+        "F13",
+        "F14"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/approval-responsibilities.md",
+          "line": 1
+        },
+        {
+          "path": "docs/form-assignees.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§10：凭证和付款",
+        "lines": [
+          352,
+          381
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F02",
+        "F16",
+        "E06",
+        "E07"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/voucher-operations.md",
+          "line": 1
+        },
+        {
+          "path": "docs/payment-batches.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§11：原件归档与留存",
+        "lines": [
+          383,
+          388
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "E07",
+        "E14"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/expense-archives.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§12：业务及管理操作",
+        "lines": [
+          389,
+          510
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F01",
+        "F02",
+        "F06",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "agentflow-server/src/main/resources/api/openapi.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§13–§15：事件、数据、端口",
+        "lines": [
+          512,
+          594
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F17",
+        "V03",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/finance-gateway.md",
+          "line": 1
+        },
+        {
+          "path": "docs/structured-finance.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§16：四种费用 Agent 职责",
+        "lines": [
+          595,
+          604
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "V01",
+        "E08"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/invoice-extraction.md",
+          "line": 1
+        },
+        {
+          "path": "docs/draft-assist.md",
+          "line": 1
+        },
+        {
+          "path": "docs/agent-execution.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§17：五组财务报表",
+        "lines": [
+          605,
+          612
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F15"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/operations-outcome-metrics.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§18：十三条费用验收",
+        "lines": [
+          613,
+          627
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F03",
+        "F05",
+        "V02",
+        "V03"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/structured-finance.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-reduction.md",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-settlement.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "source": {
+        "documentId": "05",
+        "section": "§19：企业参数和接入问题",
+        "lines": [
+          629,
+          640
+        ]
+      },
+      "status": "INDEXED_NOT_FULLY_VERIFIED",
+      "openTaskIds": [
+        "F01",
+        "F04",
+        "F08",
+        "F10",
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07",
+        "E14"
+      ],
+      "existingEvidencePointers": [
+        {
+          "path": "docs/remaining-implementation-plan.md",
+          "line": 1
+        }
+      ]
+    }
+  ],
+  "verifiedExistingCapabilities": [
+    {
+      "capability": "预算不足自动退回",
+      "finding": "不是缺失；柔性例外另见 F09。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetOutcomeHandler.java",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "capability": "核减通知",
+      "finding": "已有最小消息及详情入口，受授权最小外发规则约束；不强迫消息复制金额。付款结果通知另见 F17。",
+      "references": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java",
+          "line": 114
+        }
+      ]
+    },
+    {
+      "capability": "多级主管、字段选人、职责分离和期限代理",
+      "finding": "已完成各自本地验收；费用自动上溯/相邻去重为不同规则。",
+      "references": [
+        {
+          "path": "docs/form-assignees.md",
+          "line": 1
+        },
+        {
+          "path": "docs/approval-responsibilities.md",
+          "line": 1
+        },
+        {
+          "path": "docs/approval-proxies.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "capability": "字段帮助文案",
+      "finding": "FormSchema.Field 已定义 helpText，不能因原清单无勾选判为未开发。",
+      "references": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/form/FormSchema.java",
+          "line": 181
+        }
+      ]
+    },
+    {
+      "capability": "初始化、审批运营结果指标和风险筛选",
+      "finding": "已有本地运行证据；不替代财务报表与跨单风险。",
+      "references": [
+        {
+          "path": "docs/evidence/tenant-initialization-wizard-20261001.json",
+          "line": 1
+        },
+        {
+          "path": "docs/operations-outcome-metrics.md",
+          "line": 1
+        },
+        {
+          "path": "docs/submission-risk.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "capability": "归档与历史保留",
+      "finding": "本地封存和原件权限已实现；企业制度验收另见 E14。",
+      "references": [
+        {
+          "path": "docs/expense-archives.md",
+          "line": 1
+        }
+      ]
+    }
+  ],
+  "inspection": {
+    "openapiPathCount": 272,
+    "openapiOperationCount": 307,
+    "existingEvidenceManifestCount": 256,
+    "runtimeRetested": false,
+    "businessCodeChanged": false,
+    "searchArtifacts": "/fyoung/tmp/agentflow-remaining-20260928/requirement-audit-20261002",
+    "limitations": [
+      "证据链接标明原有验证范围；本次未重跑这些历史用例或重新校验所有运行工件。",
+      "代码缺口由实际入口/实现与规范对照；零搜索命中仅作为辅助。",
+      "sourceSectionIndex 是原始章节索引，并非每条规范的完成认证。",
+      "未完成 UI 键盘/触屏/无障碍逐条证据映射；不冒充通过。"
+    ]
+  },
+  "recommendedNextTaskIds": [
+    "F06",
+    "F07",
+    "F08",
+    "F01",
+    "F02",
+    "F13"
+  ],
+  "externalDelivery": {
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "ci": null
+  }
+}

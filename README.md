@@ -2,9 +2,9 @@
 
 AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。领域层表达审批、流程定义与工作日历规则，Flowable 作为基础设施防腐层运行 BPMN，Web 层提供租户隔离后的 REST API，Vue 设计器负责流程图编辑。
 
-当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。[Agent 字段选择、模型执行和人工复核](docs/agent-execution.md)、结构化财务及高级流程已完成当前方案的本地验收；真实通知渠道、企业财务制度与接口、企业环境和远端交付仍待完成，详见[当前剩余清单](docs/remaining-local-work.md)。
+当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。[Agent 审批摘要](docs/agent-execution.md)、财务执行链路和多项高级流程已有本地范围验收；原方案中的部分 Agent、费用管理/规则/模板/报表、组织同步、电子签和服务任务仍有本地开发。2026-10-02 已确认至少 **42 项**未完成（24 项本地开发、3 项本地验收与核对、15 项企业联调及交付），详见[当前任务台账](docs/remaining-task-ledger.md)。
 
-截至 2026-10-01，上述本地成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收；[系统自检](docs/system-adapter-checks.md)区分存储查询、适配器配置与实际企业验收，不能用健康状态推定完整平台已上线。
+截至 2026-10-02，上述本地成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收；[系统自检](docs/system-adapter-checks.md)区分存储查询、适配器配置与实际企业验收，不能用健康状态推定完整平台已上线。
 
 “流程管理”提供[流程目录](docs/definition-catalog.md)，支持名称、状态、准确流程标识及版本筛选，分批加载草稿和发布版本；打开时读取最新配置并保护未保存修改。
 
