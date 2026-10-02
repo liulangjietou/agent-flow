@@ -50,7 +50,7 @@ class InvoiceExtractionModelTest {
     private final AtomicInteger calls = new AtomicInteger();
     private HttpServer server;
     private ExecutorService threads;
-    private OpenAiCompatibleInvoiceExtractionModel model;
+    private InvoiceExtractionEngine extraction;
 
     @BeforeEach
     void startModel() throws Exception {
@@ -66,7 +66,7 @@ class InvoiceExtractionModelTest {
         });
         server.start(); configuration.setEnabled(true); configuration.setProviderId("loopback-fixture");
         configuration.setModel("vision-fixture"); configuration.setEndpoint("http://127.0.0.1:" + server.getAddress().getPort() + "/chat");
-        model = new OpenAiCompatibleInvoiceExtractionModel(originals, sources, configuration, json);
+        extraction = new InvoiceExtractionEngine(originals, sources, new OpenAiCompatibleInvoiceExtractionModel(configuration, json));
     }
 
     @AfterEach
@@ -77,11 +77,11 @@ class InvoiceExtractionModelTest {
         for (var format : List.of(InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG)) {
             byte[] bytes = image(format); var original = original(format, bytes); var context = context(original);
             output.set(result(original, "001234", "001234", 1));
-            var suggestion = model.generate(context);
+            var suggestion = extraction.generate(context);
             assertThat(suggestion.proposals().get(0).value()).isEqualTo("001234");
             assertThat(suggestion.proposals().get(0).confidence()).isEqualTo(InvoiceExtractionSuggestion.Confidence.MEDIUM);
             assertThat(suggestion.providerId()).isEqualTo("loopback-fixture");
-            assertThat(suggestion.modelVersion()).isEqualTo("synthetic-vision-v1");
+            assertThat(suggestion.processorVersion()).isEqualTo("synthetic-vision-v1");
             JsonNode body = request.get(), parts = body.path("messages").get(1).path("content");
             assertThat(body.path("store").asBoolean()).isFalse();
             assertThat(body.path("stream").asBoolean()).isFalse();
@@ -98,27 +98,27 @@ class InvoiceExtractionModelTest {
     void xmlUsesItsDeclaredEncodingAndRetainsNamespacedTextAndAttributes() throws Exception {
         byte[] bytes = "<?xml version='1.0' encoding='GB18030'?><i:Invoice xmlns:i='urn:invoice' buyer='甲公司'><i:Number>001234</i:Number></i:Invoice>".getBytes(Charset.forName("GB18030"));
         var original = original(InvoiceOriginal.Format.XML, bytes); output.set(result(original, "001234", "001234", 1));
-        var suggestion = model.generate(context(original));
+        var suggestion = extraction.generate(context(original));
         assertThat(suggestion.proposals()).hasSize(1);
         var text = request.get().path("messages").get(1).path("content").get(1).path("text").asText();
         assertThat(text).contains("i:Invoice", "buyer=\"甲公司\"", "xmlns:i=\"urn:invoice\"", "001234");
         assertThat(request.get().toString()).doesNotContain("image_url");
         output.set(result(original, "999999", "不存在的票面文字", 1));
-        assertFailure(() -> model.generate(context(original)), AssistRun.Failure.INVALID_MODEL_OUTPUT);
+        assertFailure(() -> extraction.generate(context(original)), AssistRun.Failure.INVALID_MODEL_OUTPUT);
     }
 
     @Test
     void malformedSourcesXmlExternalEntitiesAndOversizedInputNeverReachTheModel() throws Exception {
         var badPng = original(InvoiceOriginal.Format.PNG, new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10});
-        assertFailure(() -> model.generate(context(badPng)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        assertFailure(() -> extraction.generate(context(badPng)), AssistRun.Failure.INPUT_UNAVAILABLE);
         byte[] bomb = image(InvoiceOriginal.Format.PNG); ByteBuffer.wrap(bomb).putInt(16, 20_000).putInt(20, 20_000);
         var crc = new CRC32(); crc.update(bomb, 12, 17); ByteBuffer.wrap(bomb).putInt(29, (int) crc.getValue());
         var oversized = original(InvoiceOriginal.Format.PNG, bomb);
-        assertFailure(() -> model.generate(context(oversized)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        assertFailure(() -> extraction.generate(context(oversized)), AssistRun.Failure.INPUT_UNAVAILABLE);
         String external = "<!DOCTYPE invoice [<!ENTITY external SYSTEM '" + configuration.getEndpoint() + "'>]><invoice>&external;</invoice>";
         for (String xml : List.of(external, "<invoice>" + "字".repeat(30_000) + "</invoice>")) {
             var value = original(InvoiceOriginal.Format.XML, xml.getBytes(StandardCharsets.UTF_8));
-            assertFailure(() -> model.generate(context(value)), AssistRun.Failure.INPUT_UNAVAILABLE);
+            assertFailure(() -> extraction.generate(context(value)), AssistRun.Failure.INPUT_UNAVAILABLE);
         }
         assertThat(calls.get()).isZero();
     }
@@ -127,15 +127,15 @@ class InvoiceExtractionModelTest {
     void ownerSourceAndDestinationChangesFailBeforeAnyExternalRequest() throws Exception {
         var original = original(InvoiceOriginal.Format.PNG, image(InvoiceOriginal.Format.PNG));
         var context = context(original);
-        var admin = new InvoiceExtractionRun.Context(context.id(), context.tenantId(), "admin", context.createdAt(), context.input(), context.targetDigest());
+        var admin = new InvoiceExtractionRun.Context(context.id(), context.tenantId(), "admin", context.createdAt(), context.input(), context.method(), context.targetDigest());
         clearInvocations(files);
-        assertFailure(() -> model.generate(admin), AssistRun.Failure.INPUT_UNAVAILABLE); verifyNoInteractions(files);
+        assertFailure(() -> extraction.generate(admin), AssistRun.Failure.INPUT_UNAVAILABLE); verifyNoInteractions(files);
         var changed = new InvoiceExtractionInput(original.invoiceId(), original.id(), "b".repeat(64), original.format(), original.size(), 1);
-        assertFailure(() -> model.generate(new InvoiceExtractionRun.Context(context.id(), context.tenantId(), context.requestedBy(), context.createdAt(), changed, context.targetDigest())), AssistRun.Failure.INPUT_UNAVAILABLE);
+        assertFailure(() -> extraction.generate(new InvoiceExtractionRun.Context(context.id(), context.tenantId(), context.requestedBy(), context.createdAt(), changed, context.method(), context.targetDigest())), AssistRun.Failure.INPUT_UNAVAILABLE);
         configuration.setModel("another-model");
-        assertFailure(() -> model.generate(context), AssistRun.Failure.MODEL_UNAVAILABLE);
+        assertFailure(() -> extraction.generate(context), AssistRun.Failure.MODEL_UNAVAILABLE);
         configuration.setModel("vision-fixture"); configuration.setEnabled(false);
-        assertFailure(() -> model.generate(context), AssistRun.Failure.MODEL_UNAVAILABLE);
+        assertFailure(() -> extraction.generate(context), AssistRun.Failure.MODEL_UNAVAILABLE);
         assertThat(calls.get()).isZero();
     }
 
@@ -152,7 +152,7 @@ class InvoiceExtractionModelTest {
                 Map.of("proposals", List.of(Map.of("field", "INVOICE_NUMBER", "value", "001234", "confidence", "HIGH", "evidence", List.of(Map.of(
                         "originalId", UUID.randomUUID(), "originalDigest", original.sha256(), "page", 1, "quote", "001234"))))))) {
             output.set(malformed);
-            assertFailure(() -> model.generate(context), AssistRun.Failure.INVALID_MODEL_OUTPUT);
+            assertFailure(() -> extraction.generate(context), AssistRun.Failure.INVALID_MODEL_OUTPUT);
         }
     }
 
@@ -160,7 +160,59 @@ class InvoiceExtractionModelTest {
     void anEmptyExtractionIsRecordedAsNoCandidates() throws Exception {
         var original = original(InvoiceOriginal.Format.PNG, image(InvoiceOriginal.Format.PNG));
         output.set(Map.of("proposals", List.of()));
-        assertThat(model.generate(context(original)).proposals()).isEmpty();
+        assertThat(extraction.generate(context(original)).proposals()).isEmpty();
+    }
+
+    @Test
+    void recognizedXmlUsesLocalExtractionWithoutModelConfigurationOrExternalReferenceResolution() throws Exception {
+        String endpoint = configuration.getEndpoint();
+        String xml = InvoiceExtractionXmlTest.XML
+                .replace("<EInvoice>", "<EInvoice xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xsi:noNamespaceSchemaLocation='" + endpoint + "'>")
+                .replace("<TaxBureauSignature>", "<TaxBureauSignature><Reference URI='" + endpoint + "'/>")
+                .replace("</EInvoice>", "<xi:include xmlns:xi='http://www.w3.org/2001/XInclude' href='" + endpoint + "'/></EInvoice>");
+        var original = original(InvoiceOriginal.Format.XML, xml.getBytes(StandardCharsets.UTF_8));
+        configuration.setEnabled(false); configuration.setEndpoint(""); configuration.setModel(""); configuration.setApiKey("");
+        var context = localContext(original);
+        var result = extraction.generate(context);
+        assertThat(result.method()).isEqualTo(InvoiceExtractionSuggestion.Method.STRUCTURED_XML);
+        assertThat(result.proposals()).hasSize(9);
+        assertThat(result.providerId()).isEqualTo("local-xml");
+        var prepared = sources.prepare(original);
+        assertThat(prepared.method()).isEqualTo(InvoiceExtractionSuggestion.Method.STRUCTURED_XML);
+        assertThat(prepared.parts()).isEmpty();
+        assertThat(calls.get()).isZero();
+        var run = new InvoiceExtractionRun(context); run.start(1, context.createdAt()); run.complete(2, result, context.createdAt());
+        var restoredContext = json.read(json.write(context), InvoiceExtractionRun.Context.class);
+        var restoredState = json.read(json.write(run.state()), InvoiceExtractionRun.State.class);
+        assertThat(InvoiceExtractionRun.restore(restoredContext, restoredState).state()).isEqualTo(run.state());
+    }
+
+    @Test
+    void localModeFailureAndUnknownXmlNeverSwitchToTheEnabledModel() throws Exception {
+        for (var xml : List.of(InvoiceExtractionXmlTest.XML.replace("0.31", "0.32"), "<Invoice><Number>001234</Number></Invoice>",
+                InvoiceExtractionXmlTest.XML.replace("</TaxSupervisionInfo>", "<InvoiceNumber>9999</InvoiceNumber></TaxSupervisionInfo>"))) {
+            var original = original(InvoiceOriginal.Format.XML, xml.getBytes(StandardCharsets.UTF_8));
+            assertFailure(() -> extraction.generate(localContext(original)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        }
+        var known = original(InvoiceOriginal.Format.XML, InvoiceExtractionXmlTest.XML.getBytes(StandardCharsets.UTF_8));
+        // 创建时应采用已解析出的本地方式；旧模型方式的任务不能因代码能力改变而外发或换一种结果。
+        assertFailure(() -> extraction.generate(context(known)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        assertThat(calls.get()).isZero();
+    }
+
+    @Test
+    void localExtractionStillChecksOwnerAndOriginalIdentityBeforeReturningAnyValues() throws Exception {
+        var original = original(InvoiceOriginal.Format.XML, InvoiceExtractionXmlTest.XML.getBytes(StandardCharsets.UTF_8));
+        var context = localContext(original);
+        clearInvocations(files);
+        var admin = new InvoiceExtractionRun.Context(context.id(), context.tenantId(), "admin", context.createdAt(), context.input(), context.method(), null);
+        assertFailure(() -> extraction.generate(admin), AssistRun.Failure.INPUT_UNAVAILABLE);
+        verifyNoInteractions(files);
+        var input = context.input();
+        var changed = new InvoiceExtractionInput(input.invoiceId(), UUID.randomUUID(), input.originalDigest(), input.format(), input.originalBytes(), 1);
+        assertFailure(() -> extraction.generate(new InvoiceExtractionRun.Context(context.id(), context.tenantId(), context.requestedBy(),
+                context.createdAt(), changed, context.method(), null)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        assertThat(calls.get()).isZero();
     }
 
     @Test
@@ -196,7 +248,12 @@ class InvoiceExtractionModelTest {
     }
     private InvoiceExtractionRun.Context context(InvoiceOriginal original) {
         var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), 1);
-        return new InvoiceExtractionRun.Context(UUID.randomUUID(), original.tenantId(), original.ownerId(), Instant.now(), input, configuration.targetDigest(InvoiceExtractionRun.PROMPT_VERSION));
+        return new InvoiceExtractionRun.Context(UUID.randomUUID(), original.tenantId(), original.ownerId(), Instant.now(), input, InvoiceExtractionSuggestion.Method.MODEL, configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION));
+    }
+    private InvoiceExtractionRun.Context localContext(InvoiceOriginal original) {
+        var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), 1);
+        return new InvoiceExtractionRun.Context(UUID.randomUUID(), original.tenantId(), original.ownerId(), Instant.now(), input,
+                InvoiceExtractionSuggestion.Method.STRUCTURED_XML, null);
     }
     private static byte[] image(InvoiceOriginal.Format format) throws Exception {
         var bytes = new ByteArrayOutputStream(); var image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);

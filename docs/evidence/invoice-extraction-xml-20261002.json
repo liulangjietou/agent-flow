@@ -1,0 +1,122 @@
+{
+  "date": "2026-10-02",
+  "status": "STRUCTURED_XML_SCOPE_PASS_FEATURE_INCOMPLETE",
+  "baseCommit": "4bbbe9c293ae8a355df0d2d055aa2d23a8560662",
+  "implemented": [
+    "EInvoice 0.31 无命名空间结构按唯一完整路径提取 9 个字段",
+    "结构化 XML 与模型方式冻结和结果来源区分",
+    "关闭模型配置时本地提取，解析失败和未知结构不隐式外发",
+    "XML 元素路径、原件指纹、页码、提取值和本人修订分别保留",
+    "命名空间、重复分组、DTD、资源边界及 UTF-8 文本上限",
+    "统一本人原件复核、模型传输保持原有协议"
+  ],
+  "notImplemented": [
+    "PDF/OFD 内容适配",
+    "持久队列、租约、轨迹及迁移",
+    "公开 API、外发同意和票夹页面",
+    "实际应用 HTTP/浏览器/重启/非空升级验收",
+    "真实企业模型质量与接入"
+  ],
+  "tests": {
+    "uniqueTotal": 52,
+    "suites": [
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.agent.InvoiceExtractionRunTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionXmlTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.DraftAssistIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.expense.InvoiceXmlOriginalTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "logs": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-xml-scope.log",
+        "sha256": "be5a728210de26d75c9bab473aa09e14f1f8b28706ea1cee41b5ad5c24751acc"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-xml-regression.log",
+        "sha256": "14c676d2c8af195dc31805c70c37d55acde20d5ca94868e314a8782212cfb982"
+      }
+    ],
+    "scopeOverlap": "本轮 52 项与此前 83 项有重叠，不把两轮数量相加。当前改动不涉及数据库或 HTTP 契约，无新数据库/浏览器验收。"
+  },
+  "formatBoundary": {
+    "root": "EInvoice",
+    "namespace": "",
+    "documentVersion": "0.31",
+    "processorVersion": "einvoice-0.31-v1",
+    "knownFields": 9,
+    "currencyInferred": false,
+    "invoiceCodeInferred": false,
+    "unknownProfile": "MODEL input preparation only; an explicitly frozen MODEL context is required for transmission",
+    "signatureValidated": false,
+    "taxVerified": false,
+    "confidenceMeaning": "STRUCTURED_XML HIGH means direct field extraction; MODEL confidence is self assessed; neither is measured accuracy"
+  },
+  "limits": {
+    "originalBytes": 20971520,
+    "xmlDepth": 64,
+    "xmlElements": 100000,
+    "xmlAttributesPerElement": 64,
+    "xmlFallbackUtf8Bytes": 65536,
+    "quoteCharacters": 512
+  },
+  "validationLimits": {
+    "loopbackSyntheticModelHttp": true,
+    "newInvoiceApplicationHttp": false,
+    "realInvoiceFixtures": false,
+    "realModelAccuracy": false,
+    "originalStorageMockedInEngineTests": true,
+    "existingXmlStorageRegressionIncluded": true,
+    "existingRuntimeReplaced": false,
+    "schemaVersionUnchanged": 99,
+    "remainingTopLevelCategories": 6
+  },
+  "sources": [
+    {
+      "title": "TooMaker XML 发票源文件示例",
+      "url": "https://toomaker.com/guide/fms/invoice/",
+      "use": "0.31 无命名空间 EInvoice 字段及完整分组路径；不是完整税局 schema 证明"
+    },
+    {
+      "title": "财政部电子凭证会计数据标准推广应用版",
+      "url": "https://kjs.mof.gov.cn/zt/kuaijixinxihuajianshe/dzpzkjsjbzshsd/sjbz/202505/t20250519_3964020.htm",
+      "archiveUrl": "https://kjs.mof.gov.cn/zt/kuaijixinxihuajianshe/dzpzkjsjbzshsd/sjbz/202505/P020250617561583232009.zip",
+      "archiveSha256": "eb75e173c1315742302df5edf74cf9e5aed51c2733b820a3236d9cfbb7f0bd8b",
+      "use": "确认公开包为入账 XBRL，不把会计状态或主体映射为原始发票字段"
+    }
+  ]
+}

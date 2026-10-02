@@ -1,6 +1,7 @@
 package io.agentflow.agent;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.expense.InvoiceOriginal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Currency;
@@ -11,29 +12,41 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 /**
- * 票面候选值及模型引用；这里没有真实性、核销、审批或付款状态。
+ * 票面候选值及其生产来源；这里没有真实性、核销、审批或付款状态。
  * @author owlzhangfq@gmail.com
  */
-public record InvoiceExtractionSuggestion(String providerId, String modelVersion, String promptVersion, List<Proposal> proposals) {
+public record InvoiceExtractionSuggestion(Method method, String providerId, String processorVersion,
+                                         String contractVersion, List<Proposal> proposals) {
     public static final int MAX_PROPOSALS = Field.values().length;
     public static final int MAX_EVIDENCE_PER_FIELD = 4;
     public static final int MAX_QUOTE_LENGTH = 512;
+    private static final int MAX_XML_PATH_LENGTH = 512;
     private static final int MAX_PARTY_NAME_LENGTH = 256;
     private static final int MAX_TAX_IDENTIFIER_LENGTH = 64;
 
     /** 缺乏依据的字段必须省略；空列表如实表示未识别，不要求模型补造字段。 */
     public InvoiceExtractionSuggestion {
-        if (!identifier(providerId) || !identifier(modelVersion) || !identifier(promptVersion)
+        if (method == null || !identifier(providerId) || !identifier(processorVersion) || !identifier(contractVersion)
                 || proposals == null || proposals.size() > MAX_PROPOSALS
                 || proposals.stream().anyMatch(java.util.Objects::isNull)
                 || proposals.stream().map(Proposal::field).distinct().count() != proposals.size()) throw invalid();
         proposals = List.copyOf(proposals);
+        for (var proposal : proposals) for (var evidence : proposal.evidence()) {
+            if ((method == Method.STRUCTURED_XML) != (evidence.xmlPath() != null)) throw invalid();
+        }
     }
 
     /** 模型和人工值使用相同的票面格式边界，来源归属由冻结原件决定。 */
     public void requireMatches(InvoiceExtractionInput input) {
+        if (method == Method.STRUCTURED_XML && input.format() != InvoiceOriginal.Format.XML) throw invalid();
         for (var proposal : proposals) proposal.evidence().forEach(input::requireEvidence);
     }
+
+    /**
+     * 本地结构化提取与外部模型结果分别标记，不能将解析器版本当成模型名称。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum Method { STRUCTURED_XML, MODEL }
 
     /**
      * 封闭的票面字段；负数红字金额可保留，字段间是否相符留给人工核对及正式查验。
@@ -67,25 +80,32 @@ public record InvoiceExtractionSuggestion(String providerId, String modelVersion
     }
 
     /**
-     * 摘录是模型声称的票面文字，必须与原件人工核对，不作为机器查验事实。
+     * XML 路径只供对照，不执行 XPath；模型摘录不具有机器验证过的元素位置。
      * @author owlzhangfq@gmail.com
      */
-    public record Evidence(UUID originalId, String originalDigest, int page, String quote) {
+    public record Evidence(UUID originalId, String originalDigest, int page, String quote, String xmlPath) {
         public Evidence {
             if (originalId == null || originalDigest == null || !originalDigest.matches("[a-f0-9]{64}")
                     || page < 1 || page > InvoiceExtractionInput.MAX_PAGES
-                    || StringUtils.isBlank(quote) || quote.length() > MAX_QUOTE_LENGTH) throw invalid();
+                    || StringUtils.isBlank(quote) || quote.length() > MAX_QUOTE_LENGTH
+                    || xmlPath != null && (xmlPath.length() > MAX_XML_PATH_LENGTH
+                    || !xmlPath.matches("(/[A-Za-z_][A-Za-z0-9_.-]*\\[1\\]){1,8}"))) throw invalid();
+        }
+
+        /** 模型只能引用实际页和摘录，不能生成服务端解析的结构位置。 */
+        public Evidence(UUID originalId, String originalDigest, int page, String quote) {
+            this(originalId, originalDigest, page, quote, null);
         }
     }
 
     /**
-     * 模型自评的识别把握，不是实测准确率，更不是发票真实性结论。
+     * 模型使用自评把握；结构化解析的 HIGH 表示直接读取明确字段，两者都不是准确率或真实性。
      * @author owlzhangfq@gmail.com
      */
     public enum Confidence { LOW, MEDIUM, HIGH }
 
     /**
-     * 每项候选值单独绑定来源，模型原文与后续人工修订分别保留。
+     * 每项候选值单独绑定来源，提取原值与后续人工修订分别保留。
      * @author owlzhangfq@gmail.com
      */
     public record Proposal(Field field, String value, Confidence confidence, List<Evidence> evidence) {

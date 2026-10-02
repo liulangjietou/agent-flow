@@ -1,6 +1,7 @@
 package io.agentflow.agent;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.expense.InvoiceOriginal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -14,11 +15,11 @@ import org.springframework.util.CollectionUtils;
  * @author owlzhangfq@gmail.com
  */
 public final class InvoiceExtractionRun {
-    public static final String PROMPT_VERSION = "invoice-extraction-v1";
+    public static final String CONTRACT_VERSION = "invoice-extraction-v1";
     private final Context context;
     private State state = new State(Status.QUEUED, 1, null, null, null, null, null);
 
-    /** 运行身份、本人授权、完整原件和模型目的地在创建时固定。 */
+    /** 运行身份、本人授权、完整原件、执行方式和可选模型目的地在创建时固定。 */
     public InvoiceExtractionRun(Context context) { this.context = Objects.requireNonNull(context); }
 
     /** 单次开始；持久租约由运行仓储约束，不允许终态重新发送。 */
@@ -27,11 +28,11 @@ public final class InvoiceExtractionRun {
         state = new State(Status.RUNNING, expectedVersion + 1, at, null, null, null, null);
     }
 
-    /** 只接受本次来源和提示版本的完整建议，原件或财务查验不在此写入。 */
+    /** 只接受本次方式、来源和契约版本的完整建议，原件或财务查验不在此写入。 */
     public void complete(long expectedVersion, InvoiceExtractionSuggestion suggestion, Instant at) {
         require(expectedVersion, Status.RUNNING); time(at, state.startedAt());
-        if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) {
-            throw new DomainException("INVALID_AGENT_OUTPUT", "Invoice extraction prompt changed");
+        if (suggestion == null || !CONTRACT_VERSION.equals(suggestion.contractVersion()) || context.method() != suggestion.method()) {
+            throw new DomainException("INVALID_AGENT_OUTPUT", "Invoice extraction method or contract changed");
         }
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, expectedVersion + 1, state.startedAt(), at, suggestion, null, null);
@@ -96,15 +97,16 @@ public final class InvoiceExtractionRun {
     public State state() { return state; }
 
     /**
-     * 模型目的地只记录指纹，凭据和本地文件路径不得进入业务历史。
+     * 本地 XML 不设置模型目的地，不能隐式切换到模型；外发目的地只记录指纹。
      * @author owlzhangfq@gmail.com
      */
     public record Context(UUID id, String tenantId, String requestedBy, Instant createdAt,
-                          InvoiceExtractionInput input, String targetDigest) {
+                          InvoiceExtractionInput input, InvoiceExtractionSuggestion.Method method, String targetDigest) {
         public Context {
             if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64
-                    || StringUtils.isBlank(requestedBy) || requestedBy.length() > 128 || createdAt == null || input == null
-                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) {
+                    || StringUtils.isBlank(requestedBy) || requestedBy.length() > 128 || createdAt == null || input == null || method == null
+                    || method == InvoiceExtractionSuggestion.Method.MODEL && (targetDigest == null || !targetDigest.matches("[a-f0-9]{64}"))
+                    || method == InvoiceExtractionSuggestion.Method.STRUCTURED_XML && (input.format() != InvoiceOriginal.Format.XML || targetDigest != null)) {
                 throw new DomainException("INVALID_AGENT_INPUT", "Invoice extraction context is invalid");
             }
         }

@@ -76,7 +76,7 @@ class InvoiceExtractionRunTest {
             assertThat(run.state().suggestion()).isNull();
         }
         var run = started();
-        assertCode(() -> run.complete(2, new InvoiceExtractionSuggestion("fixture", "v1", "other-prompt", List.of(proposal(INVOICE_NUMBER, "0123"))), NOW.plusSeconds(2)), "INVALID_AGENT_OUTPUT");
+        assertCode(() -> run.complete(2, new InvoiceExtractionSuggestion(InvoiceExtractionSuggestion.Method.MODEL, "fixture", "v1", "other-prompt", List.of(proposal(INVOICE_NUMBER, "0123"))), NOW.plusSeconds(2)), "INVALID_AGENT_OUTPUT");
     }
 
     @Test
@@ -170,14 +170,60 @@ class InvoiceExtractionRunTest {
         run.dismiss(3, "alice", "没有识别到可用信息", NOW.plusSeconds(3)); assertRestores(run);
     }
 
+    @Test
+    void localXmlCanBeReviewedAndRestoredWithoutAModelDestination() {
+        var input = new InvoiceExtractionInput(INPUT.invoiceId(), INPUT.originalId(), INPUT.originalDigest(), InvoiceOriginal.Format.XML, 200, 1);
+        var context = new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, input,
+                InvoiceExtractionSuggestion.Method.STRUCTURED_XML, null);
+        var run = new InvoiceExtractionRun(context); run.start(1, NOW.plusSeconds(1));
+        var evidence = new InvoiceExtractionSuggestion.Evidence(input.originalId(), input.originalDigest(), 1, "00001234",
+                "/EInvoice[1]/TaxSupervisionInfo[1]/InvoiceNumber[1]");
+        var result = new InvoiceExtractionSuggestion(InvoiceExtractionSuggestion.Method.STRUCTURED_XML, "local-xml", "einvoice-0.31-v1",
+                InvoiceExtractionRun.CONTRACT_VERSION, List.of(new InvoiceExtractionSuggestion.Proposal(INVOICE_NUMBER, "00001234",
+                InvoiceExtractionSuggestion.Confidence.HIGH, List.of(evidence))));
+        run.complete(2, result, NOW.plusSeconds(2));
+        run.confirm(3, "alice", input, List.of(new InvoiceExtractionSuggestion.Selection(INVOICE_NUMBER, "00001235")), "本人核对", NOW.plusSeconds(3));
+        assertThat(run.state().suggestion().method()).isEqualTo(InvoiceExtractionSuggestion.Method.STRUCTURED_XML);
+        assertThat(run.state().suggestion().proposals().get(0).value()).isEqualTo("00001234");
+        assertThat(run.context().targetDigest()).isNull();
+        assertRestores(run);
+    }
+
+    @Test
+    void localAndModelMethodsCannotSwapDuringExecutionOrBorrowEachOthersEvidence() {
+        var xml = new InvoiceExtractionInput(INPUT.invoiceId(), INPUT.originalId(), INPUT.originalDigest(), InvoiceOriginal.Format.XML, 200, 1);
+        var local = new InvoiceExtractionRun(new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, xml,
+                InvoiceExtractionSuggestion.Method.STRUCTURED_XML, null));
+        local.start(1, NOW.plusSeconds(1));
+        assertCode(() -> local.complete(2, suggestion(List.of(proposal(INVOICE_NUMBER, "0123"))), NOW.plusSeconds(2)), "INVALID_AGENT_OUTPUT");
+        var emptyLocal = new InvoiceExtractionSuggestion(InvoiceExtractionSuggestion.Method.STRUCTURED_XML, "local-xml", "v1",
+                InvoiceExtractionRun.CONTRACT_VERSION, List.of());
+        assertCode(() -> started().complete(2, emptyLocal, NOW.plusSeconds(2)), "INVALID_AGENT_OUTPUT");
+        assertCode(() -> emptyLocal.requireMatches(INPUT), "INVALID_AGENT_OUTPUT");
+        assertCode(() -> new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, xml,
+                InvoiceExtractionSuggestion.Method.STRUCTURED_XML, "b".repeat(64)), "INVALID_AGENT_INPUT");
+        assertCode(() -> new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, xml,
+                InvoiceExtractionSuggestion.Method.MODEL, null), "INVALID_AGENT_INPUT");
+        assertCode(() -> new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, INPUT,
+                InvoiceExtractionSuggestion.Method.STRUCTURED_XML, null), "INVALID_AGENT_INPUT");
+        assertCode(() -> new InvoiceExtractionSuggestion(InvoiceExtractionSuggestion.Method.STRUCTURED_XML, "local-xml", "v1",
+                InvoiceExtractionRun.CONTRACT_VERSION, List.of(proposal(INVOICE_NUMBER, "0123"))), "INVALID_AGENT_OUTPUT");
+        var path = new InvoiceExtractionSuggestion.Evidence(INPUT.originalId(), INPUT.originalDigest(), 1, "0123", "/EInvoice[1]/InvoiceNumber[1]");
+        assertCode(() -> suggestion(List.of(new InvoiceExtractionSuggestion.Proposal(INVOICE_NUMBER, "0123",
+                InvoiceExtractionSuggestion.Confidence.HIGH, List.of(path)))), "INVALID_AGENT_OUTPUT");
+        for (var invalidPath : List.of("//InvoiceNumber", "/EInvoice[2]/InvoiceNumber[1]", "/EInvoice[1]/../InvoiceNumber[1]", "file:///a")) {
+            assertCode(() -> new InvoiceExtractionSuggestion.Evidence(INPUT.originalId(), INPUT.originalDigest(), 1, "0123", invalidPath), "INVALID_AGENT_OUTPUT");
+        }
+    }
+
     private static InvoiceExtractionRun queued() {
-        return new InvoiceExtractionRun(new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, INPUT, "b".repeat(64)));
+        return new InvoiceExtractionRun(new InvoiceExtractionRun.Context(UUID.randomUUID(), "demo", "alice", NOW, INPUT, InvoiceExtractionSuggestion.Method.MODEL, "b".repeat(64)));
     }
     private static InvoiceExtractionRun started() { var run = queued(); run.start(1, NOW.plusSeconds(1)); return run; }
     private static InvoiceExtractionRun completed() { var run = started(); run.complete(2, suggestion(List.of(proposal(INVOICE_NUMBER, "0123"))), NOW.plusSeconds(2)); return run; }
     private static InvoiceExtractionSuggestion.Evidence evidence(int page) { return new InvoiceExtractionSuggestion.Evidence(INPUT.originalId(), INPUT.originalDigest(), page, "票面原文"); }
     private static InvoiceExtractionSuggestion.Proposal proposal(InvoiceExtractionSuggestion.Field field, String value) { return new InvoiceExtractionSuggestion.Proposal(field, value, InvoiceExtractionSuggestion.Confidence.HIGH, List.of(evidence(1))); }
-    private static InvoiceExtractionSuggestion suggestion(List<InvoiceExtractionSuggestion.Proposal> proposals) { return new InvoiceExtractionSuggestion("fixture", "v1", InvoiceExtractionRun.PROMPT_VERSION, proposals); }
+    private static InvoiceExtractionSuggestion suggestion(List<InvoiceExtractionSuggestion.Proposal> proposals) { return new InvoiceExtractionSuggestion(InvoiceExtractionSuggestion.Method.MODEL, "fixture", "v1", InvoiceExtractionRun.CONTRACT_VERSION, proposals); }
     private static void assertRestores(InvoiceExtractionRun run) { assertThat(InvoiceExtractionRun.restore(run.context(), run.state()).state()).isEqualTo(run.state()); }
     private static void assertCode(ThrowingCallable operation, String code) {
         assertThatThrownBy(operation).isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo(code));
