@@ -11,8 +11,10 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -30,13 +32,16 @@ final class InvoiceOfdRenderer {
     private static final long MAX_TOTAL_PIXELS = 40_000_000;
     private static final int MAX_PNG_BYTES = 20 * 1024 * 1024;
     private static final int MAX_OBJECTS = 20_000;
+    private static final int MAX_LAYER_PAINTS = 20_000;
     private static final int MAX_SEGMENTS = 1_000_000;
     private static final Set<String> OBJECTS = Set.of("PageBlock", "PathObject", "TextObject", "ImageObject");
     private static final Set<String> IMAGE_ATTRIBUTES = InvoiceOfdVector.attributes("ResourceID");
     private static final List<String> LAYER_ORDER = List.of("Background", "Body", "Foreground");
     private int objects;
     private int segments;
+    private int layerPaints;
     private final InvoiceOfdClips clips = new InvoiceOfdClips();
+    private final Map<String, List<Element>> layerCache = new HashMap<>();
 
     private InvoiceOfdRenderer() { }
 
@@ -55,12 +60,13 @@ final class InvoiceOfdRenderer {
         return List.copyOf(result);
     }
 
-    /** 尚未实现的模板、批注和签章在入口拒绝，不能输出少内容的“成功”图片。 */
+    /** 尚未实现的批注和签章在入口拒绝，不能输出少内容的“成功”图片。 */
     private static void inspectDrawingScope(InvoiceOfdDocument.Contents contents) throws IOException {
         Element ofd = contents.root("OFD.xml", "OFD");
         shape(ofd, Set.of("Version", "DocType"), Set.of("DocBody"));
         for (Element body : children(ofd)) shape(body, Set.of(), Set.of("DocInfo", "DocRoot"));
         var documents = new HashSet<String>();
+        var pageFiles = new HashSet<String>();
         long pixels = 0;
         for (var page : contents.pages()) {
             bounded(page.x()); bounded(page.y());
@@ -71,16 +77,22 @@ final class InvoiceOfdRenderer {
                 Element document = contents.root(page.documentFile(), "Document");
                 shape(document, Set.of(), Set.of("CommonData", "Pages", "Attachments", "CustomTags"));
                 Element common = child(document, "CommonData", true);
-                shape(common, Set.of(), Set.of("MaxUnitID", "PageArea", "PublicRes", "DocumentRes", "DefaultCS"));
+                shape(common, Set.of(), Set.of("MaxUnitID", "PageArea", "PublicRes", "DocumentRes", "DefaultCS", "TemplatePage"));
                 area(child(common, "PageArea", false));
                 Element definitions = child(document, "Pages", true);
                 shape(definitions, Set.of(), Set.of("Page"));
                 for (Element definition : children(definitions)) shape(definition, Set.of("ID", "BaseLoc"), Set.of());
             }
-            Element root = contents.root(page.file(), "Page");
-            shape(root, Set.of(), Set.of("Area", "PageRes", "Content"));
-            area(child(root, "Area", false));
+            inspectPage(contents, page.file(), pageFiles);
+            for (var template : page.templates()) inspectPage(contents, template.file(), pageFiles);
         }
+    }
+
+    private static void inspectPage(InvoiceOfdDocument.Contents contents, String file, Set<String> checked) throws IOException {
+        if (!checked.add(file)) return;
+        Element root = contents.root(file, "Page");
+        shape(root, Set.of(), Set.of("Area", "PageRes", "Content", "Template"));
+        area(child(root, "Area", false));
     }
 
     private static void area(Element area) throws IOException {
@@ -97,32 +109,49 @@ final class InvoiceOfdRenderer {
                         InvoiceOfdDocument.Page page, int remainingBytes) throws IOException {
         var image = new BufferedImage(pixels(page.width()), pixels(page.height()), BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
-        try (var resources = new InvoiceOfdResources(archive, contents, page)) {
+        try (var scopes = new InvoiceOfdResources.Scopes(archive, contents, page.documentFile())) {
             graphics.setColor(Color.WHITE);
             graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             graphics.scale(PIXELS_PER_MM, PIXELS_PER_MM);
             graphics.translate(-page.x(), -page.y());
-            Element content = child(contents.root(page.file(), "Page"), "Content", false);
-            if (content != null) layers(graphics, content, resources);
+            var resources = scopes.page(page.file());
+            var layers = layers(contents, page.file());
+            // 每种类型先模板后正文；模板作为整体处于其引用指定的类型中。
+            for (String type : LAYER_ORDER) {
+                for (var template : page.templates()) if (type.equals(template.zOrder())) {
+                    var templateResources = scopes.page(template.file());
+                    var templateLayers = layers(contents, template.file());
+                    for (String innerType : LAYER_ORDER) paintLayers(graphics, templateLayers, templateResources, innerType);
+                }
+                paintLayers(graphics, layers, resources, type);
+            }
             return png(image, remainingBytes);
         } finally { graphics.dispose(); image.flush(); }
     }
 
-    private void layers(Graphics2D graphics, Element content, InvoiceOfdResources resources) throws IOException {
+    private List<Element> layers(InvoiceOfdDocument.Contents contents, String file) throws IOException {
+        var cached = layerCache.get(file);
+        if (cached != null) return cached;
+        Element content = child(contents.root(file, "Page"), "Content", false);
+        if (content == null) { layerCache.put(file, List.of()); return List.of(); }
         shape(content, Set.of(), Set.of("Layer"));
         List<Element> layers = children(content);
         for (Element layer : layers) {
             shape(layer, Set.of("ID", "Type", "DrawParam"), OBJECTS);
-            id(layer, "ID");
+            if (layer.hasAttribute("ID")) id(layer, "ID");
             if (!LAYER_ORDER.contains(layerType(layer))) throw invalid();
         }
-        // 同类型保持文档顺序；背景、正文、前景分层绘制，不依赖文件恰好已经排序。
-        for (String type : LAYER_ORDER) {
-            for (Element layer : layers) if (type.equals(layerType(layer))) {
-                block(graphics, layer, resources, InvoiceOfdStyle.resolve(layer, resources, InvoiceOfdStyle.DEFAULT));
-            }
+        layerCache.put(file, List.copyOf(layers));
+        return layerCache.get(file);
+    }
+
+    private void paintLayers(Graphics2D graphics, List<Element> layers, InvoiceOfdResources resources, String type) throws IOException {
+        for (Element layer : layers) if (type.equals(layerType(layer))) {
+            // 空图层也消耗实际展开预算，不能利用重复模板绕过图元数量限制。
+            if (++layerPaints > MAX_LAYER_PAINTS) throw invalid();
+            block(graphics, layer, resources, InvoiceOfdStyle.resolve(layer, resources, InvoiceOfdStyle.DEFAULT));
         }
     }
 

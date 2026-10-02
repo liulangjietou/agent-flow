@@ -32,6 +32,8 @@ final class InvoiceOfdDocument {
     private static final int MAX_ATTRIBUTES = 64;
     private static final int MAX_SCALAR_LENGTH = 512;
     private static final int MAX_PAGE_MM = 1000;
+    private static final int MAX_TEMPLATES_PER_DOCUMENT = 64;
+    private static final int MAX_TEMPLATE_REFERENCES_PER_PAGE = 64;
     private static final long MAX_ID = 0xffff_ffffL;
     private static final Set<String> VERSIONS = Set.of("1.0", "1.1");
     private static final Set<String> FILE_TEXT_REFERENCES = Set.of("DocBody/DocRoot", "DocBody/Signatures",
@@ -69,9 +71,10 @@ final class InvoiceOfdDocument {
             Element document = root(xml.read(documentFile), "Document");
             Element common = child(document, "CommonData", true);
             double[] commonBox = box(child(common, "PageArea", false));
+            Map<Long, Template> templates = templates(archive, xml, documentFile, common);
             var definitions = children(child(document, "Pages", true), "Page");
             if (definitions.isEmpty() || pages.size() + definitions.size() > InvoiceExtractionInput.MAX_PAGES) throw invalid();
-            var ids = new HashSet<Long>();
+            var ids = new HashSet<>(templates.keySet());
             var files = new HashSet<String>();
             for (Element definition : definitions) {
                 if (!ids.add(id(definition.getAttribute("ID")))) throw invalid();
@@ -79,9 +82,11 @@ final class InvoiceOfdDocument {
                 if (!files.add(file)) throw invalid();
                 Element page = root(xml.read(file), "Page");
                 double[] pageBox = box(child(page, "Area", false));
-                double[] area = pageBox == null ? commonBox : pageBox;
+                List<Template> references = templateReferences(page, templates);
+                double[] inherited = templateBox(xml, references, pageBox == null);
+                double[] area = pageBox != null ? pageBox : inherited != null ? inherited : commonBox;
                 if (area == null) throw invalid();
-                pages.add(new Page(documentFile, file, area[0], area[1], area[2], area[3]));
+                pages.add(new Page(documentFile, file, area[0], area[1], area[2], area[3], references));
             }
         }
         // 引用校验可能发现没有 XML 扩展名的资源文件；迭代检查，避免只检查后缀名。
@@ -92,6 +97,63 @@ final class InvoiceOfdDocument {
             }
         }
         return new Contents(xml, List.copyOf(pages));
+    }
+
+    /** 模板目录按所属文档解析；模板页中的 Template 节点无效，不递归展开。 */
+    private static Map<Long, Template> templates(InvoiceOfdArchive archive, XmlFiles xml,
+                                                String documentFile, Element common) throws IOException {
+        var definitions = children(common, "TemplatePage");
+        if (definitions.size() > MAX_TEMPLATES_PER_DOCUMENT) throw invalid();
+        var result = new HashMap<Long, Template>();
+        for (Element definition : definitions) {
+            InvoiceOfdXml.shape(definition, Set.of("ID", "Name", "ZOrder", "BaseLoc"), Set.of());
+            long id = id(definition.getAttribute("ID"));
+            String file = archive.file(parent(documentFile), definition.getAttribute("BaseLoc"));
+            var template = new Template(file, order(definition, "Background"));
+            if (result.putIfAbsent(id, template) != null) throw invalid();
+            Element root = root(xml.read(file), "Page");
+            for (Element reference : children(root, "Template")) validateTemplateReference(reference);
+        }
+        return Map.copyOf(result);
+    }
+
+    private static List<Template> templateReferences(Element page, Map<Long, Template> definitions) throws IOException {
+        var references = children(page, "Template");
+        if (references.size() > MAX_TEMPLATE_REFERENCES_PER_PAGE) throw invalid();
+        var result = new ArrayList<Template>();
+        for (Element reference : references) {
+            Template definition = definitions.get(validateTemplateReference(reference));
+            if (definition == null) throw invalid();
+            String order = reference.hasAttribute("ZOrder") ? reference.getAttribute("ZOrder") : definition.zOrder();
+            result.add(new Template(definition.file(), order));
+        }
+        return List.copyOf(result);
+    }
+
+    private static long validateTemplateReference(Element reference) throws IOException {
+        InvoiceOfdXml.shape(reference, Set.of("TemplateID", "ZOrder"), Set.of());
+        order(reference, "Background");
+        return id(reference.getAttribute("TemplateID"));
+    }
+
+    private static String order(Element element, String fallback) throws IOException {
+        String value = element.hasAttribute("ZOrder") ? element.getAttribute("ZOrder") : fallback;
+        if (!Set.of("Background", "Body", "Foreground").contains(value)) throw invalid();
+        return value;
+    }
+
+    /** 多个模板提供不同物理区域时，正文页必须显式给出区域，避免任意选择导致裁掉票据。 */
+    private static double[] templateBox(XmlFiles xml, List<Template> templates, boolean inherited) throws IOException {
+        double[] result = null;
+        for (Template template : templates) {
+            double[] candidate = box(child(root(xml.read(template.file()), "Page"), "Area", false));
+            if (candidate == null) continue;
+            if (inherited && result != null) {
+                for (int i = 0; i < result.length; i++) if (result[i] != candidate[i]) throw invalid();
+            }
+            result = candidate;
+        }
+        return result;
     }
 
     private static void references(InvoiceOfdArchive archive, XmlFiles xml, String file) throws IOException {
@@ -255,7 +317,14 @@ final class InvoiceOfdDocument {
      * 保留包内来源及实际 PhysicalBox，页码由完整列表的位置确定。
      * @author owlzhangfq@gmail.com
      */
-    record Page(String documentFile, String file, double x, double y, double width, double height) { }
+    record Page(String documentFile, String file, double x, double y, double width, double height,
+                List<Template> templates) { }
+
+    /**
+     * 保留每次引用的实际顺序及覆盖值，同一模板的重复引用不会被合并。
+     * @author owlzhangfq@gmail.com
+     */
+    record Template(String file, String zOrder) { }
 
     /**
      * 渲染期间持有已预检内容；访问仍受原来的包内路径及 XML 总预算约束。

@@ -26,6 +26,14 @@ class InvoiceOfdRendererTest {
     @TempDir Path directory;
 
     @Test
+    void rendersLayerWithoutOptionalIdentifier() throws Exception {
+        var files = fixture(1);
+        page(files, 0, "", path("0 0 10 10", "255 0 0", ""));
+        replace(files, "Doc_0/Pages/P0.xml", "<ofd:Layer ID=\"100\">", "<ofd:Layer>");
+        assertThat(pixel(render(files).get(0), 5, 5)).isEqualTo(Color.RED.getRGB());
+    }
+
+    @Test
     void preservesAllDocumentAndPageOrderAndPhysicalOrigins() throws Exception {
         var files = fixture(2);
         page(files, 0, "<ofd:Area><ofd:PhysicalBox>5 7 20 20</ofd:PhysicalBox></ofd:Area>", path("5 7 10 10", "255 0 0", ""));

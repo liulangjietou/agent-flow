@@ -33,8 +33,8 @@ class InvoiceOfdDocumentTest {
         files.put("Doc_0/Res/font.ttf", new byte[]{1, 2, 3});
         List<InvoiceOfdDocument.Page> pages = inspect(files);
         assertThat(pages).containsExactly(
-                new InvoiceOfdDocument.Page("Doc_0/Document.xml", "Doc_0/Pages/P0.xml", 0, 0, 210, 297),
-                new InvoiceOfdDocument.Page("Doc_0/Document.xml", "Doc_0/Pages/P1.xml", 1, 2, 100, 80));
+                new InvoiceOfdDocument.Page("Doc_0/Document.xml", "Doc_0/Pages/P0.xml", 0, 0, 210, 297, List.of()),
+                new InvoiceOfdDocument.Page("Doc_0/Document.xml", "Doc_0/Pages/P1.xml", 1, 2, 100, 80, List.of()));
     }
 
     @Test

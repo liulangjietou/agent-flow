@@ -29,17 +29,18 @@ final class InvoiceOfdResources implements Closeable {
     private final Map<Long, InvoiceOfdFont> fonts = new HashMap<>();
     private final InvoiceOfdColors colors;
 
-    InvoiceOfdResources(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, InvoiceOfdDocument.Page page) throws IOException {
+    private InvoiceOfdResources(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
+                                String documentFile, String pageFile, InvoiceOfdColors.ProfileBudget profileBudget) throws IOException {
         this.archive = archive;
-        Element common = child(contents.root(page.documentFile(), "Document"), "CommonData", true);
+        Element common = child(contents.root(documentFile, "Document"), "CommonData", true);
         var loaded = new HashSet<String>();
         for (String name : new String[]{"PublicRes", "DocumentRes"}) {
-            for (Element location : children(common, name)) load(contents, archive.file(parent(page.documentFile()), text(location).trim()), loaded);
+            for (Element location : children(common, name)) load(contents, archive.file(parent(documentFile), text(location).trim()), loaded);
         }
-        for (Element location : children(contents.root(page.file(), "Page"), "PageRes")) load(contents, archive.file(parent(page.file()), text(location).trim()), loaded);
+        for (Element location : children(contents.root(pageFile, "Page"), "PageRes")) load(contents, archive.file(parent(pageFile), text(location).trim()), loaded);
         Element defaultColor = child(common, "DefaultCS", false);
         Long defaultId = defaultColor == null ? null : Long.valueOf(integer(text(defaultColor).trim(), 1, 0xffff_ffffL));
-        colors = new InvoiceOfdColors(this, defaultId);
+        colors = new InvoiceOfdColors(this, defaultId, profileBudget);
     }
 
     Element element(long id, String type) throws IOException { return resource(id, type).element(); }
@@ -130,4 +131,40 @@ final class InvoiceOfdResources implements Closeable {
      * @author owlzhangfq@gmail.com
      */
     private record Resource(Element element, String base) { }
+
+    /**
+     * 一个输出页内复用各模板的资源作用域，关闭时释放所有字体，保留正文与模板的私有资源边界。
+     * @author owlzhangfq@gmail.com
+     */
+    static final class Scopes implements Closeable {
+        private final InvoiceOfdArchive archive;
+        private final InvoiceOfdDocument.Contents contents;
+        private final String documentFile;
+        private final InvoiceOfdColors.ProfileBudget profileBudget = new InvoiceOfdColors.ProfileBudget();
+        private final Map<String, InvoiceOfdResources> pages = new HashMap<>();
+
+        Scopes(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, String documentFile) {
+            this.archive = archive; this.contents = contents; this.documentFile = documentFile;
+        }
+
+        InvoiceOfdResources page(String file) throws IOException {
+            var resources = pages.get(file);
+            if (resources == null) {
+                resources = new InvoiceOfdResources(archive, contents, documentFile, file, profileBudget);
+                pages.put(file, resources);
+            }
+            return resources;
+        }
+
+        /** 一个字体关闭失败时仍释放其余作用域，异常由 try-with-resources 保留。 */
+        @Override public void close() throws IOException {
+            IOException failure = null;
+            for (var resources : pages.values()) {
+                try { resources.close(); }
+                catch (IOException error) { if (failure == null) failure = error; else failure.addSuppressed(error); }
+            }
+            pages.clear();
+            if (failure != null) throw failure;
+        }
+    }
 }

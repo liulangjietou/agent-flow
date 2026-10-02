@@ -28,10 +28,11 @@ final class InvoiceOfdColors {
     private final InvoiceOfdResources resources;
     private final Long defaultId;
     private final Map<Long, Definition> definitions = new HashMap<>();
-    private int profileLoads;
-    private int profileBytes;
+    private final ProfileBudget profileBudget;
 
-    InvoiceOfdColors(InvoiceOfdResources resources, Long defaultId) { this.resources = resources; this.defaultId = defaultId; }
+    InvoiceOfdColors(InvoiceOfdResources resources, Long defaultId, ProfileBudget profileBudget) {
+        this.resources = resources; this.defaultId = defaultId; this.profileBudget = profileBudget;
+    }
 
     Color read(Element color, Color fallback) throws IOException {
         if (color == null) return fallback;
@@ -89,9 +90,7 @@ final class InvoiceOfdColors {
 
     private ICC_ColorSpace profile(byte[] bytes, int type, int components) throws IOException {
         if (bytes.length < 132 || bytes.length > MAX_PROFILE_BYTES) throw invalid();
-        // 不同颜色空间可重复引用同一文件，每次实际加载都要计入原生色彩转换资源预算。
-        if (++profileLoads > MAX_PROFILE_LOADS || bytes.length > MAX_TOTAL_PROFILE_BYTES - profileBytes) throw invalid();
-        profileBytes += bytes.length;
+        profileBudget.consume(bytes.length);
         var input = ByteBuffer.wrap(bytes); long count = Integer.toUnsignedLong(input.getInt(128));
         if (input.getInt(0) != bytes.length || count > MAX_PROFILE_TAGS || 132 + count * 12 > bytes.length) throw invalid();
         for (int i = 0; i < count; i++) {
@@ -117,6 +116,20 @@ final class InvoiceOfdColors {
     private static int component(float value) throws IOException {
         if (!Float.isFinite(value)) throw invalid();
         return Math.round(Math.max(0, Math.min(1, value)) * 255);
+    }
+
+    /**
+     * 同一输出页的正文和模板共用预算，资源作用域增加不能放大原生配置加载上限。
+     * @author owlzhangfq@gmail.com
+     */
+    static final class ProfileBudget {
+        private int loads;
+        private int bytes;
+
+        private void consume(int length) throws IOException {
+            if (++loads > MAX_PROFILE_LOADS || length > MAX_TOTAL_PROFILE_BYTES - bytes) throw invalid();
+            bytes += length;
+        }
     }
 
     /**
