@@ -21,23 +21,40 @@ public class FlowableTaskAuthorization {
     private final TaskRecipientDirectory recipients;
     private final ApplicationRepository applications;
     private final FlowableApprovalResponsibilities responsibilities;
+    private final FlowableApprovalProxyAccess proxies;
 
     /** 候选事实来自运行引擎，组织资格仍由当前权威目录决定。 */
     public FlowableTaskAuthorization(TaskService tasks, TaskRecipientDirectory recipients, ApplicationRepository applications,
-                                     FlowableApprovalResponsibilities responsibilities) {
+                                     FlowableApprovalResponsibilities responsibilities, FlowableApprovalProxyAccess proxies) {
         this.tasks = tasks; this.recipients = recipients; this.applications = applications; this.responsibilities = responsibilities;
+        this.proxies = proxies;
     }
 
     /** 每次操作重新读取任务，锁等待后也必须重新授权。 */
     public Task require(String taskId, Actor actor) {
+        Task task = requireActive(taskId, actor);
+        if (!canAct(actor, task) || !responsibilities.allows(task, actor.userId())) {
+            throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
+        }
+        return task;
+    }
+
+    /** 读取可使用当前直接代理，写入口仍使用 require，不能把读授权误用为办理授权。 */
+    public Task requireReadable(String taskId, Actor actor) {
+        Task task = requireActive(taskId, actor);
+        if (!(canAct(actor, task) && responsibilities.allows(task, actor.userId()))
+                && !proxies.forActor(actor, java.time.Instant.now()).canRead(task)) {
+            throw new DomainException("FORBIDDEN", "The task is not available for the current user");
+        }
+        return task;
+    }
+
+    private Task requireActive(String taskId, Actor actor) {
         actor.requireRole("APPROVER");
         if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException("FORBIDDEN", "Current organization approval eligibility is missing");
         Task task = tasks.createTaskQuery().taskId(taskId).includeProcessVariables().includeIdentityLinks().singleResult();
         if (task == null || task.isSuspended() || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
             throw new DomainException("NOT_FOUND", "Active task not found");
-        }
-        if (!canAct(actor, task) || !responsibilities.allows(task, actor.userId())) {
-            throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
         }
         return task;
     }

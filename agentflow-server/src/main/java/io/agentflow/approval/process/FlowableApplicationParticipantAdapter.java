@@ -5,6 +5,8 @@ import io.agentflow.common.Actor;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.TaskService;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -16,22 +18,27 @@ import java.util.UUID;
 public class FlowableApplicationParticipantAdapter implements ApplicationParticipantPort {
     private final TaskService taskService;
     private final HistoryService historyService;
+    private final FlowableApprovalProxyAccess proxies;
 
     /** 创建参与者查询适配器。 */
-    public FlowableApplicationParticipantAdapter(TaskService taskService, HistoryService historyService) {
+    public FlowableApplicationParticipantAdapter(TaskService taskService, HistoryService historyService, FlowableApprovalProxyAccess proxies) {
         this.taskService = taskService;
         this.historyService = historyService;
+        this.proxies = proxies;
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public java.util.Set<String> readableNodes(String tenantId, String processInstanceId, Actor actor) {
         if (!tenantId.equals(actor.tenantId()) || !actor.hasRole("APPROVER")) return java.util.Set.of();
+        var scope = proxies.forActor(actor, java.time.Instant.now());
         // 暂停不会移除原任务参与事实；办理权限另由实时任务授权严格检查暂停状态。
         var active = taskService.createTaskQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
-                .includeIdentityLinks().list().stream()
+                .includeIdentityLinks().includeProcessVariables().list().stream()
                 .filter(task -> actor.userId().equals(task.getAssignee()) || actor.userId().equals(task.getOwner())
                         || task.getAssignee() == null && task.getIdentityLinks().stream().anyMatch(link -> "candidate".equals(link.getType())
-                            && (actor.userId().equals(link.getUserId()) || link.getGroupId() != null && actor.hasRole(link.getGroupId()))))
+                            && (actor.userId().equals(link.getUserId()) || link.getGroupId() != null && actor.hasRole(link.getGroupId())))
+                        || scope.canRead(task))
                 .map(org.flowable.task.api.Task::getTaskDefinitionKey).collect(java.util.stream.Collectors.toSet());
         if (!active.isEmpty()) return java.util.Set.copyOf(active);
         return historyService.createHistoricTaskInstanceQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
@@ -40,13 +47,16 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public boolean isParticipant(String tenantId, UUID applicationId, Actor actor) {
+        if (!tenantId.equals(actor.tenantId())) return false;
+        var scope = proxies.forActor(actor, java.time.Instant.now());
         boolean activeParticipant = taskService.createTaskQuery().includeProcessVariables().includeIdentityLinks()
                 .processVariableValueEquals("applicationId", applicationId.toString())
                 .processVariableValueEquals("tenantId", tenantId).list().stream()
                 .anyMatch(task -> actor.userId().equals(task.getAssignee())
                         || task.getIdentityLinks().stream().anyMatch(link -> actor.userId().equals(link.getUserId())
-                        || (link.getGroupId() != null && actor.hasRole(link.getGroupId()))));
+                        || (link.getGroupId() != null && actor.hasRole(link.getGroupId()))) || scope.canRead(task));
         if (activeParticipant) {
             return true;
         }

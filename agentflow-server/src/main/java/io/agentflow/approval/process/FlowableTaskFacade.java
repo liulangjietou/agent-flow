@@ -23,6 +23,7 @@ import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.Instant;
 import java.util.List;
@@ -49,6 +50,7 @@ public class FlowableTaskFacade {
     private final SubprocessProgressService subprocesses;
     private final SubprocessStopService subprocessStops;
     private final ProcurementPayableReservations procurementReservations;
+    private final FlowableApprovalProxyAccess proxies;
 
     /** 创建任务服务。 */
     public FlowableTaskFacade(TaskService taskService, CurrentActor currentActor,
@@ -57,7 +59,8 @@ public class FlowableTaskFacade {
                               ApprovalNotificationService notifications, FlowableTaskAuthorization authorization,
                               ExpenseApprovalService expenses, ExpenseReleaseService expenseReleases,
                               ProcurementPayableReservations procurementReservations, ApprovalCompletionService completion,
-                              SubprocessProgressService subprocesses, SubprocessStopService subprocessStops) {
+                              SubprocessProgressService subprocesses, SubprocessStopService subprocessStops,
+                              FlowableApprovalProxyAccess proxies) {
         this.taskService = taskService;
         this.recipients = recipients;
         this.currentActor = currentActor;
@@ -71,9 +74,11 @@ public class FlowableTaskFacade {
         this.subprocesses = subprocesses;
         this.subprocessStops = subprocessStops;
         this.procurementReservations = procurementReservations;
+        this.proxies = proxies;
     }
 
-    /** 只返回当前主体可领取或已指派给自己的待办。 */
+    /** 返回原生待办与当前有效直接代理可读取的待办。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<TaskView> list(String status) {
         Actor actor = currentActor.actor();
         // Flowable 任务租户字段在部分版本不会随流程变量传播；租户边界统一由 canAct 的受控变量校验保证。
@@ -84,18 +89,22 @@ public class FlowableTaskFacade {
         }
         query.active();
         if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return List.of();
-        return query.list().stream().filter(task -> authorization.canAct(actor, task)).map(task -> view(actor, task)).toList();
+        var scope = proxies.forActor(actor, Instant.now());
+        return query.list().stream().filter(task -> authorization.canAct(actor, task) || scope.canRead(task))
+                .map(task -> view(actor, task)).toList();
     }
 
     /** 按标识重新取得可操作任务，打开列表或旧消息时不依赖全量队列。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public TaskView get(String taskId) {
         return get(taskId, currentActor.actor());
     }
 
     /** 后台摘要复核已认证的发起主体，继续使用当前任务与组织事实，不修改线程认证上下文。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public TaskView get(String taskId, Actor actor) {
         actor.requireRole("APPROVER");
-        Task task = authorization.require(taskId, actor);
+        Task task = authorization.requireReadable(taskId, actor);
         if (task.isSuspended() || authorization.application(actor, task).status() != ApplicationStatus.IN_APPROVAL) {
             throw new DomainException("NOT_FOUND", "Active task not found");
         }
@@ -107,8 +116,8 @@ public class FlowableTaskFacade {
         CountersignProgress countersign = countersign(task);
         return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
                 application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
-                delegation(task).allowedActions(task.getAssignee() != null).stream()
-                        .filter(action -> countersign == null || countersign.allows(action)).toList(), countersign,
+                authorization.canAct(actor, task) ? delegation(task).allowedActions(task.getAssignee() != null).stream()
+                        .filter(action -> countersign == null || countersign.allows(action)).toList() : List.of(), countersign,
                 task.getDueDate() == null ? null : task.getDueDate().toInstant());
     }
 

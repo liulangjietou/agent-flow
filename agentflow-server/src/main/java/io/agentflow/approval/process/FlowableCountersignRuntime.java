@@ -24,7 +24,7 @@ import java.util.Map;
  */
 @Component
 public class FlowableCountersignRuntime {
-    private static final String USER = "agentflowCountersignUser";
+    static final String USER = "agentflowCountersignUser";
     private final RuntimeService runtime;
     private final TaskService tasks;
     private final HistoryService history;
