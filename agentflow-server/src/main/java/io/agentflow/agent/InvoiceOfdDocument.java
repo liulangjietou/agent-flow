@@ -77,7 +77,8 @@ final class InvoiceOfdDocument {
             var ids = new HashSet<>(templates.keySet());
             var files = new HashSet<String>();
             for (Element definition : definitions) {
-                if (!ids.add(id(definition.getAttribute("ID")))) throw invalid();
+                long pageId = id(definition.getAttribute("ID"));
+                if (!ids.add(pageId)) throw invalid();
                 String file = archive.file(parent(documentFile), definition.getAttribute("BaseLoc"));
                 if (!files.add(file)) throw invalid();
                 Element page = root(xml.read(file), "Page");
@@ -86,7 +87,7 @@ final class InvoiceOfdDocument {
                 double[] inherited = templateBox(xml, references, pageBox == null);
                 double[] area = pageBox != null ? pageBox : inherited != null ? inherited : commonBox;
                 if (area == null) throw invalid();
-                pages.add(new Page(documentFile, file, area[0], area[1], area[2], area[3], references));
+                pages.add(new Page(documentFile, file, pageId, area[0], area[1], area[2], area[3], references));
             }
         }
         // 引用校验可能发现没有 XML 扩展名的资源文件；迭代检查，避免只检查后缀名。
@@ -314,10 +315,10 @@ final class InvoiceOfdDocument {
     }
 
     /**
-     * 保留包内来源及实际 PhysicalBox，页码由完整列表的位置确定。
+     * 保留文档内页面标识、包内来源及实际 PhysicalBox；对外页码仍由完整列表的位置确定。
      * @author owlzhangfq@gmail.com
      */
-    record Page(String documentFile, String file, double x, double y, double width, double height,
+    record Page(String documentFile, String file, long id, double x, double y, double width, double height,
                 List<Template> templates) { }
 
     /**

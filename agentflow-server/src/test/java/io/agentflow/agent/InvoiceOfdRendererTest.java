@@ -199,7 +199,7 @@ class InvoiceOfdRendererTest {
         assertThatThrownBy(() -> render(template)).isInstanceOf(IOException.class);
         var annotations = fixture(1);
         replace(annotations, "Doc_0/Document.xml", "</ofd:Document>", "<ofd:Annotations>Annotations.xml</ofd:Annotations></ofd:Document>");
-        annotations.put("Doc_0/Annotations.xml", xml("Annotations", ""));
+        annotations.put("Doc_0/Annotations.xml", xml("Annotations", "<ofd:Unknown/>"));
         assertThatThrownBy(() -> render(annotations)).isInstanceOf(IOException.class);
         var signatures = fixture(1);
         replace(signatures, "OFD.xml", "</ofd:DocBody>", "<ofd:Signatures>Signatures.xml</ofd:Signatures></ofd:DocBody>");

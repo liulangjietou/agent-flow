@@ -7,6 +7,7 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,7 +34,7 @@ final class InvoiceOfdRenderer {
     private static final int MAX_OBJECTS = 20_000;
     private static final int MAX_LAYER_PAINTS = 20_000;
     private static final int MAX_SEGMENTS = 1_000_000;
-    private static final Set<String> OBJECTS = Set.of("PageBlock", "PathObject", "TextObject", "ImageObject");
+    static final Set<String> OBJECTS = Set.of("PageBlock", "PathObject", "TextObject", "ImageObject");
     private static final Set<String> IMAGE_ATTRIBUTES = InvoiceOfdVector.attributes("ResourceID");
     private static final List<String> LAYER_ORDER = List.of("Background", "Body", "Foreground");
     private int objects;
@@ -53,12 +54,13 @@ final class InvoiceOfdRenderer {
     static List<byte[]> render(InvoiceOfdArchive archive, Path fontCatalog) throws IOException {
         var contents = InvoiceOfdDocument.read(archive);
         inspectDrawingScope(contents);
+        var annotations = InvoiceOfdAnnotations.read(archive, contents);
         var renderer = new InvoiceOfdRenderer();
         var result = new ArrayList<byte[]>();
         int bytes = 0;
         try (var fonts = InvoiceOfdFonts.open(archive, fontCatalog)) {
             for (var page : contents.pages()) {
-                byte[] image = renderer.page(archive, contents, page, MAX_PNG_BYTES - bytes, fonts);
+                byte[] image = renderer.page(archive, contents, page, MAX_PNG_BYTES - bytes, fonts, annotations.getOrDefault(page, List.of()));
                 bytes += image.length;
                 result.add(image);
             }
@@ -66,7 +68,7 @@ final class InvoiceOfdRenderer {
         return List.copyOf(result);
     }
 
-    /** 尚未实现的批注和签章在入口拒绝，不能输出少内容的“成功”图片。 */
+    /** 尚未实现的签章等文档特征在入口拒绝，批注由独立索引检查后完整叠加。 */
     private static void inspectDrawingScope(InvoiceOfdDocument.Contents contents) throws IOException {
         Element ofd = contents.root("OFD.xml", "OFD");
         shape(ofd, Set.of("Version", "DocType"), Set.of("DocBody"));
@@ -81,7 +83,7 @@ final class InvoiceOfdRenderer {
             if (pagePixels > MAX_PAGE_PIXELS || pixels > MAX_TOTAL_PIXELS) throw invalid();
             if (documents.add(page.documentFile())) {
                 Element document = contents.root(page.documentFile(), "Document");
-                shape(document, Set.of(), Set.of("CommonData", "Pages", "Attachments", "CustomTags"));
+                shape(document, Set.of(), Set.of("CommonData", "Pages", "Attachments", "CustomTags", "Annotations"));
                 Element common = child(document, "CommonData", true);
                 shape(common, Set.of(), Set.of("MaxUnitID", "PageArea", "PublicRes", "DocumentRes", "DefaultCS", "TemplatePage"));
                 area(child(common, "PageArea", false));
@@ -112,7 +114,8 @@ final class InvoiceOfdRenderer {
     }
 
     private byte[] page(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
-                        InvoiceOfdDocument.Page page, int remainingBytes, InvoiceOfdFonts fonts) throws IOException {
+                        InvoiceOfdDocument.Page page, int remainingBytes, InvoiceOfdFonts fonts,
+                        List<InvoiceOfdAnnotations.Appearance> annotations) throws IOException {
         var image = new BufferedImage(pixels(page.width()), pixels(page.height()), BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         try {
@@ -134,8 +137,24 @@ final class InvoiceOfdRenderer {
                 }
                 paintLayers(graphics, layers, resources, type);
             }
+            paintAnnotations(graphics, annotations, resources);
             return png(image, remainingBytes);
         } finally { graphics.dispose(); image.flush(); }
+    }
+
+    private void paintAnnotations(Graphics2D parent, List<InvoiceOfdAnnotations.Appearance> annotations,
+                                  InvoiceOfdResources resources) throws IOException {
+        for (var appearance : annotations) {
+            if (++objects > MAX_OBJECTS) throw invalid();
+            Graphics2D graphics = (Graphics2D) parent.create();
+            try {
+                var box = appearance.boundary();
+                if (box != null) { graphics.clip(box); graphics.translate(box.x, box.y); }
+                // 隐藏只影响像素，仍检查图元并核算资源；空裁剪不会被子图元的 Alpha 覆盖。
+                if (!appearance.visible()) graphics.clip(new Rectangle2D.Double());
+                block(graphics, appearance.block(), resources, InvoiceOfdStyle.DEFAULT);
+            } finally { graphics.dispose(); }
+        }
     }
 
     private List<Element> layers(InvoiceOfdDocument.Contents contents, String file) throws IOException {
