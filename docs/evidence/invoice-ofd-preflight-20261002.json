@@ -1,0 +1,314 @@
+{
+  "date": "2026-10-02",
+  "status": "OFD_PREFLIGHT_SCOPE_PASS_RENDERING_INCOMPLETE",
+  "baseCommit": "3e4a5b6663a8d6f035611f88e1f1a4b5f6658e06",
+  "implemented": [
+    "OFD ZIP 实际解压长度、CRC、数量与内存上限",
+    "包内相对路径、绝对虚拟路径、目录逃逸与文件名别名冲突检查",
+    "只写入新目录的普通文件；保留原始 ZIP 字节",
+    "XML 外部访问禁用、单份及总字节、深度、属性与元素预算",
+    "OFD 1.0/1.1 同命名空间入口、全部文档与有序 1-10 页清单",
+    "页面来源、实际 PhysicalBox 和已识别资源引用检查"
+  ],
+  "notImplemented": [
+    "OFD 页面实际渲染、字体和图像解码、嵌套印章与完整图元验证",
+    "独立 OFD 处理进程、输出限制与适配器入口",
+    "OFD 模型输入与识别质量验收",
+    "持久运行、租约、迁移、API、票夹页面及完整运行验收"
+  ],
+  "pipelineBoundary": {
+    "helpersIntegratedIntoSourceAdapter": false,
+    "ofdAdvertisedAsSupported": false,
+    "existingOfdUnsupportedGuardStillTested": true,
+    "ofdModelCalled": false,
+    "rendererDependencyAdded": false,
+    "databaseMigrationAdded": false,
+    "runtimeReplaced": false,
+    "schemaVersion": 99,
+    "remainingTopLevelCategories": 6
+  },
+  "tests": {
+    "uniqueTotal": 64,
+    "newTests": 20,
+    "existingInvoiceRegressionTests": 44,
+    "suites": [
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.agent.InvoiceExtractionRunTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoicePdfSourceTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoicePdfInspectorTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionXmlTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "red": [
+      {
+        "stage": "archive stub",
+        "tests": 8,
+        "failures": 0,
+        "errors": 3
+      },
+      {
+        "stage": "document stub and root path gap",
+        "archiveTests": 8,
+        "archiveErrors": 1,
+        "documentTests": 9,
+        "documentErrors": 4
+      },
+      {
+        "stage": "public fixture compatibility",
+        "tests": 12,
+        "failures": 0,
+        "errors": 3
+      }
+    ],
+    "fixedGaps": [
+      "包根资源目录 / 的语义",
+      "资源基目录可以没有存储实体；实际引用仍须存在",
+      "按父节点上下文区分文档根与同名路径元素",
+      "当前公开样本使用的 1.1 入口"
+    ],
+    "logs": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-archive-red.log",
+        "sha256": "f5ce4553171eae1b07e48f8d5707ced2221abe822c03285849d2ea2bb127c8bd"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-document-red.log",
+        "sha256": "99e88f0eaa114ae9549e31919c7aa4a79eb8a692aab37d032d60c55f383ca2a7"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-compatibility-red.log",
+        "sha256": "8cdc8cb11516b2ea063c329ce8fb6b17563fd5c44348d934ec1f629411499cb2"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-preflight-final.log",
+        "sha256": "663a2e2057881750002c1d47ea70d7f6f49d4ea5636c31ae8b7c85b134643f03"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-authors.log",
+        "sha256": "bf2843e476d8f3e2d759088aeb78a14fa1a6d433b8d4199745b74140945d0f13"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-public-fixtures.log",
+        "sha256": "95cd72083a09a5f92a25f508bfdaf33314724db361d38bd11175c088f023986f"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-public-fixtures-final.log",
+        "sha256": "8350820a296307f6133c5a30403506406c982c4bb90070b5041c1c76450275e2"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-ofd-fixtures-verification.json",
+        "sha256": "08d0e2d9f7743cf619b2a28a8c0f043b1145b7cec8bc8a76d1d9e1bf35ed65fe"
+      }
+    ],
+    "scopeOverlap": "64 项与此前 PDF/XML 阶段重叠，不累计历史测试数；未改动持久化或公开接口，本轮不重复运行无关数据库和页面验收。"
+  },
+  "limits": {
+    "originalBytes": 20971520,
+    "zipEntriesIncludingDirectories": 1024,
+    "expandedEntryBytes": 8388608,
+    "totalExpandedBytes": 67108864,
+    "pathCharacters": 512,
+    "pathDepth": 32,
+    "xmlBytes": 2097152,
+    "totalXmlBytes": 8388608,
+    "totalXmlElements": 100000,
+    "xmlDepth": 64,
+    "xmlAttributes": 64,
+    "pagesAcrossAllDocuments": 10,
+    "maximumPhysicalBoxDimensionMillimeters": 1000
+  },
+  "xmlAndPathBoundary": {
+    "namespace": "http://www.ofdspec.org/2016",
+    "versions": [
+      "1.0",
+      "1.1"
+    ],
+    "doctype": "OFD",
+    "externalDtdAndEntities": false,
+    "externalSchema": false,
+    "xinclude": false,
+    "xmlBase": false,
+    "referencesCaseSensitive": true,
+    "actualReferencedFilesRequired": true,
+    "unusedBaseDirectoriesMayBeAbsent": true,
+    "allXmlSuffixFilesInspected": true,
+    "recognizedXmlReferencesWithOtherSuffixesInspected": true,
+    "completeSchemaValidation": false,
+    "allRendererReadPathsProven": false,
+    "signatureValidated": false,
+    "taxVerified": false
+  },
+  "publicFixtureChecks": {
+    "status": "EXPECTED_OUTCOMES_PASS",
+    "originalFixtures": [
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/helloworld.ofd",
+        "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e",
+        "bytes": 1651,
+        "expected": "ACCEPT_PREFLIGHT",
+        "pages": 1,
+        "passed": true,
+        "exitCode": 0,
+        "output": "OFD_PREFLIGHT_OK name=helloworld.ofd pages=1 files=4\n"
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/chineseDir.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-reader/src/test/resources/chineseDir.ofd",
+        "sha256": "c6defec84b241c74679a0d424634ff4a8605ccecc480d9736ef89218d806ac09",
+        "bytes": 2097,
+        "expected": "ACCEPT_PREFLIGHT",
+        "pages": 1,
+        "passed": true,
+        "exitCode": 0,
+        "output": "OFD_PREFLIGHT_OK name=chineseDir.ofd pages=1 files=5\n"
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/Page5.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-layout/src/test/resources/Page5.ofd",
+        "sha256": "ad57abde3dafc7fd0d2845e42b3767ba0eb900514148e1cce2205da2d97b89c0",
+        "bytes": 4110,
+        "expected": "REJECT_PREFLIGHT",
+        "reason": "Referenced Doc_0/PublicRes.xml is absent",
+        "passed": true,
+        "exitCode": 1,
+        "output": "OFD_PREFLIGHT_REJECTED name=Page5.ofd\njava.io.IOException: OFD archive is invalid, ambiguous or exceeds its limits\n\tat io.agentflow.agent.InvoiceOfdArchive.invalid(InvoiceOfdArchive.java:180)\n\tat io.agentflow.agent.InvoiceOfdArchive.file(InvoiceOfdArchive.java:91)\n\tat io.agentflow.agent.InvoiceOfdDocument.references(InvoiceOfdDocument.java:102)\n\tat io.agentflow.agent.InvoiceOfdDocument.inspect(InvoiceOfdDocument.java:86)\n\tat io.agentflow.agent.InvoiceOfdPreflightProbe.main(InvoiceOfdPreflightProbe.java:11)\n"
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/v4signed.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-sign/src/test/resources/v4signed.ofd",
+        "sha256": "8d9baae6f5f6f52a51f3402eef4cbf373c1e601950772d880819b42970e704f3",
+        "bytes": 13841,
+        "expected": "REJECT_PREFLIGHT",
+        "reason": "Template reference uses TPLS while the stored directory is Tpls; ST_Loc is case sensitive",
+        "passed": true,
+        "exitCode": 1,
+        "output": "OFD_PREFLIGHT_REJECTED name=v4signed.ofd\njava.io.IOException: OFD archive is invalid, ambiguous or exceeds its limits\n\tat io.agentflow.agent.InvoiceOfdArchive.invalid(InvoiceOfdArchive.java:180)\n\tat io.agentflow.agent.InvoiceOfdArchive.file(InvoiceOfdArchive.java:91)\n\tat io.agentflow.agent.InvoiceOfdDocument.references(InvoiceOfdDocument.java:110)\n\tat io.agentflow.agent.InvoiceOfdDocument.inspect(InvoiceOfdDocument.java:86)\n\tat io.agentflow.agent.InvoiceOfdPreflightProbe.main(InvoiceOfdPreflightProbe.java:11)\n"
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/VPage7.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-sign/src/test/resources/VPage7.ofd",
+        "sha256": "c2cedf3f88a9826510f16efa99edfc6b630527f02ed29591954f06e64fc997ac",
+        "bytes": 4777,
+        "expected": "REJECT_PREFLIGHT",
+        "reason": "Referenced Doc_0/PublicRes.xml is absent",
+        "passed": true,
+        "exitCode": 1,
+        "output": "OFD_PREFLIGHT_REJECTED name=VPage7.ofd\njava.io.IOException: OFD archive is invalid, ambiguous or exceeds its limits\n\tat io.agentflow.agent.InvoiceOfdArchive.invalid(InvoiceOfdArchive.java:180)\n\tat io.agentflow.agent.InvoiceOfdArchive.file(InvoiceOfdArchive.java:91)\n\tat io.agentflow.agent.InvoiceOfdDocument.references(InvoiceOfdDocument.java:102)\n\tat io.agentflow.agent.InvoiceOfdDocument.inspect(InvoiceOfdDocument.java:86)\n\tat io.agentflow.agent.InvoiceOfdPreflightProbe.main(InvoiceOfdPreflightProbe.java:11)\n"
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/draw_param_ref.ofd",
+        "sha256": "525eba2e09a4d7ac01a05bc176146ee9ecf5b1184fa3b909cc15599803493700",
+        "bytes": 33402,
+        "expected": "ACCEPT_PREFLIGHT",
+        "pages": 5,
+        "passed": true,
+        "exitCode": 0,
+        "output": "OFD_PREFLIGHT_OK name=draw_param_ref.ofd pages=5 files=21\n"
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-sign/src/test/resources/DigitalSign.ofd",
+        "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989",
+        "bytes": 3041,
+        "expected": "ACCEPT_PREFLIGHT",
+        "pages": 1,
+        "passed": true,
+        "exitCode": 0,
+        "output": "OFD_PREFLIGHT_OK name=DigitalSign.ofd pages=1 files=7\n"
+      }
+    ],
+    "acceptedOriginals": 4,
+    "rejectedOriginals": 3,
+    "diagnosticCopy": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/v4signed-path-diagnostic.ofd",
+      "sha256": "f52f1df911c3d84943a7699fc517a528560e9e492082e72ee65d5ef5df8ad976",
+      "change": "Only corrected the mismatched template path in a separate diagnostic copy; original bytes preserved",
+      "passed": true,
+      "output": "OFD_PREFLIGHT_OK name=v4signed-path-diagnostic.ofd pages=1 files=16\n",
+      "signatureValidated": false,
+      "notUsedAsAuthenticInvoice": true
+    },
+    "renderingPerformed": false,
+    "modelCalled": false,
+    "probeSource": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdPreflightProbe.java",
+    "probeJvmLimits": {
+      "heapMiB": 256,
+      "stackKiB": 512,
+      "directMemoryMiB": 64,
+      "metaspaceMiB": 128,
+      "perInvocationTimeoutSeconds": 20,
+      "inheritedEnvironment": false
+    },
+    "notPackagedApplicationOrWorkerValidation": true
+  },
+  "technicalSources": [
+    {
+      "url": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/basicType/ST_Loc.java",
+      "use": "包根、相对路径和大小写敏感语义；本地核对 Maven 2.4.0 sources jar"
+    },
+    {
+      "url": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/pom.xml",
+      "use": "渲染候选依赖核对，尚未引入"
+    },
+    {
+      "url": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/FontLoader.java",
+      "use": "字体初始化直接使用其他转换组件，排除依赖不能视为已验证"
+    },
+    {
+      "url": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/AWTMaker.java",
+      "use": "局部 PageBlock 异常会记录警告后继续；完整渲染仍需验证"
+    }
+  ]
+}
