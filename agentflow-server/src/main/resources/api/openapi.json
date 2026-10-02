@@ -45712,7 +45712,7 @@
           "error",
           "path"
         ],
-        "description": "进入控制器前的参数转换、方法或媒体类型错误可能返回 Spring 标准错误；此时没有业务 code/traceId。"
+        "description": "不支持的方法、媒体类型及其他尚未归一的框架入口错误可能返回 Spring 标准错误；此时没有业务 code/traceId。"
       },
       "RequestError": {
         "anyOf": [
@@ -45723,7 +45723,7 @@
             "$ref": "#/components/schemas/FrameworkError"
           }
         ],
-        "description": "业务入口校验返回 Error；UUID 等 Spring 参数转换失败返回 FrameworkError。客户端先检查 HTTP 状态，再按是否有 code 分支。"
+        "description": "业务入口校验、缺失必填查询参数及查询/路径参数类型转换失败统一返回 Error；其他框架入口错误仍兼容 FrameworkError。客户端先检查 HTTP 状态，再按是否有 code 分支。"
       },
       "AssigneeOption": {
         "type": "object",

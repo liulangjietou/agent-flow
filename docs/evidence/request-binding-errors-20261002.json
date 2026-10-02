@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-02",
+  "status": "LOCAL_ACCEPTANCE_PASS",
+  "scope": "必填查询参数及查询/路径参数类型转换的统一错误响应",
+  "classification": "ERROR_RESPONSE_NORMALIZATION",
+  "baseCommit": "0ecb7e1b4807e86e8e8d5b9ebaa5e9b280d8adce",
+  "originalAssessmentCorrection": {
+    "previous": "将框架默认 400 判断为违反已声明响应契约",
+    "verified": "RequestError.anyOf 明确兼容 FrameworkError；六份旧响应符合原契约，但没有统一 Error 的 code/message/traceId/path",
+    "compatibilityBranchRetained": true
+  },
+  "callChain": [
+    "发布请求",
+    "Spring 参数绑定",
+    "DefinitionController",
+    "IdempotencyExecutor",
+    "DefinitionApplicationService"
+  ],
+  "ownership": "参数绑定失败发生在进入控制器之前，由 GlobalExceptionHandler 统一转换；业务服务与发布事务不修改",
+  "red": {
+    "newContractTests": 8,
+    "failuresBeforeImplementation": 6,
+    "existingJsonAndDomainCasesPassed": 2,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/request-binding-red.log",
+    "runtimeResponses": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-http-request-binding-red.json"
+  },
+  "regression": {
+    "tests": 33,
+    "suites": [
+      {
+        "class": "io.agentflow.api.RequestBindingContractTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionPublicationIntegrationTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionSecurityTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/request-binding-regression.log"
+  },
+  "runtime": {
+    "status": "PASS",
+    "responses": 10,
+    "invalidBindingResponses": 6,
+    "authenticationAndDomainErrorsPreserved": true,
+    "tablesPreserved": 230,
+    "rowsPreserved": 4019,
+    "filesPreserved": 3,
+    "sourceRuntimeUnchanged": true,
+    "database": "draft_assist_runtime_2067ac411f",
+    "boot": 4,
+    "jarSha256": "83305fd8895f16d386f361f8603e3a98d275801f3ae2ab6be7b8845769cbb7f0",
+    "snapshotBefore": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-before-boot4.json",
+    "responseEvidence": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-http-request-binding-fixed.json"
+  },
+  "contracts": {
+    "status": "PASS",
+    "oldResponsesValidUnderLegacyContract": 6,
+    "oldResponsesWithoutUniformError": 6,
+    "currentResponsesValidated": 10,
+    "currentUniformErrorsValidated": 9
+  },
+  "openApiStatic": {
+    "result": "PASS",
+    "operations": 302,
+    "schemas": 602,
+    "requestExamples": 115
+  },
+  "remainingTopLevelCategories": 6,
+  "limitations": [
+    "没有新增迁移",
+    "未把其他框架错误的兼容分支删除",
+    "本地验收不替代企业联调与远端 PR/CI"
+  ],
+  "finalInstallation": {
+    "status": "PASS",
+    "boot": 5,
+    "backendPid": 42451,
+    "jarSha256": "48e23c291fcaf551eacc006044e7e66910546bef10d04eab2872f676e6e081d5",
+    "servedOpenApiMatchesSource": true,
+    "sourceAndCurrentRuntimeReady": true,
+    "tablesPreserved": 230,
+    "rowsPreserved": 4019,
+    "filesPreserved": 3,
+    "sourceUnchanged": true
+  },
+  "finalPackageLog": "/fyoung/tmp/agentflow-remaining-20260928/request-binding-final-package.log"
+}

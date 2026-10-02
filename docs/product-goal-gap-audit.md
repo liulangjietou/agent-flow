@@ -37,6 +37,10 @@
 
 当前至少五类剩余事项：以上两类含本地开发的工作和三类企业验收／交付。加上全量需求证据核对，共六条顶层待办。类别包含不同大小的任务，不能据此计算完成百分比；详细开发项随全量证据核对继续补齐。
 
-## 本轮追加的待核对接口问题
+## 本轮接口核对及已完成改进
 
-草稿验收夹具发现，`POST /process-definitions/{id}/publish` 缺少必填 `expectedRevision` 查询参数时，返回 Spring 默认 400 正文，未满足统一错误响应的 `code/message` 声明。原始响应保存在 `/fyoung/tmp/agentflow-remaining-20260928/draft-assist-http-setup.json`；需单独补最小回归并修复入口错误映射。本项属于第六类全量质量核对，未宣称已修复。明细列 `sensitive/nodeAccess` 的契约遗漏已在本轮按失败测试修正。
+草稿验收夹具发现，`POST /process-definitions/{id}/publish` 缺少必填 `expectedRevision` 查询参数时，返回 Spring 默认 400 正文。初次将它判为契约不一致并不准确：完整的 `RequestError.anyOf` 明确兼容 `FrameworkError`，旧响应通过原声明验证。该误判已纠正，不能据此声称旧 OpenAPI 校验失效。
+
+现已完成参数错误形态的统一改进：缺失必填查询参数、查询／路径参数类型错误都在 HTTP 异常处理层返回 `INVALID_REQUEST`、说明、追踪号和路径；错误说明不回显提交值。业务服务及发布事务不承担参数转换，其他框架错误的兼容分支仍保留。先证明新增的统一形态要求有 6 项失败，再通过 33 项范围回归；实际安装包的 10 份响应通过原契约，其中 9 份错误响应也通过统一 `Error` 结构验证。原 230 张表、4,019 行和 3 份文件保持，证据见[参数错误规范化](evidence/request-binding-errors-20261002.json)。本子项从第六类核对事项中关闭，顶层六类待办不变。
+
+明细列 `sensitive/nodeAccess` 的契约遗漏已在草稿助手阶段按失败测试修正。

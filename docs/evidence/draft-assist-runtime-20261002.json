@@ -171,7 +171,11 @@
     "trigger": "缺少必填 expectedRevision 查询参数",
     "observed": "框架默认 400 结构缺少统一 code/message，与声明错误契约不一致",
     "evidence": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-http-setup.json",
-    "status": "OPEN_FOR_SCOPE_AUDIT"
+    "status": "CLOSED_WITH_ASSESSMENT_CORRECTION",
+    "followUp": {
+      "correction": "原 RequestError.anyOf 已兼容框架默认正文；初次契约不一致判断不准确。后续完成参数错误格式统一，保留其他框架错误兼容。",
+      "evidence": "request-binding-errors-20261002.json"
+    }
   },
   "remainingTopLevelItems": 6,
   "remainingAgentScope": [

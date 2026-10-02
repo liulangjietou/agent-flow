@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.sql.SQLTransactionRollbackException;
 import java.util.Map;
@@ -35,9 +37,21 @@ public class GlobalExceptionHandler {
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ":" + error.getDefaultMessage())
                 .sorted().findFirst().orElse("Request validation failed");
-        return org.springframework.http.ResponseEntity.badRequest().body(Map.of(
-                "code", "INVALID_REQUEST", "message", message,
-                "traceId", UUID.randomUUID().toString(), "path", request.getRequestURI()));
+        return invalidRequest(message, request);
+    }
+
+    /** 必填查询参数在进入控制器前缺失时仍返回统一错误契约。 */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleMissingParameter(
+            MissingServletRequestParameterException exception, HttpServletRequest request) {
+        return invalidRequest("Required request parameter is missing: " + exception.getParameterName(), request);
+    }
+
+    /** 查询或路径参数类型转换失败时只返回参数名，不回显提交值和底层异常。 */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleParameterTypeMismatch(
+            MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+        return invalidRequest("Request parameter is invalid: " + exception.getName(), request);
     }
 
     /** 表单错误包含稳定的字段规则码，不回显敏感填写值。 */
@@ -67,8 +81,14 @@ public class GlobalExceptionHandler {
             if (cause instanceof DomainException domain) return handleDomain(domain, request);
             cause = cause.getCause();
         }
-        return org.springframework.http.ResponseEntity.badRequest().body(Map.of("code", "INVALID_REQUEST",
-                "message", "Request JSON is invalid", "traceId", UUID.randomUUID().toString(), "path", request.getRequestURI()));
+        return invalidRequest("Request JSON is invalid", request);
+    }
+
+    private org.springframework.http.ResponseEntity<Map<String, Object>> invalidRequest(
+            String message, HttpServletRequest request) {
+        return org.springframework.http.ResponseEntity.badRequest().body(Map.of(
+                "code", "INVALID_REQUEST", "message", message,
+                "traceId", UUID.randomUUID().toString(), "path", request.getRequestURI()));
     }
 
     /** 处理领域规则错误。 */
