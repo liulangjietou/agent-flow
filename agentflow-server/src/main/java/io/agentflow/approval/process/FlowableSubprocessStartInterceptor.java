@@ -78,6 +78,9 @@ public class FlowableSubprocessStartInterceptor implements StartProcessInstanceI
         variables.put("formData", child.payload());
         if (child.formSchema() != null) variables.put("formFieldTypes", child.formSchema().fieldTypes());
         if (initiator != null) variables.put(FlowableProcessRuntimeAdapter.INITIATOR_CONTEXT, json.write(initiator));
+        if (!prepared.formAssignees().nodes().isEmpty()) {
+            variables.put(FlowableProcessRuntimeAdapter.FORM_ASSIGNEES, json.write(prepared.formAssignees()));
+        }
         context.setBusinessKey(child.businessNo()); context.setProcessInstanceName(child.title());
         context.setVariables(variables); context.setTransientVariables(Map.of());
         execution.setTransientVariableLocal(PREPARED, prepared);

@@ -7,6 +7,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionInitiatorRequirements;
+import io.agentflow.organization.FormAssigneeBindings;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -38,12 +39,15 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final JsonUtil json;
     private final EventContractBindings eventContracts;
     private final DefinitionInitiatorRequirements initiatorRequirements;
+    private final FormAssigneeBindings formAssignees;
     public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
+    public static final String FORM_ASSIGNEES = "agentflowFormAssignees";
 
     /** 注入 Flowable 运行服务。 */
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
                                          TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
-                                         JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements) {
+                                         JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements,
+                                         FormAssigneeBindings formAssignees) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
@@ -52,6 +56,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         this.json = json;
         this.eventContracts = eventContracts;
         this.initiatorRequirements = initiatorRequirements;
+        this.formAssignees = formAssignees;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -67,6 +72,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     public StartedProcess start(StartProcessCommand command) {
         ProcessDefinition definition = boundDefinition(command.definitionBinding());
         var risk = SubmissionRisk.unassessed();
+        var selected = FormAssigneeBindings.Snapshot.EMPTY;
         // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
         if (command.tenantId().equals(definition.getTenantId())) {
             var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
@@ -81,6 +87,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                     risk = published.graph().riskPolicy().assess(published.id(), published.version(), published.formSchema(),
                             published.graph().conditionLanguageVersion(), command.payload());
                 }
+                selected = formAssignees.freeze(command.tenantId(), published.graph(), command.payload());
             }
         }
         Map<String, Object> variables = new HashMap<>();
@@ -89,6 +96,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         variables.put("businessNo", command.businessNo());
         variables.put("roundNo", command.roundNo());
         if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
+        if (!selected.nodes().isEmpty()) variables.put(FORM_ASSIGNEES, json.write(selected));
         // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
         variables.put("formData", command.payload() == null ? Map.of()
                 : Collections.unmodifiableMap(new HashMap<>(command.payload())));

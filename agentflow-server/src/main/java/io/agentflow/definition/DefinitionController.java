@@ -73,6 +73,14 @@ public class DefinitionController {
                 .body(service.assigneeOptions(currentActor.actor().tenantId()));
     }
 
+    /** 表单选项目录只向本租户流程管理员开放，不返回认证主体或组织审计。 */
+    @GetMapping("/form-assignee-options")
+    public ResponseEntity<List<DefinitionAssigneeDirectory.FormOption>> formAssigneeOptions() {
+        requireProcessAdmin();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(service.formAssigneeOptions(currentActor.actor().tenantId()));
+    }
+
     /** 设计器的抄送名单只向流程管理员开放，不要求收件人具备审批资格。 */
     @GetMapping("/copy-options")
     public ResponseEntity<List<DefinitionAssigneeDirectory.Option>> copyOptions() {

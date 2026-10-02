@@ -81,7 +81,7 @@ public class SubprocessDeploymentBindings {
                 if (target == null) {
                     if (targets.size() >= SubprocessPolicy.MAX_DEPENDENCIES) throw limit();
                     target = resolver.inspect(tenant, policy, node.id(), schema);
-                    var errors = references.inspect(tenant, target.graph());
+                    var errors = references.inspect(tenant, target.graph(), target.formSchema());
                     if (!errors.isEmpty()) throw new DefinitionValidationException(errors);
                     if (!DefinitionApprovalPaths.endsWithoutApproval(target.graph()).isEmpty()) {
                         throw new DomainException("SUBPROCESS_REQUIRES_APPROVAL_PATH", "Every subprocess completion path requires actual approval");

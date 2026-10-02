@@ -77,7 +77,8 @@ public class FlowableApprovalResponsibilities implements TaskListener {
             if (decisions instanceof String stored) excluded.addAll(json.read(stored, Decisions.class).subjects());
         }
         String rule = decode(encodedRule);
-        var original = LocalOrganizationDirectory.isLocalRule(rule) ? organization.resolve(execution, encodedRule)
+        var original = (io.agentflow.definition.FormAssigneePolicy.isFieldRule(rule) || LocalOrganizationDirectory.isLocalRule(rule))
+                ? organization.resolve(execution, encodedRule)
                 : directory.members(tenant, rule.startsWith("user:") ? Set.of(rule.substring(5)) : Set.of(),
                     rule.startsWith("role:") ? Set.of(rule.substring(5)) : Set.of());
         var members = original.stream().filter(subject -> !excluded.contains(subject)).distinct().sorted().toList();

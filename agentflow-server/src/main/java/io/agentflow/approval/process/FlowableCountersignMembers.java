@@ -64,7 +64,7 @@ public class FlowableCountersignMembers {
         Set<String> roles = rule.startsWith("role:") ? Set.of(rule.substring("role:".length())) : Set.of();
         List<String> selected = encodedReferences != null
                 ? responsibilities.resolve(root, encodedRule, excludeApplicant, encodedReferences)
-                : io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
+                : io.agentflow.definition.FormAssigneePolicy.isFieldRule(rule) || io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
                     ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles);
         List<String> members = new ArrayList<>(selected.stream().distinct().sorted().toList());
         if (members.isEmpty()) throw new DomainException("COUNTERSIGN_NO_MEMBERS", "No active approvers are available for the countersign node");

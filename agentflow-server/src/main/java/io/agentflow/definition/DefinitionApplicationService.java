@@ -62,7 +62,7 @@ public class DefinitionApplicationService {
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
         List<String> errors = validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
-        return references.inspect(tenantId, graph);
+        return references.inspect(tenantId, graph, formSchema);
     }
 
     /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
@@ -93,7 +93,7 @@ public class DefinitionApplicationService {
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
         Validation result = inspectStructure(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
-        var errors = new java.util.ArrayList<>(references.inspect(tenantId, graph));
+        var errors = new java.util.ArrayList<>(references.inspect(tenantId, graph, formSchema));
         errors.addAll(subprocesses.inspect(tenantId, graph, formSchema));
         return new Validation(errors, result.branchDiagnostics());
     }
@@ -110,6 +110,9 @@ public class DefinitionApplicationService {
     public List<DefinitionAssigneeDirectory.Option> assigneeOptions(String tenantId) {
         return assignees.options(tenantId);
     }
+
+    /** 设计者将本租户组织对象加入版本化表单选项，不能借此更改目录。 */
+    public List<DefinitionAssigneeDirectory.FormOption> formAssigneeOptions(String tenantId) { return assignees.formOptions(tenantId); }
 
     /** 抄送名单不要求审批资格；发布时仍使用同一目录再次校验。 */
     public List<DefinitionAssigneeDirectory.Option> copyOptions(String tenantId) { return assignees.copyOptions(tenantId); }

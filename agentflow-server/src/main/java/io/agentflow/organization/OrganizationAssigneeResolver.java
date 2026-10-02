@@ -1,6 +1,7 @@
 package io.agentflow.organization;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.definition.FormAssigneePolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -36,6 +37,30 @@ public class OrganizationAssigneeResolver {
                 : directory.roleMembers(tenantId, rule.substring("role:".length()));
         if (members.isEmpty()) throw new DomainException("ORGANIZATION_NO_APPROVERS", "No active approvers match the organization rule");
         return new Selection(revision, rule, members);
+    }
+
+    /** 提交事务按字段选择的明确对象解析，不从申请人任职猜测其所选部门或人员。 */
+    @Transactional
+    public Selection resolveField(String tenantId, FormAssigneePolicy policy, UUID sourceId) {
+        long revision = repository.lock(tenantId);
+        List<String> members;
+        if (policy.relation() == FormAssigneePolicy.Relation.PERSON) {
+            members = directory.roleMembers(tenantId, LocalOrganizationDirectory.PERSON_ROLE + sourceId);
+        } else {
+            var source = repository.unit(tenantId, sourceId).filter(OrganizationUnit::active)
+                    .filter(unit -> unit.kind().name().equals(policy.relation().sourceKind().name()))
+                    .orElseThrow(OrganizationAssigneeResolver::unavailable);
+            if (repository.unit(tenantId, source.legalEntityId()).filter(OrganizationUnit::active).isEmpty()) throw unavailable();
+            if (policy.relation() == FormAssigneePolicy.Relation.DEPARTMENT_HEAD) {
+                var head = appointment(tenantId, source.headAppointmentId());
+                if (!source.id().equals(head.departmentId())) throw unavailable();
+                requireActive(tenantId, head);
+                members = repository.person(tenantId, head.personId()).filter(OrganizationPerson::canApprove)
+                        .map(person -> List.of(person.subject())).orElseThrow(OrganizationAssigneeResolver::unavailable);
+            } else members = directory.roleMembers(tenantId, LocalOrganizationDirectory.UNIT_ROLE + sourceId);
+        }
+        if (members.isEmpty()) throw unavailable();
+        return new Selection(revision, policy.rule(), members);
     }
 
     /** 抄送与审批共用组织关系检查，但不要求收件人具有审批资格。 */

@@ -38991,6 +38991,63 @@
           }
         }
       }
+    },
+    "/api/v1/process-definitions/form-assignee-options": {
+      "get": {
+        "operationId": "definitionFormAssigneeOptions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取表单选人组织来源",
+        "description": "设计者将本租户人员、部门或岗位 UUID 和名称加入版本化必填单选字段。人员需具备本地审批资格；部门和岗位另提供当前人数、部门负责人是否有效。节点可配置 field:<字段标识>:PERSON、DEPARTMENT_HEAD、DEPARTMENT_MEMBERS 或 POSITION_MEMBERS；发布时核对全部选项类型和可用性，提交时固定本轮全部表单选人节点的名单。响应不含身份源账号，禁止缓存。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormAssigneeOption"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -67831,6 +67888,42 @@
           "substituteId",
           "authorizedAt"
         ]
+      },
+      "FormAssigneeOption": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "memberCount",
+          "headAvailable"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "DEPARTMENT",
+              "POSITION"
+            ]
+          },
+          "memberCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "headAvailable": {
+            "type": "boolean",
+            "description": "仅部门具有有效且可审批的负责人时为 true。"
+          }
+        }
       }
     }
   }

@@ -100,6 +100,9 @@ public final class DefinitionValidator {
                 String assigneeRule = n.properties().get(n.type() == NodeType.COPY ? "recipientRule" : "assigneeRule");
                 if (assigneeRule == null || assigneeRule.isBlank()) {
                     errors.add("ASSIGNEE_RULE_REQUIRED:" + n.id());
+                } else if (n.type() == NodeType.USER_TASK && FormAssigneePolicy.isFieldRule(assigneeRule)) {
+                    try { FormAssigneePolicy.parse(assigneeRule).field(formSchema); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
                 } else if (!isLiteralAssigneeRule(assigneeRule)) {
                     errors.add("ASSIGNEE_RULE_INVALID:" + n.id());
                 }

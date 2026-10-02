@@ -178,7 +178,7 @@ export class PortableTemplateReview {
 
   /** 缺失租户引用或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
   get canImport() {
-    const repairable = ['COPY_RECIPIENT_UNAVAILABLE:', 'ESCALATION_RECIPIENT_UNAVAILABLE:', 'ASSIGNEE_NOT_AVAILABLE:', 'DEADLINE_CALENDAR_UNAVAILABLE:', 'BRANCH_COVERAGE_GAP:']
+    const repairable = ['COPY_RECIPIENT_UNAVAILABLE:', 'ESCALATION_RECIPIENT_UNAVAILABLE:', 'ASSIGNEE_NOT_AVAILABLE:', 'FORM_ASSIGNEE_OPTION_UNAVAILABLE:', 'DEADLINE_CALENDAR_UNAVAILABLE:', 'BRANCH_COVERAGE_GAP:']
     return this.reviewed && !!this.value && !this.loading && this.errors.every(error => repairable.some(prefix => error.startsWith(prefix)))
   }
 }

@@ -2,6 +2,8 @@
 import { computed, ref, watch, useId } from 'vue'
 import FormFields from './FormFields.vue'
 import FieldPermissionPreview from './FieldPermissionPreview.vue'
+import OrganizationFormOptions from './OrganizationFormOptions.vue'
+import type { FormOption } from '../formSchema'
 import { defaultFormSchema, fieldTypes, validatePayload, validateFormSchema, ownValue, type FieldErrors, type FieldVisibility, type FieldType, type FormField, type FormSchema } from '../formSchema'
 
 const props = defineProps<{ modelValue: FormSchema | null; disabled: boolean; columnsOnly?: boolean; approvalNodes?: Array<{ id: string; name: string }>; scopeKey?: string }>()
@@ -97,6 +99,13 @@ function addOption(field: FormField) {
   while (options.some(option => option.value === `option${number}`)) number++
   options.push({ value: `option${number}`, label: `选项 ${number}` }); publish()
 }
+function addOrganizationOption(field: FormField, option: FormOption) {
+  if (props.disabled || (field.options?.length ?? 0) >= 50 || field.options?.some(value => value.value === option.value)) return
+  emit('beforeChange')
+  const options = field.options ?? (field.options = [])
+  options.push({ ...option })
+  publish()
+}
 function removeOption(field: FormField, index: number) { if (props.disabled) return; emit('beforeChange'); field.options?.splice(index, 1); publish() }
 function checkPreview() { previewErrors.value = validatePayload(props.modelValue, preview.value, true); previewChecked.value = true }
 </script>
@@ -132,6 +141,7 @@ function checkPreview() { previewErrors.value = validatePayload(props.modelValue
           </div>
           <div v-if="row.field.type === 'SELECT'" class="option-config" role="group" :aria-label="`字段 ${index + 1} 选项配置`" v-bind="errorAttributes(index, 'options')">
             <div class="option-heading"><strong>选项</strong><button type="button" :disabled="disabled || (row.field.options?.length ?? 0) >= 50" @click="addOption(row.field)">＋ 添加选项</button></div>
+            <OrganizationFormOptions v-if="!columnsOnly" :scope-key="scopeKey ?? ''" :disabled="disabled" :existing="row.field.options ?? []" @add="addOrganizationOption(row.field, $event)" />
             <p v-if="configError(index, 'options')" :id="configErrorId(row.id, 'options')" class="config-error" role="alert">{{ configError(index, 'options') }}</p>
             <div v-for="(option, optionIndex) in row.field.options" :key="optionIndex" class="option-row">
               <label>保存值<input v-model="option.value" v-bind="errorAttributes(index, `options.${optionIndex}.value`)" :aria-label="`字段 ${index + 1} 选项 ${optionIndex + 1} 保存值`" @focus="emit('beforeChange')" @input="publish" /><span v-if="configError(index, `options.${optionIndex}.value`)" :id="configErrorId(row.id, `options.${optionIndex}.value`)" class="config-error">{{ configError(index, `options.${optionIndex}.value`) }}</span></label>

@@ -1,0 +1,270 @@
+{
+  "feature": "form-field-organization-assignees",
+  "status": "LOCAL_ACCEPTANCE_PASS",
+  "recordedAt": "2026-10-02T03:39:04.051323+00:00",
+  "localDate": "2026-10-01",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "e88cca217fbc35b444e530abe5716758b874b5b1",
+  "mainUnchangedAt": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "productionVerified": false,
+  "rules": {
+    "field": "required top-level SELECT with tenant organization UUID options",
+    "relations": [
+      "PERSON",
+      "DEPARTMENT_HEAD",
+      "DEPARTMENT_MEMBERS",
+      "POSITION_MEMBERS"
+    ],
+    "publicationValidatesEveryOption": true,
+    "allUserTaskSelectionsFrozenAtSubmission": true,
+    "newRoundResolvesAgain": true,
+    "childUsesMappedInputAndIndependentSnapshot": true,
+    "activationRechecksEveryFrozenMemberEligibility": true,
+    "missingSnapshotFailsClosed": true,
+    "existingRulesPreserved": true,
+    "databaseMigrationAdded": false
+  },
+  "tests": {
+    "red": {
+      "domain": 3,
+      "failuresBeforeImplementation": 3
+    },
+    "javaUnique": 172,
+    "domain": 50,
+    "server": 122,
+    "postgres": {
+      "cases": 11,
+      "overlapsServerCases": true
+    },
+    "frontend": {
+      "cases": 66,
+      "newCases": 8,
+      "typecheck": "PASS",
+      "build": "PASS"
+    },
+    "openapi": {
+      "operations": 297,
+      "schemas": 591,
+      "requestExamples": 113,
+      "status": "PASS"
+    },
+    "http": {
+      "status": "PASS",
+      "files": {
+        "form-assignees-browser-responses.json": {
+          "responses": 66,
+          "successfulRequests": 11
+        },
+        "form-assignees-http-activation.json": {
+          "responses": 2,
+          "successfulRequests": 0
+        },
+        "form-assignees-http-change-head.json": {
+          "responses": 3,
+          "successfulRequests": 1
+        },
+        "form-assignees-http-final-restart.json": {
+          "responses": 6,
+          "successfulRequests": 0
+        },
+        "form-assignees-http-rounds.json": {
+          "responses": 17,
+          "successfulRequests": 9
+        },
+        "form-assignees-http-setup.json": {
+          "responses": 14,
+          "successfulRequests": 11
+        }
+      },
+      "totalResponses": 108,
+      "successfulRequests": 32,
+      "browserCaptureGaps": 0
+    }
+  },
+  "runtime": {
+    "database": "form_assignees_runtime_1c7eac56b7",
+    "schemaVersion": 98,
+    "backendPort": 18257,
+    "frontendPort": 15343,
+    "boot": 3,
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/form-assignees-server.jar",
+    "jarSha256": "a8d06d31863b45da1d57c2e28f291d5f55087df1eeeb9e5ab3e9ce19a8f97b28",
+    "frontendUsesBuildCopy": true,
+    "externalWorkersEnabled": false,
+    "sourceDatabase": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "sourceUnchanged": true,
+    "sourceTables": 228,
+    "sourceRows": 3550,
+    "sourceFiles": 3,
+    "existingTasksUnchanged": 13,
+    "firstRestart": {
+      "boot": 2,
+      "tables": 228,
+      "rows": 3637,
+      "files": 3,
+      "unchanged": true
+    },
+    "finalRestart": {
+      "status": "PASS",
+      "recordedAt": "2026-10-02T03:35:58.379689+00:00",
+      "boot": 3,
+      "backendPid": 29310,
+      "tableCount": 228,
+      "rowCount": 3778,
+      "fileCount": 3,
+      "snapshotUnchanged": true,
+      "sourceUnchanged": true,
+      "existingTasksUnchanged": 13,
+      "roundSnapshotsUnchanged": true,
+      "applicationsReadBack": 3
+    },
+    "applications": {
+      "approvedApplication": {
+        "id": "7b537052-5ef6-4d50-bd00-9c26a801220b",
+        "status": "APPROVED",
+        "roundNo": 1
+      },
+      "resubmittedApplication": {
+        "id": "2c9dd94d-2b77-4819-abd6-68a695d7a9eb",
+        "status": "IN_APPROVAL",
+        "roundNo": 2
+      },
+      "recoveredApplication": {
+        "id": "58f08e6d-9011-40a1-abb7-bd3b35401325",
+        "status": "IN_APPROVAL",
+        "roundNo": 1
+      }
+    }
+  },
+  "browserAccepted": [
+    "Add organization form options and configure field relationship in both designer views",
+    "Save, validate and publish the version; applicant creates and submits the form",
+    "Change department head before future node activation; restart then finance approves",
+    "Original manager approves; new head receives 403 from task read API",
+    "After final restart and normal sign-in, approved round and original candidate remain visible"
+  ],
+  "otherAccepted": [
+    "Withdrawal and resubmission produce independent old and new frozen selections",
+    "No available head rolls back submission version and rounds; original draft recovers after head restoration",
+    "ALL, ANY and PERCENT preserve members; revoked eligibility rolls back previous decision",
+    "Missing snapshot fails closed; SoD exclusions and child snapshot isolation hold",
+    "Designer directory is authorized, tenant scoped, no-store and excludes subject details"
+  ],
+  "boundaries": [
+    "Synthetic local organization and accounts; no real enterprise integration claimed",
+    "Combination cases for countersign, eligibility and subprocess verified by integration tests, not all via browser",
+    "Incomplete field configuration autosave rejected by structural validation; saving succeeds after configuration is completed",
+    "One expired browser login was restored by normal login, and verification then passed",
+    "Existing build chunk-size warning remains; no new dependency introduced",
+    "Full original requirement mapping remains incomplete; six top-level items remain"
+  ],
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "artifacts": [
+    {
+      "name": "form-assignee-domain-red.log",
+      "sha256": "05c1fedffc44968ce162e35c0f94895af856bbbc3f378694887d057820387d85"
+    },
+    {
+      "name": "form-assignee-compile-public.log",
+      "sha256": "f1c965965122b7e8e13a9d629a5a629273ecb8ec9f8455acc9e5cfece2552a27"
+    },
+    {
+      "name": "form-assignee-integration.log",
+      "sha256": "fbb39262868813c9955f21d5a71b2adac148d83b81e66f51401c1b02eef63262"
+    },
+    {
+      "name": "form-assignee-regression.log",
+      "sha256": "67ce997f1bc13e06fa069c869b7915a7ba863037beeec13623f3b566cbb69c12"
+    },
+    {
+      "name": "form-assignee-package.log",
+      "sha256": "b6d6334c2a3a74111d06a72716ba7ac6b2c51b36925aeacf21cdcf21dbea36aa"
+    },
+    {
+      "name": "form-assignees-postgres-290268ded1.log",
+      "sha256": "d1f3e74fd24f8f49b9de43eac188322191261e35fcd8bd9282759f2d3014487e"
+    },
+    {
+      "name": "form-assignees-postgres-290268ded1.json",
+      "sha256": "31a0efaeb4b423a1081f222d12f43f6562f004e0f82c6bf56733c8f9d1339c28"
+    },
+    {
+      "name": "form-assignee-web-tests.log",
+      "sha256": "384a7915248a5cd0db2eab50dc95cf1535c59b61b43f748184530a34d92bac47"
+    },
+    {
+      "name": "form-assignee-web-build-final.log",
+      "sha256": "98030764a14f02d1572032c6bb46ed123286994761ac7f78ce4f1c02e62ce6be"
+    },
+    {
+      "name": "form-assignee-openapi-static.log",
+      "sha256": "2872f5a1da615af33746f9027d4049cb9b69634ec119a185f4d106ff612c9f56"
+    },
+    {
+      "name": "form-assignees-contracts.json",
+      "sha256": "3eee2c6fd15739dcf1e95f99a7f931b6c6ded2769ceb69a124855d2e78acf2dc"
+    },
+    {
+      "name": "form-assignees-browser-responses.json",
+      "sha256": "1336293bfa50aa457328932f5758b0e40e1a063cb525465e40534e407f8a02cf"
+    },
+    {
+      "name": "form-assignees-browser-capture-gaps.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "name": "form-assignees-fixture.json",
+      "sha256": "7e3a743c8f86fc37b0dc56f7cd5a9dc7befbf7ee2a18db18ed81c3880ca7aae6"
+    },
+    {
+      "name": "form-assignees-before-restart.json",
+      "sha256": "caff6a1243495c1a91bd564398c7ba286bfca5479c97021f3005f6a75635e6cf"
+    },
+    {
+      "name": "form-assignees-restart-first.json",
+      "sha256": "6e642e1a44c374c426c4c187efcb37f505837111d2b4f6c5e07d571952b4e26b"
+    },
+    {
+      "name": "form-assignees-before-final-restart.json",
+      "sha256": "76457f9b171ce46d95ee6fe08c2548ef3b28c2a1012dfae4227bc71a768745e6"
+    },
+    {
+      "name": "form-assignees-final-restart.json",
+      "sha256": "834a42a3f1c71f9aadb6770d071eefdce8c84984ee8f322a6d107661b3df82ca"
+    },
+    {
+      "name": "form-assignees-designer.png",
+      "sha256": "b4f63109f2da0a40328629b7490b86409c249406c5a51bae0020f2a14cb37c45"
+    },
+    {
+      "name": "form-assignees-approved.png",
+      "sha256": "0786c8258663410882f0262eec85317f6551f9751c2c4a3a3337dc438521a0cc"
+    },
+    {
+      "name": "form-assignees-after-final-restart.png",
+      "sha256": "e56a83c060f37ba6568409953cb374766905527ddc39d5553b16d0e8f74ec5fd"
+    },
+    {
+      "name": "form-assignees-http-activation.json",
+      "sha256": "aeec6db9e43f0f728868a0fc6f18e68d556b93117f0f84401d16e14be30aa3bd"
+    },
+    {
+      "name": "form-assignees-http-change-head.json",
+      "sha256": "9c794127eca3e8086e0180ac271eeca644228a8d64452224871a27cdc16f3ad1"
+    },
+    {
+      "name": "form-assignees-http-final-restart.json",
+      "sha256": "2eae8f5e6ecd484dcf9dd8caa9dfdec6152d4706462ece4616921b03fc604f4c"
+    },
+    {
+      "name": "form-assignees-http-rounds.json",
+      "sha256": "6ca17fc61953021282fd3be5835c135001aff67531de15cc885efd4341f1448d"
+    },
+    {
+      "name": "form-assignees-http-setup.json",
+      "sha256": "23daf8fe5ce509d352d7ec557529bb4ba32ee071daa6346455aa1e74d2b44f61"
+    }
+  ]
+}

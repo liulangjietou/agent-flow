@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -105,6 +106,32 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     @Transactional(readOnly = true)
     public List<Option> copyOptions(String tenantId) { return options(tenantId, false); }
 
+    /** 表单目录只返回本租户在用对象的标识、名称及当前可选关系，不返回认证主体。 */
+    @Override
+    @Transactional(readOnly = true)
+    public List<FormOption> formOptions(String tenantId) {
+        if (!repository.initialized(tenantId)) return List.of();
+        var result = new ArrayList<FormOption>();
+        jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE AND approval_eligible=TRUE ORDER BY display_name,id",
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new FormOption(UUID.fromString(row.getString("id")),
+                        row.getString("display_name"), io.agentflow.definition.FormAssigneePolicy.SourceKind.PERSON, 1, false)), tenantId);
+        var counts = memberCounts(tenantId, true);
+        jdbc.query("""
+                SELECT u.id,u.name,u.kind,
+                       CASE WHEN a.active=TRUE AND a.department_id=u.id AND p.active=TRUE AND p.approval_eligible=TRUE
+                                      AND j.active=TRUE THEN TRUE ELSE FALSE END AS head_available
+                FROM organization_unit u
+                JOIN organization_unit l ON l.tenant_id=u.tenant_id AND l.id=u.legal_entity_id AND l.active=TRUE
+                LEFT JOIN organization_appointment a ON a.tenant_id=u.tenant_id AND a.id=u.head_appointment_id
+                LEFT JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id
+                LEFT JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id
+                WHERE u.tenant_id=? AND u.active=TRUE AND u.kind IN ('DEPARTMENT','POSITION') ORDER BY u.kind,u.name,u.id
+                """, (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new FormOption(UUID.fromString(row.getString("id")),
+                        row.getString("name"), io.agentflow.definition.FormAssigneePolicy.SourceKind.valueOf(row.getString("kind")),
+                        counts.getOrDefault(row.getString("id"), 0), row.getBoolean("head_available"))), tenantId);
+        return List.copyOf(result);
+    }
+
     /** 每次读取抄送快照重新核对当前人员启停状态，已冻结记录不受组织改组影响。 */
     public boolean activeRecipient(String tenantId, String subject) {
         return repository.initialized(tenantId) ? repository.personBySubject(tenantId, subject).filter(OrganizationPerson::active).isPresent()
@@ -129,12 +156,7 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
         }
         jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE" + (approvalRequired ? " AND approval_eligible=TRUE" : "") + " ORDER BY display_name,id",
                 (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new Option("role:" + PERSON_ROLE + row.getString("id"), "人员 · " + row.getString("display_name"), 1)), tenantId);
-        var counts = new HashMap<String, Integer>();
-        for (String column : List.of("department_id", "position_id")) {
-            // 列名是服务端固定白名单，不来自 URL 或客户端输入。
-            jdbc.query("SELECT a." + column + " AS id,COUNT(DISTINCT p.subject) AS members " + appointments(approvalRequired) + " GROUP BY a." + column,
-                    (org.springframework.jdbc.core.RowCallbackHandler) row -> counts.put(row.getString("id"), row.getInt("members")), tenantId);
-        }
+        var counts = memberCounts(tenantId, approvalRequired);
         jdbc.query("SELECT id,name,kind FROM organization_unit WHERE tenant_id=? AND kind IN ('DEPARTMENT','POSITION') AND active=TRUE ORDER BY kind,name,id",
                 (org.springframework.jdbc.core.RowCallbackHandler) row -> {
                     int count = counts.getOrDefault(row.getString("id"), 0);
@@ -142,6 +164,16 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
                             ("DEPARTMENT".equals(row.getString("kind")) ? "部门 · " : "岗位 · ") + row.getString("name"), count));
                 }, tenantId);
         return List.copyOf(result);
+    }
+
+    private Map<String, Integer> memberCounts(String tenantId, boolean approvalRequired) {
+        var counts = new HashMap<String, Integer>();
+        for (String column : List.of("department_id", "position_id")) {
+            // 列名是服务端固定白名单，不来自 URL 或客户端输入。
+            jdbc.query("SELECT a." + column + " AS id,COUNT(DISTINCT p.subject) AS members " + appointments(approvalRequired) + " GROUP BY a." + column,
+                    (org.springframework.jdbc.core.RowCallbackHandler) row -> counts.put(row.getString("id"), row.getInt("members")), tenantId);
+        }
+        return counts;
     }
 
     private static String appointments(boolean approvalRequired) {

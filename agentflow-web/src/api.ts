@@ -33,6 +33,7 @@ import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from
 import { readCommentMentionPage, validateCommentReceipt, type CommentMentionFilter, type CommentMentionPage } from './commentMentions.js'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
 import type { AssigneeOption } from './definitionAssignees'
+import type { FormAssigneeOption } from './formAssignees'
 import type { ApiDocument } from './apiReference'
 import { PendingWrites, type WriteRequest } from './pendingWrites.js'
 import { validateTaskAssignmentReceipt } from './taskActions.js'
@@ -308,6 +309,9 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       INVALID_RISK_POLICY: '风险规则配置无效，请核对唯一标识、公开说明、等级和条件。',
       INVALID_SUBMISSION_RISK: '风险规则的标识、公开说明或等级不合法。',
       INVALID_FORM_SCHEMA: '表单配置未通过校验，请检查字段标识、类型、选项与约束。',
+      FORM_ASSIGNEE_VALUE_REQUIRED: '请先选择表单中指定的人员、部门或岗位。',
+      FORM_ASSIGNEE_UNAVAILABLE: '本轮固定的审批人已失去审批资格，请联系组织管理员核对；本次操作未生效。',
+      FORM_ASSIGNEE_SNAPSHOT_MISSING: '本轮缺少有效的表单选人记录，流程已阻止继续推进，请联系管理员核查。',
       WEBHOOK_DELIVERY_CONFLICT: '投递状态已变化，请刷新详情后再操作。',
       WEBHOOK_TARGET_UNAVAILABLE: '原目的地已停用、移除或改址，请联系部署管理员核对配置。',
       INVALID_WEBHOOK_QUERY: '投递筛选或分页位置已失效，请重新查询。',
@@ -699,6 +703,7 @@ export const api = {
   withdrawApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回申请', body),
   cancelApplication: (id: string, body: { expectedVersion: number; comment?: string }) => write<Application>(`/applications/${encodeURIComponent(id)}/cancel`, 'POST', '作废申请', body),
   definitionAssignees: (signal: AbortSignal) => request<AssigneeOption[]>('/process-definitions/assignee-options', { signal }),
+  formAssigneeOptions: (signal: AbortSignal) => request<FormAssigneeOption[]>('/process-definitions/form-assignee-options', { signal, cache: 'no-store' }),
   searchDefinitions: (filters: DefinitionCatalogFilters, signal: AbortSignal) => request<DefinitionCatalogPage>('/process-definitions/search?' + new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)])), { signal }),
   getDefinition: (id: string, signal?: AbortSignal) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { signal }),
   templates: () => request<ProcessTemplate[]>('/process-templates'),

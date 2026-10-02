@@ -183,7 +183,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 xml.append(" flowable:candidateUsers=\"${flowableApprovalResponsibilities.resolve(execution, '")
                         .append(encodedRule).append("', ").append(responsibilities.excludeApplicant()).append(", '")
                         .append(encodedReferences).append("')}\"");
-            } else if (io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)) {
+            } else if (FormAssigneePolicy.isFieldRule(rule) || io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)) {
                 String encoded = java.util.Base64.getEncoder().encodeToString(rule.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 xml.append(" flowable:candidateUsers=\"${flowableOrganizationMembers.resolve(execution, '")
                         .append(encoded).append("')}\"");
