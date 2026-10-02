@@ -42,6 +42,30 @@ public class InvoiceExtractionService {
         return new Prepared(original.tenantId(), original.ownerId(), source.input(), source.method());
     }
 
+    /** 明确绑定本人刚查看的原件身份；页数和格式继续由服务端读取。 */
+    @Transactional(propagation = Propagation.NEVER)
+    public Prepared prepare(UUID invoiceId, UUID expectedOriginalId, String expectedOriginalDigest) {
+        var prepared = prepare(invoiceId);
+        if (!prepared.input.originalId().equals(expectedOriginalId) || !prepared.input.originalDigest().equals(expectedOriginalDigest)) throw inputChanged();
+        return prepared;
+    }
+
+    /** 本地解析不受模型总开关影响，外发前展示实际目的地和完整发送范围。 */
+    @Transactional(propagation = Propagation.NEVER)
+    public InputOptions input(UUID invoiceId) {
+        var prepared = prepare(invoiceId); String unavailable = null;
+        boolean external = prepared.method == MODEL;
+        if (external) {
+            try { configuration.requireAvailable(); } catch (DomainException failure) { unavailable = failure.code(); }
+        }
+        boolean modelAvailable = external && unavailable == null;
+        return new InputOptions(prepared.input, prepared.method,
+                !external ? Transmission.NONE : prepared.input.format() == InvoiceOriginal.Format.XML ? Transmission.XML_TEXT : Transmission.ORIGINAL_BYTES,
+                unavailable == null, unavailable, modelAvailable ? configuration.getProviderId() : null,
+                modelAvailable ? configuration.getModel() : null, modelAvailable ? configuration.uri().getAuthority() : null,
+                modelAvailable ? configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION) : null, sources.supportedFormats());
+    }
+
     /** 明确选择本地或外发方式；模型方式还必须确认相同目的地指纹，不能自动降级或改发。 */
     @Transactional
     public Receipt queue(Prepared prepared, InvoiceExtractionSuggestion.Method expectedMethod, String targetDigest) {
@@ -200,9 +224,23 @@ public class InvoiceExtractionService {
      */
     public enum ReviewAction { CONFIRM, DISMISS }
     /**
+     * 发送完整原始字节时包括原件内部元数据，XML 发送完整正文、元素名及属性。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum Transmission { NONE, XML_TEXT, ORIGINAL_BYTES }
+    /**
+     * 只展示本人原件引用、实际方式与可用目的地，不返回文件正文或凭据。
+     * @author owlzhangfq@gmail.com
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record InputOptions(InvoiceExtractionInput input, InvoiceExtractionSuggestion.Method method, Transmission transmission,
+                               boolean enabled, String unavailableCode, String providerId, String model, String destination,
+                               String targetDigest, List<InvoiceOriginal.Format> supportedFormats) { }
+    /**
      * 本人详情分开展示来源、生成结果和人工修订。
      * @author owlzhangfq@gmail.com
      */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
     public record Detail(UUID id, InvoiceExtractionInput input, InvoiceExtractionSuggestion.Method method, InvoiceExtractionRun.Status status,
                          long version, Instant createdAt, Instant startedAt, Instant completedAt, InvoiceExtractionSuggestion suggestion,
                          InvoiceExtractionRun.Failure failure, InvoiceExtractionRun.Review review, boolean canConfirm) { }

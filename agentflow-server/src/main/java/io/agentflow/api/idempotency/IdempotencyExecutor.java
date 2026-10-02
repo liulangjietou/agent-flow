@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.WebUtils;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -84,6 +87,29 @@ public class IdempotencyExecutor {
                 return replay(winner, actor, rolesHash, requestHash);
             });
         }
+    }
+
+    /**
+     * 有成功回执时直接恢复；新请求的文件或外部只读准备不持有数据库事务。
+     * 准备结束后仍由原执行器在写事务中竞争同一键，只有胜方可以产生业务效果。
+     */
+    @Transactional(propagation = Propagation.NEVER)
+    public <T> ResponseEntity<String> executePrepared(HttpServletRequest request, HttpStatus successStatus,
+                                                     Supplier<T> preparation, Function<T, ?> operation) {
+        Actor actor = currentActor.actor();
+        String key = key(request), requestHash = requestHash(request);
+        String rolesHash = digest(actor.roles().stream().sorted().map(role -> role.getBytes(StandardCharsets.UTF_8)).toList());
+        var existing = repository.find(actor.tenantId(), key);
+        if (existing.isPresent()) return replay(existing.get(), actor, rolesHash, requestHash);
+        T prepared;
+        try { prepared = preparation.get(); }
+        catch (RuntimeException failure) {
+            // 并发请求可能已在本次准备期间完成；恢复它的回执，不让文件失效掩盖成功事实。
+            var winner = repository.find(actor.tenantId(), key);
+            if (winner.isPresent()) return replay(winner.get(), actor, rolesHash, requestHash);
+            throw failure;
+        }
+        return execute(request, successStatus, () -> operation.apply(prepared));
     }
 
     private ResponseEntity<String> replay(JdbcIdempotencyRepository.StoredResponse stored, Actor actor,

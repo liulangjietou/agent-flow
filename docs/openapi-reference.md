@@ -25,7 +25,9 @@
 
 常见错误：400 参数/键无效；401 登录失效；403 无角色或资源操作权；404 资源不存在或不可见；409 版本、状态或幂等冲突；422 领域规则或表单校验失败。按接口列出的响应处理，不用 HTTP 200 推断流程已经批准。
 
-业务错误为 `{code,message,traceId,path,details?}`；表单错误在 `details.fieldErrors`，图错误在 `details.definitionErrors`。进入控制器前的 UUID 转换等失败，当前仍是 Spring `{timestamp,status,error,path}` 响应，契约使用 RequestError 联合类型表达。本文没有把所有既有异常重写为统一模型。网关也可能返回非 JSON/空正文，调用方应先按 HTTP 状态保留结果未知的写请求，再走原键恢复。
+业务错误为 `{code,message,traceId,path,details?}`；表单错误在 `details.fieldErrors`，图错误在 `details.definitionErrors`。必填查询参数缺失及查询／路径类型转换错误已统一为 `INVALID_REQUEST`；契约的 RequestError 仍兼容 Spring 标准错误。网关也可能返回非 JSON/空正文，调用方应先按 HTTP 状态保留结果未知的写请求，再走原键恢复。
+
+票据抽取使用 `/invoices/{id}/extraction-runs` 下的来源预览、排队、分页、详情和本人复核接口。模型方式必须明确确认外发并绑定原件及目的地，本地 XML 不依赖模型。成功回执恢复不重新读取原件，文件准备在幂等写事务外执行；确认不修改税务查验或财务占用，详见[票据抽取](invoice-extraction.md)。管理员审计可按 `InvoiceExtractionRun` 来源及三种明确动作检索，不包含票面正文。
 
 ## 部分报销调整入口
 

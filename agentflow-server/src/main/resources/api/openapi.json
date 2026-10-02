@@ -9960,7 +9960,10 @@
                 "EVENT_RECEIVED",
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED",
-                "TENANT_INITIALIZE"
+                "TENANT_INITIALIZE",
+                "INVOICE_EXTRACTION_QUEUE",
+                "INVOICE_EXTRACTION_CONFIRM",
+                "INVOICE_EXTRACTION_DISMISS"
               ]
             }
           },
@@ -9975,7 +9978,8 @@
                 "",
                 "Application",
                 "Task",
-                "TenantInitialization"
+                "TenantInitialization",
+                "InvoiceExtractionRun"
               ]
             }
           },
@@ -11492,7 +11496,10 @@
                 "EVENT_RECEIVED",
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED",
-                "TENANT_INITIALIZE"
+                "TENANT_INITIALIZE",
+                "INVOICE_EXTRACTION_QUEUE",
+                "INVOICE_EXTRACTION_CONFIRM",
+                "INVOICE_EXTRACTION_DISMISS"
               ]
             }
           },
@@ -11507,7 +11514,8 @@
                 "",
                 "Application",
                 "Task",
-                "TenantInitialization"
+                "TenantInitialization",
+                "InvoiceExtractionRun"
               ]
             }
           },
@@ -39769,6 +39777,782 @@
           }
         }
       }
+    },
+    "/api/v1/invoices/{id}/extraction-runs/input": {
+      "get": {
+        "operationId": "invoiceExtractionInput",
+        "tags": [
+          "财务"
+        ],
+        "summary": "查看本人票据来源、处理方式和外发范围",
+        "description": "完整原件在数据库事务外检查，不排队或发送。已识别 XML 在本地处理，不受模型关闭影响；其他 XML 和图片/PDF 需要明确外发授权。OFD 尚未接入，返回格式不支持。",
+        "x-access": "同租户、当前有效的原件本人；管理员身份不授予代读或代操作权",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原件、模型目的地、运行版本或状态冲突，活动任务冲突，或原键和请求/账号不匹配、回执已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceExtractionInputOptions"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型配置或原件存储不可用；未重新发送",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/extraction-runs": {
+      "get": {
+        "operationId": "invoiceExtractionRuns",
+        "tags": [
+          "财务"
+        ],
+        "summary": "分页查看本人票据抽取记录",
+        "description": "本人有界历史，索引不含票面、摘录或人工值。默认20条，最多50条；拒绝未知、重复及越界查询参数。",
+        "x-access": "同租户、当前有效的原件本人；管理员身份不授予代读或代操作权",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原件、模型目的地、运行版本或状态冲突，活动任务冲突，或原键和请求/账号不匹配、回执已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceExtractionPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型配置或原件存储不可用；未重新发送",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "从0开始的页号",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "queueInvoiceExtraction",
+        "tags": [
+          "财务"
+        ],
+        "summary": "明确处理方式并登记票据抽取",
+        "description": "绑定刚查看的原件 ID、摘要和方式。MODEL 必须明确 externalSendConfirmed=true 并匹配当前 targetDigest；STRUCTURED_XML 必须为 false 且无目的地。202 仅表示排队，模型或本地失败不自动重发。原键恢复仅返回最小历史回执，不重新读取文件，不重新排队。",
+        "x-access": "同租户、当前有效的原件本人；管理员身份不授予代读或代操作权",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原件、模型目的地、运行版本或状态冲突，活动任务冲突，或原键和请求/账号不匹配、回执已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型配置或原件存储不可用；未重新发送",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "任务已登记；不代表抽取或查验通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceExtractionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "description": "是否恢复原键的成功回执"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceExtractionGenerateRequest"
+              },
+              "example": {
+                "expectedOriginalId": "00000000-0000-0000-0000-000000000001",
+                "expectedOriginalDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "method": "STRUCTURED_XML",
+                "targetDigest": null,
+                "externalSendConfirmed": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/{id}/extraction-runs/{runId}": {
+      "get": {
+        "operationId": "invoiceExtractionRun",
+        "tags": [
+          "财务"
+        ],
+        "summary": "读取本人原始候选和人工确认",
+        "description": "展示原件依据、结果生产者、置信度和本人修订；他人及管理员不能代读。字段值仅为候选，模型摘录还需本人对照。拒绝查询参数。",
+        "x-access": "同租户、当前有效的原件本人；管理员身份不授予代读或代操作权",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原件、模型目的地、运行版本或状态冲突，活动任务冲突，或原键和请求/账号不匹配、回执已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceExtractionDetail"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型配置或原件存储不可用；未重新发送",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "运行标识，必须绑定路径申请",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/extraction-runs/{runId}/review": {
+      "post": {
+        "operationId": "reviewInvoiceExtraction",
+        "tags": [
+          "财务"
+        ],
+        "summary": "本人确认或放弃票据候选",
+        "description": "明确运行版本；CONFIRM 逐项选择并可修订字符串值，DISMISS 不含选择。原始候选保留，人工动作和最小审计、回执同事务提交。不修改票面、税务查验、发票占用或申请。原键回放保持原账号和角色，只返回最小回执。拒绝查询参数。",
+        "x-access": "同租户、当前有效的原件本人；管理员身份不授予代读或代操作权",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原件、模型目的地、运行版本或状态冲突，活动任务冲突，或原键和请求/账号不匹配、回执已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceExtractionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "description": "是否恢复原键的成功回执"
+              }
+            }
+          },
+          "503": {
+            "description": "模型配置或原件存储不可用；未重新发送",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "绑定本申请本轮的运行标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceExtractionReviewRequest"
+              },
+              "example": {
+                "expectedRunVersion": 3,
+                "action": "CONFIRM",
+                "selected": [
+                  {
+                    "field": "INVOICE_NUMBER",
+                    "value": "000077"
+                  }
+                ],
+                "comment": "本人对照原件后确认"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -39798,6 +40582,764 @@
       }
     },
     "schemas": {
+      "InvoiceExtractionInput": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "XML",
+              "PNG",
+              "JPEG",
+              "PDF",
+              "OFD"
+            ]
+          },
+          "originalBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 20971520
+          },
+          "pageCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "invoiceId",
+          "originalId",
+          "originalDigest",
+          "format",
+          "originalBytes",
+          "pageCount"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionInputOptions": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/InvoiceExtractionInput"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "STRUCTURED_XML",
+              "MODEL"
+            ]
+          },
+          "transmission": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "XML_TEXT",
+              "ORIGINAL_BYTES"
+            ],
+            "description": "NONE 不外发；XML_TEXT 外发完整 XML 正文、元素名和属性；ORIGINAL_BYTES 外发完整图片或 PDF 原始字节，包括内部元数据和内嵌内容。"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "unavailableCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supportedFormats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "XML",
+                "PNG",
+                "JPEG",
+                "PDF"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "input",
+          "method",
+          "transmission",
+          "enabled",
+          "unavailableCode",
+          "providerId",
+          "model",
+          "destination",
+          "targetDigest",
+          "supportedFormats"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionSelection": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "INVOICE_CODE",
+              "INVOICE_NUMBER",
+              "ISSUE_DATE",
+              "BUYER_NAME",
+              "BUYER_TAX_ID",
+              "SELLER_NAME",
+              "SELLER_TAX_ID",
+              "CURRENCY",
+              "NET_AMOUNT",
+              "TAX_AMOUNT",
+              "GROSS_AMOUNT"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "保持字符串票号和精确金额；字段的日期、币种、金额和编号格式由领域校验，确认不代表税务查验。"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionEvidence": {
+        "type": "object",
+        "properties": {
+          "originalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "xmlPath": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "description": "仅服务端结构化 XML 提供；只用于原件对照，不执行 XPath。"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "originalId",
+          "originalDigest",
+          "page",
+          "quote"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionProposal": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "INVOICE_CODE",
+              "INVOICE_NUMBER",
+              "ISSUE_DATE",
+              "BUYER_NAME",
+              "BUYER_TAX_ID",
+              "SELLER_NAME",
+              "SELLER_TAX_ID",
+              "CURRENCY",
+              "NET_AMOUNT",
+              "TAX_AMOUNT",
+              "GROSS_AMOUNT"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "保持字符串票号和精确金额；字段的日期、币种、金额和编号格式由领域校验，确认不代表税务查验。"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "description": "模型自评或结构化字段直接读取的标记，不是实测准确率或真实性保证。"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceExtractionEvidence"
+            },
+            "minItems": 1,
+            "maxItems": 4
+          }
+        },
+        "required": [
+          "field",
+          "value",
+          "confidence",
+          "evidence"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionSuggestion": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "STRUCTURED_XML",
+              "MODEL"
+            ]
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "processorVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "contractVersion": {
+            "type": "string",
+            "const": "invoice-extraction-v1"
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceExtractionProposal"
+            },
+            "maxItems": 11
+          }
+        },
+        "required": [
+          "method",
+          "providerId",
+          "processorVersion",
+          "contractVersion",
+          "proposals"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionReview": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InvoiceExtractionSelection"
+                },
+                "minItems": 1,
+                "maxItems": 11
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "actor",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CONFIRMED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 4
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "STRUCTURED_XML",
+              "MODEL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CONFIRMED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "method",
+          "status",
+          "version",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceExtractionSummary"
+            },
+            "maxItems": 50
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "input": {
+            "$ref": "#/components/schemas/InvoiceExtractionInput"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "STRUCTURED_XML",
+              "MODEL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CONFIRMED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceExtractionSuggestion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "MODEL_UNAVAILABLE",
+                  "EXECUTION_TIMEOUT",
+                  "INVALID_RESULT",
+                  "INPUT_UNAVAILABLE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceExtractionReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canConfirm": {
+            "type": "boolean",
+            "description": "当前本人可对照原件确认候选；写入时重新核对，不修改发票查验或占用。"
+          }
+        },
+        "required": [
+          "id",
+          "input",
+          "method",
+          "status",
+          "version",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "suggestion",
+          "failure",
+          "review",
+          "canConfirm"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceExtractionGenerateRequest": {
+        "type": "object",
+        "properties": {
+          "expectedOriginalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedOriginalDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "STRUCTURED_XML",
+              "MODEL"
+            ]
+          },
+          "targetDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "externalSendConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expectedOriginalId",
+          "expectedOriginalDigest",
+          "method",
+          "externalSendConfirmed"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "method": {
+                  "const": "MODEL"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "targetDigest"
+              ],
+              "properties": {
+                "targetDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "externalSendConfirmed": {
+                  "const": true
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "targetDigest": {
+                  "type": "null"
+                },
+                "externalSendConfirmed": {
+                  "const": false
+                }
+              }
+            }
+          }
+        ]
+      },
+      "InvoiceExtractionReviewRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRunVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CONFIRM",
+              "DISMISS"
+            ]
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InvoiceExtractionSelection"
+                },
+                "maxItems": 11
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedRunVersion",
+          "action"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "CONFIRM"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "selected"
+              ],
+              "properties": {
+                "selected": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceExtractionSelection"
+                  },
+                  "minItems": 1,
+                  "maxItems": 11
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "selected": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/InvoiceExtractionSelection"
+                      },
+                      "maxItems": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
       "SupplierAdjustmentDisputeView": {
         "type": "object",
         "additionalProperties": false,

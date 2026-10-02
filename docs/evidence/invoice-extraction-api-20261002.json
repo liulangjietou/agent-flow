@@ -1,0 +1,188 @@
+{
+  "recordedAt": "2026-10-02T07:28:59.242497+00:00",
+  "baseCommit": "0fea43ca256c7bd84b0524375dc238546531a392",
+  "scope": "票据抽取本人 API、事务外准备、幂等恢复、最小原子审计及契约；页面和完整运行未验收",
+  "implemented": [
+    "来源预览、排队、历史、详情和确认/放弃五个本人接口",
+    "原件身份、实际处理方式、明确外发确认与冻结目的地",
+    "原键成功回执在文件准备前恢复；准备失败遇到并发成功可恢复胜方",
+    "同一原键并发只提交一次，写入/轨迹/审计/回执原子保存",
+    "最小管理员审计筛选和导出，不提供票面或人工意见",
+    "新接口严格布尔确认、整数版本及字符串票面值"
+  ],
+  "redBeforeFix": [
+    {
+      "case": "未实现本人来源预览",
+      "observed": "预期 200，实际 404",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-red.log"
+    },
+    {
+      "case": "externalSendConfirmed=0 被自动转换",
+      "observed": "预期 400，实际 202",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-scalar-red.log"
+    },
+    {
+      "case": "expectedRunVersion=3.9 被截断",
+      "observed": "预期 400，实际 200",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-scalar-red.log"
+    }
+  ],
+  "h2Scoped": {
+    "tests": 68,
+    "suites": [
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionApiIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.approval.IdempotencyIntegrationTest",
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.approval.operations.AuditSearchIntegrationTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "postgres": {
+    "databases": {
+      "test": "extraction_backend_68d3bd428a",
+      "api": "extraction_api_68d3bd428a"
+    },
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-postgres-68d3bd428a.log",
+    "status": "PASS",
+    "existingRuntimeReplaced": false,
+    "exitCode": 0,
+    "tests": 26,
+    "suites": [
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionApiIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "overlapsH2": true,
+    "freshDatabases": true
+  },
+  "coverage": [
+    "关闭模型仍可本地 XML 排队并独立确认",
+    "其他员工、管理员、其他租户和其他原件隔离",
+    "原角色变化阻止回执恢复；匿名被拒绝",
+    "缺原键在准备前拒绝；准备失败没有成功回执",
+    "已成功回执在原件不可用时仍可恢复；正文变化或过期键不能重执行",
+    "同键并发准备的唯一效果；失败准备恢复并发已成功请求",
+    "模型必须明确外发，原件及目标变化阻断，202 不发送模型请求",
+    "排队和复核的审计失败回滚任务、轨迹及回执",
+    "原始候选和人工修改分别保留，财务资源整行保持",
+    "有界索引、重复/未知查询和额外请求字段拒绝",
+    "字面布尔确认、整数版本及字符串票面值"
+  ],
+  "contract": {
+    "operations": 307,
+    "schemas": 615,
+    "requestExamples": 117,
+    "addedOperations": 5,
+    "addedSchemas": 13,
+    "staticValidation": "PASS",
+    "javaRouteAndRecordChecks": "PASS"
+  },
+  "frontend": {
+    "invoiceExtractionPanelImplemented": false,
+    "changes": "管理员审计来源和动作标签",
+    "typecheckAndBuild": "PASS"
+  },
+  "quality": {
+    "javaFiles": 1354,
+    "namedTypes": 2604,
+    "missingAuthors": 0,
+    "parseErrors": 0,
+    "diffCheck": "PASS"
+  },
+  "migration": {
+    "newMigration": false,
+    "schema": "V100",
+    "oldAuditBackfill": false,
+    "liveV99Upgraded": false
+  },
+  "limitations": [
+    "MockMvc 是进程内接口验证，本阶段没有将其称为独立 HTTP 或浏览器验收",
+    "尚未接入票夹页面和确认结果辅助填报",
+    "OFD 全页渲染与适配器仍未接通",
+    "完整原验收库升级、实际进程重启和真实模型质量仍待验收"
+  ],
+  "remainingTopLevelCategories": 6,
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-red.log",
+      "sha256": "8ab5f863defd85440a8cf9f00450b520d9a18be0ec25622844323f317a777cea"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-scope.log",
+      "sha256": "6c8c7a69afbf61c5083a65e69b4861a4cc7e9703f90dd1cd7a75813f978964dd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-scalar-red.log",
+      "sha256": "984e0fba168517cfaca4e67a98c164d7b7c41dcf8cecd4733dcccee627954f9b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-scalar-green.log",
+      "sha256": "da85b605f2656c904b25d5c29603e99241bc4f53668dfcb1fe8b58fa16630b5e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-openapi.log",
+      "sha256": "3700b51b48e379ee32af3d6938e43ef910dda9e6e29ad7ea7d0856ed8630bd10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-web-build.log",
+      "sha256": "08b14accacebde882a7b8447647f00f33f1d432ae6a24aa0eb13b5cd872c0e8d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-authors.log",
+      "sha256": "5bf54f46dba0951d8e3d26e8b48a847486449a4de4a1aff022783c31a0ca8b6d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-h2-reports/summary.json",
+      "sha256": "448558c4760441123765da41c0f926a4d68a1e0f6c51c7e95a34780ecb80585d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-postgres-reports/summary.json",
+      "sha256": "0ce00f0debc9d3c044f715c2ffda10fdd5d12b173595250a5e0ad84645f3909d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-api-postgres-68d3bd428a.log",
+      "sha256": "86e50e5b6f3392df779682ba2602391aee6483573fca65aa7d581f498e565693"
+    }
+  ]
+}

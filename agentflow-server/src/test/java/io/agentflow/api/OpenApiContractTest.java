@@ -87,6 +87,17 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("InvoiceExtractionInput", io.agentflow.agent.InvoiceExtractionInput.class),
+                java.util.Map.entry("InvoiceExtractionInputOptions", io.agentflow.agent.InvoiceExtractionService.InputOptions.class),
+                java.util.Map.entry("InvoiceExtractionSelection", io.agentflow.agent.InvoiceExtractionController.SelectionRequest.class),
+                java.util.Map.entry("InvoiceExtractionEvidence", io.agentflow.agent.InvoiceExtractionSuggestion.Evidence.class),
+                java.util.Map.entry("InvoiceExtractionProposal", io.agentflow.agent.InvoiceExtractionSuggestion.Proposal.class),
+                java.util.Map.entry("InvoiceExtractionSuggestion", io.agentflow.agent.InvoiceExtractionSuggestion.class),
+                java.util.Map.entry("InvoiceExtractionReview", io.agentflow.agent.InvoiceExtractionRun.Review.class),
+                java.util.Map.entry("InvoiceExtractionReceipt", io.agentflow.agent.InvoiceExtractionService.Receipt.class),
+                java.util.Map.entry("InvoiceExtractionSummary", io.agentflow.agent.JdbcInvoiceExtractionRunRepository.Summary.class),
+                java.util.Map.entry("InvoiceExtractionPage", io.agentflow.agent.JdbcInvoiceExtractionRunRepository.Page.class),
+                java.util.Map.entry("InvoiceExtractionDetail", io.agentflow.agent.InvoiceExtractionService.Detail.class),
                 java.util.Map.entry("DraftAssistSelection", io.agentflow.agent.DraftSuggestion.Selection.class),
                 java.util.Map.entry("DraftAssistProposal", io.agentflow.agent.DraftSuggestion.Proposal.class),
                 java.util.Map.entry("DraftAssistSuggestion", io.agentflow.agent.DraftSuggestion.class),

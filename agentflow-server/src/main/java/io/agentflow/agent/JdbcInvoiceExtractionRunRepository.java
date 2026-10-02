@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcInvoiceExtractionRunRepository {
     private static final int BATCH_SIZE = 10;
+    private static final String AUDIT_QUEUE = "INVOICE_EXTRACTION_QUEUE";
+    private static final String AUDIT_CONFIRM = "INVOICE_EXTRACTION_CONFIRM";
+    private static final String AUDIT_DISMISS = "INVOICE_EXTRACTION_DISMISS";
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
 
@@ -117,6 +121,22 @@ public class JdbcInvoiceExtractionRunRepository {
     private void append(InvoiceExtractionRun run) {
         jdbc.update("INSERT INTO agent_invoice_extraction_transition(tenant_id,run_id,run_version,status,state_json) VALUES(?,?,?,?,?)",
                 run.context().tenantId(), run.context().id().toString(), run.state().version(), run.state().status().name(), json.write(run.state()));
+        String action = switch (run.state().status()) {
+            case QUEUED -> AUDIT_QUEUE;
+            case CONFIRMED -> AUDIT_CONFIRM;
+            case DISMISSED -> AUDIT_DISMISS;
+            default -> null;
+        };
+        if (action == null) return;
+        // 统一审计只记录本人的明确操作；自动执行有独立轨迹，不能冒充本人操作或复制票面内容。
+        var context = run.context();
+        jdbc.update("""
+                INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,action,actor_id,payload_json,occurred_at)
+                VALUES(?,?,?,'InvoiceExtractionRun',?,?,?,?,?,?)
+                """, UUID.randomUUID().toString(), context.tenantId(), UUID.randomUUID().toString(), context.id().toString(),
+                run.state().version(), action, context.requestedBy(),
+                json.write(Map.of("invoiceId", context.input().invoiceId(), "method", context.method(), "status", run.state().status())),
+                timestamp(run.state().review() == null ? context.createdAt() : run.state().review().at()));
     }
     private InvoiceExtractionRun restore(ResultSet row, int index) throws SQLException {
         var context = json.read(row.getString("context_json"), InvoiceExtractionRun.Context.class);

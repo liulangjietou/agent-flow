@@ -23,8 +23,8 @@ import java.util.UUID;
  */
 public record AuditSearchParameters(AuditSearchPort.Query query, String context) {
     private static final Set<String> KEYS = Set.of("q", "actor", "action", "source", "applicationId", "from", "to", "limit", "cursor");
-    private static final Set<String> ACTIONS = Set.of("CREATE", "EXPENSE_REDUCE", "REVISE", "SUBMIT", "WITHDRAW", "CANCEL", "CLAIM", "RELEASE", "TRANSFER", "DELEGATE", "RESOLVE", "RETURN", "REJECT", "APPROVE", "ADD_SIGNER", "REMOVE_SIGNER", "TIMER_ELAPSED", "TIMER_FAILED", "TIMER_RETRY", "INSTANCE_PAUSE", "INSTANCE_RESUME", "INSTANCE_TERMINATE", "EVENT_RECEIVED", "SUBPROCESS_COMPLETED", "SUBPROCESS_STOPPED", "TENANT_INITIALIZE");
-    private static final Set<String> SOURCES = Set.of("Application", "Task", "TenantInitialization");
+    private static final Set<String> ACTIONS = Set.of("CREATE", "EXPENSE_REDUCE", "REVISE", "SUBMIT", "WITHDRAW", "CANCEL", "CLAIM", "RELEASE", "TRANSFER", "DELEGATE", "RESOLVE", "RETURN", "REJECT", "APPROVE", "ADD_SIGNER", "REMOVE_SIGNER", "TIMER_ELAPSED", "TIMER_FAILED", "TIMER_RETRY", "INSTANCE_PAUSE", "INSTANCE_RESUME", "INSTANCE_TERMINATE", "EVENT_RECEIVED", "SUBPROCESS_COMPLETED", "SUBPROCESS_STOPPED", "TENANT_INITIALIZE", "INVOICE_EXTRACTION_QUEUE", "INVOICE_EXTRACTION_CONFIRM", "INVOICE_EXTRACTION_DISMISS");
+    private static final Set<String> SOURCES = Set.of("Application", "Task", "TenantInitialization", "InvoiceExtractionRun");
     private static final String UUID_PATTERN = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 100;

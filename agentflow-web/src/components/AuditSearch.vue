@@ -14,7 +14,10 @@ const appliedFilters = ref<AuditExportFilters>({}), downloadUrl = ref('')
 const submitted = ref(''), validation = ref('')
 const actions: Record<string, string> = { INSTANCE_PAUSE: '暂停审批', INSTANCE_RESUME: '恢复审批', INSTANCE_TERMINATE: '终止审批', TIMER_ELAPSED: '定时等待已到期', TIMER_FAILED: '定时推进失败', TIMER_RETRY: '重试原定时等待', EVENT_RECEIVED: '事件已推进等待', SUBPROCESS_COMPLETED: '子审批完成并接续', SUBPROCESS_STOPPED: '父子审批停止联动', CREATE: '创建申请', EXPENSE_REDUCE: '费用核减', REVISE: '修改申请', SUBMIT: '提交审批', WITHDRAW: '撤回申请', CANCEL: '作废申请', CLAIM: '认领任务', RELEASE: '释放任务', TRANSFER: '转办', DELEGATE: '委派', RESOLVE: '完成委派', RETURN: '退回', REJECT: '驳回', APPROVE: '同意', ADD_SIGNER: '增加会签人', REMOVE_SIGNER: '移除会签人' }
 actions.TENANT_INITIALIZE = '完成工作区初始化'
-const sources: Record<string, string> = { Application: '申请操作', Task: '任务操作', TenantInitialization: '工作区初始化' }
+actions.INVOICE_EXTRACTION_QUEUE = '发起票据抽取'
+actions.INVOICE_EXTRACTION_CONFIRM = '确认票据候选值'
+actions.INVOICE_EXTRACTION_DISMISS = '放弃票据建议'
+const sources: Record<string, string> = { Application: '申请操作', Task: '任务操作', TenantInitialization: '工作区初始化', InvoiceExtractionRun: '票据抽取' }
 const snapshot = () => JSON.stringify(fields)
 const changed = computed(() => submitted.value !== snapshot())
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
@@ -45,7 +48,7 @@ onUnmounted(() => { query.clear(); exporter.clear(); releaseDownload() })
 
 <template>
   <section class="content audit-search" :aria-busy="query.loading">
-    <div class="page-heading"><div><p class="eyebrow">OPERATIONS / AUDIT</p><h2>操作审计</h2><p class="subhead">查找当前租户的申请、任务与初始化操作，追溯谁在何时作出了什么操作。</p></div><span class="admin-label">管理员视图</span></div>
+    <div class="page-heading"><div><p class="eyebrow">OPERATIONS / AUDIT</p><h2>操作审计</h2><p class="subhead">查找当前租户的申请、任务、初始化与票据抽取操作，追溯谁在何时作出了什么操作。</p></div><span class="admin-label">管理员视图</span></div>
     <form class="panel audit-filters" @submit.prevent="refresh">
       <label class="wide">申请当前标题或业务单号<input v-model="fields.q" type="search" maxlength="100" placeholder="输入关联申请的关键词" /></label>
       <label>操作人账号<input v-model="fields.actor" maxlength="128" placeholder="精确账号，如 alice" /></label>
