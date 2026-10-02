@@ -286,6 +286,21 @@ class AssistExecutionIntegrationTest {
         } finally { configuration.setEnabled(true); }
     }
 
+    @Test
+    void revokedEligibilitySettlesFailureWithoutRollingBackTheClaim() throws Exception {
+        String app = application(); UUID id = UUID.fromString(queue(app, task(app)).path("id").asText());
+        jdbc.update("INSERT INTO organization_directory VALUES('demo',1,'admin',CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO organization_person VALUES('demo',?,'manager','经理',true,false,1)", UUID.randomUUID().toString());
+        try {
+            assertThat(execution.claim("demo", id, Instant.now())).isNull();
+            assertThat(runs.find("demo", id).orElseThrow().failure()).isEqualTo(AssistRun.Failure.INPUT_UNAVAILABLE);
+            assertThat(runs.find("demo", id).orElseThrow().status()).isEqualTo(AssistRun.Status.FAILED);
+        } finally {
+            jdbc.update("DELETE FROM organization_person WHERE tenant_id='demo'");
+            jdbc.update("DELETE FROM organization_directory WHERE tenant_id='demo'");
+        }
+    }
+
     private String task(String app) { return tasks.createTaskQuery().processVariableValueEquals("applicationId", app).singleResult().getId(); }
     private JsonNode queue(String app, String task) throws Exception {
         return write(post(path(app)), "manager", Map.of("taskId", task, "expectedVersion", 2, "targetDigest", configuration.targetDigest(), "sourceIds", List.of("form:reason")), 202);

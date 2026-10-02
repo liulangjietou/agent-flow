@@ -113,6 +113,18 @@ public class FlowableTaskFacade {
         return view(actor, task);
     }
 
+    /** 资格失效是后台任务的正常查询结果，在读取事务内转换，避免回滚外层失败记录。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public boolean canDecide(String taskId, Actor actor, UUID applicationId) {
+        try {
+            var task = get(taskId, actor);
+            return task.applicationId().equals(applicationId.toString())
+                    && task.allowedActions().contains(TaskAction.APPROVE);
+        } catch (DomainException unavailable) {
+            return false;
+        }
+    }
+
     private TaskView view(Actor actor, Task task) {
         Application application = authorization.application(actor, task);
         CountersignProgress countersign = countersign(task);

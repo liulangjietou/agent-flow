@@ -2,7 +2,6 @@ package io.agentflow.agent;
 
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
-import io.agentflow.approval.model.TaskAction;
 import io.agentflow.approval.process.FlowableTaskFacade;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.Actor;
@@ -37,8 +36,7 @@ public class AssistInputService {
 
     /** 只允许当轮可作出批准决定的人使用摘要，不因管理员或历史参与身份放宽。 */
     public void requireDecision(Application application, String taskId, Actor actor) {
-        var task = tasks.get(taskId, actor);
-        if (!task.applicationId().equals(application.id().toString()) || !task.allowedActions().contains(TaskAction.APPROVE)) {
+        if (!tasks.canDecide(taskId, actor, application.id())) {
             throw new DomainException("FORBIDDEN", "A current decision task is required for assist operations");
         }
     }
