@@ -20,7 +20,7 @@ import java.util.concurrent.TimeoutException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 摘要和草稿共用的有界文本传输，不解释业务输出，也不执行工具或重定向。
+ * 摘要、草稿和票据共用的有界 JSON 输出传输，不解释业务输出，也不执行工具或重定向。
  * @author owlzhangfq@gmail.com
  */
 final class OpenAiTextClient {
@@ -33,6 +33,15 @@ final class OpenAiTextClient {
 
     /** 发送前核对本次实际目的地，凭据只写入请求头；响应体在接收期间限额。 */
     Reply complete(String promptVersion, String expectedTarget, String instruction, Object input) {
+        return completeMessage(promptVersion, expectedTarget, instruction, json.write(input));
+    }
+
+    /** 票据适配器提供内联图片和 XML 文本块，不接收用户定义的请求内容块。 */
+    Reply completeContent(String promptVersion, String expectedTarget, String instruction, List<Map<String, Object>> parts) {
+        return completeMessage(promptVersion, expectedTarget, instruction, parts);
+    }
+
+    private Reply completeMessage(String promptVersion, String expectedTarget, String instruction, Object content) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Assist model must run outside a transaction");
         try { configuration.requireAvailable(); }
         catch (io.agentflow.common.DomainException unavailable) {
@@ -45,7 +54,7 @@ final class OpenAiTextClient {
         }
         String body = json.write(Map.of("model", model, "stream", false, "store", false,
                 "max_completion_tokens", 4096, "response_format", Map.of("type", "json_object"),
-                "messages", List.of(Map.of("role", "system", "content", instruction), Map.of("role", "user", "content", json.write(input)))));
+                "messages", List.of(Map.of("role", "system", "content", instruction), Map.of("role", "user", "content", content))));
         var request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(timeout))
                 .header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
         if (!apiKey.isBlank()) request.header("Authorization", "Bearer " + apiKey);

@@ -1,0 +1,149 @@
+{
+  "date": "2026-10-02",
+  "status": "FOUNDATION_TESTS_PASS_FEATURE_INCOMPLETE",
+  "baseCommit": "574af52285d1461ba34cf0bfc444155799ff07fe",
+  "requirements": [
+    "doc/04-产品化与开箱即用目标.md §5、§7",
+    "doc/05-费用报销领域设计.md §4.1、§16"
+  ],
+  "implemented": [
+    "固定原件引用和实际页数",
+    "11 种封闭候选字段、模型自评置信度与页码摘录",
+    "本人部分修订确认、不可变原模型值、失败及终态",
+    "PNG/JPEG 内联图片协议",
+    "XML 文本模型兜底输入、声明编码、DTD/外部引用禁用及摘录校验",
+    "事务内禁止读取/解析原件",
+    "与既有摘要和草稿复用有界非流式 JSON 传输"
+  ],
+  "notImplemented": [
+    "XML 结构化优先抽取",
+    "PDF/OFD 内容适配",
+    "持久队列、租约、轨迹及迁移",
+    "公开 API、明确外发同意和页面",
+    "实际应用 HTTP/浏览器/重启/非空升级验收",
+    "真实模型识别质量和企业验收"
+  ],
+  "tests": {
+    "uniqueTotal": 83,
+    "suites": [
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.agent.InvoiceExtractionRunTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.agent.DraftAssistRunTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.agent.AssistRunTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.expense.InvoiceVerificationJobTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.DraftAssistIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.AssistExecutionIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.AssistConfigurationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.expense.InvoiceXmlOriginalTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-domain-green.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-model-regression.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-final-scope.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-confidence-scope.log"
+    ],
+    "scopeOverlap": "首轮领域 36 项、服务端范围最终 47 项，共 83 项；重复执行的 12 项领域与 8 项协议测试不再次相加。"
+  },
+  "redThenGreen": [
+    {
+      "case": "不可识别票据应允许空候选结果，不能要求模型补造",
+      "redErrors": 1,
+      "redFailures": 0,
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-empty-red.log",
+      "resolution": "空 proposals 合法；没有候选字段仍不能进行确认"
+    },
+    {
+      "case": "原件解析不得持有应用事务",
+      "redErrors": 0,
+      "redFailures": 1,
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-transaction-red.log",
+      "resolution": "在文件读取前检查事务边界并快速失败"
+    }
+  ],
+  "validationLimits": {
+    "domainOnly": false,
+    "loopbackSyntheticModelHttp": true,
+    "applicationHttp": false,
+    "realModelAccuracy": false,
+    "originalStorageMockedInModelTests": true,
+    "existingXmlStorageRegressionIncluded": true,
+    "existingRuntimeReplaced": false,
+    "schemaVersionUnchanged": 99,
+    "remainingTopLevelCategories": 6
+  },
+  "sources": [
+    {
+      "title": "OpenAI image inputs",
+      "url": "https://developers.openai.com/api/docs/guides/images-vision",
+      "use": "Chat Completions 内联 image_url 内容块"
+    },
+    {
+      "title": "OpenAI file inputs",
+      "url": "https://developers.openai.com/api/docs/guides/file-inputs",
+      "use": "确认 Chat Completions 的原生文件输入限制，不假设其原生支持 OFD 或 XML"
+    }
+  ]
+}
