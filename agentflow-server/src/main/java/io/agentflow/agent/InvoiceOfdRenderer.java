@@ -21,6 +21,7 @@ import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageOutputStream;
 import org.w3c.dom.Element;
+import static io.agentflow.agent.InvoiceOfdResult.*;
 import static io.agentflow.agent.InvoiceOfdXml.*;
 
 /**
@@ -29,9 +30,6 @@ import static io.agentflow.agent.InvoiceOfdXml.*;
  */
 final class InvoiceOfdRenderer {
     private static final double PIXELS_PER_MM = 144.0 / 25.4;
-    private static final long MAX_PAGE_PIXELS = 8_000_000;
-    private static final long MAX_TOTAL_PIXELS = 40_000_000;
-    private static final int MAX_PNG_BYTES = 20 * 1024 * 1024;
     private static final int MAX_OBJECTS = 20_000;
     private static final int MAX_LAYER_PAINTS = 20_000;
     private static final int MAX_SEGMENTS = 1_000_000;
