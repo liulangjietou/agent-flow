@@ -75,6 +75,7 @@ public class CountersignMembershipService {
         boolean canChange = !operator.delegated() && operator.user().equals(actor.userId());
         var available = canChange && state.total() < CountersignMembership.MAX_MEMBERS
                 ? authorization.allowedTargets(task, recipients.approvers(actor.tenantId())).stream().filter(user -> !state.completedUsers().contains(user)
+                    && !state.completedResponsibilities().contains(user)
                     && state.pending().stream().noneMatch(member -> member.user().equals(user))).distinct().sorted().toList()
                 : List.<String>of();
         var pending = state.pending().stream().sorted(Comparator.comparing(CountersignMembership.Member::taskId))

@@ -6,6 +6,7 @@ export const taskActionLabels: Record<TaskAction, string> = {
 }
 export const needsRecipient = (action: TaskAction) => action === 'TRANSFER' || action === 'DELEGATE'
 export const needsComment = (action: TaskAction) => ['RETURN', 'REJECT', 'RESOLVE'].includes(action)
+export const isApprovalDecision = (action: TaskAction) => ['APPROVE', 'RETURN', 'REJECT'].includes(action)
 
 /** 领取与释放只增加一个版本；回执无法绑定原命令时保留原幂等键供用户恢复。 */
 export function validateTaskAssignmentReceipt(value: unknown, taskId: string, input: TaskActionInput) {
@@ -18,11 +19,27 @@ export function validateTaskAssignmentReceipt(value: unknown, taskId: string, in
 }
 
 /** 只按当前任务快照提交，回交接收人由服务端解析，不能通过表单伪造。 */
-export function taskActionInput(task: Task, action: TaskAction, comment: string, target: string, recipients: string[]): TaskActionInput {
+export function taskActionInput(task: Task, action: TaskAction, comment: string, target: string, recipients: string[], proxyId = ''): TaskActionInput {
   if (!task.allowedActions?.includes(action)) throw new Error('任务当前不允许此操作，请刷新后重新选择。')
   if (needsComment(action) && !comment.trim()) throw new Error('请填写处理意见。')
   if (needsRecipient(action) && (!target || !recipients.includes(target))) throw new Error('请选择可用的接收人。')
-  return { action, expectedVersion: task.version, comment: comment.trim() || undefined, targetUser: needsRecipient(action) ? target : undefined }
+  const options = task.proxyOptions ?? []
+  let selected = proxyId
+  if (!selected && task.canActDirectly === false) {
+    if (!options.length) throw new Error('当前代理已不可用，请刷新任务。')
+    if (options.length > 1) throw new Error('请选择本次代理的原审批人。')
+    selected = options[0].proxyId
+  }
+  if (selected) {
+    if (!isApprovalDecision(action)) throw new Error('代理不支持领取、转交或委派，请选择审批决定。')
+    const option = options.find(value => value.proxyId === selected), now = Date.now()
+    // 页面停留期间也可能到期；此提示不能替代服务器锁内授权。
+    if (!option || !(Date.parse(option.startsAt) <= now && now < Date.parse(option.endsAt))) {
+      throw new Error('所选代理已失效或当前不可用，请刷新任务。')
+    }
+  }
+  return { action, expectedVersion: task.version, comment: comment.trim() || undefined,
+    targetUser: needsRecipient(action) ? target : undefined, ...(selected ? { proxyId: selected } : {}) }
 }
 
 /**

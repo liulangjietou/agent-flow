@@ -3,6 +3,7 @@ package io.agentflow.approval.history;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.service.TaskAuditPort.MembershipChange;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.organization.ApprovalProxyUse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -98,7 +99,9 @@ public class JdbcAuditHistoryAdapter implements AuditHistoryPort {
                 taskEvent ? "USER_TASK" : null, taskEvent ? aggregateId : null, processId, definitionVersion,
                 string(payload, "previousStatus"), string(payload, "currentStatus"),
                 taskEvent && ("ADD_SIGNER".equals(action) || "REMOVE_SIGNER".equals(action)) && payload.get("membershipChange") != null
-                        ? json.read(json.write(payload.get("membershipChange")), MembershipChange.class) : null);
+                        ? json.read(json.write(payload.get("membershipChange")), MembershipChange.class) : null,
+                taskEvent && payload.get("proxyUse") != null
+                        ? json.read(json.write(payload.get("proxyUse")), ApprovalProxyUse.class) : null);
     }
 
     private String string(Map<String, Object> payload, String key) {

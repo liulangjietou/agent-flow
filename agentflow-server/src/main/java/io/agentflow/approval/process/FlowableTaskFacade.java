@@ -15,6 +15,8 @@ import io.agentflow.approval.service.TaskAuditPort;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
+import io.agentflow.organization.ApprovalProxyUse;
+import java.util.UUID;
 import io.agentflow.notification.ApprovalNotificationService;
 import io.agentflow.expense.ExpenseApprovalService;
 import io.agentflow.expense.ExpenseReleaseService;
@@ -114,11 +116,13 @@ public class FlowableTaskFacade {
     private TaskView view(Actor actor, Task task) {
         Application application = authorization.application(actor, task);
         CountersignProgress countersign = countersign(task);
+        boolean direct = authorization.canAct(actor, task);
+        var proxyOptions = proxies.forActor(actor, Instant.now()).options(task);
         return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
                 application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
-                authorization.canAct(actor, task) ? delegation(task).allowedActions(task.getAssignee() != null).stream()
-                        .filter(action -> countersign == null || countersign.allows(action)).toList() : List.of(), countersign,
-                task.getDueDate() == null ? null : task.getDueDate().toInstant());
+                direct ? delegation(task).allowedActions(task.getAssignee() != null).stream()
+                        .filter(action -> countersign == null || countersign.allows(action)).toList() : proxyOptions.isEmpty() ? List.of() : FlowableApprovalProxyAccess.DECISIONS, countersign,
+                task.getDueDate() == null ? null : task.getDueDate().toInstant(), direct, proxyOptions);
     }
 
     private CountersignProgress countersign(Task task) {
@@ -135,21 +139,29 @@ public class FlowableTaskFacade {
                 ((Number) variables.get(FlowableCountersignMembers.REQUIRED)).intValue());
     }
 
-    /** 执行动作；负向决定直接终止实例，避免流程继续流转。 */
+    /** 既有内部调用不指定代理依据，沿用原生权利优先和单一代理选择规则。 */
     @Transactional
     public ActionResult action(String taskId, String action, String comment, String targetUser, Long expectedVersion) {
+        return action(taskId, action, comment, targetUser, expectedVersion, null);
+    }
+
+    /** 执行动作；申请锁后复核明确代理，负向决定直接终止实例。 */
+    @Transactional
+    public ActionResult action(String taskId, String action, String comment, String targetUser, Long expectedVersion, UUID proxyId) {
         Actor actor = currentActor.actor();
         actor.requireRole("APPROVER");
         if (expectedVersion == null) {
             throw new DomainException("INVALID_REQUEST", "expectedVersion is required");
         }
-        Task task = authorization.require(taskId, actor);
+        Task task = authorization.requireReadable(taskId, actor);
         Application application = authorization.application(actor, task);
         application = completion.lock(application);
         application.checkVersion(expectedVersion);
-        task = authorization.require(taskId, actor);
-        ApplicationStatus previousStatus = application.status();
         TaskAction normalized = TaskAction.parse(action);
+        var authorized = authorization.requireAction(taskId, actor, normalized, proxyId);
+        task = authorized.task();
+        var proxyUse = authorized.proxyUse();
+        ApplicationStatus previousStatus = application.status();
         delegation(task).requireAction(normalized);
         CountersignProgress countersign = countersign(task);
         if (countersign != null) countersign.requireAction(normalized);
@@ -166,14 +178,14 @@ public class FlowableTaskFacade {
                 taskService.claim(taskId, actor.userId());
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
             }
             case RELEASE -> {
                 requireAssignee(task, actor);
                 taskService.unclaim(taskId);
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
             }
             case TRANSFER -> {
                 requireTarget(actor, targetUser);
@@ -185,7 +197,7 @@ public class FlowableTaskFacade {
                 taskService.saveTask(task);
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus, proxyUse);
             }
             case DELEGATE -> {
                 requireTarget(actor, targetUser);
@@ -195,7 +207,7 @@ public class FlowableTaskFacade {
                 taskService.delegateTask(taskId, targetUser);
                 application.recordTaskAction(expectedVersion);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus, proxyUse);
             }
             case RESOLVE -> {
                 requireComment(comment);
@@ -203,7 +215,7 @@ public class FlowableTaskFacade {
                 taskService.addComment(taskId, task.getProcessInstanceId(), comment);
                 taskService.resolveTask(taskId);
                 applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, task.getOwner(), previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, task.getOwner(), previousStatus, proxyUse);
             }
             case REJECT, RETURN -> {
                 requireComment(comment);
@@ -213,25 +225,25 @@ public class FlowableTaskFacade {
                 } else {
                     application.reject(expectedVersion);
                 }
-                recordDecisionAssignee(task, actor);
+                recordDecisionAssignee(task, actor, proxyUse);
                 taskService.addComment(task.getId(), task.getProcessInstanceId(), comment);
                 processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
                         actor.tenantId(), stopping.instanceToStop(task.getProcessInstanceId()), normalized + " by " + actor.userId()));
                 applicationRepository.update(application, expectedVersion);
                 completeRound(task, application, actor, comment);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
                 subprocessStops.after(stopping, application, actor.userId());
             }
             case APPROVE -> {
                 expenses.requireApproval(application, task);
                 var before = subprocesses.before(application);
                 application.recordTaskAction(expectedVersion);
-                recordDecisionAssignee(task, actor);
+                recordDecisionAssignee(task, actor, proxyUse);
                 ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
                         new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized.name(), comment));
                 completion.persistProgress(application, expectedVersion, task.getProcessInstanceId(),
                         completed.processEnded(), actor.userId(), comment);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus);
+                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
                 subprocesses.afterAdvance(before, application);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
@@ -260,8 +272,12 @@ public class FlowableTaskFacade {
     }
 
     /** 候选人直接决策时记录实际处理人，使任务结束后的历史参与者授权仍可追溯。 */
-    private void recordDecisionAssignee(Task task, Actor actor) {
-        if (task.getAssignee() == null) {
+    private void recordDecisionAssignee(Task task, Actor actor, ApprovalProxyUse proxyUse) {
+        if (proxyUse != null) {
+            // 保留原责任链接，实际 assignee 用于引擎完成监听、会签人数和后续职责排除。
+            taskService.addUserIdentityLink(task.getId(), proxyUse.principal(), FlowableProxyParticipation.PRINCIPAL_LINK);
+            taskService.setAssignee(task.getId(), actor.userId());
+        } else if (task.getAssignee() == null) {
             taskService.claim(task.getId(), actor.userId());
         }
     }
@@ -291,10 +307,10 @@ public class FlowableTaskFacade {
     }
 
     private String audit(Task task, Application application, Actor actor, String action, String comment, String targetUser,
-                         ApplicationStatus previousStatus) {
+                         ApplicationStatus previousStatus, ApprovalProxyUse proxyUse) {
         return auditPort.record(new TaskAuditPort.TaskOperation(actor.tenantId(), task.getId(), application.id(),
                 application.version(), application.roundNo(), task.getProcessInstanceId(), actor.userId(), action,
-                comment, targetUser, task.getTaskDefinitionKey(), task.getName(), previousStatus, application.status()));
+                comment, targetUser, task.getTaskDefinitionKey(), task.getName(), previousStatus, application.status(), null, proxyUse));
     }
 
     /**
@@ -303,7 +319,8 @@ public class FlowableTaskFacade {
      */
     public record TaskView(String taskId, String taskName, String assignee, String applicationId,
                            java.util.Date createdAt, long version, String owner, String delegationState,
-                           List<TaskAction> allowedActions, CountersignProgress countersign, Instant dueAt) { }
+                           List<TaskAction> allowedActions, CountersignProgress countersign, Instant dueAt, boolean canActDirectly,
+                           List<FlowableApprovalProxyAccess.Option> proxyOptions) { }
 
     /**
      * 动作结果。

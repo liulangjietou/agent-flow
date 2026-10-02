@@ -8,20 +8,28 @@ import java.util.List;
  * 从实际会签任务恢复的责任名单；增减签不产生审批意见，也不能移除已经完成的决定。
  * @author owlzhangfq@gmail.com
  */
-public record CountersignMembership(int total, int completed, List<Member> pending, List<String> completedUsers) {
+public record CountersignMembership(int total, int completed, List<Member> pending, List<String> completedUsers,
+                                    List<String> completedResponsibilities) {
     public static final int MAX_MEMBERS = 100;
+
+    /** 无代理的历史任务中，原责任人与实际批准人相同。 */
+    public CountersignMembership(int total, int completed, List<Member> pending, List<String> completedUsers) {
+        this(total, completed, pending, completedUsers, completedUsers);
+    }
 
     /** 引擎计数与逐人事实必须一致，历史缺失时不推定已经同意。 */
     public CountersignMembership {
         pending = List.copyOf(pending);
         completedUsers = List.copyOf(completedUsers);
+        completedResponsibilities = List.copyOf(completedResponsibilities);
         if (total < 1 || completed < 0 || pending.isEmpty() || total != pending.size() + completed
-                || completed != completedUsers.size()) throw invalid();
+                || completed != completedUsers.size() || completed != completedResponsibilities.size()) throw invalid();
         var taskIds = new HashSet<String>();
         var users = new HashSet<String>(completedUsers);
-        if (users.size() != completedUsers.size()) throw invalid();
+        var responsibilities = new HashSet<String>(completedResponsibilities);
+        if (users.size() != completedUsers.size() || responsibilities.size() != completedResponsibilities.size()) throw invalid();
         for (Member member : pending) {
-            if (!taskIds.add(member.taskId()) || !users.add(member.user())) throw invalid();
+            if (!taskIds.add(member.taskId()) || !users.add(member.user()) || !responsibilities.add(member.user())) throw invalid();
             if (!member.delegated() && !member.user().equals(member.assignee())) throw invalid();
         }
     }
@@ -30,7 +38,8 @@ public record CountersignMembership(int total, int completed, List<Member> pendi
     public void requireAddition(String sourceTaskId, String targetUser) {
         requireOperator(sourceTaskId);
         if (total >= MAX_MEMBERS) throw new DomainException("COUNTERSIGN_MEMBER_LIMIT", "Countersign member limit reached");
-        if (completedUsers.contains(targetUser) || pending.stream().anyMatch(member -> member.user().equals(targetUser))) {
+        if (completedUsers.contains(targetUser) || completedResponsibilities.contains(targetUser)
+                || pending.stream().anyMatch(member -> member.user().equals(targetUser))) {
             throw new DomainException("COUNTERSIGN_MEMBER_EXISTS", "The user already has responsibility for this countersign node");
         }
     }

@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 审批任务 REST 接口。
@@ -47,7 +48,7 @@ public class TaskController {
     public ResponseEntity<String> action(@PathVariable String taskId, @Valid @RequestBody TaskActionRequest request,
                                          HttpServletRequest httpRequest) {
         return idempotency.execute(httpRequest, HttpStatus.OK,
-                () -> facade.action(taskId, request.action(), request.comment(), request.targetUser(), request.expectedVersion()));
+                () -> facade.action(taskId, request.action(), request.comment(), request.targetUser(), request.expectedVersion(), request.proxyId()));
     }
 
     /**
@@ -55,5 +56,5 @@ public class TaskController {
      * @author owlzhangfq@gmail.com
      */
     public record TaskActionRequest(@NotBlank String action, String comment, String targetUser,
-                                    @NotNull Long expectedVersion) { }
+                                    @NotNull Long expectedVersion, UUID proxyId) { }
 }

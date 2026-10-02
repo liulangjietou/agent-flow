@@ -29,10 +29,13 @@ public class FlowableCountersignRuntime {
     private final TaskService tasks;
     private final HistoryService history;
     private final RepositoryService definitions;
+    private final FlowableProxyParticipation proxyParticipation;
 
     /** 引擎本身是任务、完成计数和历史意见的事实来源。 */
-    public FlowableCountersignRuntime(RuntimeService runtime, TaskService tasks, HistoryService history, RepositoryService definitions) {
+    public FlowableCountersignRuntime(RuntimeService runtime, TaskService tasks, HistoryService history, RepositoryService definitions,
+                                       FlowableProxyParticipation proxyParticipation) {
         this.runtime = runtime; this.tasks = tasks; this.history = history; this.definitions = definitions;
+        this.proxyParticipation = proxyParticipation;
     }
 
     /** 按当前任务的实际父执行定位本节点，不能混入另一个并行会签。 */
@@ -54,13 +57,18 @@ public class FlowableCountersignRuntime {
         var pending = tasks.createTaskQuery().processInstanceId(source.getProcessInstanceId())
                 .taskDefinitionKey(source.getTaskDefinitionKey()).active().list().stream()
                 .map(task -> member(task, root)).toList();
-        // 平台图禁止循环且尚不支持子流程，同一轮的节点只激活一次；取消历史不属于已同意。
+        // 平台图禁止循环，父子实例独立；取消历史不属于已同意，原责任和实际批准人分别保留。
         var completed = history.createHistoricTaskInstanceQuery().processInstanceId(source.getProcessInstanceId())
                 .taskDefinitionKey(source.getTaskDefinitionKey()).finished().list().stream()
-                .filter(task -> task.getDeleteReason() == null)
-                .map(task -> task.getAssignee()).toList();
+                .filter(task -> task.getDeleteReason() == null).toList();
+        var completedResponsibilities = completed.stream().map(task -> {
+            var principals = proxyParticipation.principals(task.getId());
+            if (principals.size() > 1) throw invalid();
+            return principals.isEmpty() ? task.getAssignee() : principals.get(0);
+        }).toList();
         var membership = new CountersignMembership(counter(root, FlowableCountersignMembers.TOTAL),
-                counter(root, FlowableCountersignMembers.COMPLETED), pending, completed);
+                counter(root, FlowableCountersignMembers.COMPLETED), pending,
+                completed.stream().map(task -> task.getAssignee()).toList(), completedResponsibilities);
         return new Scope(root.getId(), root.getParentId(), members.stream().map(String.class::cast).toList(), membership);
     }
 

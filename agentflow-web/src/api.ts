@@ -142,7 +142,13 @@ export interface SystemCheckReport {
 }
 export type TaskAction = 'CLAIM' | 'RELEASE' | 'TRANSFER' | 'DELEGATE' | 'RESOLVE' | 'RETURN' | 'REJECT' | 'APPROVE'
 /** 当前可操作的任务快照；动作由服务端按委派状态限制。@author owlzhangfq@gmail.com */
-export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number; mode?: 'ALL' | 'ANY' | 'PERCENT'; percentage?: number | null; required?: number }; dueAt?: string | null }
+export interface Task { taskId: string; taskName: string; assignee?: string; applicationId: string; createdAt: string; version: number; owner?: string; delegationState: 'NONE' | 'PENDING' | 'RESOLVED'; allowedActions: TaskAction[]; countersign?: { total: number; completed: number; mode?: 'ALL' | 'ANY' | 'PERCENT'; percentage?: number | null; required?: number }; dueAt?: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
+/** 本次任务的直接代理依据；是否仍有效由提交时重新核对。@author owlzhangfq@gmail.com */
+export interface ApprovalProxyOption {
+  proxyId: string; revision: number; definitionId: string; principalId: string; principal: string; startsAt: string; endsAt: string
+}
+/** 审计保留办理当时的授权，后续到期或撤销不覆盖历史。@author owlzhangfq@gmail.com */
+export interface ApprovalProxyUse extends ApprovalProxyOption { substituteId: string; authorizedAt: string }
 /** 待办只读摘要不携带审批正文或可直接提交的动作版本。@author owlzhangfq@gmail.com */
 export interface PendingTaskItem {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
@@ -161,7 +167,7 @@ export interface PendingTaskQuery {
 /** 当前筛选计数不会被已加载条数替代。@author owlzhangfq@gmail.com */
 export interface PendingTaskPage { items: PendingTaskItem[]; nextCursor?: string | null; total: number }
 /** 提交时保留任务快照版本，不在冲突后自动更新版本。@author owlzhangfq@gmail.com */
-export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number }
+export interface TaskActionInput { action: TaskAction; comment?: string; targetUser?: string; expectedVersion: number; proxyId?: string }
 export interface Application { id: string; businessNo: string; processKey: string; definitionVersion: number; createdBy: string; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; status: string; roundNo: number; version: number; businessReference?: { type: string; id: string } | null }
 export interface SubmissionRound { roundNo: number; processInstanceId: string; definitionVersion: number; title: string; payload: Record<string, unknown>; formSchema: FormSchema | null; submittedBy: string; submittedAt: string; status: string; reason: string | null; completedBy: string | null; completedAt: string | null; initiatorContext?: InitiatorContext | null; risk: SubmissionRisk }
 export interface HistoryEvent {
@@ -170,6 +176,7 @@ export interface HistoryEvent {
   nodeId?: string; nodeName?: string; nodeType?: string; taskId?: string; processInstanceId?: string; definitionVersion?: number
   previousStatus?: string; currentStatus?: string
   membershipChange?: { executionId: string; targetTaskId: string; totalBefore: number; totalAfter: number; completed: number }
+  proxyUse?: ApprovalProxyUse | null
 }
 export interface HistoryPage { items: HistoryEvent[]; nextCursor?: string | null }
 export interface HistoryQuery { roundNo?: number; action?: string; from?: string; to?: string; cursor?: string; limit?: number }

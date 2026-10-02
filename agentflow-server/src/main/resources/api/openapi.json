@@ -44186,6 +44186,16 @@
             "type": "string",
             "format": "date-time",
             "description": "真实任务的到期时刻；旧任务或未配置期限时缺失，不补造历史期限。"
+          },
+          "canActDirectly": {
+            "type": "boolean",
+            "description": "当前主体是否具有自己的原生任务办理权利，未选择代理时优先按此办理。"
+          },
+          "proxyOptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalProxyOption"
+            }
           }
         },
         "required": [
@@ -44195,7 +44205,9 @@
           "createdAt",
           "version",
           "delegationState",
-          "allowedActions"
+          "allowedActions",
+          "canActDirectly",
+          "proxyOptions"
         ]
       },
       "TaskActionRequest": {
@@ -44239,6 +44251,18 @@
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
+          },
+          "proxyId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "选择原审批人的代理编号。省略时优先使用本人的原生权利；纯代理只有一条时使用该条，多条时返回 APPROVAL_PROXY_SELECTION_REQUIRED。显式编号无效时拒绝，不回退到其他依据。代理仅允许批准、退回或驳回。"
           }
         },
         "required": [
@@ -44665,6 +44689,9 @@
           },
           "membershipChange": {
             "$ref": "#/components/schemas/CountersignMembershipChange"
+          },
+          "proxyUse": {
+            "$ref": "#/components/schemas/ApprovalProxyUse"
           }
         },
         "required": [
@@ -67670,6 +67697,102 @@
           "observedAt"
         ],
         "additionalProperties": false
+      },
+      "ApprovalProxyOption": {
+        "type": "object",
+        "description": "本任务当前可选择的直接代理依据，实际办理必须锁后重新复核。",
+        "properties": {
+          "proxyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "principalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "proxyId",
+          "revision",
+          "definitionId",
+          "principalId",
+          "principal",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "ApprovalProxyUse": {
+        "type": "object",
+        "description": "当次操作锁后已核实的代理依据；实际办理人保存在事件 actor，后续撤销不改写该事实。",
+        "properties": {
+          "proxyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "principalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "substituteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "proxyId",
+          "revision",
+          "definitionId",
+          "principalId",
+          "principal",
+          "startsAt",
+          "endsAt",
+          "substituteId",
+          "authorizedAt"
+        ]
       }
     }
   }

@@ -126,11 +126,12 @@ onUnmounted(() => { requestSequence++ })
           <div class="history-event-heading"><strong>{{ eventTitle(event) }}</strong><span v-if="event.roundNo" class="history-round">第 {{ event.roundNo }} 轮</span></div>
           <p class="history-event-meta"><time :datetime="event.occurredAt">{{ timeLabel(event.occurredAt) }}</time><span>{{ sourceLabel(event) }}</span></p>
           <p v-if="event.actor || event.targetUser" class="history-actor"><template v-if="event.actor">操作人 {{ event.actor }}</template><template v-if="event.targetUser"> → {{ event.targetUser }}</template></p>
+          <p v-if="event.proxyUse" class="history-actor">代理 {{ event.proxyUse.principal }} 办理 · 授权核对时间 {{ timeLabel(event.proxyUse.authorizedAt) }}</p>
           <p v-if="event.currentStatus && event.currentStatus !== event.previousStatus" class="history-transition"><template v-if="event.previousStatus">{{ stateLabel(event.previousStatus) }} → </template>{{ stateLabel(event.currentStatus) }}</p>
           <p v-if="event.comment" class="history-comment">{{ event.comment }}</p>
           <p v-if="event.membershipChange" class="history-transition">必要审批人数 {{ event.membershipChange.totalBefore }} → {{ event.membershipChange.totalAfter }}，已同意 {{ event.membershipChange.completed }} 人；本次操作不产生审批意见。</p>
           <p v-if="event.nodeName && event.source !== 'PROCESS_HISTORY'" class="history-node">{{ event.nodeName }}</p>
-          <details v-if="isAudit" class="history-reference"><summary>查看记录标识</summary><dl><dt>记录标识</dt><dd>{{ event.id }}</dd><template v-if="event.aggregateVersion != null"><dt>申请版本</dt><dd>{{ event.aggregateVersion }}</dd></template><template v-if="event.taskId"><dt>任务标识</dt><dd>{{ event.taskId }}</dd></template></dl></details>
+          <details v-if="isAudit" class="history-reference"><summary>查看记录标识</summary><dl><dt>记录标识</dt><dd>{{ event.id }}</dd><template v-if="event.aggregateVersion != null"><dt>申请版本</dt><dd>{{ event.aggregateVersion }}</dd></template><template v-if="event.taskId"><dt>任务标识</dt><dd>{{ event.taskId }}</dd></template><template v-if="event.proxyUse"><dt>代理标识</dt><dd>{{ event.proxyUse.proxyId }}</dd><dt>代理修订</dt><dd>{{ event.proxyUse.revision }}</dd></template></dl></details>
         </article>
       </li>
     </ol>

@@ -6,6 +6,8 @@ import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.Actor;
+import io.agentflow.common.DomainException;
+import io.agentflow.approval.model.TaskAction;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionModels.ApprovalMode;
 import io.agentflow.definition.DefinitionModels.DefinitionDraft;
@@ -14,12 +16,15 @@ import io.agentflow.definition.DefinitionModels.NodeType;
 import io.agentflow.expense.ExpenseProcessPolicy;
 import io.agentflow.organization.ApprovalProxyRepository;
 import io.agentflow.organization.ApprovalProxyRepository.ActiveProxy;
+import io.agentflow.organization.ApprovalProxyUse;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.DelegationState;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,6 +38,7 @@ import java.util.UUID;
  */
 @Component
 public class FlowableApprovalProxyAccess {
+    static final List<TaskAction> DECISIONS = List.of(TaskAction.APPROVE, TaskAction.RETURN, TaskAction.REJECT);
     private final ApprovalProxyRepository proxies;
     private final DefinitionDraftRepository definitions;
     private final ApplicationRepository applications;
@@ -72,6 +78,24 @@ public class FlowableApprovalProxyAccess {
     }
 
     /**
+     * 调用方已经持有申请及关联财务锁，再与撤销共用代理行锁；等待后按新时刻重新检查全部读取依据。
+     * 此路径不取得组织目录写锁，避免与管理员的目录锁、代理锁顺序形成环路。
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ApprovalProxyUse lockForDecision(Actor actor, Task task, UUID proxyId) {
+        var locked = proxies.lock(actor.tenantId(), proxyId).orElseThrow(FlowableApprovalProxyAccess::unavailable);
+        Instant authorizedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var selected = forActor(actor, authorizedAt).options(task).stream()
+                .filter(option -> option.proxyId().equals(locked.id()) && option.revision() == locked.revision())
+                .findFirst().orElseThrow(FlowableApprovalProxyAccess::unavailable);
+        return ApprovalProxyUse.authorized(locked, selected.principal(), authorizedAt);
+    }
+
+    private static DomainException unavailable() {
+        return new DomainException("FORBIDDEN", "The selected approval proxy is no longer available for this task");
+    }
+
+    /**
      * 一次业务读取的代理依据；详情、列表与字段使用同一判定，不产生持久参与者身份。
      * @author owlzhangfq@gmail.com
      */
@@ -86,20 +110,33 @@ public class FlowableApprovalProxyAccess {
 
         /** 只接受已加载受控变量和身份链接的当前原生任务，委派协助不能再变为最终审批代理。 */
         public boolean canRead(Task task) {
+            return !matching(task).isEmpty();
+        }
+
+        /** 候选依据只用于明确选择；编号与范围不能代替办理时的重新授权。 */
+        public List<Option> options(Task task) {
+            return matching(task).stream().map(grant -> {
+                var proxy = grant.active().proxy();
+                return new Option(proxy.id(), proxy.revision(), proxy.definitionId(), proxy.principalId(),
+                        grant.active().principalSubject(), proxy.startsAt(), proxy.endsAt());
+            }).toList();
+        }
+
+        private List<GrantScope> matching(Task task) {
             if (grants.isEmpty() || task.isSuspended() || task.getDelegationState() == DelegationState.PENDING
                     || !actor.tenantId().equals(task.getProcessVariables().get("tenantId"))
-                    || task.getTenantId() != null && !task.getTenantId().isEmpty() && !actor.tenantId().equals(task.getTenantId())) return false;
+                    || task.getTenantId() != null && !task.getTenantId().isEmpty() && !actor.tenantId().equals(task.getTenantId())) return List.of();
             var matching = grants.stream().filter(grant -> grant.runtimeDefinitionId().equals(task.getProcessDefinitionId())
                     && originalResponsibility(task, grant.active().principalSubject())).toList();
-            if (matching.isEmpty()) return false;
+            if (matching.isEmpty()) return List.of();
             var application = currentApplication(task);
-            if (application == null || !responsibilities.allows(task, actor.userId())) return false;
+            if (application == null || !responsibilities.allows(task, actor.userId())) return List.of();
             var definition = matching.get(0).definition();
-            if (!definition.key().equals(application.processKey()) || definition.version() != application.definitionVersion()) return false;
+            if (!definition.key().equals(application.processKey()) || definition.version() != application.definitionVersion()) return List.of();
             var node = definition.graph().node(task.getTaskDefinitionKey());
             if (node == null || node.type() != NodeType.USER_TASK
-                    || ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole("FINANCE")) return false;
-            return node.approvalMode() == ApprovalMode.SINGLE || independentCountersignParticipant(task);
+                    || ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole("FINANCE")) return List.of();
+            return node.approvalMode() == ApprovalMode.SINGLE || independentCountersignParticipant(task) ? matching : List.of();
         }
 
         /** 分页之前确定完整授权集合；按原审批人和精确原生版本查询，不扫描全租户任务。 */
@@ -156,4 +193,11 @@ public class FlowableApprovalProxyAccess {
      * @author owlzhangfq@gmail.com
      */
     private record GrantScope(ActiveProxy active, DefinitionDraft definition, String runtimeDefinitionId) { }
+
+    /**
+     * 给实际审批人展示本任务可选的直接代理范围，不暴露管理员原因或其他代理关系。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Option(UUID proxyId, long revision, UUID definitionId, UUID principalId, String principal,
+                          Instant startsAt, Instant endsAt) { }
 }

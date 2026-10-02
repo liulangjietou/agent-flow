@@ -19,12 +19,15 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
     private final TaskService taskService;
     private final HistoryService historyService;
     private final FlowableApprovalProxyAccess proxies;
+    private final FlowableProxyParticipation proxyParticipation;
 
     /** 创建参与者查询适配器。 */
-    public FlowableApplicationParticipantAdapter(TaskService taskService, HistoryService historyService, FlowableApprovalProxyAccess proxies) {
+    public FlowableApplicationParticipantAdapter(TaskService taskService, HistoryService historyService, FlowableApprovalProxyAccess proxies,
+                                                  FlowableProxyParticipation proxyParticipation) {
         this.taskService = taskService;
         this.historyService = historyService;
         this.proxies = proxies;
+        this.proxyParticipation = proxyParticipation;
     }
 
     @Override
@@ -41,9 +44,11 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
                         || scope.canRead(task))
                 .map(org.flowable.task.api.Task::getTaskDefinitionKey).collect(java.util.stream.Collectors.toSet());
         if (!active.isEmpty()) return java.util.Set.copyOf(active);
-        return historyService.createHistoricTaskInstanceQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
+        var historical = new java.util.HashSet<>(proxyParticipation.nodes(tenantId, processInstanceId, actor.userId()));
+        historyService.createHistoricTaskInstanceQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)
                 .finished().taskAssignee(actor.userId()).list().stream()
-                .map(org.flowable.task.api.history.HistoricTaskInstance::getTaskDefinitionKey).collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .map(org.flowable.task.api.history.HistoricTaskInstance::getTaskDefinitionKey).forEach(historical::add);
+        return java.util.Set.copyOf(historical);
     }
 
     @Override
@@ -63,6 +68,6 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
         return historyService.createHistoricTaskInstanceQuery()
                 .processVariableValueEquals("applicationId", applicationId.toString())
                 .processVariableValueEquals("tenantId", tenantId)
-                .taskAssignee(actor.userId()).count() > 0;
+                .taskAssignee(actor.userId()).count() > 0 || proxyParticipation.represented(tenantId, applicationId, actor.userId());
     }
 }

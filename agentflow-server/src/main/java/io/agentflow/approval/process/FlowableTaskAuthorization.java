@@ -1,13 +1,17 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.TaskAction;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
+import io.agentflow.organization.ApprovalProxyUse;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 import java.util.List;
 
@@ -39,7 +43,7 @@ public class FlowableTaskAuthorization {
         return task;
     }
 
-    /** 读取可使用当前直接代理，写入口仍使用 require，不能把读授权误用为办理授权。 */
+    /** 读取可使用当前直接代理；决策写入必须通过 requireAction 在锁内重新授权。 */
     public Task requireReadable(String taskId, Actor actor) {
         Task task = requireActive(taskId, actor);
         if (!(canAct(actor, task) && responsibilities.allows(task, actor.userId()))
@@ -48,6 +52,32 @@ public class FlowableTaskAuthorization {
         }
         return task;
     }
+
+    /** 申请锁之后重新读取；原生权利默认优先，显式代理失效时不得静默改用其他依据。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AuthorizedTask requireAction(String taskId, Actor actor, TaskAction action, UUID proxyId) {
+        Task task = requireActive(taskId, actor);
+        if (proxyId == null && canAct(actor, task) && responsibilities.allows(task, actor.userId())) {
+            return new AuthorizedTask(task, null);
+        }
+        if (!FlowableApprovalProxyAccess.DECISIONS.contains(action)) {
+            throw new DomainException("FORBIDDEN", "Approval proxies cannot change or delegate task responsibility");
+        }
+        UUID selected = proxyId;
+        if (selected == null) {
+            var options = proxies.forActor(actor, java.time.Instant.now()).options(task);
+            if (options.isEmpty()) throw new DomainException("FORBIDDEN", "No approval proxy is available for this task");
+            if (options.size() != 1) throw new DomainException("APPROVAL_PROXY_SELECTION_REQUIRED", "Select the original approver for this decision");
+            selected = options.get(0).proxyId();
+        }
+        return new AuthorizedTask(task, proxies.lockForDecision(actor, task, selected));
+    }
+
+    /**
+     * 当次事务中已复核的任务与代理依据；原生办理的 proxyUse 为空。
+     * @author owlzhangfq@gmail.com
+     */
+    public record AuthorizedTask(Task task, ApprovalProxyUse proxyUse) { }
 
     private Task requireActive(String taskId, Actor actor) {
         actor.requireRole("APPROVER");

@@ -54,7 +54,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 从真实发布、提交和原生待办验证代理读取；读权限不能隐式开放未接通的办理入口。
+ * 从真实发布、提交和原生待办验证代理读取；代理不能把限时权利转成永久责任。
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=false", "agentflow.sla.reminders-enabled=false"})
@@ -111,12 +111,13 @@ class ApprovalProxyTaskReadIntegrationTest {
         var proxy = grant(definition, principal, substitute);
         var detail = read("/tasks/" + task.getId(), substituteToken, 200);
         assertThat(detail.path("applicationId").asText()).isEqualTo(application.path("id").asText());
-        assertThat(detail.path("allowedActions")).isEmpty();
+        assertThat(detail.path("allowedActions").toString()).isEqualTo("[\"APPROVE\",\"RETURN\",\"REJECT\"]");
+        assertThat(detail.path("canActDirectly").asBoolean()).isFalse();
         assertThat(read("/tasks", substituteToken, 200)).hasSize(1);
         assertThat(read("/workspace/tasks", substituteToken, 200).path("total").asLong()).isEqualTo(1);
         read("/applications/" + application.path("id").asText(), substituteToken, 200);
         assertThat(tasks.createTaskQuery().taskId(task.getId()).singleResult().getAssignee()).isNull();
-        for (String action : List.of("CLAIM", "RELEASE", "TRANSFER", "DELEGATE", "RESOLVE", "APPROVE", "RETURN", "REJECT")) {
+        for (String action : List.of("CLAIM", "RELEASE", "TRANSFER", "DELEGATE", "RESOLVE")) {
             write("/tasks/" + task.getId() + "/actions", substituteToken,
                     Map.of("action", action, "expectedVersion", 2, "comment", "无办理授权", "targetUser", "principal"), 403);
         }
@@ -314,7 +315,7 @@ class ApprovalProxyTaskReadIntegrationTest {
         grant(finance, principal, substitute);
         assertDenied(task);
         doReturn(new Actor(admin.tenantId(), substitute.subject(), Set.of("APPROVER", "FINANCE"))).when(auth).authenticate(substituteToken);
-        assertThat(read("/tasks/" + task.getId(), substituteToken, 200).path("allowedActions")).isEmpty();
+        assertThat(read("/tasks/" + task.getId(), substituteToken, 200).path("allowedActions").toString()).contains("APPROVE");
         assertThat(read("/workspace/tasks", substituteToken, 200).path("total").asLong()).isEqualTo(1);
     }
 

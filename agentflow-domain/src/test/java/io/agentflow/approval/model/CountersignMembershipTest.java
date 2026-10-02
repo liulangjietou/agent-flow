@@ -28,6 +28,15 @@ class CountersignMembershipTest {
     }
 
     @Test
+    void completedProxyDecisionRetainsBothActualVoterAndRepresentedResponsibility() {
+        var state = new CountersignMembership(2, 1, List.of(member("pending")), List.of("actual"), List.of("principal"));
+        for (String target : List.of("actual", "principal")) rejects(() -> state.requireAddition("pending", target), "COUNTERSIGN_MEMBER_EXISTS");
+        state.requireAddition("pending", "independent");
+        rejects(() -> new CountersignMembership(2, 1, List.of(member("principal")), List.of("actual"), List.of("principal")), "COUNTERSIGN_STATE_INVALID");
+        rejects(() -> new CountersignMembership(2, 1, List.of(member("pending")), List.of("actual"), List.of()), "COUNTERSIGN_STATE_INVALID");
+    }
+
+    @Test
     void finalPendingTaskCannotBeRemovedEvenAfterOtherApprovals() {
         var state = new CountersignMembership(2, 1, List.of(member("a")), List.of("done"));
         rejects(() -> state.requireRemoval("a", "a"), "COUNTERSIGN_LAST_MEMBER");

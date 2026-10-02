@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { api, type Task, type TaskAction, type TaskActionInput } from '../api'
-import { needsComment, needsRecipient, taskActionInput, taskActionLabels, TaskRecipientsQuery } from '../taskActions'
+import { isApprovalDecision, needsComment, needsRecipient, taskActionInput, taskActionLabels, TaskRecipientsQuery } from '../taskActions'
 import CountersignMembers from './CountersignMembers.vue'
 import type { CountersignInput, CountersignView } from '../countersignMembership'
 import { approvalPolicyLabel } from '../approvalPolicy'
@@ -10,13 +10,18 @@ const props = defineProps<{ task: Task; scopeKey: string; locked: boolean }>()
 const emit = defineEmits<{ execute: [input: TaskActionInput]; membership: [input: CountersignInput, view: CountersignView]; refresh: [] }>()
 const membershipOpen = ref(false)
 const pending = ref<TaskAction | null>(null), comment = ref(''), target = ref(''), error = ref('')
+const selectedProxy = ref('')
 const opinionInput = ref<HTMLTextAreaElement | null>(null)
 const actionBar = ref<HTMLElement | null>(null)
 const recipients = reactive(new TaskRecipientsQuery(api.taskRecipients))
 const actions = computed(() => props.task.allowedActions ?? [])
 const delegated = computed(() => props.task.delegationState === 'PENDING')
-const membershipAllowed = computed(() => !!props.task.countersign && (props.task.countersign.mode ?? 'ALL') === 'ALL')
-function cancel() { pending.value = null; membershipOpen.value = false; comment.value = ''; target.value = ''; error.value = ''; recipients.clear() }
+const allCountersign = computed(() => !!props.task.countersign && (props.task.countersign.mode ?? 'ALL') === 'ALL')
+const membershipAllowed = computed(() => allCountersign.value && props.task.canActDirectly !== false)
+const proxyOptions = computed(() => props.task.proxyOptions ?? [])
+const proxy = computed(() => proxyOptions.value.find(option => option.proxyId === selectedProxy.value))
+const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
+function cancel() { pending.value = null; membershipOpen.value = false; comment.value = ''; target.value = ''; selectedProxy.value = ''; error.value = ''; recipients.clear() }
 /** 仅主动取消恢复按钮焦点；任务或账号变化时清理表单不抢焦点。 */
 function cancelForm() {
   const action = pending.value
@@ -29,15 +34,17 @@ function prepare(action: TaskAction) {
   cancel()
   if (['CLAIM', 'RELEASE'].includes(action)) { execute(action); return }
   pending.value = action
+  if (isApprovalDecision(action) && props.task.canActDirectly === false && proxyOptions.value.length === 1) selectedProxy.value = proxyOptions.value[0].proxyId
   if (needsRecipient(action)) reloadRecipients()
   else void nextTick(() => { if (pending.value === action && !props.locked) opinionInput.value?.focus() })
 }
 function execute(action: TaskAction) {
   if (props.locked || recipients.loading || recipients.error) return
-  try { error.value = ''; emit('execute', taskActionInput(props.task, action, comment.value, target.value, recipients.users)) }
+  try { error.value = ''; emit('execute', taskActionInput(props.task, action, comment.value, target.value, recipients.users, selectedProxy.value)) }
   catch (cause) { error.value = (cause as Error).message }
 }
-watch([() => props.scopeKey, () => props.task.taskId, () => props.task.version], cancel, { flush: 'sync' })
+watch([() => props.scopeKey, () => props.task.taskId, () => props.task.version,
+  () => JSON.stringify([props.task.canActDirectly, props.task.proxyOptions, props.task.allowedActions])], cancel, { flush: 'sync' })
 onUnmounted(cancel)
 </script>
 
@@ -45,7 +52,7 @@ onUnmounted(cancel)
   <div class="task-actions">
     <div v-if="task.countersign" class="delegation-note" role="status">
       <strong>{{ approvalPolicyLabel(task.countersign.mode ?? 'ALL', task.countersign.percentage) }} · 已同意 {{ task.countersign.completed }} / {{ task.countersign.total }} 人</strong>
-      <p v-if="membershipAllowed">当前责任人全部同意才通过，任一驳回结束整轮。人员增减须明确原因，已有意见与最初名单保留；委派协助后仍由原责任人决定。</p>
+      <p v-if="allCountersign">当前责任人全部同意才通过，任一驳回结束整轮。人员增减须明确原因，已有意见与最初名单保留；委派协助后仍由原责任人决定。</p>
       <p v-else>本节点需要 {{ task.countersign.required }} 人同意。达标后结束其余待办，不替未处理人员记录同意；达标前任一驳回结束整轮。名单和人数门槛已固定，委派协助后仍由原责任人决定。</p>
     </div>
     <div v-if="delegated" class="delegation-note"><strong>受托处理 · 回交给 {{ task.owner || '待核对的原审批人' }}</strong><p>{{ task.owner ? '填写处理意见并回交。申请继续保持审批中，由原审批人作最终决定。' : '原责任人缺失，请联系流程管理员核对后再处理。' }}</p></div>
@@ -57,6 +64,14 @@ onUnmounted(cancel)
       <p v-else-if="pending === 'DELEGATE'" class="task-action-help">接收人处理后会回交给你，最终审批仍由你完成。</p>
       <p v-else-if="pending === 'TRANSFER'" class="task-action-help">将任务交给接收人，由其继续审批。</p>
       <p v-else-if="pending === 'REJECT'" class="task-action-help">驳回将终止本轮申请；需要申请人补充后重提，请使用退回。</p>
+      <template v-if="isApprovalDecision(pending) && proxyOptions.length">
+        <label>办理身份<select v-model="selectedProxy" :disabled="locked" :required="task.canActDirectly === false">
+          <option v-if="task.canActDirectly !== false" value="">以本人审批职责办理</option>
+          <option v-else value="" disabled>请选择本次代理的原审批人</option>
+          <option v-for="option in proxyOptions" :key="option.proxyId" :value="option.proxyId">代理 {{ option.principal }} 办理</option>
+        </select></label>
+        <p v-if="proxy" class="task-action-help">代理有效至 {{ timeLabel(proxy.endsAt) }}。本次决定将同时记录你是实际办理人、{{ proxy.principal }} 是原审批人；提交时再次核对代理是否有效。</p>
+      </template>
       <template v-if="needsRecipient(pending)">
         <p v-if="recipients.loading" role="status" class="task-action-help">正在读取可接收任务的账号…</p>
         <div v-else-if="recipients.error" role="alert" class="recipient-error"><p>{{ recipients.error }}</p><button type="button" class="secondary" :disabled="locked" @click="reloadRecipients">重新读取接收人</button></div>
