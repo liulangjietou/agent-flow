@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
+import org.apache.fontbox.cff.CFFCIDFont;
 import org.apache.fontbox.ttf.CmapLookup;
 import org.apache.fontbox.ttf.CmapTable;
 import org.apache.fontbox.ttf.OTFParser;
@@ -31,6 +32,7 @@ final class InvoiceOfdFont implements Closeable {
     private final TrueTypeFont font;
     private final Closeable owner;
     private final AffineTransform toEm;
+    private final InvoiceOfdCidFont cidFont;
     private final int glyphCount;
     private boolean closed;
 
@@ -39,20 +41,15 @@ final class InvoiceOfdFont implements Closeable {
         glyphCount = font.getNumberOfGlyphs();
         if (glyphCount < 1 || glyphCount > 65_535) throw invalid();
         if (font instanceof OpenTypeFont otf && otf.isPostScript()) {
-            var matrix = otf.getCFF().getFont().getFontMatrix();
-            if (matrix == null || matrix.size() != 6) throw invalid();
-            double[] values = new double[6];
-            for (int i = 0; i < values.length; i++) {
-                values[i] = matrix.get(i).doubleValue();
-                if (!Double.isFinite(values[i])) throw invalid();
-            }
-            toEm = new AffineTransform(values);
+            var cff = otf.getCFF().getFont();
+            cidFont = cff instanceof CFFCIDFont cid ? InvoiceOfdCidFont.read(cid, glyphCount) : null;
+            toEm = cidFont == null ? InvoiceOfdCffData.matrix(cff.getFontMatrix()) : null;
         } else {
             int units = font.getUnitsPerEm();
             if (units < 16 || units > 16_384 || font.getGlyph() == null) throw invalid();
             toEm = AffineTransform.getScaleInstance(1.0 / units, 1.0 / units);
+            cidFont = null;
         }
-        if (toEm.getDeterminant() == 0 || !Double.isFinite(toEm.getDeterminant())) throw invalid();
     }
 
     /** 单字体可按嵌入文件选取，集合字体必须明确唯一 PostScript 名称；调用方应位于隔离进程。 */
@@ -97,7 +94,7 @@ final class InvoiceOfdFont implements Closeable {
         if (index <= 0 || index >= glyphCount) throw invalid();
         GeneralPath outline;
         if (font instanceof OpenTypeFont otf && otf.isPostScript()) {
-            var glyph = otf.getCFF().getFont().getType2CharString(index);
+            var glyph = otf.getCFF().getFont().getType2CharString(cidFont == null ? index : cidFont.cid(index));
             if (glyph == null) throw invalid();
             outline = glyph.getPath();
         } else {
@@ -106,7 +103,7 @@ final class InvoiceOfdFont implements Closeable {
             outline = glyph.getPath();
         }
         if (outline == null) throw invalid();
-        var result = new GeneralPath(outline); result.transform(toEm);
+        var result = new GeneralPath(outline); result.transform(cidFont == null ? toEm : cidFont.matrixFor(index));
         double[] points = new double[6];
         for (var path = result.getPathIterator(null); !path.isDone(); path.next()) {
             path.currentSegment(points);

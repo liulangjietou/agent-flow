@@ -129,7 +129,7 @@ OFD 预检分为两个职责：`InvoiceOfdArchive` 完整读取 ZIP 中央目录
 
 本阶段新增 18 项测试，连同基础页面、字体、路径、包和文档预检共 71 项通过，范围与前阶段重叠。测试先复现缺失样式、ICC 累计数量／字节未限制和极小变换导致的无效描边宽度，再验证修正。两处最初的像素断言落在抗锯齿边缘，导出原图核对后将采样点移至仍能区分几何行为的内部区域。三张合成 PNG 已实际查看，不作为真实中文票面或模型识别质量证据，详见[样式与裁剪证据](evidence/invoice-ofd-drawing-20261002.json)。
 
-后续仍需完成非等比变换的最小线宽、裁剪图元非默认可见性／透明度、渐变和图案、批注、签章及嵌套资源、文字对象非默认字重／斜体及 CFF CID 字典矩阵核对，再接入隔离进程和全部页面的模型输入。模板与部署字体进展见下节；完整票据样本尚未验收，OFD 公开入口继续关闭。
+后续仍需完成非等比变换的最小线宽、裁剪图元非默认可见性／透明度、渐变和图案、批注、签章及嵌套资源、文字对象非默认字重／斜体，再接入隔离进程和全部页面的模型输入。模板、部署字体与 CFF CID 矩阵进展见下节；完整票据样本尚未验收，OFD 公开入口继续关闭。
 
 ### OFD 模板页接续
 
@@ -152,6 +152,16 @@ OFD 预检分为两个职责：`InvoiceOfdArchive` 完整读取 ZIP 中央目录
 清单最多 64 KiB／64 项；沿用单字体 32 MiB 上限，整个渲染会话最多实际加载 64 个字体实例、累计 64 MiB，嵌入和部署字体共用预算。同一 TTC 的不同字体面拥有独立解析资源，分别计入预算；缓存命中不重复计算。资源表的四个布尔提示也改为严格解析，原测试均采用嵌入字体且省略这些提示，未覆盖非法布尔值。
 
 新增 15 项测试，连同此前 88 项共 103 项通过；修改前 11 项选择中有 4 项断言失败、2 项缺少字体支持报错。四张自造字体输出验证两个不同字体面及两页复用，其中两个不同字体面已实际查看。使用本机宋体集合中明确的 `STSongti-SC-Regular`，导出单字体供本地探针读取后，两份原始公开问候语样本完整输出，各 1191×1684，中文内容已查看；它们内容相同，不作为两种票据质量用例。系统字体和导出文件均未进入项目或分发。另两份带 `Signatures` 的原件仍在绘制入口拒绝，未删去签章来冒充完整成功；四份原件摘要保持。该结果不代表完整票据渲染、签名有效性或模型识别验收，详见[部署字体证据](evidence/invoice-ofd-deployed-fonts-20261002.json)。
+
+### OFD CFF CID 字体修复
+
+`InvoiceOfdText` 的普通 Unicode 与 `CGTransform` 显式编号都经过 `InvoiceOfdFont`，文字裁剪也共用该轮廓。OpenType 字符映射得到 GID，而 FontBox 的 `CFFCIDFont.getType2CharString` 接受 CID，直接传入 GID 可能得到 `.notdef`。现有 CFF 样本均为非 CID 字体，未覆盖这条分支；新增 8 项回归在修改前全部失败。修复在字体基础设施中按实际 charset 将 GID 转成 CID，拒绝重复、越界或与库解释不一致的映射，不改变文字排布或业务状态。
+
+矩阵按该 GID 的 FDSelect 选择字体字典，再组合原始顶层矩阵；FontBox 3.0.8 的顶层矩阵结果已折入首个 FD，不能直接复用。`InvoiceOfdCffData` 仅有界读取 CFF1 的 INDEX、DICT 与偏移，`InvoiceOfdCidFont` 验证 charset 0／1／2 和 FDSelect 0／3，字形程序仍由现有 FontBox 解释。先应用 FD 矩阵，再应用顶层矩阵；没有顶层矩阵时采用 FD 自身的变换，两者均缺省时采用 0.001 比例。编号和索引依据 [Adobe CFF §4–5、§18–19](https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf)，矩阵组合及缺省规则依据 [PostScript Language Reference §5.11.3，第 374–375 页](https://www.adobe.com/jp/print/postscript/pdfs/PLRM.pdf)。没有复制上游实现或新增运行依赖。
+
+加载时拒绝 maxp／CharStrings 数量不一致、空字形程序、FD 超界、缺少 Private、无效范围、重复 CID、奇异或非有限矩阵。原始字典最多 64 KiB、每操作最多 48 个数值、单个实数最多 64 个字符、最多 256 个 FD；沿用现有字体总字节和字形数量限制。它只验证本次适配所需的元数据，不宣称完整 CFF 验证或操作系统隔离。
+
+新增 9 项 CID 字体／整页回归与 7 项原始元数据边界测试，连同此前 103 项共 119 项通过；15 份新 CID 自造字体和原六份字体均可确定性再生。四张独立输出已实际查看，分别检查默认、双层矩阵、FD 斜切和仅顶层矩阵；Unicode 与显式编号的同一字形一致。公开原件复验仍是两份同内容问候语成功、两份带签章原件拒绝，成功 PNG 与前阶段逐字节相同。OFD 的应用入口、隔离进程和完整识别验收继续，详见[CID 字体证据](evidence/invoice-ofd-cid-fonts-20261002.json)。
 
 图片请求采用 Chat Completions 的 `image_url` 内联图片格式，协议依据为 [OpenAI 图片输入文档](https://developers.openai.com/api/docs/guides/images-vision)。PDF 使用 [OpenAI 文件输入文档](https://developers.openai.com/api/docs/guides/file-inputs)中的内联文件格式；XML 内容以文本块处理，不能据此认为模型文件接口原生支持 XML 或 OFD。最终配置的模型仍需实际图片／PDF 能力与质量验收。
 
