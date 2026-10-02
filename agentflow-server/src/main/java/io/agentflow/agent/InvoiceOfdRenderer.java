@@ -10,6 +10,7 @@ import java.awt.geom.PathIterator;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,15 +48,22 @@ final class InvoiceOfdRenderer {
 
     /** 所有页面成功后才交出图片，任何绘制失败都不得返回前面页面的部分结果。 */
     static List<byte[]> render(InvoiceOfdArchive archive) throws IOException {
+        return render(archive, null);
+    }
+
+    /** 字体清单必须来自可信部署配置，不能取自 OFD 内容；同次调用的各文档和页面共享字体所有者。 */
+    static List<byte[]> render(InvoiceOfdArchive archive, Path fontCatalog) throws IOException {
         var contents = InvoiceOfdDocument.read(archive);
         inspectDrawingScope(contents);
         var renderer = new InvoiceOfdRenderer();
         var result = new ArrayList<byte[]>();
         int bytes = 0;
-        for (var page : contents.pages()) {
-            byte[] image = renderer.page(archive, contents, page, MAX_PNG_BYTES - bytes);
-            bytes += image.length;
-            result.add(image);
+        try (var fonts = InvoiceOfdFonts.open(archive, fontCatalog)) {
+            for (var page : contents.pages()) {
+                byte[] image = renderer.page(archive, contents, page, MAX_PNG_BYTES - bytes, fonts);
+                bytes += image.length;
+                result.add(image);
+            }
         }
         return List.copyOf(result);
     }
@@ -106,10 +114,11 @@ final class InvoiceOfdRenderer {
     }
 
     private byte[] page(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
-                        InvoiceOfdDocument.Page page, int remainingBytes) throws IOException {
+                        InvoiceOfdDocument.Page page, int remainingBytes, InvoiceOfdFonts fonts) throws IOException {
         var image = new BufferedImage(pixels(page.width()), pixels(page.height()), BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
-        try (var scopes = new InvoiceOfdResources.Scopes(archive, contents, page.documentFile())) {
+        try {
+            var scopes = new InvoiceOfdResources.Scopes(archive, contents, page.documentFile(), fonts);
             graphics.setColor(Color.WHITE);
             graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

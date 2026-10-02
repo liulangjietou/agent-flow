@@ -1,0 +1,415 @@
+{
+  "recordedAt": "2026-10-02T10:28:06.941553+00:00",
+  "status": "CONTROLLED_FONT_SCOPE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "917f0ca10fbf9a87954566d9a9d36281f5dc026e",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "Internal InvoiceOfdRenderer -> document/template resource ID scope -> InvoiceOfdFonts -> existing FontBox glyph outlines -> all-page PNG result; InvoiceExtractionSources still excludes OFD",
+  "responsibility": "Rendering infrastructure; no approval or expense state changes",
+  "implemented": [
+    "Trusted caller-supplied catalog path; strict UTF-8 JSON with duplicate/trailing/unknown-field/type rejection",
+    "Exact FontName/bold/italic to absolute file, PostScript face and SHA-256; no system scan, family or case fallback",
+    "Embedded fonts remain authoritative; broken embedded data never falls back",
+    "Referenced deployed files are regular and bounded, digest verified before parsing, final path component cannot be a symlink",
+    "Per-render ownership and instance/byte budgets; reuse across pages/templates, close all on success/failure",
+    "Resource IDs remain isolated across documents/pages/templates; file/face aliases may reuse verified font",
+    "Font declaration boolean hints parsed strictly; text-object nondefault Weight/Italic remains unsupported"
+  ],
+  "standard": {
+    "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/GBT_33190-2016_电子文件存储与交换格式版式文档.pdf",
+    "document": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    },
+    "printedPagesInspected": [
+      61,
+      62
+    ],
+    "section": "11.1, table 44",
+    "findings": [
+      "FontFile optional, FontName required",
+      "Font resource family/charset/bold/italic/serif/fixed-width are matching hints, distinct from text-object drawing transforms"
+    ],
+    "referenceUrl": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/text/font/CT_Font.java",
+    "upstreamCodeCopied": false,
+    "newRuntimeDependencies": false
+  },
+  "limits": {
+    "catalogBytes": 65536,
+    "catalogMappings": 64,
+    "singleFontBytes": 33554432,
+    "loadedFontInstancesPerRender": 64,
+    "loadedFontBytesPerRender": 67108864,
+    "differentCollectionFacesCountSeparately": true,
+    "cacheHitsRecharged": false,
+    "embeddedAndDeployedBudgetShared": true
+  },
+  "configurationBoundary": {
+    "applicationPropertyWired": false,
+    "workerWired": false,
+    "publicApiAcceptsOfd": false,
+    "deploymentMustControlManifestAndParentDirectories": true,
+    "osFilesystemIsolationClaimed": false,
+    "unreferencedFilesOpened": false,
+    "digestCheckedOnFirstUsePerFontPerRender": true,
+    "subsequentUseKeepsVerifiedBytes": true,
+    "visualEquivalenceOfOperatorChosenFontsInferred": false
+  },
+  "red": {
+    "selectedTests": 11,
+    "failures": 4,
+    "errors": 2,
+    "passed": 5,
+    "existingGap": "Existing fixtures embedded all fonts and omitted matching booleans. Renderer had no catalog entry point. Temporary test bridge used old render when new overload was absent; final tests call real overload directly. Invalid embedded font booleans were independently accepted by the old entry.",
+    "bridgeRemoved": true
+  },
+  "tests": {
+    "scopedTotal": 103,
+    "newTests": 15,
+    "priorScopeOverlap": 88,
+    "suites": [
+      {
+        "name": "io.agentflow.agent.InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43795,
+          "sha256": "6f72a16d94235a42d6e0362c4d404e3f52d482e26037efa646a73bcde0861e59"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDeployedFontsTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+          "bytes": 44935,
+          "sha256": "35f5b34bfd86718a2986eceaa5bcb25c37befe2f2dce7178f68555cd2914711e"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44446,
+          "sha256": "787c160f05114d709d0d6c5e1c6b27bf00aaca273c815fc60a183029e87bbe5e"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDrawingTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+          "bytes": 45179,
+          "sha256": "2d478597b64a5070bf2d32446754aef574b481f5ca0fde7e0e3c691c25bcbcde"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdFontTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43653,
+          "sha256": "1e29c6469fb424090903d4e2c3161f59c4105b588e79cbc77abe0a6466f7e93d"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdPathTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43612,
+          "sha256": "9a690c9d013fa9f758785eb7cacab4aa99e399f2c80d3866a064a036e2832085"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdRendererTest",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45543,
+          "sha256": "6dfd08e623d50eb5f4b4b13c3571ba459c6eaf3ff807848204d68678aab5b132"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdTemplateTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+          "bytes": 44982,
+          "sha256": "406efaac0f660923165db9b06a508f148d17c3c7daa73a87174d6d80305eff2d"
+        }
+      }
+    ],
+    "scope": "OFD package, document, font/path, page, drawing and template; no unrelated full-application rerun"
+  },
+  "publicProbe": {
+    "preflightPassed": 4,
+    "wholeFileRendered": 2,
+    "wholeFileRejected": 2,
+    "samples": [
+      {
+        "file": "helloworld.ofd",
+        "pages": 1,
+        "rendered": true,
+        "renderedPages": 1,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+          "bytes": 1651,
+          "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e"
+        },
+        "sourceUrl": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/helloworld.ofd",
+        "originalUnchanged": true
+      },
+      {
+        "file": "chineseDir.ofd",
+        "pages": 1,
+        "rendered": true,
+        "renderedPages": 1,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/chineseDir.ofd",
+          "bytes": 2097,
+          "sha256": "c6defec84b241c74679a0d424634ff4a8605ccecc480d9736ef89218d806ac09"
+        },
+        "sourceUrl": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-reader/src/test/resources/chineseDir.ofd",
+        "originalUnchanged": true
+      },
+      {
+        "exception": "java.io.IOException: OFD drawing data is invalid, unsupported or exceeds rendering limits",
+        "stack": [
+          "io.agentflow.agent.InvoiceOfdXml.invalid(InvoiceOfdXml.java:112)",
+          "io.agentflow.agent.InvoiceOfdXml.shape(InvoiceOfdXml.java:52)",
+          "io.agentflow.agent.InvoiceOfdRenderer.inspectDrawingScope(InvoiceOfdRenderer.java:75)",
+          "io.agentflow.agent.InvoiceOfdRenderer.render(InvoiceOfdRenderer.java:57)",
+          "io.agentflow.agent.InvoiceOfdDeployedFontsProbe.main(InvoiceOfdDeployedFontsProbe.java:32)"
+        ],
+        "file": "draw_param_ref.ofd",
+        "pages": 5,
+        "rendered": false,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+          "bytes": 33402,
+          "sha256": "525eba2e09a4d7ac01a05bc176146ee9ecf5b1184fa3b909cc15599803493700"
+        },
+        "sourceUrl": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/draw_param_ref.ofd",
+        "originalUnchanged": true,
+        "reason": "DocBody contains Signatures; drawing rejects unimplemented signatures for the whole document"
+      },
+      {
+        "exception": "java.io.IOException: OFD drawing data is invalid, unsupported or exceeds rendering limits",
+        "stack": [
+          "io.agentflow.agent.InvoiceOfdXml.invalid(InvoiceOfdXml.java:112)",
+          "io.agentflow.agent.InvoiceOfdXml.shape(InvoiceOfdXml.java:52)",
+          "io.agentflow.agent.InvoiceOfdRenderer.inspectDrawingScope(InvoiceOfdRenderer.java:75)",
+          "io.agentflow.agent.InvoiceOfdRenderer.render(InvoiceOfdRenderer.java:57)",
+          "io.agentflow.agent.InvoiceOfdDeployedFontsProbe.main(InvoiceOfdDeployedFontsProbe.java:32)"
+        ],
+        "file": "DigitalSign.ofd",
+        "pages": 1,
+        "rendered": false,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+          "bytes": 3041,
+          "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989"
+        },
+        "sourceUrl": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-sign/src/test/resources/DigitalSign.ofd",
+        "originalUnchanged": true,
+        "reason": "DocBody contains Signatures; drawing rejects unimplemented signatures for the whole document"
+      }
+    ],
+    "renderedSamplesHaveIdenticalGreetingContent": true,
+    "invoiceExtractionQualityValidated": false,
+    "signatureValidityValidated": false,
+    "renderedOriginalsEdited": false,
+    "publicRastersViewed": [
+      "helloworld.ofd/page-1.png",
+      "chineseDir.ofd/page-1.png"
+    ],
+    "pixelDimensions": [
+      1191,
+      1684
+    ],
+    "nonWhiteBounds": [
+      180,
+      148,
+      402,
+      164
+    ],
+    "localFont": {
+      "use": "Local probe only; no font is included in project sources or distributed",
+      "source": {
+        "path": "/System/Library/Fonts/Supplemental/Songti.ttc",
+        "bytes": 66902744,
+        "sha256": "dd2f0628d302f322a2e9c3cf3253d5e73f418275e1f1421c84a7c65ce5a87777"
+      },
+      "singleFace": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/fonts/SongtiSC-Regular.ttf",
+        "bytes": 20852676,
+        "sha256": "9667150c3ea518cc9b1f076874ebe2ca2de0f66bd9854f824b9421443a7a419a"
+      },
+      "postscriptFace": "STSongti-SC-Regular",
+      "fonttools": "4.60.2"
+    },
+    "fontCopiedIntoRepository": false,
+    "fontDistributed": false,
+    "vmHeapLimitMiB": 512,
+    "isolatedApplicationWorkerAcceptance": false
+  },
+  "syntheticProbe": {
+    "pages": 4,
+    "pixelChecks": 4,
+    "visuallyInspected": [
+      "AgentFlowSyntheticA-1.png",
+      "AgentFlowSyntheticB-1.png"
+    ],
+    "boundary": "Synthetic rectangle outlines, two pages per explicitly selected collection face"
+  },
+  "authorGate": {
+    "javaFiles": 1371,
+    "namedTypes": 2633,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "preserved": {
+    "noServiceReplacement": true,
+    "noDatabaseChanges": true,
+    "noApiChanges": true,
+    "noModelRequests": true,
+    "noSeedWorkflowEdits": true
+  },
+  "remaining": [
+    "Application font configuration and bounded process integration",
+    "Text-object weight/italic, CFF CID per-font-dictionary matrices",
+    "Annotations, signatures and nested seal content",
+    "Nonconformal minimum strokes, nondefault clip vector visibility/alpha, gradients/patterns",
+    "Complete invoice rendering, all-page model input and runtime acceptance",
+    "Other Agent capabilities, organization sync, e-sign, enterprise integration/delivery and requirement audit"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-red.log",
+      "bytes": 19992,
+      "sha256": "25d7e2cf25282fd491c52ab6de9306c1ed2172a5acd1b116e5b8ae8067dd5d74"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-scope.log",
+      "bytes": 14575,
+      "sha256": "c1eb01d86de7534f373adf37c77b0457717eeb09d4254bc0d482519fe68b6256"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-authors.log",
+      "bytes": 131,
+      "sha256": "71b7c738c9bc1b03e773da7425a9f4fbd59cbfe25bbb0fcfb4ac9bcd4791ea41"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe.log",
+      "bytes": 1255,
+      "sha256": "6ceaaf891eec19f6571524466528196a0b220e953090b150759a5f4e1fbb87cf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdDeployedFontsProbe.java",
+      "bytes": 3815,
+      "sha256": "dceb6d1c4316115f1b8a805304931db9f31c4984873114bc5fac440970ed404c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/results.json",
+      "bytes": 1316,
+      "sha256": "88305b3b963008d39c89a7df98f7a930b8a6c77e60a6e1728f8826d6a59f7909"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/fonts.json",
+      "bytes": 512,
+      "sha256": "d115acfcb18348bcc3e61f698c5a9ed812047e32b0a02dcd3bb0044d568d509a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/font-provenance.json",
+      "bytes": 574,
+      "sha256": "8df3eb2e53766c43d4df26899362ff1e484c3f34c4503f830057cf372d86146b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/synthetic.ofd",
+      "bytes": 1990,
+      "sha256": "10a11ca998db12f4044517d44bbfdac345415af1c26fb1666f024e4a89df2f99"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/synthetic.ttc",
+      "bytes": 1612,
+      "sha256": "cea23660fa07caa6bdc5e01cc338017a7b5c73ee29020465b5934a6b06ed2f7d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/AgentFlowSyntheticA.json",
+      "bytes": 236,
+      "sha256": "42fb076e3ae06e9db7056829ae8c2196616147f3648aef55006b7af825a15163"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/AgentFlowSyntheticB.json",
+      "bytes": 236,
+      "sha256": "2ef9ac3ef3ab6e30e5fc16f98241015f5221d29b6d7dea82b0cc2baf61a3da45"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/AgentFlowSyntheticA-1.png",
+      "bytes": 354,
+      "sha256": "c958dfe82dff5ea822dd9ffd11401f81f6d32f8e5380843a432adc096b41d62b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/AgentFlowSyntheticA-2.png",
+      "bytes": 354,
+      "sha256": "c958dfe82dff5ea822dd9ffd11401f81f6d32f8e5380843a432adc096b41d62b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/AgentFlowSyntheticB-1.png",
+      "bytes": 354,
+      "sha256": "30ded12f530d2b1192c5a851c6d2fca44666b241c5f71a3ce5cfd16d9c7e8271"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/AgentFlowSyntheticB-2.png",
+      "bytes": 354,
+      "sha256": "30ded12f530d2b1192c5a851c6d2fca44666b241c5f71a3ce5cfd16d9c7e8271"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/chineseDir.ofd/page-1.png",
+      "bytes": 13418,
+      "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/helloworld.ofd/page-1.png",
+      "bytes": 13418,
+      "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-spec-page-68.png",
+      "bytes": 151677,
+      "sha256": "61fb1c239b3b0ddedbf40805d37ea61f25f5d1427e6adf42962ad27b3cd62e6e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-spec-page-69.png",
+      "bytes": 87508,
+      "sha256": "850151b561b5b8ef5f3841b3b74fb05c2704967f988caf7e421934155764e05f"
+    }
+  ]
+}

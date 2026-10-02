@@ -2,9 +2,7 @@ package io.agentflow.agent;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
-import java.io.Closeable;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -16,22 +14,24 @@ import org.w3c.dom.Element;
 import static io.agentflow.agent.InvoiceOfdXml.*;
 
 /**
- * 从当前文档和页面的资源表定位包内字体及位图，不访问主机路径或网络。
+ * 从文档和页面资源表定位包内内容；未嵌入字体只查询渲染会话的明确部署映射。
  * @author owlzhangfq@gmail.com
  */
-final class InvoiceOfdResources implements Closeable {
+final class InvoiceOfdResources {
     private static final long MAX_IMAGE_PIXELS = 20_000_000;
     private static final int MAX_IMAGE_SIDE = 12_000;
-    private static final int TTC_TAG = 0x74746366;
     private static final Map<String, String> GROUPS = Map.of("Fonts", "Font", "ColorSpaces", "ColorSpace", "DrawParams", "DrawParam", "MultiMedias", "MultiMedia", "CompositeGraphicUnits", "CompositeGraphicUnit");
     private final InvoiceOfdArchive archive;
     private final Map<Long, Resource> resources = new HashMap<>();
     private final Map<Long, InvoiceOfdFont> fonts = new HashMap<>();
+    private final InvoiceOfdFonts fontSession;
     private final InvoiceOfdColors colors;
 
     private InvoiceOfdResources(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
-                                String documentFile, String pageFile, InvoiceOfdColors.ProfileBudget profileBudget) throws IOException {
+                                String documentFile, String pageFile, InvoiceOfdColors.ProfileBudget profileBudget,
+                                InvoiceOfdFonts fontSession) throws IOException {
         this.archive = archive;
+        this.fontSession = fontSession;
         Element common = child(contents.root(documentFile, "Document"), "CommonData", true);
         var loaded = new HashSet<String>();
         for (String name : new String[]{"PublicRes", "DocumentRes"}) {
@@ -70,11 +70,14 @@ final class InvoiceOfdResources implements Closeable {
         Resource resource = resource(id, "Font"); Element definition = resource.element();
         shape(definition, Set.of("ID", "FontName", "FamilyName", "Charset", "Serif", "Bold", "Italic", "FixedWidth"), Set.of("FontFile"));
         String name = required(definition, "FontName");
-        Element location = child(definition, "FontFile", true);
-        byte[] bytes;
-        try (var input = archive.open(archive.file(resource.base(), text(location).trim()))) { bytes = input.readAllBytes(); }
-        String face = bytes.length >= Integer.BYTES && ByteBuffer.wrap(bytes).getInt() == TTC_TAG ? name : null;
-        var font = InvoiceOfdFont.load(bytes, face); fonts.put(id, font); return font;
+        boolean bold = bool(definition, "Bold", false), italic = bool(definition, "Italic", false);
+        bool(definition, "Serif", false); bool(definition, "FixedWidth", false);
+        Element location = child(definition, "FontFile", false);
+        // 包内字体存在但无效时直接失败，不能用部署字体掩盖缺件、截断或错误字形。
+        var font = location == null ? fontSession.deployed(name, bold, italic)
+                : fontSession.embedded(archive.file(resource.base(), text(location).trim()), name);
+        fonts.put(id, font);
+        return font;
     }
 
     BufferedImage image(long id) throws IOException {
@@ -116,16 +119,6 @@ final class InvoiceOfdResources implements Closeable {
         return resource;
     }
 
-    /** 页面结束时释放全部实际加载的字体；关闭错误不能阻止其他资源释放。 */
-    @Override public void close() throws IOException {
-        IOException failure = null;
-        for (InvoiceOfdFont font : fonts.values()) {
-            try { font.close(); } catch (IOException error) { if (failure == null) failure = error; else failure.addSuppressed(error); }
-        }
-        fonts.clear();
-        if (failure != null) throw failure;
-    }
-
     /**
      * 资源位置相对它所属的资源文件，而非当前页面。
      * @author owlzhangfq@gmail.com
@@ -133,38 +126,30 @@ final class InvoiceOfdResources implements Closeable {
     private record Resource(Element element, String base) { }
 
     /**
-     * 一个输出页内复用各模板的资源作用域，关闭时释放所有字体，保留正文与模板的私有资源边界。
+     * 一个输出页内复用模板资源作用域；字体由整次渲染会话持有，资源 ID 仍按私有作用域解析。
      * @author owlzhangfq@gmail.com
      */
-    static final class Scopes implements Closeable {
+    static final class Scopes {
         private final InvoiceOfdArchive archive;
         private final InvoiceOfdDocument.Contents contents;
         private final String documentFile;
+        private final InvoiceOfdFonts fontSession;
         private final InvoiceOfdColors.ProfileBudget profileBudget = new InvoiceOfdColors.ProfileBudget();
         private final Map<String, InvoiceOfdResources> pages = new HashMap<>();
 
-        Scopes(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, String documentFile) {
+        Scopes(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, String documentFile, InvoiceOfdFonts fontSession) {
             this.archive = archive; this.contents = contents; this.documentFile = documentFile;
+            this.fontSession = fontSession;
         }
 
         InvoiceOfdResources page(String file) throws IOException {
             var resources = pages.get(file);
             if (resources == null) {
-                resources = new InvoiceOfdResources(archive, contents, documentFile, file, profileBudget);
+                resources = new InvoiceOfdResources(archive, contents, documentFile, file, profileBudget, fontSession);
                 pages.put(file, resources);
             }
             return resources;
         }
 
-        /** 一个字体关闭失败时仍释放其余作用域，异常由 try-with-resources 保留。 */
-        @Override public void close() throws IOException {
-            IOException failure = null;
-            for (var resources : pages.values()) {
-                try { resources.close(); }
-                catch (IOException error) { if (failure == null) failure = error; else failure.addSuppressed(error); }
-            }
-            pages.clear();
-            if (failure != null) throw failure;
-        }
     }
 }

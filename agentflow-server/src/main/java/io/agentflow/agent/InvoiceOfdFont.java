@@ -21,7 +21,7 @@ import org.apache.pdfbox.io.RandomAccessReadBuffer;
  * @author owlzhangfq@gmail.com
  */
 final class InvoiceOfdFont implements Closeable {
-    private static final int MAX_FONT_BYTES = 32 * 1024 * 1024;
+    static final int MAX_FONT_BYTES = 32 * 1024 * 1024;
     private static final int MAX_FACES = 32;
     private static final int MAX_TABLES = 128;
     private static final int COLLECTION = 0x74746366;
