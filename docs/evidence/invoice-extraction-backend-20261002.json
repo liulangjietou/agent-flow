@@ -1,0 +1,214 @@
+{
+  "recordedAt": "2026-10-02T07:05:13.762125+00:00",
+  "scope": "票据抽取持久后台；公开 API、页面、OFD 渲染和完整运行验收未完成",
+  "baseCommit": "912e0999742a577e135f31d2058d90c384dd69a4",
+  "migration": "V100__invoice_extraction_runs.sql",
+  "implemented": [
+    "冻结本人原件、方式和模型目的地；活动运行唯一约束与归属复合外键",
+    "状态、版本、租约、活动键与追加轨迹同事务保存",
+    "独立有界调度、单次领取、事务外文件与模型调用、超时不重发、迟到结果隔离",
+    "初始化目录及演示账号的当前有效人员资格；不要求审批角色，管理员不可代用",
+    "原始候选和本人确认分开保存，财务原件、查验和占用保持"
+  ],
+  "redBeforeFix": [
+    {
+      "test": "InvoiceExtractionMigrationTest",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-storage-red.log",
+      "failure": "V99 之后不存在目标 V100 迁移"
+    },
+    {
+      "test": "InvoiceExtractionIntegrationTest.localExecutionFailuresDoNotClaimThatAModelWasCalled",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-local-failure-red.log",
+      "failure": "期望 EXECUTION_TIMEOUT，实际 MODEL_TIMEOUT",
+      "cause": "本地解析复用了只描述模型执行的失败分类",
+      "fix": "独立的抽取失败分类，由工作器映射模型端口失败"
+    }
+  ],
+  "testFixtureCorrections": [
+    "两个模型路径用例的模拟响应缺少 model、finish_reason=stop、message.role=assistant；补齐合法协议，没有放宽 OpenAiTextClient 校验"
+  ],
+  "h2AndRelatedRegression": {
+    "tests": 84,
+    "suites": [
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionRunTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionSchedulingTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionXmlTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoicePdfSourceTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoicePdfInspectorTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.expense.InvoiceWalletIntegrationTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.DraftAssistIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "postgres": {
+    "databases": {
+      "test": "extraction_backend_444320ea27",
+      "migration": "extraction_migration_444320ea27"
+    },
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-postgres-444320ea27.log",
+    "status": "PASS",
+    "existingRuntimeReplaced": false,
+    "exitCode": 0,
+    "tests": 15,
+    "suites": [
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "overlapsH2": true,
+    "freshDatabases": true
+  },
+  "verification": [
+    "并发排队只允许一个活动任务；并发领取只有一个执行上下文",
+    "模型关闭时本地 XML 完成；模型目标变化或关闭不外发",
+    "账号、租户、其他原件及管理员隔离；非审批人员可处理自己的原件",
+    "排队后停用与领取后发送前停用；原件完整性失败阻断",
+    "租约失效、迟到完成、未知工作异常不造成自动重发",
+    "确认保留模型原值与人工修订；财务资源整行保持",
+    "状态轨迹插入失败回滚阶段、租约和活动键",
+    "新仓储实例从保存状态重建；不是完整进程重启验收"
+  ],
+  "migrationVerification": {
+    "from": "V99",
+    "to": "V100",
+    "fixture": "独立新库迁移至 V99 后放入合成票夹、财务和原件记录",
+    "preservedTables": [
+      "finance_resource",
+      "invoice_original",
+      "invoice_wallet",
+      "agent_draft_assist_run"
+    ],
+    "oldFlywayHistoryPreserved": true,
+    "repeatMigrationCount": 0,
+    "flywayValidation": "PASS",
+    "liveAcceptanceDatabaseUpgraded": false
+  },
+  "preservedRuntime": {
+    "schema": "V99",
+    "backendPort": 18258,
+    "frontendPort": 15344,
+    "httpStatus": [
+      200,
+      200
+    ],
+    "jarSha256": "48e23c291fcaf551eacc006044e7e66910546bef10d04eab2872f676e6e081d5",
+    "replaced": false,
+    "businessRowCountsRecheckedThisStage": false
+  },
+  "qualityGates": {
+    "authors": {
+      "javaFiles": 1352,
+      "namedTypes": 2595,
+      "missingTags": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "remaining": [
+    "OFD 全页渲染、字体和有界子进程接入",
+    "公开 API、明确外发范围、幂等恢复和审计",
+    "票夹页面、本人逐字段核对及辅助填报",
+    "完整既有验收库升级、实际 HTTP、浏览器和进程重启",
+    "真实企业模型能力及识别质量验收"
+  ],
+  "topLevelRemainingCategories": 6,
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-storage-red.log",
+      "sha256": "ead7536cbece1604e2907182e87f952481834bccee5c7312468bd123aa5d9d5b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-local-failure-red.log",
+      "sha256": "0446cb6ce3a219ffbf10d1056802d2efabc9c85f01ef5fe3baecece9d5bb3856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-backend-green.log",
+      "sha256": "97a61e2383dc78d2725d3619d8deff52daf47283c78c5deed489b5836f5b87f5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-postgres-444320ea27.log",
+      "sha256": "5ba41ec9d3001adf2c243977a1d2bdf15c84be93dd3b5a182072a04471dcc955"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-backend-h2-reports/summary.json",
+      "sha256": "5dedd8027e84b0920af31e2ec742258564b27554cc4f82bf57d77b44ac87982a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-extraction-backend-postgres-reports/summary.json",
+      "sha256": "09e6016391a80d0e271a3c568598272aebfdf401dabc5b8eefecae7b0e247417"
+    }
+  ]
+}

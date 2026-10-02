@@ -81,7 +81,7 @@ class InvoiceExtractionRunTest {
 
     @Test
     void failureAndReviewAreTerminalEvenWhenTheOriginalCallReturnsLate() {
-        var failed = started(); failed.fail(2, AssistRun.Failure.MODEL_TIMEOUT, NOW.plusSeconds(2)); assertRestores(failed);
+        var failed = started(); failed.fail(2, InvoiceExtractionRun.Failure.EXECUTION_TIMEOUT, NOW.plusSeconds(2)); assertRestores(failed);
         assertCode(() -> failed.start(3, NOW.plusSeconds(3)), "AGENT_RUN_STATE_CONFLICT");
         assertCode(() -> failed.complete(3, suggestion(List.of(proposal(INVOICE_NUMBER, "0123"))), NOW.plusSeconds(3)), "AGENT_RUN_STATE_CONFLICT");
         var confirmed = completed(); confirmed.confirm(3, "alice", INPUT, List.of(new InvoiceExtractionSuggestion.Selection(INVOICE_NUMBER, "0123")), null, NOW.plusSeconds(3));

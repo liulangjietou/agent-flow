@@ -39,7 +39,7 @@ public final class InvoiceExtractionRun {
     }
 
     /** 保存稳定失败分类；超时和晚到结果不能触发自动重发。 */
-    public void fail(long expectedVersion, AssistRun.Failure failure, Instant at) {
+    public void fail(long expectedVersion, Failure failure, Instant at) {
         require(expectedVersion, Status.RUNNING); time(at, state.startedAt());
         state = new State(Status.FAILED, expectedVersion + 1, state.startedAt(), at, null, Objects.requireNonNull(failure), null);
     }
@@ -95,6 +95,8 @@ public final class InvoiceExtractionRun {
     }
     public Context context() { return context; }
     public State state() { return state; }
+    /** 只有尚未结束的抽取占用活动任务名额，人工复核不阻止新的明确请求。 */
+    public boolean active() { return state.status() == Status.QUEUED || state.status() == Status.RUNNING; }
 
     /**
      * 本地 XML 不设置模型目的地，不能隐式切换到模型；外发目的地只记录指纹。
@@ -117,11 +119,16 @@ public final class InvoiceExtractionRun {
      */
     public enum Status { QUEUED, RUNNING, COMPLETED, FAILED, CONFIRMED, DISMISSED }
     /**
+     * 本地与模型抽取共用执行分类；租约到期不声称曾经调用模型。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum Failure { MODEL_UNAVAILABLE, EXECUTION_TIMEOUT, INVALID_RESULT, INPUT_UNAVAILABLE }
+    /**
      * 原始建议、失败及人工动作分开保存。
      * @author owlzhangfq@gmail.com
      */
     public record State(Status status, long version, Instant startedAt, Instant completedAt,
-                        InvoiceExtractionSuggestion suggestion, AssistRun.Failure failure, Review review) { }
+                        InvoiceExtractionSuggestion suggestion, Failure failure, Review review) { }
     /**
      * selected 为空表示明确放弃；确认列表为不可变副本。
      * @author owlzhangfq@gmail.com

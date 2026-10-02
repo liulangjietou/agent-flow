@@ -13,11 +13,12 @@ public class InvoiceExtractionEngine implements InvoiceExtractionPort {
     private final JdbcInvoiceOriginalRepository originals;
     private final InvoiceExtractionSources sources;
     private final OpenAiCompatibleInvoiceExtractionModel model;
+    private final InvoiceExtractionEligibility eligibility;
 
     /** 复用原件仓储和模型传输，跨资源读取由此基础设施编排统一完成。 */
     public InvoiceExtractionEngine(JdbcInvoiceOriginalRepository originals, InvoiceExtractionSources sources,
-                                   OpenAiCompatibleInvoiceExtractionModel model) {
-        this.originals = originals; this.sources = sources; this.model = model;
+                                   OpenAiCompatibleInvoiceExtractionModel model, InvoiceExtractionEligibility eligibility) {
+        this.originals = originals; this.sources = sources; this.model = model; this.eligibility = eligibility;
     }
 
     /** 来源或方式变化直接失败，本地识别结果不会触发模型传输。 */
@@ -29,6 +30,7 @@ public class InvoiceExtractionEngine implements InvoiceExtractionPort {
                     .filter(value -> context.requestedBy().equals(value.ownerId())).orElseThrow(InvoiceExtractionEngine::unavailable);
             source = sources.prepare(original);
             if (!context.input().equals(source.input()) || context.method() != source.method()) throw unavailable();
+            eligibility.requireActive(context.tenantId(), context.requestedBy());
         } catch (DomainException rejected) { throw unavailable(); }
         if (source.method() == InvoiceExtractionSuggestion.Method.STRUCTURED_XML) return source.structured();
         return model.generate(context, source);

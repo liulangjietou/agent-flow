@@ -66,7 +66,8 @@ class InvoiceExtractionModelTest {
         });
         server.start(); configuration.setEnabled(true); configuration.setProviderId("loopback-fixture");
         configuration.setModel("vision-fixture"); configuration.setEndpoint("http://127.0.0.1:" + server.getAddress().getPort() + "/chat");
-        extraction = new InvoiceExtractionEngine(originals, sources, new OpenAiCompatibleInvoiceExtractionModel(configuration, json));
+        extraction = new InvoiceExtractionEngine(originals, sources, new OpenAiCompatibleInvoiceExtractionModel(configuration, json),
+                org.mockito.Mockito.mock(InvoiceExtractionEligibility.class));
     }
 
     @AfterEach
