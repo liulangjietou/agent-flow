@@ -64,17 +64,27 @@ public class FlowableApprovalProxyAccess {
 
     /** 单次读取共用观察时刻；调用方在只读事务内使用，不把此快照缓存为后续办理授权。 */
     public ReadScope forActor(Actor actor, Instant observedAt) {
+        return new ReadScope(actor, actor.hasRole("APPROVER") ? grants(actor.tenantId(), actor.userId(), observedAt) : List.of());
+    }
+
+    /** 仅判断最小提醒的本地范围，不推断身份源角色，也不能用于读取表单或办理任务。 */
+    public boolean canNotify(String tenantId, String recipient, UUID proxyId, Task task, Instant observedAt) {
+        if (originalResponsibility(task, recipient)) return false;
+        var selected = grants(tenantId, recipient, observedAt).stream()
+                .filter(grant -> grant.active().proxy().id().equals(proxyId)).toList();
+        return !eligibleGrants(tenantId, recipient, task, selected).isEmpty();
+    }
+
+    private List<GrantScope> grants(String tenantId, String recipient, Instant observedAt) {
         var grants = new ArrayList<GrantScope>();
-        if (actor.hasRole("APPROVER")) {
-            for (var active : proxies.activeForSubstitute(actor.tenantId(), actor.userId(), observedAt)) {
-                var definition = definitions.findById(actor.tenantId(), active.proxy().definitionId()).orElse(null);
-                if (definition == null || definition.status() != DraftStatus.PUBLISHED || definition.version() > Integer.MAX_VALUE) continue;
-                var nativeDefinition = engineDefinitions.createProcessDefinitionQuery().processDefinitionTenantId(actor.tenantId())
-                        .processDefinitionKey(definition.key()).processDefinitionVersion((int) definition.version()).singleResult();
-                if (nativeDefinition != null) grants.add(new GrantScope(active, definition, nativeDefinition.getId()));
-            }
+        for (var active : proxies.activeForSubstitute(tenantId, recipient, observedAt)) {
+            var definition = definitions.findById(tenantId, active.proxy().definitionId()).orElse(null);
+            if (definition == null || definition.status() != DraftStatus.PUBLISHED || definition.version() > Integer.MAX_VALUE) continue;
+            var nativeDefinition = engineDefinitions.createProcessDefinitionQuery().processDefinitionTenantId(tenantId)
+                    .processDefinitionKey(definition.key()).processDefinitionVersion((int) definition.version()).singleResult();
+            if (nativeDefinition != null) grants.add(new GrantScope(active, definition, nativeDefinition.getId()));
         }
-        return new ReadScope(actor, List.copyOf(grants));
+        return List.copyOf(grants);
     }
 
     /**
@@ -123,20 +133,10 @@ public class FlowableApprovalProxyAccess {
         }
 
         private List<GrantScope> matching(Task task) {
-            if (grants.isEmpty() || task.isSuspended() || task.getDelegationState() == DelegationState.PENDING
-                    || !actor.tenantId().equals(task.getProcessVariables().get("tenantId"))
-                    || task.getTenantId() != null && !task.getTenantId().isEmpty() && !actor.tenantId().equals(task.getTenantId())) return List.of();
-            var matching = grants.stream().filter(grant -> grant.runtimeDefinitionId().equals(task.getProcessDefinitionId())
-                    && originalResponsibility(task, grant.active().principalSubject())).toList();
+            var matching = eligibleGrants(actor.tenantId(), actor.userId(), task, grants);
             if (matching.isEmpty()) return List.of();
-            var application = currentApplication(task);
-            if (application == null || !responsibilities.allows(task, actor.userId())) return List.of();
-            var definition = matching.get(0).definition();
-            if (!definition.key().equals(application.processKey()) || definition.version() != application.definitionVersion()) return List.of();
-            var node = definition.graph().node(task.getTaskDefinitionKey());
-            if (node == null || node.type() != NodeType.USER_TASK
-                    || ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole("FINANCE")) return List.of();
-            return node.approvalMode() == ApprovalMode.SINGLE || independentCountersignParticipant(task) ? matching : List.of();
+            var node = matching.get(0).definition().graph().node(task.getTaskDefinitionKey());
+            return ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole("FINANCE") ? List.of() : matching;
         }
 
         /** 分页之前确定完整授权集合；按原审批人和精确原生版本查询，不扫描全租户任务。 */
@@ -151,35 +151,52 @@ public class FlowableApprovalProxyAccess {
             return List.copyOf(allowed);
         }
 
-        private Application currentApplication(Task task) {
-            Object id = task.getProcessVariables().get("applicationId");
-            if (!(id instanceof String text)) return null;
-            UUID applicationId;
-            try { applicationId = UUID.fromString(text); }
-            catch (IllegalArgumentException invalid) { return null; }
-            var application = applications.findById(actor.tenantId(), applicationId).orElse(null);
-            if (application == null || application.status() != ApplicationStatus.IN_APPROVAL
-                    || !(task.getProcessVariables().get("roundNo") instanceof Number roundNo)
-                    || roundNo.longValue() != application.roundNo()
-                    || application.runtimeDefinitionId() != null && !application.runtimeDefinitionId().equals(task.getProcessDefinitionId())) return null;
-            return rounds.findByRound(actor.tenantId(), application.id(), application.roundNo())
-                    .filter(round -> round.status() == SubmissionRound.Status.IN_APPROVAL
-                            && round.definitionVersion() == application.definitionVersion()
-                            && round.processInstanceId().equals(task.getProcessInstanceId()))
-                    .map(round -> application).orElse(null);
-        }
+    }
 
-        private boolean independentCountersignParticipant(Task task) {
-            // 同一人已有本节点责任（包括委派出去等待返回的责任）或已批准，不能再代理另一票。
-            boolean ownPending = tasks.createTaskQuery().processInstanceId(task.getProcessInstanceId())
-                    .taskDefinitionKey(task.getTaskDefinitionKey()).active().list().stream()
-                    .anyMatch(pending -> actor.userId().equals(pending.getAssignee())
-                            || actor.userId().equals(tasks.getVariable(pending.getId(), FlowableCountersignRuntime.USER)));
-            if (ownPending) return false;
-            return history.createHistoricTaskInstanceQuery().processInstanceId(task.getProcessInstanceId())
-                    .taskDefinitionKey(task.getTaskDefinitionKey()).taskAssignee(actor.userId()).finished().list().stream()
-                    .noneMatch(completed -> completed.getDeleteReason() == null);
-        }
+    private List<GrantScope> eligibleGrants(String tenantId, String recipient, Task task, List<GrantScope> grants) {
+        if (grants.isEmpty() || task.isSuspended() || task.getDelegationState() == DelegationState.PENDING
+                || !tenantId.equals(task.getProcessVariables().get("tenantId"))
+                || task.getTenantId() != null && !task.getTenantId().isEmpty() && !tenantId.equals(task.getTenantId())) return List.of();
+        var matching = grants.stream().filter(grant -> grant.runtimeDefinitionId().equals(task.getProcessDefinitionId())
+                && originalResponsibility(task, grant.active().principalSubject())).toList();
+        if (matching.isEmpty()) return List.of();
+        var application = currentApplication(tenantId, task);
+        if (application == null || !responsibilities.allows(task, recipient)) return List.of();
+        var definition = matching.get(0).definition();
+        if (!definition.key().equals(application.processKey()) || definition.version() != application.definitionVersion()) return List.of();
+        var node = definition.graph().node(task.getTaskDefinitionKey());
+        if (node == null || node.type() != NodeType.USER_TASK) return List.of();
+        return node.approvalMode() == ApprovalMode.SINGLE || independentCountersignParticipant(task, recipient) ? matching : List.of();
+    }
+
+    private Application currentApplication(String tenantId, Task task) {
+        Object id = task.getProcessVariables().get("applicationId");
+        if (!(id instanceof String text)) return null;
+        UUID applicationId;
+        try { applicationId = UUID.fromString(text); }
+        catch (IllegalArgumentException invalid) { return null; }
+        var application = applications.findById(tenantId, applicationId).orElse(null);
+        if (application == null || application.status() != ApplicationStatus.IN_APPROVAL
+                || !(task.getProcessVariables().get("roundNo") instanceof Number roundNo)
+                || roundNo.longValue() != application.roundNo()
+                || application.runtimeDefinitionId() != null && !application.runtimeDefinitionId().equals(task.getProcessDefinitionId())) return null;
+        return rounds.findByRound(tenantId, application.id(), application.roundNo())
+                .filter(round -> round.status() == SubmissionRound.Status.IN_APPROVAL
+                        && round.definitionVersion() == application.definitionVersion()
+                        && round.processInstanceId().equals(task.getProcessInstanceId()))
+                .map(round -> application).orElse(null);
+    }
+
+    private boolean independentCountersignParticipant(Task task, String recipient) {
+        // 同一人已有本节点责任（包括委派出去等待返回的责任）或已批准，不能再代理另一票。
+        boolean ownPending = tasks.createTaskQuery().processInstanceId(task.getProcessInstanceId())
+                .taskDefinitionKey(task.getTaskDefinitionKey()).active().list().stream()
+                .anyMatch(pending -> recipient.equals(pending.getAssignee())
+                        || recipient.equals(tasks.getVariable(pending.getId(), FlowableCountersignRuntime.USER)));
+        if (ownPending) return false;
+        return history.createHistoricTaskInstanceQuery().processInstanceId(task.getProcessInstanceId())
+                .taskDefinitionKey(task.getTaskDefinitionKey()).taskAssignee(recipient).finished().list().stream()
+                .noneMatch(completed -> completed.getDeleteReason() == null);
     }
 
     private static boolean originalResponsibility(Task task, String principal) {

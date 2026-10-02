@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 import io.agentflow.auth.AuthService;
+import io.agentflow.approval.process.FlowableApprovalProxyNotifications;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.OrganizationPerson;
@@ -21,11 +22,14 @@ public class NotificationDeliveryService {
     private final NotificationDestinations destinations;
     private final OrganizationRepository organization;
     private final AuthService demo;
+    private final FlowableApprovalProxyNotifications proxies;
 
     /** 组织、偏好、投递按固定顺序加锁，不能与关闭偏好的顺序反转。 */
     public NotificationDeliveryService(JdbcNotificationDeliveryStore store, NotificationPreferencesRepository preferences,
-                                       NotificationDestinations destinations, OrganizationRepository organization, AuthService demo) {
+                                       NotificationDestinations destinations, OrganizationRepository organization, AuthService demo,
+                                       FlowableApprovalProxyNotifications proxies) {
         this.store = store; this.preferences = preferences; this.destinations = destinations; this.organization = organization; this.demo = demo;
+        this.proxies = proxies;
     }
 
     /** 在开始发送前复核当前人员、原同意、消息归属及固定绑定，过期租约只进入未知。 */
@@ -35,6 +39,9 @@ public class NotificationDeliveryService {
         if (identity == null) return null;
         var currentPreferences = lockRecipient(identity);
         var value = store.lock(id).orElseThrow();
+        // 领取可能等待两类行锁；租约起点和抑制事实不能使用等待前的旧时刻。
+        Instant afterLocks = Instant.now();
+        if (afterLocks.isAfter(now)) now = afterLocks;
         var expired = value.progress().expire(now);
         if (expired != value.progress()) { store.save(value, expired, null, null); return null; }
         if (!value.progress().due(now)) return null;
@@ -88,7 +95,8 @@ public class NotificationDeliveryService {
                 ? organization.personBySubject(value.tenantId(), value.recipient()).map(OrganizationPerson::active).orElse(false)
                 : demo.activeAccount(value.tenantId(), value.recipient());
         if (!active) return FailureCode.RECIPIENT_INACTIVE;
-        return store.ownsMessage(value) ? null : FailureCode.MESSAGE_UNAVAILABLE;
+        // 领取可能等待目录锁，代理期限必须在等待后重新观察；旧消息不随新授权复活。
+        return store.ownsMessage(value) && proxies.deliveryAllowed(value, Instant.now()) ? null : FailureCode.MESSAGE_UNAVAILABLE;
     }
     private static FailureCode bindingFailure(NotificationDelivery value, NotificationDestinations.Destination target) {
         if (value.bindingId() == null || value.destinationDigest() == null) return FailureCode.BINDING_NOT_CAPTURED;

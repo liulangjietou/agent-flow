@@ -3,6 +3,7 @@ package io.agentflow.notification;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.TaskAction;
+import io.agentflow.approval.process.FlowableApprovalProxyNotifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +25,13 @@ import static io.agentflow.notification.InboxMessage.Kind;
 public class ApprovalNotificationService {
     private final InboxRepository inbox;
     private final TaskAudiencePort audience;
+    private final FlowableApprovalProxyNotifications proxies;
 
     /** 注入消息仓储和实际任务接收人端口。 */
-    public ApprovalNotificationService(InboxRepository inbox, TaskAudiencePort audience) {
+    public ApprovalNotificationService(InboxRepository inbox, TaskAudiencePort audience, FlowableApprovalProxyNotifications proxies) {
         this.inbox = inbox;
         this.audience = audience;
+        this.proxies = proxies;
     }
 
     /** 提交成功后给申请人确认，并提醒实际第一批审批人。 */
@@ -172,6 +175,7 @@ public class ApprovalNotificationService {
                     application.businessNo(), Kind.TASK_OVERDUE, "system:sla", taskId, task.get().nodeName(),
                     application.roundNo(), occurredAt, null, "审批任务已超过处理期限，请查看当前待办。"));
         }
+        proxies.overdue(application.tenantId(), taskId);
         return true;
     }
 

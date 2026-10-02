@@ -25,6 +25,7 @@ flowable:
 
 agentflow:
   notifications:
+    proxy-reminders-enabled: ${AGENTFLOW_PROXY_REMINDERS_ENABLED:true}
     delivery-worker-enabled: ${AGENTFLOW_NOTIFICATION_DELIVERY_WORKER_ENABLED:false}
     public-url: ${AGENTFLOW_NOTIFICATION_PUBLIC_URL:}
     smtp-servers: {}
