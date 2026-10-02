@@ -13,8 +13,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,12 +36,20 @@ final class InvoiceOfdRenderer {
     private static final int MAX_OBJECTS = 20_000;
     private static final int MAX_LAYER_PAINTS = 20_000;
     private static final int MAX_SEGMENTS = 1_000_000;
-    static final Set<String> OBJECTS = Set.of("PageBlock", "PathObject", "TextObject", "ImageObject");
-    private static final Set<String> IMAGE_ATTRIBUTES = InvoiceOfdVector.attributes("ResourceID");
+    private static final int MAX_BLOCK_DEPTH = 64;
+    private static final int MAX_COMPOSITE_DEPTH = 16;
+    private static final long MAX_LIVE_GROUP_PIXELS = 16_000_000;
+    private static final long MAX_TOTAL_GROUP_PIXELS = 40_000_000;
+    static final Set<String> OBJECTS = Set.of("PageBlock", "PathObject", "TextObject", "ImageObject", "CompositeObject");
+    private static final Set<String> RESOURCE_OBJECT_ATTRIBUTES = InvoiceOfdVector.attributes("ResourceID");
     private static final List<String> LAYER_ORDER = List.of("Background", "Body", "Foreground");
     private int objects;
     private int segments;
     private int layerPaints;
+    private int blockDepth;
+    private long liveGroupPixels;
+    private long totalGroupPixels;
+    private final Set<Element> activeComposites = Collections.newSetFromMap(new IdentityHashMap<>());
     private final InvoiceOfdClips clips = new InvoiceOfdClips();
     private final Map<String, List<Element>> layerCache = new HashMap<>();
 
@@ -122,6 +132,8 @@ final class InvoiceOfdRenderer {
             var scopes = new InvoiceOfdResources.Scopes(archive, contents, page.documentFile(), fonts);
             graphics.setColor(Color.WHITE);
             graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
+            // 显式页面裁剪使复合图元的离屏表面始终受真实输出像素范围约束。
+            graphics.setClip(0, 0, image.getWidth(), image.getHeight());
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             graphics.scale(PIXELS_PER_MM, PIXELS_PER_MM);
@@ -184,19 +196,24 @@ final class InvoiceOfdRenderer {
     private static String layerType(Element layer) { return layer.hasAttribute("Type") ? layer.getAttribute("Type") : "Body"; }
 
     private void block(Graphics2D graphics, Element block, InvoiceOfdResources resources, InvoiceOfdStyle style) throws IOException {
-        for (Element object : children(block)) {
-            if (++objects > MAX_OBJECTS) throw invalid();
-            if (object.getLocalName().equals("PageBlock")) {
-                shape(object, Set.of("ID"), OBJECTS);
-                if (object.hasAttribute("ID")) id(object, "ID");
-                block(graphics, object, resources, style);
-            } else draw(graphics, object, resources, style);
-        }
+        // XML 深度只约束单文件；资源间跳转与 PageBlock 必须合计，才能约束实际 Java 调用栈。
+        if (++blockDepth > MAX_BLOCK_DEPTH) throw invalid();
+        try {
+            for (Element object : children(block)) {
+                if (++objects > MAX_OBJECTS) throw invalid();
+                if (object.getLocalName().equals("PageBlock")) {
+                    shape(object, Set.of("ID"), OBJECTS);
+                    if (object.hasAttribute("ID")) id(object, "ID");
+                    block(graphics, object, resources, style);
+                } else draw(graphics, object, resources, style);
+            }
+        } finally { blockDepth--; }
     }
 
     private void draw(Graphics2D parent, Element object, InvoiceOfdResources resources, InvoiceOfdStyle inherited) throws IOException {
         boolean image = object.getLocalName().equals("ImageObject");
-        if (image) shape(object, IMAGE_ATTRIBUTES, Set.of("Clips"));
+        boolean composite = object.getLocalName().equals("CompositeObject");
+        if (image || composite) shape(object, RESOURCE_OBJECT_ATTRIBUTES, Set.of("Clips"));
         id(object, "ID");
         var box = InvoiceOfdVector.boundary(object);
         var style = InvoiceOfdStyle.resolve(object, resources, inherited);
@@ -216,8 +233,50 @@ final class InvoiceOfdRenderer {
             for (double value : matrix) bounded(value);
             graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
             if (image) image(graphics, resources, object);
+            else if (composite) composite(graphics, resources, object, style, alpha);
             else paint(graphics, resources, object, style);
         } finally { graphics.dispose(); }
+    }
+
+    private void composite(Graphics2D graphics, InvoiceOfdResources resources, Element object,
+                           InvoiceOfdStyle style, int alpha) throws IOException {
+        var resource = resources.composite(id(object, "ResourceID"));
+        Element content = resource.content();
+        if (activeComposites.size() >= MAX_COMPOSITE_DEPTH || !activeComposites.add(content)) throw invalid();
+        try {
+            graphics.clip(new Rectangle2D.Double(0, 0, resource.width(), resource.height()));
+            // 隐藏不跳过展开和校验，避免损坏资源或递归环借此绕过预算。
+            if (alpha == 0 || graphics.getTransform().getDeterminant() == 0) graphics.clip(new Rectangle2D.Double());
+            if (alpha == 0 || alpha == 255 || graphics.getTransform().getDeterminant() == 0) block(graphics, content, resources, style);
+            else translucentComposite(graphics, content, resources, style);
+        } finally { activeComposites.remove(content); }
+    }
+
+    /** 先合成组内图元，再对整组应用一次 Alpha；子图元重叠不能重复叠加组透明度。 */
+    private void translucentComposite(Graphics2D graphics, Element content, InvoiceOfdResources resources,
+                                      InvoiceOfdStyle style) throws IOException {
+        Shape clip = graphics.getClip();
+        if (clip == null) throw invalid();
+        var bounds = graphics.getTransform().createTransformedShape(clip).getBounds();
+        if (bounds.isEmpty()) { block(graphics, content, resources, style); return; }
+        long pixels = (long) bounds.width * bounds.height;
+        if (pixels > MAX_PAGE_PIXELS || pixels > MAX_LIVE_GROUP_PIXELS - liveGroupPixels
+                || pixels > MAX_TOTAL_GROUP_PIXELS - totalGroupPixels) throw invalid();
+        liveGroupPixels += pixels; totalGroupPixels += pixels;
+        var image = new BufferedImage(bounds.width, bounds.height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D isolated = image.createGraphics();
+        try {
+            isolated.setRenderingHints(graphics.getRenderingHints());
+            isolated.translate(-bounds.x, -bounds.y);
+            isolated.transform(graphics.getTransform());
+            isolated.setClip(clip);
+            block(isolated, content, resources, style);
+            Graphics2D device = (Graphics2D) graphics.create();
+            try {
+                device.setTransform(new AffineTransform());
+                device.drawImage(image, bounds.x, bounds.y, null);
+            } finally { device.dispose(); }
+        } finally { isolated.dispose(); image.flush(); liveGroupPixels -= pixels; }
     }
 
     private void paint(Graphics2D graphics, InvoiceOfdResources resources, Element object, InvoiceOfdStyle style) throws IOException {

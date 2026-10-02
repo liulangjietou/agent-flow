@@ -82,9 +82,7 @@ final class InvoiceOfdResources {
 
     BufferedImage image(long id) throws IOException {
         Resource resource = resource(id, "MultiMedia"); Element definition = resource.element();
-        shape(definition, Set.of("ID", "Type", "Format"), Set.of("MediaFile"));
-        if (!required(definition, "Type").equals("Image")) throw invalid();
-        String file = archive.file(resource.base(), text(child(definition, "MediaFile", true)).trim());
+        String file = imageFile(resource);
         try (var input = archive.open(file); var stream = new MemoryCacheImageInputStream(input)) {
             var readers = ImageIO.getImageReaders(stream);
             if (!readers.hasNext()) throw invalid();
@@ -113,6 +111,34 @@ final class InvoiceOfdResources {
         }
     }
 
+    /** 预览图片只校验引用；实际输出始终完整绘制必需的矢量 Content。 */
+    Composite composite(long id) throws IOException {
+        Element definition = element(id, "CompositeGraphicUnit");
+        shape(definition, Set.of("ID", "Width", "Height"), Set.of("Thumbnail", "Substitution", "Content"));
+        double width = number(required(definition, "Width")), height = number(required(definition, "Height"));
+        if (width < 0 || height < 0) throw invalid();
+        for (String name : new String[]{"Thumbnail", "Substitution"}) {
+            Element preview = child(definition, name, false);
+            if (preview != null) {
+                shape(preview, Set.of(), Set.of());
+                imageFile(resource(integer(text(preview).trim(), 1, 0xffff_ffffL), "MultiMedia"));
+            }
+        }
+        Element content = child(definition, "Content", true);
+        shape(content, Set.of("ID"), InvoiceOfdRenderer.OBJECTS);
+        if (content.hasAttribute("ID")) id(content, "ID");
+        return new Composite(content, width, height);
+    }
+
+    private String imageFile(Resource resource) throws IOException {
+        Element definition = resource.element();
+        shape(definition, Set.of("ID", "Type", "Format"), Set.of("MediaFile"));
+        if (!required(definition, "Type").equals("Image")) throw invalid();
+        Element file = child(definition, "MediaFile", true);
+        shape(file, Set.of(), Set.of());
+        return archive.file(resource.base(), text(file).trim());
+    }
+
     private Resource resource(long id, String type) throws IOException {
         Resource resource = resources.get(id);
         if (resource == null || !resource.element().getLocalName().equals(type)) throw invalid();
@@ -124,6 +150,12 @@ final class InvoiceOfdResources {
      * @author owlzhangfq@gmail.com
      */
     private record Resource(Element element, String base) { }
+
+    /**
+     * 保留原 Content 身份以检查活动引用链；宽高是裁剪尺寸，不是自动缩放目标。
+     * @author owlzhangfq@gmail.com
+     */
+    record Composite(Element content, double width, double height) { }
 
     /**
      * 一个输出页内复用模板资源作用域；字体由整次渲染会话持有，资源 ID 仍按私有作用域解析。
