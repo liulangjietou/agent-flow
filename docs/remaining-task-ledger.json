@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T21:58:01.424976+00:00",
+  "recordedAt": "2026-10-03T22:20:13.836073+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工及供应商付款、凭证、费用预算、冲销、结算、回款、应付调整、放款退回、原还款及复核通知已接通。本阶段补齐预算调整台账复核失败、原指令结果、冲突与安全结束通知，以及受当前权限保护的原消息详情。113 项 Java、220 项前端用例通过；原批准修订、历史事实、重复去重及通知事务回滚已验证。报销资源调整等独立异常来源、固定包和环境验收仍待完成。",
+      "observed": "既有付款、凭证、预算、冲销、结算、回款、还款复核及预算调整通知保持。本阶段补齐整笔报销资源调整准备异常、原预算冲正结果、资源受阻／完成及实际安全结束通知，并接通受原轮次权限保护的原消息详情。94 个不同 Java 用例和 189 项前端用例通过；原结算修订、历史事实时间、去重、通知失败资源回滚及失权投递拦截已验证。部分报销调整等独立来源、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1758,6 +1758,14 @@
         },
         {
           "path": "docs/evidence/budget-adjustment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-adjustment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-adjustment-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3558,9 +3566,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "REPAYMENT_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
-    "implementationCommit": "1a06c0c1e206d96a5fa4b7b08c5b3935d489ca9e",
-    "evidence": "docs/evidence/repayment-notifications-20261003.json",
-    "recordedAt": "2026-10-03T21:16:22.733236+00:00"
+    "status": "WHOLE_EXPENSE_RESOURCE_ADJUSTMENT_NOTIFICATIONS_SCOPE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "39e06bd24664849821c78ba970b4d12f773932c5",
+    "evidence": "docs/evidence/expense-adjustment-notifications-20261003.json",
+    "recordedAt": "2026-10-03T22:20:13.836073+00:00"
   }
 }

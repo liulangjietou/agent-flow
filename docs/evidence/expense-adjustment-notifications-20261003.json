@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T22:20:13.836073+00:00",
+  "task": "F17",
+  "status": "WHOLE_EXPENSE_RESOURCE_ADJUSTMENT_NOTIFICATIONS_SCOPE_VERIFIED_TASK_OPEN",
+  "sourceCommit": "39e06bd24664849821c78ba970b4d12f773932c5",
+  "branch": "codex/governance-identifier-integration",
+  "knownOpenTaskCount": 34,
+  "sourceTrace": {
+    "callers": [
+      "ExpenseResourceAdjustmentController",
+      "ExpenseResourceAdjustmentWorker"
+    ],
+    "applicationServices": [
+      "ExpenseResourceAdjustmentPreparationService",
+      "ExpenseResourceAdjustmentBudgetExecution",
+      "ExpenseResourceAdjustmentExecution",
+      "ExpenseResourceAdjustmentActionService"
+    ],
+    "downstream": [
+      "JdbcExpenseResourceAdjustmentPreparationRepository",
+      "JdbcBudgetConsumptionReversalRepository",
+      "JdbcExpenseResourceAdjustmentRepository",
+      "ExpenseResourceChanges"
+    ],
+    "responsibility": "Application services emit saved facts inside the original transaction; repositories prove original source revisions and actual reversal effects; notification access enforces original recipients and current original-round financial permissions.",
+    "testGap": "Existing tests verified finance state and atomicity but never asserted notification creation or inbox navigation."
+  },
+  "delivered": [
+    "Preparation failure and source invalidation notifications",
+    "Original budget unknown/not-found/rejected/expired/voided/reconciling/applied facts",
+    "Local resource blocked/completed facts distinct from budget results",
+    "Safe retirement based on actual persisted decision without duplicate unsent-void notification",
+    "Canonical original-id/fact deduplication, original fact timestamp proof, immutable settlement revision binding",
+    "Read-only no-store original message endpoint with current authorization and revocation-aware delivery",
+    "Actual Vue inbox and detail, stale-response/identity/timeout/unmount protections, original-round navigation"
+  ],
+  "redEvidence": {
+    "backendCases": 4,
+    "backendFailures": 4,
+    "backendErrors": 0,
+    "backendSession": 84487,
+    "webMissingEntryFailures": 1,
+    "webSession": 91682,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-red.log",
+    "webLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-web-red.log"
+  },
+  "validation": {
+    "java": {
+      "counting": "Distinct (classname,name) with last executed result; reruns do not increase the count.",
+      "distinctCases": 94,
+      "domainCases": 27,
+      "serverCases": 67,
+      "classes": 9,
+      "allLatestPassed": true,
+      "attempts": [
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.finance.BudgetConsumptionReversalTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.BudgetConsumptionReversalTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.finance.BudgetConsumptionReversalOperationTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.BudgetConsumptionReversalOperationTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.finance.ExpenseResourceAdjustmentPreparationTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.ExpenseResourceAdjustmentPreparationTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.finance.ExpenseResourceAdjustmentTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.ExpenseResourceAdjustmentTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 26,
+          "failures": 0,
+          "errors": 1,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.notification.NotificationDeliveryApiIntegrationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.notification.InboxIntegrationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.notification.InboxIntegrationTest.xml"
+        },
+        {
+          "run": "first-scope",
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.api.OpenApiContractTest.xml"
+        },
+        {
+          "run": "repaired",
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/repaired/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml"
+        },
+        {
+          "run": "contract",
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/contract/TEST-io.agentflow.api.OpenApiContractTest.xml"
+        },
+        {
+          "run": "domain",
+          "class": "io.agentflow.finance.ExpenseResourceAdjustmentTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/domain/TEST-io.agentflow.finance.ExpenseResourceAdjustmentTest.xml"
+        },
+        {
+          "run": "original-api",
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/original-api/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml"
+        },
+        {
+          "run": "message-final",
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/message-final/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml"
+        }
+      ]
+    },
+    "newIntegrationTests": 8,
+    "newDomainTests": 2,
+    "webTests": 189,
+    "webFiles": [
+      "budget-adjustment-notifications.test.mjs",
+      "budget-notifications.test.mjs",
+      "disbursement-return-notifications.test.mjs",
+      "expense-return-notifications.test.mjs",
+      "expense-settlement-notifications.test.mjs",
+      "notification-deliveries.test.mjs",
+      "notification-preferences.test.mjs",
+      "notifications.test.mjs",
+      "payment-notifications.test.mjs",
+      "repayment-notifications.test.mjs",
+      "repayment-review-notifications.test.mjs",
+      "reversal-check-notifications.test.mjs",
+      "reversal-notifications.test.mjs",
+      "supplier-adjustment-notifications.test.mjs",
+      "supplier-payment-notifications.test.mjs",
+      "supplier-return-notifications.test.mjs",
+      "supplier-settlement-notifications.test.mjs",
+      "voucher-notifications.test.mjs",
+      "expense-adjustment-notifications.test.mjs",
+      "expense-resource-adjustment.test.mjs"
+    ],
+    "newWebTests": 10,
+    "openapi": {
+      "operations": 358,
+      "schemas": 736,
+      "requestExamples": 125,
+      "result": "PASS",
+      "responseRecordsChecked": 6
+    },
+    "typecheck": "PASS",
+    "viteBuild": "PASS with existing >500 kB chunk warning",
+    "authors": {
+      "files": 1613,
+      "namedTypes": 3130,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "fixtureCorrections": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-fixture-corrections.json",
+    "excludedStaleReports": "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-excluded-reports.json",
+    "runtimeLimit": "H2 integration, actual authentication and Flowable, synthetic finance receiver; no browser, PostgreSQL, fixed-package or enterprise-acceptance claim."
+  },
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseAdjustmentChanged.java": "23fb75691093592eb1684a7b130f4ee9e383b01a31182ae2c4f59ba4a25f6fd5",
+    "agentflow-domain/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotice.java": "c0b56a9ac0e09ed446f955e316c63687ec4de026d2536a4e13b96f9d6ba2bf04",
+    "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java": "a4ca0a7307ebba9295b4b2fa1bbd92101c7195d1c905ced26f410fca1535ec90",
+    "agentflow-domain/src/test/java/io/agentflow/finance/ExpenseResourceAdjustmentTest.java": "4b627c4b13d69e00b62090f850b702ce9536a0a02eef626f8a79458ae148fec9",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentActionService.java": "796db3f8fd11961e9ac4ee4bda37271b7ce7d126e2fa73aaeb845e788c0f4ed0",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentBudgetExecution.java": "188df2ec5d9f468b182510ca2598415a7bc52787ff09d3e3c9fb23b41bc0fcfd",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentExecution.java": "d16ca7552a40ed300a07e1dad327150de1894bb56e6a3a2aadfeef9c8659d330",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentPreparationService.java": "68f8758a96c8e7e85d47df815cbb5a4690e0810d80e28c02c70b1d3e57f0caf2",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseResourceAdjustmentRepository.java": "5ac013b00b22df007972fa9d3c853d7f44bdfa301248d6f4c95ea951c14e0cc8",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcBudgetConsumptionReversalRepository.java": "5c9aba32947e103f7c80e51c4813e1b71dcf811beab8afa00ee4da9e509d2287",
+    "agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationAccess.java": "0f84d8f8bbcf58a6cad9f739f9ae7d1b883b2da9f67c287f63a96049a279ae37",
+    "agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationController.java": "8b7f63653c0ba743b153a4881cf92fbcd7ee7f7574043f01b26bd05665a6a00c",
+    "agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationService.java": "84186e10ae96443693ff0e80135e4584a2896a87a4d12dd74e63801b3c90b550",
+    "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java": "f9a38538dcf63c765113ceb9ce87bf1e86d1c3c19fedf169a447581ba760dbe9",
+    "agentflow-server/src/main/resources/api/openapi.json": "298e4ea5801b898e029beeb3a668fc0e8f1e471bab8e5a87e37095c564116532",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "5482ca2a45fa35848241b3f653376583e163ebcbb9f547a8ef7ca265b51cc7ec",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "5f3c2ce178e98efb8cee496e59b41656ac94b737bedb68e3a51e7f49103b8053",
+    "agentflow-web/scripts/test-requests.mjs": "d1e1cc8335ff374fb9fbea300b24669acad684bb02ad028fcd4b0299c1198290",
+    "agentflow-web/src/App.vue": "7cd3283bd52bf8e231d18eff1857072cb3b8c8732ca696ae9a5a92e7f5ae7455",
+    "agentflow-web/src/api.ts": "753299b18d754d87ca03857d7ba0035a1c81f016ed2081529b5369318345da09",
+    "agentflow-web/src/components/ExpenseAdjustmentNotificationDetail.vue": "f5250f1def6a110c68e786c989885f7caf3201cbcbb4d90226a01126b096a752",
+    "agentflow-web/src/components/NotificationInbox.vue": "132ebe81d19519422da8e0fd06a96642182605a89319d449a128dbc430490282",
+    "agentflow-web/src/expenseAdjustmentNotification.ts": "d9f0960b0052b138640633485675e02bb1dda3695163fa00d01cbf7d121714c7",
+    "agentflow-web/src/notificationInbox.ts": "b2c1e433bcbad249f33347bd70169bcd11fb96c5202bd81a2994af4d0aeb7a7c",
+    "agentflow-web/tests/expense-adjustment-notifications.test.mjs": "bd5368e41b6bb15eaa7513e86218f2bd2852d017e45344952ca9c8d6aa634015"
+  },
+  "artifactHashes": {
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-authors.log": "c4e20629a80f779b4da29402f359fe8c77af47dc68ca485730588f6e98c12f97",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-build.log": "e34ff6b991ec7188a565d5e07a413a04270ebad51fb8a0661515d1e3602e3bbd",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-contract-java.log": "b382ab17acf3f3a6c120aac0cac7ed5604ec99e4c3fbdfe91aefdae949fb1ce3",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-domain-final.log": "a109f777c5d3f8b4330e104552788510cf9657866e928ff1972748cca31ad0dc",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-excluded-reports.json": "a6acd9fbdfcc08f4cbf3561a3131c5c9433eed80f4041813858f18fac831be5c",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/contract/TEST-io.agentflow.api.OpenApiContractTest.xml": "76f4601ee79a2f00a3183082df38e9f66c2d2cac9db810af5108372b87b436a2",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/domain/TEST-io.agentflow.finance.ExpenseResourceAdjustmentTest.xml": "c9238ad7e42725231acae11c7a527b9980bf4074aa5cd5c2176f9fdfa1bd76b3",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.api.OpenApiContractTest.xml": "aacf3421f38bd1f601e66b82984adcad34a716df06b20f6120d1a38cfa2cf758",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml": "1876322168495e738aced0dc383208716deb2caaa3149b5ec380e3cc657538db",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.BudgetConsumptionReversalOperationTest.xml": "37281cb89943c65ada365416a5955f86860445257c216cdceabc619d2538a434",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.BudgetConsumptionReversalTest.xml": "660f0ccb9f18c4670bd478328b1caddd3f4a42ca894845ea3e38b4bc83c58a3f",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.ExpenseResourceAdjustmentPreparationTest.xml": "74701ffdfec45b5df8cdb7c48cfa8784fef90dd035ef9b7815ab686f1ad91c7b",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.finance.ExpenseResourceAdjustmentTest.xml": "d9f916c1bd0c73ace9482a9ba62c97f55523695a8d1aaa39a33e84427778efcc",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.notification.InboxIntegrationTest.xml": "b5c77cc9d1f0e9179087961c8cb934991ea738f7dcb3cdd3f70f929a3bf487a3",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml": "a19588332931a360cd2ca28e2632ef781297d9caedf33ad640fbc2d7a27a0485",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/first-scope/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml": "02e88104c8cd01210936c3833a805d642cb3f071739013c3e5f62aba1cb78834",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/message-final/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml": "d6769e79f14f51118cd70a78b83b07fab6fabd1ab39e5139279855ff2a3a1490",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/original-api/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml": "1d6090f892d534f60bae1d768804bec0f8379ed8ad4bc15edaafb14cd0a24e2d",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-final-reports/repaired/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml": "8e1b1cf69c75328f33c8d19f9510f091f0881e8505ff82f73768a6b1a075984d",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-fixture-corrections.json": "9aebbbf4f6eca0c2e37436bbb62c657a96a39dbcb522373416f1709c9ff349b6",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-java-summary.json": "7b5b321cbe09d3c4cb5e68711d98184b733af71a695542696ae0dac27a0713b3",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-message-final.log": "83a576742089ba2d88660de170818a5a8abcfaf4b1a669f016427f065a382e9a",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-next-audit.json": "d2ed2fe60810b70af6470cb3e4f363385188527e62b6491bb8ebbadee1f8bcac",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-openapi.log": "e3ec66f877d31462fe5523b0909b21005669c0c214571e2408fadda18d09fe78",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-original-api.log": "89425d43f510ae245cd554b7853805a3b48c7306c55ccd79e4657ceab3039d83",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-red-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml": "4ac4019d24ab5cb836b3323166f64882e636b8f5feb1a79a3338c0a117f4b849",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-red.log": "126221aef8531885ed6677a2f4a6ad32890eabf038f99e8cacb7239a4b852fd9",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-repaired-tests.log": "b4b6a95b88fb6e00561095d4ceb9092da589deafd19e1fdfc65283ecc9a14d03",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-scope.log": "b7f75ee87a1317d53c9263c13274c35defd76babb9cf0fa6db35701326d509a2",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-source-audit.json": "155597f311b03240cec3e754b1fff14864875c26bb7da5f5047e5940b9a71482",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-source-manifest.json": "b9b1f230e38ec0a65c260c423f72d61f02f91b5efed5d9b22ec8d6c7aa253ace",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-web-entry.log": "4c266fa4a1a0bfd776e31f15a74f9fe28ba016f783ce6cbc024c2ecccfad27da",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-web-files.json": "7d4cea00affde0868f970f5a28b97fec284c2d2c5a6589ba8f386ca62d963c9e",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-web-green.log": "083bc42b02ec95dfbe09811bbbfa4e2613c8f2d3ee8bac6ccc3dd0b8ca17e331",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-web-red.log": "7f68d9b4dba61f62f7899d0bc58ed1b80067dfef1e7b2a2120ade7dbdedca7be",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-adjustment-notifications-web-scope.log": "96c6a8369793b896e0756350e68ac1b5bc016b47d9b4083664108fe4e76fda7c"
+  },
+  "remaining": [
+    "Expense partial adjustment preparation/budget/accrual/resource/decision notifications and remaining original-source coverage audit",
+    "F17 fixed-package runtime, persistence/restart and combined notification acceptance",
+    "Browser and PostgreSQL acceptance not performed in this stage; prior administrator policy and image I/O blockers were not bypassed",
+    "Real enterprise financial and messaging acceptance",
+    "V02 final local gate before E15 remote push/PR/CI; goal remains active"
+  ]
+}
