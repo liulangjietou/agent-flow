@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T03:11:24.650103+00:00",
+  "recordedAt": "2026-10-03T03:33:16.972058+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 39,
+    "knownOpenTaskCount": 38,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 21,
+      "LOCAL_DEVELOPMENT": 20,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 39,
+    "projectRemainingLowerBound": 38,
     "completionPercentage": null,
     "notes": [
-      "39 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "38 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -923,7 +923,7 @@
       "id": "F01",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "费用制度与费用类别的版本化管理",
       "sourceRefs": [
         {
@@ -951,7 +951,7 @@
           ]
         }
       ],
-      "observed": "版本化后端、13 个管理操作、专用权限、管理页面、发布确认、原请求恢复和历史查询已完成阶段验证；事前申请类别修订绑定、旧预检失效与提交并发已验证。填报同版提示及来源展示已通过 44 条 Java 用例（13 条同时在 PostgreSQL 通过）、51 条前端用例、类型检查和构建；管理制度完整业务安装包验收仍待完成，F01 仍为 OPEN。",
+      "observed": "类别与制度版本管理、专用权限、三版本发布、历史查询、本人填报提示及来源、预检失效、提交串行化、事前申请类别绑定均已完成。固定安装包完成正常/超标/禁止项、发布竞争、撤回重提、旧数据兼容与实际页面验收；同包重启和独立恢复保留 240 张表、5,509 行及 9 个附件，恢复后的在审单可继续完成审批。",
       "references": [
         {
           "path": "docs/expense-configuration.md",
@@ -972,19 +972,21 @@
         {
           "path": "docs/evidence/expense-policy-guidance-20261003.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-configuration-complete-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "租户可管理类别和制度版本，覆盖法人、类别、城市等级、职级、日期、币种等条件；发布后不可覆盖；填报反馈与提交结论可追溯到同一权威源；不硬编码企业标准。",
       "dependsOn": [],
-      "progress": {
-        "stage": "FILL_TIME_GUIDANCE_PHASE_VERIFIED_TASK_OPEN",
+      "completion": {
         "implementationCommit": "440704e4969d0ba421d00e3037e61b7206ad29d9",
-        "evidence": "docs/evidence/expense-policy-guidance-20261003.json",
-        "remaining": [
-          "管理制度下实际报销提交、并发发布与不可变历史轮次的完整业务验收",
-          "将填报提示及事前申请类别绑定纳入固定安装包浏览器验收",
-          "结合上述链路的同包重启、恢复与旧数据兼容性核对"
-        ]
+        "verifiedCommit": "a8baeee26ff354dd98fc788412e0cdbd587a5cb0",
+        "verifiedAt": "2026-10-03T03:33:16.972058+00:00",
+        "evidence": "docs/evidence/expense-configuration-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "平台发布版本；认证本人及授权目录；同一企业财务事实源，当前运行夹具为合成事实。真实企业联调由 E03 单独验收。"
       }
     },
     {
@@ -3285,7 +3287,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F01",
     "F02",
     "F13"
   ],
@@ -3295,19 +3296,13 @@
     "ci": null
   },
   "latestProgress": {
-    "taskId": "F08",
-    "implementationCommit": "70faba5e0ee416f31b08a3a5011a964cc46ca061",
-    "completedAt": "2026-10-03T01:19:16.562171+00:00",
-    "openapiPathCount": 274,
-    "openapiOperationCount": 309,
-    "evidence": "docs/evidence/advance-overdue-controls-20261003.json"
-  },
-  "latestInProgress": {
     "taskId": "F01",
-    "stage": "FILL_TIME_GUIDANCE_PHASE_VERIFIED_TASK_OPEN",
     "implementationCommit": "440704e4969d0ba421d00e3037e61b7206ad29d9",
-    "evidence": "docs/evidence/expense-policy-guidance-20261003.json",
+    "verifiedCommit": "a8baeee26ff354dd98fc788412e0cdbd587a5cb0",
+    "completedAt": "2026-10-03T03:33:16.972058+00:00",
     "openapiPathCount": 286,
-    "openapiOperationCount": 323
-  }
+    "openapiOperationCount": 323,
+    "evidence": "docs/evidence/expense-configuration-complete-20261003.json"
+  },
+  "latestInProgress": null
 }

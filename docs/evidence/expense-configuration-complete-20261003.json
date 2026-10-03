@@ -1,0 +1,890 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T03:33:16.972058+00:00",
+  "taskId": "F01",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "verifiedCommit": "a8baeee26ff354dd98fc788412e0cdbd587a5cb0",
+  "lastImplementationCommit": "440704e4969d0ba421d00e3037e61b7206ad29d9",
+  "branch": "codex/governance-identifier-integration",
+  "phaseEvidence": [
+    "docs/evidence/expense-configuration-backend-20261003.json",
+    "docs/evidence/expense-configuration-management-20261003.json",
+    "docs/evidence/expense-plan-category-binding-20261003.json",
+    "docs/evidence/expense-policy-guidance-20261003.json"
+  ],
+  "completionMatrix": [
+    {
+      "requirement": "租户类别与制度版本管理，法人、类别、城市等级、职级、日期、币种等条件可配置",
+      "evidence": [
+        "管理阶段 API/页面与范围测试",
+        "expense-managed-http-configure-and-within.json",
+        "expense-managed-admin-browser.json"
+      ]
+    },
+    {
+      "requirement": "已发布内容不可覆盖，当前类别及生效版本变化使旧事实失效",
+      "evidence": [
+        "expense-managed-http-publication-races-resume.json",
+        "expense-managed-http-plan-category-binding.json",
+        "expense-managed-admin-browser.json"
+      ]
+    },
+    {
+      "requirement": "本人填报反馈和正式预检引用同一已发布规则与可信来源",
+      "evidence": [
+        "expense-managed-http-within-resume.json",
+        "expense-managed-browser.json",
+        "expense-managed-http-policy-boundaries-resume.json"
+      ]
+    },
+    {
+      "requirement": "提交与发布正确串行化，撤回重提保留旧轮次",
+      "evidence": [
+        "expense-managed-submit-races.log",
+        "expense-managed-http-submit-lock-races.json",
+        "expense-managed-http-withdraw-resubmit.json"
+      ]
+    },
+    {
+      "requirement": "同包重启、数据库与原件恢复后仍可读历史并继续审批",
+      "evidence": [
+        "expense-managed-restart-restoration-verification.json",
+        "expense-managed-recovery-browser.json",
+        "expense-managed-restored-workflow-continuation.json"
+      ]
+    }
+  ],
+  "runtime": {
+    "syntheticFinancialSource": true,
+    "newExpenseReports": 10,
+    "newExpensePlans": 1,
+    "checks": {
+      "guidancePrecheckSubmissionSameVersion": true,
+      "oldPublishedPolicyUnchanged": true,
+      "policyBoundaries": {
+        "excess-no-reason": {
+          "status": "BLOCKED",
+          "findings": [
+            {
+              "stage": "INPUT",
+              "nature": "REJECTED",
+              "code": "EXPENSE_EXCEPTION_REASON_REQUIRED"
+            }
+          ]
+        },
+        "excess-with-reason": {
+          "status": "READY",
+          "usable": true,
+          "findings": []
+        },
+        "deny": {
+          "status": "BLOCKED",
+          "usable": false,
+          "findings": [
+            {
+              "stage": "INPUT",
+              "nature": "REJECTED",
+              "code": "EXPENSE_POLICY_DENIED"
+            }
+          ]
+        },
+        "prior-required": {
+          "status": "BLOCKED",
+          "usable": false,
+          "findings": [
+            {
+              "stage": "POLICY",
+              "lineNo": 1,
+              "nature": "REJECTED",
+              "code": "PRIOR_REQUEST_REQUIRED"
+            }
+          ]
+        }
+      },
+      "staleReadyBlockedAfterPublish": true,
+      "publishingWhilePolicyEvaluatesDiscardsResult": true,
+      "publishingWhileGuidanceWaitsDiscardsResult": true,
+      "oldRoundsUnchangedAfterFourVersions": true,
+      "managementRoleRequired": true,
+      "otherEmployeeCannotReadReport": true,
+      "finalSubmissionSerialization": {
+        "publish-first": {
+          "result": "PASS",
+          "observedDatabaseLockWaiters": [
+            1,
+            2
+          ],
+          "selectedPolicyVersion": 4,
+          "publishedVersion": 5,
+          "submission": {
+            "traceId": "1f9c33a0-e557-424b-a11e-94899bff0b2e",
+            "message": "Expense precheck must be refreshed before submission",
+            "path": "/api/v1/expense-reports/072cb6ab-b76e-4f66-800e-6fb6e6b709f3/submit",
+            "code": "POLICY_CONFIGURATION_CHANGED"
+          }
+        },
+        "submit-first": {
+          "result": "PASS",
+          "observedDatabaseLockWaiters": [
+            1,
+            2
+          ],
+          "selectedPolicyVersion": 5,
+          "publishedVersion": 6,
+          "submission": {
+            "reportId": "48a44db0-071e-47a8-83c7-831bae3b491a",
+            "applicationId": "c70876aa-7ffb-4607-8b5d-5c546471282a",
+            "applicationVersion": 3,
+            "financialVersion": 2,
+            "roundNo": 1,
+            "budgetOperationId": "26dda23b-b44b-4c97-861c-6470b3af4b66"
+          }
+        }
+      },
+      "planCategoryBindingRuntime": {
+        "staleRevisionRejected": 2,
+        "frozenCategoryRevision": 3,
+        "latestCategoryRevision": 4,
+        "policyOnlyPublishKeepsReady": true,
+        "historyUnchanged": true
+      },
+      "legacyRoundsReadable": {
+        "plans": [
+          {
+            "id": "0a9fdaef-faed-4b15-972f-53b7270de575",
+            "roundNo": 2,
+            "missingCategoryRevisionReadable": true
+          }
+        ],
+        "expenseId": "4578ee38-3fac-42b4-83bb-2559f5b92b3d",
+        "expenseHasNoManagedReceipt": true
+      },
+      "withdrawAndResubmitAcrossPolicyVersions": {
+        "firstRoundPolicyVersion": 1,
+        "secondRoundPolicyVersion": 7,
+        "secondRoundCategoryRevision": 4,
+        "firstRoundUnchanged": true
+      },
+      "restartAndRestoration": {
+        "restarted": {
+          "result": "PASS",
+          "database": "expense_managed_255a048601",
+          "tables": 240,
+          "rows": 5509,
+          "files": 9,
+          "allRowsAndFilesMatchBeforeRestart": true,
+          "jarSha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804",
+          "boot": 3,
+          "freshLogin": true,
+          "historicalExpenseRoundsPreserved": true,
+          "planCategoryRevision": 3,
+          "currentCategoryRevision": 4,
+          "policyVersion": 7,
+          "readOnlyGuidanceWorks": true,
+          "packagedOpenApiMatchesSource": true
+        },
+        "restored": {
+          "result": "PASS",
+          "database": "expense_managed_restore_235035a798",
+          "tables": 240,
+          "rows": 5509,
+          "files": 9,
+          "allRowsAndFilesMatchBeforeRestart": true,
+          "jarSha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804",
+          "boot": 1,
+          "freshLogin": true,
+          "historicalExpenseRoundsPreserved": true,
+          "planCategoryRevision": 3,
+          "currentCategoryRevision": 4,
+          "policyVersion": 7,
+          "readOnlyGuidanceWorks": true,
+          "packagedOpenApiMatchesSource": true
+        }
+      },
+      "restoredWorkflowContinues": {
+        "result": "PASS",
+        "reportId": "57849d36-6405-4f7c-b0cd-1c0fda1eb364",
+        "steps": [
+          "业务审批",
+          "明确签收后完成原件收单",
+          "财务审核"
+        ],
+        "status": "APPROVED",
+        "frozenPolicyAndAmountsUnchanged": true,
+        "moneyPaid": false,
+        "erpPosted": false
+      }
+    },
+    "startupPreservation": {
+      "sourceCommit": "a8baeee26ff354dd98fc788412e0cdbd587a5cb0",
+      "jarSha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804",
+      "sourcePreserved": true,
+      "clonePreserved": true,
+      "tables": 240,
+      "rows": 5044,
+      "files": 9,
+      "schema": "103"
+    },
+    "backupAndRestore": {
+      "sourceRuntimePreserved": true,
+      "databaseRestored": "expense_managed_restore_235035a798",
+      "rows": 5509,
+      "tables": 240,
+      "files": 9,
+      "jarSha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804",
+      "backupSha256": "62fe7915bd4bced9105dc8930c3f96f9ea6ed3fd22da082fbeb4158baf0d84dc",
+      "databaseAndFilesExactlyMatch": true,
+      "existingBaselineQueuedBudgetTargetChange": {
+        "id": "bfa14374-a14f-4759-bc46-79587ebc9ada",
+        "reportId": "e5c946bc-3826-4cc1-b02b-109d114b35b6",
+        "originalStatus": "QUEUED",
+        "afterEnabledCloneWorker": "UNKNOWN",
+        "reason": "TARGET_CHANGED",
+        "isNewF01Report": false,
+        "note": "历史未执行命令绑定旧目标；副本启用新受控目标后拒绝改投，原源库保持。新增 F01 提交预算全部 APPLIED。"
+      }
+    },
+    "recovery": {
+      "restarted": {
+        "result": "PASS",
+        "database": "expense_managed_255a048601",
+        "tables": 240,
+        "rows": 5509,
+        "files": 9,
+        "allRowsAndFilesMatchBeforeRestart": true,
+        "jarSha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804",
+        "boot": 3,
+        "freshLogin": true,
+        "historicalExpenseRoundsPreserved": true,
+        "planCategoryRevision": 3,
+        "currentCategoryRevision": 4,
+        "policyVersion": 7,
+        "readOnlyGuidanceWorks": true,
+        "packagedOpenApiMatchesSource": true
+      },
+      "restored": {
+        "result": "PASS",
+        "database": "expense_managed_restore_235035a798",
+        "tables": 240,
+        "rows": 5509,
+        "files": 9,
+        "allRowsAndFilesMatchBeforeRestart": true,
+        "jarSha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804",
+        "boot": 1,
+        "freshLogin": true,
+        "historicalExpenseRoundsPreserved": true,
+        "planCategoryRevision": 3,
+        "currentCategoryRevision": 4,
+        "policyVersion": 7,
+        "readOnlyGuidanceWorks": true,
+        "packagedOpenApiMatchesSource": true
+      }
+    }
+  },
+  "browser": {
+    "fillAndSubmit": {
+      "status": "PASS",
+      "checks": {
+        "liveAmountAndQuantityWithoutExtraRequest": true,
+        "onlyApplicableRuleWithSource": true,
+        "mobileNoHorizontalOverflow": true,
+        "failedRefreshClearsAdviceAndCanRecover": true,
+        "createdPrecheckedAndSubmittedThroughBrowser": true
+      },
+      "consoleErrors": []
+    },
+    "plan": {
+      "result": "PASS",
+      "frozenCategoryRevision": 3,
+      "currentCategoryRevision": 4,
+      "freshLogin": true,
+      "completionOracle": "rendered frozen category revision text"
+    },
+    "admin": {
+      "result": "PASS",
+      "currentPolicyVersion": 7,
+      "historicalVersion": 1,
+      "originalConstraintsAndDimensionsVisible": true
+    },
+    "recovery": {
+      "restarted": {
+        "result": "PASS",
+        "freshLogin": true,
+        "planFrozenCategoryRevision": 3,
+        "expensePolicyVersion": 7,
+        "expenseCategoryRevision": 4,
+        "evidenceSourceVisible": true
+      },
+      "restored": {
+        "result": "PASS",
+        "freshLogin": true,
+        "planFrozenCategoryRevision": 3,
+        "expensePolicyVersion": 7,
+        "expenseCategoryRevision": 4,
+        "evidenceSourceVisible": true
+      }
+    },
+    "visualInspection": [
+      "expense-managed-guidance-mobile.png",
+      "expense-managed-submission-sources.png"
+    ],
+    "mobileViewport": [
+      390,
+      844
+    ],
+    "freshBrowserActionsUseLivePackagedHttp": true
+  },
+  "validation": {
+    "newJavaOrWebUnitTestsThisRuntimePhase": false,
+    "explanation": "本阶段没有产品代码修改，复用已通过的范围门禁并执行固定安装包真实 HTTP、PostgreSQL、Flowable 与浏览器验收。阶段用例有重叠，不将数量相加。",
+    "priorPhaseScopes": [
+      {
+        "phase": "backend",
+        "java": 340,
+        "postgresSubset": 47,
+        "web": 31
+      },
+      {
+        "phase": "management",
+        "web": 86
+      },
+      {
+        "phase": "planCategory",
+        "java": 46,
+        "postgresSubset": 21,
+        "web": 43
+      },
+      {
+        "phase": "guidance",
+        "java": 44,
+        "postgresSubset": 13,
+        "web": 51
+      }
+    ],
+    "packaging": "PASS",
+    "frozenFrontendMatchesGuidancePhase": true,
+    "packagedOpenApiMatchesSource": true,
+    "contract": {
+      "paths": 286,
+      "operations": 323,
+      "schemas": 646,
+      "requestExamples": 121
+    }
+  },
+  "diagnostics": [
+    "最初夹具将汇率写成字符串，真实入口按契约拒绝 INVALID_RESPONSE；改为 JSON 数值后在同一草稿重新预检通过，没有修改产品代码。",
+    "验收脚本最初把 PRECHECK_NOT_READY 的 422 误断言为 409，并误读发布响应中的 activePolicy.version 层级；原响应保留，修正夹具断言后接续已有记录，没有重复发布重跑。",
+    "计划页面最初只等 networkidle，仍处在详情加载态；另一次尝试关闭被模态框覆盖的提示。改为等待实际类别修订文本，并在打开模态框前关闭提示，最终页面验收通过。",
+    "一个原基线 QUEUED 预算命令绑定旧财务目标，副本开启工作器后保持 UNKNOWN/TARGET_CHANGED，未被改投新服务。原源库保持不变，新增 F01 提交均得到合成预算 APPLIED 回执。"
+  ],
+  "limitations": [
+    "本地财务源为显式合成规则与事实，不能代替 E03 企业制度、职级及城市等级验收。",
+    "恢复接续验证到人工财务审批结束，不声明真实付款或 ERP 过账；相关外部任务和 F02 保持 OPEN。",
+    "V02 最终全项目验收和 V03 全条款核对仍未完成，本证据只关闭 F01。"
+  ],
+  "taskCountAfterCompletion": {
+    "knownOpen": 38,
+    "localDevelopment": 20,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "remote": {
+    "configured": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseCategoryCatalog.java": "7db7559996d24447f37ba8216a2b367bfaabb1c44820c2215adcb147f5f1a02f",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java": "8839b922d4f860b6a0caa58d9ad065168361f36d4afdfb69f7b29bf17016c373",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlanRound.java": "9b2fecd6df1b562b4a4acb9e795083e58f9e5d09e000a07cf4926982a05e53e5",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyDefinition.java": "7896a7d36a309221e17b30f18e24b7c88610d3179e3eb5ef5f2896c362d76b3b",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyDraft.java": "1fc48c45d3874eefc8e6c0e2ba631d0a233061c568e6ecb2e4f63ae8e477fe58",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyGuidance.java": "0747179216729c968b1e915b6475f401ad321b5f06abb77756a94a7c0b212d4b",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyGuidancePort.java": "d0ee74f05c0990a3f68a760053304b3f07f9f89c218bb662fd3560dacd8fd0e6",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyPort.java": "2bb81d9c05e1922e25f5e14474a52da5c778565c4aec28be7b07cd0c1af93ca4",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyReceipt.java": "cc5df250c4e6813c7db0d0ba57cfefe28e455d9d3bbe96d4992f07ec64d7206a",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySelection.java": "49210e08d308a1dd201082143074a468e9988b6c950c59f1c1e075795bc8cea3",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySnapshot.java": "931321677e020bb92c3f214ef3e2d316aa98d29be94d60f1d7fd76a9b2621fa9",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePrecheckEvidence.java": "e311c59f296280cd57c2825b3152bfa796d668b57a8b7b96f3c40e84b396f770",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ManagedExpensePolicy.java": "6c425c47228601bc883c42dad84daa3427f2923e4ea21f622921c02c562cdcac",
+    "agentflow-domain/src/main/java/io/agentflow/expense/PublishedExpensePolicy.java": "2e1fa25c10b504c233d5dba53c5c098af68227368a5769ae30626d2040157862",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseConfigurationTest.java": "5e2417873b0fabafd74e353874e7a929d8deb0ae5e1d64e071ce091c3ed21b67",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpensePlanTest.java": "ae3abb3e765a66d7474ab83a9c0bce8d56f0a649ede9ee39337babdade41081c",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseReportTest.java": "4aa7c8ded797903622cc7ea59382a538d31c180a0730a4bc8df775d9e1430e6a",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "8f4bca2bf1a9400922fe2e98f81815c873c6f557c1e00d5ca82661fe6d579baa",
+    "agentflow-server/src/main/java/io/agentflow/auth/AuthService.java": "7555eb2466584dd4b76ea88c44e91c41506967cc628d4f434daef94c78f41f5b",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationController.java": "fdc4c2f9a8120ddfcc6d328f6cc8a59c0d87761c6c7c407999965b77227c8e26",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationInput.java": "3cdaa2f1b60c19d14535c01933aa1b1a5787ff99c4fbcc663cf4c7d1f22e6192",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationJsonConfiguration.java": "02debe93d9d4c79df59d6fee10ebf3647bbf3cb8cbb8086664b197eb1f09d5d0",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationQuery.java": "9a7a789f31f5a104f442ab148d96b4e6af868809e51a9b18a9dc13af58c69ac8",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationService.java": "4208824ec1cafa0d142f935c43115191926bdeefae8f9fe8422aa326cb55532e",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckEvaluator.java": "ddad761431cd529dc5fdc3eccea612befabf88e74b7aeb2c93c7e3ff04388a61",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckService.java": "922ef51e105c2ad8dce72a978f95e455f1aeb7c67bc46bbce87785d84dcb68fd",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanSubmissionService.java": "61af143f9f4caf5b421801c99ffa13155f188be565c71bf27c1020ff8377ef1c",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePolicyConfiguration.java": "976bb8e0cedac8dc051f891bc931c93841736a252878f254a10ae6759820b596",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePolicyGuidanceController.java": "0dc7d6a9617249062e4b75b9e88c2e6deca0971fcabb28efbb6e5d6047b4fc2d",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePolicyGuidanceService.java": "905f8a0b4f14372d4abcb895e83568576b1957ff211aa149134ce34eb86df2b7",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java": "a8baee5c0d9053633d0b86f1cdbeb6ed4967ebcb0cc6ceeb839e00255f9ea9cd",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java": "49c1a0902819bf49e24904a7d38bd9f6dbbac364885a8d687ddf3c3011197485",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java": "efdfd9579d5abdad00e26a67d31857727fd7cd83e6bc697c7341e3e2b2ec4eba",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseConfigurationRepository.java": "09548a1053b5628367be6a7d50e2d5c6f37f15397557d5b3ca2a85b890608018",
+    "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java": "daeaa76b499cd5821d22b59e2ee3cd87db6afb9992c6b231160c28bfc0f3e5ca",
+    "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicies.java": "9a44b29edbe280698426097cc9f4e2ffa3beeda5cea20ad80a696280f5c2edbb",
+    "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicyGuidance.java": "9cbf6fc724764d0fbfaffe2c9060b04a306d9b561ff050e1ebf904a331b6bee7",
+    "agentflow-server/src/main/java/io/agentflow/finance/GatewayFinanceMasterData.java": "b4f4d2f19ef01553c759bda5fc6f239e912264669d56ec95c5d1e39c837358b4",
+    "agentflow-server/src/main/resources/api/openapi.json": "b6bfdd7552d8a799acb533f13140e5be5777d579a8fe4ce47a008cafdceff1f0",
+    "agentflow-server/src/main/resources/db/migration/V103__expense_configuration.sql": "3bf910f1f242b35db65a8f1e5cc4f0554317209fdf733ba7e583641b1f8f4872",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "0a0078e927bc6cb8cf4bfbc681a24223960ab6a59370f40b0a6d251f237b559e",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationApiTest.java": "f089590d81b12fdce42e7dd54b257333d5e47fcea275ed36645ba3368ede7e7f",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationIntegrationTest.java": "eb468872ba3e381e017f21050e0e59ab7bf6294d22e835008d8228c53b252f25",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationMigrationTest.java": "cbb848d47443508979ce553eaa151ba9ec34b677dbaf8b1014817e676443915b",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePlanIntegrationTest.java": "58f41927b4f15e305fe3db1eda29455788f5ebca192363feb1ae4eaad69bc971",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePolicyGuidanceIntegrationTest.java": "240c4b6b2b6a52add1d70dc068541de13348e1579ce51aacac264f9992014e6e",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckIntegrationTest.java": "29bc6043e96fb7405e2f99bbdc8df9e9e7c67addd62c057aa228b1921d2fcb42",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java": "d1afebb99b002be864f4daeea19cb4033895e038401966ff73eb35994f1b051d",
+    "agentflow-web/scripts/test-requests.mjs": "ea321ccfd8361441144457d1d6c10083a9908be12b89dbac057d1370832208d9",
+    "agentflow-web/src/App.vue": "9965660f1911ad301ecd0749828961f0968ce25e021084c2513fd5326b793a3b",
+    "agentflow-web/src/api.ts": "d35a4d756973b4e92b557a6cca7f84754a6f1c75618ea1ea49c3b34e3d053cdc",
+    "agentflow-web/src/components/ExpenseConfigurationHistory.vue": "ee15a46c7e1ce904987f880db9876687c79386a25c7cc476b1deb298892ac6eb",
+    "agentflow-web/src/components/ExpenseConfigurationManager.vue": "94c95c5258caba02a8b2d6e00a035445d217e9ea61e9ee72fc153b3dba1db9a0",
+    "agentflow-web/src/components/ExpenseDetail.vue": "40ecb0eef7b0ff2a977f206f9bcde7d3eb83d79f2cb62e2f19f0f3bb99cb4c45",
+    "agentflow-web/src/components/ExpenseEditor.vue": "2a0a07397508cbb287a7844fd0e104a1a683a4c812e41b4f1615fdf14eecb819",
+    "agentflow-web/src/components/ExpenseLineEditor.vue": "4b8a74839b3e4d85303030e2373b7943d543245e40e7d3668d4e55b4931f5545",
+    "agentflow-web/src/components/ExpensePlanLines.vue": "74593ad313d155f19338e33914a59a1f18e8bf7a86884515f1b129de0dda7197",
+    "agentflow-web/src/components/ExpensePolicyGuidance.vue": "2cfea0d18de9660260b23d3a9a724b8ba00cfad82f2b7295f01a9f81c10387ee",
+    "agentflow-web/src/components/ExpensePolicyRules.vue": "2e517808d85a74faf808c1e70a7f46a230a6d77f2ad786380d3cdbbf5f506d4e",
+    "agentflow-web/src/components/ExpensePolicySummary.vue": "055213898c02be906befea0bfda8a9461701b60e7066e11480bfe68e742b327b",
+    "agentflow-web/src/components/ExpenseSubmission.vue": "85252a4a7b10baa2f5318073c9550d90288afb7b493057009c10be67560d15f6",
+    "agentflow-web/src/components/WorkspaceNavigation.vue": "04481f91b8156584f0bb28f1b80be983219a88766f9bc4683bd6563b696c9a79",
+    "agentflow-web/src/expenseConfiguration.ts": "7f751d2f38b53d5f9c329f166c78fab36126f0bc50095663589b72faf935f03d",
+    "agentflow-web/src/expenseConfigurationDrafts.ts": "ae36d53f9e5825aa010af4fce21be922f52db6871bd8fbd07bdcf3793a311096",
+    "agentflow-web/src/expenseConfigurationRead.ts": "91eb15ada6e6b12e9e1348cecca60700be4a4067bfe4f5a1c78f7d0666bb3ab2",
+    "agentflow-web/src/expenseDraft.ts": "a1ba99d265dde8122f2c5d88555a41e4d672316436b887b2a8787ca11a08f6c5",
+    "agentflow-web/src/expensePlan.ts": "af1d6a342b98d511c5032594f2fd9d8901f52f25df84009a83055255c44aec04",
+    "agentflow-web/src/expensePolicyGuidance.ts": "8573c6dc611d06f9540b7dc310bbd85e332e2f89caad889afbe63be083520134",
+    "agentflow-web/src/expenses.ts": "2a5d6b95e77d87b86cfb876d403fd13c78b42590f1d01130447b1a07acc98e32",
+    "agentflow-web/src/workspaceNavigation.ts": "d5bb167b170825ce1c43b3eb80e9ed6836682dae48d2fc410bc6e130ac3882bd",
+    "agentflow-web/tests/expense-configuration.test.mjs": "efdf24d726f4622fb4f1fc7015a64afb799cff57fc618300779baf4015786258",
+    "agentflow-web/tests/expense-plan.test.mjs": "14c0589ba4a31a67d3ed2599c4cd0bd089da72f5654728b8575e4194774efc3a",
+    "agentflow-web/tests/expense-policy-guidance.test.mjs": "b818fae6077f877979075539a936cd59f555770a7f9c5266f8cd4eb921749dc2",
+    "agentflow-web/tsconfig.json": "85039f808777dda8cc36936213b9e4c5f99c03ea34e6f8d25ad1bfb5503b2bc4"
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/backup-restore-expense-managed-runtime.py",
+      "bytes": 3973,
+      "sha256": "b45bd3c84dff6ba12e8d024797316445b9666c20051441e92dc0247afe8d4e43"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/exercise-expense-managed-publications-v1-diagnostic.py",
+      "bytes": 3622,
+      "sha256": "124c8b497e3351f9ecfaab5ff4ed1894f08c9fbbc8e6e813d3dbc1e8b8ab4e4d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/exercise-expense-managed-publications.py",
+      "bytes": 3670,
+      "sha256": "a4cdf353c3fcefde19f78f8a665244ffba1ec63e4103a5a2d41de04cb5847bb2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/exercise-expense-managed-submit-races.py",
+      "bytes": 5095,
+      "sha256": "ceda7df965bc7a6a527dd922ef6fe1b0e5b8c63792d274fc3d47957dbec52c7b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-admin-browser.json",
+      "bytes": 119,
+      "sha256": "1d8c42aece6d91021d03c9a5c2b6176605b76af5e0095b8b22ffb38ab413403f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-admin-current-and-history.png",
+      "bytes": 763375,
+      "sha256": "9dd7b96b05d491c97f9e78242d0e7ae011d9cb7b311bc23e2fc3a614691eddd7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-after-submit.png",
+      "bytes": 312483,
+      "sha256": "e721c3e6d660af00ae0bbe220930a5452095c1b268acdbc63ac7ecb745ed84cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-backup-restore.json",
+      "bytes": 804,
+      "sha256": "0c435ad8db995770f04e1f115ebf2e64feefcbc85a18252ca033ac31a7b292dc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-before-restart.json",
+      "bytes": 26673,
+      "sha256": "a840b631d37b154ee809a01f6ccc21755232c3460edbccaa061b4d9975483c95"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser-editor-recon.txt",
+      "bytes": 479,
+      "sha256": "05da0b84051a7edf0a95a19afa78a281a9b356f9b1a5800680f26691d283df1a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser-financial-recon.txt",
+      "bytes": 806,
+      "sha256": "ff4ac69fe6bd3fc9dbf02b8b0c0a2cb15a6d7566b187b11f3d5574eda4337b2a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser-initial.png",
+      "bytes": 110861,
+      "sha256": "eec3931b0ed5def4e2220de639283b47466fedc7b1b6b99f9a1abf0d7cbe97a6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser-recon.txt",
+      "bytes": 945,
+      "sha256": "f36afa97c4b2ae99c4ab858263319a2f3b58b1c029611254c0fe803d909a2c67"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser.json",
+      "bytes": 6020,
+      "sha256": "745aeb79931be7e051be954e87943adb266fb93c60383f5226db0a777eb700b7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser.log",
+      "bytes": 308,
+      "sha256": "d870ebba41dab888b38f5095de70a399077b3f0e08d6cdc1c6fed86029c25b2a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-browser.py",
+      "bytes": 9168,
+      "sha256": "768575da362f37c0ad2f6a2f7f9c2192ee2ded66b06b8b10a08ae261a6af496f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-database-restore.log",
+      "bytes": 18292,
+      "sha256": "d269a51067882af63f6014d61eb8d480acf44e56ec1ebf46c149d71a5141665d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-finance-calls.jsonl",
+      "bytes": 84897,
+      "sha256": "4cfe86f31ebe9de5fe453a03f901bcb8ef91d60a4a97b043df65adc038a301a8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-finance-receipts.json",
+      "bytes": 1908,
+      "sha256": "2bdd44dfdf5469468e599f4e42408749a5f7777ad88dda0a145e3061e8bbb5d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-finance-v1-diagnostic.py",
+      "bytes": 9101,
+      "sha256": "6654e0678222da48409ff32dc7de6aca3e11c61aa288e391ca4b8bc6a1f998d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-finance.py",
+      "bytes": 9099,
+      "sha256": "dba514341599adf3dfa01d7dde45bba8383dd06fb6820f8dc8b680181a47ae99"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-guidance-desktop.png",
+      "bytes": 53849,
+      "sha256": "eca3241635cd80cdd7ce83857ba6b86564a07a7386c57c48ca820133eb8ae4b6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-guidance-mobile.png",
+      "bytes": 76674,
+      "sha256": "a15f6134514da086a8d78c945203754391eb211b142a68a9e9224afaa297aac1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-after-restarted.json",
+      "bytes": 2529259,
+      "sha256": "fbf8f17f4814fe9d437002a2401cc0adebf5b3f97844f3fd29f190ff88d77782"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-after-restored.json",
+      "bytes": 2529259,
+      "sha256": "9b49cb4b18acf3815e8499192cf1477ad7cb8cb0236654cb9e1db3127f2ce0ea"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-before-resubmission.json",
+      "bytes": 6304,
+      "sha256": "dfc52547c77d26a46676f06521cccef0c688317f75206f961ff2820946c59a10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-configure-and-within.json",
+      "bytes": 35277,
+      "sha256": "4ec3b7fd53d97f709b2cb14572a934bf32936d7085693035051d4e6a92e61950"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-initial-read.json",
+      "bytes": 7423,
+      "sha256": "1ceb4c0c1d6105d42ca2e915bf100500bac1e85ed5787dac78c68bdd36688e3b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-initial.log",
+      "bytes": 1219,
+      "sha256": "870f6ffda1a43e2bc1c9c8a24045e0c8bdec70f0e3f32f7fd371920b05cbd65b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-legacy-rounds.json",
+      "bytes": 10860,
+      "sha256": "fe671504ef334410e7a67aa51a56d643a969565dc8f2933a75ef3a675dcda0db"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-plan-category-binding.json",
+      "bytes": 52442,
+      "sha256": "2154e8f32c2b37f95bc8f125caf61d4ef401a17a3eb0e2dfd1bf9e68efaf41ef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-plan-create.json",
+      "bytes": 13513,
+      "sha256": "f96b40963caddc9beb152f00cd11e257989fb2141cbc0b1d304a740776cb5d7a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-policy-boundaries-resume.json",
+      "bytes": 66468,
+      "sha256": "1e197b2f7569f57d5feae23717f0ba93505edd59ab58629ff46113c27f398cff"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-policy-boundaries.json",
+      "bytes": 13749,
+      "sha256": "25228ca559ede7c0eb8e6756cf8632e8f33741e22d72d1f4276b2db5af978b3e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-publication-races-resume.json",
+      "bytes": 86059,
+      "sha256": "0c79c5c6bd6e451546c8bcc14dff1564c6abc5451ae053c976b191ff50b5e0cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-publication-races.json",
+      "bytes": 37624,
+      "sha256": "427faf0be7d8c2963a11469abe951818053a7beefccd1ebab872ac4d422a62c1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-restored-workflow-continuation.json",
+      "bytes": 32161,
+      "sha256": "d329f52a018a6fa304a2d0b0997c60963e7a734a1001640d1616f26736ba9f9c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-restored-workflow-read.json",
+      "bytes": 5645,
+      "sha256": "c396ab5503efed6feb868a9b990e51197254d185cae53668753a314dfe1ea6ba"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-submit-lock-races.json",
+      "bytes": 93024,
+      "sha256": "c651c8eafd08a6390b620185afafe876a31e28348dcf0ae3ecf22fd955540fcb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-withdraw-resubmit.json",
+      "bytes": 35085,
+      "sha256": "040eea41945bb17371398b1eef7f6558f9b82a6429db5a8bb7ef6749cfb45611"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-http-within-resume.json",
+      "bytes": 22908,
+      "sha256": "998214d6f4a8bc75cebc5b98d8c5ccf228c364c57b0f20e32250aad12cd7f181"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-journey.json",
+      "bytes": 123371,
+      "sha256": "27cda4a29a057ce0d54533747eba49afd329ac509856a1fe32bb1cc20ef524dd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-plan-bound-version-verified.png",
+      "bytes": 142834,
+      "sha256": "6fda02405a1ff8a2161d675e6759130144acfeccd021f40b8c70a3bb62027685"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-plan-bound-version.png",
+      "bytes": 142834,
+      "sha256": "6fda02405a1ff8a2161d675e6759130144acfeccd021f40b8c70a3bb62027685"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-plan-browser-recon.txt",
+      "bytes": 103,
+      "sha256": "4e13286c4a6606c1e1c4b981117576a3ab6f8fbe6e4405ae8a62937ba6b4f876"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-plan-browser.json",
+      "bytes": 160,
+      "sha256": "7d9457269d4746697e81b6081757fbdac5a443461d50d4ff6a84969c42896913"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-preview.mjs",
+      "bytes": 541,
+      "sha256": "1fe63fd816fce29b764a3b2d491e54f64ad5b6321d65aea6d4b9376a94945ae1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-publications-resume.log",
+      "bytes": 273,
+      "sha256": "43e3689f13270353391e87cc7ee328dfe7e3159399a21607faceca07de735517"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-publications.log",
+      "bytes": 205,
+      "sha256": "c85fb308372174e99768341c88d1563384db3440fd5adeb087c81566093ad4d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-recovery-browser.json",
+      "bytes": 410,
+      "sha256": "56343ff1851ce089a6ac5c2b61d17ea79e81f8538188b8464db8d50b86d68107"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-recovery-browser.log",
+      "bytes": 348,
+      "sha256": "0246b0958a23c4c6cbfd0cd9d275f638c66fb9aa87956211213c47941bab3387"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-recovery-browser.py",
+      "bytes": 2912,
+      "sha256": "e7a897a0e0e11aaed385f213610ac54bc1615a67848ac85bb1d9b7ad078e1362"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restart-restoration-verification.json",
+      "bytes": 1060,
+      "sha256": "33cd1237434f93f6bf37b36a4f91901356e996c640b01c02d5669fb49e6a6b3b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restarted-expense.png",
+      "bytes": 305953,
+      "sha256": "fac108e40042ca209004ab6588875e8876e682b47dc1205aa26d50b67d640c1b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restarted-plan.png",
+      "bytes": 147839,
+      "sha256": "685853fba892a58ffd69dd8b522f169300721c2c3f40168a02095408bf44a0e9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restore.log",
+      "bytes": 18290,
+      "sha256": "26b30a37733d89cb006f9831800f8cdc8ecfd28046915288960d01715b4ccf70"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restored-expense.png",
+      "bytes": 305953,
+      "sha256": "fac108e40042ca209004ab6588875e8876e682b47dc1205aa26d50b67d640c1b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restored-plan.png",
+      "bytes": 147839,
+      "sha256": "685853fba892a58ffd69dd8b522f169300721c2c3f40168a02095408bf44a0e9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restored-preview.mjs",
+      "bytes": 541,
+      "sha256": "448eab757fd0b810e8e99d2603b8a2683aa018dc6693008404c32164bd0a1d8e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restored-runtime-boot1.log",
+      "bytes": 7359,
+      "sha256": "8f1ddee3399a9823f1053e20902a85f0569f29be41508d8206e19770632893fb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restored-runtime.json",
+      "bytes": 29920,
+      "sha256": "468b0b35c30940f7e9d99c96ca45d1ec2eb3cb02f520817ccb2e5278e27da823"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-restored-workflow-continuation.json",
+      "bytes": 286,
+      "sha256": "e05b37cb06ba983e3b908c11b0006dcfbf7860dd2d28e64cb9eb89d657bc379e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-runtime-boot1.log",
+      "bytes": 8023,
+      "sha256": "a6aab08293f8537db7a246bb6bf0fef66a254f6533f17bb7a8548c01a2cfc756"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-runtime-boot2.log",
+      "bytes": 8024,
+      "sha256": "98fef66717314841734e6fd88c860f878fc8dec5497656f5c6aadde24553d1af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-runtime-boot3.log",
+      "bytes": 7351,
+      "sha256": "f4a7e5cb34b655f4437d67153e6c5058a027575a89e93b27098597ce9ba8fa93"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-runtime-package.log",
+      "bytes": 13930,
+      "sha256": "49fa7ff49e199473f905b7eeccc5787a79f6eadb99b6821bca83fd63bbc5d55d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-runtime.json",
+      "bytes": 29843,
+      "sha256": "ee2c59287c814d15c319c97f1f0983966940a8890609fac09d2ade4bdce60af6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-startup-preservation.json",
+      "bytes": 267,
+      "sha256": "57abac0bc36e9f21abdf6a8a3719e3c4823989777e2418ca9007e43a9f41f790"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-submission-sources.png",
+      "bytes": 163106,
+      "sha256": "931bdc1226c93774a0e3303cbb030e5dd112bc9f09e64d5dfe647be9be2698fa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense-managed-submit-races.log",
+      "bytes": 755,
+      "sha256": "ef56e2ce5778301902c0e918815e794e14b06ba2bf61d60af34c6442e0e00b86"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense_managed_client.py",
+      "bytes": 2903,
+      "sha256": "16595362cdf5de994c9a0f3def976dff70bb84d0a53096928393c4d4fb2fb067"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/expense_managed_journey.py",
+      "bytes": 8210,
+      "sha256": "2262af6c3018aacc4e9a023e0a50bc57ea4d126f18ef65c8c407ab5ae7f8613c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/prepare-expense-managed-runtime.py",
+      "bytes": 2200,
+      "sha256": "9f23b6db5d7a87c945b7c8e79484843c7ba34b9561211042a4d1efba5d9670f4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/record-expense-managed-acceptance.py",
+      "bytes": 11727,
+      "sha256": "d2eab4d2b7a2db7337b8f39c03e0db0873c10382d9d494cff7adccd482eb4316"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/resume-expense-managed-publications.py",
+      "bytes": 3648,
+      "sha256": "9e3bd9b872858db056f24f52a4189a386a63a7d4eca28f389f799e7ce43013af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/run-expense-managed-restored-runtime.py",
+      "bytes": 4479,
+      "sha256": "a3ce80ed5701f46bef221233d1fd5d28ed10798f56d01eee1baca55c554ebde7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/run-expense-managed-runtime.py",
+      "bytes": 4461,
+      "sha256": "c8bc792bfbb2843fe14cdd1e8150c8e7ddbca7aa82e8e5df8c7041d0bfa85687"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-acceptance-snapshot/wecom_runtime_common.py",
+      "bytes": 1943,
+      "sha256": "c09857a84a04482322a4a3fe66dc5679ec97b07f0116fefa2334a52366a71259"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-complete-backup.sql",
+      "bytes": 16499800,
+      "sha256": "62fe7915bd4bced9105dc8930c3f96f9ea6ed3fd22da082fbeb4158baf0d84dc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-managed-server.jar",
+      "bytes": 78782638,
+      "sha256": "26b4c58d300554c8e3ea0c2892c2d290f4ad5456281fcf1fe18b315b37d59804"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-policy-guidance-web-dist/assets/index-BNzrhuc-.js",
+      "bytes": 1638800,
+      "sha256": "e11e1b141baa745fc6f8be4f7538295fe9dde393ecc1d0d6fec1d5f8ae192b62"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-policy-guidance-web-dist/assets/index-DKmgokUy.css",
+      "bytes": 373920,
+      "sha256": "d78363eed508ca9e4c35984b311c4c95d310c1e2efd1e146f104f877383d95ca"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-policy-guidance-web-dist/index.html",
+      "bytes": 420,
+      "sha256": "b7ea557bfece7e75a45bee2f037201525c3a5d5ed26f48c8a8013e0310f9e32c"
+    }
+  ]
+}
