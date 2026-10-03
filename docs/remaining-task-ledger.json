@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T18:25:31.638769+00:00",
+  "recordedAt": "2026-10-03T18:49:49.350698+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工与供应商付款、凭证准备异常及原过账结果通知已接通。本阶段接通费用预算冻结、调整、释放、消费的原操作通知、受控历史详情和消息页面，85 项 Java、77 项前端用例通过；原财务版本接收关系、未知/查无/拒绝区分、原命令重试、外发抑制与当前字段权限已验证。独立冲销、业务结算及其他恢复来源、固定包与环境验收仍待完成。",
+      "observed": "员工与供应商付款、原凭证及费用预算通知已接通。本阶段补齐独立冲销准备、执行和安全结束的原事实通知、当前权限详情与消息页面；145 项 Java、115 项前端用例通过，旧尝试、实际结束经办人、事务回滚及外发抑制已验证。人工外部冲销核对、业务结算及其他恢复来源、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1670,6 +1670,14 @@
         },
         {
           "path": "docs/evidence/budget-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/reversal-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/reversal-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3470,9 +3478,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "BUDGET_OPERATION_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
-    "implementationCommit": "2e20706437525d50af807f7e0017dfb76803a350",
-    "evidence": "docs/evidence/budget-notifications-20261003.json",
-    "recordedAt": "2026-10-03T18:25:31.638769+00:00"
+    "status": "INDEPENDENT_REVERSAL_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
+    "implementationCommit": "9351fc1e3d8f4c6d01ccf3f2188c1d1902f0f9bf",
+    "evidence": "docs/evidence/reversal-notifications-20261003.json",
+    "recordedAt": "2026-10-03T18:49:49.350698+00:00"
   }
 }
