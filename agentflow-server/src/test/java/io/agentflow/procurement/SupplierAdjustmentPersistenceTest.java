@@ -126,11 +126,11 @@ class SupplierAdjustmentPersistenceTest {
         adjustments = new JdbcSupplierPayableAdjustmentRepository(jdbc, json, adjustmentIntents, adjustmentSources);
         completions = new JdbcSupplierAdjustmentCompletions(jdbc, json);
         completion = proxy(new SupplierAdjustmentCompletionService(adjustmentSources, adjustments, payments, returnLedgers, returnChecks, completions,
-                new JdbcFinanceReceiptCreditRepository(jdbc), reservations));
+                new JdbcFinanceReceiptCreditRepository(jdbc), reservations, event -> { }));
         var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
         var eligibility = new SupplierAdjustmentSources(adjustmentSources, settlementSources, sources);
-        adjustmentPreparation = proxy(new SupplierAdjustmentPreparationService(adjustmentSources, eligibility, adjustmentIntents, adjustments, 30));
-        adjustmentExecution = proxy(new SupplierAdjustmentService(adjustmentSources, eligibility, settlementSources, adjustments, 30));
+        adjustmentPreparation = proxy(new SupplierAdjustmentPreparationService(adjustmentSources, eligibility, adjustmentIntents, adjustments, event -> { }, 30));
+        adjustmentExecution = proxy(new SupplierAdjustmentService(adjustmentSources, eligibility, settlementSources, adjustments, event -> { }, 30));
     }
 
 

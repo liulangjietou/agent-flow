@@ -147,6 +147,7 @@ class SupplierFinanceWorkflowTest {
     @Autowired JdbcSupplierPaymentReturnRepository returnRegistrations;
     @Autowired SupplierPaymentReturnService returnService;
     @Autowired io.agentflow.notification.SupplierReturnNotificationAccess supplierReturnNoticeAccess;
+    @Autowired io.agentflow.notification.SupplierAdjustmentNotificationAccess supplierAdjustmentNoticeAccess;
     @Autowired SupplierPaymentReturnPort returnPort;
     @Autowired JdbcSupplierAdjustmentPreparationRepository adjustmentPreparations;
     @Autowired JdbcSupplierPayableAdjustmentRepository adjustments;
@@ -1257,6 +1258,158 @@ class SupplierFinanceWorkflowTest {
         assertThat(view.path("canPrepare").asBoolean()).isFalse(); assertThat(view.path("items").isEmpty()).isTrue();
         assertThat(view.path("completion").isNull()).isTrue(); assertThat(view.path("bank").isNull()).isTrue(); assertPrivateFactsAbsent(view);
         assertThat(calls.values().stream().mapToInt(AtomicInteger::get).sum()).isEqualTo(previousCalls);
+    }
+
+    @Test void supplierAdjustmentErpNoticePrecedesSeparateLocalCompletion() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID id = queueAdjustment(payment);
+        var claimed = adjustmentExecution.claim("demo", id, Instant.now());
+        var sending = adjustmentExecution.ready(claimed, adjustmentReader.read(claimed.command().source(), claimed.command().period().request().accountingDate()), Instant.now());
+        adjustmentExecution.finish(sending, new FinanceResult.Success<>(adjustmentObservation(sending.command())), Instant.now());
+        assertThat(supplierAdjustmentNoticeRecipients(id, "ERP_ADJUSTED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).isEmpty();
+        String path = supplierAdjustmentNoticePath(id, "alice", "ERP_ADJUSTED");
+        var before = ok(read(path, "alice"), 200); assertThat(before.at("/operation/status").asText()).isEqualTo("ADJUSTED");
+        assertThat(before.path("completion").isNull()).isTrue(); pollAdjustment(id);
+        var done = ok(read(path, "alice"), 200); assertThat(done.at("/completion/adjustmentVersion").asLong()).isEqualTo(before.at("/operation/version").asLong());
+        assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).containsExactlyInAnyOrder("alice", "finance");
+        pollAdjustment(id); assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).hasSize(2);
+        assertThat(calls).doesNotContainKey("supplier-payable-adjustment-command");
+    }
+
+    @Test void supplierAdjustmentOldPreparationNoticeCannotBorrowLaterCompletion() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment);
+        UUID first = UUID.fromString(ok(send(adjustmentPreparePath(payment), "finance", adjustmentInput(adjustmentView(payment))), 202).path("preparationId").asText());
+        var claimed = adjustmentPreparation.claim("demo", first, Instant.now());
+        adjustmentPreparation.finish(claimed, new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED), Instant.now());
+        assertThat(supplierAdjustmentNoticeRecipients(first, "PREPARATION_BLOCKED")).containsExactlyInAnyOrder("alice", "finance");
+        String path = supplierAdjustmentNoticePath(first, "finance", "PREPARATION_BLOCKED"); UUID second = queueAdjustment(payment); pollAdjustment(second);
+        var old = ok(read(path, "finance"), 200); assertThat(old.path("adjustmentId").asText()).isEqualTo(first.toString());
+        assertThat(old.at("/preparation/status").asText()).isEqualTo("BLOCKED"); assertThat(old.path("operation").isNull()).isTrue(); assertThat(old.path("completion").isNull()).isTrue();
+        assertThat(supplierAdjustmentNoticeRecipients(second, "COMPLETED")).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void supplierAdjustmentRejectedResultAndActualRetirementNotifySeparately() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedAdjustment(payment); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.REJECTED, 2);
+        ok(send(adjustmentDisputePath(id) + "/resolutions", "finance", adjustmentDisputeInput(adjustmentDisputeView(id))), 202);
+        assertThat(supplierAdjustmentNoticeRecipients(id, "REJECTED")).containsExactlyInAnyOrder("alice", "finance");
+        String path = supplierAdjustmentNoticePath(id, "finance", "REJECTED"); assertThat(ok(read(path, "finance"), 200).path("retirement").isNull()).isTrue();
+        var state = adjustmentView(payment).at("/items/0"); long version = state.path("version").asLong();
+        ok(send(adjustmentActionPath(id), "finance", adjustmentAction(state, "RETIRE")), 202);
+        assertThat(adjustments.find("demo", id).orElseThrow().version()).isEqualTo(version);
+        var ended = ok(read(supplierAdjustmentNoticePath(id, "alice", "RETIRED"), "alice"), 200);
+        assertThat(ended.at("/retirement/basis").asText()).isEqualTo("CONFIRMED_REJECTED"); assertThat(ended.path("completion").isNull()).isTrue();
+        UUID replacement = queueAdjustment(payment); pollAdjustment(replacement);
+        assertThat(ok(read(path, "finance"), 200).path("completion").isNull()).isTrue();
+    }
+
+    @Test void supplierAdjustmentCompletionNoticeFailureRollsBackOnlyLocalAccounting() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID id = queueAdjustment(payment);
+        var claimed = adjustmentExecution.claim("demo", id, Instant.now());
+        var sending = adjustmentExecution.ready(claimed, adjustmentReader.read(claimed.command().source(), claimed.command().period().request().accountingDate()), Instant.now());
+        adjustmentExecution.finish(sending, new FinanceResult.Success<>(adjustmentObservation(sending.command())), Instant.now());
+        var adjusted = adjustments.find("demo", id).orElseThrow(); var source = adjusted.command().source();
+        var reservation = reservations.find("demo", source.returns().request().command().holdCommand().authorization().source().reservation().id()).orElseThrow();
+        String originalLedger = jdbc.queryForObject("SELECT state_json FROM supplier_payment_returns WHERE tenant_id='demo' AND payment_id=?", String.class, payment.toString());
+        var receipt = ((FinanceResult.Success<SupplierPaymentReturnPort.Receipt>) returnPort.query(source.returns().request())).value();
+        String key = "supplier-adjustment:" + id + ":COMPLETED";
+        jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT supplier_adjustment_notice_fixture CHECK(event_key<>'" + key + "' OR recipient_id<>'finance')");
+        try { assertThatThrownBy(() -> adjustmentCompletion.complete(adjusted, receipt, Instant.now())).isInstanceOf(RuntimeException.class); }
+        finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT supplier_adjustment_notice_fixture"); }
+        assertThat(adjustments.find("demo", id)).contains(adjusted); assertThat(adjustments.active("demo", payment)).contains(adjusted);
+        assertThat(reservations.find("demo", reservation.id())).contains(reservation);
+        assertThat(jdbc.queryForObject("SELECT state_json FROM supplier_payment_returns WHERE tenant_id='demo' AND payment_id=?", String.class, payment.toString())).isEqualTo(originalLedger);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM supplier_adjustment_completion WHERE tenant_id='demo' AND operation_id=?", Long.class, id.toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND supplier_adjustment_id=?", Long.class, id.toString())).isZero();
+        assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).isEmpty(); assertThat(supplierAdjustmentNoticeRecipients(id, "ERP_ADJUSTED")).hasSize(2);
+        var proof = adjustmentCompletion.complete(adjusted, receipt, Instant.now());
+        assertThat(adjustmentCompletion.complete(adjusted, receipt, Instant.now())).isEqualTo(proof);
+        assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void supplierAdjustmentCompletionMessageKeepsOwnProofAfterMoreFundsAndLaterDispute() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID first = queueAdjustment(payment); pollAdjustment(first);
+        String path = supplierAdjustmentNoticePath(first, "finance", "COMPLETED"); var response = read(path, "finance"); var before = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); var proof = before.path("completion");
+        assertThat(proof.path("adjustmentId").asText()).isEqualTo(first.toString()); assertThat(before.toString()).doesNotContain("amount", "commandDigest", "private-ledger", "actions", "accountDigest");
+        for (String other : List.of("admin", "bob", "cashier")) okError(read(path, other), 404, "NOT_FOUND");
+        okError(read(path + "?adjustmentId=" + UUID.randomUUID(), "finance"), 400, "INVALID_INBOX_QUERY");
+        returnRevision = 2; registerFunds(payment); UUID second = queueAdjustment(payment); pollAdjustment(second);
+        assertThat(ok(read(path, "finance"), 200).path("completion")).isEqualTo(proof);
+        var later = ok(read(supplierAdjustmentNoticePath(second, "finance", "COMPLETED"), "finance"), 200);
+        assertThat(later.at("/completion/returnVersion").asLong()).isGreaterThan(proof.path("returnVersion").asLong());
+        queryAdjustmentDispute(first, SupplierPayableAdjustmentObservation.Status.REJECTED, 2);
+        var disputed = ok(read(path, "finance"), 200); assertThat(disputed.at("/operation/status").asText()).isEqualTo("RECONCILING");
+        assertThat(disputed.path("completion")).isEqualTo(proof); assertThat(supplierAdjustmentNoticeRecipients(first, "RECONCILING")).hasSize(2);
+        assertThat(supplierAdjustmentNoticeRecipients(first, "COMPLETED")).hasSize(2);
+    }
+
+    @Test void supplierAdjustmentPreparationRetryDeduplicatesAndNormalQueriesStayQuiet() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment);
+        UUID id = UUID.fromString(ok(send(adjustmentPreparePath(payment), "finance", adjustmentInput(adjustmentView(payment))), 202).path("preparationId").asText());
+        var claimed = adjustmentPreparation.claim("demo", id, Instant.now()); adjustmentPreparation.claim("demo", id, claimed.leaseUntil());
+        var retry = adjustmentPreparations.find("demo", id).orElseThrow(); var second = adjustmentPreparation.claim("demo", id, retry.nextAttemptAt());
+        adjustmentPreparation.fail(second, retry.nextAttemptAt()); assertThat(supplierAdjustmentNoticeRecipients(id, "PREPARATION_RETRY")).hasSize(2);
+        UUID another = paidBank(); registerFunds(another); UUID operation = queueAdjustment(another);
+        var running = adjustmentExecution.claim("demo", operation, Instant.now()); adjustmentExecution.fail(running, Instant.now());
+        assertThat(supplierAdjustmentNoticeRecipients(operation, "EXECUTION_RETRY")).hasSize(2);
+        UUID pending = unresolvedAdjustment(paidBank()); assertThat(supplierAdjustmentNoticeRecipients(pending, "UNKNOWN")).isEmpty();
+    }
+
+    @Test void supplierAdjustmentResolvedErpResultNotifiesBeforeItsBankRecheckCompletion() throws Exception {
+        UUID payment = paidBank(); UUID id = unresolvedAdjustment(payment); queryAdjustmentDispute(id, SupplierPayableAdjustmentObservation.Status.ADJUSTED, 2);
+        var before = adjustmentDisputeView(id); var input = adjustmentDisputeInput(before); String key = UUID.randomUUID().toString();
+        var first = send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input); ok(first, 202);
+        assertThat(send(adjustmentDisputePath(id) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        String path = supplierAdjustmentNoticePath(id, "finance", "ERP_ADJUSTED"); assertThat(ok(read(path, "finance"), 200).path("completion").isNull()).isTrue();
+        assertThat(supplierAdjustmentNoticeRecipients(id, "ERP_ADJUSTED")).hasSize(2); assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).isEmpty();
+        pollAdjustment(id); assertThat(ok(read(path, "finance"), 200).at("/completion/adjustmentId").asText()).isEqualTo(id.toString());
+        assertThat(calls.get("supplier-payable-adjustment-command").get()).isEqualTo(1);
+    }
+
+    @Test void supplierAdjustmentMessageRechecksCurrentRecipientEntityTenantAndDeliveryEligibility() throws Exception {
+        var recipient = new Actor("demo", "finance", Set.of("FINANCE")); var preference = noticePreferences.get(recipient); noticePreferences.revise(recipient, preference.version(), true, false);
+        try {
+            UUID payment = paidBank(); registerFunds(payment); UUID checkId = queueAdjustment(payment); pollAdjustment(checkId);
+            String path = supplierAdjustmentNoticePath(checkId, "finance", "COMPLETED"); String eventKey = "supplier-adjustment:" + checkId + ":COMPLETED";
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT d.id FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.event_key=? AND n.recipient_id='finance'", String.class, eventKey));
+            var delivery = noticeDeliveries.find(deliveryId).orElseThrow(); assertThat(supplierAdjustmentNoticeAccess.deliveryAllowed(delivery)).isTrue();
+            actors.set(new Actor("other", "finance", Set.of("FINANCE")));
+            try { assertThatThrownBy(() -> supplierAdjustmentNoticeAccess.target(delivery.inboxId())).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, e -> assertThat(e.code()).isEqualTo("NOT_FOUND")); }
+            finally { actors.clear(); }
+            jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+            try { assertThat(read(path, "finance").getStatus()).isIn(403, 404); }
+            finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+            jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+            assertThat(read(path, "finance").getStatus()).isIn(403, 404); assertThat(supplierAdjustmentNoticeAccess.deliveryAllowed(delivery)).isFalse();
+            assertThat(noticeDeliveryService.claim(deliveryId, Instant.now())).isNull();
+            assertThat(noticeDeliveries.find(deliveryId).orElseThrow().progress().status()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.Status.SUPPRESSED);
+        } finally { var current = noticePreferences.get(recipient); noticePreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    @Test void supplierAdjustmentAlreadyCompletedDoesNotAnnouncePendingLocalAccountingToReactivatedFinance() throws Exception {
+        UUID payment = paidBank(); registerFunds(payment); UUID id = queueAdjustment(payment);
+        var claimed = adjustmentExecution.claim("demo", id, Instant.now());
+        var sending = adjustmentExecution.ready(claimed, adjustmentReader.read(claimed.command().source(), claimed.command().period().request().accountingDate()), Instant.now());
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        try {
+            adjustmentExecution.finish(sending, new FinanceResult.Success<>(adjustmentObservation(sending.command())), Instant.now());
+            var current = adjustments.find("demo", id).orElseThrow();
+            var receipt = ((FinanceResult.Success<SupplierPaymentReturnPort.Receipt>) returnPort.query(current.command().source().returns().request())).value();
+            adjustmentCompletion.complete(current, receipt, Instant.now());
+        } finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString()); }
+        assertThat(supplierAdjustmentNoticeRecipients(id, "ERP_ADJUSTED")).containsExactly("alice");
+        assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).containsExactly("alice");
+        ok(send(adjustmentActionPath(id), "finance", adjustmentAction(adjustmentView(payment).at("/items/0"), "QUERY")), 202); pollAdjustment(id);
+        assertThat(supplierAdjustmentNoticeRecipients(id, "ERP_ADJUSTED")).containsExactly("alice");
+        assertThat(supplierAdjustmentNoticeRecipients(id, "COMPLETED")).containsExactly("alice");
+    }
+
+    private List<String> supplierAdjustmentNoticeRecipients(UUID id, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, "supplier-adjustment:" + id + ":" + fact);
+    }
+    private String supplierAdjustmentNoticePath(UUID id, String recipient, String fact) {
+        String message = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class, "supplier-adjustment:" + id + ":" + fact, recipient);
+        return "/api/v1/notifications/" + message + "/supplier-adjustment-target";
     }
 
     @Test void adjustmentFinishesOnlyAfterErpAndLocalPostingThenAccountsOnlyLaterNewFunds() throws Exception {

@@ -13,6 +13,7 @@ export const notificationLabels: Record<InboxMessage['kind'], string> = {
   BUDGET_RESULT: '预算操作结果更新', BUDGET_ATTENTION: '预算操作需核对',
   VOUCHER_RESULT: '凭证结果更新', VOUCHER_ATTENTION: '凭证处理需核对',
   SUPPLIER_RETURN_RESULT: '供应商回款核对结果', SUPPLIER_RETURN_ATTENTION: '供应商回款需核对',
+  SUPPLIER_ADJUSTMENT_RESULT: '供应商应付调整结果更新', SUPPLIER_ADJUSTMENT_ATTENTION: '供应商应付调整需核对',
   SUPPLIER_SETTLEMENT_RESULT: '供应商结算结果更新', SUPPLIER_SETTLEMENT_ATTENTION: '供应商结算需核对',
   SUPPLIER_PAYMENT_RESULT: '供应商付款结果更新', SUPPLIER_PAYMENT_ATTENTION: '供应商付款需核对',
   PAYMENT_RESULT: '付款结果更新', PAYMENT_ATTENTION: '付款执行需核对',

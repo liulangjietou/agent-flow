@@ -46895,6 +46895,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/supplier-adjustment-target": {
+      "get": {
+        "operationId": "supplierAdjustmentNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原供应商应付调整",
+        "description": "消息固定原准备与调整编号，同一事实按原编号去重。ERP 实际调整结果先提交，本地账务完成在另一次银行复核之后保存。原完成凭据按编号回放原修订，后续追加回款及另一调整不能替换旧事实。当前原轮次字段权限、原参与关系及法人任职重新核验，管理员不能绕过。拒绝查询参数，响应 no-store，不调整、不完成账务、不提供金额、账户或办理许可。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierAdjustmentNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -53465,7 +53570,9 @@
               "SUPPLIER_SETTLEMENT_RESULT",
               "SUPPLIER_SETTLEMENT_ATTENTION",
               "SUPPLIER_RETURN_RESULT",
-              "SUPPLIER_RETURN_ATTENTION"
+              "SUPPLIER_RETURN_ATTENTION",
+              "SUPPLIER_ADJUSTMENT_RESULT",
+              "SUPPLIER_ADJUSTMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -81902,6 +82009,275 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/SupplierReturnNotificationRegistration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierAdjustmentNotificationPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "issue",
+          "updatedAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "BLOCKED",
+              "VOIDED"
+            ]
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "LEASE_EXPIRED",
+              "SOURCE_CHANGED",
+              "ACCOUNTING_PERIOD_REJECTED",
+              "EVIDENCE_CHANGED",
+              null
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierAdjustmentNotificationOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "issue",
+          "updatedAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CHECKING",
+              "ADJUSTING",
+              "UNKNOWN",
+              "QUERYING",
+              "ADJUSTED",
+              "REJECTED",
+              "NOT_FOUND",
+              "RECONCILING",
+              "VOIDED"
+            ]
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "LEASE_EXPIRED",
+              "SOURCE_CHANGED",
+              "EVIDENCE_CHANGED",
+              "FINANCE_RETIRED",
+              "STALE_OBSERVATION",
+              "INCONSISTENT_OBSERVATION",
+              "RECHECK_REQUESTED",
+              null
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierAdjustmentNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "basis",
+          "retiredAt"
+        ],
+        "properties": {
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_REJECTED"
+            ]
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierAdjustmentNotificationCompletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentId",
+          "adjustmentVersion",
+          "paymentId",
+          "paymentVersion",
+          "returnVersion",
+          "completedAt"
+        ],
+        "properties": {
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierAdjustmentNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "adjustmentId",
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "accountingDate",
+          "fact",
+          "preparation",
+          "operation",
+          "retirement",
+          "completion"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "PREPARATION_RETRY",
+              "PREPARATION_BLOCKED",
+              "PREPARATION_VOIDED",
+              "EXECUTION_RETRY",
+              "UNKNOWN",
+              "NOT_FOUND",
+              "RECONCILING",
+              "REJECTED",
+              "VOIDED",
+              "ERP_ADJUSTED",
+              "COMPLETED",
+              "RETIRED"
+            ]
+          },
+          "preparation": {
+            "$ref": "#/components/schemas/SupplierAdjustmentNotificationPreparation"
+          },
+          "operation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierAdjustmentNotificationCompletion"
               },
               {
                 "type": "null"

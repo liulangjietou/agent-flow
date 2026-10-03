@@ -106,7 +106,7 @@ import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vu
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type SupplierReturnNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget, type ReversalCheckNotificationTarget } from './api'
+import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type SupplierReturnNotificationTarget, type SupplierAdjustmentNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget, type ReversalCheckNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
@@ -626,6 +626,11 @@ function openExpenseSettlementNotification(target: ExpenseSettlementNotification
 }
 /** 固定原采购申请轮次，办理能力由原页面再次核验。 */
 function openSupplierSettlementNotification(target: SupplierSettlementNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 消息固定原应付调整轮次，不复用通知作为财务办理授权。 */
+function openSupplierAdjustmentNotification(target: SupplierAdjustmentNotificationTarget) {
   if (busy.value || writesBlocked.value) return
   recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
 }
@@ -1366,7 +1371,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" @voucher-open="openVoucherNotification" @budget-open="openBudgetNotification" @reversal-open="openReversalNotification" @reversal-check-open="openReversalCheckNotification" @settlement-open="openExpenseSettlementNotification" @supplier-settlement-open="openSupplierSettlementNotification" @supplier-return-open="openSupplierReturnNotification" />
+        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" @voucher-open="openVoucherNotification" @budget-open="openBudgetNotification" @reversal-open="openReversalNotification" @reversal-check-open="openReversalCheckNotification" @settlement-open="openExpenseSettlementNotification" @supplier-adjustment-open="openSupplierAdjustmentNotification" @supplier-settlement-open="openSupplierSettlementNotification" @supplier-return-open="openSupplierReturnNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
