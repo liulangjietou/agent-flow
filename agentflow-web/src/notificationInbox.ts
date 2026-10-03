@@ -1,11 +1,13 @@
-import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget, ReversalNotificationTarget, ReversalCheckNotificationTarget } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget, ReversalNotificationTarget, ReversalCheckNotificationTarget, ExpenseSettlementNotificationTarget, ExpenseSettlementNotificationState } from './api'
 import { validatePayment } from './payments.js'
 import { validateSupplierCashier } from './supplierCashier.js'
 import { preparationLabels, operationLabels } from './vouchers.js'
+import { settlementLabels, settlementFundingLabels } from './expenseSettlement.js'
 import { reversalCheckLabels } from './voucherReversal.js'
 import { reversalPreparationLabels, reversalExecutionLabels } from './voucherReversalExecution.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  EXPENSE_SETTLEMENT_RESULT: '报销核销已完成', EXPENSE_SETTLEMENT_ATTENTION: '报销结算需核对',
   REVERSAL_CHECK_RESULT: '外部冲销登记结果', REVERSAL_CHECK_ATTENTION: '外部冲销核对需处理',
   REVERSAL_RESULT: '独立冲销结果更新', REVERSAL_ATTENTION: '独立冲销需核对',
   BUDGET_RESULT: '预算操作结果更新', BUDGET_ATTENTION: '预算操作需核对',
@@ -25,6 +27,39 @@ export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK
 export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
 export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
 export const isVoucherNotification = (item: InboxMessage) => ['VOUCHER_RESULT', 'VOUCHER_ATTENTION'].includes(item.kind)
+
+export const isSettlementNotification = (item: InboxMessage) => ['EXPENSE_SETTLEMENT_RESULT', 'EXPENSE_SETTLEMENT_ATTENTION'].includes(item.kind)
+/** 原修订和当前状态独立校验，拒绝把等待、预算拒绝或争议显示成已完成。 */
+export function readExpenseSettlementNotificationTarget(value: ExpenseSettlementNotificationTarget, message: InboxMessage): ExpenseSettlementNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的结算修订不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const closed = (v: object, keys: string[]) => Object.keys(v).every(key => keys.includes(key))
+  const stateKeys = ['version', 'status', 'resourcesConsumed', 'budgetOperationId', 'issue', 'updatedAt']
+  const state = (v: ExpenseSettlementNotificationState) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v) || !positive(v.version) || !Object.prototype.hasOwnProperty.call(settlementLabels, v.status)
+        || typeof v.resourcesConsumed !== 'boolean' || !instant(v.updatedAt) || !closed(v, stateKeys)
+        || v.budgetOperationId !== null && !uuid(v.budgetOperationId)
+        || v.issue !== null && (typeof v.issue !== 'string' || !/^[A-Z][A-Z0-9_]{0,63}$/.test(v.issue))
+        || ['BLOCKED', 'BUDGET_REJECTED', 'REVIEW_REQUIRED'].includes(v.status) !== (v.issue !== null)
+        || ['BUDGET_PENDING', 'BUDGET_REJECTED', 'SETTLED'].includes(v.status) && (!v.resourcesConsumed || v.budgetOperationId === null)
+        || ['QUEUED', 'BLOCKED'].includes(v.status) && v.budgetOperationId !== null
+        || !v.resourcesConsumed && v.budgetOperationId !== null) invalid()
+  }
+  if (!value || !isSettlementNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.applicationId, value.reportId].every(uuid) || !positive(value.roundNo) || !positive(value.financialVersion)
+      || !Object.prototype.hasOwnProperty.call(settlementFundingLabels, value.funding) || !instant(value.fundingConfirmedAt)
+      || !closed(value, ['messageId', 'applicationId', 'reportId', 'roundNo', 'financialVersion', 'funding', 'fundingConfirmedAt', 'notice', 'current'])) invalid()
+  state(value.notice); state(value.current)
+  const old = value.notice, current = value.current
+  if (!['SETTLED', 'BLOCKED', 'BUDGET_REJECTED', 'REVIEW_REQUIRED'].includes(old.status)
+      || (message.kind === 'EXPENSE_SETTLEMENT_RESULT') !== (old.status === 'SETTLED') || current.version < old.version
+      || Date.parse(old.updatedAt) < Date.parse(value.fundingConfirmedAt) || Date.parse(current.updatedAt) < Date.parse(old.updatedAt)
+      || old.resourcesConsumed && !current.resourcesConsumed
+      || current.version === old.version && stateKeys.some(key => current[key as keyof typeof current] !== old[key as keyof typeof old])) invalid()
+  return value
+}
 
 export const isReversalCheckNotification = (item: InboxMessage) => ['REVERSAL_CHECK_RESULT', 'REVERSAL_CHECK_ATTENTION'].includes(item.kind)
 /** 绑定原核对；未核清、候选证据及实际登记必须分别保留，不能接受新核对替换。 */

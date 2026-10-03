@@ -36,11 +36,12 @@ public class ExpensePaymentReturnService {
     private final JdbcExpenseSettlementRepository settlements;
     private final PaymentAudit audit;
     private final ApplicationEventPublisher events;
+    private final ExpenseSettlementChanges settlementChanges;
     public ExpensePaymentReturnService(CurrentActor actors, ExpensePaymentReturnSources sources, PaymentAccess access, PaymentPersonnel personnel,
             JdbcExpensePaymentReturnCheckRepository checks, JdbcExpensePaymentReturnsRepository ledgers, JdbcExpensePaymentReturnRepository registrations,
-            JdbcExpenseSettlementRepository settlements, PaymentAudit audit, ApplicationEventPublisher events) {
+            JdbcExpenseSettlementRepository settlements, PaymentAudit audit, ApplicationEventPublisher events, ExpenseSettlementChanges settlementChanges) {
         this.actors = actors; this.sources = sources; this.access = access; this.personnel = personnel; this.checks = checks; this.ledgers = ledgers;
-        this.registrations = registrations; this.settlements = settlements; this.audit = audit; this.events = events;
+        this.registrations = registrations; this.settlements = settlements; this.audit = audit; this.events = events; this.settlementChanges = settlementChanges;
     }
     /** 幂等回放也复核当前岗位与完整原轮次字段，申请人及原出纳不能确认。 */
     public void authorize(UUID reportId) {
@@ -81,7 +82,7 @@ public class ExpensePaymentReturnService {
         if (input.outcome() != check.receipt().status()) throw new DomainException("EXPENSE_PAYMENT_RETURN_OUTCOME_CHANGED", "Registration must match the displayed expense return outcome");
         var decision = new ExpensePaymentReturn(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.evidenceReference(), input.comment());
         var next = ledger.register(decision); ledgers.update(next);
-        var settlement = decision.applyTo(source.settlement()); if (!settlement.equals(source.settlement())) settlements.update(settlement);
+        var settlement = decision.applyTo(source.settlement()); if (!settlement.equals(source.settlement())) settlementChanges.persist(source.settlement(), settlement);
         var resolved = check.resolve(decision, now); checks.update(resolved); registrations.create(decision, next);
         events.publishEvent(new ExpensePaymentReturnRegistered(decision, next));
         var event = audit.record(source.authorization(), decision.id(), next.version(), "FINANCE", "EXPENSE_PAYMENT_RETURN_REGISTER", check.status().name(), resolved.status().name(), input.comment(), now);
@@ -134,7 +135,7 @@ public class ExpensePaymentReturnService {
         if (!same) {
             var frozen = ledger.requireReview(now); if (!frozen.equals(ledger)) ledgers.update(frozen);
             var settlement = source.settlement().requireReview("EXPENSE_PAYMENT_RETURN_REVIEW_REQUIRED", now);
-            if (!settlement.equals(source.settlement())) settlements.update(settlement);
+            if (!settlement.equals(source.settlement())) settlementChanges.persist(source.settlement(), settlement);
         }
     }
     /** 外部异常不产生财务结论，已留存资金和冻结保持。 */

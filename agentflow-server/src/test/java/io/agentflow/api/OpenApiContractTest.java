@@ -541,6 +541,8 @@ class OpenApiContractTest {
                 java.util.Map.entry("InboxMessage", io.agentflow.notification.InboxMessage.class),
                 java.util.Map.entry("VoucherNotificationTarget", io.agentflow.notification.VoucherNotificationAccess.Target.class),
                 java.util.Map.entry("BudgetNotificationTarget", io.agentflow.notification.BudgetNotificationAccess.Target.class),
+                java.util.Map.entry("ExpenseSettlementNotificationTarget", io.agentflow.notification.ExpenseSettlementNotificationAccess.Target.class),
+                java.util.Map.entry("ExpenseSettlementNotificationState", io.agentflow.notification.ExpenseSettlementNotificationAccess.State.class),
                 java.util.Map.entry("ReversalNotificationTarget", io.agentflow.notification.ReversalNotificationAccess.Target.class),
                 java.util.Map.entry("ReversalCheckNotificationTarget", io.agentflow.notification.ReversalCheckNotificationAccess.Target.class),
                 java.util.Map.entry("ReversalCheckNotificationObservation", io.agentflow.notification.ReversalCheckNotificationAccess.Observation.class),

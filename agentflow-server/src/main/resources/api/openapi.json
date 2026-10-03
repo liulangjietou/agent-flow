@@ -46580,6 +46580,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/expense-settlement-target": {
+      "get": {
+        "operationId": "expenseSettlementNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原报销结算修订",
+        "description": "消息固定原结算修订，响应分别展示当时事实与当前状态；不跟随新预算命令替换历史。当前原轮次字段权限与原参与关系、法人任职重新核验，管理员不能绕过。拒绝查询参数，响应 no-store，不消费资源、不重试预算、不提供金额、账户或办理许可。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseSettlementNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -53144,7 +53249,9 @@
               "REVERSAL_RESULT",
               "REVERSAL_ATTENTION",
               "REVERSAL_CHECK_RESULT",
-              "REVERSAL_CHECK_ATTENTION"
+              "REVERSAL_CHECK_ATTENTION",
+              "EXPENSE_SETTLEMENT_RESULT",
+              "EXPENSE_SETTLEMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -81045,6 +81152,104 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "ExpenseSettlementNotificationState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "resourcesConsumed",
+          "budgetOperationId",
+          "issue",
+          "updatedAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExpenseSettlementStatus"
+          },
+          "resourcesConsumed": {
+            "type": "boolean"
+          },
+          "budgetOperationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+            "maxLength": 64
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpenseSettlementNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "applicationId",
+          "reportId",
+          "roundNo",
+          "financialVersion",
+          "funding",
+          "fundingConfirmedAt",
+          "notice",
+          "current"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "funding": {
+            "type": "string",
+            "enum": [
+              "PAYMENT",
+              "FULL_OFFSET",
+              "ZERO_AMOUNT"
+            ]
+          },
+          "fundingConfirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/ExpenseSettlementNotificationState"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ExpenseSettlementNotificationState"
           }
         }
       }

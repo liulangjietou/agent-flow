@@ -26,9 +26,10 @@ public class ExpenseFinancialDisputeRecovery {
     private final JdbcExpenseSettlementRepository settlements;
     private final ExpenseSettlementSources sources;
     private final JdbcBudgetOperationRepository budgets;
+    private final ExpenseSettlementChanges changes;
     /** 只读当前原预算操作，不新建资金、预算或资源消费命令。 */
-    public ExpenseFinancialDisputeRecovery(ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, ExpenseSettlementSources sources, JdbcBudgetOperationRepository budgets) {
-        this.reports = reports; this.settlements = settlements; this.sources = sources; this.budgets = budgets;
+    public ExpenseFinancialDisputeRecovery(ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, ExpenseSettlementSources sources, JdbcBudgetOperationRepository budgets, ExpenseSettlementChanges changes) {
+        this.reports = reports; this.settlements = settlements; this.sources = sources; this.budgets = budgets; this.changes = changes;
     }
     /** 裁决、恢复及审计共用事务，预算迟到成功在锁内重新读取。 */
     @EventListener
@@ -76,6 +77,6 @@ public class ExpenseFinancialDisputeRecovery {
         catch (DomainException unavailable) { return; }
         var budget = current.budgetOperationId() == null ? null : budgets.find(tenant, current.budgetOperationId()).orElseThrow(
                 () -> new DomainException("EXPENSE_BUDGET_SOURCE_CHANGED", "Original consumption operation not found"));
-        settlements.update(current.resolveFinancialReview(budget, at));
+        changes.persist(current, current.resolveFinancialReview(budget, at));
     }
 }

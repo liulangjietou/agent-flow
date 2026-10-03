@@ -56,6 +56,17 @@ public class JdbcExpenseSettlementRepository {
         return jdbc.query("SELECT * FROM expense_settlement WHERE tenant_id=? AND report_id=?", row(), tenant, reportId.toString()).stream().findFirst();
     }
 
+    /** 原消息读取固定修订，后来的重试或裁决不能替换已经发生的结算事实。 */
+    public Optional<ExpenseSettlement> revision(String tenant, UUID reportId, long version) {
+        return jdbc.query("SELECT state_json FROM expense_settlement_revision WHERE tenant_id=? AND report_id=? AND version=?", (row, index) -> {
+            var value = json.read(row.getString("state_json"), ExpenseSettlement.class); var source = value.input().source();
+            if (!source.tenantId().equals(tenant) || !source.businessId().equals(reportId) || value.version() != version) {
+                throw new IllegalStateException("Persisted expense settlement revision identity is inconsistent");
+            }
+            return value;
+        }, tenant, reportId.toString(), version).stream().findFirst();
+    }
+
     /** 本地核销不含网络等待，消费者用原报销锁完成有界短事务。 */
     public List<Candidate> pending() {
         return jdbc.query("SELECT tenant_id,report_id,version FROM expense_settlement WHERE status='QUEUED' ORDER BY updated_at,tenant_id,report_id LIMIT 10",

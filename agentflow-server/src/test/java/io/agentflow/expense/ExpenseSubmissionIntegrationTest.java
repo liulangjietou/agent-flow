@@ -157,6 +157,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseSettlementWorker settlementWorker;
     @Autowired ExpenseSettlementService settlementService;
     @Autowired ExpenseSettlementRegistration settlementRegistration;
+    @Autowired org.springframework.context.ApplicationEventPublisher applicationEvents;
+    @Autowired io.agentflow.notification.ExpenseSettlementNotificationAccess settlementNotificationAccess;
     @Autowired PaymentOperationService paymentExecution;
     @Autowired ApprovedVoucherSources voucherSources;
     @Autowired JdbcVoucherPreparationRepository voucherPreparations;
@@ -841,6 +843,8 @@ class ExpenseSubmissionIntegrationTest {
         var versions = resourceVersions(report); settlementWorker.poll(); budgetWorker.poll();
         var settled = settlements.find("demo", report.id()).orElseThrow(); assertThat(settled.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(settled.input().voucherOperationId()).isNull(); assertThat(settled.input().payment()).isNull();
+        assertThat(settlementNoticeRecipients(report, settled.version())).contains("alice");
+        assertThat(ok(read(settlementNoticePath(report, settled.version(), "alice"), "alice"), 200).path("funding").asText()).isEqualTo("ZERO_AMOUNT");
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isZero();
         pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow().archive();
         assertThat(archive).isNotNull(); assertThat(archive.manifest().vouchers()).isEmpty();
@@ -1643,6 +1647,8 @@ class ExpenseSubmissionIntegrationTest {
     @Test void expensePaymentReturnUnknownEvidenceNeedsExplicitFreshConfirmationBeforeSettlementResumes() throws Exception {
         var report = archiveReadyExpense(); var original = settlements.find("demo", report.id()).orElseThrow(); var resources = resourceVersions(report);
         expenseReturnStatus = ExpensePaymentReturnPort.Status.UNRESOLVED; var unresolved = queryExpenseReturn(report);
+        var held = settlements.find("demo", report.id()).orElseThrow(); var oldNotice = settlementNoticePath(report, held.version(), "alice");
+        assertThat(settlementNoticeRecipients(report, held.version())).containsExactlyInAnyOrder("alice", "finance");
         assertThat(asFinance(() -> expenseReturns.registrationIssue(expenseReturnSources.find("demo", report.id()), expenseReturnLedgers.find("demo", report.id()).orElseThrow(), unresolved, Instant.now())))
                 .isEqualTo("EXPENSE_PAYMENT_RETURN_EVIDENCE_UNAVAILABLE");
         assertThatThrownBy(() -> settlementSources.requireCurrent(settlements.find("demo", report.id()).orElseThrow(), current(report)))
@@ -1651,6 +1657,9 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
         registerExpenseReturn(report, confirmed);
         var recovered = settlements.find("demo", report.id()).orElseThrow(); assertThat(recovered.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(settlementNoticeRecipients(report, recovered.version())).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(oldNotice, "alice"), 200); assertThat(detail.at("/notice/status").asText()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(detail.at("/current/status").asText()).isEqualTo("SETTLED");
         assertThat(recovered.input()).isEqualTo(original.input()); assertThat(recovered.budgetOperationId()).isEqualTo(original.budgetOperationId()); assertThat(resourceVersions(report)).isEqualTo(resources);
         assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().reviewRequired()).isFalse();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isZero();
@@ -3905,6 +3914,99 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
     }
 
+    @Test void expenseSettlementCompletionNotifiesAfterActualBudgetConsumption() throws Exception {
+        var report = paidExpense(); var queued = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(settlementNoticeRecipients(report, queued.version())).isEmpty();
+        settlementWorker.poll(); var pending = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(settlementNoticeRecipients(report, pending.version())).isEmpty();
+        budgetWorker.poll(); var settled = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(settled.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(settlementNoticeRecipients(report, settled.version())).containsExactlyInAnyOrder("alice", "finance");
+        settlementWorker.poll(); budgetWorker.poll();
+        assertThat(settlementNoticeRecipients(report, settled.version())).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void expenseSettlementBlockedResourcesNotifyWithoutErasingPaymentSuccess() throws Exception {
+        var report = paidExpense(); var id = current(report).currentRound().advanceOffsets().get(0).advanceId();
+        var advance = advances.find("demo", id).orElseThrow(); long version = advance.version();
+        advance.requirePaymentReview(version); advances.update(advance, version, "fixture", "PAYMENT_REVIEW");
+        var before = resourceVersions(report); settlementWorker.poll(); var blocked = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(blocked.status()).isEqualTo(ExpenseSettlement.Status.BLOCKED);
+        assertThat(settlementNoticeRecipients(report, blocked.version())).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(resourceVersions(report)).isEqualTo(before);
+        assertThat(paymentOperations.find("demo", blocked.input().payment().operationId()).orElseThrow().settleable()).isTrue();
+    }
+
+    private List<String> settlementNoticeRecipients(ExpenseReport report, long version) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND event_key LIKE ? ORDER BY recipient_id", String.class,
+                report.applicationId().toString(), "expense-settlement:" + report.id() + ":" + version + ":%");
+    }
+
+    private String settlementNoticePath(ExpenseReport report, long version, String recipient) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key LIKE ?", String.class,
+                recipient, "expense-settlement:" + report.id() + ":" + version + ":%") + "/expense-settlement-target";
+    }
+
+    @Test void expenseSettlementOldMessageKeepsRejectedRevisionAfterRetryAndRechecksPermissions() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetStatus = BudgetObservation.Status.REJECTED;
+        budgetRejection = BudgetObservation.Rejection.ACCOUNTING_PERIOD_CLOSED; budgetWorker.poll();
+        var rejected = settlements.find("demo", report.id()).orElseThrow(); var oldPath = settlementNoticePath(report, rejected.version(), "alice");
+        budgetStatus = BudgetObservation.Status.APPLIED;
+        tx().executeWithoutResult(status -> settlementService.retry("demo", report.id(), rejected.version())); settlementWorker.poll(); budgetWorker.poll();
+        var settled = settlements.find("demo", report.id()).orElseThrow(); var resources = resourceVersions(report);
+        var response = read(oldPath, "alice"); var target = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(target.at("/notice/status").asText()).isEqualTo("BUDGET_REJECTED"); assertThat(target.at("/notice/version").asLong()).isEqualTo(rejected.version());
+        assertThat(target.at("/current/status").asText()).isEqualTo("SETTLED"); assertThat(target.at("/current/version").asLong()).isEqualTo(settled.version());
+        assertThat(target.at("/notice/budgetOperationId").asText()).isNotEqualTo(target.at("/current/budgetOperationId").asText());
+        assertThat(target.toString()).doesNotContain("amount", "account", "receiptReference", "commandDigest", "canRetry");
+        for (String actor : List.of("admin", "cashier", "bob")) assertThat(read(oldPath, actor).getStatus()).isIn(403, 404);
+        assertThat(read(oldPath + "?roundNo=1", "alice").getStatus()).isEqualTo(400);
+        assertThat(read(settlementNoticePath(report, settled.version(), "finance"), "finance").getStatus()).isEqualTo(200);
+        UUID financeNotice = UUID.fromString(settlementNoticePath(report, settled.version(), "finance").split("/")[4]);
+        actors.set(new Actor("demo", "finance", Set.of("ADMIN")));
+        try { assertThatThrownBy(() -> settlementNotificationAccess.target(financeNotice)).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { actors.clear(); }
+        actors.set(new Actor("foreign", "finance", Set.of("FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> settlementNotificationAccess.target(financeNotice)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                failure -> assertThat(failure.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        String id = oldPath.split("/")[4]; String event = jdbc.queryForObject("SELECT event_key FROM notification_inbox WHERE id=?", String.class, id);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event.replace(":BUDGET_REJECTED", ":REVIEW_REQUIRED"), id);
+        try { assertThat(read(oldPath, "alice").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event, id); }
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpenseSettlementChanged(rejected, settled)));
+        assertThat(settlementNoticeRecipients(report, settled.version())).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void expenseSettlementNotificationAndDispatchRollbackAndCurrentEntityRevocationAreAtomic() throws Exception {
+        var report = paidExpense(); var queued = settlements.find("demo", report.id()).orElseThrow();
+        var candidate = new JdbcExpenseSettlementRepository.Candidate("demo", report.id(), queued.version());
+        var actor = new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false);
+        try {
+            assertThatThrownBy(() -> tx().execute(status -> {
+                settlementService.block(candidate, "INVOICE_VERIFICATION_REQUIRED");
+                assertThat(settlementNoticeRecipients(report, queued.version() + 1)).containsExactlyInAnyOrder("alice", "finance");
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key LIKE ? AND i.recipient_id='finance'", Integer.class,
+                        "expense-settlement:" + report.id() + ":%" )).isEqualTo(1);
+                throw new IllegalStateException("Synthetic settlement notification rollback");
+            })).hasMessageContaining("Synthetic settlement notification rollback");
+            assertThat(settlements.find("demo", report.id())).contains(queued); assertThat(settlementNoticeRecipients(report, queued.version() + 1)).isEmpty();
+            settlementService.block(candidate, "INVOICE_VERIFICATION_REQUIRED");
+            String path = settlementNoticePath(report, queued.version() + 1, "finance"); String messageId = path.split("/")[4];
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, messageId));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(organizationRepository.person("demo", finance).orElseThrow().active()).isTrue();
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404);
+                assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
     @Test void budgetConsumeRejectionRetriesOnlyBudgetAndKeepsConsumedResources() throws Exception {
         var report = paidExpense(); settlementWorker.poll(); var versions = resourceVersions(report);
         var first = settlements.find("demo", report.id()).orElseThrow().budgetOperationId();
@@ -3972,6 +4074,8 @@ class ExpenseSubmissionIntegrationTest {
         var queued = settlements.find("demo", report.id()).orElseThrow(); assertThat(queued.input().payment()).isNull(); assertThat(queued.input().payable()).isEqualTo(money("0"));
         settlementWorker.poll(); budgetWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().consumed()).isEqualTo(money("100"));
+        var settled = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(ok(read(settlementNoticePath(report, settled.version(), "alice"), "alice"), 200).path("funding").asText()).isEqualTo("FULL_OFFSET");
         assertThat(paymentAuthorizations.latest("demo", report.applicationId(), 1)).isEmpty(); assertThat(paymentWrites).isZero();
         pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow().archive();
         assertThat(archive).isNotNull(); assertThat(archive.manifest().vouchers()).extracting(ExpenseArchive.Voucher::kind).containsExactly(VoucherCommand.Kind.EXPENSE_ACCRUAL);

@@ -35,6 +35,7 @@ class ExpenseSettlementPersistenceTest {
     @Autowired ApplicationRepository applications;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired io.agentflow.common.JsonUtil json;
 
     @Test void queueAndRetryRetainOriginalIdentityAndEveryRevision() {
         var initial = fixture(); create(initial); var id = initial.input().source().businessId();
@@ -44,9 +45,21 @@ class ExpenseSettlementPersistenceTest {
         var retry = blocked.retry(NOW.plusSeconds(2)); update(retry);
         var held = retry.requireReview("PAYMENT_REVERSED", NOW.plusSeconds(3)); update(held);
         assertThat(settlements.find("demo", id)).contains(held);
+        assertThat(settlements.revision("demo", id, blocked.version())).contains(blocked);
+        assertThat(settlements.revision("foreign", id, blocked.version())).isEmpty();
+        assertThat(settlements.revision("demo", id, held.version() + 1)).isEmpty();
         assertThat(jdbc.queryForList("SELECT version FROM expense_settlement_revision WHERE tenant_id='demo' AND report_id=? ORDER BY version", Long.class, id.toString())).containsExactly(1L, 2L, 3L, 4L);
         assertThatThrownBy(() -> update(blocked)).isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> create(initial)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test void historicalRevisionRejectsPayloadFromAnotherVersion() {
+        var initial = fixture(); create(initial); var id = initial.input().source().businessId();
+        var blocked = initial.block("INVOICE_VERIFICATION_REQUIRED", NOW.plusSeconds(1)); update(blocked);
+        jdbc.update("UPDATE expense_settlement_revision SET state_json=? WHERE tenant_id='demo' AND report_id=? AND version=?", json.write(initial), id.toString(), blocked.version());
+        try { assertThatThrownBy(() -> settlements.revision("demo", id, blocked.version())).isInstanceOf(IllegalStateException.class)
+                .hasMessage("Persisted expense settlement revision identity is inconsistent"); }
+        finally { jdbc.update("UPDATE expense_settlement_revision SET state_json=? WHERE tenant_id='demo' AND report_id=? AND version=?", json.write(blocked), id.toString(), blocked.version()); }
     }
 
     @Test void originalSourceAndCreatedTimeCannotBeChangedByAForgedNextVersion() {
