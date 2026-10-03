@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T09:57:38.042206+00:00",
+  "recordedAt": "2026-10-03T11:47:22.471935+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1653,7 +1653,7 @@
           ]
         }
       ],
-      "observed": "可信目录与持久队列、事务外 HTTP、原生等待推进已完成组件验证，含暂停/停止、撤回重提、并发、原号恢复和 V106 升级。161 项范围回归、18 项 PostgreSQL 验证通过。公开目录、设计绑定、模拟及页面尚未接通；DefinitionValidator 仍拒绝公开使用 SERVICE_TASK，独立进程和配套恢复尚待验收。",
+      "observed": "可信目录公开接口、设计绑定、权限与实际参数预检、主子流程提交、纯模拟及两种设计视图已接通。177 项 Java 范围测试、79 项前端测试、构建和 OpenAPI 通过；固定包 HTTP 主链路与默认 H2 文件库三轮执行中强退恢复通过。运行状态页面、真实浏览器、PostgreSQL 补测和配套恢复待完成。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskOperation.java",
@@ -1674,15 +1674,20 @@
         {
           "path": "docs/evidence/service-task-backend-20261003.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/service-task-public-design-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。",
       "dependsOn": [],
       "progress": {
-        "stage": "BACKEND_COMPONENTS_VERIFIED",
-        "implementationCommit": "9c0bdda645053ca5fb728d77040718cd4f922027",
-        "evidence": "docs/evidence/service-task-backend-20261003.json",
-        "domainFoundationEvidence": "docs/evidence/service-task-foundation-20261003.json"
+        "stage": "PUBLIC_DESIGN_AND_RESTART_VERIFIED",
+        "implementationCommit": "ef4aefcd36be0d8a9ae04cfd62b2b9fe11422d9d",
+        "evidence": "docs/evidence/service-task-public-design-20261003.json",
+        "backendEvidence": "docs/evidence/service-task-backend-20261003.json",
+        "durabilityCommit": "bb95a51ce3e89c19f2c973518d949214f8dc1366"
       }
     },
     {
@@ -3397,8 +3402,9 @@
   },
   "latestProgress": {
     "taskId": "W01",
-    "status": "BACKEND_COMPONENTS_VERIFIED",
-    "implementationCommit": "9c0bdda645053ca5fb728d77040718cd4f922027",
-    "evidence": "docs/evidence/service-task-backend-20261003.json"
+    "status": "PUBLIC_DESIGN_AND_RESTART_VERIFIED",
+    "implementationCommit": "ef4aefcd36be0d8a9ae04cfd62b2b9fe11422d9d",
+    "evidence": "docs/evidence/service-task-public-design-20261003.json",
+    "durabilityCommit": "bb95a51ce3e89c19f2c973518d949214f8dc1366"
   }
 }
