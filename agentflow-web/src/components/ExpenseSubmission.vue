@@ -9,7 +9,7 @@ import AdvanceOffsetSuggestion from './AdvanceOffsetSuggestion.vue'
 import type { AdvanceOffsetSuggestion as OffsetSuggestion } from '../advanceOffsetSuggestion'
 
 const props = defineProps<{ detail: ExpenseDetail; scopeKey: string; timeZone: string; locked: boolean }>()
-const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion] }>()
+const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion]; checked: [] }>()
 const appointment = ref(''), accountingDate = ref(''), options = ref<PrecheckOptions | null>(null), result = ref<PrecheckView | null>(null)
 const reading = ref(false), saving = ref(false), confirm = ref(false), error = ref(''), requiresRefresh = ref(false)
 let epoch = 0, controller: AbortController | null = null, poll: ReturnType<typeof setTimeout> | undefined, expiry: ReturnType<typeof setTimeout> | undefined, pollUntil = 0
@@ -79,6 +79,7 @@ async function submit() {
   finally { if (version === epoch) { saving.value = false; emit('busy', false) } }
 }
 watch(() => [appointment.value, accountingDate.value], () => { confirm.value = false })
+watch(() => result.value ? `${result.value.job.id}:${result.value.job.status}` : '', (value, old) => { if (value && value !== old) emit('checked') })
 watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion], () => {
   stop(); appointment.value = ''; accountingDate.value = ''; options.value = null; result.value = null; saving.value = false; emit('busy', false); requiresRefresh.value = false
   if (props.scopeKey) void load()

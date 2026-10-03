@@ -109,6 +109,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
+import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
 import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from './invoiceExtraction'
 
 type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SERVICE_TASK' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
@@ -1142,6 +1143,9 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-requests\/[^/?]+\/close$/.test(request.path)) {
         notice.value = '原额度关闭结果已确认，请核对最新额度状态。'
         templateRefresh.value++
+      } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
+        acknowledgeExplanation(actorScope.value, request.path, result as ExplanationReceipt)
+        notice.value = '原预检解释操作已确认，请核对同一条记录；费用金额、检查结论和审批状态保持不变。'
       } else if (request.path.startsWith('/expense-reports')) {
         if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
           const value = result as ExpenseDetailData

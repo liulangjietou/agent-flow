@@ -5,6 +5,7 @@ import { readExpenseCategories, readExpenseConfiguration, readPolicyDraft, readP
 import type { AdvanceOffsetSuggestion } from './advanceOffsetSuggestion'
 import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
 import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
+import { explanationPath, readExplanationInput, readExplanationPage, readExplanationDetail, validateExplanationReceipt, type ExplanationReceipt, type ExplanationGenerate, type ExplanationReview } from './precheckExplanation.js'
 import { extractionPath, readExtractionOptions, readExtractionPage, readExtractionDetail, validateExtractionReceipt, type ExtractionReceipt, type ExtractionGenerate, type ExtractionReview } from './invoiceExtraction.js'
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
 import { approvalProxyPath, readApprovalProxy, readApprovalProxyPage, validateApprovalProxyReceipt, type ApprovalProxyInput, type ApprovalProxyReceipt } from './approvalProxies.js'
@@ -475,6 +476,7 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   const instance = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/runtime\/(pause|resume|terminate)$/.exec(operation.path)
   if (instance) validateInstanceReceipt(result as InstanceControlView, decodeURIComponent(instance[1]!), Number(instance[2]), instance[3] as InstanceControlAction, JSON.parse(operation.body!) as InstanceControlInput)
   if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) validateDraftReceipt(result, operation.path, operation.body!)
+  if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(operation.path)) validateExplanationReceipt(result, operation.path, operation.body!)
   return result
 })
 function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
@@ -657,6 +659,11 @@ export const api = {
   expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
   queueExpensePrecheck: (id: string, input: PrecheckInput) => write<{ id: string }>(`/expense-reports/${encodeURIComponent(id)}/precheck`, 'POST', '发起费用预检', input),
   expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  precheckExplanationInput: (id: string, precheckId: string, signal: AbortSignal) => request(explanationPath(id) + '/input?precheckId=' + encodeURIComponent(precheckId), { signal, cache: 'no-store' }).then(value => readExplanationInput(value, precheckId)),
+  precheckExplanationRuns: (id: string, page: number, signal: AbortSignal) => request(explanationPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readExplanationPage(value, page)),
+  precheckExplanationRun: (id: string, runId: string, signal: AbortSignal) => request(explanationPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readExplanationDetail(value, runId)),
+  generatePrecheckExplanation: (id: string, body: ExplanationGenerate) => write<ExplanationReceipt>(explanationPath(id), 'POST', '生成本人预检解释', body),
+  reviewPrecheckExplanation: (id: string, runId: string, body: ExplanationReview) => write<ExplanationReceipt>(explanationPath(id) + '/' + encodeURIComponent(runId) + '/review', 'POST', '复核本人预检解释', body),
   advanceOffsetSuggestion: (id: string, jobId: string, signal: AbortSignal) => request<AdvanceOffsetSuggestion>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}/advance-offset-suggestion`, { signal, cache: 'no-store' }),
   submitExpense: (id: string, input: { applicationVersion: number; financialVersion: number; precheckId: string }) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/submit`, 'POST', '正式提交报销', input),
   invoices: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceItem>>('/invoices' + historyQuery(filter), { signal, cache: 'no-store' }),
