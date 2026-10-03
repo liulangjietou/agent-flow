@@ -37,6 +37,12 @@ public class ExpensePolicyConfiguration {
     /** 旧预检在制度发布或生效目录修订后必须失效，草稿编辑不影响已发布判定。 */
     public boolean current(String tenant, ExpensePolicySelection selection) { return Objects.equals(snapshot(tenant).selection(), selection); }
 
+    /** 事前计划只使用启用后的类别目录，费用制度单独发布不改变其金额或有效性。 */
+    public Long categoryRevision(String tenant) {
+        var current = service.current(tenant);
+        return current.activePolicy() == null ? null : current.categories().version();
+    }
+
     /** 配置锁必须留在最终提交事务内，不能检查后释放再创建审批轮次。 */
     public void lockForSubmission(String tenant) {
         if (!TransactionSynchronizationManager.isActualTransactionActive() || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {

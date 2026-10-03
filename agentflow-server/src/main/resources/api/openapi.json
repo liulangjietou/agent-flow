@@ -55497,6 +55497,13 @@
             },
             "minItems": 1,
             "maxItems": 200
+          },
+          "managedCategoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true,
+            "description": "本轮实际采用的平台类别修订；未启用管理及旧轮次为空，不表示费用制度已经审核。"
           }
         },
         "required": [

@@ -28,6 +28,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -85,6 +88,7 @@ class ExpensePlanIntegrationTest {
     @Autowired AuthService auth;
     @Autowired CurrentActor actors;
     @Autowired JdbcTemplate jdbc;
+    @Autowired PlatformTransactionManager transactions;
     @Autowired OrganizationService organization;
     @Autowired DefinitionApplicationService definitions;
     @Autowired ApplicationRepository applications;
@@ -95,6 +99,7 @@ class ExpensePlanIntegrationTest {
     @Autowired ExpensePlanCheckWorker worker;
     @Autowired JdbcExpensePlanCheckRepository checks;
     @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired ExpenseConfigurationService expenseConfiguration;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
@@ -112,6 +117,7 @@ class ExpensePlanIntegrationTest {
             if (job.status() == Status.QUEUED) job = execution.claim("demo", job.input().id(), Instant.now());
             if (job != null) execution.finish(job, Result.unavailable("INTERNAL_ERROR"), Instant.now());
         }
+        clearExpenseConfiguration();
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
@@ -303,6 +309,115 @@ class ExpensePlanIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT status FROM approval_submission_round WHERE tenant_id='demo' AND application_id=? AND round_no=1", String.class, app(id).id().toString())).isEqualTo("IN_APPROVAL");
         } finally { jdbc.execute("ALTER TABLE finance_resource DROP CONSTRAINT ck_plan_credit_fixture"); }
         ok(act(id, "APPROVE"), 200); assertThat(requests.find("demo", id)).isPresent();
+    }
+
+    @Test void enablingManagedCategoriesInvalidatesAnExistingLegacyReadyPlan() throws Exception {
+        UUID id = create(); UUID checked = ready(id); long before = app(id).version();
+        configureCategories(false);
+        var view = ok(read(path(id) + "/prechecks/" + checked, "alice"), 200);
+        assertThat(view.path("usable").asBoolean()).isFalse();
+        assertThat(view.path("unavailableCode").asText()).isEqualTo("EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+        var response = send(path(id) + "/submit", "alice", submission(id, checked));
+        assertThat(response.getStatus()).isEqualTo(409);
+        code(response, "EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+        assertThat(app(id).version()).isEqualTo(before); assertThat(current(id).rounds()).isEmpty();
+        assertThat(requests.find("demo", id)).isEmpty();
+    }
+
+    @Test void changedManagedCategoryRevisionInvalidatesReadyButPolicyOnlyPublicationDoesNot() throws Exception {
+        String policyKey = configureCategories(true); UUID id = create(); UUID checked = ready(id);
+        var saved = expenseConfiguration.draft("demo", policyKey);
+        expenseConfiguration.saveDraft(admin, policyKey, saved.revision(), policyDefinition("只编辑费用制度"), "草稿不改变类别");
+        assertThat(ok(read(path(id) + "/prechecks/" + checked, "alice"), 200).path("usable").asBoolean()).isTrue();
+        expenseConfiguration.publish(admin, policyKey, 2, 1, 1, "发布仅改变费用制度");
+        assertThat(ok(read(path(id) + "/prechecks/" + checked, "alice"), 200).path("usable").asBoolean()).isTrue();
+        expenseConfiguration.saveCategories(admin, 1, managedCategories(false), "停用差旅类别");
+        var view = ok(read(path(id) + "/prechecks/" + checked, "alice"), 200);
+        assertThat(view.path("usable").asBoolean()).isFalse();
+        assertThat(view.path("unavailableCode").asText()).isEqualTo("EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+        code(send(path(id) + "/submit", "alice", submission(id, checked)), "EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+    }
+
+    @Test void categoryChangeDuringRateWaitCannotPersistAReadyPlan() throws Exception {
+        configureCategories(true); UUID id = create(); UUID checked = enqueue(id);
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        responder = (operation, request) -> { if (operation.equals("exchange-rate")) { entered.countDown(); await(release); } return normal(operation, request); };
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            var running = pool.submit(worker::poll); assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            expenseConfiguration.saveCategories(admin, 1, managedCategories(false), "外部等待期间停用差旅");
+            release.countDown(); running.get(10, TimeUnit.SECONDS);
+            assertThat(check(checked).status()).isEqualTo(Status.UNAVAILABLE);
+            assertThat(check(checked).result().code()).isEqualTo("EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+            assertThat(current(id).rounds()).isEmpty();
+        } finally { release.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test void policyOnlyPublicationStillSubmitsAndApprovalKeepsTheOriginalCategoryRevision() throws Exception {
+        String key = configureCategories(true); UUID id = create(); UUID checked = ready(id);
+        assertThat(check(checked).result().evidence().preview().managedCategoryRevision()).isEqualTo(1L);
+        expenseConfiguration.saveDraft(admin, key, 1, policyDefinition("新版费用金额制度"), "类别目录保持不变");
+        expenseConfiguration.publish(admin, key, 2, 1, 1, "仅发布费用制度版本");
+        ok(send(path(id) + "/submit", "alice", submission(id, checked)), 200);
+        var frozen = current(id).currentRound(); assertThat(frozen.managedCategoryRevision()).isEqualTo(1L);
+        expenseConfiguration.saveCategories(admin, 1, managedCategories(false), "新申请停用差旅");
+        ok(act(id, "APPROVE"), 200); ok(act(id, "APPROVE"), 200);
+        assertThat(current(id).currentRound()).isEqualTo(frozen);
+        assertThat(ok(read(path(id), "alice"), 200).at("/financialRound/managedCategoryRevision").asLong()).isEqualTo(1L);
+        assertThat(requests.find("demo", id).orElseThrow().balance(7).limit()).isEqualTo(money("710", "CNY"));
+        assertThat(calls.keySet()).containsExactlyInAnyOrder("catalog", "exchange-rate");
+    }
+
+    @Test void submitWaitsForCategoryWriterAndRejectsItsSupersededPreview() throws Exception {
+        configureCategories(true); UUID id = create(); UUID checked = ready(id); var input = submission(id, checked);
+        var held = new CountDownLatch(1); var release = new CountDownLatch(1); var entered = new CountDownLatch(1);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var writer = pool.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+                expenseConfiguration.saveCategories(admin, 1, managedCategories(false), "并发停用差旅");
+                held.countDown(); await(release);
+            }));
+            assertThat(held.await(10, TimeUnit.SECONDS)).isTrue();
+            var submission = pool.submit(() -> { entered.countDown(); return send(path(id) + "/submit", "alice", input); });
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> submission.get(300, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            release.countDown(); writer.get(10, TimeUnit.SECONDS);
+            var response = submission.get(10, TimeUnit.SECONDS);
+            assertThat(response.getStatus()).isEqualTo(409); code(response, "EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+            assertThat(current(id).rounds()).isEmpty(); assertThat(app(id).status()).isEqualTo(ApplicationStatus.DRAFT);
+            assertThat(requests.find("demo", id)).isEmpty();
+        } finally { release.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test void historicalPrecheckWithoutCategoryRevisionRemainsReadableAsUnmanaged() throws Exception {
+        UUID id = create(); UUID checked = ready(id); var evidence = check(checked).result().evidence();
+        var legacy = json.read(json.write(evidence), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) legacy.path("preview")).remove("managedCategoryRevision");
+        var restored = json.read(json.write(legacy), Evidence.class);
+        assertThat(restored.preview().managedCategoryRevision()).isNull();
+        assertThat(restored).isEqualTo(evidence);
+    }
+
+    private String configureCategories(boolean travelActive) {
+        expenseConfiguration.saveCategories(admin, 0, managedCategories(travelActive), "合成类别目录");
+        String key = "plan-policy-" + UUID.randomUUID();
+        expenseConfiguration.saveDraft(admin, key, 0, policyDefinition("合成事前类别制度"), "合成制度草稿");
+        expenseConfiguration.publish(admin, key, 1, 1, 0, "明确启用平台类别"); return key;
+    }
+    private List<ExpenseCategoryCatalog.Category> managedCategories(boolean travelActive) {
+        return List.of(new ExpenseCategoryCatalog.Category("TRAVEL", "差旅", List.of(ExpenseLine.Unit.ITEM), travelActive),
+                new ExpenseCategoryCatalog.Category("OTHER", "其他", List.of(ExpenseLine.Unit.ITEM), true));
+    }
+    private ExpensePolicyDefinition policyDefinition(String name) {
+        return new ExpensePolicyDefinition(name, List.of(new ExpensePolicyDefinition.Rule("allow", "合成允许规则",
+                new ExpensePolicyDefinition.Match(List.of(), List.of(), List.of(), List.of(), null, null, null),
+                new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW, null, null, null, null, List.of(), false))));
+    }
+    private void clearExpenseConfiguration() {
+        // 仅清理本类独立测试库中的配置；历史计划快照不受当前指针影响。
+        jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
+        for (String table : List.of("expense_policy_activation", "expense_policy_version", "expense_policy_draft_revision",
+                "expense_policy_draft", "expense_category_revision", "expense_configuration")) jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo'");
     }
 
     private UUID create() throws Exception { return id(ok(send("/api/v1/expense-plans", "alice", createBody(published(false, false), content("100"))), 201)); }

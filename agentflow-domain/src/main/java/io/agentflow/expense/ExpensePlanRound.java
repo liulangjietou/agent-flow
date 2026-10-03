@@ -16,13 +16,20 @@ import java.util.List;
  */
 public record ExpensePlanRound(int roundNo, long submittedPlanVersion, String submittedBy, Instant submittedAt,
                                ExpensePlanContent content, FinanceCatalog.LegalEntity legalEntity, String catalogVersion,
-                               List<FrozenLine> lines) {
+                               List<FrozenLine> lines, Long managedCategoryRevision) {
+    /** 未启用平台类别的历史轮次没有类别修订，保留原目录证据。 */
+    public ExpensePlanRound(int roundNo, long submittedPlanVersion, String submittedBy, Instant submittedAt,
+                            ExpensePlanContent content, FinanceCatalog.LegalEntity legalEntity, String catalogVersion,
+                            List<FrozenLine> lines) {
+        this(roundNo, submittedPlanVersion, submittedBy, submittedAt, content, legalEntity, catalogVersion, lines, null);
+    }
+
     /** 重建快照时仍核对逐行汇兑和分摊，不信任持久化的派生金额。 */
     public ExpensePlanRound {
         if (roundNo < 1 || submittedPlanVersion < 1 || StringUtils.isBlank(submittedBy) || submittedBy.length() > 128 || submittedAt == null
                 || content == null || legalEntity == null || !legalEntity.id().equals(content.legalEntityId())
                 || StringUtils.isBlank(catalogVersion) || catalogVersion.length() > 128 || CollectionUtils.isEmpty(lines)
-                || lines.size() != content.lines().size()) throw invalid();
+                || lines.size() != content.lines().size() || managedCategoryRevision != null && managedCategoryRevision < 1) throw invalid();
         LocalDate date = LocalDate.ofInstant(submittedAt, ZoneId.of(legalEntity.timeZone()));
         Money total = Money.zero(legalEntity.baseCurrency());
         for (int index = 0; index < lines.size(); index++) {

@@ -20,6 +20,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import static io.agentflow.expense.ExpensePlanCheck.*;
@@ -32,23 +33,26 @@ import static io.agentflow.expense.ExpensePlanCheck.*;
 public class ExpensePlanCheckService {
     private static final int DEFAULT_LIMIT = 25;
     private static final int MAX_LIMIT = 100;
+    private static final String CATEGORY_CHANGED = "EXPENSE_CATEGORY_CONFIGURATION_CHANGED";
     private final CurrentActor actors;
     private final ExpensePlanRepository plans;
     private final ApprovalApplicationFacade applications;
     private final ApplicationRepository applicationRepository;
     private final OrganizationInitiatorDirectory initiators;
     private final FinanceGatewayConfiguration configuration;
+    private final ExpensePolicyConfiguration policyConfiguration;
     private final JdbcExpensePlanCheckRepository jobs;
     private final int timeoutSeconds;
 
     /** 身份检查不复用管理员读取权限，所有外部事实由独立执行器获取。 */
     public ExpensePlanCheckService(CurrentActor actors, ExpensePlanRepository plans, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
-            JdbcExpensePlanCheckRepository jobs,
+            JdbcExpensePlanCheckRepository jobs, ExpensePolicyConfiguration policyConfiguration,
             @Value("${agentflow.expense-plans.precheck-timeout-seconds:300}") int timeoutSeconds) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Expense plan check timeout must be between 15 and 900 seconds");
         this.actors = actors; this.plans = plans; this.applications = applications; this.applicationRepository = applicationRepository;
         this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.timeoutSeconds = timeoutSeconds;
+        this.policyConfiguration = policyConfiguration;
     }
 
     /** 返回实际目标和双版本，不把配置可用解释为计划已经通过。 */
@@ -125,7 +129,7 @@ public class ExpensePlanCheckService {
         return job;
     }
 
-    /** 落库前复核申请、任职、目标；网络等待期间的任何修改都不能混入成功。 */
+    /** 落库前复核申请、任职、目标和类别；网络等待期间的修改不能混入成功。 */
     @Transactional
     public void finish(ExpensePlanCheck claimed, Result result, Instant at) {
         plans.lock(claimed.input().tenantId(), claimed.input().planId());
@@ -133,6 +137,7 @@ public class ExpensePlanCheckService {
         if (job.status() != Status.RUNNING || job.version() != claimed.version() || !job.input().equals(claimed.input())) return;
         Instant now = time(at); String failure = contextFailure(job);
         if (failure != null) result = Result.unavailable(failure);
+        else if (result.evidence() != null && !currentCategory(job.input().tenantId(), result.evidence().preview())) result = Result.unavailable(CATEGORY_CHANGED);
         else if (result.evidence() != null && !result.evidence().validUntil().isAfter(at)) result = Result.unavailable("FACTS_EXPIRED");
         jobs.update(job.finish(result, now));
     }
@@ -142,6 +147,7 @@ public class ExpensePlanCheckService {
         if (job.status() != Status.READY) return "PRECHECK_NOT_READY";
         if (jobs.latestAttempt(job.input().tenantId(), job.input().planId()) != job.input().attempt()) return "PRECHECK_SUPERSEDED";
         if (!job.result().evidence().validUntil().isAfter(now)) return "FACTS_EXPIRED";
+        if (!currentCategory(job.input().tenantId(), job.result().evidence().preview())) return CATEGORY_CHANGED;
         String failure = contextFailure(job); if (failure != null) return failure;
         var preview = job.result().evidence().preview();
         if (!preview.content().equals(plan.content())) return "CONTEXT_CHANGED";
@@ -160,6 +166,9 @@ public class ExpensePlanCheckService {
         var current = initiators.findCurrent(new Actor(input.tenantId(), input.employeeId(), Set.of()), input.initiator().appointmentId());
         if (current.filter(input.initiator()::equals).isEmpty()) return "INITIATOR_CHANGED";
         return null;
+    }
+    private boolean currentCategory(String tenant, ExpensePlanRound preview) {
+        return Objects.equals(policyConfiguration.categoryRevision(tenant), preview.managedCategoryRevision());
     }
     private ExpensePlan owned(UUID id) { return plans.find(actors.actor().tenantId(), id).filter(value -> value.employeeId().equals(actors.actor().userId())).orElseThrow(ExpensePlanCheckService::notFound); }
     private static Summary summary(ExpensePlanCheck job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().planVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }

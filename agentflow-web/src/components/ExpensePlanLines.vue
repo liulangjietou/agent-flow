@@ -6,6 +6,7 @@ defineProps<{ content: PlanContent; financial?: PlanRound | null }>()
 
 <template>
   <div class="plan-lines" aria-label="计划明细行">
+    <p v-if="financial?.managedCategoryRevision != null" class="category-revision">本轮使用平台费用类别修订 {{ financial.managedCategoryRevision }}</p>
     <p v-if="!content.lines.length" class="empty-lines">尚未填写计划明细。</p>
     <article v-for="line in content.lines" :key="line.lineNo" class="plan-line">
       <div class="line-heading"><span class="line-number">{{ line.lineNo }}</span><div><h4>{{ line.description }}</h4><p>{{ line.categoryCode }} · {{ line.plannedOn }}<template v-if="line.endedOn"> 至 {{ line.endedOn }}</template> · {{ line.cityCode }}</p></div><strong>{{ moneyLabel(line.amount) }}</strong></div>
@@ -21,5 +22,6 @@ defineProps<{ content: PlanContent; financial?: PlanRound | null }>()
 </template>
 
 <style scoped>
+.category-revision{font-size:12px;line-height:1.8;color:var(--muted);overflow-wrap:anywhere}
 .plan-line{padding:20px 0;border-bottom:1px solid var(--line)}.line-heading{display:flex;align-items:flex-start;gap:10px}.line-number{flex-shrink:0;width:25px;height:25px;border-radius:7px;display:grid;place-items:center;font:11px 'DM Mono',monospace;background:var(--paper);color:var(--muted)}.line-heading>div{min-width:0}.line-heading h4{margin:3px 0 7px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.line-heading p{margin:0;color:var(--muted);font-size:11px;line-height:1.7}.line-heading>strong{font:12px 'DM Mono',monospace;margin:5px 0 0 auto;white-space:nowrap}.line-evidence{font-size:11px;line-height:1.9;color:var(--muted);margin-top:14px}.line-evidence summary{cursor:pointer;color:var(--deep);padding:5px 0}.line-evidence summary:focus-visible{outline:3px solid var(--teal);outline-offset:2px}.evidence-body{padding:8px 14px;background:var(--paper);border-radius:8px}.line-evidence p,.line-evidence li{overflow-wrap:anywhere}.line-evidence h5{font-size:11px;margin-bottom:5px}.line-evidence ul{padding-left:18px}.empty-lines{font-size:12px;color:var(--muted)}@media(max-width:600px){.line-heading{flex-wrap:wrap}.line-heading>div{flex:1}.line-heading>strong{width:100%;margin-left:35px}}
 </style>

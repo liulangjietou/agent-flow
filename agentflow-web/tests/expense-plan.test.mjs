@@ -31,6 +31,16 @@ function submission() {
   return panel(Submission, { detail: detail(), scopeKey: 'alice', timeZone: 'Asia/Shanghai', locked: false })
 }
 
+test('平台类别修订变化给出明确重查提示，旧 READY 不再开放提交', async () => {
+  const panel = submission()
+  try {
+    await settle()
+    assert.equal(panel.state.issue('EXPENSE_CATEGORY_CONFIGURATION_CHANGED'), '费用类别修订已变化，请刷新目录并重新检查')
+    const old = { ...view(), usable: false, unavailableCode: 'EXPENSE_CATEGORY_CONFIGURATION_CHANGED' }
+    assert.equal(usablePlanCheck(old, detail(), 'appointment'), false)
+  } finally { panel.close() }
+})
+
 test('保存边界按整数分校验大额分摊，金额保持原字符串，不修改输入', () => {
   const value = content(); value.lines[0].amount = money('999999999999999.99'); value.lines[0].allocations[0].amount = money('999999999999999.99')
   const before = copy(value), result = planContent(value, catalog())

@@ -25,10 +25,13 @@ public class ExpensePlanCheckEvaluator {
     private final FinanceMasterDataPort catalogs;
     private final ExchangeRatePort rates;
     private final FinanceGatewayConfiguration configuration;
+    private final ExpensePolicyConfiguration policyConfiguration;
 
     /** 事前计划不调用报销账户、验票或预算冻结接口。 */
-    public ExpensePlanCheckEvaluator(ExpensePlanRepository plans, FinanceMasterDataPort catalogs, ExchangeRatePort rates, FinanceGatewayConfiguration configuration) {
+    public ExpensePlanCheckEvaluator(ExpensePlanRepository plans, FinanceMasterDataPort catalogs, ExchangeRatePort rates,
+            FinanceGatewayConfiguration configuration, ExpensePolicyConfiguration policyConfiguration) {
         this.plans = plans; this.catalogs = catalogs; this.rates = rates; this.configuration = configuration;
+        this.policyConfiguration = policyConfiguration;
     }
 
     /** 任一依赖失败都不生成部分可用的预检。 */
@@ -43,6 +46,8 @@ public class ExpensePlanCheckEvaluator {
         ensureLive(job); var input = job.input();
         var plan = plans.find(input.tenantId(), input.planId()).orElseThrow(() -> new CheckFailure(Result.unavailable("CONTEXT_CHANGED")));
         if (plan.version() != input.planVersion()) return Result.unavailable("CONTEXT_CHANGED");
+        // 在目录网络请求之前固定修订，落库时复核，防止把等待期间的新配置写成原检查依据。
+        Long categoryRevision = policyConfiguration.categoryRevision(input.tenantId());
         var catalog = value(catalogs.catalog(input.tenantId(), input.employeeId()));
         var entity = catalog.legalEntity(input.initiator().legalEntityId());
         Instant checkedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
@@ -53,7 +58,7 @@ public class ExpensePlanCheckEvaluator {
             conversions.put(currency, value(rates.rate(input.tenantId(), entity.id(), currency, entity.baseCurrency(), date)));
         }
         ensureLive(job);
-        plan.freeze(input.planVersion(), input.roundNo(), catalog, conversions, input.initiator(), checkedAt);
+        plan.freeze(input.planVersion(), input.roundNo(), catalog, conversions, input.initiator(), checkedAt, categoryRevision);
         Instant validUntil = checkedAt.plusSeconds(FACT_TTL_SECONDS);
         if (validUntil.isAfter(catalog.validUntil())) validUntil = catalog.validUntil();
         Instant nextRateDay = date.plusDays(1).atStartOfDay(ZoneId.of(entity.timeZone())).toInstant();

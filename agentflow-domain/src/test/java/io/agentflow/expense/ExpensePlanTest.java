@@ -129,6 +129,18 @@ class ExpensePlanTest {
         fails("INVALID_EXPENSE_PLAN", () -> ExpensePlan.restore(new ExpensePlan.State(state.id(), state.tenantId(), state.applicationId(), "bob", state.content(), state.rounds(), state.version())));
     }
 
+    @Test void managedCategoryRevisionMustBePositiveAndSurvivesRestoringTheRound() {
+        var plan = plan(content(List.of(line(1, "100", "CNY"))));
+        for (long revision : List.of(0L, -1L)) {
+            fails("INVALID_EXPENSE_PLAN_ROUND", () -> plan.freeze(1, 1, catalog(), rates(), initiator(ENTITY, "alice"), NOW, revision));
+            assertThat(plan.version()).isEqualTo(1); assertThat(plan.rounds()).isEmpty();
+        }
+        plan.freeze(1, 1, catalog(), rates(), initiator(ENTITY, "alice"), NOW, 2L);
+        assertThat(ExpensePlan.restore(plan.state()).currentRound().managedCategoryRevision()).isEqualTo(2L);
+        var unmanaged = plan(content(List.of(line(1, "100", "CNY")))); freeze(unmanaged);
+        assertThat(unmanaged.currentRound().managedCategoryRevision()).isNull();
+    }
+
     private static void freeze(ExpensePlan plan) { plan.freeze(1, 1, catalog(), rates(), initiator(ENTITY, "alice"), NOW); }
     private static ExpensePlan plan(ExpensePlanContent content) { return ExpensePlan.draft(UUID.randomUUID(), "demo", UUID.randomUUID(), "alice", content); }
     private static ExpensePlanContent content(List<ExpensePlanContent.Line> lines) { return new ExpensePlanContent(ENTITY, ExpenseContent.Type.TRAVEL, "差旅事前申请", lines); }

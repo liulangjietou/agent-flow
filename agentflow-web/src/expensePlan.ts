@@ -8,7 +8,7 @@ export interface PlanContent { legalEntityId: string; type: ExpenseContent['type
 export interface PlanVersions { applicationVersion: number; planVersion: number }
 export interface PlanRound {
   roundNo: number; submittedPlanVersion: number; submittedBy: string; submittedAt: string; content: PlanContent
-  legalEntity: FinanceCatalog['legalEntities'][number]; catalogVersion: string
+  legalEntity: FinanceCatalog['legalEntities'][number]; catalogVersion: string; managedCategoryRevision?: number | null
   lines: Array<{ original: PlanLine; rate: FrozenExpenseLine['assessment']['exchangeRate']; amount: Money; allocations: CostAllocation[] }>
 }
 export interface PlanDetail extends PlanVersions { id: string; applicationId: string; businessNo: string; status: string; roundNo: number; editable: boolean; content: PlanContent; financialRound?: PlanRound | null }
@@ -89,6 +89,7 @@ export function planTotal(round: PlanRound): Money {
   return { value: `${total / 100n}.${String(total % 100n).padStart(2, '0')}`, currency: round.legalEntity.baseCurrency }
 }
 export const planIssues: Record<string, string> = {
+  EXPENSE_CATEGORY_CONFIGURATION_CHANGED: '费用类别修订已变化，请刷新目录并重新检查',
   EXPENSE_PLAN_LINES_REQUIRED: '请先保存至少一行计划', EXPENSE_PLAN_CHECK_ACTIVE: '已有检查正在执行，请刷新状态',
   EXPENSE_PLAN_FORM_REQUIRED: '请选择支持事前申请的流程版本', EXPENSE_PLAN_REVIEW_REQUIRED: '所选流程有绕过人工审核的路径，请联系流程管理员',
   EXPENSE_PLAN_REVIEW_FIELDS_REQUIRED: '审批节点需要完整读取计划明细，请联系流程管理员', EXPENSE_PLAN_CATALOG_CHANGED: '本人财务目录已变化，请重新预检',

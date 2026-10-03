@@ -42,9 +42,15 @@ public final class ExpensePlan {
         requireVersion(expectedVersion); content = Objects.requireNonNull(changed); version++;
     }
 
-    /** 全部主数据与汇率校验通过后一次性追加轮次，失败不改变当前计划。 */
+    /** 未启用平台类别时按原目录冻结，不给历史数据补造类别版本。 */
     public void freeze(long expectedVersion, int roundNo, FinanceCatalog catalog, Map<String, ExpenseExchangeRate> rates,
                        InitiatorContext initiator, Instant now) {
+        freeze(expectedVersion, roundNo, catalog, rates, initiator, now, null);
+    }
+
+    /** 全部主数据与汇率校验通过后一次性追加轮次，并保留实际使用的类别修订。 */
+    public void freeze(long expectedVersion, int roundNo, FinanceCatalog catalog, Map<String, ExpenseExchangeRate> rates,
+                       InitiatorContext initiator, Instant now, Long managedCategoryRevision) {
         requireVersion(expectedVersion);
         if (roundNo != rounds.size() + 1 || now == null || !rounds.isEmpty() && now.isBefore(rounds.get(rounds.size() - 1).submittedAt())) throw invalid();
         if (CollectionUtils.isEmpty(content.lines())) throw new DomainException("EXPENSE_PLAN_LINES_REQUIRED", "At least one planned expense line is required");
@@ -62,7 +68,7 @@ public final class ExpensePlan {
             var amount = rate.convert(line.amount());
             frozen.add(new ExpensePlanRound.FrozenLine(line, rate, amount, CostAllocation.apportion(line.allocations(), amount)));
         }
-        var round = new ExpensePlanRound(roundNo, version, employeeId, now, content, entity, catalog.sourceVersion(), frozen);
+        var round = new ExpensePlanRound(roundNo, version, employeeId, now, content, entity, catalog.sourceVersion(), frozen, managedCategoryRevision);
         var changed = new ArrayList<>(rounds); changed.add(round); rounds = List.copyOf(changed); version++;
     }
 
