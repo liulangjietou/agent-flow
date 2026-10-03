@@ -310,6 +310,139 @@ class SupplierFinanceWorkflowTest {
         return "/api/v1/notifications/" + id + "/supplier-payment-target";
     }
 
+    @Test void payableReviewFailureNotifiesOriginalParticipant() throws Exception {
+        UUID id = approved();
+        UUID review = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText());
+        var claimed = reviewService.claim("demo", review, Instant.now());
+        reviewService.fail(claimed, Instant.now());
+        assertThat(payableReviews.find("demo", review).orElseThrow().status()).isEqualTo(SupplierPayableReview.Status.UNAVAILABLE);
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='SUPPLIER_PAYABLE_ATTENTION'", String.class,
+                app(id).id().toString())).contains("finance");
+    }
+
+    @Test void payableHoldUnknownNotifiesOriginalParticipants() throws Exception {
+        UUID id = approved(); queueAndRead(id);
+        UUID authorization = UUID.fromString(ok(send(financePath(id) + "/authorizations", "finance", authorizeInput(id, view(id, "finance"))), 202).path("authorizationId").asText());
+        var claimed = holdService.claim("demo", authorization, Instant.now());
+        holdService.fail(claimed, SupplierPayableHoldOperation.Failure.TIMEOUT, Instant.now());
+        assertThat(holds.find("demo", authorization).orElseThrow().status()).isEqualTo(SupplierPayableHoldOperation.Status.UNKNOWN);
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='SUPPLIER_PAYABLE_ATTENTION'", String.class,
+                app(id).id().toString())).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void payableAuthorizationRetirementNotifiesActualDecision() throws Exception {
+        UUID id = approved(); queueAndRead(id);
+        UUID authorization = UUID.fromString(ok(send(financePath(id) + "/authorizations", "finance", authorizeInput(id, view(id, "finance"))), 202).path("authorizationId").asText());
+        ok(send(actionUrl(authorization), "finance", action(view(id, "finance"), "RETIRE")), 202);
+        assertThat(authorizations.retirement("demo", authorization)).isPresent();
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='SUPPLIER_PAYABLE_RESULT'", String.class,
+                app(id).id().toString())).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void payableReviewNotificationKeepsFailedOriginalAndRechecksFinanceFields() throws Exception {
+        UUID id = approved(); UUID review = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText());
+        var claimed = reviewService.claim("demo", review, Instant.now()); reviewService.fail(claimed, Instant.now());
+        String path = payableNoticePath(review, "finance", "REVIEW_UNAVAILABLE"); var response = read(path, "finance"); var original = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(original.at("/review/id").asText()).isEqualTo(review.toString());
+        assertThat(original.path("operation").isNull()).isTrue(); assertThat(original.toString()).doesNotContain("amount", "account", "payableReference", "commandDigest", "requestedBy", "actions");
+        UUID next = queueAndRead(id); assertThat(next).isNotEqualTo(review); assertThat(ok(read(path, "finance"), 200)).isEqualTo(original);
+        for (String stranger : List.of("alice", "cashier", "admin", "bob", "manager")) okError(read(path, stranger), 404, "NOT_FOUND");
+        okError(read(path + "?roundNo=1", "finance"), 400, "INVALID_INBOX_QUERY");
+        jdbc.update("UPDATE organization_person SET approval_eligible=FALSE WHERE tenant_id='demo' AND id=?", finance.toString());
+        try { assertThat(read(path, "finance").getStatus()).isIn(403, 404); }
+        finally { jdbc.update("UPDATE organization_person SET approval_eligible=TRUE WHERE tenant_id='demo' AND id=?", finance.toString()); }
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        okError(read(path, "finance"), 404, "NOT_FOUND");
+    }
+
+    @Test void payableHoldNotificationQueriesSameOriginalAndPreservesHistoryWithoutDuplicates() throws Exception {
+        UUID id = approved(); queueAndRead(id);
+        UUID authorization = UUID.fromString(ok(send(financePath(id) + "/authorizations", "finance", authorizeInput(id, view(id, "finance"))), 202).path("authorizationId").asText());
+        var claimed = holdService.claim("demo", authorization, Instant.now()); holdService.fail(claimed, SupplierPayableHoldOperation.Failure.TIMEOUT, Instant.now());
+        String path = payableNoticePath(authorization, "alice", "UNKNOWN"); var first = ok(read(path, "alice"), 200);
+        assertThat(first.at("/operation/status").asText()).isEqualTo("UNKNOWN");
+        ok(send(actionUrl(authorization), "finance", action(view(id, "finance"), "QUERY")), 202); pollHold(authorization);
+        var recovered = ok(read(path, "alice"), 200); assertThat(recovered.path("sourceId").asText()).isEqualTo(authorization.toString());
+        assertThat(recovered.path("fact").asText()).isEqualTo("UNKNOWN"); assertThat(recovered.at("/operation/status").asText()).isEqualTo("HELD");
+        assertThat(recovered.at("/operation/observation/outcome").asText()).isEqualTo("HELD");
+        assertThat(recovered.toString()).doesNotContain("heldAmount", "holdReference", "ledgerVersion", "accountDigest", "commandDigest", "actions");
+        ok(send(actionUrl(authorization), "finance", action(view(id, "finance"), "QUERY")), 202); pollHold(authorization);
+        holdService.finish(claimed, new io.agentflow.finance.FinanceResult.Success<>(held(claimed.command())), Instant.now());
+        assertThat(payableNoticeCount(authorization, "HELD")).isEqualTo(2); assertThat(payableNoticeCount(authorization, "UNKNOWN")).isEqualTo(2);
+        assertThat(calls.getOrDefault("supplier-payable-hold-command", new AtomicInteger()).get()).isZero();
+        assertThat(calls.get("supplier-payable-hold-query").get()).isEqualTo(2);
+        for (String user : List.of("cashier", "admin", "bob")) okError(read(path, user), 404, "NOT_FOUND");
+    }
+
+    @Test void payableRetirementNotificationKeepsActualDecisionAfterReplacement() throws Exception {
+        UUID id = approved(); queueAndRead(id);
+        UUID original = UUID.fromString(ok(send(financePath(id) + "/authorizations", "finance", authorizeInput(id, view(id, "finance"))), 202).path("authorizationId").asText());
+        String key = UUID.randomUUID().toString(); var input = action(view(id, "finance"), "RETIRE");
+        ok(send(actionUrl(original), "finance", key, input), 202); ok(send(actionUrl(original), "finance", key, input), 202);
+        String path = payableNoticePath(original, "alice", "RETIRED"); var target = ok(read(path, "alice"), 200);
+        assertThat(target.at("/retirement/operationId").asText()).isEqualTo(original.toString());
+        assertThat(target.at("/retirement/basis").asText()).isEqualTo("NEVER_DISPATCHED");
+        assertThat(target.at("/operation/failure").asText()).isEqualTo("FINANCE_RETIRED");
+        queueAndRead(id); var replacement = ok(send(financePath(id) + "/authorizations", "finance", authorizeInput(id, view(id, "finance"))), 202);
+        assertThat(replacement.path("authorizationId").asText()).isNotEqualTo(original.toString());
+        assertThat(ok(read(path, "alice"), 200)).isEqualTo(target); assertThat(payableNoticeCount(original, "RETIRED")).isEqualTo(2);
+        assertThat(payableNoticeCount(original, "VOIDED")).isZero(); assertThat(calls.keySet()).doesNotContain("supplier-payable-hold-command");
+    }
+
+    @Test void payableNotificationRejectsUnrecordedFactAndTimestamp() throws Exception {
+        UUID id = authorizedHold(approved()); String key = "supplier-payable:OPERATION:" + id + ":HELD";
+        String path = payableNoticePath(id, "alice", "HELD"); var original = ok(read(path, "alice"), 200);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", "supplier-payable:OPERATION:" + id + ":RETIRED", key);
+        try { okError(read(path, "alice"), 404, "NOT_FOUND"); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", key, "supplier-payable:OPERATION:" + id + ":RETIRED"); }
+        var timestamp = jdbc.queryForObject("SELECT created_at FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", java.sql.Timestamp.class, key);
+        jdbc.update("UPDATE notification_inbox SET created_at=? WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", java.sql.Timestamp.from(timestamp.toInstant().plusSeconds(1)), key);
+        try { okError(read(path, "alice"), 404, "NOT_FOUND"); }
+        finally { jdbc.update("UPDATE notification_inbox SET created_at=? WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", timestamp, key); }
+        assertThat(ok(read(path, "alice"), 200)).isEqualTo(original);
+    }
+
+    @Test void payableNotificationFailureRollsBackOriginalStateAndDispatchThenRevokedScopeSuppresses() throws Exception {
+        var recipient = new Actor("demo", "finance", Set.of("FINANCE")); var before = noticePreferences.get(recipient);
+        noticePreferences.revise(recipient, before.version(), true, false);
+        try {
+            UUID id = approved(); queueAndRead(id);
+            UUID authorization = UUID.fromString(ok(send(financePath(id) + "/authorizations", "finance", authorizeInput(id, view(id, "finance"))), 202).path("authorizationId").asText());
+            var claimed = holdService.claim("demo", authorization, Instant.now()); var application = app(id).id();
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT payable_notice_fixture CHECK(application_id<>'" + application + "' OR kind<>'SUPPLIER_PAYABLE_ATTENTION' OR recipient_id<>'finance')");
+            try { assertThatThrownBy(() -> holdService.fail(claimed, SupplierPayableHoldOperation.Failure.TIMEOUT, Instant.now())).isInstanceOf(RuntimeException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT payable_notice_fixture"); }
+            assertThat(holds.find("demo", authorization)).contains(claimed); assertThat(payableNoticeCount(authorization, "UNKNOWN")).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON d.inbox_id=n.id WHERE n.application_id=? AND n.kind='SUPPLIER_PAYABLE_ATTENTION'", Long.class, application.toString())).isZero();
+            holdService.fail(claimed, SupplierPayableHoldOperation.Failure.TIMEOUT, Instant.now());
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT d.id FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.tenant_id='demo' AND n.event_key=? AND n.recipient_id='finance'", String.class, "supplier-payable:OPERATION:" + authorization + ":UNKNOWN"));
+            jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+            assertThat(noticeDeliveryService.claim(deliveryId, Instant.now())).isNull();
+            assertThat(noticeDeliveries.find(deliveryId).orElseThrow().progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
+        } finally { var current = noticePreferences.get(recipient); noticePreferences.revise(recipient, current.version(), before.emailEnabled(), before.enterpriseImEnabled()); }
+    }
+
+    @Test void payableReviewLeaseNoticeKeepsOriginalRequestAfterRecovery() throws Exception {
+        UUID id = approved(); UUID review = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText());
+        var first = reviewService.claim("demo", review, Instant.now()); assertThat(reviewService.claim("demo", review, first.leaseUntil())).isNull();
+        String path = payableNoticePath(review, "finance", "REVIEW_INTERRUPTED");
+        assertThat(ok(read(path, "finance"), 200).at("/review/status").asText()).isEqualTo("QUEUED");
+        var next = reviewService.claim("demo", review, first.leaseUntil()); reviewService.fail(next, first.leaseUntil());
+        var target = ok(read(path, "finance"), 200); assertThat(target.path("fact").asText()).isEqualTo("REVIEW_INTERRUPTED");
+        assertThat(target.at("/review/id").asText()).isEqualTo(review.toString()); assertThat(target.at("/review/status").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(target.path("operation").isNull()).isTrue();
+    }
+
+    private String payableNoticePath(UUID source, String recipient, String fact) {
+        String type = fact.startsWith("REVIEW_") ? "REVIEW" : "OPERATION";
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key=?", String.class,
+                recipient, "supplier-payable:" + type + ":" + source + ":" + fact) + "/supplier-payable-target";
+    }
+    private long payableNoticeCount(UUID source, String fact) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Long.class,
+                "supplier-payable:OPERATION:" + source + ":" + fact);
+    }
+
     @Test void explicitReviewAndAuthorizationUseOriginalFactsAndReplayOnlyOneDecision() throws Exception {
         UUID id = approved(); var initial = view(id, "finance"); assertThat(initial.at("/actions/review").asBoolean()).isTrue();
         var body = reviewInput(id); String reviewKey = UUID.randomUUID().toString();

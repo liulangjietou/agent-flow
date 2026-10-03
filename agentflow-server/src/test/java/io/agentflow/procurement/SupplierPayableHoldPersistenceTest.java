@@ -85,7 +85,7 @@ class SupplierPayableHoldPersistenceTest {
             if (!eligible.get()) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Synthetic inactive appointment");
             return null;
         }).when(personnel).requireEligible(eq(tenant), eq("finance"), eq(entity));
-        var factory = new ProxyFactory(new SupplierPayableHoldService(sources, authorizations, operations, personnel, 30)); factory.setProxyTargetClass(true);
+        var factory = new ProxyFactory(new SupplierPayableHoldService(sources, authorizations, operations, personnel, 30, event -> { })); factory.setProxyTargetClass(true);
         factory.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource())); service = (SupplierPayableHoldService) factory.getProxy();
     }
 

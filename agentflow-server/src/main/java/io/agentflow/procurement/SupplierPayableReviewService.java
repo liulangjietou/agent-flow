@@ -9,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +25,13 @@ public class SupplierPayableReviewService {
     private final SupplierPayableHoldService holds;
     private final PaymentPersonnel personnel;
     private final Duration lease;
+    private final ApplicationEventPublisher events;
 
     /** 领域、原批准及财务任职在事务中核验，ERP 读取留给独立执行器。 */
     public SupplierPayableReviewService(ApprovedSupplierPaymentSources sources, JdbcSupplierPayableReviewRepository reviews,
                                         JdbcSupplierPaymentAuthorizationRepository authorizations, SupplierPayableHoldService holds, PaymentPersonnel personnel,
-                                        @Value("${agentflow.supplier-payments.review-lease-seconds:90}") int leaseSeconds) {
+                                        @Value("${agentflow.supplier-payments.review-lease-seconds:90}") int leaseSeconds, ApplicationEventPublisher events) {
+        this.events = events;
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Supplier review lease must be between 15 and 300 seconds");
         this.sources = sources; this.reviews = reviews; this.authorizations = authorizations; this.holds = holds; this.personnel = personnel; this.lease = Duration.ofSeconds(leaseSeconds);
     }
@@ -44,25 +47,25 @@ public class SupplierPayableReviewService {
     @Transactional
     public SupplierPayableReview claim(String tenant, UUID id, Instant now) {
         var current = locked(tenant, id); if (current == null || !current.active()) return null; now = time(now);
-        if (current.leaseExpired(now)) { reviews.update(current.expireLease(now)); return null; }
+        if (current.leaseExpired(now)) { persist(current.expireLease(now)); return null; }
         if (current.status() == SupplierPayableReview.Status.RUNNING || !available(current, now)) return null;
-        var claimed = current.claim(now, lease); reviews.update(claimed); return claimed;
+        var claimed = current.claim(now, lease); persist(claimed); return claimed;
     }
 
     /** ERP 读取成功只产生等待财务决定的证据，不自动签发授权。 */
     @Transactional
     public void finish(SupplierPayableReview claimed, FinanceResult<ProcurementPayablePort.Payable> result, Instant now) {
         var current = currentClaim(claimed); if (current == null) return; now = time(now);
-        if (current.leaseExpired(now)) { reviews.update(current.expireLease(now)); return; }
-        if (available(current, now)) reviews.update(current.complete(result, now));
+        if (current.leaseExpired(now)) { persist(current.expireLease(now)); return; }
+        if (available(current, now)) persist(current.complete(result, now));
     }
 
     /** 读取异常仅保存稳定失败分类，后继必须重新取得真实应付而非手填余额。 */
     @Transactional
     public void fail(SupplierPayableReview claimed, Instant now) {
         var current = currentClaim(claimed); if (current == null) return; now = time(now);
-        if (current.leaseExpired(now)) { reviews.update(current.expireLease(now)); return; }
-        if (available(current, now)) reviews.update(current.fail(SupplierPayableReview.Issue.INTERNAL_ERROR, now));
+        if (current.leaseExpired(now)) { persist(current.expireLease(now)); return; }
+        if (available(current, now)) persist(current.fail(SupplierPayableReview.Issue.INTERNAL_ERROR, now));
     }
 
     /** 同一财务在证据窗口内明确授权，授权、预留队列和单次消费必须一起成功。 */
@@ -72,7 +75,7 @@ public class SupplierPayableReviewService {
         if (current == null || current.version() != expectedVersion || !current.input().requestedBy().equals(finance) || !current.usable(now)) throw unavailable();
         requireSource(current.input().source(), finance);
         var authorization = new SupplierPaymentAuthorization(UUID.randomUUID(), current.input().source(), current.payable(), finance, now, now.plus(SupplierPaymentAuthorization.MAX_VALIDITY));
-        var operation = holds.register(authorization, now); reviews.update(current.consume(authorization, now)); return operation;
+        var operation = holds.register(authorization, now); persist(current.consume(authorization, now)); return operation;
     }
 
     private SupplierPayableReview locked(String tenant, UUID id) {
@@ -85,13 +88,17 @@ public class SupplierPayableReviewService {
     }
     private boolean available(SupplierPayableReview current, Instant now) {
         try { requireSource(current.input().source(), current.input().requestedBy()); return true; }
-        catch (DomainException changed) { reviews.update(current.voidSource(now)); return false; }
+        catch (DomainException changed) { persist(current.voidSource(now)); return false; }
     }
     private void requireSource(ApprovedProcurementPayment expected, String finance) {
         var source = expected.reservation().source();
         if (!expected.equals(sources.derive(source.tenantId(), source.requestId()))) throw unavailable();
         personnel.requireEligible(source.tenantId(), finance, source.round().content().legalEntityId());
         if (authorizations.activeForRequest(source.tenantId(), source.requestId()).isPresent()) throw new DomainException("SUPPLIER_PAYMENT_ALREADY_AUTHORIZED", "Original supplier authorization must be safely ended before a new review");
+    }
+    private void persist(SupplierPayableReview value) {
+        reviews.update(value);
+        events.publishEvent(new SupplierPayableChanged.Review(value));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException unavailable() { return new DomainException("SUPPLIER_PAYABLE_REVIEW_UNAVAILABLE", "Fresh payable review for this finance actor and unchanged approved source is required"); }

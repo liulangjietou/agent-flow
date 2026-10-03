@@ -87,8 +87,8 @@ class SupplierPayableReviewPersistenceTest {
             if (!eligible.get()) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Synthetic inactive appointment");
             return null;
         }).when(personnel).requireEligible(eq(tenant), eq("finance"), eq(entity));
-        holds = proxy(new SupplierPayableHoldService(sources, authorizations, operations, personnel, 30));
-        service = proxy(new SupplierPayableReviewService(sources, reviews, authorizations, holds, personnel, 30));
+        holds = proxy(new SupplierPayableHoldService(sources, authorizations, operations, personnel, 30, event -> { }));
+        service = proxy(new SupplierPayableReviewService(sources, reviews, authorizations, holds, personnel, 30, event -> { }));
     }
 
     @Test void readAndAuthorizationRestoreExactOriginalFactsAndConsumptionSurvivesRestart() {

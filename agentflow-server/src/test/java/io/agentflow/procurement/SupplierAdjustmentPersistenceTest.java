@@ -113,7 +113,7 @@ class SupplierAdjustmentPersistenceTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
             return null;
         }).when(personnel).requireEligible(eq(tenant), anyString(), eq(entity));
-        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30));
+        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30, event -> { }));
         sources = new SupplierPaymentSources(approvedSources, authorizations, holds, personnel);
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);

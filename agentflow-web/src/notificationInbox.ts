@@ -7,6 +7,7 @@ import { reversalCheckLabels } from './voucherReversal.js'
 import { reversalPreparationLabels, reversalExecutionLabels } from './voucherReversalExecution.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  SUPPLIER_PAYABLE_RESULT: '供应商应付处理结果', SUPPLIER_PAYABLE_ATTENTION: '供应商应付需核对',
   EXPENSE_RETURN_RESULT: '报销退回核对结果', EXPENSE_RETURN_ATTENTION: '报销退回需核对',
   DISBURSEMENT_RETURN_RESULT: '借款放款退回核对结果', DISBURSEMENT_RETURN_ATTENTION: '借款放款退回需核对', REPAYMENT_RESULT: '借款还款登记结果', REPAYMENT_ATTENTION: '借款还款需核对', REPAYMENT_REVIEW_RESULT: '还款复核裁决结果', REPAYMENT_REVIEW_ATTENTION: '还款复核需处理',
   EXPENSE_PARTIAL_ADJUSTMENT_RESULT: '报销部分调整结果', EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION: '报销部分调整需核对',

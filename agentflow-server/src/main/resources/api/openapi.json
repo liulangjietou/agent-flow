@@ -47735,6 +47735,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/supplier-payable-target": {
+      "get": {
+        "operationId": "supplierPayableNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原应付复核或预留",
+        "description": "按本人消息的原复核或授权编号读取，核对原批准修订、已发生的历史事实和当前原轮次权限。复核仅限发起该次读取的财务；预留结果限定原申请人、原授权人与实际安全结束参与人。新授权不能替换旧消息。只返回最小状态、冲突观察和真实结束依据，不含金额、账户、预留号、命令或操作许可。拒绝查询参数，响应 no-store；读取不调用外部系统，也不改变消息已读状态。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPayableNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -54321,7 +54426,9 @@
               "EXPENSE_ADJUSTMENT_RESULT",
               "EXPENSE_ADJUSTMENT_ATTENTION",
               "EXPENSE_PARTIAL_ADJUSTMENT_RESULT",
-              "EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION"
+              "EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION",
+              "SUPPLIER_PAYABLE_RESULT",
+              "SUPPLIER_PAYABLE_ATTENTION"
             ]
           },
           "actor": {
@@ -84805,6 +84912,339 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "SupplierPayableNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "sourceType",
+          "sourceId",
+          "fact",
+          "review",
+          "operation",
+          "retirement"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "REVIEW",
+              "OPERATION"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "REVIEW_UNAVAILABLE",
+              "REVIEW_BLOCKED",
+              "REVIEW_SOURCE_CHANGED",
+              "REVIEW_INTERRUPTED",
+              "UNKNOWN",
+              "NOT_FOUND",
+              "HELD",
+              "REJECTED",
+              "RECONCILING",
+              "EXPIRED",
+              "VOIDED",
+              "RETIRED"
+            ]
+          },
+          "review": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPayableNotificationReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPayableNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPayableNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierPayableNotificationReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "CONSUMED",
+              "BLOCKED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "LEASE_EXPIRED",
+              "SOURCE_CHANGED",
+              "PAYABLE_REJECTED",
+              "PAYABLE_CHANGED",
+              null
+            ]
+          }
+        }
+      },
+      "SupplierPayableNotificationOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "failure",
+          "observation",
+          "conflictingObservation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RESERVING",
+              "UNKNOWN",
+              "QUERYING",
+              "HELD",
+              "REJECTED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "LEASE_EXPIRED",
+              "INTERNAL_ERROR",
+              "SEND_WINDOW_EXPIRED",
+              "SOURCE_CHANGED",
+              "FINANCE_RETIRED",
+              "STALE_OBSERVATION",
+              "INCONSISTENT_OBSERVATION",
+              "RECHECK_REQUESTED",
+              null
+            ]
+          },
+          "observation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPayableNotificationObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflictingObservation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierPayableNotificationObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SupplierPayableNotificationObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "heldAt",
+          "rejection"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "HELD",
+              "REJECTED",
+              "PENDING",
+              "NOT_FOUND"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "heldAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "rejection": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "PAYABLE_VERSION_CONFLICT",
+              "PAYABLE_INSUFFICIENT",
+              "PAYABLE_UNAVAILABLE",
+              "SUPPLIER_UNAVAILABLE",
+              "ACCOUNT_CHANGED",
+              "MATCHING_CHANGED",
+              "AUTHORIZATION_EXPIRED",
+              "APPROVAL_CHANGED",
+              null
+            ]
+          }
+        }
+      },
+      "SupplierPayableNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "operationVersion",
+          "basis",
+          "retiredAt"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_REJECTED"
+            ]
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

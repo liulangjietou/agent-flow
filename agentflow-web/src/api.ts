@@ -223,7 +223,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'EXPENSE_PARTIAL_ADJUSTMENT_RESULT' | 'EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION' | 'EXPENSE_ADJUSTMENT_RESULT' | 'EXPENSE_ADJUSTMENT_ATTENTION' | 'DISBURSEMENT_RETURN_RESULT' | 'DISBURSEMENT_RETURN_ATTENTION' | 'REPAYMENT_RESULT' | 'REPAYMENT_ATTENTION' | 'REPAYMENT_REVIEW_RESULT' | 'REPAYMENT_REVIEW_ATTENTION' | 'BUDGET_ADJUSTMENT_RESULT' | 'BUDGET_ADJUSTMENT_ATTENTION' | 'EXPENSE_RETURN_RESULT' | 'EXPENSE_RETURN_ATTENTION' | 'SUPPLIER_RETURN_RESULT' | 'SUPPLIER_RETURN_ATTENTION' | 'SUPPLIER_ADJUSTMENT_RESULT' | 'SUPPLIER_ADJUSTMENT_ATTENTION' | 'SUPPLIER_SETTLEMENT_RESULT' | 'SUPPLIER_SETTLEMENT_ATTENTION' | 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'SUPPLIER_PAYABLE_RESULT' | 'SUPPLIER_PAYABLE_ATTENTION' | 'EXPENSE_PARTIAL_ADJUSTMENT_RESULT' | 'EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION' | 'EXPENSE_ADJUSTMENT_RESULT' | 'EXPENSE_ADJUSTMENT_ATTENTION' | 'DISBURSEMENT_RETURN_RESULT' | 'DISBURSEMENT_RETURN_ATTENTION' | 'REPAYMENT_RESULT' | 'REPAYMENT_ATTENTION' | 'REPAYMENT_REVIEW_RESULT' | 'REPAYMENT_REVIEW_ATTENTION' | 'BUDGET_ADJUSTMENT_RESULT' | 'BUDGET_ADJUSTMENT_ATTENTION' | 'EXPENSE_RETURN_RESULT' | 'EXPENSE_RETURN_ATTENTION' | 'SUPPLIER_RETURN_RESULT' | 'SUPPLIER_RETURN_ATTENTION' | 'SUPPLIER_ADJUSTMENT_RESULT' | 'SUPPLIER_ADJUSTMENT_ATTENTION' | 'SUPPLIER_SETTLEMENT_RESULT' | 'SUPPLIER_SETTLEMENT_ATTENTION' | 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -313,7 +313,16 @@ export interface DisbursementReturnNotificationTarget {
   observation: { outcome: 'UNRESOLVED' | 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; revision: number; observedAt: string; validUntil: string } | null
   resolution: { id: string; advanceVersion: number; outcome: 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; resolvedAt: string } | null
 }
-/** 原还款复核与真实裁决的只读摘要。 */
+/** 原供应商复核与预留的只读消息摘要。 */
+export interface SupplierPayableNotificationTarget {
+  messageId: string; requestId: string; applicationId: string; roundNo: number; sourceType: 'REVIEW' | 'OPERATION'; sourceId: string
+  fact: 'REVIEW_UNAVAILABLE' | 'REVIEW_BLOCKED' | 'REVIEW_SOURCE_CHANGED' | 'REVIEW_INTERRUPTED' | 'UNKNOWN' | 'NOT_FOUND' | 'REJECTED' | 'HELD' | 'RECONCILING' | 'EXPIRED' | 'VOIDED' | 'RETIRED'
+  review: { id: string; version: number; status: keyof typeof import('./supplierFinance').reviewLabels; requestedAt: string; updatedAt: string; issue: string | null } | null
+  operation: { id: string; version: number; status: keyof typeof import('./supplierFinance').holdLabels; createdAt: string; updatedAt: string; failure: string | null; observation: SupplierPayableNotificationObservation | null; conflictingObservation: SupplierPayableNotificationObservation | null } | null
+  retirement: { operationId: string; operationVersion: number; basis: 'NEVER_DISPATCHED' | 'CONFIRMED_REJECTED'; retiredAt: string } | null
+}
+export interface SupplierPayableNotificationObservation { outcome: 'HELD' | 'REJECTED' | 'PENDING' | 'NOT_FOUND'; revision: number; observedAt: string; heldAt: string | null; rejection: string | null }
+/** 原预算调整复核与执行事实的只读摘要。 */
 export interface BudgetAdjustmentNotificationTarget {
   messageId: string; requestId: string; applicationId: string; roundNo: number; sourceType: 'REVIEW' | 'OPERATION'; sourceId: string
   fact: 'REVIEW_UNAVAILABLE' | 'REVIEW_BLOCKED' | 'REVIEW_SOURCE_CHANGED' | 'UNKNOWN' | 'NOT_FOUND' | 'REJECTED' | 'APPLIED' | 'RECONCILING' | 'EXPIRED' | 'VOIDED' | 'RETIRED'
@@ -930,6 +939,7 @@ export const api = {
   disbursementReturnNotificationTarget: (id: string, signal?: AbortSignal) => request<DisbursementReturnNotificationTarget>(`/notifications/${encodeURIComponent(id)}/disbursement-return-target`, { cache: 'no-store', signal }),
   repaymentReviewNotificationTarget: (id: string, signal?: AbortSignal) => request<RepaymentReviewNotificationTarget>(`/notifications/${encodeURIComponent(id)}/repayment-review-target`, { cache: 'no-store', signal }),
   budgetAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<BudgetAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/budget-adjustment-target`, { cache: 'no-store', signal }),
+  supplierPayableNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierPayableNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-payable-target`, { cache: 'no-store', signal }),
   expenseAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<ExpenseAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-adjustment-target`, { cache: 'no-store', signal }),
   expensePartialAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<ExpensePartialAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-partial-adjustment-target`, { cache: 'no-store', signal }),
   repaymentNotificationTarget: (id: string, signal?: AbortSignal) => request<RepaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/repayment-target`, { cache: 'no-store', signal }),
