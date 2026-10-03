@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T06:41:34.641049+00:00",
+  "recordedAt": "2026-10-03T07:38:33.887137+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 36,
+    "knownOpenTaskCount": 35,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 18,
+      "LOCAL_DEVELOPMENT": 17,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 36,
+    "projectRemainingLowerBound": 35,
     "completionPercentage": null,
     "notes": [
-      "36 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "35 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -1055,7 +1055,7 @@
       "id": "F03",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "按行程自动计算定额补贴",
       "sourceRefs": [
         {
@@ -1075,21 +1075,29 @@
           ]
         }
       ],
-      "observed": "ExpenseLine 接收 quantity、日期和手填 claimedGross；DAY 单位不等于补贴规则，尚无系统计算的只读补贴行。",
+      "observed": "发布制度显式配置日额和自然日口径，页面自动重算并只读展示。保存和预检均校验权威规则及金额；实际 PostgreSQL 验证 5 类篡改、权限、幂等、换版阻断、撤回重提及旧轮次。桌面/390 像素页面和重启通过；9 张旧费用单存储字节保持，7 份新版本保留原计算。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseLine.java",
-          "line": 17
+          "path": "docs/expense-allowances.md",
+          "line": 1
         },
         {
-          "path": "agentflow-web/src/components/ExpenseEditor.vue",
+          "path": "docs/evidence/expense-allowances-complete-20261003.json",
           "line": 1
         }
       ],
       "acceptance": "基于固定制度与行程计算天数和金额，页面显示依据且不能手改；服务端拒绝篡改；人工调整行程后重新计算并留存版本。",
       "dependsOn": [
         "F01"
-      ]
+      ],
+      "completion": {
+        "implementationCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+        "verifiedCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+        "verifiedAt": "2026-10-03T07:38:33.887137+00:00",
+        "evidence": "docs/evidence/expense-allowances-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "日额必须由管理员显式发布，员工和城市事实来自配置的财务服务；实际运行使用本地合成来源，企业标准由 E03 验收。"
+      }
     },
     {
       "id": "F04",
@@ -3335,8 +3343,8 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F03",
-    "F05"
+    "F05",
+    "F04"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
@@ -3361,10 +3369,10 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F13",
-    "implementationCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
-    "verifiedCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
-    "completedAt": "2026-10-03T06:41:34.641049+00:00",
-    "evidence": "docs/evidence/financial-template-journey-complete-20261003.json"
+    "taskId": "F03",
+    "implementationCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+    "verifiedCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+    "completedAt": "2026-10-03T07:38:33.887137+00:00",
+    "evidence": "docs/evidence/expense-allowances-complete-20261003.json"
   }
 }

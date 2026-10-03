@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F03",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "recordedAt": "2026-10-03T07:38:33.887137+00:00",
+  "implementationCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+  "verifiedCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+  "verifiedSourceFiles": 35,
+  "runtime": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-server-v2.jar",
+    "jarSha256": "c5f24d1edb4ff20b3bd0c422f05b16d2780660d604cc92f46d05fcf50f37cedd",
+    "database": "expense_allowance_ea4eb2248d",
+    "backendPort": 18287,
+    "frontendPort": 15364,
+    "financePort": 18286,
+    "restartBoot": 4,
+    "migration": "No new migration; existing expense state and revision JSON retain allowance basis",
+    "webBundleManifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-web-manifest.json"
+  },
+  "businessRules": {
+    "dayCountBasis": "CALENDAR_DAYS_INCLUSIVE",
+    "publishedDailyRateRequired": true,
+    "syntheticRates": [
+      "100.00 CNY",
+      "120.00 CNY"
+    ],
+    "ordinaryDayExpensesRemainOrdinary": true,
+    "sameCategoryOverlapScope": "one expense report",
+    "tax": "zero deductible tax; no linked invoice"
+  },
+  "callChain": [
+    "ExpenseLineEditor / ExpenseEditor",
+    "ExpenseController with prepared idempotency",
+    "ExpenseAllowancePreparation outside transaction",
+    "ExpenseDraftService rechecks actor, publication, destination and expiry under configuration lock",
+    "ExpensePrecheckEvaluator rechecks calculation and external assessment",
+    "ExpenseReport revisions and frozen ExpenseRound"
+  ],
+  "verification": {
+    "java": {
+      "status": "PASS",
+      "suites": [
+        {
+          "suite": "ExpenseAllowanceTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpenseConfigurationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpenseConfigurationApiTest",
+          "tests": 31,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpenseAllowancePreparationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpenseAllowanceDefinitionTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpensePolicyGuidanceIntegrationTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpenseDraftIntegrationTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ExpenseSubmissionIntegrationTest",
+          "tests": 231,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "tests": 320
+    },
+    "frontend": {
+      "tests": 1109,
+      "failures": 0,
+      "build": "PASS"
+    },
+    "openapi": {
+      "operations": 333,
+      "schemas": 670,
+      "requestExamples": 123,
+      "status": "PASS"
+    },
+    "actualHttpContracts": {
+      "status": "PASS",
+      "files": {
+        "expense-allowance-http-browser.json": {
+          "responses": 25,
+          "requests": 1
+        },
+        "expense-allowance-http-restart-browser.json": {
+          "responses": 12,
+          "requests": 0
+        },
+        "expense-allowance-http-restart.json": {
+          "responses": 13,
+          "requests": 0
+        },
+        "expense-allowance-http-rounds.json": {
+          "responses": 43,
+          "requests": 10
+        },
+        "expense-allowance-http-setup-resume.json": {
+          "responses": 13,
+          "requests": 10
+        },
+        "expense-allowance-http-setup.json": {
+          "responses": 13,
+          "requests": 2
+        }
+      },
+      "totalResponses": 119,
+      "requests": 23
+    },
+    "journeyChecks": {
+      "upgradedExistingExpenseReportsReadable": 9,
+      "previewInclusiveCalendarDays": true,
+      "fiveTamperInputsRejectedWithoutClientBasis": true,
+      "forgedSourceReplacedAndReplayHasNoFinanceReads": true,
+      "anotherEmployeeCannotReadAllowance": true,
+      "newPublicationBlocksUnrecalculatedDraft": true,
+      "withdrawRecalculateResubmitPreservesOriginalRound": true,
+      "secondRoundBasisAnd600Retained": true,
+      "originalRound400AndPublishedVersionRetained": true,
+      "browserSaved480AndVersionsRetained": true,
+      "originalBudgetStillConfirmed": true,
+      "nineOldReportsReadableAfterRestart": true
+    },
+    "browserChecks": {
+      "mobile390DetailNoOverflow": true,
+      "calculatedDaysGrossTaxReadOnlyAndUnitLocked": true,
+      "itineraryChangeRecalculatesAndUpdatesSingleAllocation": true,
+      "mobile390EditorNoOverflow": true,
+      "browserSaveUsesServerBasisAndOmitsClientBasis": true,
+      "publishedAllowanceRuleEditableInAdminForm": true,
+      "mobile390AdminNoOverflow": true
+    },
+    "restartBrowserChecks": {
+      "savedFormulaAndItineraryVisibleAfterRestart": true,
+      "mobile390FormulaNoOverflow": true
+    },
+    "persistenceChecks": {
+      "nineOldStateJsonBytesUnchanged": true,
+      "originalAndRevisedAllowanceCalculationsRetained": true
+    },
+    "preservedOldReports": 9,
+    "newReportRevisionCount": 7,
+    "screenshotsInspected": 7
+  },
+  "observedAmounts": {
+    "firstDraft": "300.00 CNY",
+    "firstSubmittedRound": "400.00 CNY",
+    "secondSubmittedRound": "600.00 CNY",
+    "browserSavedDraft": "480.00 CNY",
+    "originalRoundAfterRestart": "400.00 CNY"
+  },
+  "regression": {
+    "rootCause": "Strict admin configuration DTO omitted fixedAllowance, so real HTTP save rejected it as unknown JSON. Earlier feature tests called the configuration service directly.",
+    "redEvidence": "expense-allowance-admin-json-red.xml",
+    "correction": "Map explicit allowance input in the HTTP DTO; preserve strict unknown field and scalar guards.",
+    "moneyInputContract": "Numeric money continues to return existing INVALID_MONEY / 422; the initial new test expected 400 and was corrected."
+  },
+  "scope": {
+    "localBusinessAcceptance": true,
+    "realEnterpriseRateAndFactsVerified": false,
+    "externalAcceptanceTask": "E03",
+    "crossReportRiskTask": "F04",
+    "projectFinalGateTask": "V02",
+    "remoteDeliveryTask": "E15"
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-implementation.json",
+      "sha256": "8a990593ad3f6588fadcc6996ae5fee4eb31abf72994a67483a8ee65f5fbe8e5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-java-results.json",
+      "sha256": "e4cd753b651adcf0a08df99e9e34842d6ebe9d9a6c2184a6c34710196541b693"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-admin-json-red.log",
+      "sha256": "68bb7b087bf7f128f746b858c010bff90c93d76bb6d7bb50e376b8860604f06f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-admin-json-red.xml",
+      "sha256": "ca537ea71e22292fb6df46d57d0e7a60be2e7a5911491dc2851f814d3e877355"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-admin-json-final.log",
+      "sha256": "aa95636c8421ce311735a49e14a50f98355d19f4d6a23e624877cc9ec7c4c3e1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-web-final.log",
+      "sha256": "5b3f927db872002e29a6482d036665580178a953dd9061cc17f349492fc64dea"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-upgrade-baseline.json",
+      "sha256": "833f3f69dbafb774c72df57ca62415dc8fd2458a93ff376ff0a08bb86be52c21"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-journey.json",
+      "sha256": "c92e4f03228dd1adf1638ac1a87ce6d396ea20097a47c7aa6a848f56393166c4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-browser.json",
+      "sha256": "5624063c1ac052f4ce35eeef3c2454fbaf06eef7def78ae5299c7273bd268ee2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-restart.json",
+      "sha256": "13142011e257005d00b3fc6f10900a105a76cc10e0575fe5b342ba410556d916"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-restart-browser.json",
+      "sha256": "7c5eb602ba5655c9589d4c8dd477e28e176656ec13c99cd0c83c9714a4a3af25"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-persistence.json",
+      "sha256": "1f932c068889d627568efde6e2e2c007956409523e5a02cfacaf530487df0173"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-persistence-restart.json",
+      "sha256": "1f932c068889d627568efde6e2e2c007956409523e5a02cfacaf530487df0173"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-web-manifest.json",
+      "sha256": "a5b4f64bcd90f06431b919cbc0f47f3397dec23b592b8d90f8ff8f6704f2d6b4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-contracts.json",
+      "sha256": "4c9c765660887277a18ea52d1bde5496997dcbb96db6364c93db7337a21b5ca4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-runtime-boot3.log",
+      "sha256": "59dba10aae24efbb67ad3da55c8a53f9a0fffbb2f17e0134535d7799a5dc1ba3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-runtime-boot4-acceptance.log",
+      "sha256": "67b2f4c7adcbc1608f37304721ab65fd3273dccaef80514602fe7e6443438e1e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense_allowance_runtime.py",
+      "sha256": "d1ccc2e85b81bca86e22d2202f7879a7d7da3514a76cce948c57131571b04040"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-browser.py",
+      "sha256": "c7f99ab22bad1ec6cedac2e56a155186e9870f7181a1222a3aa20d3676b4cdc4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-restart-browser.py",
+      "sha256": "d6861164fdf285435eca589f8f9e74f584f55b0bec6fe645164fd0ef08fccdc5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-expense-allowance-restart.py",
+      "sha256": "7c5ba0bc0de768e7b7888c0c34dea31a9fb5579dd07da839a774353821fe4cf2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-expense-allowance-persistence.py",
+      "sha256": "daa29c5cf6051da0f838bc6da0ec8e67735492879968504196275cc2f0a59e3c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-expense-allowance-contracts.mjs",
+      "sha256": "4de1e8361be660be22b2cd421b4901fe1b3eaeeed570ac3e7ec66d1906d58316"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-http-browser.json",
+      "sha256": "fea95e084f9a98901ffbd7e83e42a8af672ae40534e81a151f0cc0fe158a09f9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-http-restart-browser.json",
+      "sha256": "7d358cc2d65add8650ee235d3e15bda87f1ac7e39559c80509d0b8a710e7a45e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-http-restart.json",
+      "sha256": "048146271e2f22366aa7ab9015db17d48e4812e468919f2d6d3a7b683605190e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-http-rounds.json",
+      "sha256": "e75640c74de3cc6394dac79e813e99c45b7ac2613783ca8f724ff390e21ecad9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-http-setup-resume.json",
+      "sha256": "60f0da4fe0e24f1c5f9db6bc7e9c19ea3a74e57728e9a693acda1450b3c4811a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-http-setup.json",
+      "sha256": "a82f869798e205a5e40f20211615104936b9afc6f8d6319c246a3e88b17b5080"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-detail-desktop.png",
+      "sha256": "b17646d58b61dee4829dcf8ed384e19f345dc02eba4eae37bb0e9ecce9e9f325"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-detail-mobile.png",
+      "sha256": "504c8d7ff6b1cd1fa1947fc66cc8e0437626f9a8cbbf1e6808f3de2b70a2dbe9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-editor-desktop.png",
+      "sha256": "554ab587ac04900251fa4ab26ef507e6d92e1e5c2e712a821d21e2321f9b2a6d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-editor-mobile.png",
+      "sha256": "cc9eb68ba26abeea19fa5717c591884f8f99b915722562337996fa73729b8598"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-admin-desktop.png",
+      "sha256": "85d4d64f4a625b7e2763cf03e38706b095f940ab410171579f5353c70627b176"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-admin-mobile.png",
+      "sha256": "3d5e8579c6194d3bd3a35067b703ea14956dfc3eed5f69f94f4eb8b8d3ff9114"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-restart-formula-mobile.png",
+      "sha256": "d923dbaecf0d8ecfe81bfc2647b4a8f688024a8316ea364a3c67450798e8dacc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseAllowanceTest.xml",
+      "sha256": "b652b4a6008da15294d888793c66e47512a88336cdd5c7a972c9dff9ca5a162a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseConfigurationTest.xml",
+      "sha256": "faa8628ab68df994ed1094021a2a8aad57e4e1320b20146296c43599dd93bede"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseConfigurationApiTest.xml",
+      "sha256": "86c0ab6f861b8ded3cd99dd0c02af12d5a25a285e4accedebc6ea9540ccce420"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseAllowancePreparationTest.xml",
+      "sha256": "4c5968b18401b0a50d97bed092bf110215fe7f5754631ad1546302f09ea4affe"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseAllowanceDefinitionTest.xml",
+      "sha256": "dc8d049e809ae1d091b522ca8365602888b4a408b91e9868f8a4f66997204d23"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpensePolicyGuidanceIntegrationTest.xml",
+      "sha256": "5bb33768e0abff5b9e16d922a9d5adc7e259d756739ba9f5beb40ed2b0e649b9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseDraftIntegrationTest.xml",
+      "sha256": "d5dae2344e290700e68241ad7f59485be2386f730a59e83db9459398cc8ac704"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-allowance-scoped-results/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "75245e8f4044725095c3cf37d382266d408d84b76e169c76f003747403a9897f"
+    }
+  ]
+}
