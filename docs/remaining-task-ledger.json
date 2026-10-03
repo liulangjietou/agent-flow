@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T01:19:16.562171+00:00",
+  "recordedAt": "2026-10-03T02:07:40.985668+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -951,27 +951,31 @@
           ]
         }
       ],
-      "observed": "现有 GatewayExpensePolicies 查询外部判定，ExpensePolicySnapshot 冻结版本；类别来自 FinanceCatalog。当前 309 操作的 OpenAPI 中没有制度/类别管理与发布入口。",
+      "observed": "已完成类别和制度的版本化后端、13 个管理操作、严格输入及专用权限，并把制度选择绑定到预检与最终提交；范围验证 340 条 Java（其中 47 条也在 PostgreSQL 通过）及 31 条前端回归。管理页面、填报提示和固定安装包验收待完成，F01 仍为 OPEN。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicies.java",
+          "path": "docs/expense-configuration.md",
           "line": 1
         },
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySnapshot.java",
+          "path": "docs/evidence/expense-configuration-backend-20261003.json",
           "line": 1
-        },
-        {
-          "path": "agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java",
-          "line": 64
-        },
-        {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
-          "line": 96
         }
       ],
       "acceptance": "租户可管理类别和制度版本，覆盖法人、类别、城市等级、职级、日期、币种等条件；发布后不可覆盖；填报反馈与提交结论可追溯到同一权威源；不硬编码企业标准。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "stage": "BACKEND_PHASE_VERIFIED",
+        "implementationCommit": "14cf591ca83d0018bb468b2705ba1382614cb918",
+        "evidence": "docs/evidence/expense-configuration-backend-20261003.json",
+        "remaining": [
+          "管理页面与未知写入恢复",
+          "同版本填报提示",
+          "事前申请类别修订变化使旧预检失效",
+          "实际 managed 制度提交并发和不可变轮次链路",
+          "固定安装包非空升级、页面、重启与恢复验收"
+        ]
+      }
     },
     {
       "id": "F02",
@@ -3287,5 +3291,13 @@
     "openapiPathCount": 274,
     "openapiOperationCount": 309,
     "evidence": "docs/evidence/advance-overdue-controls-20261003.json"
+  },
+  "latestInProgress": {
+    "taskId": "F01",
+    "stage": "BACKEND_PHASE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "14cf591ca83d0018bb468b2705ba1382614cb918",
+    "evidence": "docs/evidence/expense-configuration-backend-20261003.json",
+    "openapiPathCount": 285,
+    "openapiOperationCount": 322
   }
 }

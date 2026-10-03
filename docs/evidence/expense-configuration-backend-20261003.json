@@ -1,0 +1,435 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T02:07:40.985668+00:00",
+  "taskId": "F01",
+  "status": "BACKEND_PHASE_VERIFIED_TASK_OPEN",
+  "implementationCommit": "14cf591ca83d0018bb468b2705ba1382614cb918",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "费用类别与制度版本管理、不可变历史、权限、严格输入、同版本预检与最终提交锁",
+  "java": {
+    "uniqueScopedTests": 340,
+    "reports": [
+      {
+        "name": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+        "sha256": "33660e3e814aab4898c39fe625c82670a367bd29285e8d6d4bd639937082afca"
+      },
+      {
+        "name": "io.agentflow.expense.ExpenseConfigurationApiTest",
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpenseConfigurationApiTest.xml",
+        "sha256": "1c66f7469e6e599f41627594bc7e5aaa1aca507f7e458a909abc75aad3a228e7"
+      },
+      {
+        "name": "io.agentflow.expense.ExpenseConfigurationIntegrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpenseConfigurationIntegrationTest.xml",
+        "sha256": "3617820965c70546800afebd26c526e5348626c58cc7f4eac02a25086cab6fb0"
+      },
+      {
+        "name": "io.agentflow.expense.ExpenseConfigurationMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpenseConfigurationMigrationTest.xml",
+        "sha256": "d49e439043794be79a0725c7b3882134432aaa2efd1b4475edfc236d3a185366"
+      },
+      {
+        "name": "io.agentflow.expense.ExpenseConfigurationTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpenseConfigurationTest.xml",
+        "sha256": "8230e06cf6ab9efc38ebb54a115eb6e357533428106b0e1594ba66211607452c"
+      },
+      {
+        "name": "io.agentflow.expense.ExpensePlanIntegrationTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpensePlanIntegrationTest.xml",
+        "sha256": "ad9c96c8aade1117d18a68a6ace3f8703f4c092b4539b42000c7c5011b54fc2f"
+      },
+      {
+        "name": "io.agentflow.expense.ExpensePrecheckIntegrationTest",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpensePrecheckIntegrationTest.xml",
+        "sha256": "e8a819286961de8853c4104f1d1943f9e3b6b88c68af71f11a1cb501434d785c"
+      },
+      {
+        "name": "io.agentflow.expense.ExpenseReportTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpenseReportTest.xml",
+        "sha256": "8c015d6108865d1cd653172a06fabc35023a84c01b5ad7573bcfc753deab4da4"
+      },
+      {
+        "name": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+        "tests": 229,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+        "sha256": "a9e75f33153ddd4a3d1ace9d611f6fb66e20a8d5dcbd18f673568abb3f6277eb"
+      },
+      {
+        "name": "io.agentflow.finance.FinanceGatewayClientTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/reports/TEST-io.agentflow.finance.FinanceGatewayClientTest.xml",
+        "sha256": "a1104ee82ffa3b46baceb07f343439ac5085739fd5cde6b99ff3333c614e4b10"
+      }
+    ],
+    "postgresUniqueSubsetTests": 47,
+    "postgresClasses": [
+      "ExpenseConfigurationApiTest",
+      "ExpensePrecheckIntegrationTest",
+      "ExpenseConfigurationMigrationTest"
+    ],
+    "postgresRuns": [
+      {
+        "exitCode": 0,
+        "databases": {
+          "AGENTFLOW_EXPENSE_CONFIG_TEST": "expense_configuration_e3d7ed4bf5",
+          "AGENTFLOW_PRECHECK_TEST": "expense_configuration_a15445b34b",
+          "AGENTFLOW_EXPENSE_CONFIG_MIGRATION": "expense_configuration_9e41a760b5"
+        },
+        "classes": "ExpenseConfigurationApiTest,ExpensePrecheckIntegrationTest,ExpenseConfigurationMigrationTest"
+      },
+      {
+        "exitCode": 0,
+        "databases": {
+          "AGENTFLOW_EXPENSE_CONFIG_TEST": "expense_configuration_1813f54229"
+        },
+        "classes": "ExpenseConfigurationApiTest"
+      }
+    ],
+    "postgresNotes": "PostgreSQL 47 条是 340 条的子集；首次 46 条和后续 26 条有重复，未相加。"
+  },
+  "web": {
+    "tests": 31,
+    "failures": 0,
+    "build": "PASS",
+    "warning": "Existing bundle exceeds 500 kB",
+    "managementBrowserAcceptance": false
+  },
+  "contract": {
+    "paths": 285,
+    "operations": 322,
+    "schemas": 643,
+    "requestExamples": 121,
+    "existingOperationChanges": [],
+    "existingSchemaChanges": [
+      "ExpensePolicySnapshot"
+    ]
+  },
+  "authors": {
+    "javaFiles": 1420,
+    "namedTypes": 2734,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "red": [
+    {
+      "log": "expense-configuration-red.log",
+      "failure": "管理 GET 预期 200 实际 404"
+    },
+    {
+      "log": "expense-configuration-precheck-red.log",
+      "failure": "发布新制度后旧 READY 仍可用"
+    },
+    {
+      "log": "expense-configuration-json-red.log",
+      "failure": "重复 JSON 键和尾随文档预期 400 实际 200"
+    }
+  ],
+  "diagnostics": [
+    {
+      "log": "expense-configuration-web-scope.log",
+      "finding": "测试启动参数误带 tests/ 路径，修正为文件名后运行通过；不是产品测试失败。"
+    }
+  ],
+  "runtime": {
+    "applicationJarReplaced": false,
+    "packagedApplicationAcceptance": false,
+    "sharedWebDistRebuilt": true,
+    "preservedF08WebArtifact": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-web-dist",
+    "enterpriseAcceptance": false
+  },
+  "remaining": [
+    "管理页面与未知写入恢复",
+    "同版本填报提示",
+    "事前申请类别修订变化使旧预检失效",
+    "实际 managed 制度提交并发和不可变轮次链路",
+    "固定安装包非空升级、页面、重启与恢复验收"
+  ],
+  "taskCount": {
+    "open": 39,
+    "localDevelopment": 21,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "remote": {
+    "configured": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "sourceHashes": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseCategoryCatalog.java",
+      "sha256": "7db7559996d24447f37ba8216a2b367bfaabb1c44820c2215adcb147f5f1a02f"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyDefinition.java",
+      "sha256": "4b5a3fd96274a0259d99e00bbcc8d52257d932b60a7e9b1ec32e0d2ede3e22ad"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyDraft.java",
+      "sha256": "1fc48c45d3874eefc8e6c0e2ba631d0a233061c568e6ecb2e4f63ae8e477fe58"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyPort.java",
+      "sha256": "2bb81d9c05e1922e25f5e14474a52da5c778565c4aec28be7b07cd0c1af93ca4"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicyReceipt.java",
+      "sha256": "cc5df250c4e6813c7db0d0ba57cfefe28e455d9d3bbe96d4992f07ec64d7206a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySelection.java",
+      "sha256": "49210e08d308a1dd201082143074a468e9988b6c950c59f1c1e075795bc8cea3"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePolicySnapshot.java",
+      "sha256": "931321677e020bb92c3f214ef3e2d316aa98d29be94d60f1d7fd76a9b2621fa9"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePrecheckEvidence.java",
+      "sha256": "e311c59f296280cd57c2825b3152bfa796d668b57a8b7b96f3c40e84b396f770"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ManagedExpensePolicy.java",
+      "sha256": "6c425c47228601bc883c42dad84daa3427f2923e4ea21f622921c02c562cdcac"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/PublishedExpensePolicy.java",
+      "sha256": "2e1fa25c10b504c233d5dba53c5c098af68227368a5769ae30626d2040157862"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseConfigurationTest.java",
+      "sha256": "5e2417873b0fabafd74e353874e7a929d8deb0ae5e1d64e071ce091c3ed21b67"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseReportTest.java",
+      "sha256": "4aa7c8ded797903622cc7ea59382a538d31c180a0730a4bc8df775d9e1430e6a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java",
+      "sha256": "b8845de5d9ffc5cff2027205ae2f937c5f69d87fea647a07a944aacccb402b30"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/AuthService.java",
+      "sha256": "7555eb2466584dd4b76ea88c44e91c41506967cc628d4f434daef94c78f41f5b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationController.java",
+      "sha256": "fdc4c2f9a8120ddfcc6d328f6cc8a59c0d87761c6c7c407999965b77227c8e26"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationInput.java",
+      "sha256": "3cdaa2f1b60c19d14535c01933aa1b1a5787ff99c4fbcc663cf4c7d1f22e6192"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationJsonConfiguration.java",
+      "sha256": "02debe93d9d4c79df59d6fee10ebf3647bbf3cb8cbb8086664b197eb1f09d5d0"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationQuery.java",
+      "sha256": "9a7a789f31f5a104f442ab148d96b4e6af868809e51a9b18a9dc13af58c69ac8"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationService.java",
+      "sha256": "4208824ec1cafa0d142f935c43115191926bdeefae8f9fe8422aa326cb55532e"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePolicyConfiguration.java",
+      "sha256": "4baba364ed8bf6bb36dff432d78b06e056cb4d3b53a262e714016fdf1b3f9e9f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+      "sha256": "a8baee5c0d9053633d0b86f1cdbeb6ed4967ebcb0cc6ceeb839e00255f9ea9cd"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java",
+      "sha256": "49c1a0902819bf49e24904a7d38bd9f6dbbac364885a8d687ddf3c3011197485"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java",
+      "sha256": "efdfd9579d5abdad00e26a67d31857727fd7cd83e6bc697c7341e3e2b2ec4eba"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseConfigurationRepository.java",
+      "sha256": "09548a1053b5628367be6a7d50e2d5c6f37f15397557d5b3ca2a85b890608018"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicies.java",
+      "sha256": "9a44b29edbe280698426097cc9f4e2ffa3beeda5cea20ad80a696280f5c2edbb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayFinanceMasterData.java",
+      "sha256": "b4f4d2f19ef01553c759bda5fc6f239e912264669d56ec95c5d1e39c837358b4"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "d5cb2b2ef451d6b837bd1b8e39bbc1195517be55929bfae6c282f4d5c4a3ba9c"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V103__expense_configuration.sql",
+      "sha256": "3bf910f1f242b35db65a8f1e5cc4f0554317209fdf733ba7e583641b1f8f4872"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "44232757cc0d96ce716f8cf2f49c769c4189b2c1d074c76784bb9130aad54e32"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationApiTest.java",
+      "sha256": "f089590d81b12fdce42e7dd54b257333d5e47fcea275ed36645ba3368ede7e7f"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationIntegrationTest.java",
+      "sha256": "eb468872ba3e381e017f21050e0e59ab7bf6294d22e835008d8228c53b252f25"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationMigrationTest.java",
+      "sha256": "cbb848d47443508979ce553eaa151ba9ec34b677dbaf8b1014817e676443915b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckIntegrationTest.java",
+      "sha256": "29bc6043e96fb7405e2f99bbdc8df9e9e7c67addd62c057aa228b1921d2fcb42"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java",
+      "sha256": "d1afebb99b002be864f4daeea19cb4033895e038401966ff73eb35994f1b051d"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseDetail.vue",
+      "sha256": "ddeca651992a5568edf70e81b24433cde90e0f4d3732ac1d03b63a88c58e6edb"
+    },
+    {
+      "path": "agentflow-web/src/expenseDraft.ts",
+      "sha256": "a1ba99d265dde8122f2c5d88555a41e4d672316436b887b2a8787ca11a08f6c5"
+    },
+    {
+      "path": "agentflow-web/src/expenses.ts",
+      "sha256": "975cf3cd919942d5b788e81e4cfcc76f473a696566e74806d088bc5d15e1ff0f"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-api.log",
+      "sha256": "79a2177673099f9ed5c3de369a596f89300fbd8f1d276b19a94095eac53744fa",
+      "bytes": 71802
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-authors.log",
+      "sha256": "ceb39096f0f460bf86746fba95d8926ba1f950e9ce2ff5e954629d2be450e69f",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-bound-precheck.log",
+      "sha256": "012f40f02456fb77df7c36399f1aa71d37e2df0811a2b71a65fd445e1db5adaa",
+      "bytes": 125800
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-initial-green.log",
+      "sha256": "f004f54ca16e0fbe1ef38b8623693d03a6be8fd344ec6bf0054411329474ce6d",
+      "bytes": 42921
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-json-red.log",
+      "sha256": "31f5e8a5bccaf9d85ff1dda6b2e16b53b8c16c7ab63a6e27e0c94d0a5219dc51",
+      "bytes": 50367
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-json-submission-openapi.log",
+      "sha256": "d3af882df89c225c824f4eda8582722bd356b4f344de80cc241ff9778722bf77",
+      "bytes": 153774
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-openapi.log",
+      "sha256": "1f16b641e48460b365294784492059468bffca2777d76093feeaff0c8b836b12",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-pg-dimensions.json",
+      "sha256": "d505380966eb09323ecd679763a82f563997ade471d088365739147e083ffaaf",
+      "bytes": 158
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-pg-dimensions.log",
+      "sha256": "59735d631b120f543a3fee8911a2527839b6bd1178969553484e7d91e847c2f8",
+      "bytes": 41888
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-pg-first.json",
+      "sha256": "592b3401aac6823a3e1bf5c15ab4f55a66d1db55df6f892e585cefc6463e246f",
+      "bytes": 368
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-pg-first.log",
+      "sha256": "1c2729a72dc739f7827c71bb0de022c8ce7d391d28f7413432f391d18bcf4d5d",
+      "bytes": 88230
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-precheck-red.log",
+      "sha256": "f4423a1ebc7c8c80dae16255fb9d29e9b883dc584b98d68c5d65d06df318d22c",
+      "bytes": 43365
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-red.log",
+      "sha256": "f1330a535164a2d0d359c737cbf1e7eb49f554bf4fd5e07a3c017f5e1e940526",
+      "bytes": 43539
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-web-build.log",
+      "sha256": "2ec32aa57a7a9856c6f1d864113b433306e862413b468e90d560a012f84e00cc",
+      "bytes": 781
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-web-final.log",
+      "sha256": "237d276ad2c3cf8e56ce764185c7dc17c4f42816362534697d67f19053c4d7fe",
+      "bytes": 3167
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-web-scope-fixed.log",
+      "sha256": "6f13b4b5a46117b298e68b341c075ec54506996e725f5a268adeb05b80e57404",
+      "bytes": 3170
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-backend-evidence-snapshot/expense-configuration-web-scope.log",
+      "sha256": "60c54a5cd8d02ab25fadf7b3021217cad88f77b89a393f5c93eea3ec47455b96",
+      "bytes": 245
+    }
+  ]
+}
