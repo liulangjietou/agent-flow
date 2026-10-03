@@ -1,6 +1,6 @@
 # 付款结果与财务异常通知
 
-这是 F17 的员工付款阶段记录。员工借款和费用报销的付款操作，以及付款操作创建前的出纳请求检查异常，现在可以产生最小站内消息及外发意向，并从消息读取对应的原授权。供应商付款已完成独立的后台、页面及范围验证，见[供应商付款通知](supplier-payment-notifications.md)。凭证准备与原过账通知另见[凭证通知](voucher-notifications.md)。费用预算及冲销通知已在后续阶段接通；供应商结算、回款及应付调整通知也已接通，见[供应商结算通知](supplier-settlement-notifications.md)、[供应商回款通知](supplier-return-notifications.md)及[供应商应付调整通知](supplier-adjustment-notifications.md)。报销付款退回查询与明确登记通知见[报销付款退回通知](expense-return-notifications.md)。借款放款退回查询与明确裁决通知见[借款放款退回通知](disbursement-return-notifications.md)。F17 仍为 OPEN，其他独立资金核对及恢复来源的覆盖核对、固定安装包与环境验收尚未完成。
+这是 F17 的员工付款阶段记录。员工借款和费用报销的付款操作，以及付款操作创建前的出纳请求检查异常，现在可以产生最小站内消息及外发意向，并从消息读取对应的原授权。供应商付款已完成独立的后台、页面及范围验证，见[供应商付款通知](supplier-payment-notifications.md)。凭证准备与原过账通知另见[凭证通知](voucher-notifications.md)。费用预算及冲销通知已在后续阶段接通；供应商结算、回款及应付调整通知也已接通，见[供应商结算通知](supplier-settlement-notifications.md)、[供应商回款通知](supplier-return-notifications.md)及[供应商应付调整通知](supplier-adjustment-notifications.md)。报销付款退回查询与明确登记通知见[报销付款退回通知](expense-return-notifications.md)。借款放款退回查询与明确裁决通知见[借款放款退回通知](disbursement-return-notifications.md)。还款查询、明确登记及触发原还款复核的通知见[借款还款通知](repayment-notifications.md)。F17 仍为 OPEN，其他独立资金核对及恢复来源的覆盖核对、固定安装包与环境验收尚未完成。
 
 ## 调用链与职责
 
@@ -51,7 +51,7 @@
 
 ## F17 尚未完成的部分
 
-1. 尚未覆盖的借款还款、复核及其他独立财务恢复来源继续追链核对。员工及供应商结算、回款、应付调整、费用预算、原凭证、独立冲销执行与核对、报销付款退回和借款放款退回均已有代码与页面范围证据；这些阶段验证不代替完整运行验收。
+1. 独立还款复核查询及裁决、其他财务恢复来源与异常分支继续追链核对。员工及供应商结算、回款、应付调整、费用预算、原凭证、独立冲销执行与核对、报销付款退回和借款放款退回均已有代码与页面范围证据；这些阶段验证不代替完整运行验收。
 2. 员工及供应商全部通知来源接通后的固定安装包 HTTP、非空旧库、重启、恢复和权限变动验收；浏览器和 PostgreSQL 条件恢复后的补验。
 
 真实邮件、企业 IM、ERP 和银行回执联调分别归 E01、E02、E06、E07，不因本地合成协议通过而关闭。

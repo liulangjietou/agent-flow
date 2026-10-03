@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T20:58:05.476991+00:00",
+  "recordedAt": "2026-10-03T21:16:22.733236+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工及供应商付款、凭证、费用预算、冲销、结算、供应商回款、应付调整及报销付款退回通知已接通。本阶段补齐借款放款退回查询、明确裁决和原消息详情，106 项 Java、151 项前端用例通过；原决定重放查询消费及相邻借款修订，通知失败回滚借款、入款凭据、审计与外发意向，任职撤销阻断读取和投递。借款还款及复核等其他独立财务来源覆盖核对、固定包和环境验收仍待完成。",
+      "observed": "员工及供应商付款、凭证、费用预算、冲销、结算、回款、应付调整、报销付款退回及借款放款退回通知已接通。本阶段补齐还款查询、明确登记与查询触发原还款复核的通知，按用例去重后 157 项 Java、183 项前端用例通过；旧 JSON 与历史登记可读，通知失败回滚登记和复核冻结，原查询依据不随后续裁决改变。独立还款复核裁决通知、其他异常分支核对、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1734,6 +1734,14 @@
         },
         {
           "path": "docs/evidence/disbursement-return-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/repayment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/repayment-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3534,9 +3542,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "implementationCommit": "a40bd5b3188f51214284a525dc11de3c245147b8",
-    "recordedAt": "2026-10-03T20:58:05.476991+00:00",
-    "status": "DISBURSEMENT_RETURN_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
-    "evidence": "docs/evidence/disbursement-return-notifications-20261003.json"
+    "status": "REPAYMENT_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+    "implementationCommit": "1a06c0c1e206d96a5fa4b7b08c5b3935d489ca9e",
+    "evidence": "docs/evidence/repayment-notifications-20261003.json",
+    "recordedAt": "2026-10-03T21:16:22.733236+00:00"
   }
 }
