@@ -26,9 +26,10 @@ def save(path, value):
 class Receiver:
     """按原号去重；业务效果持久保存后，暂扣执行回执以形成确定的退出窗口。"""
 
-    def __init__(self, directory):
+    def __init__(self, directory, port=0):
         self.directory = directory
-        self.calls, self.effects = [], {}
+        saved = json.loads((directory / "receiver.json").read_text()) if (directory / "receiver.json").exists() else {"calls": [], "effects": {}}
+        self.calls, self.effects = saved["calls"], saved["effects"]
         self.contract_digest = None
         self.recorded, self.release = threading.Event(), threading.Event()
         self.lock = threading.Lock()
@@ -77,7 +78,7 @@ class Receiver:
                 except (BrokenPipeError, ConnectionResetError):
                     pass
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
         self.server.daemon_threads = True
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -164,25 +165,30 @@ class Runtime:
             return False
 
 
+def publish_fixture(runtime, receiver):
+    """发布含敏感映射字段的合成服务节点，恢复验收复用同一业务定义。"""
+    contract = runtime.request("GET", "/process-definitions/service-task-options/receipt.register/versions/1", user="admin")
+    receiver.contract_digest = contract["contractDigest"]
+    nodes = [{"id": "start", "name": "开始", "type": "START", "properties": {}},
+             {"id": "service", "name": "合成操作", "type": "SERVICE_TASK", "properties": {
+                 "serviceOperationKey": "receipt.register", "serviceOperationVersion": "1",
+                 "serviceContractDigest": receiver.contract_digest, "serviceInput.memo": "reason"}},
+             {"id": "review", "name": "人工审批", "type": "USER_TASK", "properties": {"assigneeRule": "user:finance"}},
+             {"id": "end", "name": "结束", "type": "END", "properties": {}}]
+    edges = [{"id": "edge-" + str(index), "source": left, "target": right, "condition": "", "defaultBranch": False}
+             for index, (left, right) in enumerate(zip(("start", "service", "review"), ("service", "review", "end")))]
+    definition = runtime.request("POST", "/process-definitions", {"key": "restart-" + str(uuid4()), "name": "异常退出恢复验收",
+        "graph": {"nodes": nodes, "edges": edges}, "formSchema": {"schemaVersion": 2, "fields": [
+            {"key": "reason", "label": "说明", "type": "TEXT", "required": True},
+            {"key": "secret", "label": "不可外发", "type": "TEXT", "required": False, "sensitive": True}]}}, user="admin")
+    return runtime.request("POST", "/process-definitions/" + definition["id"] + "/publish?expectedRevision=" + str(definition["revision"]),
+                                         {"changeNote": "固定安装包异常退出恢复验收"}, user="admin")
+
+
 def exercise(runtime, receiver, cycle):
     """结束执行中的应用进程，随后只允许原号查询恢复及真实人工批准。"""
     if cycle == 0:
-        contract = runtime.request("GET", "/process-definitions/service-task-options/receipt.register/versions/1", user="admin")
-        receiver.contract_digest = contract["contractDigest"]
-        nodes = [{"id": "start", "name": "开始", "type": "START", "properties": {}},
-                 {"id": "service", "name": "合成操作", "type": "SERVICE_TASK", "properties": {
-                     "serviceOperationKey": "receipt.register", "serviceOperationVersion": "1",
-                     "serviceContractDigest": receiver.contract_digest, "serviceInput.memo": "reason"}},
-                 {"id": "review", "name": "人工审批", "type": "USER_TASK", "properties": {"assigneeRule": "user:finance"}},
-                 {"id": "end", "name": "结束", "type": "END", "properties": {}}]
-        edges = [{"id": "edge-" + str(index), "source": left, "target": right, "condition": "", "defaultBranch": False}
-                 for index, (left, right) in enumerate(zip(("start", "service", "review"), ("service", "review", "end")))]
-        definition = runtime.request("POST", "/process-definitions", {"key": "restart-" + str(uuid4()), "name": "异常退出恢复验收",
-            "graph": {"nodes": nodes, "edges": edges}, "formSchema": {"schemaVersion": 2, "fields": [
-                {"key": "reason", "label": "说明", "type": "TEXT", "required": True},
-                {"key": "secret", "label": "不可外发", "type": "TEXT", "required": False, "sensitive": True}]}}, user="admin")
-        runtime.definition = runtime.request("POST", "/process-definitions/" + definition["id"] + "/publish?expectedRevision=" + str(definition["revision"]),
-                                             {"changeNote": "固定安装包异常退出恢复验收"}, user="admin")
+        runtime.definition = publish_fixture(runtime, receiver)
     definition = runtime.definition
     # 先正常关闭并重开已有库，覆盖关闭整理后的文件状态，而不只检查新库。
     if not runtime.stop():
