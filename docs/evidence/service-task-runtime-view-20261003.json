@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "taskId": "W01",
+  "stage": "RUNTIME_VIEW_AND_CRASH_RECOVERY_VERIFIED",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T12:12:06.502502+00:00",
+  "implementationCommit": "29863129698d7d1c93cc5392df01b4d279d9f7de",
+  "branch": "codex/governance-identifier-integration",
+  "summary": "授权运行记录接口与申请详情页签完成；原轮次状态、权限、分页、账号切换和安装包三轮执行中强退恢复通过。环境验收与配套恢复仍待完成。",
+  "scope": [
+    "复用申请详情授权，按原轮次与不可变定义读取有界分页",
+    "只返回封闭状态和时间；命令、凭据、目标与任意回执正文不外露",
+    "未知结果、服务完成和人工批准分别表达；结束轮次不提示继续新轮次",
+    "页面切换账号、申请、轮次、注销和权限失效时清除旧记录"
+  ],
+  "verification": {
+    "java": {
+      "tests": 62,
+      "suites": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "web": {
+      "tests": 39,
+      "failures": 0,
+      "productionBuild": "PASS",
+      "existingLargeBundleWarning": true
+    },
+    "openapi": {
+      "status": "PASS",
+      "operations": 337,
+      "schemas": 677,
+      "requestExamples": 123
+    },
+    "packaging": {
+      "status": "PASS",
+      "testsSkipped": true,
+      "reason": "Same Java sources already passed the scoped 62-test run",
+      "jar": "/fyoung/tmp/agentflow-remaining-20260928/service-task-runtime-view-server.jar",
+      "sha256": "5c94e4361d12f091e4c4fca2bbb9eaf4099844f18bafe3c2ae4421ccdc0bd4ef"
+    },
+    "actualHttp": {
+      "status": "PASS",
+      "syntheticReceiver": true,
+      "cycles": 3,
+      "executeCalls": 3,
+      "originalNumberQueries": 3,
+      "humanApprovals": 3,
+      "before": "EXECUTING/PENDING",
+      "after": "APPLIED/ADVANCED",
+      "sameOperationIds": true,
+      "noInputsOrCredentialsInView": true,
+      "result": "restart/result.json"
+    },
+    "browser": {
+      "status": "NOT_RUN",
+      "reason": "Browser administrator policy check unavailable; no workaround or screenshots"
+    },
+    "postgres": {
+      "status": "NOT_RUN",
+      "reason": "Existing Docker image layer I/O blocker; new runtime scope not executed on PostgreSQL"
+    },
+    "pairedRestore": {
+      "status": "NOT_RUN"
+    }
+  },
+  "redGreen": [
+    {
+      "case": "Closed original round with APPLIED/PENDING",
+      "coverageGap": "Original assertions covered explanation text but not the visible status label and compiled template.",
+      "red": "service-task-runtime-view-label-red.log",
+      "failures": 2,
+      "cause": "Status label derived only from operation/progress and ignored original round conclusion.",
+      "fix": "State label and explanation both consume the original round status; actual template asserts no continuation hint after withdrawal."
+    }
+  ],
+  "limits": [
+    "本阶段范围测试与此前范围存在重叠，不累加成全量测试数量",
+    "Vue 组件模板验证不等于真实浏览器验收",
+    "合成回环强退恢复不是断电、企业接收方或配套恢复证明"
+  ],
+  "remaining": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/service-task-runtime-evidence-snapshot",
+  "artifactCount": 30,
+  "artifacts": [
+    {
+      "path": "java/TEST-io.agentflow.approval.ApplicationHistoryIntegrationTest.xml",
+      "size": 81430,
+      "sha256": "8a5ec3191801eb8c14fff7c0d85dc2274c8698dfc3f0116117cbf34004f69d09"
+    },
+    {
+      "path": "java/TEST-io.agentflow.servicetask.ServiceTaskPublicApiIntegrationTest.xml",
+      "size": 112833,
+      "sha256": "1455076ccd2de27b6231a223ef56c5af0638fcb7466f6100107e9aaaac920e82"
+    },
+    {
+      "path": "java/TEST-io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest.xml",
+      "size": 116872,
+      "sha256": "04f4f0601eccb39f089cb80a3b012a3321868d6ca06aa6fc7db088ff0170c08a"
+    },
+    {
+      "path": "restart/receiver.json",
+      "size": 4620,
+      "sha256": "62e9f213ce3b29c2dc44138bae9a96431e1bc9a0ddc791625abbe731ef294775"
+    },
+    {
+      "path": "restart/result.json",
+      "size": 888,
+      "sha256": "880f8b16403388033d5e90b564eeba5872cedb1d4b11fdc359370d0c1710213a"
+    },
+    {
+      "path": "restart/runtime-1.log",
+      "size": 37149,
+      "sha256": "26ab758ae3bb3c0030d76f4c3f32afb1538659a76e1dc9b2691b469c262aa19b"
+    },
+    {
+      "path": "restart/runtime-2.log",
+      "size": 14203,
+      "sha256": "4ee8c8bba6d96f4e94ae703060d9dd81383e5b61919c6148653b35d1e2209e8b"
+    },
+    {
+      "path": "restart/runtime-3.log",
+      "size": 14877,
+      "sha256": "4a3a7f6bd4d3e0e0fe08bec942e092f1014fca8f4e295bba7376c959ff66039f"
+    },
+    {
+      "path": "restart/runtime-4.log",
+      "size": 14204,
+      "sha256": "b5812cc4ee54588736a72c1b019fca74b8eb4d4f6f144b2d9479491e0c48163c"
+    },
+    {
+      "path": "restart/runtime-5.log",
+      "size": 14876,
+      "sha256": "0bbb024ded51aa64e252be288b91b6094a8e67a8bc14b357cff2666c085bc38e"
+    },
+    {
+      "path": "restart/runtime-6.log",
+      "size": 14203,
+      "sha256": "5ff6319ec961d33ef7034b035ee0b62320b3f3b623e2cab50d24fa8274869028"
+    },
+    {
+      "path": "restart/runtime-7.log",
+      "size": 14876,
+      "sha256": "461b733ffacff0dec28a25d17bcbbfd438aff4ba9df6d29d392a44d6d4b6d6f4"
+    },
+    {
+      "path": "restart/runtime.yaml",
+      "size": 961,
+      "sha256": "6d8cf012060c1cd715fa37a18f7ca8b1fdaf275e00a38e237761a5efaf6c2322"
+    },
+    {
+      "path": "restart/status-after-recovery-0.json",
+      "size": 746,
+      "sha256": "af73d428d6d9fad68a5e295f42f0a707990c6d6d19a92d0d1a8db02c060b3381"
+    },
+    {
+      "path": "restart/status-after-recovery-1.json",
+      "size": 746,
+      "sha256": "d0ef6d430dfb006a07bb7e5d11dfbe362902d852697030b32ca5b57da0e58ad8"
+    },
+    {
+      "path": "restart/status-after-recovery-2.json",
+      "size": 746,
+      "sha256": "23d4c530bcf33c5002ed30f7a0c59295eff8f23308c009b4918d0228678b8e82"
+    },
+    {
+      "path": "restart/status-before-crash-0.json",
+      "size": 642,
+      "sha256": "8fa7eacd5addc6469d706cbe0f17d7e5186a3ac06ac5af359d05bc3d39b2186f"
+    },
+    {
+      "path": "restart/status-before-crash-1.json",
+      "size": 642,
+      "sha256": "a94d295f6719ccd61a07d9145e48ead6d533a32f6a04bea714292eb9985d072f"
+    },
+    {
+      "path": "restart/status-before-crash-2.json",
+      "size": 642,
+      "sha256": "df4404005906be00bbc81d7cfda0bd9fa8534a400bbc4c89796a54946bd2df3e"
+    },
+    {
+      "path": "service-task-runtime-view-build-verified.log",
+      "size": 781,
+      "sha256": "274ace93ae0c2e3905557ee0eb9b2fd426f45079447d42e35daa6d81d402215f"
+    },
+    {
+      "path": "service-task-runtime-view-first.log",
+      "size": 184522,
+      "sha256": "c84a12a1be411cb20cad3ba19439db1d818b1a1b4a392278ce25b43802e3113a"
+    },
+    {
+      "path": "service-task-runtime-view-label-green.log",
+      "size": 4333,
+      "sha256": "abb3fbf442deaad4bc9cdb557be13cf6f6ed94a89730e5ce522a77c518d66f7d"
+    },
+    {
+      "path": "service-task-runtime-view-label-red.log",
+      "size": 3876,
+      "sha256": "29184e7a6d90a86623c9cbc50bccde1903c8daa92f0ebda63a5f3a15f1042bae"
+    },
+    {
+      "path": "service-task-runtime-view-openapi.log",
+      "size": 141,
+      "sha256": "afc9e471fb6a22ad0237d361580b4d235241ada2e06da9139b5b8ae71a4351ef"
+    },
+    {
+      "path": "service-task-runtime-view-package.log",
+      "size": 13873,
+      "sha256": "55186ae048ef9672dfa15c710aeeaa7adf1b3336059533bb15658a3f146a5dd3"
+    },
+    {
+      "path": "service-task-runtime-view-restart.log",
+      "size": 734,
+      "sha256": "30903f9c83a03163d085d6b7e2e951010a9ab607a66caa7043cc62d846f8f29f"
+    },
+    {
+      "path": "service-task-runtime-view-state-red.log",
+      "size": 1989,
+      "sha256": "524f90b585977afde668ac57f4fb7a42ac7c2aa7dff09ce4a8b56064c7514748"
+    },
+    {
+      "path": "web-dist/assets/index-V8k8oGIQ.js",
+      "size": 1714063,
+      "sha256": "49acf4b71cb46c26f4860506b8d5e37f1cf77c22db05573eff5eef4228e6ccf5"
+    },
+    {
+      "path": "web-dist/assets/index-xwBq8Km-.css",
+      "size": 388674,
+      "sha256": "54cf328f13dd6a2622fceeba5cdccaaa0f83d264a0bffb149dd5241c3f721085"
+    },
+    {
+      "path": "web-dist/index.html",
+      "size": 420,
+      "sha256": "c4105698ed15a5eb9ba6c15966feb5bc1720501dfafe420640bf2b3ab756e590"
+    }
+  ],
+  "sources": [
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/JdbcServiceTaskOperationRepository.java",
+      "sha256": "dc2ffa7148df75e6089ac3172c0b2469b022b1505511497737e23f208dd81840"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskRuntimeController.java",
+      "sha256": "5a0b958b1d2faf13a54b53694d21c7775621a24b567b8065fa3b3cc096aa7d10"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskRuntimeQuery.java",
+      "sha256": "43059b9d81e38707dc47d2bb6bd9111d2d581e61b67e5eead362cfa15585aa5a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskRuntimeService.java",
+      "sha256": "c4b22eac233e65972f2e369d27389072e575962d43137c13fca9b68da80d3f55"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "c6049e5f01b24a8d77dba3efbadf195025e5db0c4a4a36fcb29379cbd87378e3"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskPublicApiIntegrationTest.java",
+      "sha256": "6d47d3fe673665ef750df60c7036d9b604bb51f8167d9dd3d225399edf4aff81"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "58085bce3d807cf2f3b8f3c10c78024e931a2b145966567ad72d853ddaf562b4"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "9f7a51b49aba8e96fd0e52125dd40da6388587090aa054a7541dc3c1775f429b"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "38187e187f642efe90c13468e7d30fde1c15d312c5e676ec38f53c0f1c3949ec"
+    },
+    {
+      "path": "agentflow-web/src/components/ApplicationRecord.vue",
+      "sha256": "9b7ca86f979a37d9e28ac40813963a9dfafdbd49e6b499726dc0a6a03be3bdfd"
+    },
+    {
+      "path": "agentflow-web/src/components/ServiceTaskRuntimePanel.vue",
+      "sha256": "47e0beeeb40651aa7a4d0528fcbd76fe5313efb6b1afb711bf038d6ad0ea8228"
+    },
+    {
+      "path": "agentflow-web/src/serviceTaskRuntime.ts",
+      "sha256": "61b2266a23c2df6132ed2d197fcf7f7d19dc65e8666cceff4799dcc80b162761"
+    },
+    {
+      "path": "agentflow-web/src/serviceTasks.ts",
+      "sha256": "a79ce36f2ad4f6a1a6136f73ea4d965b00b7f9e667738ac51669dc4ca2e85b24"
+    },
+    {
+      "path": "agentflow-web/tests/service-task-runtime.test.mjs",
+      "sha256": "c68b1f16c786f719e57dba20dcc60aa3c3104a1c193d8ffcabf914abbcddf6f3"
+    },
+    {
+      "path": "scripts/check-service-task-restart.py",
+      "sha256": "01060099343feddaa90747337fa76f3db10c7dc85ba05bd4fa598cf237d340f6"
+    }
+  ]
+}

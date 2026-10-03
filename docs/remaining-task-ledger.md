@@ -10,7 +10,7 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 
 计数单位是一个可独立验收的交付目标。同一功能的后台、页面、迁移和测试合算一项；本地实现与企业实际联调分开。已完成 OFD 组件属于 A01 的阶段进展，不把每个图元或测试计成新任务。
 
-W01 的可信目录公开接口、设计绑定、主/子流程校验、模拟和两种设计视图已接通：177 项 Java 范围测试、79 项前端测试、构建及 OpenAPI 通过，固定包 HTTP 流程已到达人工批准。默认 H2 文件库三轮执行中强退恢复已通过；运行状态页面、真实浏览器、PostgreSQL 补测和配套恢复继续推进，总数保持 34。见[公开设计阶段证据](evidence/service-task-public-design-20261003.json)和[实现说明](service-tasks.md)。
+W01 的可信目录、公开设计及授权运行记录接口与页面已经接通。运行记录阶段 62 项 Java、39 项前端范围测试、构建和 OpenAPI 通过；固定包三轮强退前后均保留同一操作号，恢复时只查询原号，之后由人工审批完成。真实浏览器、PostgreSQL 补测和配套恢复继续推进，总数保持 34。见[运行记录阶段证据](evidence/service-task-runtime-view-20261003.json)、[公开设计阶段证据](evidence/service-task-public-design-20261003.json)和[实现说明](service-tasks.md)。
 
 机器可读原表：[remaining-task-ledger.json](remaining-task-ledger.json)。原始规范为相邻 `doc/00` 至 `doc/05`，路径、SHA-256、规范行范围保存在原表；后附历史进度不再重复计为新需求。
 
@@ -46,7 +46,7 @@ W01 的可信目录公开接口、设计绑定、主/子流程校验、模拟和
 | F15 | 费用财务专用报表 | 当前运营统计涵盖审批均时、退回、SLA、通知和 Agent 采纳；没有费用 P50/P90、超标核减、查验重复拦截、借款账龄和计划执行率的读模型。 [ApprovalOperationsReadPort.java:36](../agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java#L36)、[operations-outcome-metrics.md:1](operations-outcome-metrics.md#L1) | 按法人/部门/类别提供提交至批准至付款 P50/P90、超标核减和退回原因、查验失败和重复拦截、借款账龄/计划执行率、凭证/付款失败积压；口径、未知样本与权限可核验。 原依据：05 §17。 |
 | F16 | 出纳工作台法人/账户/到期日筛选 | CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。 [CashierPaymentWorkspace.java:81](../agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java#L81)、[payment-batches.md:1](payment-batches.md#L1) | 定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。 原依据：05 §10.2；01 费用报销页面。 |
 | F17 | 付款结果与财务异常业务通知 | InboxMessage.Kind 已有审批和核减事件，但没有付款结果或异常事件；PaymentOperationChanged 现有监听器用于凭证和结算，不向收件人生成消息。 [InboxMessage.java:31](../agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java#L31)、[PaymentOperationService.java:127](../agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java#L127) | 真实结果/冲突驱动最小站内通知与外发意向；接收人和读取权限实时校验；重复或迟到事件去重；未知不写成成功，核减既有通知保持。 原依据：04 §3.F。 |
-| W01 | 白名单服务任务的设计与执行 | 公开目录、设计绑定、主子流程预检和两种设计视图已接通，固定包 HTTP 主链路及默认文件库三轮强退恢复通过。运行状态页面、真实浏览器、PostgreSQL 补测和配套恢复待完成。 [公开设计证据](evidence/service-task-public-design-20261003.json)、[实现说明](service-tasks.md)。 | 仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。 原依据：04 §3.D；02 §7。 |
+| W01 | 白名单服务任务的设计与执行 | 公开目录、设计绑定、主子流程预检、两种设计视图及授权运行记录接口与页面已接通。固定包三轮强退和原号状态恢复通过；真实浏览器、PostgreSQL 补测和配套恢复待完成。 [公开设计证据](evidence/service-task-public-design-20261003.json)、[实现说明](service-tasks.md)。 | 仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。 原依据：04 §3.D；02 §7。 |
 
 ### 本地验收与核对
 
@@ -114,4 +114,4 @@ W01 的可信目录公开接口、设计绑定、主/子流程校验、模拟和
 
 ## 接续顺序
 
-按本地优先的授权，F01、F02、F03、F06、F07、F08、F10、F13 已完成，当前推进 W01 的运行状态页面及剩余验收；F04 的聚合时间窗口和有效单据口径、F05 的超容差规则仍等待业务答复。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。
+按本地优先的授权，F01、F02、F03、F06、F07、F08、F10、F13 已完成，W01 运行状态接口和页面已完成范围验证，当前推进配套恢复及剩余环境验收；F04 的聚合时间窗口和有效单据口径、F05 的超容差规则仍等待业务答复。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。
