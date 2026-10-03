@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T02:29:20.166423+00:00",
+  "recordedAt": "2026-10-03T02:42:15.894641+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -951,7 +951,7 @@
           ]
         }
       ],
-      "observed": "版本化后端、13 个管理操作、专用权限、管理页面、三版本发布确认、原请求恢复和历史查询已完成阶段验证；340 条 Java（47 条同时在 PostgreSQL 通过）、86 条前端回归及实际管理页面/非空升级/同包重启验收通过。填报提示、事前申请类别绑定及管理制度完整提交链路待完成，F01 仍为 OPEN。",
+      "observed": "版本化后端、13 个管理操作、专用权限、管理页面、三版本发布确认、原请求恢复及历史查询已完成阶段验证；事前申请类别修订绑定、旧预检失效、提交并发与历史轮次保护已完成阶段验证，本阶段通过 46 条 Java 回归（21 条同时在 PostgreSQL 通过）、43 条前端回归及构建通过。填报提示和管理制度完整业务安装包验收仍待完成，F01 仍为 OPEN。",
       "references": [
         {
           "path": "docs/expense-configuration.md",
@@ -963,6 +963,10 @@
         },
         {
           "path": "docs/evidence/expense-configuration-backend-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-plan-category-binding-20261003.json",
           "line": 1
         }
       ],
@@ -3297,9 +3301,9 @@
   },
   "latestInProgress": {
     "taskId": "F01",
-    "stage": "MANAGEMENT_UI_PHASE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "e7e0ce9cb0b24b60e1196f3925b0adf2e1ffd078",
-    "evidence": "docs/evidence/expense-configuration-management-20261003.json",
+    "stage": "PLAN_CATEGORY_BINDING_PHASE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "6753285e1f1eeb20c8582b65953326ea777c787c",
+    "evidence": "docs/evidence/expense-plan-category-binding-20261003.json",
     "openapiPathCount": 285,
     "openapiOperationCount": 322
   }
