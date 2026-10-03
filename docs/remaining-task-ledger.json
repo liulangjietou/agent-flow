@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T21:40:36.054479+00:00",
+  "recordedAt": "2026-10-03T21:58:01.424976+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工及供应商付款、凭证、费用预算、冲销、结算、回款、应付调整、放款退回和原还款通知已接通。本阶段补齐独立还款复核查询、人工裁决和原消息详情，并修复确认状态与历史退回冲突漏报、相同已登记退回误报。172 项 Java、187 项前端用例通过，旧 JSON、历史决定、事务回滚与当前资格核验通过。预算调整执行等独立异常来源、固定包和环境验收仍待完成。",
+      "observed": "员工及供应商付款、凭证、费用预算、冲销、结算、回款、应付调整、放款退回、原还款及复核通知已接通。本阶段补齐预算调整台账复核失败、原指令结果、冲突与安全结束通知，以及受当前权限保护的原消息详情。113 项 Java、220 项前端用例通过；原批准修订、历史事实、重复去重及通知事务回滚已验证。报销资源调整等独立异常来源、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1750,6 +1750,14 @@
         },
         {
           "path": "docs/evidence/repayment-review-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/budget-adjustment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/budget-adjustment-notifications-20261003.json",
           "line": 1
         }
       ],
