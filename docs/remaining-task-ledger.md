@@ -1,10 +1,10 @@
 # 当前未完成任务台账
 
-更新：2026-10-03 UTC，F02 本地完整验收完成；已确认未完成降至 37 项。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
+更新：2026-10-03 UTC，F13 财务模板包本地完整验收完成；已确认未完成降至 36 项。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
 
-F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目依据页面验收。缺项、错误回显、发布竞争、处理中重启、回执丢失原查询恢复通过；独立配套恢复保留 245 张表、6,276 行和 9 个附件。详见[完整本地证据](evidence/account-mapping-complete-20261003.json)。F13 财务模板目录、复制、模拟、发布及配套样例下载已有阶段验证，完整业务办理继续，见[阶段证据](evidence/financial-templates-catalog-20261003.json)。
+F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目依据页面验收。缺项、错误回显、发布竞争、处理中重启、回执丢失原查询恢复通过；独立配套恢复保留 245 张表、6,276 行和 9 个附件。详见[完整本地证据](evidence/account-mapping-complete-20261003.json)。F13 三类模板与十个配套样例现已完成实际办理；核减路由、超标、借款冲销、事前消费、重复票阻断及免纸件模式通过。配套恢复后可接续在审单，见[完整模板证据](evidence/financial-template-journey-complete-20261003.json)。
 
-**当前已确认 37 项未完成：19 项本地开发、3 项本地验收与核对、15 项需要真实企业环境或远端的联调/交付。全项目至少剩余 37 项。** V03 尚未完成，所以不能声称这是全量精确总数，也不能给完成百分比。
+**当前已确认 36 项未完成：18 项本地开发、3 项本地验收与核对、15 项需要真实企业环境或远端的联调/交付。全项目至少剩余 36 项。** V03 尚未完成，所以不能声称这是全量精确总数，也不能给完成百分比。
 
 此前“6 项”是六个工作类别，不能当成六个小任务。本次发现原费用方案里的管理入口、补贴、跨单风险、额度控制、项目审批和报表仍有缺口，已单独编号；这些来自既定方案，没有新增产品需求。
 
@@ -18,7 +18,7 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 | --- | ---: | --- |
 | Agent | 4 | OFD、模型预检解释、结构化财务填报、费用风险建议 |
 | 组织与电子签 | 2 | 外部组织同步、电子签业务用例 |
-| 费用与财务产品 | 12 | 补贴、跨单风险、额度、预算、路由、模板、项目审批、报表、出纳及结果通知 |
+| 费用与财务产品 | 11 | 补贴、跨单风险、额度、预算、路由、项目审批、报表、出纳及结果通知 |
 | 流程能力 | 1 | 白名单服务任务 |
 | 本地验收与核对 | 3 | 票据模型完整运行、最终版本验收、余下原条款核对 |
 | 真实企业联调与交付 | 15 | 通知、财务、模型、组织、签署、IdP、部署恢复、容量、留存和 PR/CI |
@@ -42,7 +42,6 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 | F10 | 退回/撤回保留预算的到期释放 | ExpenseReleaseService 明确保留退回和撤回占用，只处理驳回和作废释放；未有按已配置 N 天释放的调度。 [ExpenseReleaseService.java:35](../agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java#L35)、[expense-submission.md:1](expense-submission.md#L1) | 显式保留期、可追溯释放队列；重提与过期释放并发不误释放新轮次；未知外部结果对账，重新提交重新预检。 原依据：05 §8.2。 |
 | F11 | 费用自审批场景自动上溯 | 通用职责分离已过滤申请人并在无人时阻断；多级主管可显式选择，但遇到费用自审批时不会自动沿任职关系上溯并审计。 [FlowableApprovalResponsibilities.java:85](../agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java#L85)、[OrganizationAssigneeResolver.java:107](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java#L107) | 仅已发布费用策略启用；固定任职依据、检测环路与空上级，记录原候选和替代人及规则版本；财务职责分离仍强制。 原依据：05 §9.1。 |
 | F12 | 相邻业务审批人重复的受控自动通过 | 现有职责分离记录真实批准人以排除冲突，不实现相邻相同审批人自动通过；未有该类审计动作。 [FlowableApprovalResponsibilities.java:1](../agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java#L1)、[approval-responsibilities.md:1](approval-responsibilities.md#L1) | 按发布版本识别相邻业务节点，记录自动动作和来源；非相邻默认不跳过；财务签收、审核、复核永不自动跳过；并发和重启不重复推进。 原依据：05 §9.1。 |
-| F13 | 报销、事前申请和借款模板包 | 三份模板的复制、模拟及发布已有阶段证据。配套类别、制度、映射、签收设置和 10 个业务输入已接入只读接口与模板中心下载；本阶段 55 条范围测试、13 份实际 HTTP 契约及三类浏览器下载通过，升级保留 245 张表/6,328 行/9 附件。10 个样例的真实业务办理仍未逐项验收。 [目录证据](evidence/financial-templates-catalog-20261003.json)、[配套包证据](evidence/financial-template-examples-20261003.json) | 3 个模板可复制、验证、模拟、发布并从专用入口提交；附类别、制度、映射、签收开关和超标/核减/冲销/重复票样例；金额矩阵及财务复核阈值可配置。 原依据：04 §3.B、§6；05 §9。 |
 | F14 | 项目分摊驱动的项目负责人会签 | FinanceCatalog.Project 只有法人、代码、名称；ExpenseFormContract 仅有明细入口、金额、币种、超标四类字段，未有项目负责人来源和按所有项目生成的会签。 [FinanceCatalog.java:80](../agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java#L80)、[ExpenseFormContract.java:17](../agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java#L17) | 由可信项目目录解析每个实际分摊项目负责人并冻结；去重不丢项目责任；空匹配阻断；多项目必须全部完成且不能绕过字段权限。 原依据：05 §9。 |
 | F15 | 费用财务专用报表 | 当前运营统计涵盖审批均时、退回、SLA、通知和 Agent 采纳；没有费用 P50/P90、超标核减、查验重复拦截、借款账龄和计划执行率的读模型。 [ApprovalOperationsReadPort.java:36](../agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java#L36)、[operations-outcome-metrics.md:1](operations-outcome-metrics.md#L1) | 按法人/部门/类别提供提交至批准至付款 P50/P90、超标核减和退回原因、查验失败和重复拦截、借款账龄/计划执行率、凭证/付款失败积压；口径、未知样本与权限可核验。 原依据：05 §17。 |
 | F16 | 出纳工作台法人/账户/到期日筛选 | CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。 [CashierPaymentWorkspace.java:81](../agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java#L81)、[payment-batches.md:1](payment-batches.md#L1) | 定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。 原依据：05 §10.2；01 费用报销页面。 |
@@ -75,7 +74,7 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 | E12 | 目标环境安装、升级和配套恢复 | 已有容器、数据库和原件配套备份的本地方案，目标主机/存储、升级和跨环境恢复未实际验收。 [production-backup-recovery.md:1](production-backup-recovery.md#L1) | 按固定版本安装和非空升级；数据库及文件一致恢复，原在审继续；记录目标 RPO/RTO 和回退结果。 原依据：04 §3.A、§6。 |
 | E13 | 目标容量、SLO 与告警 | 已有容量基线和告警规则证据，不能替代企业目标负载和真实告警接收链路。 [production-monitoring.md:1](production-monitoring.md#L1) | 按目标并发、数据量、附件规模测吞吐/延迟/错误及资源上限，演练真实告警并明确容量与 SLO。 原依据：02 §10、§13。 |
 | E14 | 留存、数据位置和电子档案制度验收 | 本地封存、原件保留与权限已实现；企业留存期限、数据位置和档案接入要求尚无目标环境验收，不能由文档年份推定合规。 [expense-archives.md:1](expense-archives.md#L1) | 落实已确认留存及数据位置策略并验证访问、恢复和不可覆盖控制；如需企业档案系统，用实际接入证据验收。 原依据：05 §11。 |
-| E15 | 远端提交、开放 PR 与 CI | origin 已配置为 https://github.com/liulangjietou/agent-flow.git；GitHub 仓库可访问且具有推送权限。当前远端尚无分支，本地开发分支尚无 PR 或 CI 结果。E15 依赖 V02 最终版本验收，仍为 OPEN。 [远端核对记录](evidence/account-mapping-management-backend-20261003.json) | 目标仓库可用后以个人身份推送、创建开放 PR、附 PR 链接并验证 CI；无远端不虚构交付。 原依据：04 §7。 |
+| E15 | 远端提交、开放 PR 与 CI | origin 已配置且可访问，远端已有 main 与集成分支，当前没有开放 PR。本地开发分支 codex/governance-identifier-integration 尚未推送，也未完成对应最终版本 CI 验收。E15 依赖 V02 最终版本验收，仍为 OPEN。 | 目标仓库可用后以个人身份推送、创建开放 PR、附 PR 链接并验证 CI；无远端不虚构交付。 原依据：04 §7。 |
 
 ## 已从本台账完成
 
@@ -86,6 +85,7 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 | F06 | 本人手工关闭已批准事前额度 | 实现 `414b5d7`；API、原因确认、权限、版本、并发、审计、原键恢复及非空运行/重启通过。原批准和原预留保持，见[额度关闭](expense-request-closure.md)与[验收证据](evidence/expense-request-closure-20261002.json)。 |
 | F07 | 借款冲销 FIFO 建议 | 实现 `2ab9a38`；有效预检金额、跨页排序、冻结与保留预留、明确采纳及人工调整经 API/页面验收，V101 原账本保持及进程重启通过。见[借款建议](advance-offset-suggestion.md)与[验收证据](evidence/advance-offset-suggestion-20261002.json)。 |
 | F08 | 逾期借款提醒与新借款控制配置 | 实现 `70faba5`；配置三态、预检/提交双重检查、还款恢复、时区与跨页、一次性提醒、事务回滚与并发通过，V102 非空升级及实际页面/重启通过。见[逾期借款控制](advance-overdue-controls.md)与[验收证据](evidence/advance-overdue-controls-20261003.json)。 |
+| F13 | 报销、事前申请和借款模板包 | 实现 `abd5563`、`7667849`；固定包完成三类模板发布与十个业务样例，另验证免纸件模式。53 条业务断言、493 份实际响应及 124 份请求契约、桌面/390 像素页面和原件下载通过。配套恢复保留 245 张表、1,375 行、1 份原件，在审单继续完成审批/付款/核销，40 条原财务回执保持。见[使用说明](financial-template-examples.md)与[完整本地证据](evidence/financial-template-journey-complete-20261003.json)。 |
 
 ## 已有能力与授权调整
 
@@ -112,4 +112,4 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 
 ## 接续顺序
 
-按本地优先的授权，F01、F02、F06、F07、F08 已完成，接续 F13 报销、事前申请和借款模板包。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。
+按本地优先的授权，F01、F02、F06、F07、F08、F13 已完成，接续 F03 行程定额补贴及 F05 事前额度控制。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。

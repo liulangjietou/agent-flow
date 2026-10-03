@@ -1,0 +1,1092 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T06:41:34.641049+00:00",
+  "taskId": "F13",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "taskCompleted": true,
+  "verifiedCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+  "implementationCommits": [
+    "abd556384bdaa02d488753b47bbd8b0fd994562a",
+    "766784983088cc8f2d89a1f69e5cca2fe8c29dc6"
+  ],
+  "scope": "三个员工财务模板、配套类别/制度/映射/签收设置、十个业务样例和独立恢复后的继续办理；本轮补齐运行证据，未更改产品代码。",
+  "callChain": {
+    "callers": [
+      "模板中心复制、模拟与发布",
+      "专用报销、事前和借款创建/预检/提交入口",
+      "人工主管、签收、财务审核和出纳操作"
+    ],
+    "downstream": [
+      "本次任职和固化审批人",
+      "已发布类别、制度与科目映射",
+      "预算、原件查验、凭证、付款和结算端口"
+    ],
+    "affectedScenarios": [
+      "普通报销",
+      "住宿超标",
+      "核减后的金额分支",
+      "原金额财务复核",
+      "已放款借款冲销",
+      "事前额度消费",
+      "重复票据阻断",
+      "关闭纸件要求仍人工检查",
+      "配套恢复后原单继续办理"
+    ]
+  },
+  "priorEvidence": {
+    "catalog": "docs/evidence/financial-templates-catalog-20261003.json",
+    "companion": "docs/evidence/financial-template-examples-20261003.json",
+    "catalogScopedTests": 77,
+    "companionScopedTests": 55,
+    "scopesOverlap": true,
+    "priorTestsRerunThisStage": false,
+    "reason": "本阶段保持经过范围门禁的固定包；新增实际业务、页面与配套恢复验收，没有产品代码变更。",
+    "configurableAmountMatrixVerified": true,
+    "configurableFinanceRecheckThresholdVerified": true,
+    "companionUpgradePreserved": {
+      "tables": 245,
+      "rows": 6328,
+      "files": 9
+    }
+  },
+  "verification": {
+    "businessAssertions": 53,
+    "packScenarios": 10,
+    "additionalVariant": "expense-no-paper",
+    "scenarios": [
+      {
+        "id": "plan-basic",
+        "templateKey": "expense-plan",
+        "reportId": "a45eb8ba-764e-4068-b4fd-6b6ba20092be",
+        "applicationId": "58734093-e860-4b36-b398-e91629233891",
+        "assertions": [
+          "批准额度为 800，首次批准未消费",
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "advance-basic",
+        "templateKey": "advance-request",
+        "reportId": "d1d5f595-760d-43c7-9e8c-ed867b5236e6",
+        "applicationId": "aa22204e-7d96-45ca-b561-ca1e1a4a76bb",
+        "assertions": [
+          "实付 300 后才出现已放款借款余额",
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-basic",
+        "templateKey": "expense-report",
+        "reportId": "99501e15-1dbc-4a89-a1ca-cfe04dbb3b4f",
+        "applicationId": "d0255bec-b09c-4755-acf2-79e00f62002c",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-over-standard",
+        "templateKey": "expense-report",
+        "reportId": "893975f9-12cf-4fd0-8104-aa7af71994f4",
+        "applicationId": "dfbc93cf-4e85-45c5-848a-02f8d6f2a9ab",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成",
+          "固定制度每晚 500，650 需要例外"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-reduction",
+        "templateKey": "expense-report",
+        "reportId": "4f2874b6-7587-4eda-a268-a41163e8e775",
+        "applicationId": "504b1472-eac6-46df-b5e7-4e67f91bb3d7",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成",
+          "核定和实付均为 9500"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-finance-recheck",
+        "templateKey": "expense-report",
+        "reportId": "7a671b2c-58da-4dd6-b11c-92ab60a88cc3",
+        "applicationId": "fd722437-cd65-489a-85c0-04cb6dff9957",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成",
+          "未核减 10500 实际进入复核并付款"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-advance-offset",
+        "templateKey": "expense-report",
+        "reportId": "f7d4fbb2-4e95-46b1-bb5d-4e071b26a063",
+        "applicationId": "206e4b83-1752-4f3c-a47d-c595686aa628",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成",
+          "结算前预留 60，未还仍为 300",
+          "结算后冲销 60、未还 240、实付 20"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-prior-plan",
+        "templateKey": "expense-report",
+        "reportId": "3e26d660-8c17-4152-9ba0-d36b263ffc0c",
+        "applicationId": "de80ba34-ce02-475c-9a3b-9c16b507f06c",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成",
+          "先预留 80，再消费 80，原批准 800 和可用 720"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-invoice-owner",
+        "templateKey": "expense-report",
+        "reportId": "790160da-7ce4-4f97-aadb-7bea6b1d848c",
+        "applicationId": "fbd6e1f4-495d-47ab-9ff0-618755090e3f",
+        "assertions": [
+          "实际人工节点与预期相同",
+          "对应专用业务对象已批准",
+          "实际付款成功且付款凭证已过账",
+          "资金确认后资源核销与预算实际占用已完成",
+          "同票由第一单在审占用，并可在恢复后核销"
+        ],
+        "status": "PASS"
+      },
+      {
+        "id": "expense-invoice-duplicate",
+        "templateKey": "expense-report",
+        "reportId": "fb73e96f-6943-4739-b53f-062cbf83c3fd",
+        "applicationId": "50bce6f7-8511-465a-8d81-d8fc9075ec74",
+        "assertions": [
+          "第二单预检和提交受阻，原占用保持"
+        ],
+        "status": "PASS"
+      }
+    ],
+    "assertions": [
+      {
+        "case": "plan-basic",
+        "assertion": "批准额度为 800，首次批准未消费",
+        "status": "PASS"
+      },
+      {
+        "case": "advance-basic",
+        "assertion": "实付 300 后才出现已放款借款余额",
+        "status": "PASS"
+      },
+      {
+        "case": "plan-basic",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "plan-basic",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "advance-basic",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "advance-basic",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "advance-basic",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-basic",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-basic",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-basic",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-basic",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-over-standard",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-over-standard",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-over-standard",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-over-standard",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-reduction",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-reduction",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-reduction",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-reduction",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-finance-recheck",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-finance-recheck",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-finance-recheck",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-finance-recheck",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-advance-offset",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-advance-offset",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-advance-offset",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-advance-offset",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-prior-plan",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-prior-plan",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-prior-plan",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-prior-plan",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-invoice-owner",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-invoice-owner",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-invoice-owner",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-invoice-owner",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-no-paper",
+        "assertion": "实际人工节点与预期相同",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-no-paper",
+        "assertion": "对应专用业务对象已批准",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-no-paper",
+        "assertion": "实际付款成功且付款凭证已过账",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-no-paper",
+        "assertion": "资金确认后资源核销与预算实际占用已完成",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-over-standard",
+        "assertion": "固定制度每晚 500，650 需要例外",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-reduction",
+        "assertion": "核定和实付均为 9500",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-finance-recheck",
+        "assertion": "未核减 10500 实际进入复核并付款",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-advance-offset",
+        "assertion": "结算前预留 60，未还仍为 300",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-advance-offset",
+        "assertion": "结算后冲销 60、未还 240、实付 20",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-prior-plan",
+        "assertion": "先预留 80，再消费 80，原批准 800 和可用 720",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-invoice-owner",
+        "assertion": "同票由第一单在审占用，并可在恢复后核销",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-invoice-duplicate",
+        "assertion": "第二单预检和提交受阻，原占用保持",
+        "status": "PASS"
+      },
+      {
+        "case": "expense-no-paper",
+        "assertion": "关闭纸件要求仍人工收单且不伪造签收记录",
+        "status": "PASS"
+      },
+      {
+        "case": "paired-restore",
+        "assertion": "所有旧财务回执保持且凭证与付款命令仅受理一次",
+        "status": "PASS"
+      },
+      {
+        "case": "browser-and-restore",
+        "assertion": "financial-template-journey-browser.json",
+        "status": "PASS"
+      },
+      {
+        "case": "browser-and-restore",
+        "assertion": "financial-template-journey-restored-browser.json",
+        "status": "PASS"
+      },
+      {
+        "case": "browser-and-restore",
+        "assertion": "financial-template-journey-continuation-result.json",
+        "status": "PASS"
+      },
+      {
+        "case": "paired-restore",
+        "assertion": "原冻结数据库和文件仍未修改",
+        "status": "PASS"
+      }
+    ],
+    "actualHttpResponses": 493,
+    "requestContracts": 124,
+    "browser": {
+      "status": "PASS",
+      "checks": {
+        "reductionOriginalAndApprovedVisible": true,
+        "expense-reductionMobile390NoOverflow": true,
+        "offsetAndPayableVisible": true,
+        "expense-advance-offsetMobile390NoOverflow": true,
+        "frozenNoPaperVisible": true,
+        "expense-no-paperMobile390NoOverflow": true,
+        "advance-balanceMobile390NoOverflow": true,
+        "plan-balanceMobile390NoOverflow": true,
+        "consumedResourcesVisible": true,
+        "duplicate-blockedMobile390NoOverflow": true,
+        "blockedPrecheckVisibleAndSubmitDisabled": true
+      },
+      "pageErrors": [],
+      "unexpectedWrites": []
+    },
+    "restoredBrowser": {
+      "status": "PASS",
+      "checks": {
+        "restoredInvoiceConsumedByOriginalReportVisible": true,
+        "mobile390NoOverflow": true,
+        "restoredOriginalDownloadExactBytes": true
+      },
+      "pageErrors": [],
+      "unexpectedWrites": []
+    },
+    "visualInspection": [
+      "核减桌面金额与原申报对照",
+      "390 像素事前额度余额",
+      "390 像素恢复后票据核销和原件下载入口"
+    ],
+    "financialReceipts": {
+      "budget": 17,
+      "voucher": 18,
+      "payment": 9
+    },
+    "voucherAndPaymentCommandsAcceptedOnce": true,
+    "pairedRestore": {
+      "status": "PASS",
+      "sourceDatabase": "financial_journey_73d81b93f0",
+      "restoredDatabase": "financial_journey_restore_7cf3eb2a37",
+      "backup": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-backup.sql",
+      "backupSha256": "8e7451af858d181a84c62beb7b92c266b7e91750c22f4dc98c70ef47677a6fba",
+      "jarSha256": "fb2580e2b963acad98e1c7073bb1419e27189fd033409e19a6fc2fa31a433307",
+      "tables": 245,
+      "rows": 1375,
+      "files": 1,
+      "allTablesAndFilesPreserved": true,
+      "afterStartupAllTablesAndFilesPreserved": true
+    },
+    "restoredContinuation": {
+      "status": "PASS",
+      "invoiceConsumedByOriginalReport": true,
+      "originalFortyFinancialReceiptsUnchanged": true,
+      "newFinancialReceipts": 4,
+      "sourceBackupDatabaseAndFilesUnchanged": true,
+      "restoredInvoicePaymentAmount": {
+        "value": "100.00",
+        "currency": "CNY"
+      },
+      "restoredInvoicePaymentVoucher": "POSTED",
+      "settlement": {
+        "reportId": "790160da-7ce4-4f97-aadb-7bea6b1d848c",
+        "applicationId": "fbd6e1f4-495d-47ab-9ff0-618755090e3f",
+        "roundNo": 1,
+        "applicationVersion": 8,
+        "financialVersion": 2,
+        "settlement": {
+          "version": 3,
+          "status": "SETTLED",
+          "resourcesConsumed": true,
+          "budgetStatus": "APPLIED",
+          "issue": null,
+          "funding": "PAYMENT",
+          "fundingConfirmedAt": "2026-10-03T06:38:16.770832Z",
+          "updatedAt": "2026-10-03T06:38:18.769434Z"
+        },
+        "canRetry": false
+      }
+    }
+  },
+  "packagedRuntime": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-examples-server.jar",
+    "jarSha256": "fb2580e2b963acad98e1c7073bb1419e27189fd033409e19a6fc2fa31a433307",
+    "frontend": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-examples-web-dist",
+    "database": "financial_journey_restore_7cf3eb2a37",
+    "sourceDatabase": "financial_journey_73d81b93f0",
+    "schemaVersion": 104,
+    "backendPort": 18285,
+    "frontendPort": 15363,
+    "financePort": 18282,
+    "restoredBoots": 2,
+    "originalBackendStoppedForColdBackup": true,
+    "allBusinessWritesThroughPublicApi": true
+  },
+  "observedBoundaries": {
+    "duplicateInvoice": {
+      "precheckFinding": [
+        {
+          "stage": "INVOICE",
+          "lineNo": 1,
+          "nature": "REJECTED",
+          "code": "INVOICE_VERIFICATION_REQUIRED"
+        }
+      ],
+      "submitError": "PRECHECK_NOT_READY",
+      "originalClaimUnchanged": true,
+      "explanation": "两份报销共用同一已占用原件编号，第一单占用增加原件版本，第二单先在查验版本新鲜度检查被阻断；没有将实际结果写成 INVOICE_OCCUPIED。跨文件同规范票号互斥不是此样例新增验收范围。"
+    },
+    "harnessCorrections": [
+      "付款授权按接口契约接受 202；已受理回执从原记录恢复，没有重复授权。",
+      "借款列表按 id 绑定，事前额度按 lines 读取，原件查验作业成功状态为 SUCCEEDED。",
+      "付款前等待实际凭证过账；不把异步准备未完成视为产品失败。"
+    ],
+    "externalFacts": "财务、查验、预算、ERP 与资金回执均来自本地合成协议服务；真实企业联调继续由 E03–E07 验收。"
+  },
+  "remainingScope": [
+    "F04 跨单路由、F09 柔性预算、F11 自审批上溯、F12 相邻业务节点去重、F14 项目会签仍独立 OPEN。",
+    "V02 最终版本门禁、V03 全量原条款核对与 E15 PR/CI 尚未完成。"
+  ],
+  "counting": {
+    "previousOpenTaskCount": 37,
+    "knownOpenTaskCount": 36,
+    "localDevelopment": 18,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "artifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot",
+  "artifactCount": 96,
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/expense_managed_client.py",
+      "bytes": 2903,
+      "sha256": "16595362cdf5de994c9a0f3def976dff70bb84d0a53096928393c4d4fb2fb067"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-advance-authorization.log",
+      "bytes": 361,
+      "sha256": "60e6b3cd0c4205f17ecdc92081be8558f70847d1713bd144c3766fdb6f19ee7c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-advance-balance-desktop.png",
+      "bytes": 104015,
+      "sha256": "1d8b210f2847e5fa005108cd523813a49a97d176a12e001fd52756f184ce8a3d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-advance-balance-mobile.png",
+      "bytes": 65482,
+      "sha256": "7030aaa3711e76ee5807e69423e43b126a42a3f4a1c59aad322d2037906da8eb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-advance-payment.log",
+      "bytes": 1055,
+      "sha256": "18da9f66e8d81927d9e6067e180f1cddf8b87966ec3256403761e62d0ff2b0f4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-backup-finance-receipts.json",
+      "bytes": 118927,
+      "sha256": "7856d535a0d421321156ec9cd4b94b9725e93046c63af7bc85f0f04872430576"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-backup-state.json",
+      "bytes": 199437,
+      "sha256": "667ecab8c1234708c7d925890ba79f346c2a2cc9cf183c0d7170b5705dbd3129"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-backup.sql",
+      "bytes": 1910898,
+      "sha256": "8e7451af858d181a84c62beb7b92c266b7e91750c22f4dc98c70ef47677a6fba"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-browser.json",
+      "bytes": 595,
+      "sha256": "fb1efe709718afb0570f3c43884c27fef512b4d874c567660d9246a5a8f493fa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-browser.log",
+      "bytes": 537,
+      "sha256": "b08890e82d7f65d76be8e358d33d31038b30df2eda8c5fcb4ee637ebc21aba25"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-browser.py",
+      "bytes": 5395,
+      "sha256": "f1f3c865b0f9437319ce50d7aa25c92eb0ac0edbb28b2893f54731e5ca378b7c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-continuation-result.json",
+      "bytes": 859,
+      "sha256": "a85e95bb2b14f3fb555d9af64d34c3a02b633f4cbd61d07a307439ae244fdd1f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-contracts-final.log",
+      "bytes": 1934,
+      "sha256": "e28ecce0085ece9b731e49c21e9224ce83ce30bd494a54280b16d8100c4d0911"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-contracts.json",
+      "bytes": 2548,
+      "sha256": "9e3cfa55d50ba99ac221591d5309f06d7ec9d0d7df8ab270c6bca2fef1cb7de0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-contracts.log",
+      "bytes": 1677,
+      "sha256": "935a7d50fdc2334d4e9cf84c07bb43f3bd87ff2862bc8eead1faf28940c84570"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-duplicate-blocked-desktop.png",
+      "bytes": 177856,
+      "sha256": "b287451d180a8b7077e49a7d2ce3ee4cce0a6b10adee6706a550e55a65d600a7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-duplicate-blocked-mobile.png",
+      "bytes": 89478,
+      "sha256": "3070a77759fda0800bb28e2a1925cc7cff71fed0cd2efce05e6b6e9352c5de58"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-expense-advance-offset-desktop.png",
+      "bytes": 168252,
+      "sha256": "726f91283d5655e2050a3547aa340f8cf72b47810187c63b079a729a99aeb686"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-expense-advance-offset-mobile.png",
+      "bytes": 76982,
+      "sha256": "66619a0fda039d125f1931808a3ff398a5dbcbade832b6d89b40dfb1e764f0a3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-expense-no-paper-desktop.png",
+      "bytes": 173349,
+      "sha256": "3e7851bdd0992939654ae807a5e7e0c3434298d0a07b4c8c2c3329f3b64edfc3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-expense-no-paper-mobile.png",
+      "bytes": 75499,
+      "sha256": "157a1569a461a6f9a0af2081b5a027a96720fbceafa97bdbc9bd6cef6c943606"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-expense-reduction-desktop.png",
+      "bytes": 173786,
+      "sha256": "0a3c5bbaeae87a908f73e09b9ef4974cd0aa4f49827d32e571ba0d10392dab39"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-expense-reduction-mobile.png",
+      "bytes": 78200,
+      "sha256": "d5bda426ee76fa8df2dcde1d5c50583127cc0976ec217848027d64855fdc0dba"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-finance-calls.jsonl",
+      "bytes": 160292,
+      "sha256": "84cacc50e371d3c969817d5136cc9b034f13e3efdb32fd5efd2d6f124c2ec625"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-finance-inspect.log",
+      "bytes": 4304,
+      "sha256": "10c8b3b63ee93a6e6a94c0d2e0cdd4ba200e9aca726f897b36bed2bf20032fed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-finance-receipts.json",
+      "bytes": 133297,
+      "sha256": "5716b9becfb6b817f0f69272c54c3b300afe1581358655a2fcdb86220c3c0799"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-finance.py",
+      "bytes": 16866,
+      "sha256": "0095091f5572844a255e971d907e9bd2cbe4cf2a089afca9f5adc3baef2bef9c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-first-approvals.log",
+      "bytes": 607,
+      "sha256": "8ea4af975f9e7320d14e48687bf0454738cd91779252f56ac39f00442bc76441"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-first-payments-resume.log",
+      "bytes": 138,
+      "sha256": "e8b08c56bddfee50465fe900ae4cdda4190b476c4d77f87f73ac8e453bbcab3e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-first-payments.log",
+      "bytes": 2323,
+      "sha256": "644f0e83b998001b697a7f397f6221e0ef4ed5524ce6e10750a9cbecb30b985c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-first-submissions.log",
+      "bytes": 782,
+      "sha256": "5116e60219e0fc170bd7a8c5f996ca6ac98572bf703fe7e5823f030e24943cbf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-advance-authorization.json",
+      "bytes": 2017,
+      "sha256": "02970d17699baf9a9d02c353a51dc2801c2cba6c918cc9226432370e259971ab"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-advance-payment.json",
+      "bytes": 1979,
+      "sha256": "30b35cc83891feb218551c9dc815be66b71796fa3d4eb9fb2cad745b86e6c306"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-browser.json",
+      "bytes": 141175,
+      "sha256": "d53eb24cf3d56c33109aafe412b2b99e2b3d785c21c4db0501a303a92b9df22b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-configuration.json",
+      "bytes": 116314,
+      "sha256": "c1a877d9dced6fbaeb0c4a6f87470f9a7f044ccbfd56413fedcc7d152ab95fdf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-finance-inspect.json",
+      "bytes": 7374,
+      "sha256": "686ec2a6e18d625d02ade7a4f20a4291eb2bf62df292d388be6b54d27bb168d2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-first-approvals.json",
+      "bytes": 30387,
+      "sha256": "f6d7f462e0382d095448a9fd2666a22fc9574f2e8fd9f1c182db9697944e3f7f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-first-payments-resume.json",
+      "bytes": 13730,
+      "sha256": "0ce5d25ea7c37639bf9fa663429de558038165f0d89ecd480b2124d6e3ca5b45"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-first-payments.json",
+      "bytes": 15826,
+      "sha256": "93bff80d2cef26abd15470583dbaa82f0d35246b95cc11c9d025ee76cb21f743"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-first-submissions.json",
+      "bytes": 41233,
+      "sha256": "a03eb69fb49dc95a99e5e9a3f789ae23f930c2cf74dbb65e5414952095b08660"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-invoice-conflict.json",
+      "bytes": 36762,
+      "sha256": "8faf1670adb92d40d7c5b1268833e5295f270c748ef15cdc90d3b6d1a9cb1408"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-invoice.json",
+      "bytes": 3975,
+      "sha256": "73886cec98a3363c31e7e5cdd32d2731a26eef4eb14f568a4ed52435e1bf9da6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-matrix-cases.json",
+      "bytes": 117718,
+      "sha256": "421af5e73d40e5bdacb7e93795ea256c8a2a327489bb167db40560c12ee7956b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-matrix-payments.json",
+      "bytes": 29217,
+      "sha256": "fbdf56ad0d81908154f080663eb978b86c2977da6861789b116487c4d7fe73cc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-no-paper.json",
+      "bytes": 44532,
+      "sha256": "23691cbaa2dac36ac87da593686f766e55a13bbed95cd180d1d187cb1e7fbffe"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-organization.json",
+      "bytes": 10564,
+      "sha256": "34ef57e82d566ebe0d2fb28efdce292cf13625d5ebd3f36d80f95142986f4c5c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-pre-backup.json",
+      "bytes": 23375,
+      "sha256": "231696fbc7a0753c385f45e11183b5b21ef067ed8aea0c77801de7453c147170"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-resource-bindings.json",
+      "bytes": 4808,
+      "sha256": "ec8195888a198ad58a92e102f59e63cdb43cd4e5dc0ffc4c13060d0312a7e697"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-resource-completion-resume.json",
+      "bytes": 63820,
+      "sha256": "a9f185cc93de7714724a5948f28140a604210c8fbeaa0b0e725c380af952f97c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-resource-completion.json",
+      "bytes": 19154,
+      "sha256": "391c4a1a5578bfc6db675431e04796b92f95a355ff06eb22e18c6fb484df3d89"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-resources-submit.json",
+      "bytes": 41178,
+      "sha256": "918c60412746ded5b39955312b83a85d0750956077d72ba0702c81ef97565cd2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-restored-browser.json",
+      "bytes": 18416,
+      "sha256": "506828853f52f262ad1d0a63aab6bbb049b459b0f571b909a05ab7da578d6da7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-http-restored-continuation.json",
+      "bytes": 52726,
+      "sha256": "a37c925bb82ee29a3d6763110d8135317791a1821229de5d2dce8d946d244a45"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-invoice-conflict.log",
+      "bytes": 1279,
+      "sha256": "64cd2ddf6db120ca1f42040a549a96f2a9efc8ef72aa9399a96f603252d78767"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-invoice.log",
+      "bytes": 407,
+      "sha256": "b393ae15618ec3017388d675d4ef18db46d6f1dd9691cb736dc5dfca8b28e8da"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-invoice.xml",
+      "bytes": 664,
+      "sha256": "9a9796de80c40c5be89d7d6d08a835926a41892f158bbad605fee7e05f7fc2aa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-matrix-cases.log",
+      "bytes": 353,
+      "sha256": "1c4d5a4e7ea807bc276c852dccdf85bf1f2b1582b1be63c057ca4f2ec32aef71"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-no-paper.log",
+      "bytes": 1043,
+      "sha256": "3fc08483eedaf4b2baee51861b2b2489216208c908e13435066172e719a91896"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-no-paper.py",
+      "bytes": 1749,
+      "sha256": "99c0ed0163464f358c298813151d02f8f9183431848343e9a5e711ec4c478d6b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-organization.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-plan-balance-desktop.png",
+      "bytes": 97624,
+      "sha256": "e51f3760b61b3e42c383473d1126aa3fa3e4187be913232631f11e09eaa6e530"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-plan-balance-mobile.png",
+      "bytes": 57297,
+      "sha256": "64e85d8eea901da8eeb9f7cecf9468246a8e9e105cf676b6096197c8b7badd92"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-pre-backup.log",
+      "bytes": 11033,
+      "sha256": "ec3c92bee70866effca948db01b71714258ee99a4e55504967323be6c0714ea9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-preview.mjs",
+      "bytes": 545,
+      "sha256": "8f4267993e311f1794ebfae982696c3e4048eba826b5d98587fc3bd9d29935fb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-resource-bindings.log",
+      "bytes": 228,
+      "sha256": "1cf99098f1139366152fcd9e769361b71a343cc789d7d0fc7eedaea850097fc2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-resource-completion-resume.log",
+      "bytes": 1209,
+      "sha256": "b424b98cab156566c0ffbf985ba8817da761881b0ce7245a958d1ddb285d1601"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-resource-completion-v2.log",
+      "bytes": 735,
+      "sha256": "01568432144282dfd0fdc905015706b995b9f7764925ac54eb5a549527e3ce13"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-resource-completion.log",
+      "bytes": 1279,
+      "sha256": "d6bf6f84ceee2fce539495da31328a64ca661ba2a6840e9ad33beee1e5fc776a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-resources-submit.log",
+      "bytes": 1169,
+      "sha256": "8d2e7e9409c823f0e97e84b46f49b29ad654cb708c53c9148524ec4976a7f7f2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restore-database.log",
+      "bytes": 18529,
+      "sha256": "31d479ed3a76b98d49d87877e6d81a60f6c67431c88151a5e4ed5d9708406549"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restore-evidence.json",
+      "bytes": 28731,
+      "sha256": "10e25c0c14d74ba4b99c32f6dbf270e92fb8403ab1a5551adfd7d741117ead24"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restore-runtime.json",
+      "bytes": 29179,
+      "sha256": "737d6b24228fe0fc358a176874d43254111abbd4536a5bc61ea670adb5f7ee51"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restore.log",
+      "bytes": 463,
+      "sha256": "ffac9fe7f8c769ffa68212ce7169633a3f46494e672d1f2783d35d752b9189a9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-browser.json",
+      "bytes": 228,
+      "sha256": "3c90beb0a45766903dabf8ac71023987666f49760b88665650e310d8959f9319"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-browser.log",
+      "bytes": 202,
+      "sha256": "85d72828aaf34cd341bbf31b428adfedcbba3313f7ca9966919c970f07ef1647"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-browser.py",
+      "bytes": 3755,
+      "sha256": "04eb12ac65b396390acb4b4820ecae4087d0c307a3975d66627cb8d615ff420d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-continuation.log",
+      "bytes": 743,
+      "sha256": "2213f1b0403bb803ef41a11c12596ec4d35bacd79e1bf97e2dbe908a2fc67d48"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-invoice-desktop.png",
+      "bytes": 122248,
+      "sha256": "1f8d95321ddbf73282db0afbd7c1f652455c5c6719dafbd2c4b0ca14dc590f0b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-invoice-download.xml",
+      "bytes": 664,
+      "sha256": "9a9796de80c40c5be89d7d6d08a835926a41892f158bbad605fee7e05f7fc2aa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-invoice-mobile.png",
+      "bytes": 51379,
+      "sha256": "ce894f89bc5c191aa9591be91b00658db6487277533ec6f70cfdc57fe0334ed0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-preview.mjs",
+      "bytes": 545,
+      "sha256": "c6e5250ed7f3a8e6e23414b960dc05c2ec609e0793895c54d42bc79de045b294"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-runtime-boot1.log",
+      "bytes": 8045,
+      "sha256": "9add5b53aebbb09e4fd5f08bd83bd87b04628d6691a1a36c866ce02a62fde082"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-restored-runtime-boot2.log",
+      "bytes": 7371,
+      "sha256": "0ae780192e7d5db74b72c28fb4e477a9ac070814d0623b16453c11191faaffa6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-results.json",
+      "bytes": 35887,
+      "sha256": "603d302140e4abd4184b4d741c2aa10d84239481d4a8351fae69efe0d050f535"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-results.log",
+      "bytes": 309,
+      "sha256": "63741d60a267a91b6ea91f540055505a8cb398dc4a4b29d19688014d4cbaa1e8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-runtime-boot1.log",
+      "bytes": 29950,
+      "sha256": "e9dcdb90bc6c12a267fc001d4217b7f99f9cb800157d54156e2209d3d3f33289"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-runtime.json",
+      "bytes": 953,
+      "sha256": "9eded9b70b20f4e6fc1ccbfef7d66ea0f080ff009ecbb40fa4a0793fb5a9667b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-setup.log",
+      "bytes": 101,
+      "sha256": "9cb7fbb50f0b150a899ae45626d65d44b134dfa3ca1dbb1bfbd94fc2f0cf0188"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial_template_journey.py",
+      "bytes": 11931,
+      "sha256": "29b1a181a7e41a1c41aac5786acb0e9478544f340fadc27452bd3676d9c5a49d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/restore-financial-template-journey.py",
+      "bytes": 3583,
+      "sha256": "9556b63dbc7a8052c6c352c27af251117276283e0ff8b6aa164ea84c02e6595c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/run-financial-template-journey-restored-runtime.py",
+      "bytes": 4501,
+      "sha256": "c7e9cc946c39107b8a14886819ec8160360c3fa610b5e3bd4a5b0709a41ba1bd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/run-financial-template-journey-runtime.py",
+      "bytes": 4484,
+      "sha256": "c1d1f88b17414950df5a79bfc6892bdf7335d0a81e61dda2bd1bc0bc44ed8e22"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/verify-financial-template-journey-contracts.mjs",
+      "bytes": 2276,
+      "sha256": "704da1f92c87b0856d801d0e286179b2ef0513cf3f580e69207364540d763d8b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/verify-financial-template-journey-results.py",
+      "bytes": 5995,
+      "sha256": "5837e96ee9882e8fd41303d2a253a56dbe310bbb66392001e4bf128502eb2952"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/wecom_runtime_common.py",
+      "bytes": 1943,
+      "sha256": "c09857a84a04482322a4a3fe66dc5679ec97b07f0116fefa2334a52366a71259"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-template-journey-evidence-snapshot/financial-template-journey-remote-observation.json",
+      "bytes": 616,
+      "sha256": "b60c1966de2f3f6b0d95730278bd621c1205b1c2def19dd39384024169f32d70"
+    }
+  ],
+  "deliveryObservation": {
+    "verifiedAt": "2026-10-03T06:43:36.503599+00:00",
+    "repository": "https://github.com/liulangjietou/agent-flow",
+    "commands": [
+      "git ls-remote --heads origin",
+      "gh pr list --repo liulangjietou/agent-flow --state open --json number,title,url,headRefName,baseRefName"
+    ],
+    "heads": {
+      "main": "fec4a87c6c785ddabf40ad2584060e264abddd2f",
+      "vibeCodingO/merge-completed-tasks": "b5a50a8f9d6411b16d2913a38325a497e6c9e97c"
+    },
+    "openPullRequests": [],
+    "currentWorktreeBranch": "codex/governance-identifier-integration",
+    "currentBranchPushed": false,
+    "finalDeliveryDependsOn": [
+      "V02"
+    ]
+  }
+}

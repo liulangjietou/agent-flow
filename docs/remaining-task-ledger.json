@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T06:19:50.800321+00:00",
+  "recordedAt": "2026-10-03T06:41:34.641049+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 37,
+    "knownOpenTaskCount": 36,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 19,
+      "LOCAL_DEVELOPMENT": 18,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 37,
+    "projectRemainingLowerBound": 36,
     "completionPercentage": null,
     "notes": [
-      "37 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "36 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -1420,7 +1420,7 @@
       "id": "F13",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "报销、事前申请和借款模板包",
       "sourceRefs": [
         {
@@ -1440,7 +1440,7 @@
           ]
         }
       ],
-      "observed": "三份模板的复制、模拟及发布已有阶段证据。配套类别、制度、映射、签收设置和 10 个业务输入已接入只读接口与模板中心下载；本阶段 55 条范围测试、13 份实际 HTTP 契约及三类浏览器下载通过，升级保留 245 张表/6,328 行/9 附件。10 个样例的真实业务办理仍未逐项验收。",
+      "observed": "三个模板的复制、验证、模拟、发布、配套配置与专用业务办理已完成本地验收。10 个样例及免纸件变体通过 53 条业务断言；493 份实际响应和 124 份请求通过契约；桌面/390 像素页面、原件下载及独立配套恢复通过。恢复保留 245 张表、1,375 行、1 份原件，在审单继续完成付款与核销，40 条旧财务回执保持。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/template/ClasspathProcessTemplateCatalog.java",
@@ -1457,6 +1457,10 @@
         {
           "path": "docs/evidence/financial-template-examples-20261003.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-template-journey-complete-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "3 个模板可复制、验证、模拟、发布并从专用入口提交；附类别、制度、映射、签收开关和超标/核减/冲销/重复票样例；金额矩阵及财务复核阈值可配置。",
@@ -1464,7 +1468,14 @@
         "F01",
         "F02"
       ],
-      "progressEvidence": "docs/evidence/financial-template-examples-20261003.json"
+      "completion": {
+        "implementationCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+        "verifiedCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+        "verifiedAt": "2026-10-03T06:41:34.641049+00:00",
+        "evidence": "docs/evidence/financial-template-journey-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "使用实际业务 API、人工审批和固定安装包；外部财务事实由独立本地合成服务提供，真实企业 E03–E07 联调保持待办。"
+      }
     },
     {
       "id": "F14",
@@ -2171,7 +2182,7 @@
           ]
         }
       ],
-      "observed": "origin 已配置为 https://github.com/liulangjietou/agent-flow.git；GitHub 仓库可访问且具有推送权限。当前远端尚无分支，本地开发分支尚无 PR 或 CI 结果。E15 依赖 V02 最终版本验收，仍为 OPEN。",
+      "observed": "origin 已配置且可访问，远端已有 main 与集成分支，当前没有开放 PR。本地开发分支 codex/governance-identifier-integration 尚未推送，也未完成对应最终版本 CI 验收。E15 依赖 V02 最终版本验收，仍为 OPEN。",
       "references": [
         {
           "path": "docs/remaining-implementation-plan.md",
@@ -3324,39 +3335,36 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F13"
+    "F03",
+    "F05"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
     "origin": "https://github.com/liulangjietou/agent-flow.git",
     "repository": "https://github.com/liulangjietou/agent-flow",
     "pushPermission": true,
-    "remoteBranches": [],
+    "remoteBranches": [
+      "main",
+      "vibeCodingO/merge-completed-tasks"
+    ],
     "pullRequest": null,
     "ci": null,
     "dependsOn": [
       "V02"
     ],
-    "verifiedAt": "2026-10-03T04:14:38.448896+00:00"
+    "verifiedAt": "2026-10-03T06:43:36.503599+00:00",
+    "remoteBranchHeads": {
+      "main": "fec4a87c6c785ddabf40ad2584060e264abddd2f",
+      "vibeCodingO/merge-completed-tasks": "b5a50a8f9d6411b16d2913a38325a497e6c9e97c"
+    },
+    "currentBranchPushed": false,
+    "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F02",
-    "implementationCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
-    "verifiedCommit": "7fc7813be8dc751a35d1cfd19b93991a892f5417",
-    "completedAt": "2026-10-03T05:37:50.342009+00:00",
-    "evidence": "docs/evidence/account-mapping-complete-20261003.json"
-  },
-  "latestInProgress": {
     "taskId": "F13",
-    "phase": "COMPANION_PACK_API_UI_DOWNLOAD_VERIFIED",
-    "taskCompleted": false,
-    "scope": "员工财务模板配套配置与业务输入、只读读取接口、模板中心查看与下载；不自动应用任何配置或金融事实。",
-    "evidence": "docs/evidence/financial-template-examples-20261003.json",
-    "remaining": [
-      "以下载出的 10 个输入绑定实际本地法人、日期、人员、票据与借款/事前资源，逐项执行预期结果。",
-      "通过原配置 API 发布演示类别、制度与映射；本地财务服务补齐匹配样例的类别、签收开关与原件查验协议。",
-      "从三个默认模板副本完成真实填报、预检、提交与审批；核减后复核路由、已放款借款冲销、事前额度占用与同票互斥必须实际验证。",
-      "最终固定包完成样例完整链路、恢复与适用回归后再评估是否关闭 F13；其他已编号任务仍保留。"
-    ]
+    "implementationCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+    "verifiedCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+    "completedAt": "2026-10-03T06:41:34.641049+00:00",
+    "evidence": "docs/evidence/financial-template-journey-complete-20261003.json"
   }
 }
