@@ -1,3 +1,4 @@
+import type { AdvanceOffsetSuggestion } from './advanceOffsetSuggestion'
 import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
 import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
 import { extractionPath, readExtractionOptions, readExtractionPage, readExtractionDetail, validateExtractionReceipt, type ExtractionReceipt, type ExtractionGenerate, type ExtractionReview } from './invoiceExtraction.js'
@@ -585,6 +586,7 @@ export const api = {
   expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
   queueExpensePrecheck: (id: string, input: PrecheckInput) => write<{ id: string }>(`/expense-reports/${encodeURIComponent(id)}/precheck`, 'POST', '发起费用预检', input),
   expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  advanceOffsetSuggestion: (id: string, jobId: string, signal: AbortSignal) => request<AdvanceOffsetSuggestion>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}/advance-offset-suggestion`, { signal, cache: 'no-store' }),
   submitExpense: (id: string, input: { applicationVersion: number; financialVersion: number; precheckId: string }) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/submit`, 'POST', '正式提交报销', input),
   invoices: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceItem>>('/invoices' + historyQuery(filter), { signal, cache: 'no-store' }),
   invoice: (id: string, signal: AbortSignal) => request<InvoiceItem>(`/invoices/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),

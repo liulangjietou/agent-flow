@@ -40724,6 +40724,100 @@
           }
         }
       }
+    },
+    "/api/v1/expense-reports/{id}/prechecks/{jobId}/advance-offset-suggestion": {
+      "get": {
+        "operationId": "getAdvanceOffsetSuggestion",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "按实际放款日期获取本人借款冲销建议",
+        "description": "仅申请人读取有效预检绑定的当前建议。按放款日期及 UUID 文本升序跨页查询同法人、同币种实际借款；排除其他单占用、净还款、银行退回及所有待复核冻结，计入本单上一轮仍保留的预留。合计不超过核定含税金额，最多 50 笔。只读不预留；人工采纳后须保存、重新预检并正式提交。拒绝所有查询参数。",
+        "x-access": "已认证员工本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceOffsetSuggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -71042,6 +71136,103 @@
             "format": "uuid"
           }
         }
+      },
+      "AdvanceOffsetSuggestion": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "precheckId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedGross": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "offsetTotal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "payable": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "selectionLimitReached": {
+            "type": "boolean",
+            "description": "已推荐 50 笔且仍有未被冲销的核定金额；不表示其余金额必定存在可用借款。"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/AdvanceOffsetSuggestionItem"
+            }
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "precheckId",
+          "applicationVersion",
+          "financialVersion",
+          "validUntil",
+          "approvedGross",
+          "offsetTotal",
+          "payable",
+          "selectionLimitReached",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AdvanceOffsetSuggestionItem": {
+        "type": "object",
+        "properties": {
+          "advanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "paidOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "advanceId",
+          "version",
+          "paidOn",
+          "capacity",
+          "amount"
+        ],
+        "additionalProperties": false
       }
     }
   }

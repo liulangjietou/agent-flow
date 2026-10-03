@@ -10,6 +10,7 @@ import ExpenseLineEditor from './ExpenseLineEditor.vue'
 import ExpenseFundingPicker from './ExpenseFundingPicker.vue'
 import ExpenseSubmission from './ExpenseSubmission.vue'
 import ExpenseInvoiceAssist from './ExpenseInvoiceAssist.vue'
+import type { AdvanceOffsetSuggestion } from '../advanceOffsetSuggestion'
 
 const props = defineProps<{ scopeKey: string; initial?: ExpenseDetail; locked?: boolean }>()
 const emit = defineEmits<{ close: []; submitted: [applicationId: string]; busy: [value: boolean] }>()
@@ -92,6 +93,15 @@ function close() {
 }
 function leave() { if (!saving.value && !childBusy.value && !assistBusy.value && !props.locked) { leaving = true; expenseDrafts.clear(props.scopeKey, sessionKey.value); emit('close') } }
 function submitted(applicationId: string) { leaving = true; expenseDrafts.clear(props.scopeKey, sessionKey.value); emit('submitted', applicationId) }
+/** 只改写当前未变动草稿；脏状态立即关闭提交入口，保存后必须重新预检。 */
+function applyOffsets(suggestion: AdvanceOffsetSuggestion) {
+  const detail = state.value.detail
+  if (blocked.value || dirty.value || !detail?.editable || !props.scopeKey || suggestion.reportId !== detail.id
+    || suggestion.applicationId !== detail.applicationId || suggestion.applicationVersion !== detail.applicationVersion
+    || suggestion.financialVersion !== detail.financialVersion || !(Date.parse(suggestion.validUntil) > Date.now())) return
+  state.value.content.advanceOffsets = suggestion.items.map(row => ({ advanceId: row.advanceId, amount: { ...row.amount } }))
+  notice.value = '已将借款建议填入草稿。可继续调整；保存后请重新预检。'
+}
 /** 冲突后明确放弃本地内容并读取服务器版本，不自动用新版本再次写入。 */
 async function reloadSaved() {
   if (saving.value || childBusy.value || assistBusy.value || props.locked || state.value.pending || !state.value.detail) return
@@ -140,7 +150,7 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
         <div class="save-toolbar"><span>{{ dirty ? '有未保存的内容' : state.detail ? '当前费用内容已保存' : '允许先保存不含费用行的草稿' }}</span><button class="primary" :disabled="blocked || loading || selection.loading || !state.detail && !state.definition">{{ saving ? '正在保存…' : '保存费用草稿' }}</button></div>
       </fieldset>
     </form>
-    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy" @busy="childBusy = $event" @submitted="submitted" />
+    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy" @busy="childBusy = $event" @submitted="submitted" @offsets="applyOffsets" />
     <p v-else-if="state.detail && dirty" class="editor-help">请先保存当前修改，再执行费用预检或提交。</p>
   </section>
 </template>

@@ -5,9 +5,11 @@ import { expenseError, moneyLabel, type ExpenseDetail } from '../expenses'
 import { nextExpenseRound, precheckIssues, precheckStages, precheckStatuses, usablePrecheck, type PrecheckOptions, type PrecheckView } from '../expenseDraft'
 import { initiatorContextLabel } from '../initiatorContext'
 import InitiatorAppointmentPicker from './InitiatorAppointmentPicker.vue'
+import AdvanceOffsetSuggestion from './AdvanceOffsetSuggestion.vue'
+import type { AdvanceOffsetSuggestion as OffsetSuggestion } from '../advanceOffsetSuggestion'
 
 const props = defineProps<{ detail: ExpenseDetail; scopeKey: string; timeZone: string; locked: boolean }>()
-const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean] }>()
+const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion] }>()
 const appointment = ref(''), accountingDate = ref(''), options = ref<PrecheckOptions | null>(null), result = ref<PrecheckView | null>(null)
 const reading = ref(false), saving = ref(false), confirm = ref(false), error = ref(''), requiresRefresh = ref(false)
 let epoch = 0, controller: AbortController | null = null, poll: ReturnType<typeof setTimeout> | undefined, expiry: ReturnType<typeof setTimeout> | undefined, pollUntil = 0
@@ -104,6 +106,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
       <template v-if="result.preview"><div class="preview-amounts"><div><small>核定含税额</small><strong>{{ moneyLabel(result.preview.approvedGross) }}</strong></div><div><small>借款抵扣</small><strong>{{ moneyLabel(result.preview.offsetTotal) }}</strong></div><div><small>应付余额</small><strong>{{ moneyLabel(result.preview.payable) }}</strong></div></div><p class="submission-help">收款账户 {{ result.preview.maskedAccount }} · 汇率日期 {{ result.rateDate }}<br />有效至 {{ result.validUntil ? new Date(result.validUntil).toLocaleString('zh-CN') : '待核对' }}；正式提交仍会复核有效性。</p></template>
       <p v-if="result.usable && !ready" class="submission-help">请选择与本次检查一致的任职和会计日期；修改选择后需要重新预检。</p>
     </article>
+    <AdvanceOffsetSuggestion v-if="ready && result && !requiresRefresh" :detail="detail" :precheck="result" :scope-key="scopeKey" :locked="blocked || reading || confirm" @apply="emit('offsets', $event)" />
     <button v-if="!confirm" type="button" class="primary" :disabled="blocked || reading || requiresRefresh || !ready" @click="prepare">核对并提交审批</button>
     <div v-else class="submit-confirmation" role="group" aria-label="确认正式提交报销"><p>确认按上方费用、任职、会计日期和收款账户提交第 {{ nextExpenseRound(detail) }} 轮审批？提交后当前内容将冻结，修改需按流程退回或撤回。</p><div class="submission-toolbar"><button type="button" class="secondary" :disabled="saving" @click="confirm = false">返回核对</button><button type="button" class="primary" :disabled="blocked || reading || requiresRefresh || !ready" @click="submit">{{ saving ? '正在提交…' : '确认正式提交' }}</button></div></div>
   </section>

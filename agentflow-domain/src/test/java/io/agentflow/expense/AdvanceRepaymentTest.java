@@ -24,6 +24,7 @@ class AdvanceRepaymentTest {
         advance.repay(2, repayment(advance, "receipt-a", "60"));
         assertThat(advance.balance()).isEqualTo(original); assertThat(advance.repaid()).isEqualTo(money("60"));
         assertThat(advance.outstanding()).isEqualTo(money("40")); assertThat(advance.available()).isEqualTo(money("0"));
+        assertThat(advance.offsetCapacity(null)).isEqualTo(money("0")); assertThat(advance.offsetCapacity(use)).isEqualTo(money("40"));
         assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.PARTIALLY_SETTLED); assertThat(advance.overdue(LocalDate.parse("2026-10-02"))).isTrue();
         advance.settle(3, use);
         assertThat(advance.status()).isEqualTo(EmployeeAdvance.Status.SETTLED); assertThat(advance.outstanding()).isEqualTo(money("0"));
@@ -66,6 +67,7 @@ class AdvanceRepaymentTest {
     void independentRepaymentDisputeSurvivesOriginalPaymentResolutionAndAllowsOnlyRelease() {
         var advance = advance(); var use = new ExpenseUse(UUID.randomUUID(), 1, 0); advance.reserve(1, use, money("40"));
         var repayment = repayment(advance, "r", "20"); advance.repay(2, repayment); advance.requireRepaymentReview(3, repayment.id()); var held = advance.state();
+        assertThat(advance.offsetCapacity(use)).isEqualTo(money("0"));
         advance.requireRepaymentReview(4, repayment.id()); assertThat(advance.state()).isEqualTo(held);
         fails("ADVANCE_REPAYMENT_REVIEW_REQUIRED", () -> advance.settle(4, use));
         fails("ADVANCE_REPAYMENT_REVIEW_REQUIRED", () -> advance.repay(4, repayment(advance, "next", "1")));

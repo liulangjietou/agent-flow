@@ -10,6 +10,24 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const output = mkdtempSync('/fyoung/tmp/agentflow-web-requests-')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 
+// 借款建议及草稿采纳使用真实组件，验证只读复核和旧身份迟到响应。
+for (const [component, suffix, rendered] of [['AdvanceOffsetSuggestion', 'Panel', false], ['AdvanceOffsetSuggestion', 'Rendered', true], ['ExpenseEditor', 'OffsetEditor', false], ['ExpenseSubmission', 'OffsetSubmission', false]]) {
+  const descriptor = parse(readFileSync(resolve(root, `src/components/${component}.vue`), 'utf8'), { filename: `${component}.vue` }).descriptor
+  const name = component + suffix, script = compileScript(descriptor, { id: name })
+  let source = script.content
+  if (rendered) {
+    const template = compileTemplate({ source: descriptor.template.content, filename: `${component}.vue`, id: name, compilerOptions: { bindingMetadata: script.bindings } })
+    if (template.errors.length) throw new Error(template.errors.join('\n'))
+    source = source.replace('export default', 'const component =') + '\n' + template.code + '\ncomponent.render = render; export default component;'
+  }
+  source = source.replace(/from ['"]vue['"]/g, `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
+    .replace(/['"]\.\.\/([^'"]+)['"]/g, (_, module) => `'./${module.endsWith('.js') ? module : module + '.js'}'`)
+    .replace(/import (\w+) from '[^']+\.vue'/g, 'const $1 = { render: () => null }')
+  writeFileSync(resolve(output, `${name}.js`), ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
+  process.env[`AGENTFLOW_TEST_${name.toUpperCase()}`] = resolve(output, `${name}.js`)
+}
+process.env.AGENTFLOW_TEST_ADVANCE_OFFSET_SUGGESTION = resolve(output, 'advanceOffsetSuggestion.js')
+
 // 额度关闭使用真实确认组件和工作台模板，验证原请求恢复及身份变化。
 for (const [component, suffix, rendered] of [['ExpenseRequestClose', 'Panel', false], ['ExpenseRequestClose', 'Rendered', true], ['ExpenseWorkspace', 'Closure', true]]) {
   const descriptor = parse(readFileSync(resolve(root, `src/components/${component}.vue`), 'utf8'), { filename: `${component}.vue` }).descriptor
@@ -524,7 +542,7 @@ process.env.AGENTFLOW_TEST_EXPENSE_DRAFT = resolve(output, 'expenseDraft.js')
 process.env.AGENTFLOW_TEST_INVOICE_WALLET = resolve(output, 'invoiceWallet.js')
 
 
-for (const name of ['expenseRequestClosure', 'invoiceExtraction', 'draftAssist', 'formAssignees', 'approvalProxies', 'workspaceNavigation', 'approvalResponsibilities', 'tenantInitialization', 'submissionRisk', 'notificationDeliveries', 'notificationPreferences', 'commentMentions', 'taskBatch', 'subprocessRelations', 'initiatorRequirements', 'subprocessDesigner', 'events', 'instanceControl', 'timerWaits', 'approvalPolicy', 'countersignMembership', 'expensePartialAdjustment', 'supplierAdjustmentDispute', 'supplierAdjustment', 'supplierReturn', 'supplierSettlementDispute', 'supplierDispute', 'budgetFinance', 'paymentBatches', 'paymentCallbacks', 'supplierSettlement', 'supplierCashier', 'supplierFinance', 'expenseResourceAdjustment', 'expensePaymentReturn', 'voucherReversalExecution', 'voucherReversal', 'disbursementReturn', 'repaymentReview', 'advanceRepayment', 'expenseArchive', 'expenseSettlement', 'payments', 'vouchers', 'advanceRequest', 'procurementPayment', 'budgetAdjustment', 'invoiceWallet', 'expenseDraft', 'expensePlan', 'expenses', 'attachments', 'initiatorContext', 'organization', 'taskDeadline', 'notificationTexts', 'conditionGroups', 'assistRuns', 'definitionSelection', 'definitionCatalog', 'conditionSyntax', 'conditionPresentation', 'designerValidation', 'webhooks', 'auditSearch', 'portableTemplate', 'workbookExport', 'applicationExport', 'roundComparison', 'quickDesigner', 'conditionBuilder', 'roundDiagram', 'applicationSearch', 'businessCalendars', 'applicationComments', 'firstWorkflow', 'approvalOperations', 'definitionAssignees', 'apiReference', 'api', 'pendingWrites', 'formSchema', 'templateCenter', 'unsavedConfirmation', 'systemChecks', 'definitionSimulation', 'definitionComparison', 'designerGraph', 'designerLayout', 'draftAutosave', 'workspaceRecords', 'taskActions', 'notificationInbox', 'pendingTaskQueue']) {
+for (const name of ['advanceOffsetSuggestion', 'expenseRequestClosure', 'invoiceExtraction', 'draftAssist', 'formAssignees', 'approvalProxies', 'workspaceNavigation', 'approvalResponsibilities', 'tenantInitialization', 'submissionRisk', 'notificationDeliveries', 'notificationPreferences', 'commentMentions', 'taskBatch', 'subprocessRelations', 'initiatorRequirements', 'subprocessDesigner', 'events', 'instanceControl', 'timerWaits', 'approvalPolicy', 'countersignMembership', 'expensePartialAdjustment', 'supplierAdjustmentDispute', 'supplierAdjustment', 'supplierReturn', 'supplierSettlementDispute', 'supplierDispute', 'budgetFinance', 'paymentBatches', 'paymentCallbacks', 'supplierSettlement', 'supplierCashier', 'supplierFinance', 'expenseResourceAdjustment', 'expensePaymentReturn', 'voucherReversalExecution', 'voucherReversal', 'disbursementReturn', 'repaymentReview', 'advanceRepayment', 'expenseArchive', 'expenseSettlement', 'payments', 'vouchers', 'advanceRequest', 'procurementPayment', 'budgetAdjustment', 'invoiceWallet', 'expenseDraft', 'expensePlan', 'expenses', 'attachments', 'initiatorContext', 'organization', 'taskDeadline', 'notificationTexts', 'conditionGroups', 'assistRuns', 'definitionSelection', 'definitionCatalog', 'conditionSyntax', 'conditionPresentation', 'designerValidation', 'webhooks', 'auditSearch', 'portableTemplate', 'workbookExport', 'applicationExport', 'roundComparison', 'quickDesigner', 'conditionBuilder', 'roundDiagram', 'applicationSearch', 'businessCalendars', 'applicationComments', 'firstWorkflow', 'approvalOperations', 'definitionAssignees', 'apiReference', 'api', 'pendingWrites', 'formSchema', 'templateCenter', 'unsavedConfirmation', 'systemChecks', 'definitionSimulation', 'definitionComparison', 'designerGraph', 'designerLayout', 'draftAutosave', 'workspaceRecords', 'taskActions', 'notificationInbox', 'pendingTaskQueue']) {
   const path = resolve(root, `src/${name}.ts`)
   if (!existsSync(path)) continue
   const source = readFileSync(path, 'utf8').replace('import.meta.env.VITE_API_BASE', 'undefined')

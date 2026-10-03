@@ -238,6 +238,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired io.agentflow.organization.ApprovalProxyService approvalProxies;
     @Autowired io.agentflow.definition.DefinitionDraftRepository definitionRecords;
 
+    private final List<EmployeeAdvance> fifoFixtures = new ArrayList<>();
+
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(admin);
@@ -249,6 +251,12 @@ class ExpenseSubmissionIntegrationTest {
     }
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
+        for (var advance : fifoFixtures) {
+            jdbc.update("DELETE FROM finance_amount_use WHERE tenant_id=? AND resource_type='ADVANCE' AND resource_id=?", advance.tenantId(), advance.id().toString());
+            jdbc.update("DELETE FROM employee_advance_order WHERE tenant_id=? AND advance_id=?", advance.tenantId(), advance.id().toString());
+            jdbc.update("DELETE FROM finance_resource_revision WHERE tenant_id=? AND resource_type='ADVANCE' AND resource_id=?", advance.tenantId(), advance.id().toString());
+            jdbc.update("DELETE FROM finance_resource WHERE tenant_id=? AND resource_type='ADVANCE' AND id=?", advance.tenantId(), advance.id().toString());
+        }
         for (UUID report : created) {
             for (var partial : jdbc.queryForList("SELECT id FROM expense_partial_adjustment WHERE tenant_id='demo' AND report_id=? ORDER BY sequence_no DESC,created_at DESC,id DESC", String.class, report.toString())) {
                 jdbc.update("DELETE FROM expense_partial_adjustment_dispute WHERE tenant_id='demo' AND adjustment_id=?", partial);
@@ -1248,16 +1256,14 @@ class ExpenseSubmissionIntegrationTest {
             assertThat(secondPage.path("items")).hasSize(1);
             assertThat(secondPage.path("items").get(0).path("id").asText()).isNotEqualTo(firstPage.path("items").get(0).path("id").asText());
         }
-        var prior = ok(read("/api/v1/expense-requests?limit=100", "alice"), 200).path("items");
-        var found = java.util.stream.StreamSupport.stream(prior.spliterator(), false).filter(item -> item.path("id").asText().equals(first.prior().toString())).findFirst().orElseThrow();
+        var found = ownedResourceFromPages("/api/v1/expense-requests", first.prior());
         assertThat(found.path("lines").get(0).path("available").path("value").asText()).isEqualTo("200.00");
         var loansResponse = read("/api/v1/employee-advances?limit=100", "alice");
         assertThat(loansResponse.getHeader("Cache-Control")).isEqualTo("no-store");
         assertThat(loansResponse.getContentAsString()).doesNotContain("synthetic-payment", "paymentReference", "account", "reservations");
         var held = advances.find("demo", first.advance()).orElseThrow(); long oldVersion = held.version();
         held.requirePaymentReview(oldVersion); advances.update(held, oldVersion, "payment-settlement", "PAYMENT_REVIEW");
-        var heldView = java.util.stream.StreamSupport.stream(ok(read("/api/v1/employee-advances?limit=100", "alice"), 200).path("items").spliterator(), false)
-                .filter(item -> item.path("id").asText().equals(first.advance().toString())).findFirst().orElseThrow();
+        var heldView = ownedResourceFromPages("/api/v1/employee-advances", first.advance());
         assertThat(heldView.path("status").asText()).isEqualTo("PAYMENT_REVIEW");
         assertThat(heldView.path("available").path("value").asText()).isEqualTo("0.00");
         assertThat(heldView.path("paid").path("value").asText()).isEqualTo("200.00");
@@ -4631,6 +4637,18 @@ class ExpenseSubmissionIntegrationTest {
         return mvc.perform(get(path).header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn().getResponse();
     }
 
+    // 财务夹具保留历史；新增随机 UUID 不保证位于前 100 笔，按公开游标查找而不假定测试总量。
+    private com.fasterxml.jackson.databind.JsonNode ownedResourceFromPages(String path, UUID id) throws Exception {
+        String cursor = null; var visited = new java.util.HashSet<String>();
+        do {
+            var page = ok(read(path + "?limit=100" + (cursor == null ? "" : "&beforeId=" + cursor), "alice"), 200);
+            for (var row : page.path("items")) if (row.path("id").asText().equals(id.toString())) return row;
+            cursor = page.path("nextBeforeId").isTextual() ? page.path("nextBeforeId").asText() : null;
+            if (cursor != null) assertThat(visited.add(cursor)).as("Resource pagination must advance").isTrue();
+        } while (cursor != null);
+        throw new AssertionError("Owned financial resource was absent from all pages: " + id);
+    }
+
     private void enterFinance(ExpenseReport report) throws Exception {
         submit(report); budgetWorker.poll(); ok(act(report, "manager", "APPROVE"), 200);
         ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
@@ -4640,6 +4658,108 @@ class ExpenseSubmissionIntegrationTest {
     private Map<String, Object> reductionInput(ExpenseReport report, String gross, String tax) {
         return Map.of("applicationVersion", app(report).version(), "financialVersion", current(report).version(),
                 "lines", List.of(Map.of("lineNo", 1, "approvedGross", gross, "approvedTax", tax)), "reasonCode", "INELIGIBLE_COST", "comment", "合成核减原因");
+    }
+
+    @Test
+    void advanceOffsetSuggestionUsesVerifiedGrossAndPaidDateWithoutReservingFunds() throws Exception {
+        var fixture = fixture(false); var report = fixture.report();
+        var later = new EmployeeAdvance(UUID.randomUUID(), "demo", entity, "alice", money("200"),
+                "fifo-later-" + UUID.randomUUID(), LocalDate.now().minusDays(1), LocalDate.now().plusDays(30));
+        var earlier = new EmployeeAdvance(UUID.randomUUID(), "demo", entity, "alice", money("40"),
+                "fifo-earlier-" + UUID.randomUUID(), LocalDate.now().minusDays(2), LocalDate.now().plusDays(30));
+        advances.create(later, "fixture"); advances.create(earlier, "fixture");
+        fifoFixtures.add(later); fifoFixtures.add(earlier);
+        UUID checked = precheck(report); String endpoint = path(report) + "/prechecks/" + checked + "/advance-offset-suggestion";
+        var result = ok(read(endpoint, "alice"), 200);
+        assertThat(result.path("approvedGross").path("value").asText()).isEqualTo("100.00");
+        assertThat(result.path("items").size()).isEqualTo(2);
+        assertThat(result.path("items").get(0).path("advanceId").asText()).isEqualTo(earlier.id().toString());
+        assertThat(result.path("items").get(0).path("amount").path("value").asText()).isEqualTo("40.00");
+        assertThat(result.path("items").get(1).path("advanceId").asText()).isEqualTo(later.id().toString());
+        assertThat(result.path("items").get(1).path("amount").path("value").asText()).isEqualTo("60.00");
+        assertThat(result.path("offsetTotal").path("value").asText()).isEqualTo("100.00");
+        assertThat(advances.find("demo", earlier.id()).orElseThrow().state()).isEqualTo(earlier.state());
+        assertThat(advances.find("demo", later.id()).orElseThrow().state()).isEqualTo(later.state());
+        for (String user : List.of("bob", "finance", "admin")) assertThat(read(endpoint, user).getStatus()).isEqualTo(404);
+    }
+
+    @Test
+    void advanceOffsetSuggestionCrossesFullFrozenPageAndUsesStableTextOrderForSamePaidDate() throws Exception {
+        var report = fixture(false).report(); LocalDate date = LocalDate.now().minusDays(2);
+        for (int i = 0; i < 100; i++) {
+            var frozen = fifoAdvance(UUID.randomUUID(), "demo", "alice", entity, "200", "CNY", date.minusDays(1));
+            frozen.requirePaymentReview(1); advances.update(frozen, 1, "fixture", "PAYMENT_REVIEW");
+        }
+        var first = fifoAdvance(UUID.fromString("7fffffff-ffff-ffff-ffff-" + UUID.randomUUID().toString().substring(24)), "demo", "alice", entity, "40", "CNY", date);
+        var second = fifoAdvance(UUID.fromString("80000000-0000-0000-0000-" + UUID.randomUUID().toString().substring(24)), "demo", "alice", entity, "100", "CNY", date);
+        fifoAdvance(UUID.randomUUID(), "foreign", "alice", entity, "900", "CNY", date.minusDays(5));
+        fifoAdvance(UUID.randomUUID(), "demo", "bob", entity, "900", "CNY", date.minusDays(5));
+        fifoAdvance(UUID.randomUUID(), "demo", "alice", UUID.randomUUID(), "900", "CNY", date.minusDays(5));
+        fifoAdvance(UUID.randomUUID(), "demo", "alice", entity, "900", "USD", date.minusDays(5));
+        UUID checked = precheck(report);
+        var result = ok(read(path(report) + "/prechecks/" + checked + "/advance-offset-suggestion", "alice"), 200);
+        assertThat(result.path("items").size()).isEqualTo(2);
+        assertThat(result.path("items").get(0).path("advanceId").asText()).isEqualTo(first.id().toString());
+        assertThat(result.path("items").get(1).path("advanceId").asText()).isEqualTo(second.id().toString());
+        assertThat(result.path("items").get(1).path("amount").path("value").asText()).isEqualTo("60.00");
+    }
+
+    @Test
+    void advanceOffsetSuggestionLimitsSelectionAndLeavesUncoveredGrossVisible() throws Exception {
+        var report = fixture(false).report(); var ids = new ArrayList<String>();
+        for (int i = 0; i < 51; i++) ids.add(fifoAdvance(UUID.randomUUID(), "demo", "alice", entity, "1", "CNY", LocalDate.now()).id().toString());
+        ids.sort(String::compareTo); UUID checked = precheck(report);
+        var result = ok(read(path(report) + "/prechecks/" + checked + "/advance-offset-suggestion", "alice"), 200);
+        assertThat(result.path("items").size()).isEqualTo(50); assertThat(result.path("selectionLimitReached").asBoolean()).isTrue();
+        assertThat(result.path("items").get(49).path("advanceId").asText()).isEqualTo(ids.get(49));
+        assertThat(result.path("offsetTotal").path("value").asText()).isEqualTo("50.00");
+        assertThat(result.path("payable").path("value").asText()).isEqualTo("50.00");
+    }
+
+    @Test
+    void advanceOffsetSuggestionRejectsExpiredSupersededOrChangedPrechecksAndAllowsManualAmounts() throws Exception {
+        var report = fixture(false).report(); var advance = fifoAdvance(UUID.randomUUID(), "demo", "alice", entity, "30", "CNY", LocalDate.now());
+        UUID first = precheck(report), checked = precheck(report);
+        assertCode(read(path(report) + "/prechecks/" + first + "/advance-offset-suggestion", "alice"), "PRECHECK_SUPERSEDED");
+        String endpoint = path(report) + "/prechecks/" + checked + "/advance-offset-suggestion";
+        assertCode(read(endpoint + "?amount=1000", "alice"), "INVALID_QUERY");
+        var suggestion = ok(read(endpoint, "alice"), 200);
+        assertThat(suggestion.path("offsetTotal").path("value").asText()).isEqualTo("30.00");
+        assertThat(suggestion.path("payable").path("value").asText()).isEqualTo("70.00");
+        var original = report.content(); var revised = new ExpenseContent(entity, original.type(), original.title(), original.lines(), List.of(new AdvanceOffset(advance.id(), money("20"))));
+        ok(send(path(report) + "/revise", "alice", Map.of("applicationVersion", app(report).version(), "financialVersion", current(report).version(), "content", revised)), 200);
+        assertCode(read(endpoint, "alice"), "CONTEXT_CHANGED");
+        checked = precheck(current(report)); endpoint = path(report) + "/prechecks/" + checked + "/advance-offset-suggestion";
+        var raw = json.read(json.write(prechecks.find("demo", checked).orElseThrow()), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        Instant expires = prechecks.find("demo", checked).orElseThrow().completedAt().plusMillis(1);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) raw.path("result").path("evidence")).put("validUntil", expires.toString());
+        jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", json.write(raw), checked.toString());
+        if (!Instant.now().isAfter(expires)) Thread.sleep(2);
+        assertCode(read(endpoint, "alice"), "FACTS_EXPIRED");
+        checked = precheck(current(report)); advance.requirePaymentReview(1); advances.update(advance, 1, "fixture", "PAYMENT_REVIEW");
+        assertCode(read(path(report) + "/prechecks/" + checked + "/advance-offset-suggestion", "alice"), "RESOURCES_CHANGED");
+        assertCode(send(path(report) + "/submit", "alice", submitInput(current(report), checked)), "RESOURCES_CHANGED");
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.DRAFT);
+    }
+
+    @Test
+    void advanceOffsetSuggestionOnWithdrawnReportIncludesItsOwnRetainedReservation() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); submit(report); budgetWorker.poll();
+        ok(send(path(report) + "/withdraw", "alice", lifecycleInput(report)), 200);
+        verify(fixture.invoice());
+        UUID checked = precheck(current(report));
+        var result = ok(read(path(report) + "/prechecks/" + checked + "/advance-offset-suggestion", "alice"), 200);
+        assertThat(result.path("items").get(0).path("capacity").path("value").asText()).isEqualTo("200.00");
+        assertThat(result.path("items").get(0).path("amount").path("value").asText()).isEqualTo("100.00");
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().reservedFor(new ExpenseUse(report.id(), 1, 0))).isEqualTo(money("50"));
+        submit(current(report));
+        assertThat(current(report).currentRound().offsetTotal()).isEqualTo(money("50"));
+    }
+
+    private EmployeeAdvance fifoAdvance(UUID id, String tenant, String employee, UUID legalEntity, String amount, String currency, LocalDate paidOn) {
+        var advance = new EmployeeAdvance(id, tenant, legalEntity, employee, new Money(new BigDecimal(amount), currency),
+                "fifo-fixture-" + UUID.randomUUID(), paidOn, LocalDate.now().plusDays(30));
+        advances.create(advance, "fixture"); fifoFixtures.add(advance); return advance;
     }
 
     private Fixture fixture(boolean withResources) throws Exception {

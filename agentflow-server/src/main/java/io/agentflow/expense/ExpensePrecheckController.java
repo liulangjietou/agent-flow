@@ -25,8 +25,15 @@ import java.util.UUID;
 public class ExpensePrecheckController {
     private final ExpensePrecheckService prechecks;
     private final IdempotencyExecutor idempotency;
+    private final AdvanceOffsetSuggestionService offsets;
     /** 幂等事务仅登记输入，后台获取事实。 */
-    public ExpensePrecheckController(ExpensePrecheckService prechecks, IdempotencyExecutor idempotency) { this.prechecks = prechecks; this.idempotency = idempotency; }
+    public ExpensePrecheckController(ExpensePrecheckService prechecks, IdempotencyExecutor idempotency, AdvanceOffsetSuggestionService offsets) { this.prechecks = prechecks; this.idempotency = idempotency; this.offsets = offsets; }
+    /** 推荐金额只来自有效预检，不接受客户端指定申请人、额度或排序。 */
+    @GetMapping("/prechecks/{jobId}/advance-offset-suggestion")
+    public ResponseEntity<AdvanceOffsetSuggestionService.Suggestion> offsets(@PathVariable UUID id, @PathVariable UUID jobId, @RequestParam Map<String, String> parameters) {
+        if (!parameters.isEmpty()) throw new io.agentflow.common.DomainException("INVALID_QUERY", "Advance offset suggestion does not accept query parameters");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(offsets.suggest(id, jobId));
+    }
     /** 公开实际目标和当前双版本供申请人确认。 */
     @GetMapping("/precheck-options")
     public ResponseEntity<ExpensePrecheckService.Options> options(@PathVariable UUID id) {

@@ -135,6 +135,12 @@ public final class EmployeeAdvance {
     /** 页面可用额度与领域占用规则保持一致，冻结不会改变原余额账本。 */
     public Money available() { return reviewRequired() ? Money.zero(balance.limit().currency()) : balance.available().minus(repaid()).minus(returnedDisbursements()); }
 
+    /** 重提可沿用本单旧轮次预留；其他单占用和任何待复核冻结均不能用于新轮次。 */
+    public Money offsetCapacity(ExpenseUse retainedUse) {
+        if (reviewRequired()) return Money.zero(balance.limit().currency());
+        return retainedUse == null ? available() : available().plus(balance.reservedFor(retainedUse));
+    }
+
     /** 分别保留报销冲销和实际还款，两者共同决定未还余额。 */
     public Money repaid() { return receivedRepayments().minus(returnedRepayments()); }
     /** 原始收款合计不因后来真实退回而减写。 */

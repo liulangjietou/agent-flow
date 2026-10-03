@@ -25,6 +25,20 @@ class ExpenseResourcesTest {
     private static final LocalDate PAID = LocalDate.parse("2026-09-01"), DUE = LocalDate.parse("2026-09-28");
 
     @Test
+    void offsetCapacityOnlyRestoresTheSpecifiedReservationAndNeverUnfreezesReviewedFunds() {
+        var advance = advance(); var retained = use(0); var other = use(0);
+        advance.reserve(1, retained, money("40")); advance.reserve(2, other, money("20"));
+        assertThat(advance.offsetCapacity(null)).isEqualTo(money("40"));
+        assertThat(advance.offsetCapacity(retained)).isEqualTo(money("80"));
+        assertThat(advance.offsetCapacity(new ExpenseUse(retained.reportId(), 2, 0))).isEqualTo(money("40"));
+        var state = advance.state();
+        advance.requirePaymentReview(advance.version()); assertThat(advance.offsetCapacity(retained)).isEqualTo(money("0"));
+        advance = EmployeeAdvance.restore(state); advance.requireVoucherReview(advance.version(), UUID.randomUUID());
+        assertThat(advance.offsetCapacity(retained)).isEqualTo(money("0"));
+        assertThat(advance.balance().reservedFor(retained)).isEqualTo(money("40"));
+    }
+
+    @Test
     void reservationReplacementConservesBalanceAndDoesNotOverwriteOtherReports() {
         var first = use(1); var second = use(1);
         var balance = ReservedAmount.available(money("100")).reserve(first, money("60")).reserve(second, money("40"));
