@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T18:04:55.795225+00:00",
+  "recordedAt": "2026-10-03T18:25:31.638769+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工及供应商付款、凭证准备异常与原过账结果通知、最小外发意向、受控原记录详情和消息页面已接通。凭证阶段 238 项 Java、68 项前端用例通过；重新准备不替换旧消息，原凭证绑定独立冲销时保留过账事实并明确停用。普通挂账沿用原审批范围，付款凭证继续检查原法人范围。预算、核销及其他恢复来源、固定包和环境验收仍待完成。",
+      "observed": "员工与供应商付款、凭证准备异常及原过账结果通知已接通。本阶段接通费用预算冻结、调整、释放、消费的原操作通知、受控历史详情和消息页面，85 项 Java、77 项前端用例通过；原财务版本接收关系、未知/查无/拒绝区分、原命令重试、外发抑制与当前字段权限已验证。独立冲销、业务结算及其他恢复来源、固定包与环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1662,6 +1662,14 @@
         },
         {
           "path": "docs/evidence/voucher-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/budget-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/budget-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3462,9 +3470,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "VOUCHER_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
-    "implementationCommit": "b8949565afd55c297d9e20d1e9a0337e3cf70f9b",
-    "evidence": "docs/evidence/voucher-notifications-20261003.json",
-    "recordedAt": "2026-10-03T18:04:55.795225+00:00"
+    "status": "BUDGET_OPERATION_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
+    "implementationCommit": "2e20706437525d50af807f7e0017dfb76803a350",
+    "evidence": "docs/evidence/budget-notifications-20261003.json",
+    "recordedAt": "2026-10-03T18:25:31.638769+00:00"
   }
 }
