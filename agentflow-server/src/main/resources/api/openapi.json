@@ -47357,7 +47357,8 @@
               "TASK_COUNTERSIGN_COMPLETED",
               "APPLICATION_PAUSED",
               "APPLICATION_RESUMED",
-              "COMMENT_MENTIONED"
+              "COMMENT_MENTIONED",
+              "ADVANCE_OVERDUE"
             ]
           },
           "actor": {
@@ -54744,12 +54745,22 @@
                 "type": "null"
               }
             ]
+          },
+          "overduePolicy": {
+            "type": "string",
+            "enum": [
+              "UNCONFIGURED",
+              "ALLOW",
+              "BLOCK"
+            ],
+            "description": "当前租户的新借款逾期控制，仅检查本人本次法人下的未还借款；未配置不自动阻断。"
           }
         },
         "required": [
           "applicationVersion",
           "requestVersion",
-          "enabled"
+          "enabled",
+          "overduePolicy"
         ],
         "additionalProperties": false
       },

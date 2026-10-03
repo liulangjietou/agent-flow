@@ -37,6 +37,12 @@ agentflow:
   budgets:
     worker-enabled: ${AGENTFLOW_BUDGET_WORKER_ENABLED:true}
     lease-seconds: ${AGENTFLOW_BUDGET_LEASE_SECONDS:90}
+  advances:
+    overdue:
+      reminders-enabled: ${AGENTFLOW_ADVANCE_OVERDUE_REMINDERS_ENABLED:true}
+      reminder-delay-ms: ${AGENTFLOW_ADVANCE_OVERDUE_REMINDER_DELAY_MS:60000}
+      # 按租户显式设置 tenants.<tenant>.block-new-requests；缺省不自动阻断。
+      tenants: {}
   expenses:
     precheck-worker-enabled: ${AGENTFLOW_EXPENSE_PRECHECK_WORKER_ENABLED:true}
     precheck-timeout-seconds: ${AGENTFLOW_EXPENSE_PRECHECK_TIMEOUT_SECONDS:300}

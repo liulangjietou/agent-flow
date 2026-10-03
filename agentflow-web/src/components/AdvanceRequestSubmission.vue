@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { expenseError } from '../expenses'
 import { precheckIssues, precheckStatuses } from '../expenseDraft'
-import { nextAdvanceRound, advanceIssues, usableAdvanceCheck, type AdvanceDetail, type AdvanceCheckOptions, type AdvanceCheckView } from '../advanceRequest'
+import { nextAdvanceRound, advanceIssues, advanceOverduePolicyText, usableAdvanceCheck, type AdvanceDetail, type AdvanceCheckOptions, type AdvanceCheckView } from '../advanceRequest'
 import AdvanceRequestTerms from './AdvanceRequestTerms.vue'
 import { initiatorContextLabel } from '../initiatorContext'
 import InitiatorAppointmentPicker from './InitiatorAppointmentPicker.vue'
@@ -75,7 +75,7 @@ async function submit() {
     if (version !== epoch) return
     if (receipt.id !== id || receipt.applicationId !== props.detail.applicationId) throw new Error('Receipt mismatch')
     confirm.value = false; requiresRefresh.value = true; saving.value = false; emit('busy', false); emit('submitted', receipt.applicationId)
-  } catch (cause) { if (version === epoch) { error.value = expenseError(cause); requiresRefresh.value = true; confirm.value = false } }
+  } catch (cause) { if (version === epoch) { error.value = advanceIssues[(cause as { code?: string }).code ?? ''] ?? expenseError(cause); requiresRefresh.value = true; confirm.value = false } }
   finally { if (version === epoch) { saving.value = false; emit('busy', false) } }
 }
 watch(appointment, () => { confirm.value = false })
@@ -93,6 +93,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
     <InitiatorAppointmentPicker v-model="appointment" :scope-key="scopeKey" :disabled="blocked || active" required />
     <p class="submission-help">借款法人时区：{{ timeZone }}。归还日不能早于法人当地提交日期，预检跨日后需重新查询。</p>
     <p v-if="options?.destination" class="submission-help">本次财务查询目标：{{ options.destination }}</p>
+    <p v-if="options" class="submission-help" aria-label="逾期借款控制">{{ advanceOverduePolicyText(options.overduePolicy) }}</p>
     <p v-if="options && !options.enabled" class="submission-error">{{ issue(options.unavailableCode) }}</p>
     <p v-if="error" class="submission-error" role="alert">{{ error }}</p>
     <div class="submission-toolbar"><button type="button" class="secondary" :disabled="blocked || reading || active || requiresRefresh || !options?.enabled" @click="queue">开始借款预检</button><button type="button" class="quiet" :disabled="blocked || reading" @click="pollUntil = Date.now() + 90_000; load()">刷新预检结果</button></div>

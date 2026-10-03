@@ -1,6 +1,7 @@
 import type { InboxMessage, InboxPage, InboxQuery } from './api'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  ADVANCE_OVERDUE: '借款逾期提醒',
   TASK_ESCALATED: '审批超时升级提醒',
   COMMENT_MENTIONED: '有人在评论中提及你',
   APPLICATION_PAUSED: '审批已暂停', APPLICATION_RESUMED: '审批已恢复', APPLICATION_SUBMITTED: '申请已提交', TASK_PENDING: '有新的待办', APPLICATION_RETURNED: '申请已退回',

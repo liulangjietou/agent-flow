@@ -16,7 +16,14 @@ export interface AdvanceRequestItem extends AdvanceVersions { id: string; applic
 export interface AdvanceCreate { businessNo: string; processKey: string; definitionVersion: number; content: AdvanceContent }
 export interface AdvanceRevise extends AdvanceVersions { content: AdvanceContent }
 export interface AdvanceCheckInput extends AdvanceVersions { initiatorAppointmentId: string; targetDigest: string }
-export interface AdvanceCheckOptions extends AdvanceVersions { enabled: boolean; unavailableCode?: string | null; destination?: string | null; targetDigest?: string | null; latestPrecheckId?: string | null }
+export interface AdvanceCheckOptions extends AdvanceVersions { enabled: boolean; unavailableCode?: string | null; destination?: string | null; targetDigest?: string | null; latestPrecheckId?: string | null; overduePolicy: 'UNCONFIGURED' | 'ALLOW' | 'BLOCK' }
+/** 未配置必须明确显示，不能将缺失配置解释为已经实施了逾期控制。 */
+export function advanceOverduePolicyText(policy: AdvanceCheckOptions['overduePolicy'] | undefined): string {
+  if (policy === 'BLOCK') return '本租户已启用逾期控制：本人在本次法人下存在逾期借款时，不能提交新借款。正式提交时会再次核对。'
+  if (policy === 'ALLOW') return '本租户已明确允许有逾期借款时提交新借款，逾期提醒仍独立执行。'
+  if (policy === 'UNCONFIGURED') return '本租户尚未配置是否禁止逾期员工提交新借款，当前不因逾期自动阻断。'
+  return '未能读取逾期控制配置，请刷新后核对。'
+}
 export interface AdvanceCheckView {
   job: AdvanceVersions & { id: string; version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'BLOCKED' | 'UNAVAILABLE'; attempt: number; createdAt: string; startedAt?: string | null; completedAt?: string | null }
   usable: boolean; unavailableCode?: string | null; initiator: InitiatorContext; validUntil?: string | null; preview?: AdvanceRound | null; failureCode?: string | null
@@ -52,6 +59,7 @@ export function usableAdvanceCheck(view: AdvanceCheckView | null, detail: Advanc
     && view.initiator.legalEntityId === detail.content.legalEntityId && !!view.validUntil && Date.parse(view.validUntil) > now
 }
 export const advanceIssues: Record<string, string> = {
+  ADVANCE_OVERDUE: '本人在本次法人下仍有逾期借款，请处理未还余额后重新预检。',
   ADVANCE_REQUEST_CHECK_ACTIVE: '已有借款预检正在执行，请刷新状态', ADVANCE_REQUEST_FORM_REQUIRED: '请选择支持员工借款的流程版本',
   ADVANCE_REQUEST_REVIEW_REQUIRED: '所选流程有绕过人工审核的路径，请联系流程管理员',
   ADVANCE_REQUEST_REVIEW_FIELDS_REQUIRED: '审批节点需要完整读取借款明细，请联系流程管理员',

@@ -40,15 +40,18 @@ public class AdvanceRequestCheckService {
     private final FinanceGatewayConfiguration configuration;
     private final JdbcAdvanceRequestCheckRepository jobs;
     private final int timeoutSeconds;
+    private final AdvanceOverdueConfiguration overdueConfiguration;
+    private final AdvanceOverdueChecks overdue;
 
     /** 身份检查不复用管理员读取权限，所有外部事实由独立执行器获取。 */
     public AdvanceRequestCheckService(CurrentActor actors, AdvanceRequestRepository requests, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
-            JdbcAdvanceRequestCheckRepository jobs,
+            JdbcAdvanceRequestCheckRepository jobs, AdvanceOverdueConfiguration overdueConfiguration, AdvanceOverdueChecks overdue,
             @Value("${agentflow.advance-requests.precheck-timeout-seconds:300}") int timeoutSeconds) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Advance request check timeout must be between 15 and 900 seconds");
         this.actors = actors; this.requests = requests; this.applications = applications; this.applicationRepository = applicationRepository;
         this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.timeoutSeconds = timeoutSeconds;
+        this.overdueConfiguration = overdueConfiguration; this.overdue = overdue;
     }
 
     /** 返回实际目标和双版本，不把配置可用解释为借款申请已经通过。 */
@@ -58,7 +61,7 @@ public class AdvanceRequestCheckService {
         String unavailable = !application.editable() ? "APPLICATION_NOT_EDITABLE" : destination == null ? "FINANCE_GATEWAY_UNAVAILABLE" : null;
         return new Options(application.version(), advance.version(), unavailable == null, unavailable,
                 destination == null ? null : destination.baseUri().getAuthority(), destination == null ? null : destination.digest(advance.tenantId()),
-                jobs.latestId(advance.tenantId(), requestId).orElse(null));
+                jobs.latestId(advance.tenantId(), requestId).orElse(null), overdueConfiguration.policy(advance.tenantId()));
     }
 
     /** 只登记明确选择的任职和输入版本，排队事务不访问外部系统。 */
@@ -144,7 +147,8 @@ public class AdvanceRequestCheckService {
         var preview = job.result().evidence().preview();
         if (!preview.content().equals(advance.content())) return "CONTEXT_CHANGED";
         LocalDate date = LocalDate.ofInstant(now, ZoneId.of(preview.legalEntity().timeZone()));
-        return date.equals(LocalDate.ofInstant(preview.submittedAt(), ZoneId.of(preview.legalEntity().timeZone()))) ? null : "SUBMISSION_DATE_CHANGED";
+        if (!date.equals(LocalDate.ofInstant(preview.submittedAt(), ZoneId.of(preview.legalEntity().timeZone())))) return "SUBMISSION_DATE_CHANGED";
+        return overdue.failure(advance.tenantId(), advance.employeeId(), preview.legalEntity(), now);
     }
 
     private String contextFailure(AdvanceRequestCheck job) {
@@ -185,7 +189,8 @@ public class AdvanceRequestCheckService {
      * 排队入口可用性和真实目标。
      * @author owlzhangfq@gmail.com
      */
-    public record Options(long applicationVersion, long requestVersion, boolean enabled, String unavailableCode, String destination, String targetDigest, UUID latestPrecheckId) { }
+    public record Options(long applicationVersion, long requestVersion, boolean enabled, String unavailableCode, String destination, String targetDigest, UUID latestPrecheckId,
+                          AdvanceOverdueConfiguration.Policy overduePolicy) { }
     /**
      * 有界历史的轻量状态。
      * @author owlzhangfq@gmail.com

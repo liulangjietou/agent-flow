@@ -206,7 +206,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */

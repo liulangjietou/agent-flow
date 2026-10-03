@@ -64,7 +64,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true", "agentflow.timers.enabled=false",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
-        "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.expense-plans.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false"})
+        "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.expense-plans.precheck-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
+        "agentflow.advances.overdue.reminders-enabled=false", "agentflow.advances.overdue.tenants.demo.block-new-requests=true"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AdvanceRequestIntegrationTest {
     private static final HttpServer SERVER = server();
@@ -107,9 +108,15 @@ class AdvanceRequestIntegrationTest {
     @Autowired FinanceGatewayConfiguration configuration;
     @Autowired ApprovedVoucherSources voucherSources;
     @Autowired JdbcVoucherPreparationRepository voucherPreparations;
+    @Autowired AdvanceOverdueConfiguration overdueConfiguration;
+    @Autowired AdvanceOverdueChecks overdueChecks;
+    @Autowired JdbcAdvanceOverdueRepository overdueRepository;
+    @Autowired AdvanceOverdueReminders overdueReminders;
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
+        var overduePolicy = new AdvanceOverdueConfiguration.Tenant(); overduePolicy.setBlockNewRequests(true);
+        overdueConfiguration.setTenants(new java.util.LinkedHashMap<>(Map.of("demo", overduePolicy)));
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(admin);
         entity = organization.createUnit(admin, OrganizationUnit.Kind.LEGAL_ENTITY, "合成事前法人", null, null, true).id();
         var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成部门", entity, null, true);
@@ -126,6 +133,136 @@ class AdvanceRequestIntegrationTest {
         }
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @Test void overdueBalanceAppearingAfterReadyCannotBypassTheSubmissionGate() throws Exception {
+        UUID id = create(); UUID checked = ready(id);
+        var today = LocalDate.now(java.time.ZoneId.of("Pacific/Kiritimati"));
+        var paid = new EmployeeAdvance(UUID.randomUUID(), "demo", entity, "alice", money("100", "CNY"),
+                "overdue-" + UUID.randomUUID(), today.minusDays(10), today.minusDays(1));
+        paidAdvances.create(paid, "test");
+        var before = app(id); long requestVersion = current(id).version();
+        code(send(path(id) + "/submit", "alice", submission(id, checked)), "ADVANCE_OVERDUE");
+        assertThat(app(id).status()).isEqualTo(ApplicationStatus.DRAFT);
+        assertThat(app(id).version()).isEqualTo(before.version());
+        assertThat(current(id).version()).isEqualTo(requestVersion);
+        assertThat(current(id).rounds()).isEmpty();
+    }
+
+    @Test void overduePrechecksRemainBlockedUntilTheActualBalanceIsFullyRepaid() throws Exception {
+        UUID id = create(); var today = LocalDate.now(java.time.ZoneId.of("Pacific/Kiritimati"));
+        var paid = overdueBalance("demo", "alice", entity, today.minusDays(1), "CNY");
+        assertThat(ok(read(path(id) + "/prechecks/options", "alice"), 200).path("overduePolicy").asText()).isEqualTo("BLOCK");
+        UUID first = enqueue(id); worker.poll();
+        assertThat(check(first).status()).isEqualTo(Status.BLOCKED); assertThat(check(first).result().code()).isEqualTo("ADVANCE_OVERDUE");
+        repay(paid, "20"); UUID second = enqueue(id); worker.poll();
+        assertThat(check(second).result().code()).isEqualTo("ADVANCE_OVERDUE");
+        repay(paid, "80"); UUID third = ready(id);
+        ok(send(path(id) + "/submit", "alice", submission(id, third)), 200);
+        assertThat(app(id).status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(paidAdvances.find("demo", paid.id()).orElseThrow().outstanding()).isEqualTo(money("0", "CNY"));
+    }
+
+    @Test void explicitAllowAndUnconfiguredPoliciesDoNotPretendToEnforceBlocking() throws Exception {
+        var today = LocalDate.now(java.time.ZoneId.of("Pacific/Kiritimati"));
+        overdueBalance("demo", "alice", entity, today.minusDays(1), "CNY");
+        for (boolean configured : List.of(true, false)) {
+            if (configured) overdueConfiguration.getTenants().get("demo").setBlockNewRequests(false);
+            else overdueConfiguration.setTenants(new java.util.LinkedHashMap<>());
+            UUID id = create();
+            assertThat(ok(read(path(id) + "/prechecks/options", "alice"), 200).path("overduePolicy").asText()).isEqualTo(configured ? "ALLOW" : "UNCONFIGURED");
+            submit(id); assertThat(app(id).status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        }
+    }
+
+    @Test void overdueScopeUsesLegalEntityDateAndAllItsCurrenciesWithoutLeakingOtherOwners() {
+        var due = LocalDate.parse("2026-10-10"); var at = Instant.parse("2026-10-10T10:00:00Z");
+        var east = new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", false, "v1", "Pacific/Kiritimati");
+        var west = new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", false, "v1", "America/Los_Angeles");
+        overdueBalance("other-tenant", "alice", entity, due.minusDays(1), "CNY");
+        overdueBalance("demo", "bob", entity, due.minusDays(1), "CNY");
+        overdueBalance("demo", "alice", UUID.randomUUID(), due.minusDays(1), "CNY");
+        assertThat(overdueChecks.failure("demo", "alice", east, at)).isNull();
+        var paid = overdueBalance("demo", "alice", entity, due, "USD");
+        paid.requirePaymentReview(paid.version()); paidAdvances.update(paid, paid.version() - 1, "test", "PAYMENT_REVIEW");
+        assertThat(paid.available()).isEqualTo(money("0", "USD"));
+        assertThat(overdueChecks.failure("demo", "alice", west, at)).isNull();
+        assertThat(overdueChecks.failure("demo", "alice", east, at.minusSeconds(1))).isNull();
+        assertThat(overdueChecks.failure("demo", "alice", east, at)).isEqualTo("ADVANCE_OVERDUE");
+    }
+
+    @Test void overdueGateReadsPastAFullPageOfSettledLoans() {
+        var due = LocalDate.parse("2026-10-10"); var at = Instant.parse("2026-10-10T10:00:00Z");
+        var legal = new FinanceCatalog.LegalEntity(entity, "合成法人", "CNY", false, "v1", "Pacific/Kiritimati");
+        for (int index = 0; index < JdbcAdvanceOverdueRepository.BATCH_SIZE; index++) repay(overdueBalance("demo", "alice", entity, due.minusDays(1), "CNY"), "100");
+        assertThat(overdueChecks.failure("demo", "alice", legal, at)).isNull();
+        overdueBalance("demo", "alice", entity, due, "CNY");
+        assertThat(overdueChecks.failure("demo", "alice", legal, at)).isEqualTo("ADVANCE_OVERDUE");
+    }
+
+    @Test void overdueReminderUsesFrozenZoneAndLatestBalanceAndRemainsOnceAfterRepayment() throws Exception {
+        var paid = approvedBalance(); var candidate = overdueCandidate(paid);
+        var at = paid.dueOn().plusDays(1).atStartOfDay(java.time.ZoneId.of("Pacific/Kiritimati")).toInstant();
+        assertThat(overdueReminders.remind(candidate, at.minusSeconds(1))).isFalse();
+        repay(paid, "20");
+        assertThat(overdueReminders.remind(candidate, at)).isTrue();
+        assertThat(overdueReminders.remind(candidate, at.plusSeconds(5))).isFalse();
+        var evidence = jdbc.queryForMap("SELECT * FROM advance_overdue_reminder WHERE tenant_id='demo' AND advance_id=?", paid.id().toString());
+        assertThat(evidence.get("outstanding")).isEqualTo(new BigDecimal("80.00"));
+        assertThat(evidence.get("time_zone")).isEqualTo("Pacific/Kiritimati");
+        assertThat(((java.sql.Date) evidence.get("observed_on")).toLocalDate()).isEqualTo(paid.dueOn().plusDays(1));
+        String message = evidence.get("inbox_id").toString();
+        assertThat(ok(read("/api/v1/notifications?limit=100", "alice"), 200).path("items").toString()).contains(message, "ADVANCE_OVERDUE");
+        assertThat(ok(read("/api/v1/notifications?limit=100", "bob"), 200).path("items").toString()).doesNotContain(message);
+        assertThat(send("/api/v1/notifications/" + message + "/read", "bob", Map.of()).getStatus()).isEqualTo(404);
+        ok(send("/api/v1/notifications/" + message + "/read", "alice", Map.of()), 200);
+        repay(paid, "80");
+        assertThat(overdueReminders.remind(candidate, at.plusSeconds(86400))).isFalse();
+        assertThat(jdbc.queryForMap("SELECT * FROM advance_overdue_reminder WHERE tenant_id='demo' AND advance_id=?", paid.id().toString())).isEqualTo(evidence);
+        assertThat(overdueRepository.candidates(at, null)).doesNotContain(candidate);
+        var settledBeforeScan = approvedBalance(); repay(settledBeforeScan, "100");
+        assertThat(overdueReminders.remind(overdueCandidate(settledBeforeScan), at)).isFalse();
+        assertThat(overdueRepository.recorded(overdueCandidate(settledBeforeScan))).isFalse();
+    }
+
+    @Test void overdueReminderRollsBackWithItsEvidenceAndConcurrentScansCommitOnlyOne() throws Exception {
+        var paid = approvedBalance(); var candidate = overdueCandidate(paid);
+        var at = paid.dueOn().plusDays(1).atStartOfDay(java.time.ZoneId.of("Pacific/Kiritimati")).toInstant();
+        jdbc.execute("ALTER TABLE advance_overdue_reminder ADD CONSTRAINT ck_overdue_fixture CHECK (advance_id <> '" + paid.id() + "')");
+        try {
+            assertThatThrownBy(() -> overdueReminders.remind(candidate, at)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            assertThat(overdueRepository.recorded(candidate)).isFalse();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Integer.class, "advance-overdue:" + paid.id())).isZero();
+        } finally { jdbc.execute("ALTER TABLE advance_overdue_reminder DROP CONSTRAINT ck_overdue_fixture"); }
+        var pool = Executors.newFixedThreadPool(2); var start = new CountDownLatch(1);
+        try {
+            var first = pool.submit(() -> { await(start); return overdueReminders.remind(candidate, at); });
+            var second = pool.submit(() -> { await(start); return overdueReminders.remind(candidate, at); });
+            start.countDown(); assertThat(List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS))).containsExactlyInAnyOrder(true, false);
+        } finally { pool.shutdownNow(); }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Integer.class, "advance-overdue:" + paid.id())).isEqualTo(1);
+        assertThat(overdueRepository.recorded(candidate)).isTrue();
+    }
+
+    private EmployeeAdvance approvedBalance() throws Exception {
+        UUID id = create(); submit(id); ok(act(id, "APPROVE"), 200); ok(act(id, "APPROVE"), 200);
+        var paid = new EmployeeAdvance(id, "demo", entity, "alice", money("100", "CNY"), "synthetic-paid-" + id,
+                LocalDate.now(java.time.ZoneId.of("Pacific/Kiritimati")), current(id).content().dueOn());
+        paidAdvances.create(paid, "test"); return paid;
+    }
+    private EmployeeAdvance overdueBalance(String tenant, String employee, UUID legal, LocalDate due, String currency) {
+        var paid = new EmployeeAdvance(UUID.randomUUID(), tenant, legal, employee, money("100", currency), "synthetic-overdue-" + UUID.randomUUID(), due.minusDays(10), due);
+        paidAdvances.create(paid, "test"); return paid;
+    }
+    private void repay(EmployeeAdvance paid, String amount) {
+        var now = Instant.now(); String reference = UUID.randomUUID().toString(); var value = money(amount, paid.balance().limit().currency());
+        var request = new io.agentflow.finance.AdvanceRepaymentPort.Request(paid.id(), paid.legalEntityId(), paid.employeeId(), paid.paymentReference(), value.currency(), reference);
+        var receipt = new io.agentflow.finance.AdvanceRepaymentPort.Receipt(request, io.agentflow.finance.AdvanceRepaymentPort.Status.CONFIRMED, 1, now.minusSeconds(1), now.plusSeconds(60),
+                new io.agentflow.finance.AdvanceRepaymentPort.Funding(io.agentflow.finance.AdvanceRepaymentPort.Channel.CASH, "funding-" + reference, value, now.minusSeconds(10)),
+                new io.agentflow.finance.AdvanceRepaymentPort.Posting("voucher-" + reference, "entry-" + reference, value, LocalDate.now(), now.minusSeconds(2)));
+        long version = paid.version(); paid.repay(version, new AdvanceRepayment(UUID.randomUUID(), paid.tenantId(), UUID.randomUUID(), receipt, "finance", now, "合成实际还款凭据"));
+        paidAdvances.update(paid, version, "finance", "REPAY");
+    }
+    private static JdbcAdvanceOverdueRepository.Candidate overdueCandidate(EmployeeAdvance paid) { return new JdbcAdvanceOverdueRepository.Candidate(paid.tenantId(), paid.id(), paid.dueOn()); }
 
     @Test void createReplaysOneBindingAndPreservesMoneyWithoutPaidBalance() throws Exception {
         var definition = published(false, false); var body = createBody(definition, content("100")); String key = UUID.randomUUID().toString();

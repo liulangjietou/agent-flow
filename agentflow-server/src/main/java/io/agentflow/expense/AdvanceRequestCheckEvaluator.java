@@ -25,11 +25,12 @@ public class AdvanceRequestCheckEvaluator {
     private final FinanceMasterDataPort catalogs;
     private final EmployeeAccountPort accounts;
     private final FinanceGatewayConfiguration configuration;
+    private final AdvanceOverdueChecks overdue;
 
     /** 所有财务事实来自真实端口，未配置或查不到时不构造默认账户。 */
     public AdvanceRequestCheckEvaluator(AdvanceRequestRepository requests, FinanceMasterDataPort catalogs, EmployeeAccountPort accounts,
-                                        FinanceGatewayConfiguration configuration) {
-        this.requests = requests; this.catalogs = catalogs; this.accounts = accounts; this.configuration = configuration;
+                                        FinanceGatewayConfiguration configuration, AdvanceOverdueChecks overdue) {
+        this.requests = requests; this.catalogs = catalogs; this.accounts = accounts; this.configuration = configuration; this.overdue = overdue;
     }
 
     /** 候选约定使用同一个领域冻结方法，外部成功仍须通过归属与日期检查。 */
@@ -51,6 +52,8 @@ public class AdvanceRequestCheckEvaluator {
         ensureLive(job);
         Instant checkedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         request.freeze(input.requestVersion(), input.roundNo(), catalog, account, input.initiator(), checkedAt);
+        String failure = overdue.failure(input.tenantId(), input.employeeId(), entity, checkedAt);
+        if (failure != null) return Result.blocked(failure);
         LocalDate date = LocalDate.ofInstant(checkedAt, ZoneId.of(entity.timeZone()));
         Instant nextDay = date.plusDays(1).atStartOfDay(ZoneId.of(entity.timeZone())).toInstant();
         Instant validUntil = Stream.of(checkedAt.plusSeconds(FACT_TTL_SECONDS), catalog.validUntil(), account.validUntil(), nextDay)

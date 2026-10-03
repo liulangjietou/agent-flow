@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRenderer, reactive } from 'vue'
-const { emptyAdvance, advanceContent, advanceDefinition, usableAdvanceCheck, AdvanceDrafts, advanceDrafts } = await import(process.env.AGENTFLOW_TEST_ADVANCE_REQUEST)
+const { emptyAdvance, advanceContent, advanceDefinition, usableAdvanceCheck, advanceOverduePolicyText, AdvanceDrafts, advanceDrafts } = await import(process.env.AGENTFLOW_TEST_ADVANCE_REQUEST)
 const { default: Editor } = await import(process.env.AGENTFLOW_TEST_ADVANCEREQUESTEDITOR)
 const { default: Submission } = await import(process.env.AGENTFLOW_TEST_ADVANCEREQUESTSUBMISSION)
 const { default: Detail } = await import(process.env.AGENTFLOW_TEST_ADVANCEREQUESTDETAIL)
@@ -31,6 +31,13 @@ function submission() {
   api.advanceCheckOptions = async () => options(); api.advanceCheck = async () => view()
   return panel(Submission, { detail: detail(), scopeKey: 'alice', timeZone: 'Asia/Shanghai', locked: false })
 }
+
+test('页面区分已阻断、明确允许、未配置与读取缺失，不把缺失当作生效', () => {
+  assert.match(advanceOverduePolicyText('BLOCK'), /不能提交新借款/)
+  assert.match(advanceOverduePolicyText('ALLOW'), /明确允许/)
+  assert.match(advanceOverduePolicyText('UNCONFIGURED'), /尚未配置/)
+  assert.match(advanceOverduePolicyText(undefined), /未能读取/)
+})
 
 test('保存保持精确十进制金额，仅发送借款约定，不携带账号和批准事实', () => {
   const value = { ...content(), accountReference: 'forged', accountDigest: 'a'.repeat(64), approved: true }; value.amount.value = '999999999999999.99'
@@ -153,6 +160,17 @@ test('正式提交需二次确认，使用原预检和双版本；改变任职�
     p.state.appointment = 'different'; await settle(); assert.equal(p.state.confirm, false)
     p.state.appointment = 'appointment'; await settle(); p.state.prepare(); await p.state.submit()
     assert.deepEqual(calls, [['report', { applicationVersion: 2, requestVersion: 4, precheckId: 'precheck' }]]); assert.deepEqual(p.events, ['app'])
+  } finally { p.close() }
+})
+
+test('服务端最终发现逾期时显示中文原因并撤销确认，不能复用旧 READY 重试', async () => {
+  const p = submission(); let writes = 0
+  api.submitAdvanceRequest = async () => { writes++; throw { status: 409, code: 'ADVANCE_OVERDUE', message: 'Refresh advance request facts before submission' } }
+  try {
+    await settle(); p.state.appointment = 'appointment'; await settle(); p.state.prepare(); await p.state.submit()
+    assert.match(p.state.error, /逾期借款/); assert.equal(p.state.confirm, false)
+    assert.equal(p.state.requiresRefresh, true); assert.deepEqual(p.events, [])
+    await p.state.submit(); assert.equal(writes, 1)
   } finally { p.close() }
 })
 
