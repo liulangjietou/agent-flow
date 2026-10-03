@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.jdbc.JdbcTimestampPrecision;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -116,8 +117,9 @@ public class JdbcExpensePartialPreparationRepository {
                     || !input.id().toString().equals(row.getString("id")) || !original.id().toString().equals(row.getString("adjustment_id")) || original.version() != row.getLong("adjustment_version")
                     || !basis.reportId().toString().equals(row.getString("report_id")) || !input.side().name().equals(row.getString("side")) || !input.requestedBy().equals(row.getString("requested_by"))
                     || value.version() != row.getLong("version") || !value.status().name().equals(row.getString("status")) || !Objects.equals(value.active() ? 1 : null, row.getObject("active_slot", Integer.class))
-                    || !input.requestedAt().equals(row.getTimestamp("created_at").toInstant()) || !value.updatedAt().equals(row.getTimestamp("updated_at").toInstant())
-                    || !Objects.equals(value.leaseUntil(), instant(row.getTimestamp("lease_until")))) throw inconsistent();
+                    || !JdbcTimestampPrecision.matches(input.requestedAt(), row.getTimestamp("created_at"))
+                    || !JdbcTimestampPrecision.matches(value.updatedAt(), row.getTimestamp("updated_at"))
+                    || !JdbcTimestampPrecision.matches(value.leaseUntil(), row.getTimestamp("lease_until"))) throw inconsistent();
             if (value.status() == ExpensePartialAdjustmentPreparation.Status.AUTHORIZED) requireConsumption(value);
             return value;
         };
@@ -127,7 +129,7 @@ public class JdbcExpensePartialPreparationRepository {
         var proofs = jdbc.query("SELECT * FROM expense_partial_adjustment_authorization WHERE tenant_id=? AND preparation_id=?", (row, index) -> {
             if (!input.adjustment().id().toString().equals(row.getString("adjustment_id")) || row.getLong("preparation_after") != value.version()
                     || row.getLong("adjustment_after") != value.authorizedVersion() || !row.getString("operation_id").equals(input.id().toString())
-                    || !row.getTimestamp("authorized_at").toInstant().equals(value.updatedAt())) throw inconsistent();
+                    || !JdbcTimestampPrecision.matches(value.updatedAt(), row.getTimestamp("authorized_at"))) throw inconsistent();
             var before = adjustments.revision(tenant, input.adjustment().id(), row.getLong("adjustment_before")).orElseThrow(JdbcExpensePartialPreparationRepository::inconsistent);
             var after = adjustments.revision(tenant, input.adjustment().id(), row.getLong("adjustment_after")).orElseThrow(JdbcExpensePartialPreparationRepository::inconsistent);
             var prepared = revision(tenant, input.id(), row.getLong("preparation_before"));
@@ -153,8 +155,7 @@ public class JdbcExpensePartialPreparationRepository {
         jdbc.update("INSERT INTO expense_partial_adjustment_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES(?,?,?,?)",
                 value.input().adjustment().input().basis().tenantId(), value.input().id().toString(), value.version(), json.write(value));
     }
-    private static Timestamp timestamp(Instant at) { return at == null ? null : Timestamp.from(at); }
-    private static Instant instant(Timestamp at) { return at == null ? null : at.toInstant(); }
+    private static Timestamp timestamp(Instant at) { return at == null ? null : Timestamp.from(JdbcTimestampPrecision.roundedToMicros(at)); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial preparation or selected authorization changed"); }
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted partial preparation identity or authorization proof is inconsistent"); }
     /**

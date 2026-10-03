@@ -53,7 +53,8 @@ public class ExpensePartialPreparationService {
     public ExpensePartialAdjustment authorize(String tenant, UUID id, long expected, UUID preparationId, long preparationVersion, String actor, Instant at) {
         var current = adjustment(tenant, id); var value = preparations.find(tenant, preparationId).orElseThrow(ExpensePartialPreparationService::conflict);
         if (current.version() != expected || !value.input().adjustment().id().equals(id) || value.version() != preparationVersion || !value.input().requestedBy().equals(actor)) throw conflict();
-        var now = time(at); requireAvailable(value, now); var authorized = value.authorize(current, now); sources.requireCurrent(value.evidence().source());
+        // 授权按原始证据的精确截止时刻判定，数据库时间精度由 JDBC 仓储处理。
+        requireAvailable(value, at); var authorized = value.authorize(current, at); sources.requireCurrent(value.evidence().source());
         return preparations.consume(authorized);
     }
 

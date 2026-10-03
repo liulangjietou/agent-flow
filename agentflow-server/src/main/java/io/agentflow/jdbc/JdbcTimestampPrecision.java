@@ -1,5 +1,6 @@
 package io.agentflow.jdbc;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
@@ -17,5 +18,10 @@ public final class JdbcTimestampPrecision {
     public static Instant roundedToMicros(Instant value) {
         var truncated = value.truncatedTo(ChronoUnit.MICROS);
         return value.getNano() % NANOS_PER_MICRO >= HALF_MICRO_NANOS ? truncated.plusNanos(NANOS_PER_MICRO) : truncated;
+    }
+
+    /** 同时核对可空时间与 SQL 微秒投影，空值不匹配实际存在的时间元数据。 */
+    public static boolean matches(Instant original, Timestamp stored) {
+        return original == null ? stored == null : stored != null && roundedToMicros(original).equals(stored.toInstant());
     }
 }
