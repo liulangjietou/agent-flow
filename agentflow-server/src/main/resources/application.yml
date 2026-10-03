@@ -2,7 +2,8 @@ spring:
   application:
     name: agentflow-server
   datasource:
-    url: ${AGENTFLOW_DATASOURCE_URL:jdbc:h2:file:./data/agentflow;DB_CLOSE_ON_EXIT=FALSE}
+    # 外部操作紧随事务提交；关闭延迟写入及区块复用，避免强退恢复丢失已提交事实。
+    url: ${AGENTFLOW_DATASOURCE_URL:jdbc:h2:file:./data/agentflow;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0;REUSE_SPACE=FALSE}
     username: ${AGENTFLOW_DATASOURCE_USERNAME:sa}
     password: ${AGENTFLOW_DATASOURCE_PASSWORD:}
     driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.h2.Driver}
