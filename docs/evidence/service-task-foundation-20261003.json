@@ -1,0 +1,943 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T09:10:56.203357+00:00",
+  "taskId": "W01",
+  "status": "DOMAIN_FOUNDATION_VERIFIED",
+  "taskStatus": "OPEN",
+  "implementationCommit": "a065643f52ef97177f123aa90b090f4615133f4f",
+  "branch": "codex/governance-identifier-integration",
+  "goalStatus": "active",
+  "scope": "白名单服务任务的固定契约、输入权限投影、不可变命令、回执与恢复状态；未开放运行入口。",
+  "callChain": [
+    "高级设计器与定义接口",
+    "DefinitionValidator / ServiceTaskPolicy",
+    "可信目录的精确契约绑定（应用层待接入）",
+    "ServiceTaskInputs / ServiceTaskCommand",
+    "持久作业与事务外适配器（待接入）",
+    "Flowable 原等待推进（待接入）"
+  ],
+  "ownership": {
+    "domain": "契约边界、字段投影、不可变来源及实体状态迁移。",
+    "applicationPending": "租户目录、持久化、领取 CAS、与引擎及父子轮次的事务编排。",
+    "adapterPending": "固定可信目标的有界调用、原操作号查询与协议校验。"
+  },
+  "verified": [
+    "契约固定 key、version、参数类型、必填及敏感标记；参数最多 16 个，单值最多 8192 UTF-8 字节，参数名与值合计最多 32768 字节。",
+    "字段必须显式映射且服务节点为 READ_ONLY；敏感或其他节点受限字段不能传给非敏感参数。无隐式整表单、附件或嵌套对象输入。",
+    "命令冻结租户、申请、轮次、定义版本与摘要、原 processInstance/execution/node 和参数；固定排序及长度编码，独立 Python 协议向量通过。",
+    "超时、异常和领取到期转 UNKNOWN 后只查原号；仅权威 NOT_FOUND 后才允许以同一命令重发。",
+    "终态拒绝不能自动重发；错号、错摘要、未来回执及过期领取成功不形成有效终态。结果仅保留有界凭据。",
+    "真实 JsonUtil 往返保留所有状态的类型、摘要和恢复方向；重复字段、尾随 JSON 及无效恢复状态被拒绝。",
+    "定义预检拒绝任意 URL、Bean、脚本、结果变量配置、错节点属性、名称表达式及隐式多出线；SERVICE_TASK 仍统一被 UNSUPPORTED_NODE_TYPE 阻断。"
+  ],
+  "redGreen": {
+    "priorCoverage": "旧测试只断言 SERVICE_TASK 不被支持；没有字段契约、恢复或详细配置诊断用例。",
+    "initialCompile": "测试静态导入重名导致编译失败，修正为明确的 AssertJ 导入；未计为测试成功。",
+    "red": {
+      "tests": 30,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0
+    },
+    "failedCases": [
+      "serviceConfigurationBelongsOnlyToServiceNodes",
+      "unsupportedRuntimeDoesNotHideUnsafePropertiesLabelsOrImplicitForks"
+    ],
+    "fix": "定义结构入口统一验证服务属性来源、受限配置、任务名称和出线，保持未完成运行能力关闭。"
+  },
+  "tests": {
+    "domainModule": {
+      "tests": 1023,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "finalScope": {
+      "domain": 30,
+      "server": 32,
+      "tests": 62,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "overlap": "末次 30 项领域测试包含在此前 1023 项中，不重复累计。1023 项之后仅将同值 200 的名称上限常量独立命名；末次 62 项对最终代码验证。",
+    "serverClasses": [
+      "ServiceTaskSerializationTest",
+      "DefinitionApplicationServiceTest",
+      "DefinitionPreviewIntegrationTest",
+      "DefinitionSecurityTest"
+    ],
+    "newCases": 33,
+    "commands": [
+      "mvn -pl agentflow-domain -am test",
+      "mvn -pl agentflow-server -am -Dtest=ServiceTask*Test,DefinitionApplicationServiceTest,DefinitionPreviewIntegrationTest,DefinitionSecurityTest -Dsurefire.failIfNoSpecifiedTests=false test"
+    ],
+    "jdk": "Corretto 17.0.16"
+  },
+  "notYetImplemented": [
+    "可信服务目录、目标配置与原契约的持久绑定",
+    "持久队列、原领取版本 CAS 与真实崩溃恢复",
+    "事务外 execute/query 协议适配及受控服务实际调用",
+    "Flowable 服务等待、暂停/终止/父子轮次与迟到结果收尾",
+    "设计器、选择目录、模拟、状态及恢复页面",
+    "真实 HTTP、浏览器、非空升级、原在审接续、重启及配套恢复验收"
+  ],
+  "limitations": [
+    "领域记录没有替代数据库 CAS 或引擎事务；这些仍待开发。",
+    "H2/MockMvc 回归检查既有定义预检、权限及发布，不是服务任务端到端验收。",
+    "没有新 API、数据库迁移、前端改动、真实服务执行、目标环境验收或远端 PR/CI。",
+    "W01 仍为 OPEN，当前未完成仍为 34 项，下界口径保持。"
+  ],
+  "sourceFiles": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+      "sha256": "c2a768d0b9b8f6ca347495a72a797a7f03e9f0beb1c0e3b97bd82eb278d912a5"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/ServiceTaskInputs.java",
+      "sha256": "a78918c05e917fd14ef6ae73b83c8165aa23179286e5d9d7a43dc9c4a7c829f7"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/ServiceTaskPolicy.java",
+      "sha256": "099c58646ef54d26b3bacb865e4cd19d133634e5d201305edd0c8cd8c8f434bc"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskCommand.java",
+      "sha256": "05b4107d2a1ef30b0b3aae0d695c0f0d318e529bd448b55ba6171bc31618570a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskContract.java",
+      "sha256": "85368e73aabb28e09b4259b5c0bd8d02a0ede707d2fb17941a7aa8120be19b25"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskObservation.java",
+      "sha256": "f2f055eccb2b72dbe9788693db08bc0b8954a01adec627b30cb3a36c2ec02814"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskOperation.java",
+      "sha256": "6084b80d7227762a1dca4bc2b1258f923397c25439e96000b8735d5064d5acd7"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/definition/ServiceTaskDefinitionTest.java",
+      "sha256": "a1a3a10f816d987ac5e096a8a761559d846689f9dfb2a51f82334e907d223478"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/definition/ServiceTaskInputsTest.java",
+      "sha256": "791ec26870e24a0c59100ea37c346c6d015395845e4585b229e3673a1dd110ef"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/servicetask/ServiceTaskCommandTest.java",
+      "sha256": "861bf45f9b924b9e978ffb4eef28de98acf158c2e4df8bd8aa39928d75f96cfd"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/servicetask/ServiceTaskContractTest.java",
+      "sha256": "54b729a8675db347820b13e882addda69f320de627903e20e1f324aeceb57229"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/servicetask/ServiceTaskOperationTest.java",
+      "sha256": "a8e3030a2d99f9e0ef43c9601447f8f2d72fcead3e1b3d08dbddc6c45ab2ba6b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskSerializationTest.java",
+      "sha256": "af189767f69a79c6c5a517c2d448a9be1ebd42e34f61bd3fabb4d114e257aa5b"
+    }
+  ],
+  "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/service-task-foundation-evidence-snapshot",
+  "artifacts": [
+    {
+      "path": "final-reports/TEST-io.agentflow.definition.DefinitionApplicationServiceTest.xml",
+      "sha256": "7c9d79d62ecb137acf94e7b35fcc8c802c4f6f77587e142ef36d0750f0808896",
+      "bytes": 43636
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.definition.DefinitionPreviewIntegrationTest.xml",
+      "sha256": "a95193eec66eec5660192a4bb674600247f28c643e21811b61c2a14d3699b5e9",
+      "bytes": 74500
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.definition.DefinitionSecurityTest.xml",
+      "sha256": "40f6a71569534ec1198c3c1574da725ed7f4736e85135c857cbfbe2a42f11c9d",
+      "bytes": 74024
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "35ee3b889023f67693c97238387c222fe1733d30a8512e966301235fd7224943",
+      "bytes": 10429
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "54ee33c64069fbc66cd7662cf1a4b13eca64390accd7454caa0a44b16cac5d57",
+      "bytes": 10752
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "af8cc7d8cc39f7a6f99c5d03396f9763b5461bba58d129a8167a688f40ae1a60",
+      "bytes": 10411
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "025ded376709a12fea7a41c0b5566b43a6a233496786c5bd60822601916bda89",
+      "bytes": 11602
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "21d88ea382281f9e2cb0e0315ce14fdc46188fbbfb31cc7a71f877d9d0abd5c7",
+      "bytes": 11203
+    },
+    {
+      "path": "final-reports/TEST-io.agentflow.servicetask.ServiceTaskSerializationTest.xml",
+      "sha256": "e133a3ba3d60b1c54b80389a1354a8708816f868f8087224f21d61b738d4440c",
+      "bytes": 43520
+    },
+    {
+      "path": "service-task-definition-regression.log",
+      "sha256": "d19d9b920aeda7e7fd158658b552847a95b33c35d49b622a824c468c8d85d5a7",
+      "bytes": 74146
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.agent.AssistRunTest.xml",
+      "sha256": "b86e6c7cfa394f687287bf5c4797739b543076f9d80261b1a0a5ec26d8f4e93e",
+      "bytes": 11778
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.agent.AssistValueObjectsTest.xml",
+      "sha256": "7aacd0c7a22f4cc8041cae9d39b0185b56809c6a47b75f0a0db755dbcf1e5891",
+      "bytes": 11773
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.agent.DraftAssistRunTest.xml",
+      "sha256": "828a0931d3a37c3df96f14441ff125e15fa08d3de0e788d399542251258e0bcb",
+      "bytes": 10510
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.agent.InvoiceExtractionRunTest.xml",
+      "sha256": "94754b408bdf449774baaffce25b5c46b33b4aa2f5b9799ebc847be30922932c",
+      "bytes": 11885
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.approval.ApplicationCancellationTest.xml",
+      "sha256": "859acc48bce1fed35fb165a1036d8facce952f78d3171fba1353a998e96d5133",
+      "bytes": 12923
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.approval.ApplicationCommentTest.xml",
+      "sha256": "b2b9e23962dee840c8055fc84a3148fb59e71c3db59f48dcb7e7cfab754c2f70",
+      "bytes": 11333
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.approval.ApplicationDomainTest.xml",
+      "sha256": "67c2828446c768091a3453f964193564b277c1508c4d565ff275b1941b03527c",
+      "bytes": 11866
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.approval.model.ApplicationPayloadSnapshotTest.xml",
+      "sha256": "4524054375d5295c06ca170a0de698b234030540a3b7da6af0fc39cff9a98923",
+      "bytes": 9991
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.approval.model.CountersignMembershipTest.xml",
+      "sha256": "280c73b21f1083aecd4a0f0e9047cfd129a5cc5c73f84ec162978d1384be6da2",
+      "bytes": 11039
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.approval.operations.ApprovalMetricsTest.xml",
+      "sha256": "cd1348ccb971cf162bb47617e4888e85e7bc682d11f86ee3d8288d7e40ec2518",
+      "bytes": 10092
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.budget.BudgetAdjustmentCheckTest.xml",
+      "sha256": "bd9cbd6f30138818d9ca7fbb747809839d238911a2b54e1cc3b1dd18cbfa319d",
+      "bytes": 10539
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.budget.BudgetAdjustmentCommandTest.xml",
+      "sha256": "0d68296b8234c1f6e5e76a2af10c168501ea4494a955dca3656a3147d31ed55e",
+      "bytes": 11052
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.budget.BudgetAdjustmentContentTest.xml",
+      "sha256": "5b7b4378e0cfb5e6a9452bb2b6fddfc6ff93a5bedbdda46a7fed00a1c447fa94",
+      "bytes": 10973
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.budget.BudgetAdjustmentOperationTest.xml",
+      "sha256": "da931477e4deb3dcc34d85301446cc49b2198bf84b4cadd461dc407583149ef0",
+      "bytes": 10937
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.budget.BudgetAdjustmentRequestTest.xml",
+      "sha256": "8c90d3e1f84dbff5992c1892fee8f96080163bc3d4e5a8858f46c1d37f15aa00",
+      "bytes": 10597
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.budget.BudgetAdjustmentReviewTest.xml",
+      "sha256": "1a71bf669601dc70b66272461934cc1e45f0a9add82b828fd77a3f2337714806",
+      "bytes": 10593
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.calendar.BusinessCalendarTest.xml",
+      "sha256": "10dcd77c27781e4458bfde63ffce0a54607c381487a9ce776b4ce406e0fd7741",
+      "bytes": 10907
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.calendar.BusinessDeadlineResumeTest.xml",
+      "sha256": "e228c4916998f18648d7323b77c08e5002d73dcb1d963c5b140aed0e38cbf636",
+      "bytes": 10747
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.calendar.BusinessDeadlineTest.xml",
+      "sha256": "fc066de89c9297269c3cf3a4fe288f02a490f5bce39ab832b54a12fe23943f84",
+      "bytes": 11148
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ApprovalPolicyTest.xml",
+      "sha256": "096a87b67c98ccd4249693e6f4402fb59514542d92cd8a28fc0a03d70b9560ff",
+      "bytes": 10187
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ApprovalResponsibilityPolicyTest.xml",
+      "sha256": "7e46c89e001a8fe10abca9810e8d88d2c378dbdb929132806f7a90b3b19c94d3",
+      "bytes": 10429
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ApprovalRiskPolicyTest.xml",
+      "sha256": "d487ad9847289ee0a7705c9c5f5c9edfdc0a31c75b2af7beaf9222b05821a20a",
+      "bytes": 10834
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.BranchCoverageAnalyzerTest.xml",
+      "sha256": "71eb4a57429a71661729d067b4db731b8692cc3cd74dc4803c82b85570ccdd12",
+      "bytes": 11075
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ConditionGroupContractTest.xml",
+      "sha256": "fd09f4188541a9dedb0094f31a6d0f878ee000371494b1e6158ab56c33decf6c",
+      "bytes": 9979
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ConditionLanguageTest.xml",
+      "sha256": "ec60b889e907875ff9c9b5de21fc6d5218494266d7a1ad2fdb664a530964a679",
+      "bytes": 10858
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ConditionParserQuotedLiteralTest.xml",
+      "sha256": "1330e6ba940f1a29ef097f2b561648f8c37a6440df42b1c1568ad0719e872aed",
+      "bytes": 11886
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ConditionPresentationContractTest.xml",
+      "sha256": "bab55592d65b34eb7291b89b850ee67017b9a50cf2829b5c6e413c9a784d3bcd",
+      "bytes": 9966
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.CopyNodeTest.xml",
+      "sha256": "65f9655268e43efcddbdbf25dd0ee1b4af7ea0bfe721493aebb1eaab9744fd6d",
+      "bytes": 10063
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.DefinitionAvailabilityTest.xml",
+      "sha256": "cb514ddef44aff61cdb77f2a10c62db87574dee162e0ed52de52bcfa4edf9eed",
+      "bytes": 10093
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.DefinitionDiffServiceTest.xml",
+      "sha256": "a5b34b9c67673255c147ae783165d4a39535fcdeb743222cd8210100b10d6bed",
+      "bytes": 11153
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.DefinitionDomainTest.xml",
+      "sha256": "f35f996ef5f9f81013ba50fa143ba6f36fa278840677fbfa72e3db00f357d242",
+      "bytes": 11030
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.DefinitionIdentifierTest.xml",
+      "sha256": "31e1de44baabe83e6bf2f50b3cae5d5be4c82a98102bdc1b766144a79cc55f11",
+      "bytes": 10361
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.DefinitionPublicationTest.xml",
+      "sha256": "9c7bf0e64237d21ab079259e6bdba442f6525e51931e97559b18fb81644bdc00",
+      "bytes": 10386
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.DefinitionSimulationTraceTest.xml",
+      "sha256": "387efd1273a6f2b537945b36071e7281e6565fe4d29e3b67ba8933650a3ffbbe",
+      "bytes": 10259
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.EventDefinitionTest.xml",
+      "sha256": "43ec16a8d346d8811b6f9d41560c50d20beb802ebe8dc78d97d9f8c619875e94",
+      "bytes": 10381
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.FormAssigneeValidationTest.xml",
+      "sha256": "19a84c4367796d1ae3bf13bd8c407347262198cee2677772a8405c21bf2eacc9",
+      "bytes": 10265
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ParallelGatewayTest.xml",
+      "sha256": "30966ff9bf9163de2b5cacc9399d8e51a44c3a7979b21538514bc61b3613a778",
+      "bytes": 11318
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "7211dd265d7a81bec7d6da166808fb0af6224544b4c17f5506d0583dde939de8",
+      "bytes": 10280
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "2a92fb6fbea0fe9785c78fa3722104c01c29f716c9aeb72e6aca5832f2755f14",
+      "bytes": 10595
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.SimulationStructureTest.xml",
+      "sha256": "9e0eebcf7234d179b76e86896013c0f2799dbf71443dba0bb25c7d2bc4b301cb",
+      "bytes": 10228
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.SubprocessDefinitionValidationTest.xml",
+      "sha256": "24f0417024206236e82db4b6a4dfd6dc0b0f545da5acbb377f04c372dbd28cd4",
+      "bytes": 10626
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.SubprocessInputsTest.xml",
+      "sha256": "59378b7bc934c8cbb93d4a09b94117340de2218918068bfb22626b8130956635",
+      "bytes": 13240
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.TaskDeadlinePolicyTest.xml",
+      "sha256": "7cd2b20a7f9fe091bf4ade5cfc884e96ce535dbb84673f120fad7794a7b8b740",
+      "bytes": 11092
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.TaskEscalationPolicyTest.xml",
+      "sha256": "615e2944fa37d226f22ca9497a8b7873c83b07798a5bf3a1bc83594b21164b1a",
+      "bytes": 11472
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.definition.TimerDefinitionTest.xml",
+      "sha256": "43b447402238ec102bd0b4239707e3dd67052f98cee49ad8a2363409b4ec5902",
+      "bytes": 10634
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.event.EventContractTest.xml",
+      "sha256": "7646223c583d678714fb8e9a263f420bb500eb0273f7e87f95c779ab405677e5",
+      "bytes": 10481
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.event.EventInboxItemTest.xml",
+      "sha256": "a79e21a2c0fd319a73314ebb513e3905af66191bda6e9c662b2a89a9121e07a0",
+      "bytes": 10484
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceDisbursementReturnTest.xml",
+      "sha256": "ab10181dc4f49ed6c7f97e63c107704a4622d57cf55cddb9f2fe0531587dd3a2",
+      "bytes": 11208
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceRepaymentCheckTest.xml",
+      "sha256": "73abc0366fdb8cd1cc3610bcf855f646e8b155d1fa0cc4797df0a08d3609c028",
+      "bytes": 10179
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceRepaymentResolutionTest.xml",
+      "sha256": "69f287118fd869862d92f9c93ccc6a0f1be5a6dbfdd4a801a3138b28651ae954",
+      "bytes": 10944
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceRepaymentReviewCheckTest.xml",
+      "sha256": "83bd9c5aebe5ca65566bb45379af196be73cbe05f4dc0b3882aadcbb568e6027",
+      "bytes": 10252
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml",
+      "sha256": "ea09c666ea8813d163b6d063c413b6786cfd731ce15e959dabc14460a5d5c0aa",
+      "bytes": 11011
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceRequestContractTest.xml",
+      "sha256": "c18431f312123f6e3ad36b5f999ead980255d861f9973fd3387f5797a02c31ec",
+      "bytes": 10678
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.AdvanceRequestTest.xml",
+      "sha256": "75d859542f34a17e38c57fc331d8dbef2f282436afbdbaf6f66e837e4751193e",
+      "bytes": 10840
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ConsumptionReductionTest.xml",
+      "sha256": "a709fc2bb19ff869f72c12f94a63d424060efb82f2a4e19ebd89908463fd3e7f",
+      "bytes": 10597
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ConsumptionReversalTest.xml",
+      "sha256": "c596deaad551c97f13b83fd49659c4b8fdcd61a0b1b875c11a233144512c6037",
+      "bytes": 10626
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseAdjustmentAmountsTest.xml",
+      "sha256": "d432b531341c56670cc5d527769e922d3e20aca942fb4e5e4f3ca9cd88320a53",
+      "bytes": 11296
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseAllowanceTest.xml",
+      "sha256": "8ea4fad1e5022e287cb08d90adfce0afd87cdd0e7be15773ae3a188e2aaa1478",
+      "bytes": 11566
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseBudgetRetentionTest.xml",
+      "sha256": "32549af1791bd5b550f1b72ac3e852fd248f65640c0a67ca1fe50a4042259512",
+      "bytes": 10713
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseConfigurationTest.xml",
+      "sha256": "06ae0c4a275ad20ca8c91dc7d81eb31f2ca02bd1cc3384687483fc5c66d32cc2",
+      "bytes": 11118
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpensePaymentReturnTest.xml",
+      "sha256": "1057f0f3c27e7ccb13ea41fecd655b520ee8786ba47092f7e5a3e143a69da19b",
+      "bytes": 11071
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpensePlanContractTest.xml",
+      "sha256": "9391a2d877b3eade14d40e54be63c2add2d4ba1a734a6cf61f2ae5f6211980f9",
+      "bytes": 10663
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpensePlanTest.xml",
+      "sha256": "62a9f560aa848f82cd636b2b8b03a6f0c581a6825001d693174b5a1d0620b548",
+      "bytes": 11433
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpensePrecheckJobTest.xml",
+      "sha256": "935fa418fd83060efb66af01f0b7d2eb586df2a140929e591d19f0b05101220b",
+      "bytes": 10229
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseProcessPolicyTest.xml",
+      "sha256": "96a9fcddfcec47c5868a10c52fbdb02a72bd3ec9ac84e56557596500080176a5",
+      "bytes": 10356
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseReportTest.xml",
+      "sha256": "ef56213467f50ad037b83ef0994cbe013c43444ee0c01b612ae8d12ca8aad300",
+      "bytes": 12313
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseResourcesTest.xml",
+      "sha256": "b54d9feb55f4cc7296ffe836b762b83c8241a85f9c847527a97ee80bb46bb4cc",
+      "bytes": 12615
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseSettlementTest.xml",
+      "sha256": "b3192c47e1caef6c7b0e7ce47eee36a419c3f6c12eeac2037b6789ff68f50fa0",
+      "bytes": 10227
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.ExpenseSubmissionResourcesTest.xml",
+      "sha256": "2671b7c42afa03a9482d36c6d5b3cc3d152addcdd61ad3b836a9eff17a16d8b8",
+      "bytes": 13804
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.expense.InvoiceVerificationJobTest.xml",
+      "sha256": "753c20ad9e149ffe8bfd66328e4cc58aabfbbe0063faeef5c31410884429a4de",
+      "bytes": 10336
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.AccountMappingConfigurationTest.xml",
+      "sha256": "0acc6e17dfda895400c4457c2a5d989bd119729920bbac6ab235dc31f6dc4338",
+      "bytes": 11049
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.AccountingContractsTest.xml",
+      "sha256": "2bc0e642c6c08b962e70c09565042c7bf7693dfa267a1d1a96167ecb16b36521",
+      "bytes": 10247
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.AdvanceRepaymentAdjustmentPortTest.xml",
+      "sha256": "421f44f7a3105b564cf0f71492b71501b4b9c17f22e1ab72deabe3dca5dbf265",
+      "bytes": 11200
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetCommandTest.xml",
+      "sha256": "c4183433375383d1ddd3311d3c2754aae8e3abadeba91ede6371eb5812a7c36d",
+      "bytes": 10246
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetConsumptionReductionOperationTest.xml",
+      "sha256": "3e186107d1add26b686844890f1f728511a57b5a6cc273361d79b5ab2bf93a62",
+      "bytes": 11676
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetConsumptionReductionTest.xml",
+      "sha256": "b75f7e679ddaacae0f1dfe04f5487ec3f5249f68b0003d29859609ad3c8fdca8",
+      "bytes": 11134
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetConsumptionReversalOperationTest.xml",
+      "sha256": "81b72370261ef59347019b50691452b26510ad98a50f2372578c236a8a006501",
+      "bytes": 10828
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetConsumptionReversalTest.xml",
+      "sha256": "74151186581e336184511fdf2b0d96a56276fdf71b4512d67908f206c0918260",
+      "bytes": 10762
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetOperationTest.xml",
+      "sha256": "039ffc01fb75cfabba12f4688bddb7be9100627da80bc9e44b37c8d7e926bad5",
+      "bytes": 10876
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetPrecheckPortTest.xml",
+      "sha256": "b97ec4e5d94d8c3b9ae3593331ebf3bb114a136daf8c050ab9f82a3de4088f2a",
+      "bytes": 10232
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.BudgetRefreezeTest.xml",
+      "sha256": "db9889f99852b3e539b4bdddf8cd7774aadc491eca708c7e9b37ca5847c64163",
+      "bytes": 10546
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpenseAccrualReductionOperationTest.xml",
+      "sha256": "e19ab619eb12c797967ab9d95535e4305b0528a16af1b60d25bcfec4b43d813e",
+      "bytes": 12034
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpenseAccrualReductionTest.xml",
+      "sha256": "0ed56483714d98a4b0febfc6570d5ae5d15248c27f30c0dcb34db375c55e6c44",
+      "bytes": 11130
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpenseAdjustmentFinancialSourceTest.xml",
+      "sha256": "6c83266ad44ba6e92a9d78f68342b49bc1e0d553fca6fd9f5ca321a5fbe813c8",
+      "bytes": 11062
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpenseAdjustmentFundingSourceTest.xml",
+      "sha256": "30b5df5d67ef162ab340bd44512ed2d59fe78ae00185435d4b597947ce24af2e",
+      "bytes": 11330
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpensePartialAdjustmentPreparationTest.xml",
+      "sha256": "696fb5322155525113462cd8b8ff274c26f723b4a580b397c26088224dc022b8",
+      "bytes": 11013
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpensePartialAdjustmentTest.xml",
+      "sha256": "19e21eba1b283dd30bd6cde11d2a9de4163c2ec6958575a76474ecc6118cbd12",
+      "bytes": 11595
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpensePartialDisputeResolutionTest.xml",
+      "sha256": "ddc69d8e6e9c2099c487ba6a54c1e06753057ad3cffd2830a62d31eacb9c7882",
+      "bytes": 10461
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpenseResourceAdjustmentPreparationTest.xml",
+      "sha256": "e268421e6c00c60e90bb7f16ba9cd9c30208be0754931850e6f3cec7e5117042",
+      "bytes": 10685
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.ExpenseResourceAdjustmentTest.xml",
+      "sha256": "78a48dfb4b2a9d32f2e70bfdc624fac8b68d68174e40b90ce8626e272d1832e1",
+      "bytes": 11146
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.FinanceContractsTest.xml",
+      "sha256": "cb32060c2436f93e9ee3a33c4611f56998d27609c023ea97aa7c458b2d5c2418",
+      "bytes": 10363
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentAccountsPortTest.xml",
+      "sha256": "0a337dafe2f67eeb64679f8a702ce1eafd6cabf53f619cdbf7fe4c213a5b3939",
+      "bytes": 10265
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentAuthorizationTest.xml",
+      "sha256": "818cbaf85ef35363e3ad7dd860e93092330680382de242601a154badf4d3b63e",
+      "bytes": 11186
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentBatchTest.xml",
+      "sha256": "81712b1888574285c30eb52a0c798f85d7ef29404b46fa6893d9fa027fce9b88",
+      "bytes": 10526
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentCommandTest.xml",
+      "sha256": "7665f9f8064b1098a2897b5b623e70b41641ece79e20dfcb26347c682c722e2b",
+      "bytes": 10570
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentExecutionRequestTest.xml",
+      "sha256": "2010d20bf01b2a26baddccf2c98dc5a24a222e83459a4191db919b7c16e927ef",
+      "bytes": 10764
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentOperationTest.xml",
+      "sha256": "c3f985f9108b7c6efba202276cca2238a692f10839afeeee5d7f7b356f0d5b47",
+      "bytes": 12996
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.PaymentPayeeReviewTest.xml",
+      "sha256": "22888f27010970aac2389a21832552d2efdcb0df3652e1206c218dce8e146f61",
+      "bytes": 10728
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherCommandTest.xml",
+      "sha256": "a4dc07775f5e95bef7532a8f58ffbd3e071fd929f4468255c15505d77fd4efd5",
+      "bytes": 11016
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherOperationTest.xml",
+      "sha256": "27ed0816d23dae8851cd1589f66293883bf21406870433fbe9dba73a83072cdc",
+      "bytes": 12086
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherPreparationTest.xml",
+      "sha256": "b20f2a83db50a6a65d2768746c71ead624e8c40490214a48ca649e4d1f2a3d8b",
+      "bytes": 11115
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherReversalCommandTest.xml",
+      "sha256": "225db8c0bf7dd934104df6ccdda184fa8bc6add341d049b3ec142f0420fe02cc",
+      "bytes": 10767
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherReversalOperationTest.xml",
+      "sha256": "9639551d320e3fe3be0bcb6f9c1515f15cbcf9d2880e45a864a371187877c7fd",
+      "bytes": 10763
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherReversalPreparationTest.xml",
+      "sha256": "c536ea9e78442018e2cd1b742054427fdb3766769a1a250dd5bf72e5b9f41f94",
+      "bytes": 10295
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherReversalRetirementTest.xml",
+      "sha256": "ef598bbab485da089e9f3fa63add8bedcb1f92edb88c39dfc75ede1f74100b0d",
+      "bytes": 10487
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherReversalTest.xml",
+      "sha256": "05947aba5fd8ce6d107167771ffbee6d0069778a153ff4a896b3c6e2fe207b3f",
+      "bytes": 10984
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.finance.VoucherSourceTest.xml",
+      "sha256": "23ad70c6d7410bedaa51a8e7bc02bfc255e666e3372f7bba822207cf5c3d53fe",
+      "bytes": 10524
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.form.AttachmentFormSchemaTest.xml",
+      "sha256": "3d95dce5dc0dc915fd08bd0fbe324e3650b54d108e7925902690827cc6622221",
+      "bytes": 10091
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.form.DetailTableSchemaTest.xml",
+      "sha256": "9811a96de6a422bb5b94ecdfd8a1c0bb113de4a1487837ad5dea6ba7359e52b8",
+      "bytes": 10358
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.form.FormSchemaTest.xml",
+      "sha256": "f2179b0c2ecb81d131e1ac99cc89e478325115caef5157f4b9f886e9e7f0973d",
+      "bytes": 13972
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.integration.DeliveryProgressTest.xml",
+      "sha256": "fc83f6925bfa3d5b6f21a1fa02b5691f0d890c79ac8b9bd24c8f18efeb3ada1e",
+      "bytes": 10857
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.notification.NotificationDeliveryProgressTest.xml",
+      "sha256": "cd2a2a5731136e08019077a390a4d684e3950ab713461babfb42d772cc7b5746",
+      "bytes": 10586
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.notification.NotificationPreferencesTest.xml",
+      "sha256": "69139a75bad242db6ddec3a11e73bef0c2e71f7c5aa0c9509ad3f827eeb1c258",
+      "bytes": 10290
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.notification.NotificationTextsTest.xml",
+      "sha256": "72c13ad8c76b3e7ee58275f9556ff4c3eefe4e8f36665dfb1165a5ca1d6566b5",
+      "bytes": 10148
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.organization.ApprovalProxyTest.xml",
+      "sha256": "993162b047223af79980a1223aa676edc2ff3bf1f682e818a4349662c0953e31",
+      "bytes": 10632
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.organization.OrganizationModelsTest.xml",
+      "sha256": "b9354f55b6af843e0aaf21f0c19716b8cac4d58080bf210a69c42d6d86edd10c",
+      "bytes": 10202
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.ProcurementPayableTest.xml",
+      "sha256": "5d0ed6ee061f01e8113553d62a5c1e2048c5efff713f6379b1f370fe7304ae01",
+      "bytes": 10727
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.ProcurementPaymentCheckTest.xml",
+      "sha256": "36c95111c18ad970d8836967b8b93c4f5cfc4db15e361b4c11f78fa71c2b91a6",
+      "bytes": 10580
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.ProcurementPaymentRequestTest.xml",
+      "sha256": "053be246f5f31b80b30ab3fcc4072711e17d94755175b52bdcbd0ffcb3c0fb43",
+      "bytes": 10800
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierAdjustmentDisputeResolutionTest.xml",
+      "sha256": "f04b6135ab5e2b851b7dc3f76b36fa57a1c0eb0244ee162c55efb78ff891a7be",
+      "bytes": 11197
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierAdjustmentPreparationTest.xml",
+      "sha256": "58a16cbc8f6e52f51b8f78df019c62214b622add4bbc765ec9dc27c1a7c09a64",
+      "bytes": 10525
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierAuthorizationRetirementTest.xml",
+      "sha256": "d3e46c0270ebd0ce7e0c8840b278b8fc9e5b42130682782ad8fc8660ac27011c",
+      "bytes": 10500
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPayableAdjustmentTest.xml",
+      "sha256": "28072c4e959ae23295e3debe2ffb0c64960563165173319f45420b38f7e9ff79",
+      "bytes": 12052
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPayableHoldTest.xml",
+      "sha256": "69e4901e5db5eae30406dc0797bddb92e485cce0266af44d8866bfbc0fe6b752",
+      "bytes": 11952
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPayableReviewTest.xml",
+      "sha256": "b4f570d8e6dd979d58cda56de29ad00881392bfa1491f126298ef39fb317c1dd",
+      "bytes": 10642
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPayableSettlementTest.xml",
+      "sha256": "796782c149c73d2d675ea27074a4cc1eab41867b0f9822404f5c5407852d0592",
+      "bytes": 12067
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPaymentAuthorizationTest.xml",
+      "sha256": "bcde2cfac2d30d0c7c0607ecb53d9a95daec7c1114ee13f8897cecdc69315b04",
+      "bytes": 10831
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPaymentDisputeResolutionTest.xml",
+      "sha256": "f460f5fbfa9553975a67f1960042b44baf727dad23b60fc632e72079655bb225",
+      "bytes": 11034
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPaymentExecutionRequestTest.xml",
+      "sha256": "45ef03fdaac35074f6b4c393a804618a49e67221a2ec0e0b039cede524fb92cc",
+      "bytes": 10833
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPaymentOperationTest.xml",
+      "sha256": "48099fd24cb4626990768d26218097eae38d7942ff4ea91144104d725ca28def",
+      "bytes": 12584
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPaymentReturnAccountingTest.xml",
+      "sha256": "58f007b508f834245faf0703d94bb4f63ed2317a7f815c4916d626e1dfb5e69f",
+      "bytes": 11437
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierPaymentReturnTest.xml",
+      "sha256": "467470fad686dc0aaa0bdfa1670c9fa5756948f3e1d03925cdd205006159add3",
+      "bytes": 11805
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierSettlementClosureTest.xml",
+      "sha256": "53e8efddafe309c0c9baccf439fc428fb12ffd9cad601e6a0fa0359859b92e0f",
+      "bytes": 10854
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierSettlementDisputeResolutionTest.xml",
+      "sha256": "de944761d576d6c8b20010bdf22a74117aa48e1c048c7e7255da09accb5bff2b",
+      "bytes": 11229
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.procurement.SupplierSettlementPreparationTest.xml",
+      "sha256": "1f7141017fdec484d12777057d54fa1db1ebee1285cab1e859a1f9472ecddd14",
+      "bytes": 10885
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "51fd5ef1ab3ad78bc2e33947f93a1751a65298bfd49c0a8e34c2574f90a07596",
+      "bytes": 10261
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "45ae6c839c8e5517eceeb9365a2ef9879b69a4005e2a102167b2460e05149542",
+      "bytes": 11441
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "8e03592c575688ccf6a3cee4eba19ab948443da6d627c7fa28255748fa686ff9",
+      "bytes": 11048
+    },
+    {
+      "path": "service-task-domain-green-reports/TEST-io.agentflow.template.ProcessTemplateTest.xml",
+      "sha256": "a20d4045d04f8e3c81ff453db3bf585d68a2ebaad95353f5b57b3e1577233820",
+      "bytes": 10372
+    },
+    {
+      "path": "service-task-domain-green.log",
+      "sha256": "047f31f9d285e38cbb66a7b3c9aa50c2c5a1c32222dd26b89351b8ed81ab36fa",
+      "bytes": 40534
+    },
+    {
+      "path": "service-task-domain-red-reports/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "b212d6d73157b1d7e348b45a2011d40d536d26b9904a9e63a207dad4b57d0fab",
+      "bytes": 12633
+    },
+    {
+      "path": "service-task-domain-red-reports/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "d9bdf84788ba73d2edc59a65bf7a518d5319306155725bae22d861c94558b8d2",
+      "bytes": 10654
+    },
+    {
+      "path": "service-task-domain-red-reports/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "9fa84c39284b25e54d95d81910d06801691e8bc47609ef71fb932e0b1a641777",
+      "bytes": 10315
+    },
+    {
+      "path": "service-task-domain-red-reports/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "1a399375fa582964ae192dc1e4d27d9a8aab23248c17cbb19349fcacc17bd8ba",
+      "bytes": 11499
+    },
+    {
+      "path": "service-task-domain-red-reports/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "4e5cf22a13effbe5723890e5162088e57fc40e1412f4d370bc3fc679c7a249b8",
+      "bytes": 11106
+    },
+    {
+      "path": "service-task-domain-red.log",
+      "sha256": "06615b90c465f08589226fa6cc187ec34e00ec654ece32bd9bac07fa5d1b32ec",
+      "bytes": 10734
+    },
+    {
+      "path": "service-task-domain-test.log",
+      "sha256": "d617ec91470f4973049da172494ecdcbe321116b61bf06209bc6bbe8df79cadc",
+      "bytes": 11529
+    },
+    {
+      "path": "service-task-protocol-vector.json",
+      "sha256": "782650af9d78d33a14d61972cd1bfd9764304acaebf968f10e41d31d10af928b",
+      "bytes": 1095
+    },
+    {
+      "path": "source-hashes.json",
+      "sha256": "94945d0d0dc547f5604303a7b02978f17eadd544da3b13389d79eb6cd4a068b3",
+      "bytes": 2621
+    }
+  ]
+}

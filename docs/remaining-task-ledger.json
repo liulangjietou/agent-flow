@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T08:47:57.339607+00:00",
+  "recordedAt": "2026-10-03T09:10:56.203357+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1653,19 +1653,32 @@
           ]
         }
       ],
-      "observed": "NodeType 含 SERVICE_TASK，但 DefinitionValidator 明确拒绝，发布适配器没有该分支。抄送使用内部 serviceTask 不代表对用户开放服务任务。",
+      "observed": "固定契约、字段权限投影、不可变命令和查询优先的恢复状态已实现并验证。持久目录/队列、事务外适配器、Flowable 等待推进、模拟及页面尚未接通；DefinitionValidator 仍拒绝公开使用 SERVICE_TASK。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
-          "line": 90
+          "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskOperation.java",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
-          "line": 109
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/ServiceTaskInputs.java",
+          "line": 1
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+          "line": 98
+        },
+        {
+          "path": "docs/evidence/service-task-foundation-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "stage": "DOMAIN_FOUNDATION_VERIFIED",
+        "implementationCommit": "a065643f52ef97177f123aa90b090f4615133f4f",
+        "evidence": "docs/evidence/service-task-foundation-20261003.json"
+      }
     },
     {
       "id": "V01",
@@ -3351,6 +3364,7 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
+    "W01",
     "F04",
     "F05"
   ],
@@ -3377,10 +3391,9 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F10",
-    "status": "LOCAL_ACCEPTANCE_COMPLETE",
-    "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
-    "verifiedCommit": "43e95e55dcd0a5f389dafee59c2f92338d17bdf0",
-    "evidence": "docs/evidence/expense-budget-retention-complete-20261003.json"
+    "taskId": "W01",
+    "status": "DOMAIN_FOUNDATION_VERIFIED",
+    "implementationCommit": "a065643f52ef97177f123aa90b090f4615133f4f",
+    "evidence": "docs/evidence/service-task-foundation-20261003.json"
   }
 }
