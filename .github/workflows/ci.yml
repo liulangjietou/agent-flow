@@ -48,6 +48,8 @@ jobs:
           PG_TEST_DATABASE_PREFIX: agentflow_business
           AGENTFLOW_PG_TEST_BASE_URL: jdbc:postgresql://localhost:5432/
           PGPASSWORD: isolated-ci-database-only
+          # 每个上下文独立持有连接池，及时淘汰旧上下文，保留单池原有并发容量。
+          JAVA_TOOL_OPTIONS: -Dspring.test.context.cache.maxSize=4 -Djava.io.tmpdir=/fyoung/tmp
         run: |
           postgres_cases=(
             'AGENTFLOW_ORGANIZATION_TEST:organization'
