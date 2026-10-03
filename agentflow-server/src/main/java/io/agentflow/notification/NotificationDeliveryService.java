@@ -26,15 +26,17 @@ public class NotificationDeliveryService {
     private final PaymentNotificationAccess payments;
     private final SupplierPaymentNotificationAccess supplierPayments;
     private final VoucherNotificationAccess vouchers;
+    private final BudgetNotificationAccess budgets;
 
     /** 组织、偏好、投递按固定顺序加锁，不能与关闭偏好的顺序反转。 */
     public NotificationDeliveryService(JdbcNotificationDeliveryStore store, NotificationPreferencesRepository preferences,
                                        NotificationDestinations destinations, OrganizationRepository organization, AuthService demo,
-                                       FlowableApprovalProxyNotifications proxies, PaymentNotificationAccess payments, SupplierPaymentNotificationAccess supplierPayments, VoucherNotificationAccess vouchers) {
+                                       FlowableApprovalProxyNotifications proxies, PaymentNotificationAccess payments, SupplierPaymentNotificationAccess supplierPayments, VoucherNotificationAccess vouchers, BudgetNotificationAccess budgets) {
         this.store = store; this.preferences = preferences; this.destinations = destinations; this.organization = organization; this.demo = demo;
         this.proxies = proxies;
         this.payments = payments; this.supplierPayments = supplierPayments;
         this.vouchers = vouchers;
+        this.budgets = budgets;
     }
 
     /** 在开始发送前复核当前人员、原同意、消息归属及固定绑定，过期租约只进入未知。 */
@@ -102,7 +104,7 @@ public class NotificationDeliveryService {
         if (!active) return FailureCode.RECIPIENT_INACTIVE;
         // 领取可能等待目录锁，代理期限必须在等待后重新观察；旧消息不随新授权复活。
         return store.ownsMessage(value) && proxies.deliveryAllowed(value, Instant.now()) && payments.deliveryAllowed(value) && supplierPayments.deliveryAllowed(value)
-                && vouchers.deliveryAllowed(value) ? null : FailureCode.MESSAGE_UNAVAILABLE;
+                && vouchers.deliveryAllowed(value) && budgets.deliveryAllowed(value) ? null : FailureCode.MESSAGE_UNAVAILABLE;
     }
     private static FailureCode bindingFailure(NotificationDelivery value, NotificationDestinations.Destination target) {
         if (value.bindingId() == null || value.destinationDigest() == null) return FailureCode.BINDING_NOT_CAPTURED;

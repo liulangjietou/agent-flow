@@ -540,6 +540,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("HandledItem", io.agentflow.approval.workspace.WorkspaceReadPort.HandledItem.class),
                 java.util.Map.entry("InboxMessage", io.agentflow.notification.InboxMessage.class),
                 java.util.Map.entry("VoucherNotificationTarget", io.agentflow.notification.VoucherNotificationAccess.Target.class),
+                java.util.Map.entry("BudgetNotificationTarget", io.agentflow.notification.BudgetNotificationAccess.Target.class),
                 java.util.Map.entry("InboxPage", io.agentflow.notification.InboxApplicationService.Page.class),
                 java.util.Map.entry("NotificationPreferences", io.agentflow.notification.NotificationPreferencesController.View.class),
                 java.util.Map.entry("HistoryEvent", io.agentflow.approval.history.HistoryEvent.class),

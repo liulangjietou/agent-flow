@@ -46265,6 +46265,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/budget-target": {
+      "get": {
+        "operationId": "budgetNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原预算操作",
+        "description": "固定原预算命令、原申请轮次和财务版本；新的预算操作不替换旧消息。当前费用字段权限重新核验，不返回金额、账户、分摊、命令或写入动作。拒绝查询参数，响应 no-store。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -52823,7 +52928,9 @@
               "SUPPLIER_PAYMENT_RESULT",
               "SUPPLIER_PAYMENT_ATTENTION",
               "VOUCHER_RESULT",
-              "VOUCHER_ATTENTION"
+              "VOUCHER_ATTENTION",
+              "BUDGET_RESULT",
+              "BUDGET_ATTENTION"
             ]
           },
           "actor": {
@@ -80099,6 +80206,148 @@
           "reversalBound": {
             "type": "boolean",
             "description": "原凭证仍绑定独立冲销时为 true；已过账事实保留，但不能作为新的财务依据。"
+          }
+        }
+      },
+      "BudgetNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "operationId",
+          "applicationId",
+          "reportId",
+          "roundNo",
+          "financialVersion",
+          "version",
+          "action",
+          "status",
+          "attempts",
+          "updatedAt",
+          "observedStatus",
+          "issue",
+          "ledgerRevision",
+          "reference",
+          "appliedAt"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "FREEZE",
+              "ADJUST",
+              "RELEASE",
+              "CONSUME"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "UNKNOWN",
+              "QUERYING",
+              "APPLIED",
+              "REJECTED"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "PENDING",
+              "NOT_FOUND",
+              "APPLIED",
+              "REJECTED",
+              null
+            ]
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "LEASE_EXPIRED",
+              "INTERNAL_ERROR",
+              "BUDGET_INSUFFICIENT",
+              "BUDGET_POLICY_UNAVAILABLE",
+              "ACCOUNTING_PERIOD_CLOSED",
+              "COST_OBJECT_UNAVAILABLE",
+              "LEGAL_ENTITY_UNAVAILABLE",
+              "EMPLOYEE_UNAVAILABLE",
+              "LEDGER_VERSION_CONFLICT",
+              "RESERVATION_FINALIZED",
+              null
+            ]
+          },
+          "ledgerRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "appliedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }

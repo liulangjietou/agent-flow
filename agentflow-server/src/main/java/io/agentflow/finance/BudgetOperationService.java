@@ -65,23 +65,23 @@ public class BudgetOperationService {
         var found = operations.find(tenant, id).orElse(null); if (found == null) return null;
         reports.lock(tenant, found.input().command().position().reportId());
         var current = operations.find(tenant, id).orElseThrow(BudgetOperationService::notFound); now = time(now);
-        if (current.expired(now)) { operations.update(current.expire(now)); return null; }
+        if (current.expired(now)) { persist(current, current.expire(now)); return null; }
         if (current.terminal() || current.running() || now.isBefore(current.nextAttemptAt())) return null;
-        var claimed = current.claim(now, lease); operations.update(claimed); return claimed;
+        var claimed = current.claim(now, lease); persist(current, claimed); return claimed;
     }
 
     /** 任务和预算台账一并落库；迟到执行者不能越过领取版本更新任何状态。 */
     @Transactional
     public void finish(BudgetOperation claimed, FinanceResult<BudgetObservation> result, Instant now) {
         var current = currentClaim(claimed); if (current == null) return;
-        complete(current.complete(result, time(now)));
+        persist(current, current.complete(result, time(now)));
     }
 
     /** 未分类本地异常同样保留为未知外部结果。 */
     @Transactional
     public void fail(BudgetOperation claimed, Instant now) {
         var current = currentClaim(claimed); if (current == null) return;
-        complete(current.unavailable(BudgetOperation.Failure.INTERNAL_ERROR, time(now)));
+        persist(current, current.unavailable(BudgetOperation.Failure.INTERNAL_ERROR, time(now)));
     }
 
     private BudgetOperation register(BudgetOccupation previous, BudgetOperation.Input input, Instant now) {
@@ -94,7 +94,7 @@ public class BudgetOperationService {
         var current = operations.find(command.tenantId(), command.id()).orElseThrow(BudgetOperationService::notFound);
         return current.version() == claimed.version() && current.running() && current.status() == claimed.status() && current.input().equals(claimed.input()) ? current : null;
     }
-    private void complete(BudgetOperation completed) {
+    private void persist(BudgetOperation previous, BudgetOperation completed) {
         operations.update(completed);
         if (completed.terminal()) {
             var command = completed.input().command();
@@ -102,6 +102,7 @@ public class BudgetOperationService {
             occupations.update(occupation.complete(completed));
             events.publishEvent(new BudgetOperationCompleted(completed));
         }
+        events.publishEvent(new BudgetOperationChanged(previous, completed));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget operation or financial report not found"); }

@@ -135,6 +135,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
     @Autowired io.agentflow.notification.VoucherNotificationAccess voucherNotificationAccess;
+    @Autowired io.agentflow.notification.BudgetNotificationAccess budgetNotificationAccess;
     @Autowired AuthService auth;
     @Autowired CurrentActor actors;
     @Autowired JdbcTemplate jdbc;
@@ -731,6 +732,55 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
         assertThat(requests.find("demo", fixture.prior()).orElseThrow().balance(1).available()).isEqualTo(money("200"));
         budgetWorker.poll(); assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.RELEASED);
+    }
+
+    @Test
+    void budgetNotificationsRetainOriginalCommandAndActualReducerUnderCurrentFieldPermissions() throws Exception {
+        var report = fixture(true).report(); enterFinance(report);
+        var freeze = operations.latest("demo", report.id()).orElseThrow();
+        String freezeKey = "budget:" + freeze.input().command().id() + ":APPLIED";
+        String freezeMessage = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, freezeKey);
+        var receipt = ok(send(reductionPath(report), "finance", reductionInput(report, "25", "1")), 200);
+        UUID operationId = UUID.fromString(receipt.path("budgetOperationId").asText());
+        budgetStatus = BudgetObservation.Status.REJECTED; budgetRejection = BudgetObservation.Rejection.LEDGER_VERSION_CONFLICT; budgetWorker.poll();
+        String key = "budget:" + operationId + ":REJECTED";
+        var freezeDetail = ok(read("/api/v1/notifications/" + freezeMessage + "/budget-target", "alice"), 200);
+        assertThat(freezeDetail.path("financialVersion").asLong()).isEqualTo(freeze.input().command().position().financialVersion());
+        assertThat(freezeDetail.path("operationId").asText()).isEqualTo(freeze.input().command().id().toString());
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, freezeKey)).containsExactly("alice");
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, key))
+                .containsExactlyInAnyOrder("alice", "finance");
+        UUID messageId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='finance'", String.class, key));
+        String noticePath = "/api/v1/notifications/" + messageId + "/budget-target";
+        var response = read(noticePath, "finance"); var original = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(original.path("operationId").asText()).isEqualTo(operationId.toString());
+        assertThat(original.path("financialVersion").asLong()).isEqualTo(current(report).version());
+        assertThat(original.path("issue").asText()).isEqualTo("LEDGER_VERSION_CONFLICT");
+        assertThat(original.toString()).doesNotContain("allocations", "commandDigest", "targetDigest", "account", "actions");
+        for (String role : List.of("EMPLOYEE", "ADMIN")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> budgetNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); }
+            finally { actors.clear(); }
+        }
+        for (String user : List.of("alice", "bob", "admin", "manager")) assertThat(read(noticePath, user).getStatus()).isEqualTo(404);
+        assertThat(read(noticePath + "?roundNo=2", "finance").getStatus()).isEqualTo(400);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "budget:" + operationId + ":UNKNOWN", messageId.toString());
+        try { assertThat(read(noticePath, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", key, messageId.toString()); }
+        jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE id=?", messageId.toString());
+        try { assertThat(read(noticePath, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE id=?", messageId.toString()); }
+        var command = operations.find("demo", operationId).orElseThrow().input();
+        var next = new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(transaction ->
+                budgetExecution.reserve("demo", report.id(), current(report).version(), command.command().position().accountingDate(), command.targetDigest(), Instant.now()));
+        budgetStatus = BudgetObservation.Status.APPLIED; budgetWorker.poll();
+        assertThat(operations.find("demo", next.input().command().id()).orElseThrow().status()).isEqualTo(BudgetOperation.Status.APPLIED);
+        assertThat(ok(read(noticePath, "finance"), 200)).isEqualTo(original);
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='finance'");
+        try { assertThat(read(noticePath, "finance").getStatus()).isIn(403, 404); }
+        finally { jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='finance'"); }
     }
 
     @Test

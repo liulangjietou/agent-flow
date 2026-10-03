@@ -1,9 +1,10 @@
-import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget } from './api'
 import { validatePayment } from './payments.js'
 import { validateSupplierCashier } from './supplierCashier.js'
 import { preparationLabels, operationLabels } from './vouchers.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  BUDGET_RESULT: '预算操作结果更新', BUDGET_ATTENTION: '预算操作需核对',
   VOUCHER_RESULT: '凭证结果更新', VOUCHER_ATTENTION: '凭证处理需核对',
   SUPPLIER_PAYMENT_RESULT: '供应商付款结果更新', SUPPLIER_PAYMENT_ATTENTION: '供应商付款需核对',
   PAYMENT_RESULT: '付款结果更新', PAYMENT_ATTENTION: '付款执行需核对',
@@ -20,6 +21,36 @@ export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK
 export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
 export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
 export const isVoucherNotification = (item: InboxMessage) => ['VOUCHER_RESULT', 'VOUCHER_ATTENTION'].includes(item.kind)
+
+export const isBudgetNotification = (item: InboxMessage) => ['BUDGET_RESULT', 'BUDGET_ATTENTION'].includes(item.kind)
+export const budgetActionLabels = { FREEZE: '冻结', ADJUST: '调整冻结', RELEASE: '释放', CONSUME: '消费' }
+export const budgetStatusLabels = { QUEUED: '原命令待执行', EXECUTING: '正在发送原命令', UNKNOWN: '原操作结果暂不明确', QUERYING: '正在查询原操作', APPLIED: '原操作已确认', REJECTED: '原操作已明确拒绝' }
+const budgetFailureLabels = { NOT_CONFIGURED: '预算连接尚未配置', TARGET_CHANGED: '预算连接配置已变化', TIMEOUT: '预算系统响应超时', CONNECTION: '预算系统暂时无法连接', AUTHENTICATION: '预算系统认证未通过', REMOTE_FAILURE: '预算系统暂时不可用', INVALID_RESPONSE: '预算回执未通过校验', RESPONSE_TOO_LARGE: '预算回执超出接收范围', LEASE_EXPIRED: '原执行未在期限内确认', INTERNAL_ERROR: '预算处理暂时异常' }
+const budgetRejectionLabels = { BUDGET_INSUFFICIENT: '预算余额不足', BUDGET_POLICY_UNAVAILABLE: '预算控制规则不可用', ACCOUNTING_PERIOD_CLOSED: '会计期间已关闭', COST_OBJECT_UNAVAILABLE: '成本对象不可用', LEGAL_ENTITY_UNAVAILABLE: '法人不可用', EMPLOYEE_UNAVAILABLE: '员工不可用', LEDGER_VERSION_CONFLICT: '预算台账版本存在冲突', RESERVATION_FINALIZED: '原预算占用已经结束' }
+const budgetFailures = Object.keys(budgetFailureLabels), budgetRejections = Object.keys(budgetRejectionLabels)
+/** 只显示约定的稳定原因，不将远端原始错误正文带入页面。 */
+export const budgetIssueLabel = (issue: string) => ({ ...budgetFailureLabels, ...budgetRejectionLabels } as Record<string, string>)[issue] ?? '原因暂不可用'
+/** 原消息只定位固定命令；严格区分处理中、查询查无、业务拒绝和实际应用。 */
+export function readBudgetNotificationTarget(value: BudgetNotificationTarget, message: InboxMessage): BudgetNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的预算记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  if (!value || !isBudgetNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.operationId, value.applicationId, value.reportId].every(uuid) || ![value.roundNo, value.financialVersion, value.version].every(positive)
+      || !Number.isSafeInteger(value.attempts) || value.attempts < 0 || !instant(value.updatedAt)
+      || !Object.prototype.hasOwnProperty.call(budgetActionLabels, value.action) || !Object.prototype.hasOwnProperty.call(budgetStatusLabels, value.status)
+      || Object.keys(value).some(key => !['messageId', 'operationId', 'applicationId', 'reportId', 'roundNo', 'financialVersion', 'action', 'status', 'version', 'attempts', 'updatedAt', 'observedStatus', 'issue', 'ledgerRevision', 'reference', 'appliedAt'].includes(key))) invalid()
+  const applied = value.status === 'APPLIED'
+  if (applied ? value.observedStatus !== 'APPLIED' || value.issue !== null || !positive(value.ledgerRevision) || !instant(value.appliedAt)
+      || typeof value.reference !== 'string' || !value.reference.trim() || value.reference.length > 128
+    : value.ledgerRevision !== null || value.appliedAt !== null || value.reference !== null) invalid()
+  if (value.status === 'REJECTED' && (value.observedStatus !== 'REJECTED' || !budgetRejections.includes(value.issue ?? ''))) invalid()
+  if (value.status === 'UNKNOWN' && !(value.observedStatus === 'PENDING' && value.issue === null || value.observedStatus === null && budgetFailures.includes(value.issue ?? ''))) invalid()
+  if (value.status === 'QUEUED' && (value.issue !== null || value.observedStatus !== null && value.observedStatus !== 'NOT_FOUND')) invalid()
+  if (['EXECUTING', 'QUERYING'].includes(value.status) && (value.issue !== null || value.observedStatus !== null)) invalid()
+  return value
+}
 
 /** 原准备和过账必须同号；消息详情没有写入许可，也不接受同轮最新准备替换旧编号。 */
 export function readVoucherNotificationTarget(value: VoucherNotificationTarget, message: InboxMessage): VoucherNotificationTarget {
