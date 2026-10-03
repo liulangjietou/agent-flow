@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T05:13:35.682006+00:00",
+  "recordedAt": "2026-10-03T05:37:50.342009+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 38,
+    "knownOpenTaskCount": 37,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 20,
+      "LOCAL_DEVELOPMENT": 19,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 38,
+    "projectRemainingLowerBound": 37,
     "completionPercentage": null,
     "notes": [
-      "38 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "37 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -993,7 +993,7 @@
       "id": "F02",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "科目映射版本的管理配置",
       "sourceRefs": [
         {
@@ -1013,10 +1013,14 @@
           ]
         }
       ],
-      "observed": "领域、网关、V104 管理存储、9 个认证接口及准备选择绑定已完成。管理页面和原凭证科目版本摘要已实现；本阶段 110 条范围测试通过，其中 3 条 PostgreSQL 17.11 复测通过。真实管理页面完成草稿、发布、历史、权限和回执丢失原键恢复，V104 固定包升级保留原业务表与 9 个附件。完整凭证链路、同包重启和配套恢复尚待验收，F02 保持 OPEN。",
+      "observed": "版本管理、专用权限、准备选择绑定及原凭证页面均已完成。固定安装包验证报销挂账、借款挂账和成功付款凭证；缺项、错误回显、发布竞争、进程退出后原查询恢复通过。独立配套恢复保留 245 张表、6,276 行和 9 个附件；恢复后可接续处理中准备，22 条旧命令输入与摘要保持，旧三类凭证可读取。",
       "references": [
         {
           "path": "docs/account-mapping-configuration.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/account-mapping-complete-20261003.json",
           "line": 1
         },
         {
@@ -1037,7 +1041,15 @@
         }
       ],
       "acceptance": "提供类别与法人维度的版本管理或明确的权威系统管理接入；旧凭证保留原映射证据；无有效映射仍阻断；本地演示可配置样例并完成凭证链路。",
-      "dependsOn": []
+      "dependsOn": [],
+      "completion": {
+        "implementationCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
+        "verifiedCommit": "7fc7813be8dc751a35d1cfd19b93991a892f5417",
+        "verifiedAt": "2026-10-03T05:37:50.342009+00:00",
+        "evidence": "docs/evidence/account-mapping-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "平台发布映射固定选择，ERP 校验有效性并提供原过账事实；本地运行使用合成服务，企业 ERP 和付款联调由 E06、E07 验收。"
+      }
     },
     {
       "id": "F03",
@@ -3303,7 +3315,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F02",
     "F13"
   ],
   "externalDelivery": {
@@ -3320,30 +3331,16 @@
     "verifiedAt": "2026-10-03T04:14:38.448896+00:00"
   },
   "latestProgress": {
-    "taskId": "F01",
-    "implementationCommit": "440704e4969d0ba421d00e3037e61b7206ad29d9",
-    "verifiedCommit": "a8baeee26ff354dd98fc788412e0cdbd587a5cb0",
-    "completedAt": "2026-10-03T03:33:16.972058+00:00",
-    "openapiPathCount": 286,
-    "openapiOperationCount": 323,
-    "evidence": "docs/evidence/expense-configuration-complete-20261003.json"
+    "taskId": "F02",
+    "implementationCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
+    "verifiedCommit": "7fc7813be8dc751a35d1cfd19b93991a892f5417",
+    "completedAt": "2026-10-03T05:37:50.342009+00:00",
+    "evidence": "docs/evidence/account-mapping-complete-20261003.json"
   },
   "latestInProgress": {
-    "taskId": "F02",
-    "phase": "MANAGEMENT_UI_AND_VOUCHER_EVIDENCE_SCOPE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
-    "verifiedCommit": "d3e2e66984953150286ea51e344e255fe1ea48c5",
-    "evidence": "docs/evidence/account-mapping-ui-20261003.json",
-    "scopedTests": 110,
-    "webTests": 100,
-    "javaTests": 10,
-    "postgresSubset": 3,
-    "managementApiImplemented": true,
-    "preparationSelectionIntegrated": true,
-    "managementUiImplemented": true,
-    "voucherEvidenceProjectionImplemented": true,
-    "managementBrowserPassed": true,
+    "taskId": "F13",
+    "phase": "NEXT_TASK_SELECTED",
     "taskCompleted": false,
-    "nextPhase": "FIXED_PACKAGE_END_TO_END_RESTART_RESTORE"
+    "scope": "报销、事前申请和借款模板包"
   }
 }
