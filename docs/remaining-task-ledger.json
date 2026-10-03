@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T14:31:49.522911+00:00",
+  "recordedAt": "2026-10-03T14:49:44.008509+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工借款与费用报销的付款操作通知、最小外发意向、原付款权限接口及消息页面已接通，122 项 Java、49 项前端范围验证通过。同轮重新授权后旧消息仍指向原付款。登记前异常、供应商及其他财务异常来源、固定包和环境验收仍待完成。",
+      "observed": "员工借款与费用报销的付款操作及登记前检查异常通知、最小外发意向、原付款权限接口及消息页面已接通。本阶段 132 项 Java、50 项前端范围验证通过；未发送检查与后续付款检查的同类事实去重，原授权被替换后旧消息仍固定原记录。供应商及其他财务异常来源、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1638,6 +1638,10 @@
         },
         {
           "path": "docs/evidence/payment-notifications-employee-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-request-notifications-20261003.json",
           "line": 1
         },
         {
@@ -3442,9 +3446,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "EMPLOYEE_PAYMENT_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
-    "implementationCommit": "8fb5793e50ae58b908caee0a9e7ec3d6d9c1b966",
-    "evidence": "docs/evidence/payment-notifications-employee-20261003.json",
-    "recordedAt": "2026-10-03T14:31:49.522911+00:00"
+    "status": "EMPLOYEE_PRE_OPERATION_REQUEST_NOTIFICATIONS_VERIFIED_FULL_F17_PENDING",
+    "implementationCommit": "3f7c07b63016361524393b7a2d195873a2b15a91",
+    "evidence": "docs/evidence/payment-request-notifications-20261003.json",
+    "recordedAt": "2026-10-03T14:49:44.008509+00:00"
   }
 }

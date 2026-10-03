@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "EMPLOYEE_PRE_OPERATION_REQUEST_NOTIFICATIONS",
+  "recordedAt": "2026-10-03T14:49:44.008509+00:00",
+  "implementationCommit": "3f7c07b63016361524393b7a2d195873a2b15a91",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "Employee advance and reimbursement cashier-request checks before any PaymentOperation exists",
+    "Original request cashier and immutable original authorization participants",
+    "Atomic state, inbox and outbound-intent updates; same-fact deduplication across request and payment checks",
+    "Protected original detail and actual Vue unsent-request rendering"
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "tests": 132,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "path": "java-final/TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.finance.PaymentExecutionRequestTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+          "tests": 56,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.finance.PaymentOperationTest.xml",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-final/TEST-io.agentflow.notification.PaymentNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "java-batches/TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "countingNote": "126 distinct final cases plus 6 explicitly selected nested batch cases. Counts XML testcase identities, excludes RED and earlier reruns. No Java source changes between these final runs."
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 50,
+      "files": [
+        "payment-notifications.test.mjs",
+        "notifications.test.mjs",
+        "payments.test.mjs",
+        "notification-deliveries.test.mjs"
+      ],
+      "method": "Compiled actual Vue components, including PaymentFacts server-rendered templates; Node runner, not browser acceptance."
+    },
+    "authors": {
+      "result": "PASS",
+      "javaFiles": 1525,
+      "namedTypes": 2930,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": {
+      "result": "PASS"
+    },
+    "reusedUnchangedProductionChecks": {
+      "reference": "docs/evidence/payment-notifications-employee-20261003.json",
+      "checks": [
+        "Web typecheck",
+        "Web production build",
+        "OpenAPI contract inventory and examples"
+      ],
+      "verification": "Git comparison confirms only the Web test file changed; all Web production/build inputs unchanged. OpenAPI SHA256 matches the prior manifest. OpenApiContractTest also reran in the current 132-case gate.",
+      "webChangesSincePriorImplementation": [
+        "agentflow-web/tests/payment-notifications.test.mjs"
+      ],
+      "openapiSha256": "adf46205312f89b7284b953d6e7ca1a6c49a42ac2c72ca1eb7b3d5351772312e"
+    }
+  },
+  "scenarios": [
+    "Normal queued/running/ready requests do not emit anomaly messages or write funds.",
+    "Blocked account checks notify only original applicant, authorizer and cashier, with no bank operation.",
+    "Unavailable request checks and a later PaymentOperation check failure share one original-authorization/fact notice per recipient.",
+    "Expired lease, expired authorization and finance voiding during reads preserve the original request and prevent stale-worker writes.",
+    "Fault-injected inbox insertion rolls back request and authorization changes plus outbound intents.",
+    "Actual expense workflow supports all three original participants, rejects strangers and inactive participants, and keeps the old notification after replacement authorization.",
+    "Actual payment detail templates render unsent queued failure, blocked, voided and expired requests without bank receipt or success claims."
+  ],
+  "redEvidence": {
+    "log": "payment-request-notifications-red.log",
+    "expectedFailure": "Account check correctly produced BLOCKED with no PaymentOperation; original-recipient notification list was [] instead of alice, finance and cashier."
+  },
+  "earlierAttempts": {
+    "excludedFromPassingCount": [
+      "payment-request-notifications-first.log"
+    ],
+    "fixtureRepair": "The recovery fixture initially called the post-send fail method on CHECKING. It now calls the existing checkFailed entry; production state guards were not relaxed."
+  },
+  "migration": {
+    "newMigration": false,
+    "newApi": false,
+    "newWebProductionCode": false
+  },
+  "notCompleted": [
+    "Supplier payment outcomes/conflicts and protected original supplier target",
+    "Voucher, budget, settlement and other financial exception producer coverage",
+    "Fixed-package HTTP, nonempty upgrade and restart/recovery acceptance for the whole F17 scope",
+    "Actual browser and PostgreSQL new-range acceptance",
+    "Real enterprise SMTP/IM and financial system acceptance (E01/E02/E06/E07)"
+  ],
+  "constraints": [
+    "Local-only implementation; no push or PR in this phase.",
+    "No browser-policy bypass or Docker/PostgreSQL repair attempted.",
+    "Synthetic gateways and H2 prove scoped local behavior, not enterprise acceptance."
+  ],
+  "sourceManifest": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "25d6fce35fd2fa78ab85009d0c257d03143d3b37df6d5c10e218a99b9352b46d"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/PaymentNotice.java",
+      "sha256": "b85b2efe1762d15df7b7dd77c2ca5f116f7bc8c35333767cb5ac8fa37e238869"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/finance/PaymentExecutionRequestTest.java",
+      "sha256": "c6d5c3f049e5007982485b5351ae4ec4c95564f5b7d8707b4d38da9fffa5093f"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/finance/PaymentOperationTest.java",
+      "sha256": "27d7f82ccdfd740e099ab5267338043b289a20a3c43b222117214a04c9a0ab0d"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/notification/PaymentNoticeTest.java",
+      "sha256": "970c9820734f83769eea2bd6902ab5ebe30abb082aaacec9ea292e1fb24553c0"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestChanged.java",
+      "sha256": "61ff96657c75694854d16df26f49d6503581e45d509717ba30f53fc7046e26f3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestService.java",
+      "sha256": "f4de5ee7be301047241acd8ea49b4124dbe1dba45671c0a156019d07bf8cb2fa"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "71136f2eb8e27633b83fb45fa9939491ac5828a278d0e7345bd75d32bf70a430"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationAccess.java",
+      "sha256": "9e6c691c105edf2d3373bf49b24348dca1b9214c63534a2334fde7f7eb343e07"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationController.java",
+      "sha256": "873800e529dd9abc7911043d5a2df0512596e8d598876a367e39418b6a65bc68"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationService.java",
+      "sha256": "c0bfa7efbe17319c2621df8d5546bd9b9331cae3997ce9f916f47dc3468f07be"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "adf46205312f89b7284b953d6e7ca1a6c49a42ac2c72ca1eb7b3d5351772312e"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "sha256": "a942447fdd99840e851f09f897aff108cf254f37cafe75dc55e41fee66e73fd8"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/PaymentOperationIntegrationTest.java",
+      "sha256": "4c35dfea11307ff40728b4875e84ec67b0d886bdfab49e7d11e5e8405d5c59de"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "cf70ef75ec9398daa55798082daf787e9f4b7f994d8969c9da83cc48d8628e11"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "51be787869c3a24be0ac36d050841c52fba4884c77959711be0ee48a3e05a8b3"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "5f069b203dec6ccfb47a0c28fc683add83c6b0ec60b93ba68db4ef20c5a6c1be"
+    },
+    {
+      "path": "agentflow-web/src/components/CashierWorkspace.vue",
+      "sha256": "c10038646c28872b5fb1aa67501e157c942eed7069d83978f33f7cf33fa27e5b"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "f4ea6e9d6f949f9f03accfa5620d5eaa3a6a7c51a41f21a81e8db5654654e4a7"
+    },
+    {
+      "path": "agentflow-web/src/components/PaymentNotificationDetail.vue",
+      "sha256": "fee87a5acb92b7848a2cf62413207f07bf7cb9e474d9e52c46262d9e3d90162b"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "0cf02f6d23038d5396873f38314c7ae0631a0122f1c8f5724b163aed3ed451a2"
+    },
+    {
+      "path": "agentflow-web/tests/payment-notifications.test.mjs",
+      "sha256": "a67d002d67d4b91e831dc95b93a10d9c5972ce82f4edce9cead09972141d4315"
+    }
+  ],
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/payment-request-notifications-evidence-snapshot",
+  "artifactManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/payment-request-notifications-evidence-snapshot/artifact-manifest.json",
+    "sha256": "20cac907e09a85429703927d048746cfc345405cefca653d0652cbb7fe6d0a5f",
+    "files": 17
+  },
+  "remainingCount": {
+    "knownOpenTaskCount": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  }
+}
