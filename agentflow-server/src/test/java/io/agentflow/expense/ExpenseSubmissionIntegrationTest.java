@@ -2282,6 +2282,153 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(send(path(other) + "/resource-adjustment/actions", "finance", wrong).getStatus()).isEqualTo(409);
     }
 
+    @Test void expenseAdjustmentNotificationPreparationFailureKeepsOriginalSource() throws Exception {
+        var report = resourceAdjustmentReport();
+        var receipt = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report)));
+        var claimed = resourcePreparing.claim("demo", receipt.preparationId(), adjustmentTime());
+        resourcePreparing.fail(claimed, adjustmentTime());
+        assertExpenseAdjustmentRecipients(receipt.preparationId(), "PREPARATION_UNAVAILABLE");
+        assertThat(resourceAdjustments.active("demo", report.id())).isEmpty();
+        String path = expenseAdjustmentNoticePath(receipt.preparationId(), "PREPARATION_UNAVAILABLE", "finance");
+        var response = read(path, "finance"); var detail = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(detail.path("adjustmentId").asText()).isEqualTo(receipt.preparationId().toString());
+        assertThat(detail.path("budget").isNull()).isTrue(); assertThat(detail.path("adjustment").isNull()).isTrue();
+        assertThat(detail.toString()).doesNotContain("targetDigest", "evidenceReference", "ledgerRevision", "amount", "authorizedBy", "actions");
+        for (String other : List.of("alice", "cashier", "admin")) assertThat(read(path, other).getStatus()).isEqualTo(404);
+        assertThat(read(path + "?reportId=" + report.id(), "finance").getStatus()).isEqualTo(400);
+    }
+
+    @Test void expenseAdjustmentNotificationUnknownBudgetDoesNotClaimResourceCompletion() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        invalidBudgetReversalResponse = true; resourceWorker.poll();
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "BUDGET_UNKNOWN");
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isFalse();
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "COMPLETED")).isZero();
+        var original = budgetReversals.find("demo", prepared.input().id()).orElseThrow();
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpenseAdjustmentChanged.Budget(original)));
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "BUDGET_UNKNOWN");
+        invalidBudgetReversalResponse = false;
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY))); resourceWorker.poll();
+        var detail = ok(read(expenseAdjustmentNoticePath(prepared.input().id(), "BUDGET_UNKNOWN", "alice"), "alice"), 200);
+        assertThat(detail.path("fact").asText()).isEqualTo("BUDGET_UNKNOWN");
+        assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED");
+        assertThat(detail.path("completion").isNull()).isFalse(); assertThat(budgetReversalWrites).isEqualTo(1);
+    }
+
+    @Test void expenseAdjustmentNotificationCompletionRequiresActualResourceWrites() throws Exception {
+        var report = resourceAdjustmentReport(); var ready = readyResourceExecution(report);
+        assertThat(expenseAdjustmentNoticeCount(ready.id(), "COMPLETED")).isZero();
+        resourceAdjustmentExecution.apply(resourceCandidate(ready));
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED");
+        var versions = resourceVersions(report); resourceAdjustmentExecution.apply(resourceCandidate(ready));
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED"); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    @Test void expenseAdjustmentNotificationRetirementIsSeparateFromUnsentBudgetVoid() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        asFinance(() -> resourceActions.retire(report.id(), resourceRetirementInput(report)));
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "RETIRED");
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "BUDGET_VOIDED")).isZero();
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "COMPLETED")).isZero();
+        assertThat(budgetReversalWrites).isZero();
+        var next = prepareResourceWorkflow(report); assertThat(next.input().id()).isNotEqualTo(prepared.input().id());
+        var original = ok(read(expenseAdjustmentNoticePath(prepared.input().id(), "RETIRED", "finance"), "finance"), 200);
+        assertThat(original.path("adjustmentId").asText()).isEqualTo(prepared.input().id().toString());
+        assertThat(original.path("retirement").isNull()).isFalse(); assertThat(original.path("completion").isNull()).isTrue();
+    }
+
+    @Test void expenseAdjustmentNotificationBudgetAndBlockedResourcesAreDistinctFacts() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        var claimed = resourceBudgetExecution.claim("demo", prepared.input().id(), adjustmentTime()); var command = claimed.input().command(); var at = adjustmentTime();
+        var observation = new BudgetConsumptionReversalObservation(command.id(), command.digest(), BudgetConsumptionReversalObservation.Status.APPLIED, at,
+                command.consumed().ledgerRevision() + 1, "synthetic-budget-reversal-" + command.id(), command.period().periodReference(), command.period().request().accountingDate(), at, null);
+        budgetReversalCommands.put(command.id(), command); budgetReversalAppliedAt.put(command.id(), at);
+        resourceBudgetExecution.finish(claimed, new FinanceResult.Success<>(observation), at);
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "BUDGET_APPLIED");
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "COMPLETED")).isZero();
+        var ready = resourceAdjustments.find("demo", prepared.input().id()).orElseThrow();
+        resourceAdjustmentExecution.block(resourceCandidate(ready), "RESOURCE_CHANGED");
+        assertExpenseAdjustmentRecipients(ready.id(), "RESOURCES_BLOCKED");
+        var detail = ok(read(expenseAdjustmentNoticePath(ready.id(), "BUDGET_APPLIED", "alice"), "alice"), 200);
+        assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED");
+        assertThat(detail.path("adjustment").path("resourcesReversed").asBoolean()).isFalse(); assertThat(detail.path("completion").isNull()).isTrue();
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.RETRY_RESOURCES))); resourceWorker.poll();
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED");
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY))); resourceWorker.poll();
+        assertThat(expenseAdjustmentNoticeCount(ready.id(), "RESOURCES_BLOCKED")).isEqualTo(2);
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.CONFIRM_COMPLETED)));
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED");
+    }
+
+    @Test void expenseAdjustmentNotificationRejectsFabricatedFactsAndMessageTimes() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        invalidBudgetReversalResponse = true; resourceWorker.poll();
+        String path = expenseAdjustmentNoticePath(prepared.input().id(), "BUDGET_UNKNOWN", "finance"); String id = path.split("/")[4];
+        String key = "expense-adjustment:" + prepared.input().id() + ":BUDGET_UNKNOWN";
+        var created = jdbc.queryForObject("SELECT created_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "expense-adjustment:" + prepared.input().id() + ":BUDGET_RECONCILING", id);
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", key, id); }
+        jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", java.sql.Timestamp.from(created.toInstant().plusSeconds(1)), id);
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", created, id); }
+        assertThat(read(path, "finance").getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id)).isNull();
+    }
+
+    @Test void expenseAdjustmentNotificationRevokedPreparationExcludesInactiveFinance() throws Exception {
+        var report = resourceAdjustmentReport(); var receipt = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report)));
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try {
+            resourceWorker.poll();
+            assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE event_key=?", String.class,
+                    "expense-adjustment:" + receipt.preparationId() + ":PREPARATION_VOIDED")).containsExactly("alice");
+            assertThat(read(expenseAdjustmentNoticePath(receipt.preparationId(), "PREPARATION_VOIDED", "alice"), "alice").getStatus()).isEqualTo(200);
+        } finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void expenseAdjustmentNotificationFailureRollsBackResourcesAndSuppressesRevokedDelivery() throws Exception {
+        var report = resourceAdjustmentReport(); var ready = readyResourceExecution(report); var before = resourceVersions(report);
+        var actor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false); String key = "expense-adjustment:" + ready.id() + ":COMPLETED";
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT expense_adjustment_notice_failure CHECK (NOT (event_key='" + key + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> resourceAdjustmentExecution.apply(resourceCandidate(ready))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT expense_adjustment_notice_failure"); }
+            assertThat(resourceVersions(report)).isEqualTo(before); assertThat(resourceAdjustments.find("demo", ready.id())).contains(ready);
+            assertThat(expenseAdjustmentNoticeCount(ready.id(), "COMPLETED")).isZero();
+            resourceAdjustmentExecution.apply(resourceCandidate(ready));
+            var path = expenseAdjustmentNoticePath(ready.id(), "COMPLETED", "finance");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, path.split("/")[4]));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    private String expenseAdjustmentNoticePath(UUID adjustmentId, String fact, String recipient) {
+        String id = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "expense-adjustment:" + adjustmentId + ":" + fact, recipient);
+        return "/api/v1/notifications/" + id + "/expense-adjustment-target";
+    }
+    private void assertExpenseAdjustmentRecipients(UUID id, String fact) {
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+                "expense-adjustment:" + id + ":" + fact)).containsExactlyInAnyOrder("alice", "finance");
+    }
+    private int expenseAdjustmentNoticeCount(UUID id, String fact) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Integer.class,
+                "expense-adjustment:" + id + ":" + fact);
+    }
+
     private ExpenseResourceAdjustmentPreparationService.PrepareInput resourcePreparationInput(ExpenseReport report) {
         return new ExpenseResourceAdjustmentPreparationService.PrepareInput(1, app(report).version(), current(report).version(), settlements.find("demo", report.id()).orElseThrow().version(), LocalDate.now(), "full-cancellation-evidence", "独立核对后取消整笔报销");
     }

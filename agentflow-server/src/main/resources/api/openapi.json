@@ -47525,6 +47525,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/expense-adjustment-target": {
+      "get": {
+        "operationId": "expenseAdjustmentNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原报销资源调整",
+        "description": "固定原准备与调整编号，核验原结算修订、准确通知事实和当前原轮次字段权限。预算冲正、资源完成和安全结束分别展示，资源完成要求实际反向明细。拒绝查询参数，响应 no-store；读取不查询外部系统、不执行调整、不标记已读。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseAdjustmentNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -54107,7 +54212,9 @@
               "REPAYMENT_REVIEW_RESULT",
               "REPAYMENT_REVIEW_ATTENTION",
               "BUDGET_ADJUSTMENT_RESULT",
-              "BUDGET_ADJUSTMENT_ATTENTION"
+              "BUDGET_ADJUSTMENT_ATTENTION",
+              "EXPENSE_ADJUSTMENT_RESULT",
+              "EXPENSE_ADJUSTMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -83887,6 +83994,306 @@
           "retiredAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ExpenseAdjustmentNotificationPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "updatedAt",
+          "issue"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "AUTHORIZED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          }
+        }
+      },
+      "ExpenseAdjustmentNotificationBudget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "updatedAt",
+          "failure",
+          "outcome",
+          "conflictingOutcome"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "QUERYING",
+              "UNKNOWN",
+              "APPLIED",
+              "REJECTED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "APPLIED",
+                  "REJECTED",
+                  "PENDING",
+                  "NOT_FOUND"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflictingOutcome": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "APPLIED",
+                  "REJECTED",
+                  "PENDING",
+                  "NOT_FOUND"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpenseAdjustmentNotificationAdjustment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "updatedAt",
+          "resourcesReversed",
+          "issue"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_BUDGET",
+              "READY",
+              "APPLIED",
+              "REVIEW_REQUIRED",
+              "RETIRED"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resourcesReversed": {
+            "type": "boolean"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          }
+        }
+      },
+      "ExpenseAdjustmentNotificationCompletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentVersion",
+          "budgetVersion",
+          "completedAt"
+        ],
+        "properties": {
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budgetVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpenseAdjustmentNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adjustmentVersion",
+          "budgetVersion",
+          "retiredAt"
+        ],
+        "properties": {
+          "adjustmentVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "budgetVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpenseAdjustmentNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "adjustmentId",
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "fact",
+          "preparation",
+          "budget",
+          "adjustment",
+          "completion",
+          "retirement"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "PREPARATION_UNAVAILABLE",
+              "PREPARATION_VOIDED",
+              "BUDGET_UNKNOWN",
+              "BUDGET_NOT_FOUND",
+              "BUDGET_REJECTED",
+              "BUDGET_EXPIRED",
+              "BUDGET_VOIDED",
+              "BUDGET_RECONCILING",
+              "BUDGET_APPLIED",
+              "RESOURCES_BLOCKED",
+              "COMPLETED",
+              "RETIRED"
+            ]
+          },
+          "preparation": {
+            "$ref": "#/components/schemas/ExpenseAdjustmentNotificationPreparation"
+          },
+          "budget": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAdjustmentNotificationBudget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adjustment": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAdjustmentNotificationAdjustment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAdjustmentNotificationCompletion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAdjustmentNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }

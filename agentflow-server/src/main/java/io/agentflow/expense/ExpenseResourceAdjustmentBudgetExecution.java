@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpenseResourceAdjustmentBudgetExecution {
+    private final ApplicationEventPublisher events;
     private static final Duration LEASE = Duration.ofSeconds(90);
     private final ExpenseReportRepository reports;
     private final JdbcExpenseResourceAdjustmentRepository adjustments;
@@ -30,39 +32,40 @@ public class ExpenseResourceAdjustmentBudgetExecution {
     private final FinanceGatewayConfiguration gateway;
     /** 原报销锁同时保护预算领取、安全结束和资源执行，避免释放后迟到外发。 */
     public ExpenseResourceAdjustmentBudgetExecution(ExpenseReportRepository reports, JdbcExpenseResourceAdjustmentRepository adjustments,
-            JdbcBudgetConsumptionReversalRepository operations, ExpenseResourceAdjustmentSources sources, PaymentPersonnel personnel, FinanceGatewayConfiguration gateway) {
+            JdbcBudgetConsumptionReversalRepository operations, ExpenseResourceAdjustmentSources sources, PaymentPersonnel personnel, FinanceGatewayConfiguration gateway, ApplicationEventPublisher events) {
+        this.events = events;
         this.reports = reports; this.adjustments = adjustments; this.operations = operations; this.sources = sources; this.personnel = personnel; this.gateway = gateway;
     }
     /** 首次发送复核原授权，过期与失效只停止新写入；未知结果继续查询原命令。 */
     @Transactional
     public BudgetConsumptionReversalOperation claim(String tenant, UUID id, Instant at) {
         var current = locked(tenant, id); var now = time(at);
-        if (current.expired(now)) { operations.update(current.expire(now)); return null; }
+        if (current.expired(now)) { persist(current.expire(now)); return null; }
         if (current.running() || current.nextAttemptAt() == null || current.nextAttemptAt().isAfter(now)) return null;
         if (current.status() == BudgetConsumptionReversalOperation.Status.QUEUED && now.isBefore(current.input().command().expiresAt())) {
             try { requireSendSources(current); }
-            catch (DomainException changed) { var stopped = current.voidBeforeSend(now); operations.update(stopped); sync(stopped, now); return null; }
+            catch (DomainException changed) { var stopped = current.voidBeforeSend(now); persist(stopped); sync(stopped, now); return null; }
         }
-        var claimed = current.claim(now, LEASE); operations.update(claimed);
+        var claimed = current.claim(now, LEASE); persist(claimed);
         if (!claimed.running()) { sync(claimed, now); return null; } return claimed;
     }
     /** 接受同一领取版本的回执，明确预算成功才允许后续本地资源执行。 */
     @Transactional
     public void finish(BudgetConsumptionReversalOperation claimed, FinanceResult<BudgetConsumptionReversalObservation> result, Instant at) {
         var current = current(claimed); if (current == null) return; var now = time(at); var completed = current.complete(result, now);
-        operations.update(completed); sync(completed, now);
+        persist(completed); sync(completed, now);
     }
     /** HTTP 或完成事务异常后保留未知；不能通过生成新命令掩盖外部结果。 */
     @Transactional
     public void fail(BudgetConsumptionReversalOperation claimed, Instant at) {
         var current = current(claimed); if (current == null) return; var now = time(at);
-        var unknown = current.unavailable(BudgetConsumptionReversalOperation.Failure.INTERNAL_ERROR, now); operations.update(unknown); sync(unknown, now);
+        var unknown = current.unavailable(BudgetConsumptionReversalOperation.Failure.INTERNAL_ERROR, now); persist(unknown); sync(unknown, now);
     }
     /** 人工只读查询保留原输入，已完成或待执行资源先转复核，查询期间不能重复释放资源。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public BudgetConsumptionReversalOperation query(String tenant, UUID id, long expected, Instant at) {
         var current = locked(tenant, id); requireVersion(current, expected); if (current.attempts() == 0) throw conflict(); var now = time(at);
-        var next = current.requestQuery(now); operations.update(next);
+        var next = current.requestQuery(now); persist(next);
         var adjustment = adjustment(tenant, id);
         if (adjustment.status() == ExpenseResourceAdjustment.Status.READY || adjustment.status() == ExpenseResourceAdjustment.Status.APPLIED) {
             adjustments.update(adjustment.requireReview("BUDGET_RECHECK_REQUIRED", now));
@@ -73,7 +76,7 @@ public class ExpenseResourceAdjustmentBudgetExecution {
     @Transactional(propagation = Propagation.MANDATORY)
     public BudgetConsumptionReversalOperation resend(String tenant, UUID id, long expected, Instant at) {
         var current = locked(tenant, id); requireVersion(current, expected); requireSendSources(current);
-        var next = current.retryNotFound(time(at)); operations.update(next); return next;
+        var next = current.retryNotFound(time(at)); persist(next); return next;
     }
     /** 安全结束先持久停止未外发命令，调整占用与结束审计由外层同一事务处理。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -92,6 +95,9 @@ public class ExpenseResourceAdjustmentBudgetExecution {
         }
         if (operation.attempts() == 0) sources.requireCurrent(adjustment.input().basis()); else sources.requireSupported(adjustment.input().basis());
         personnel.requireEligible(command.source().tenantId(), command.authorizedBy(), command.source().position().legalEntityId());
+    }
+    private void persist(BudgetConsumptionReversalOperation value) {
+        operations.update(value); events.publishEvent(new ExpenseAdjustmentChanged.Budget(value));
     }
     private void sync(BudgetConsumptionReversalOperation operation, Instant at) {
         var command = operation.input().command(); var current = adjustment(command.source().tenantId(), command.adjustmentId());

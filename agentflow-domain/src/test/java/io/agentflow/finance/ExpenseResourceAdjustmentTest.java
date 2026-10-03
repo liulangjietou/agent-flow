@@ -8,6 +8,7 @@ import io.agentflow.expense.ExpensePaymentReturns;
 import io.agentflow.expense.ExpenseResourceAdjustment;
 import io.agentflow.expense.ExpenseResourceAdjustmentBasis;
 import io.agentflow.expense.ExpenseSettlement;
+import io.agentflow.notification.ExpenseAdjustmentNotice;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -25,6 +26,28 @@ class ExpenseResourceAdjustmentTest {
     private static final Instant NOW = Instant.parse("2026-09-29T16:00:00Z");
     private static final LocalDate DATE = LocalDate.of(2026, 9, 29);
     private static final String TARGET = "a".repeat(64);
+
+    @Test void noticeFactsSeparateBudgetResourcesAndDeliberateRechecks() {
+        var input = input(basis(false), "finance"); var pending = ExpenseResourceAdjustment.begin(input); var budget = applied(input.budget());
+        assertThat(ExpenseAdjustmentNotice.from(pending)).isEmpty();
+        assertThat(ExpenseAdjustmentNotice.from(budget)).contains(ExpenseAdjustmentNotice.BUDGET_APPLIED);
+        var ready = pending.budgetApplied(budget, NOW.plusSeconds(1)); assertThat(ExpenseAdjustmentNotice.from(ready)).isEmpty();
+        assertThat(ExpenseAdjustmentNotice.from(ready.requireReview("RESOURCE_CHANGED", NOW.plusSeconds(2)))).contains(ExpenseAdjustmentNotice.RESOURCES_BLOCKED);
+        var complete = ready.applied(NOW.plusSeconds(2)); assertThat(ExpenseAdjustmentNotice.from(complete)).contains(ExpenseAdjustmentNotice.COMPLETED);
+        assertThat(ExpenseAdjustmentNotice.from(complete.requireReview("BUDGET_RECHECK_REQUIRED", NOW.plusSeconds(3)))).isEmpty();
+        assertThat(ExpenseAdjustmentNotice.from(budget.requestQuery(NOW.plusSeconds(3)))).isEmpty();
+        var running = BudgetConsumptionReversalOperation.queue(input.budget(), NOW).claim(NOW, Duration.ofSeconds(30));
+        assertThat(ExpenseAdjustmentNotice.from(running)).isEmpty();
+        assertThat(ExpenseAdjustmentNotice.from(running.unavailable(BudgetConsumptionReversalOperation.Failure.CONNECTION, NOW.plusSeconds(1)))).contains(ExpenseAdjustmentNotice.BUDGET_UNKNOWN);
+    }
+
+    @Test void noticeSourceRejectsNoncanonicalIdsAndOtherBusinessKeys() {
+        var id = UUID.fromString("12345678-abcd-abcd-abcd-123456789abc"); var fact = ExpenseAdjustmentNotice.COMPLETED;
+        assertThat(ExpenseAdjustmentNotice.source(fact.eventKey(id))).contains(new ExpenseAdjustmentNotice.Source(id, fact));
+        for (String invalid : List.of("expense-adjustment:1-1-1-1-1:COMPLETED", "expense-adjustment:" + id + ":UNKNOWN", "expense-adjustment:" + id.toString().toUpperCase() + ":COMPLETED", "supplier-adjustment:" + id + ":COMPLETED")) {
+            assertThat(ExpenseAdjustmentNotice.source(invalid)).isEmpty();
+        }
+    }
 
     @Test void budgetAndResourcesCompleteSeparatelyWithoutRewritingOriginalSettlement() {
         var input = input(basis(false), "finance"); var queued = ExpenseResourceAdjustment.begin(input); var operation = applied(input.budget());

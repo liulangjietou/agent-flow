@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpenseResourceAdjustmentActionService {
+    private final ApplicationEventPublisher events;
     private final CurrentActor actors;
     private final ExpenseResourceAdjustmentAccess access;
     private final JdbcExpenseResourceAdjustmentRepository adjustments;
@@ -35,7 +37,8 @@ public class ExpenseResourceAdjustmentActionService {
     /** 人工动作与审计共用当前权限，预算发送及原资源转换保持各自职责。 */
     public ExpenseResourceAdjustmentActionService(CurrentActor actors, ExpenseResourceAdjustmentAccess access, JdbcExpenseResourceAdjustmentRepository adjustments,
             JdbcBudgetConsumptionReversalRepository budgets, ExpenseResourceAdjustmentBudgetExecution budgetExecution,
-            ExpenseResourceAdjustmentSources sources, ExpenseResourceAdjustmentAudit audit) {
+            ExpenseResourceAdjustmentSources sources, ExpenseResourceAdjustmentAudit audit, ApplicationEventPublisher events) {
+        this.events = events;
         this.actors = actors; this.access = access; this.adjustments = adjustments; this.budgets = budgets; this.budgetExecution = budgetExecution; this.sources = sources; this.audit = audit;
     }
     /** 查询不依赖原来源仍可写，重发与资源恢复则复核原财务依据；所有动作保留原命令。 */
@@ -51,10 +54,10 @@ public class ExpenseResourceAdjustmentActionService {
                 budgetExecution.resend(actor.tenantId(), before.id(), budget.version(), now);
             }
             case RETRY_RESOURCES -> {
-                sources.requireSupported(before.input().basis()); adjustments.update(before.retryResources(budget, now));
+                sources.requireSupported(before.input().basis()); persist(before.retryResources(budget, now));
             }
             case CONFIRM_COMPLETED -> {
-                sources.requireSupported(before.input().basis()); adjustments.update(before.confirmCompleted(budget, now));
+                sources.requireSupported(before.input().basis()); persist(before.confirmCompleted(budget, now));
             }
         }
         var after = adjustments.find(actor.tenantId(), before.id()).orElseThrow(); var operation = budgets.find(actor.tenantId(), before.id()).orElseThrow();
@@ -68,7 +71,7 @@ public class ExpenseResourceAdjustmentActionService {
         var before = requireAdjustment(report, input.roundNo(), input.adjustmentId(), input.adjustmentVersion()); requireBudget(before, input.budgetVersion()); var now = now();
         var stopped = budgetExecution.stop(actors.actor().tenantId(), before.id(), input.budgetVersion(), now);
         var decision = new ExpenseResourceAdjustmentRetirement(before, stopped, actors.actor().userId(), input.evidenceReference(), input.reason(), now);
-        adjustments.retire(decision); var event = audit.record(before.input().basis(), before.id(), decision.after().version(), "EXPENSE_ADJUSTMENT_RETIRE", input.reason(), now);
+        adjustments.retire(decision); events.publishEvent(new ExpenseAdjustmentChanged.Retired(decision)); var event = audit.record(before.input().basis(), before.id(), decision.after().version(), "EXPENSE_ADJUSTMENT_RETIRE", input.reason(), now);
         return receipt(decision.after(), stopped, event);
     }
     /** 工作台只投影当前可办理动作，纯领域转换用于预判，不保存任何状态。 */
@@ -97,6 +100,9 @@ public class ExpenseResourceAdjustmentActionService {
             value.retire(budget.status() == BudgetConsumptionReversalOperation.Status.QUEUED ? budget.voidBeforeSend(at) : budget, at);
             return true;
         } catch (DomainException unavailable) { return false; }
+    }
+    private void persist(ExpenseResourceAdjustment value) {
+        adjustments.update(value); events.publishEvent(new ExpenseAdjustmentChanged.Resources(value));
     }
     private ExpenseResourceAdjustment requireAdjustment(UUID report, int round, UUID id, long version) {
         var value = adjustments.find(actors.actor().tenantId(), id).orElseThrow(ExpenseResourceAdjustmentActionService::conflict);
