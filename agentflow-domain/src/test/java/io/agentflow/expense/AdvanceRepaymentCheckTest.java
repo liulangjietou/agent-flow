@@ -43,10 +43,40 @@ class AdvanceRepaymentCheckTest {
     @Test void invalidRestoredStatesAndBackdatedTransitionsFailClosed() {
         var active = active();
         assertThatThrownBy(() -> active.complete(new FinanceResult.Success<>(receipt(active, AdvanceRepaymentPort.Status.CONFIRMED)), NOW.minusSeconds(1))).isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> new AdvanceRepaymentCheck(active.input(), 2, AdvanceRepaymentCheck.Status.RUNNING, NOW, null, null, null, null)).isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> new AdvanceRepaymentCheck(active.input(), 2, AdvanceRepaymentCheck.Status.UNAVAILABLE, NOW, null, null, null, null)).isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> new AdvanceRepaymentCheck(active.input(), 2, AdvanceRepaymentCheck.Status.RECORDED, NOW, null, receipt(active, AdvanceRepaymentPort.Status.PENDING), UUID.randomUUID(), null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new AdvanceRepaymentCheck(active.input(), 2, AdvanceRepaymentCheck.Status.RUNNING, NOW, null, null, null, null, null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new AdvanceRepaymentCheck(active.input(), 2, AdvanceRepaymentCheck.Status.UNAVAILABLE, NOW, null, null, null, null, null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new AdvanceRepaymentCheck(active.input(), 2, AdvanceRepaymentCheck.Status.RECORDED, NOW, null, receipt(active, AdvanceRepaymentPort.Status.PENDING), UUID.randomUUID(), null, null)).isInstanceOf(DomainException.class);
         assertThat(active.voidSource(NOW).issue()).isEqualTo(AdvanceRepaymentCheck.Issue.SOURCE_CHANGED);
+    }
+    @Test void notificationFactsDistinguishQueryFailureMissingFundsAndActualRegistration() {
+        var active = active(); var notice = io.agentflow.notification.RepaymentNotice.class;
+        assertThat(io.agentflow.notification.RepaymentNotice.from(active)).isEmpty();
+        for (var outcome : AdvanceRepaymentPort.Status.values()) {
+            var checked = active.complete(new FinanceResult.Success<>(receipt(active, outcome)), NOW);
+            var fact = io.agentflow.notification.RepaymentNotice.from(checked);
+            if (outcome == AdvanceRepaymentPort.Status.CONFIRMED) {
+                assertThat(fact).isEmpty();
+                var value = new AdvanceRepayment(UUID.randomUUID(), "demo", active.input().id(), checked.receipt(), "finance", NOW, "明确登记");
+                assertThat(io.agentflow.notification.RepaymentNotice.from(checked.record(value, NOW))).contains(io.agentflow.notification.RepaymentNotice.RECORDED);
+            } else assertThat(fact).contains(Enum.valueOf(notice, outcome.name()));
+        }
+        assertThat(io.agentflow.notification.RepaymentNotice.from(active.fail(AdvanceRepaymentCheck.Issue.TIMEOUT, NOW))).contains(io.agentflow.notification.RepaymentNotice.UNAVAILABLE);
+        assertThat(io.agentflow.notification.RepaymentNotice.from(active.voidSource(NOW))).contains(io.agentflow.notification.RepaymentNotice.SOURCE_CHANGED);
+    }
+    @Test void triggeredReviewIsPartOfOriginalQueryAndCannotBeConsumedAsNewRepayment() {
+        var active = active(); var checked = active.complete(new FinanceResult.Success<>(receipt(active, AdvanceRepaymentPort.Status.CONFIRMED)), NOW);
+        var original = UUID.randomUUID(); var reviewed = checked.requiringReview(original);
+        assertThat(reviewed.version()).isEqualTo(checked.version()); assertThat(reviewed.reviewRepaymentId()).isEqualTo(original); assertThat(reviewed.usable(NOW)).isFalse();
+        assertThat(io.agentflow.notification.RepaymentNotice.from(reviewed)).contains(io.agentflow.notification.RepaymentNotice.REVIEW_REQUIRED);
+        assertThatThrownBy(() -> active.requiringReview(original)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> reviewed.requiringReview(UUID.randomUUID())).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> reviewed.record(new AdvanceRepayment(UUID.randomUUID(), "demo", active.input().id(), checked.receipt(), "finance", NOW, "不得重复登记"), NOW)).isInstanceOf(DomainException.class);
+    }
+    @Test void repaymentNotificationKeysRejectForeignSourcesAndNonCanonicalIdentifiers() {
+        var id = UUID.fromString("12345678-abcd-4abc-8abc-1234567890ab"); var notice = io.agentflow.notification.RepaymentNotice.RECORDED;
+        assertThat(io.agentflow.notification.RepaymentNotice.source(notice.eventKey(id))).contains(new io.agentflow.notification.RepaymentNotice.Source(id, notice));
+        for (String key : java.util.List.of("disbursement-return:" + id + ":RECORDED", "repayment:" + id.toString().toUpperCase() + ":RECORDED", "repayment:" + id + ":UNKNOWN", notice.eventKey(id) + ":extra"))
+            assertThat(io.agentflow.notification.RepaymentNotice.source(key)).isEmpty();
     }
     private static AdvanceRepaymentCheck active() {
         return AdvanceRepaymentCheck.queue(new AdvanceRepaymentCheck.Input(UUID.randomUUID(), "demo", UUID.randomUUID(), 4, "a".repeat(64),
