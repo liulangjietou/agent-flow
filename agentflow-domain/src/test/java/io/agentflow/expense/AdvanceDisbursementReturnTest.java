@@ -161,6 +161,21 @@ class AdvanceDisbursementReturnTest {
         assertThat(DisbursementReturnNotice.source(null)).isEmpty();
     }
 
+    @Test void noticesKeepOriginalComparisonAndSuppressAlreadyAcceptedReturns() {
+        var queued = AdvanceDisbursementReturnCheck.queue(new AdvanceDisbursementReturnCheck.Input(UUID.randomUUID(), "demo", "b".repeat(64), 3, request, "finance", NOW));
+        var running = queued.claim(NOW, Duration.ofSeconds(90));
+        var confirmed = running.complete(new FinanceResult.Success<>(receipt(List.of())), NOW.plusSeconds(1));
+        var conflict = confirmed.withReviewRequirement(true);
+        assertThat(DisbursementReturnNotice.from(confirmed)).isEmpty(); assertThat(DisbursementReturnNotice.from(conflict)).contains(DisbursementReturnNotice.REVIEW_REQUIRED);
+        fails("DISBURSEMENT_RETURN_CHECK_CONFLICT", () -> conflict.withReviewRequirement(false));
+        var decision = new AdvanceDisbursementReturn(UUID.randomUUID(), "demo", conflict.input().id(), conflict.receipt(), "finance", NOW.plusSeconds(2), "proof", "本次明确裁决");
+        assertThat(DisbursementReturnNotice.REVIEW_REQUIRED.presentIn(conflict.resolve(decision, decision.resolvedAt()))).isTrue();
+        var returned = running.complete(new FinanceResult.Success<>(receipt(List.of(item("noticed-return", "20")))), NOW.plusSeconds(1));
+        assertThat(DisbursementReturnNotice.from(returned)).contains(DisbursementReturnNotice.RETURN_REVIEW);
+        assertThat(DisbursementReturnNotice.from(returned.withReviewRequirement(false))).isEmpty();
+        assertThat(DisbursementReturnNotice.from(returned.withReviewRequirement(true))).contains(DisbursementReturnNotice.RETURN_REVIEW);
+    }
+
     private void apply(EmployeeAdvance advance, List<AdvanceDisbursementReturnPort.ReturnItem> items) { advance.requirePaymentReview(advance.version()); advance.resolveDisbursementReview(advance.version(), decision(items)); }
     private AdvanceDisbursementReturn decision(List<AdvanceDisbursementReturnPort.ReturnItem> items) { return new AdvanceDisbursementReturn(UUID.randomUUID(), "demo", UUID.randomUUID(), receipt(items), "finance", NOW, "proof", "核对原放款、入款和贷方分录"); }
     private AdvanceDisbursementReturnPort.Receipt receipt(List<AdvanceDisbursementReturnPort.ReturnItem> items) {

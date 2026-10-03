@@ -5,6 +5,7 @@ import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
 import io.agentflow.finance.AdvanceRepaymentPort;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
+import io.agentflow.notification.RepaymentReviewNotice;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -40,9 +41,37 @@ class AdvanceRepaymentReviewCheckTest {
     @Test void malformedRestoredLeaseDecisionAndBackdatedTransitionsFailClosed() {
         var active = active();
         assertThatThrownBy(() -> active.fail(AdvanceRepaymentReviewCheck.Issue.CONNECTION, NOW.minusSeconds(1))).isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> new AdvanceRepaymentReviewCheck(active.input(), 2, AdvanceRepaymentReviewCheck.Status.RUNNING, NOW, null, null, null, null)).isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> new AdvanceRepaymentReviewCheck(active.input(), 3, AdvanceRepaymentReviewCheck.Status.RESOLVED, NOW, null, evidence(active, AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED), UUID.randomUUID(), null)).isInstanceOf(DomainException.class);
-        assertThatThrownBy(() -> new AdvanceRepaymentReviewCheck(active.input(), 3, AdvanceRepaymentReviewCheck.Status.UNAVAILABLE, NOW, null, null, null, null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new AdvanceRepaymentReviewCheck(active.input(), 2, AdvanceRepaymentReviewCheck.Status.RUNNING, NOW, null, null, null, null, null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new AdvanceRepaymentReviewCheck(active.input(), 3, AdvanceRepaymentReviewCheck.Status.RESOLVED, NOW, null, evidence(active, AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED), UUID.randomUUID(), null, null)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new AdvanceRepaymentReviewCheck(active.input(), 3, AdvanceRepaymentReviewCheck.Status.UNAVAILABLE, NOW, null, null, null, null, null)).isInstanceOf(DomainException.class);
+    }
+    @Test void originalComparisonIsImmutableAndPreservedByResolution() {
+        var active = active(); var checked = active.complete(new FinanceResult.Success<>(evidence(active, AdvanceRepaymentAdjustmentPort.Status.CONFIRMED)), NOW);
+        assertThat(checked.reviewRequired()).isNull(); assertThat(RepaymentReviewNotice.from(checked)).isEmpty();
+        var conflict = checked.withReviewRequirement(true);
+        assertThat(RepaymentReviewNotice.from(conflict)).contains(RepaymentReviewNotice.REVIEW_REQUIRED);
+        assertThatThrownBy(() -> conflict.withReviewRequirement(false)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> active.withReviewRequirement(true)).isInstanceOf(DomainException.class);
+        var decision = new AdvanceRepaymentResolution(UUID.randomUUID(), "demo", checked.input().id(), checked.receipt(), "finance", NOW, "proof", "明确裁决");
+        var resolved = conflict.resolve(decision, NOW); assertThat(resolved.reviewRequired()).isTrue();
+        assertThat(RepaymentReviewNotice.REVIEW_REQUIRED.presentIn(resolved)).isTrue();
+        assertThat(RepaymentReviewNotice.from(resolved)).contains(RepaymentReviewNotice.RESOLVED);
+        assertThat(RepaymentReviewNotice.REVIEW_REQUIRED.presentIn(checked.resolve(decision, NOW))).isFalse();
+        assertThat(RepaymentReviewNotice.from(checked.withReviewRequirement(false))).isEmpty();
+    }
+    @Test void unavailableUnresolvedAndSourceChangedHaveNoFinancialDecision() {
+        var active = active(); var unknown = active.complete(new FinanceResult.Success<>(evidence(active, AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED)), NOW).withReviewRequirement(true);
+        assertThat(RepaymentReviewNotice.from(unknown)).contains(RepaymentReviewNotice.UNRESOLVED);
+        assertThat(RepaymentReviewNotice.RESOLVED.presentIn(unknown)).isFalse();
+        assertThat(RepaymentReviewNotice.from(active.fail(AdvanceRepaymentReviewCheck.Issue.CONNECTION, NOW))).contains(RepaymentReviewNotice.UNAVAILABLE);
+        assertThat(RepaymentReviewNotice.from(active.voidSource(NOW))).contains(RepaymentReviewNotice.SOURCE_CHANGED);
+    }
+    @Test void noticeKeysRejectOtherBusinessesAndNoncanonicalIdentifiers() {
+        var id = UUID.fromString("abcdefab-abcd-abcd-abcd-abcdefabcdef");
+        for (var notice : RepaymentReviewNotice.values()) assertThat(RepaymentReviewNotice.source(notice.eventKey(id))).contains(new RepaymentReviewNotice.Source(id, notice));
+        for (String key : java.util.List.of("repayment:" + id + ":RESOLVED", "repayment-review:1-1-1-1-1:RESOLVED", "repayment-review:" + id + ":CONFIRMED",
+                "repayment-review:" + id + ":RESOLVED:2", "repayment-review:" + id.toString().toUpperCase() + ":RESOLVED")) assertThat(RepaymentReviewNotice.source(key)).isEmpty();
+        assertThat(RepaymentReviewNotice.source(null)).isEmpty();
     }
     private static AdvanceRepaymentReviewCheck active() {
         var amount = new Money(new BigDecimal("25"), "CNY"); var original = new AdvanceRepaymentPort.Receipt(new AdvanceRepaymentPort.Request(UUID.randomUUID(), UUID.randomUUID(), "alice", "payment", "CNY", "receipt"),

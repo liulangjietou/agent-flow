@@ -121,6 +121,7 @@ class AdvanceRepaymentIntegrationTest {
     @Autowired JdbcPaymentOperationRepository payments;
     @Autowired FinanceGatewayConfiguration configuration;
     @Autowired io.agentflow.notification.RepaymentNotificationAccess repaymentNoticeAccess;
+    @Autowired io.agentflow.notification.RepaymentReviewNotificationAccess repaymentReviewNoticeAccess;
     @Autowired AdvanceRepaymentWorker worker;
     @Autowired AdvanceRepaymentService service;
     @Autowired JdbcAdvanceRepaymentCheckRepository checks;
@@ -673,6 +674,86 @@ class AdvanceRepaymentIntegrationTest {
         assertThat(resolutions.latest("demo", repayment)).isEmpty(); assertThat(balance(loan).repaid()).isEqualTo(money("25"));
     }
 
+    @Test void repaymentReviewNotificationFailureKeepsOwnQueryAfterFreshConfirmation() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-notice-failure"); var before = balance(loan).state();
+        var check = review(loan, repayment); var claimed = reviewService.claim("demo", check, Instant.now()); reviewService.fail(claimed, Instant.now());
+        assertThat(repaymentReviewNoticeRecipients(check, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        var target = repaymentReviewNoticePath(check, "UNAVAILABLE", "alice"); var fresh = review(loan, repayment); reviewWorker.poll();
+        assertThat(reviewChecks.find("demo", fresh).orElseThrow().receipt().status()).isEqualTo(AdvanceRepaymentAdjustmentPort.Status.CONFIRMED);
+        var detail = ok(read(target, "alice"), 200); assertThat(detail.path("checkId").asText()).isEqualTo(check.toString());
+        assertThat(detail.path("resolution").isNull()).isTrue(); assertThat(detail.path("observation").isNull()).isTrue(); assertThat(balance(loan).state()).isEqualTo(before);
+    }
+
+    @Test void repaymentReviewNotificationCandidateNeverClaimsDebtHasBeenAdjusted() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-notice-candidate"); var repaid = balance(loan).repaid(); var debt = balance(loan).outstanding();
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.PARTIALLY_RETURNED; partialReturns = List.of(partialItem("review-notice-partial", "10")); receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll();
+        assertThat(repaymentReviewNoticeRecipients(check, "RETURN_REVIEW")).containsExactlyInAnyOrder("alice", "finance");
+        var target = ok(read(repaymentReviewNoticePath(check, "RETURN_REVIEW", "alice"), "alice"), 200);
+        assertThat(target.path("repaymentId").asText()).isEqualTo(repayment.toString()); assertThat(target.path("resolution").isNull()).isTrue();
+        assertThat(target.at("/observation/outcome").asText()).isEqualTo("PARTIALLY_RETURNED"); assertThat(balance(loan).repaymentReviews()).containsExactly(repayment);
+        assertThat(balance(loan).repaid()).isEqualTo(repaid); assertThat(balance(loan).outstanding()).isEqualTo(debt);
+    }
+
+    @Test void repaymentReviewNotificationResolutionRetainsExactDecisionAndDeduplicatesReplay() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-notice-result"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll(); String key = UUID.randomUUID().toString(); var input = resolveInput(loan, check);
+        var response = send(reviewPath(loan, repayment) + "/resolutions", "finance", key, input); var saved = ok(response, 202);
+        assertThat(send(reviewPath(loan, repayment) + "/resolutions", "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(repaymentReviewNoticeRecipients(check, "RESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        var target = repaymentReviewNoticePath(check, "RESOLVED", "alice"); var original = ok(read(target, "alice"), 200);
+        assertThat(original.at("/resolution/id").asText()).isEqualTo(saved.path("resolutionId").asText());
+        assertThat(original.at("/resolution/advanceVersion").asLong()).isEqualTo(balance(loan).version());
+        var earlier = ok(read(repaymentReviewNoticePath(check, "RETURN_REVIEW", "alice"), "alice"), 200); assertThat(earlier.path("resolution")).isEqualTo(original.path("resolution"));
+        receiptRevision = 3; reviewRevision = 2; var next = review(loan, repayment); reviewWorker.poll();
+        assertThat(ok(read(target, "alice"), 200)).isEqualTo(original); assertThat(reviewChecks.find("demo", next).orElseThrow().resolutionId()).isNull();
+        assertThat(repaymentReviewNoticeRecipients(next, "RETURN_REVIEW")).isEmpty();
+        assertThat(original.toString()).doesNotContain("fundsReturn", "accountDigest", "transactionReference", "amount", "canResolve");
+    }
+
+    @Test void repaymentReviewNotificationConfirmedConflictPreservesHistoricalReturnFacts() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-notice-conflict"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll(); ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, check)), 202);
+        var returned = balance(loan).returnedRepayments(); var debt = balance(loan).outstanding();
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.CONFIRMED; reviewRevision = 2; receiptRevision = 3; var inconsistent = review(loan, repayment); reviewWorker.poll();
+        assertThat(balance(loan).repaymentReviewRequired()).isTrue(); assertThat(repaymentReviewNoticeRecipients(inconsistent, "REVIEW_REQUIRED")).containsExactlyInAnyOrder("alice", "finance");
+        var target = ok(read(repaymentReviewNoticePath(inconsistent, "REVIEW_REQUIRED", "alice"), "alice"), 200);
+        assertThat(target.at("/observation/outcome").asText()).isEqualTo("CONFIRMED"); assertThat(target.path("resolution").isNull()).isTrue();
+        assertThat(balance(loan).returnedRepayments()).isEqualTo(returned); assertThat(balance(loan).outstanding()).isEqualTo(debt);
+    }
+
+    @Test void disbursementReturnNotificationConfirmedHistoryConflictRequiresAttention() throws Exception {
+        var loan = paidLoan(); var funds = bankReturn("disbursement-notice-conflict", "20");
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED; disbursementFacts = List.of(funds);
+        var check = disbursementReview(loan); disbursementWorker.poll(); ok(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, check)), 202);
+        var returned = balance(loan).returnedDisbursements(); var debt = balance(loan).outstanding();
+        disbursementStatus = AdvanceDisbursementReturnPort.Status.CONFIRMED; disbursementFacts = List.of(); disbursementRevision = 2;
+        var inconsistent = disbursementReview(loan); disbursementWorker.poll(); assertThat(balance(loan).paymentReviewRequired()).isTrue();
+        assertThat(disbursementNoticeRecipients(inconsistent, "REVIEW_REQUIRED")).containsExactlyInAnyOrder("alice", "finance");
+        var target = ok(read(disbursementNoticePath(inconsistent, "REVIEW_REQUIRED", "alice"), "alice"), 200);
+        assertThat(target.at("/observation/outcome").asText()).isEqualTo("CONFIRMED"); assertThat(target.path("resolution").isNull()).isTrue();
+        assertThat(balance(loan).returnedDisbursements()).isEqualTo(returned); assertThat(balance(loan).outstanding()).isEqualTo(debt);
+    }
+
+    @Test void disbursementReturnNotificationIdenticalAcceptedReturnDoesNotInventAnotherPendingDecision() throws Exception {
+        var loan = paidLoan(); disbursementStatus = AdvanceDisbursementReturnPort.Status.PARTIALLY_RETURNED;
+        disbursementFacts = List.of(bankReturn("disbursement-notice-repeat", "20")); var first = disbursementReview(loan); disbursementWorker.poll();
+        ok(send(path(loan) + "/disbursement-resolutions", "finance", disbursementInput(loan, first)), 202); var before = balance(loan).state();
+        disbursementRevision = 2; var repeated = disbursementReview(loan); disbursementWorker.poll();
+        assertThat(balance(loan).state()).isEqualTo(before); assertThat(balance(loan).paymentReviewRequired()).isFalse();
+        assertThat(disbursementView(loan, "finance").at("/latestCheck/canResolve").asBoolean()).isFalse();
+        assertThat(disbursementNoticeRecipients(repeated, "RETURN_REVIEW")).isEmpty();
+        assertThat(ok(read(disbursementNoticePath(first, "RETURN_REVIEW", "alice"), "alice"), 200).path("resolution").isNull()).isFalse();
+    }
+
+    private List<String> repaymentReviewNoticeRecipients(UUID check, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, "repayment-review:" + check + ":" + fact);
+    }
+    private String repaymentReviewNoticePath(UUID check, String fact, String recipient) {
+        String id = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class, "repayment-review:" + check + ":" + fact, recipient);
+        return "/api/v1/notifications/" + id + "/repayment-review-target";
+    }
+
     @Test void repaymentNotificationFailureKeepsOriginalQueryAfterSuccessfulRetry() throws Exception {
         var loan = paidLoan(); var before = balance(loan).state(); var failed = query(loan, "notice-failed");
         var claimed = service.claim("demo", failed, Instant.now()); service.fail(claimed, Instant.now());
@@ -818,6 +899,111 @@ class AdvanceRepaymentIntegrationTest {
         ok(send(reviewPath(loan, originalId) + "/resolutions", "finance", resolveInput(loan, review)), 202);
         assertThat(balance(loan).repaymentReviews()).isEmpty(); assertThat(ok(read(target, "alice"), 200)).isEqualTo(snapshot);
         assertThat(balance(loan).repaid()).isEqualTo(money("25")); assertThat(paymentWrites).isEqualTo(outgoing); assertThat(voucherWrites).isEqualTo(postings);
+    }
+
+    @Test void repaymentReviewNotificationCurrentScopeAndExactFactGuardReads() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-scope"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED; var check = review(loan, repayment); reviewWorker.poll(); var before = balance(loan).state();
+        var own = repaymentReviewNoticePath(check, "UNRESOLVED", "finance"); var messageId = UUID.fromString(own.split("/")[4]); ok(read(own, "finance"), 200);
+        for (String actor : List.of("alice", "admin", "cashier", "bob")) assertThat(read(own, actor).getStatus()).isIn(403, 404);
+        assertThat(read(own + "?advanceId=" + loan, "finance").getStatus()).isEqualTo(400);
+        actors.set(new Actor("demo", "finance", Set.of("ADMIN")));
+        try { assertThatThrownBy(() -> repaymentReviewNoticeAccess.target(messageId)).isInstanceOf(io.agentflow.common.DomainException.class); } finally { actors.clear(); }
+        actors.set(new Actor("foreign", "finance", Set.of("FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> repaymentReviewNoticeAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        String event = "repayment-review:" + check + ":UNRESOLVED";
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "repayment-review:" + check + ":REVIEW_REQUIRED", messageId.toString());
+        try { assertThat(read(own, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event, messageId.toString()); }
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> events.publishEvent(new AdvanceRepaymentReviewChanged(reviewChecks.find("demo", check).orElseThrow())));
+        assertThat(repaymentReviewNoticeRecipients(check, "UNRESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(balance(loan).state()).isEqualTo(before); assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, messageId.toString())).isNull();
+    }
+
+
+    @Test void repaymentReviewNotificationTimeoutAndRevokedAppointmentCannotUseLateEvidence() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-timeout"); var first = review(loan, repayment); var before = balance(loan).state();
+        var claimed = reviewService.claim("demo", first, Instant.now()); assertThat(reviewService.claim("demo", first, claimed.leaseUntil())).isNull(); reviewService.fail(claimed, claimed.leaseUntil().plusSeconds(1));
+        assertThat(repaymentReviewNoticeRecipients(first, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        var queued = review(loan, repayment); jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        try { reviewWorker.poll(); assertThat(repaymentReviewNoticeRecipients(queued, "SOURCE_CHANGED")).containsExactly("alice");
+            assertThat(ok(read(repaymentReviewNoticePath(queued, "SOURCE_CHANGED", "alice"), "alice"), 200).path("status").asText()).isEqualTo("VOIDED");
+            assertThat(balance(loan).state()).isEqualTo(before);
+        } finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString()); }
+    }
+
+
+    @Test void repaymentReviewNotificationUnknownRequiresExplicitDecisionAndRetainsOldQuery() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-unknown"); var debt = balance(loan).outstanding(); int writes = paymentWrites, postings = voucherWrites;
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.UNRESOLVED; var unknown = review(loan, repayment); reviewWorker.poll();
+        var target = repaymentReviewNoticePath(unknown, "UNRESOLVED", "alice"); var snapshot = ok(read(target, "alice"), 200);
+        assertThat(balance(loan).repaymentReviews()).contains(repayment);
+        reviewStatus = AdvanceRepaymentAdjustmentPort.Status.CONFIRMED; reviewRevision++; receiptRevision++;
+        var confirmed = review(loan, repayment); reviewWorker.poll(); assertThat(balance(loan).repaymentReviews()).contains(repayment);
+        assertThat(repaymentReviewNoticeRecipients(confirmed, "RESOLVED")).isEmpty();
+        ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, confirmed)), 202);
+        assertThat(repaymentReviewNoticeRecipients(confirmed, "RESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(ok(read(target, "alice"), 200)).isEqualTo(snapshot); assertThat(balance(loan).repaymentReviews()).isEmpty();
+        assertThat(balance(loan).outstanding()).isEqualTo(debt); assertThat(balance(loan).returnedRepayments()).isEqualTo(money("0"));
+        assertThat(paymentWrites).isEqualTo(writes); assertThat(voucherWrites).isEqualTo(postings);
+    }
+
+    @Test void repaymentReviewNotificationFailureRollsBackQueryHoldAndDecisionThenCancelsRevokedDelivery() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-atomic"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var check = review(loan, repayment); var claimed = reviewService.claim("demo", check, Instant.now()); var before = balance(loan).state();
+        var receipt = (AdvanceRepaymentAdjustmentPort.Receipt) response("advance-repayment-adjustment", json.read(json.write(claimed.input().request()), JsonNode.class));
+        var result = new FinanceResult.Success<>(receipt); String observedEvent = "repayment-review:" + check + ":RETURN_REVIEW";
+        jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT review_query_notice_failure CHECK (NOT (event_key='" + observedEvent + "' AND recipient_id='finance'))");
+        try { assertThatThrownBy(() -> reviewService.finish(claimed, result, Instant.now())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT review_query_notice_failure"); }
+        assertThat(reviewChecks.find("demo", check)).contains(claimed); assertThat(balance(loan).state()).isEqualTo(before);
+        assertThat(repaymentReviewNoticeRecipients(check, "RETURN_REVIEW")).isEmpty();
+        reviewService.finish(claimed, result, Instant.now()); var checked = reviewChecks.find("demo", check).orElseThrow(); var held = balance(loan).state();
+        var finance = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var preference = notificationPreferences.get(finance);
+        notificationPreferences.revise(finance, preference.version(), true, false); String event = "repayment-review:" + check + ":RESOLVED";
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT review_decision_notice_failure CHECK (NOT (event_key='" + event + "' AND recipient_id='finance'))"); actors.set(finance);
+            try { assertThatThrownBy(() -> reviewService.resolve(loan, repayment, new AdvanceRepaymentReviewService.ResolveInput(balance(loan).version(), check, checked.version(), checked.receipt().status(), "proof", "明确裁决原还款"))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { actors.clear(); jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT review_decision_notice_failure"); }
+            assertThat(balance(loan).state()).isEqualTo(held); assertThat(reviewChecks.find("demo", check)).contains(checked); assertThat(resolutions.latest("demo", repayment)).isEmpty();
+            assertThat(repaymentReviewNoticeRecipients(check, "RESOLVED")).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM advance_repayment_return WHERE tenant_id='demo' AND repayment_id=?", Integer.class, repayment.toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='ADVANCE_REPAYMENT_REVIEW_RESOLVE'", Integer.class, app(loan).id().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=?", Integer.class, event)).isZero();
+            ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, check)), 202);
+            var own = repaymentReviewNoticePath(check, "RESOLVED", "finance"); UUID delivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, own.split("/")[4]));
+            jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+            assertThat(read(own, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(delivery, Instant.now())).isNull();
+            assertThat(notificationDeliveryStore.find(delivery).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+        } finally {
+            actors.clear(); jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+            var current = notificationPreferences.get(finance); notificationPreferences.revise(finance, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    @Test void repaymentReviewNotificationResolutionProofAndLegacyAssessmentRemainReadable() throws Exception {
+        var loan = paidLoan(); var repayment = repay(loan, "review-proof"); reviewStatus = AdvanceRepaymentAdjustmentPort.Status.RETURNED; receiptRevision = 2;
+        var check = review(loan, repayment); reviewWorker.poll(); var checked = reviewChecks.find("demo", check).orElseThrow();
+        var saved = ok(send(reviewPath(loan, repayment) + "/resolutions", "finance", resolveInput(loan, check)), 202);
+        var id = UUID.fromString(saved.path("resolutionId").asText()); var resolved = reviewChecks.find("demo", check).orElseThrow(); var proof = resolutions.find("demo", id).orElseThrow();
+        assertThat(resolutions.find("foreign", id)).isEmpty();
+        for (String column : List.of("advance_version", "check_version")) {
+            long correct = column.equals("advance_version") ? proof.advanceVersion() : resolved.version();
+            jdbc.update("UPDATE advance_repayment_resolution SET " + column + "=? WHERE tenant_id='demo' AND id=?", correct - 1, id.toString());
+            try { assertThatThrownBy(() -> resolutions.find("demo", id)).isInstanceOf(io.agentflow.common.DomainException.class); }
+            finally { jdbc.update("UPDATE advance_repayment_resolution SET " + column + "=? WHERE tenant_id='demo' AND id=?", correct, id.toString()); }
+        }
+        var originals = new HashMap<Long, String>();
+        try {
+            for (long version : List.of(checked.version(), resolved.version())) {
+                String raw = jdbc.queryForObject("SELECT state_json FROM repayment_review_check_revision WHERE tenant_id='demo' AND check_id=? AND version=?", String.class, check.toString(), version);
+                originals.put(version, raw); var old = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(raw, JsonNode.class); old.remove("reviewRequired");
+                assertThat(json.read(old.toString(), AdvanceRepaymentReviewCheck.class).reviewRequired()).isNull();
+                jdbc.update("UPDATE repayment_review_check_revision SET state_json=? WHERE tenant_id='demo' AND check_id=? AND version=?", old.toString(), check.toString(), version);
+            }
+            assertThat(resolutions.find("demo", id)).contains(proof);
+        } finally {
+            originals.forEach((version, raw) -> jdbc.update("UPDATE repayment_review_check_revision SET state_json=? WHERE tenant_id='demo' AND check_id=? AND version=?", raw, check.toString(), version));
+        }
+        assertThat(ok(read(repaymentReviewNoticePath(check, "RETURN_REVIEW", "alice"), "alice"), 200).at("/resolution/id").asText()).isEqualTo(id.toString());
     }
 
     private List<String> repaymentNoticeRecipients(UUID check, String fact) {

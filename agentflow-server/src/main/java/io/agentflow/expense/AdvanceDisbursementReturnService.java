@@ -121,14 +121,16 @@ public class AdvanceDisbursementReturnService {
     public void finish(AdvanceDisbursementReturnCheck claimed, FinanceResult<AdvanceDisbursementReturnPort.Receipt> result, Instant at) {
         var source = sources.locked(claimed.input().tenantId(), claimed.input().request().command().binding().businessId()); var current = current(claimed); if (current == null) return; var now = time(at);
         if (!available(current, source, now)) return;
-        var completed = current.complete(result, now); persistCheck(completed); if (completed.receipt() == null) return;
+        var completed = current.complete(result, now); if (completed.receipt() == null) { persistCheck(completed); return; }
         var receipt = completed.receipt(); var advance = source.funding().advance(); var previous = decisions.latest(advance.tenantId(), advance.id()).orElse(null);
         boolean same = receipt.status() != AdvanceDisbursementReturnPort.Status.UNRESOLVED
                 && (previous == null ? receipt.status() == AdvanceDisbursementReturnPort.Status.CONFIRMED : receipt.sameReturns(previous.receipt()))
                 && receipt.samePaymentFacts(source.funding().payment().observation()) && !evidenceChanged(completed);
+        completed = completed.withReviewRequirement(!same);
         if (!same && !advance.paymentReviewRequired()) {
             long version = advance.version(); advance.requirePaymentReview(version); balances.update(advance, version, "disbursement-return-query", "PAYMENT_REVIEW");
         }
+        persistCheck(completed);
     }
     /** 外部异常不生成回款结论，操作者可以明确建立新的查询。 */
     @Transactional
