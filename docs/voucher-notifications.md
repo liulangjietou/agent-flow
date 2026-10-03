@@ -46,4 +46,4 @@ F17 的借款挂账、报销挂账和员工付款凭证已接通准备异常、E
 
 ## 尚未完成
 
-费用预算原操作通知已接通，见[预算通知](budget-notifications.md)。独立冲销准备、执行与安全结束的通知及页面也已接通，见[独立冲销通知](reversal-notifications.md)。人工外部冲销核对及登记通知见[外部冲销核对通知](reversal-check-notifications.md)。业务核销及其他恢复来源仍需逐项核对并补齐通知。全部 F17 来源接通后，还需要固定安装包 HTTP、非空旧库、重启和恢复验收；本阶段不代表实际浏览器或 PostgreSQL 新范围验收。真实企业通知渠道、ERP 和银行回执仍由相应外部验收任务覆盖。本阶段没有推送或创建 PR。
+费用预算原操作通知已接通，见[预算通知](budget-notifications.md)。独立冲销准备、执行与安全结束的通知及页面也已接通，见[独立冲销通知](reversal-notifications.md)。人工外部冲销核对及登记通知见[外部冲销核对通知](reversal-check-notifications.md)。报销结算通知见[结算修订通知](expense-settlement-notifications.md)。供应商结算及其他独立恢复来源仍需逐项核对并补齐通知。全部 F17 来源接通后，还需要固定安装包 HTTP、非空旧库、重启和恢复验收；本阶段不代表实际浏览器或 PostgreSQL 新范围验收。真实企业通知渠道、ERP 和银行回执仍由相应外部验收任务覆盖。本阶段没有推送或创建 PR。
