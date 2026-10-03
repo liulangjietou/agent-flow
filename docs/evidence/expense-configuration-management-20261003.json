@@ -1,0 +1,398 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T02:29:20.166423+00:00",
+  "taskId": "F01",
+  "status": "MANAGEMENT_UI_PHASE_VERIFIED_TASK_OPEN",
+  "implementationCommit": "e7e0ce9cb0b24b60e1196f3925b0adf2e1ffd078",
+  "backendCodeCommit": "14cf591ca83d0018bb468b2705ba1382614cb918",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "管理页面、编辑与三版本发布确认、原写入恢复、只读历史、身份隔离、数据库非空升级和同包重启",
+  "web": {
+    "uniqueScopedTests": 86,
+    "newConfigurationTests": 21,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "build": "PASS",
+    "warning": "Existing bundle exceeds 500 kB",
+    "distDirectory": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-web-dist-v3",
+    "typecheckEmitsNoJavaScript": true,
+    "buildArtifacts": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-web-dist-v3/assets/index-B4Wsp4oI.js",
+        "sha256": "93318396a40d19c1a7200d8f1a572f101b53d07012f3fa9e32944086ea9eb31b",
+        "bytes": 1629226
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-web-dist-v3/assets/index-BrUIWvZa.css",
+        "sha256": "5d7c735e74a356e13f10d35399f24f16c4133c8b2f536eac0411558597f98af1",
+        "bytes": 372507
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-web-dist-v3/index.html",
+        "sha256": "9a358439895ac66695b3ac53aad7b717d6f40d2ec592b751722a6c0296f891c6",
+        "bytes": 420
+      }
+    ]
+  },
+  "backendPhaseEvidence": "docs/evidence/expense-configuration-backend-20261003.json",
+  "backendTestsRerunThisUiPhase": false,
+  "backendPackaging": "PASS_WITH_TESTS_SKIPPED_PREVIOUS_SCOPED_TESTS_PRESERVED",
+  "browser": {
+    "categoriesSaved": 1,
+    "categoryHistory": true,
+    "sameOriginalWriteRecovery": {
+      "attempts": 2,
+      "sameKey": true,
+      "sameBody": true,
+      "savedRevision": 1
+    },
+    "publishConfirmed": {
+      "policyVersion": 1,
+      "draftRevision": 1,
+      "categoryRevision": 1,
+      "activeRevision": 1
+    },
+    "unpublishedDraftDoesNotRewritePublished": true,
+    "unpublishedAndDraftHistory": true,
+    "mobileNoHorizontalOverflow": true,
+    "employeeDenied": {
+      "navigationHidden": true,
+      "httpStatus": 403
+    },
+    "result": "PASS"
+  },
+  "upgrade": {
+    "result": "PASS",
+    "sourceRows": 5032,
+    "sourceTables": 234,
+    "retainedBusinessTablesUnchanged": 233,
+    "newTables": [
+      "expense_category_revision",
+      "expense_configuration",
+      "expense_policy_activation",
+      "expense_policy_draft",
+      "expense_policy_draft_revision",
+      "expense_policy_version"
+    ],
+    "filesUnchanged": 9,
+    "sourceUnchanged": true
+  },
+  "restart": {
+    "result": "PASS",
+    "sameJar": true,
+    "jarSha256": "66c2497fda12109a634e31ca1a5a37cef7817bd7d9df9a6a29f780ea1942d8c5",
+    "boot": 2,
+    "tables": 240,
+    "rows": 5044,
+    "files": 9,
+    "snapshotUnchanged": true,
+    "sourceUnchanged": true
+  },
+  "restartBrowser": {
+    "result": "PASS",
+    "freshLoginAfterRestart": true,
+    "activePolicyVersion": 1,
+    "unpublishedDraftRevision": 2,
+    "activationHistoryReadable": true,
+    "mobileViewport": [
+      390,
+      844
+    ]
+  },
+  "red": [
+    {
+      "log": "expense-configuration-ui-red.log",
+      "failures": [
+        "合法多行理由被当成不可读回执",
+        "新建草稿离开页面后输入标识丢失"
+      ]
+    },
+    {
+      "log": "expense-configuration-ui-recovery-red.log",
+      "failures": [
+        "原新建请求恢复确认后，页面仍停留在零修订创建状态"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "finding": "第一次类型检查在错误工作目录调用，未执行；随后 vue-tsc -b 在源码目录生成 248 个旧 JS 文件并遮蔽新 TS 内容，实际浏览器因此未使用已修复校验。",
+      "resolution": "确认这些文件均由本阶段同两秒内生成且不受 Git 跟踪，连同 tsbuildinfo 移入独立诊断目录保留；设置 noEmit，再从真实源码构建 v3；默认类型检查确认源码内生成 JS 数为 0。",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/emitted-js-manifest.json"
+    },
+    {
+      "finding": "实际浏览器中帮助文字及选项会进入 label 文本，原精确选择器未命中；历史标题正则中的斜线也触发旧 Playwright 解析限制。",
+      "resolution": "改为限定区域中的前缀标签/标题选择器，从已有步骤继续，不重复保存或发布。"
+    },
+    {
+      "finding": "expense-configuration-history-red.log 是真实响应的诊断用例，通过；不是失败复现证据。",
+      "resolution": "根因在陈旧构建产物，未改写合法历史业务响应。"
+    }
+  ],
+  "limitations": [
+    "管理页面验收使用本地合成类别和制度；不证明真实企业金额、职级或城市等级已接通。",
+    "本运行包关闭企业财务网关和外部工作器；尚未验收采用管理制度的实际预检、提交与并发发布全链路。",
+    "先前生效选择绑定的 Java 范围验证保留在后端阶段证据；不能把本页面验收当成 F01 全部完成。"
+  ],
+  "remaining": [
+    "同版本填报提示及来源展示",
+    "事前申请类别修订变化后的旧预检失效",
+    "采用管理制度的实际提交、并发发布与不可变轮次完整链路",
+    "结合新增链路完成最终安装包验收和恢复兼容性核对"
+  ],
+  "knownOpenTaskCount": 39,
+  "remainingCountIsLowerBound": true,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "sourceHashes": [
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "a85a8aa5b8fb4faa86285277201c41e132607584139b68a93d8538dff9dbdf69"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "9965660f1911ad301ecd0749828961f0968ce25e021084c2513fd5326b793a3b"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "dba7e0af17a0fac21aabfa941e305c278fa136eaab69a1ff676b0eef40cb7f79"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseConfigurationHistory.vue",
+      "sha256": "ee15a46c7e1ce904987f880db9876687c79386a25c7cc476b1deb298892ac6eb"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseConfigurationManager.vue",
+      "sha256": "94c95c5258caba02a8b2d6e00a035445d217e9ea61e9ee72fc153b3dba1db9a0"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpensePolicyRules.vue",
+      "sha256": "2e517808d85a74faf808c1e70a7f46a230a6d77f2ad786380d3cdbbf5f506d4e"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpensePolicySummary.vue",
+      "sha256": "055213898c02be906befea0bfda8a9461701b60e7066e11480bfe68e742b327b"
+    },
+    {
+      "path": "agentflow-web/src/components/WorkspaceNavigation.vue",
+      "sha256": "04481f91b8156584f0bb28f1b80be983219a88766f9bc4683bd6563b696c9a79"
+    },
+    {
+      "path": "agentflow-web/src/expenseConfiguration.ts",
+      "sha256": "a6870b8b6fd1a8bc7c24bb0127a1c4b0cb30214fad0bcbd44b2f9176b03d78bc"
+    },
+    {
+      "path": "agentflow-web/src/expenseConfigurationDrafts.ts",
+      "sha256": "ae36d53f9e5825aa010af4fce21be922f52db6871bd8fbd07bdcf3793a311096"
+    },
+    {
+      "path": "agentflow-web/src/expenseConfigurationRead.ts",
+      "sha256": "91eb15ada6e6b12e9e1348cecca60700be4a4067bfe4f5a1c78f7d0666bb3ab2"
+    },
+    {
+      "path": "agentflow-web/src/workspaceNavigation.ts",
+      "sha256": "d5bb167b170825ce1c43b3eb80e9ed6836682dae48d2fc410bc6e130ac3882bd"
+    },
+    {
+      "path": "agentflow-web/tests/expense-configuration.test.mjs",
+      "sha256": "efdf24d726f4622fb4f1fc7015a64afb799cff57fc618300779baf4015786258"
+    },
+    {
+      "path": "agentflow-web/tsconfig.json",
+      "sha256": "85039f808777dda8cc36936213b9e4c5f99c03ea34e6f8d25ad1bfb5503b2bc4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-ui-red.log",
+      "sha256": "bf26a97631ce04e06bc005dc2d3cbf69838f55e5166ed9b1596737276a857e3a",
+      "bytes": 2961
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-ui-recovery-red.log",
+      "sha256": "102979c0523db512939d5842dc1eadf757323a64fe96d2213e19a9ae45e8b73c",
+      "bytes": 2784
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-ui-typecheck-first.log",
+      "sha256": "5fee242fc7819ddabd5e22deaf144c6c8eab8da6835c650b9a291f362e2a6e79",
+      "bytes": 63
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-ui-typecheck.log",
+      "sha256": "6a12505503bfa8956fc06ca8962812814111e8f5e879f6067128d51afca00f47",
+      "bytes": 724
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-ui-clean-scope.log",
+      "sha256": "c86598c7221f04e8a1c7f1709b92f36b2e406efd13cba7e1d35da63f8cb76ead",
+      "bytes": 8387
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-ui-clean-build.log",
+      "sha256": "6a9d1457f02c197490313c4f88bb5f43610323c5cbb605de0d1bbeff2b67d75f",
+      "bytes": 1288
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-package.log",
+      "sha256": "8d1f67704f357e2a881963dff8384b8c2f49a244e84f6e42cb358c8f616f7da2",
+      "bytes": 13930
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-no-emit-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-no-emit-check.json",
+      "sha256": "49b5a3f435cd6339ab945592fca9cf2a1a455769d723f478bbf180d5234aad45",
+      "bytes": 100
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-upgrade.json",
+      "sha256": "c295ee3a89bbba78caa21a649d32cb7eced65407f406fa834eae97bea68da175",
+      "bytes": 29010
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-before-restart.json",
+      "sha256": "4fb49b633112cfa8b24a3276b9f7b76fd15af7e7ef9c60c75c1f51ad319b80e5",
+      "bytes": 28747
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-restart.json",
+      "sha256": "b00ceeef64efde0e0bdee1af47d16d8cb0c670e9a69697289e7aedc2d7a0f8e3",
+      "bytes": 241
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser.json",
+      "sha256": "5202930a36a30f51be0fa73d0341e0ef12ae4c016ca5dddf29758f019e79d0bf",
+      "bytes": 531
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser.log",
+      "sha256": "ca21af72b2f07b975ac633b2ccb29b3f36698e65f0ba567326378bf258e11656",
+      "bytes": 1681
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v2.log",
+      "sha256": "3a83f7d2f9603ef65ecebdd45cf4d9403d54a6455bb2f86890c1fec6c6ea1788",
+      "bytes": 1704
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v3.log",
+      "sha256": "92891c3587100f950f24b1c35add4c12fdb3730309f194c983998767580dd3fd",
+      "bytes": 1741
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v4.log",
+      "sha256": "13c9df2d9eaa134b817b3b2314743f577afd45f00100ec3166234de02674d92f",
+      "bytes": 2324
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v5.log",
+      "sha256": "e6d773963e354d4618084d92da6540dc5532240fa580807dd5d7b1e4ec8ae05c",
+      "bytes": 459
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-restart-browser.json",
+      "sha256": "69c5ea8741e581a6586ea6039437a67bc1e41fa6d30a7d9dab1ad5743def3710",
+      "bytes": 199
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-restart-browser.log",
+      "sha256": "03afcef2e0b8af3198da64dc83fd51d00ab94c6a6bc1d4cd2dc752f5b3da2e93",
+      "bytes": 173
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-publish-review.png",
+      "sha256": "d02e91ad46a78b256d8f519e238e58ed912ff60ac38c6a737c0142cc73ded752",
+      "bytes": 97695
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-desktop.png",
+      "sha256": "d9f7a4e55ebeaa9f09f3eb74f847f51b75e9643a328d17d16fe05255a02bf365",
+      "bytes": 274497
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-mobile.png",
+      "sha256": "9bba65d3fb6043ffb3fceb0ea3518a25ccaa9a73ff6f83857697c46ac132ccb1",
+      "bytes": 275135
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-mobile-viewport.png",
+      "sha256": "0acb6a824bf8de1c3af12bcb0b6ef4d151169a8c571483ef8a0d5eed392e326d",
+      "bytes": 76888
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-runtime.json",
+      "sha256": "b16b97720643287be42240315bba84f16b78cea351326649bd6779e45b7b73d4",
+      "bytes": 28875
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser.py",
+      "sha256": "0a73f9d424f4afb097427ded744fd2a89b283105da1203f45a5deaf28fd05c0f",
+      "bytes": 8736
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v2.py",
+      "sha256": "df76d83a0b721e735340ba7e5418cd00d478e7850a176175dca3fd8f81c558d1",
+      "bytes": 8312
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v3.py",
+      "sha256": "783868b2b7cf43dd1e457aef4ad34dddaeb75fb0dee5de00f7da28dac9195e6c",
+      "bytes": 8326
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v4.py",
+      "sha256": "47bcc713d110a8c1d731ba5518a456f22c06ecd54a063168cdde3b515fe94fc3",
+      "bytes": 8356
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-browser-v5.py",
+      "sha256": "89656905721a628208fbed7812cf98adf8b29a4fa8d6676672ec23617e6e5632",
+      "bytes": 4457
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-restart-browser.py",
+      "sha256": "7088ca60e157b61fee240be7eafc6e5c4495b17fdca286540d5b25d8d8d76117",
+      "bytes": 2177
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-preview.mjs",
+      "sha256": "052e0cae49b1f37915852e5d4a78a2dee790c84c2b768b86922e419c6964a51a",
+      "bytes": 548
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/prepare-expense-configuration-runtime.py",
+      "sha256": "202c4200f13a371e9bb5bfd8492bf59c1275c0c16eedbf8612231cabe1f11066",
+      "bytes": 2201
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/run-expense-configuration-runtime.py",
+      "sha256": "7e3fceaead24652297692244eb48a3fd6f58e79f52abf1b7df75eb06ca6d3891",
+      "bytes": 4208
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-history-stack.log",
+      "sha256": "edca3ae1694f9c3279edb86d86ebb7b9cc17d11b0f5fb0a66928837fd9f4582a",
+      "bytes": 962
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-category-history-wire.json",
+      "sha256": "58b734ba4590d6ef940ec626146ab786432702184edbda8915e6063a14681c33",
+      "bytes": 247
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/expense-configuration-history-red.log",
+      "sha256": "b5a24c3a1c62e8760a4b6968a4473831a57c9b2384d5daeaab1a279ba2da79ca",
+      "bytes": 2169
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-configuration-management-evidence-snapshot/emitted-js-manifest.json",
+      "sha256": "22e71853f90609d29f08b9b99a5d15f6a95ded1d15e64e53d61141bc6342914a",
+      "bytes": 46414
+    }
+  ]
+}

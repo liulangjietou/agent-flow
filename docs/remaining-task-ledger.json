@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T02:07:40.985668+00:00",
+  "recordedAt": "2026-10-03T02:29:20.166423+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -951,10 +951,14 @@
           ]
         }
       ],
-      "observed": "已完成类别和制度的版本化后端、13 个管理操作、严格输入及专用权限，并把制度选择绑定到预检与最终提交；范围验证 340 条 Java（其中 47 条也在 PostgreSQL 通过）及 31 条前端回归。管理页面、填报提示和固定安装包验收待完成，F01 仍为 OPEN。",
+      "observed": "版本化后端、13 个管理操作、专用权限、管理页面、三版本发布确认、原请求恢复和历史查询已完成阶段验证；340 条 Java（47 条同时在 PostgreSQL 通过）、86 条前端回归及实际管理页面/非空升级/同包重启验收通过。填报提示、事前申请类别绑定及管理制度完整提交链路待完成，F01 仍为 OPEN。",
       "references": [
         {
           "path": "docs/expense-configuration.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-configuration-management-20261003.json",
           "line": 1
         },
         {
@@ -965,15 +969,14 @@
       "acceptance": "租户可管理类别和制度版本，覆盖法人、类别、城市等级、职级、日期、币种等条件；发布后不可覆盖；填报反馈与提交结论可追溯到同一权威源；不硬编码企业标准。",
       "dependsOn": [],
       "progress": {
-        "stage": "BACKEND_PHASE_VERIFIED",
-        "implementationCommit": "14cf591ca83d0018bb468b2705ba1382614cb918",
-        "evidence": "docs/evidence/expense-configuration-backend-20261003.json",
+        "stage": "MANAGEMENT_UI_PHASE_VERIFIED",
+        "implementationCommit": "e7e0ce9cb0b24b60e1196f3925b0adf2e1ffd078",
+        "evidence": "docs/evidence/expense-configuration-management-20261003.json",
         "remaining": [
-          "管理页面与未知写入恢复",
-          "同版本填报提示",
-          "事前申请类别修订变化使旧预检失效",
-          "实际 managed 制度提交并发和不可变轮次链路",
-          "固定安装包非空升级、页面、重启与恢复验收"
+          "同版本填报提示及来源展示",
+          "事前申请类别修订变化后的旧预检失效",
+          "采用管理制度的实际提交、并发发布与不可变轮次完整链路",
+          "结合新增链路完成最终安装包验收和恢复兼容性核对"
         ]
       }
     },
@@ -3294,9 +3297,9 @@
   },
   "latestInProgress": {
     "taskId": "F01",
-    "stage": "BACKEND_PHASE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "14cf591ca83d0018bb468b2705ba1382614cb918",
-    "evidence": "docs/evidence/expense-configuration-backend-20261003.json",
+    "stage": "MANAGEMENT_UI_PHASE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "e7e0ce9cb0b24b60e1196f3925b0adf2e1ffd078",
+    "evidence": "docs/evidence/expense-configuration-management-20261003.json",
     "openapiPathCount": 285,
     "openapiOperationCount": 322
   }
