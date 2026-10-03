@@ -490,11 +490,16 @@ class PaymentOperationIntegrationTest {
 
     @Test void oldSuccessfulPaymentIsRecoveredWithoutAnotherSendOrQuery() {
         var job = job(); worker.poll(); var id = job.input().command().binding().businessId();
-        jdbc.update("DELETE FROM finance_resource_revision WHERE tenant_id='demo' AND resource_type='ADVANCE' AND resource_id=?", id.toString());
-        jdbc.update("DELETE FROM finance_resource WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", id.toString());
+        // 按依赖顺序清除本用例的拨付记录和余额，模拟旧付款已成功但本地尚未入账。
+        tx().executeWithoutResult(status -> {
+            jdbc.update("DELETE FROM employee_advance_order WHERE tenant_id='demo' AND advance_id=?", id.toString());
+            jdbc.update("DELETE FROM finance_resource_revision WHERE tenant_id='demo' AND resource_type='ADVANCE' AND resource_id=?", id.toString());
+            jdbc.update("DELETE FROM finance_resource WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", id.toString());
+        });
         assertThat(operations.missingAdvanceBalances()).extracting(JdbcPaymentOperationRepository.Candidate::id).contains(job.input().command().id());
         worker.poll(); disbursements.recover("demo", job.input().command().id());
         assertThat(balances.find("demo", id).orElseThrow().version()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM employee_advance_order WHERE tenant_id='demo' AND advance_id=?", Long.class, id.toString())).isEqualTo(1L);
         assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero();
     }
 

@@ -457,8 +457,7 @@ writeFileSync(resolve(output, 'InitiatorAppointmentPicker.js'), ts.transpileModu
 const fieldsDescriptor = parse(readFileSync(resolve(root, 'src/components/FormSchemaEditor.vue'), 'utf8'), { filename: 'FormSchemaEditor.vue' }).descriptor
 const fieldsComponent = compileScript(fieldsDescriptor, { id: 'field-editor-test' }).content
   .replaceAll("from 'vue'", `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
-  .replace("import FormFields from './FormFields.vue'", 'const FormFields = {}')
-  .replace("import FieldPermissionPreview from './FieldPermissionPreview.vue'", 'const FieldPermissionPreview = {}')
+  .replace(/import (\w+) from ['"][^'"]+\.vue['"]/g, 'const $1 = { render: () => null }')
   .replaceAll("'../formSchema'", "'./formSchema.js'")
 writeFileSync(resolve(output, 'FormSchemaEditor.js'), ts.transpileModule(fieldsComponent, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
