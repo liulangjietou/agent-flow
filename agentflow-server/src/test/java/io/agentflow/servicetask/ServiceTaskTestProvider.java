@@ -90,6 +90,8 @@ final class ServiceTaskTestProvider implements AutoCloseable {
         try (var output = exchange.getResponseBody()) { output.write(bytes); }
     }
     @Override public void close() { server.stop(0); executor.shutdownNow(); }
+    /** @author owlzhangfq@gmail.com */
     enum Mode { NORMAL, REDIRECT, TOO_LARGE, SLOW_BODY, WRONG_TENANT, DUPLICATE_FIELD }
+    /** @author owlzhangfq@gmail.com */
     record Call(String path, JsonNode request, String idempotencyKey, String authorization) { }
 }

@@ -87,7 +87,10 @@ class ServiceTaskFileDurabilityTest {
         return defaultUrl.replace("./data/agentflow", file.toString());
     }
 
-    /** 子进程只写入专用临时数据库；父进程收到提交标记后立即结束该进程。 */
+    /**
+     * 子进程只写入专用临时数据库；父进程收到提交标记后立即结束该进程。
+     * @author owlzhangfq@gmail.com
+     */
     public static class Committer {
         /** 提交信号与连接关闭分开，避免正常关闭掩盖延迟刷盘窗口。 */
         public static void main(String[] args) throws Exception {

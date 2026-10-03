@@ -74,11 +74,17 @@ public class ServiceTaskRuntimeService {
                 operation.createdAt(), operation.updatedAt(), completedAt, stored.progressedAt(), operation.failure(), available);
     }
 
-    /** 原轮次状态与当前申请版本分别返回，不能将旧轮次结果当成新轮次推进。 @author owlzhangfq@gmail.com */
+    /**
+     * 原轮次状态与当前申请版本分别返回，不能将旧轮次结果当成新轮次推进。
+     * @author owlzhangfq@gmail.com
+     */
     public record View(UUID applicationId, long applicationVersion, int roundNo, SubmissionRound.Status roundStatus,
                        List<Entry> items, UUID nextAfterId) { }
 
-    /** 只列出有界状态字段；即使管理员读取也不会序列化命令和回执原文。 @author owlzhangfq@gmail.com */
+    /**
+     * 只列出有界状态字段；即使管理员读取也不会序列化命令和回执原文。
+     * @author owlzhangfq@gmail.com
+     */
     public record Entry(UUID id, String nodeId, String nodeName, String operationKey, String operationVersion,
                         String operationName, String version, ServiceTaskOperation.Status status,
                         JdbcServiceTaskOperationRepository.Progress progress, int attempts, Instant createdAt, Instant updatedAt,

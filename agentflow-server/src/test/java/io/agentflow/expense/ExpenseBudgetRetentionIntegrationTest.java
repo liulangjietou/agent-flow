@@ -294,5 +294,6 @@ class ExpenseBudgetRetentionIntegrationTest {
         try { if (!latch.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Synthetic latch expired"); }
         catch (InterruptedException failure) { Thread.currentThread().interrupt(); throw new IllegalStateException(failure); }
     }
+    /** @author owlzhangfq@gmail.com */
     private record Fixture(ExpenseReport report, BudgetOperation operation) { }
 }
