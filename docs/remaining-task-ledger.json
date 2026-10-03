@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T07:38:33.887137+00:00",
+  "recordedAt": "2026-10-03T08:20:36.619220+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1350,19 +1350,28 @@
           ]
         }
       ],
-      "observed": "ExpenseReleaseService 明确保留退回和撤回占用，只处理驳回和作废释放；未有按已配置 N 天释放的调度。",
+      "observed": "已实现显式租户期限、V105 持久队列、到期释放及携原凭据重提，当前和历史页面区分处理结果；范围测试通过，安装包、实际浏览器及重启恢复尚待验收。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java",
-          "line": 35
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionService.java",
+          "line": 1
         },
         {
           "path": "docs/expense-submission.md",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-budget-retention-local-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "显式保留期、可追溯释放队列；重提与过期释放并发不误释放新轮次；未知外部结果对账，重新提交重新预检。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "status": "LOCAL_IMPLEMENTATION_VERIFIED_PENDING_RUNTIME_ACCEPTANCE",
+        "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
+        "evidence": "docs/evidence/expense-budget-retention-local-20261003.json"
+      }
     },
     {
       "id": "F11",
@@ -3343,6 +3352,7 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
+    "F10",
     "F05",
     "F04"
   ],
@@ -3369,10 +3379,9 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F03",
-    "implementationCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
-    "verifiedCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
-    "completedAt": "2026-10-03T07:38:33.887137+00:00",
-    "evidence": "docs/evidence/expense-allowances-complete-20261003.json"
+    "taskId": "F10",
+    "status": "LOCAL_IMPLEMENTATION_VERIFIED_PENDING_RUNTIME_ACCEPTANCE",
+    "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
+    "evidence": "docs/evidence/expense-budget-retention-local-20261003.json"
   }
 }
