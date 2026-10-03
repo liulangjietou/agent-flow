@@ -27,7 +27,7 @@ public class VoucherWorkspace {
     private final PaymentPersonnel personnel;
     private final CurrentActor actors;
     private final VoucherDisputeService disputes;
-    /** 查询仅投影状态、凭证号和时间，不返回外部目标、账户、科目或原始响应。 */
+    /** 查询仅投影状态、凭证号、时间和科目版本身份，不返回外部目标、账户、科目或原始响应。 */
     public VoucherWorkspace(VoucherAccess access, JdbcVoucherPreparationRepository preparations, JdbcVoucherOperationRepository operations,
                             VoucherSources sources, PaymentPersonnel personnel, CurrentActor actors, VoucherDisputeService disputes) {
         this.access = access; this.preparations = preparations; this.operations = operations;
@@ -70,7 +70,7 @@ public class VoucherWorkspace {
                     && operation.input().command().binding().businessVersion() == context.businessVersion());
         return new View(applicationId, application.businessReference().type(), application.businessReference().id(), context.roundNo(), application.version(), context.businessVersion(),
                 preparation == null ? null : new Preparation(preparation.input().id(), preparation.status(), preparation.input().attempt(), preparation.createdAt(), preparation.completedAt(), preparation.result() == null ? null : preparation.result().code()),
-                operation == null ? null : operation(operation), new Actions(prepare, query, resend), kind, disputes.view(context, operation, Instant.now()));
+                operation == null ? null : operation(operation), new Actions(prepare, query, resend), kind, disputes.view(context, operation, Instant.now()), mappingEvidence(preparation, operation));
     }
     private boolean paymentSourceMatches(VoucherOperation operation) {
         try { return sources.derive(sources.reference(operation.input().command())).matches(operation.input().command()); }
@@ -83,6 +83,18 @@ public class VoucherWorkspace {
                 operation.updatedAt(), command.expiresAt(), observation == null ? null : observation.status(), observation == null ? null : observation.voucherReference(),
                 observation == null ? null : observation.postedAt(), operation.conflictingObservation() != null, issue);
     }
+    /** 已登记命令优先于准备记录；只读原始绑定，不能用当前发布配置推断历史。 */
+    private static MappingEvidence mappingEvidence(VoucherPreparation preparation, VoucherOperation operation) {
+        var mapping = operation == null ? null : operation.input().command().mapping();
+        var request = mapping != null ? mapping.request() : preparation == null ? null : preparation.mappingRequest();
+        if (request == null) return null;
+        var selected = request.managedMapping() == null ? null : request.managedMapping().selection();
+        return new MappingEvidence(selected == null ? MappingSource.ERP_MANAGED : MappingSource.PLATFORM_PUBLISHED,
+                request.legalEntityId(), request.currency(), selected == null ? null : selected.mappingId(),
+                selected == null ? null : selected.mappingVersion(), selected == null ? null : selected.categoryRevision(),
+                selected == null ? null : selected.activeRevision(), selected == null ? null : selected.definitionDigest(),
+                mapping == null ? null : mapping.sourceVersion());
+    }
     private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_QUERY", "Only a positive roundNo is accepted for voucher status"); }
     /**
      * 所有状态均限定在明确的业务与轮次，客户端须核对绑定后展示。
@@ -90,7 +102,20 @@ public class VoucherWorkspace {
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID applicationId, BusinessReference.Type businessType, UUID businessId, int roundNo, long applicationVersion, long businessVersion,
-                       Preparation preparation, Operation operation, Actions actions, VoucherCommand.Kind kind, VoucherDisputeService.View dispute) { }
+                       Preparation preparation, Operation operation, Actions actions, VoucherCommand.Kind kind, VoucherDisputeService.View dispute, MappingEvidence mapping) { }
+    /**
+     * 平台选择与 ERP 管理分别声明，不将准备阶段的意图说成 ERP 已确认事实。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum MappingSource { ERP_MANAGED, PLATFORM_PUBLISHED }
+    /**
+     * 经过业务字段读取授权的原版本证据；ERP 来源版本仅在原凭证命令登记后提供。
+     * @author owlzhangfq@gmail.com
+     */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record MappingEvidence(MappingSource source, UUID legalEntityId, String currency, UUID mappingId,
+                                  Long mappingVersion, Long categoryRevision, Long activeRevision,
+                                  String definitionDigest, String erpSourceVersion) { }
     /**
      * 不公开准备的财务目标或完整输入。
      * @author owlzhangfq@gmail.com

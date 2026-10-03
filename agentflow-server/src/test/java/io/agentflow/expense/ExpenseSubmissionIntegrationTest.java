@@ -157,6 +157,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcVoucherOperationRepository voucherOperations;
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired VoucherPreparationService voucherPreparationService;
+    @Autowired AccountMappingConfigurationService mappingConfiguration;
+    @Autowired ExpenseConfigurationService mappingCategories;
     @Autowired VoucherOperationService voucherExecution;
     @Autowired VoucherReversalService voucherReversals;
     @Autowired VoucherReversalWorker voucherReversalWorker;
@@ -228,6 +230,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcExpenseResourceAdjustmentRepository resourceAdjustments;
     @Autowired JdbcBudgetConsumptionReversalRepository budgetReversals;
     @Autowired AccountingPeriodPort accountingPeriods;
+    @Autowired AccountMappingPort accountingMappings;
     @Autowired ExpenseResourceAdjustmentExecution resourceAdjustmentExecution;
     @MockitoSpyBean ExpensePrecheckResources financialResources;
     @MockitoSpyBean io.agentflow.api.idempotency.JdbcIdempotencyRepository idempotency;
@@ -805,6 +808,7 @@ class ExpenseSubmissionIntegrationTest {
         var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200); String path = voucherPath(report);
         var owned = ok(read(path, "alice"), 200);
         assertThat(owned.path("applicationId").asText()).isEqualTo(report.applicationId().toString());
+        assertThat(owned.has("mapping")).isTrue(); assertThat(owned.get("mapping").isNull()).isTrue();
         assertThat(owned.has("operation")).isTrue(); assertThat(owned.get("operation").isNull()).isTrue();
         assertThat(owned.path("preparation").has("completedAt")).isTrue(); assertThat(owned.path("preparation").has("issue")).isTrue();
         assertThat(owned.at("/preparation/status").asText()).isEqualTo("QUEUED"); assertThat(owned.at("/actions/prepare").asBoolean()).isFalse();
@@ -831,8 +835,11 @@ class ExpenseSubmissionIntegrationTest {
         for (String field : List.of("observedStatus", "voucherReference", "postedAt", "issue")) assertThat(queued.path("operation").has(field)).isTrue();
         assertThat(queued.at("/operation/status").asText()).isEqualTo("QUEUED"); assertThat(queued.at("/actions/query").asBoolean()).isFalse();
         voucherWorker.poll(); var posted = ok(read(path, "finance"), 200); assertThat(posted.at("/operation/status").asText()).isEqualTo("POSTED");
+        assertThat(posted.at("/mapping/source").asText()).isEqualTo("ERP_MANAGED");
+        assertThat(posted.at("/mapping/mappingId").isNull()).isTrue();
+        assertThat(posted.at("/mapping/erpSourceVersion").asText()).isNotBlank();
         assertThat(posted.at("/operation/voucherReference").asText()).isEqualTo("synthetic-voucher"); assertThat(posted.at("/actions/query").asBoolean()).isTrue();
-        assertThat(posted.toString()).doesNotContain("targetDigest", "accountDigest", "accountReference", "mapping", "commandDigest", "synthetic-private-account");
+        assertThat(posted.toString()).doesNotContain("targetDigest", "accountDigest", "accountReference", "managedMapping", "entries", "commandDigest", "synthetic-private-account");
         assertThat(ok(read(path, "alice"), 200).at("/actions/query").asBoolean()).isFalse();
         var queryInput = voucherInput(report, "QUERY", posted.path("operation")); String queryKey = UUID.randomUUID().toString();
         var query = send(path + "/actions", "finance", queryKey, queryInput); ok(query, 202);
@@ -3838,6 +3845,50 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
     }
 
+    @Test void approvedExpenseUsesPublishedCategoryTaxOffsetAndPayableMappingWithOriginalAllocations() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        var preparation = voucherPreparations.latest("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var plan = voucherSources.derive(preparation.input().source()); var request = plan.mappingRequest();
+        var currentCategories = mappingCategories.categories("demo"); var categories = new ArrayList<>(currentCategories.categories());
+        request.keys().stream().filter(key -> key.role() == AccountMappingPort.Role.EXPENSE)
+                .filter(key -> categories.stream().noneMatch(category -> category.code().equals(key.selector())))
+                .forEach(key -> categories.add(new ExpenseCategoryCatalog.Category(key.selector(), "合成映射类别", List.of(ExpenseLine.Unit.values()), true)));
+        mappingCategories.saveCategories(admin, currentCategories.version(), categories, "合成报销科目类别");
+        var entries = new ArrayList<>(request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-managed-" + key.role())).toList());
+        entries.add(new AccountMappingPort.Entry(new AccountMappingPort.Key(AccountMappingPort.Role.BANK, "unused-bank"), "synthetic-unused"));
+        String key = "expense-" + UUID.randomUUID();
+        var draft = mappingConfiguration.saveDraft(admin, key, 0, new AccountMappingDefinition("合成报销科目", entity, "CNY", entries), "合成报销配置");
+        var head = mappingConfiguration.current("demo", entity, "CNY");
+        var published = mappingConfiguration.publish(admin, key, draft.revision(), head.categoryRevision(), head.activeRevision(), "合成报销发布");
+        assertThat(ok(read(voucherPath(report), "finance"), 200).at("/mapping").isNull()).isTrue();
+        var work = voucherPreparationService.claim("demo", preparation.input().id(), Instant.now()); assertThat(work).isNotNull();
+        var selected = ok(read(voucherPath(report), "finance"), 200).path("mapping");
+        assertThat(selected.path("source").asText()).isEqualTo("PLATFORM_PUBLISHED");
+        assertThat(selected.path("mappingId").asText()).isEqualTo(published.activeMapping().mappingId().toString());
+        assertThat(selected.path("erpSourceVersion").isNull()).isTrue();
+        assertThat(selected.toString()).doesNotContain("targetDigest", "accountCode", "unused-bank", "entries");
+        var period = accountingPeriods.period("demo", work.preparation().input().targetDigest(), work.source().periodRequest()).requireValue();
+        var mapping = accountingMappings.mapping("demo", work.preparation().input().targetDigest(), work.preparation().mappingRequest()).requireValue();
+        var preparedCommand = work.source().prepare(preparation.input().id(), period, mapping, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        voucherPreparationService.finish(work.preparation(), preparedCommand, null, Instant.now()); voucherWorker.poll();
+        var operation = voucherOperations.find("demo", preparation.input().id()).orElseThrow(); var command = operation.input().command();
+        assertThat(operation.usablePosted()).isTrue(); assertThat(command.lines()).isEqualTo(plan.lines()); assertThat(command.totals()).isEqualTo(plan.totals());
+        assertThat(command.mapping().request().keys()).isEqualTo(request.keys());
+        assertThat(command.mapping().request().keys()).extracting(AccountMappingPort.Key::role).contains(AccountMappingPort.Role.EXPENSE, AccountMappingPort.Role.DEDUCTIBLE_TAX, AccountMappingPort.Role.EMPLOYEE_RECEIVABLE, AccountMappingPort.Role.EMPLOYEE_PAYABLE);
+        assertThat(command.mapping().request().managedMapping().selection().mappingId()).isEqualTo(published.activeMapping().mappingId());
+        assertThat(command.mapping().entries()).hasSize(entries.size() - 1);
+        var originalEvidence = ok(read(voucherPath(report), "finance"), 200).path("mapping");
+        assertThat(originalEvidence.path("mappingVersion").asLong()).isEqualTo(published.activeMapping().version());
+        assertThat(originalEvidence.path("activeRevision").asLong()).isEqualTo(published.activeRevision());
+        assertThat(originalEvidence.path("definitionDigest").asText()).isEqualTo(command.mapping().request().managedMapping().selection().definitionDigest());
+        assertThat(originalEvidence.path("erpSourceVersion").asText()).isEqualTo(command.mapping().sourceVersion());
+        var changed = mappingConfiguration.saveDraft(admin, key, draft.revision(), new AccountMappingDefinition("新合成版本", entity, "CNY", entries), "保存下一版本");
+        mappingConfiguration.publish(admin, key, changed.revision(), published.categoryRevision(), published.activeRevision(), "切换下一版本");
+        assertThat(ok(read(voucherPath(report), "alice"), 200).path("mapping")).isEqualTo(originalEvidence);
+        assertThat(read(voucherPath(report), "admin").getStatus()).isEqualTo(403);
+        assertThat(read(voucherPath(report), "bob").getStatus()).isEqualTo(404);
+    }
+
     @Test void paymentVoucherUsesFrozenExpenseTimeZoneAfterResourcesAndBudgetWereConsumed() throws Exception {
         legalTimeZone = "America/New_York"; var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll();
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
@@ -5010,7 +5061,8 @@ class ExpenseSubmissionIntegrationTest {
             }
             case "account-mapping" -> {
                 var request = json.read(data.toString(), AccountMappingPort.Request.class); var at = Instant.now();
-                yield new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+                yield new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.managedMapping() == null
+                        ? request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList() : request.managedMapping().entries());
             }
             case "voucher-reversal" -> {
                 var request = json.read(data.toString(), VoucherReversalPort.Request.class);

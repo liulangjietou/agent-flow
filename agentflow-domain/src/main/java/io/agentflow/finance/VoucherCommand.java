@@ -37,7 +37,8 @@ public record VoucherCommand(UUID id, String tenantId, Kind kind, Binding bindin
         String currency = totals.gross().currency();
         if (!period.matches(new AccountingPeriodPort.Request(legalEntityId, currency, accountingDate), createdAt)
                 || !mapping.request().legalEntityId().equals(legalEntityId) || !mapping.request().currency().equals(currency)
-                || !mapping.matches(mapping.request(), createdAt)) throw invalid();
+                || !mapping.matches(mapping.request(), createdAt)
+                || mapping.request().managedMapping() != null && !tenantId.equals(mapping.request().managedMapping().tenantId())) throw invalid();
         lines = lines.stream().sorted(Comparator.comparingInt(Line::lineNo)).toList();
         var keys = new HashSet<AccountMappingPort.Key>(); var identities = new HashSet<List<Object>>();
         var offsets = new HashSet<UUID>();
@@ -93,6 +94,13 @@ public record VoucherCommand(UUID id, String tenantId, Kind kind, Binding bindin
                         receipt.paymentReference(), receipt.completedAt().toString(), receipt.receiptReference());
             }
             add(digest, createdAt.toString(), expiresAt.toString());
+            // 只为新管理映射追加版本证据，旧凭证字节序列和摘要保持原协议。
+            var managed = mapping.request().managedMapping();
+            if (managed != null) {
+                var selection = managed.selection();
+                add(digest, "agentflow-managed-account-mapping-1", selection.mappingId().toString(), Long.toString(selection.mappingVersion()),
+                        Long.toString(selection.categoryRevision()), Long.toString(selection.activeRevision()), selection.definitionDigest(), selection.targetDigest());
+            }
             return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }

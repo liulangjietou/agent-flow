@@ -96,6 +96,8 @@ class PaymentOperationIntegrationTest {
     @Autowired JdbcVoucherPreparationRepository preparations;
     @Autowired VoucherPreparationService preparationService;
     @Autowired VoucherPreparationWorker preparationWorker;
+    @Autowired AccountMappingConfigurationService mappingConfiguration;
+    private boolean managedMappingCreated;
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired PaymentVoucherSources paymentVoucherSources;
     @Autowired FailureListener listener;
@@ -125,6 +127,12 @@ class PaymentOperationIntegrationTest {
         RESPONDER.set(PaymentOperationIntegrationTest::response); setupOrganization();
     }
     @AfterEach void removeOnlyPaymentFixtures() {
+        if (managedMappingCreated) {
+            jdbc.update("UPDATE account_mapping_scope SET active_revision=0,active_mapping_id=NULL,active_mapping_version=NULL WHERE tenant_id='demo' AND legal_entity_id=?", ENTITY.toString());
+            for (var table : List.of("account_mapping_activation", "account_mapping_version", "account_mapping_draft_revision", "account_mapping_draft", "account_mapping_scope")) {
+                jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo' AND legal_entity_id=?", ENTITY.toString());
+            }
+        }
         for (var id : fixtures) {
             var batchIds = jdbc.queryForList("SELECT batch_id FROM payment_batch_item WHERE tenant_id='demo' AND authorization_id=?", String.class, id.toString());
             for (var batch : batchIds) {
@@ -324,6 +332,24 @@ class PaymentOperationIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT'",
                 Integer.class, payment.input().command().binding().applicationId().toString())).isEqualTo(1);
         assertThat(WRITES.get()).isEqualTo(1);
+    }
+
+    @Test void paymentVoucherUsesPublishedBankAndPayableAccountsWithoutChangingThePaidReceipt() {
+        var payment = job(); worker.poll(); var paid = reload(payment); var queued = paymentPreparation(payment);
+        var actor = new io.agentflow.common.Actor("demo", "admin", java.util.Set.of("FINANCE_CONFIG_ADMIN"));
+        var entries = List.of(new AccountMappingPort.Entry(new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_PAYABLE, ""), "synthetic-managed-payable"),
+                new AccountMappingPort.Entry(new AccountMappingPort.Key(AccountMappingPort.Role.BANK, paid.input().command().debitAccountReference()), "synthetic-managed-bank"));
+        String key = "payment-" + UUID.randomUUID(); managedMappingCreated = true;
+        var draft = mappingConfiguration.saveDraft(actor, key, 0, new AccountMappingDefinition("合成付款科目", ENTITY, "CNY", entries), "合成付款科目配置");
+        var current = mappingConfiguration.current("demo", ENTITY, "CNY");
+        var published = mappingConfiguration.publish(actor, key, draft.revision(), current.categoryRevision(), current.activeRevision(), "合成付款科目发布");
+        preparationWorker.poll(); var prepared = paymentVoucher(payment); voucherWorker.poll();
+        assertThat(paymentVoucher(payment).usablePosted()).isTrue();
+        assertThat(prepared.input().command().mapping().request().managedMapping().selection().mappingId()).isEqualTo(published.activeMapping().mappingId());
+        assertThat(prepared.input().command().mapping().entries()).containsExactlyInAnyOrderElementsOf(entries);
+        assertThat(prepared.input().command().payment().receipt()).isEqualTo(paid.observation());
+        assertThat(paymentPreparation(payment).input()).isEqualTo(queued.input());
+        assertThat(reload(payment)).isEqualTo(paid); assertThat(WRITES.get()).isEqualTo(1); assertThat(VOUCHER_WRITES.get()).isEqualTo(1);
     }
 
     @Test void repeatedBankQueriesKeepOriginalSuccessfulRevisionAndPostOneSeparateVoucher() {
@@ -881,7 +907,8 @@ class PaymentOperationIntegrationTest {
         }
         if (path.endsWith("account-mapping")) {
             var mapping = wire.read(data.toString(), AccountMappingPort.Request.class);
-            return new AccountMappingPort.Mapping(mapping, "v1", at, at.plusSeconds(300), mapping.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+            return new AccountMappingPort.Mapping(mapping, "v1", at, at.plusSeconds(300), mapping.managedMapping() == null
+                    ? mapping.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList() : mapping.managedMapping().entries());
         }
         if (path.endsWith("voucher-command") || path.endsWith("voucher-query")) {
             var voucher = path.endsWith("voucher-command") ? wire.read(data.path("command").toString(), VoucherCommand.class) : VOUCHER_COMMANDS.get(UUID.fromString(data.path("operationId").asText()));

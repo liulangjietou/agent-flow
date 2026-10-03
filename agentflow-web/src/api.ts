@@ -1,4 +1,5 @@
 import { policyGuidanceQuery, readPolicyGuidance, type PolicyGuidanceContext } from './expensePolicyGuidance.js'
+import { readMappingCurrent, readMappingDraft, readMappingDirectory, readPublishedMapping, readMappingVersions, readMappingActivations, readMappingDraftRevision, validateMappingReceipt, validateMappingPublicationHistory, type MappingScope, type MappingDraft, type MappingCurrent, type MappingDraftInput, type MappingPublishInput } from './accountMappings.js'
 import { readExpenseCategories, readExpenseConfiguration, readPolicyDraft, readPublishedPolicy, readPolicyDirectory, readCategoryHistory, readPolicyHistory, readActivationHistory, readCategoryRevision, readPolicyDraftRevision, validateConfigurationReceipt, type CategoryInput, type PolicyDraftInput, type PolicyPublishInput, type ExpenseCategories, type ExpensePolicyDraft, type ExpenseConfigurationCurrent } from './expenseConfiguration.js'
 import type { AdvanceOffsetSuggestion } from './advanceOffsetSuggestion'
 import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
@@ -412,16 +413,28 @@ async function sendExtraction(operation: WriteRequest, key: string): Promise<Ext
 }
 
 /** 配置写入超时保留原键，回执须符合原租户、原内容及版本后才能确认成功。 */
-async function sendExpenseConfiguration(operation: WriteRequest, key: string) {
+async function sendFinanceConfiguration(operation: WriteRequest, key: string,
+    validate: (value: unknown, path: string, body: string, actor: Pick<Actor, 'tenantId' | 'userId'> | null, signal: AbortSignal) => unknown = validateConfigurationReceipt) {
   const actor = requestActor ? { ...requestActor } : null, controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const value = await Promise.race([
-      request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal }),
+      request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal })
+        .then(value => validate(value, operation.path, operation.body!, actor, controller.signal)),
       new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject({ status: 0, code: 'REQUEST_TIMEOUT', message: '配置保存结果尚未确认，请恢复原操作。' } satisfies ApiError) }, 12_000) })
     ])
-    return validateConfigurationReceipt(value, operation.path, operation.body!, actor)
+    return value
   } finally { clearTimeout(timer) }
+}
+/** 发布后的附加历史核对失败不能证明写入失败，保留原请求等待本人恢复。 */
+async function validateMappingOperation(value: unknown, path: string, body: string, actor: Pick<Actor, 'tenantId' | 'userId'> | null, signal: AbortSignal) {
+  const checked = validateMappingReceipt(value, path, body, actor)
+  if (!path.endsWith('/publish')) return checked
+  const revision = (JSON.parse(body) as MappingPublishInput).expectedDraftRevision
+  let original: unknown
+  try { original = await request(path.replace(/publish$/, 'draft/versions/' + revision), { signal, cache: 'no-store' }) }
+  catch { throw { status: 0, code: 'RESPONSE_UNREADABLE', message: '发布响应已返回，但原草稿证据尚未核对，请恢复原发布操作。' } satisfies ApiError }
+  return validateMappingPublicationHistory(checked as MappingCurrent, original, revision)
 }
 /** 所有配置读取固定身份并禁止缓存；返回后仍由页面代次丢弃迟到响应。 */
 function configurationRead<T>(path: string, signal: AbortSignal, read: (value: unknown, actor: Pick<Actor, 'tenantId' | 'userId'> | null) => T): Promise<T> {
@@ -430,7 +443,8 @@ function configurationRead<T>(path: string, signal: AbortSignal, read: (value: u
 }
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
-  if (operation.path === '/admin/expense-categories' || /^\/admin\/expense-policies\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendExpenseConfiguration(operation, key)
+  if (operation.path === '/admin/expense-categories' || /^\/admin\/expense-policies\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendFinanceConfiguration(operation, key)
+  if (/^\/admin\/account-mappings\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendFinanceConfiguration(operation, key, validateMappingOperation)
   if (/^\/expense-requests\/[^/?]+\/close$/.test(operation.path)) return sendExpenseRequestClose(operation, key)
   if (/^\/invoices\/[^/?]+\/extraction-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) return sendExtraction(operation, key)
   const actor = requestActor ? { ...requestActor } : null
@@ -459,6 +473,15 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  accountMappings: (filters: Partial<MappingScope>, afterKey: string | undefined, signal: AbortSignal) => configurationRead('/admin/account-mappings' + historyQuery({ ...filters, afterKey, limit: 25 }), signal, value => readMappingDirectory(value, filters, afterKey)),
+  accountMappingCurrent: (scope: MappingScope, signal: AbortSignal) => configurationRead('/admin/account-mappings/current' + historyQuery({ legalEntityId: scope.legalEntityId, currency: scope.currency }), signal, (value, actor) => readMappingCurrent(value, actor, scope)),
+  accountMappingDraft: (key: string, signal: AbortSignal) => configurationRead('/admin/account-mappings/' + encodeURIComponent(key) + '/draft', signal, (value, actor) => readMappingDraft(value, actor, key)),
+  saveAccountMappingDraft: (key: string, body: MappingDraftInput) => write<MappingDraft>('/admin/account-mappings/' + encodeURIComponent(key) + '/draft', 'PUT', '保存科目映射草稿', body),
+  publishAccountMapping: (key: string, body: MappingPublishInput) => write<MappingCurrent>('/admin/account-mappings/' + encodeURIComponent(key) + '/publish', 'POST', '发布科目映射并切换本范围生效版本', body),
+  accountMappingVersions: (key: string, beforeVersion: number | undefined, signal: AbortSignal) => configurationRead('/admin/account-mappings/' + encodeURIComponent(key) + '/versions' + historyQuery({ beforeVersion, limit: 25 }), signal, value => readMappingVersions(value, beforeVersion)),
+  accountMappingVersion: (key: string, version: number, signal: AbortSignal) => configurationRead('/admin/account-mappings/' + encodeURIComponent(key) + '/versions/' + version, signal, (value, actor) => readPublishedMapping(value, actor, key, version)),
+  accountMappingDraftVersion: (key: string, mappingId: string, revision: number, signal: AbortSignal) => configurationRead('/admin/account-mappings/' + encodeURIComponent(key) + '/draft/versions/' + revision, signal, value => readMappingDraftRevision(value, mappingId, revision)),
+  accountMappingActivations: (scope: MappingScope, beforeVersion: number | undefined, signal: AbortSignal) => configurationRead('/admin/account-mappings/activations' + historyQuery({ legalEntityId: scope.legalEntityId, currency: scope.currency, beforeVersion, limit: 25 }), signal, value => readMappingActivations(value, beforeVersion)),
   expenseConfiguration: (signal: AbortSignal) => configurationRead('/admin/expense-policies/current', signal, readExpenseConfiguration),
   expenseCategories: (signal: AbortSignal) => configurationRead('/admin/expense-categories', signal, readExpenseCategories),
   saveExpenseCategories: (body: CategoryInput) => write<ExpenseCategories>('/admin/expense-categories', 'PUT', '保存费用类别修订', body),

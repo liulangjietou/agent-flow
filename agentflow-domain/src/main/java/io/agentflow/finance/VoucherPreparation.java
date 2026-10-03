@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
@@ -11,7 +12,8 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record VoucherPreparation(Input input, long version, Status status, Instant createdAt, Instant startedAt,
-                                 Instant leaseUntil, Instant completedAt, Result result) {
+                                 Instant leaseUntil, Instant completedAt, Result result,
+                                 @JsonInclude(JsonInclude.Include.NON_NULL) AccountMappingPort.Request mappingRequest) {
     /** 每次只读准备有独立编号、固定批准版本和三版生命周期。 */
     public VoucherPreparation {
         if (input == null || status == null || createdAt == null || version < 1 || version > 3
@@ -22,19 +24,33 @@ public record VoucherPreparation(Input input, long version, Status status, Insta
         boolean active = status == Status.QUEUED || status == Status.RUNNING;
         if (active ? result != null || completedAt != null : version != 3 || result == null || result.status() != status || completedAt == null || completedAt.isBefore(startedAt)) throw invalid();
         if (status == Status.READY && (input.targetDigest() == null || !input.id().equals(result.operationId()) || !completedAt.isBefore(leaseUntil))) throw invalid();
+        if (mappingRequest != null) {
+            if (status == Status.QUEUED || input.targetDigest() == null) throw invalid();
+            var managed = mappingRequest.managedMapping();
+            if (managed != null && (!managed.tenantId().equals(input.source().tenantId()) || !managed.selection().targetDigest().equals(input.targetDigest()))) throw invalid();
+        }
+    }
+    /** 恢复升级前的状态不添加选择；新领取由应用服务明确绑定后再读取 ERP。 */
+    public VoucherPreparation(Input input, long version, Status status, Instant createdAt, Instant startedAt,
+                              Instant leaseUntil, Instant completedAt, Result result) {
+        this(input, version, status, createdAt, startedAt, leaseUntil, completedAt, result, null);
     }
     /** 批准事务只入队，即使 ERP 尚未配置也能保留待处理事实。 */
     public static VoucherPreparation queue(Input input, Instant now) { return new VoucherPreparation(input, 1, Status.QUEUED, now, null, null, null, null); }
     /** 领取只读准备的租约，跨执行器通过仓储版本隔离。 */
     public VoucherPreparation start(Instant now, Instant until) {
+        return start(now, until, null);
+    }
+    /** 固定领取时的必要科目及管理版本，终态保留原选择用于恢复与审计。 */
+    public VoucherPreparation start(Instant now, Instant until, AccountMappingPort.Request request) {
         if (status != Status.QUEUED) throw conflict();
-        return new VoucherPreparation(input, 2, Status.RUNNING, createdAt, now, until, null, null);
+        return new VoucherPreparation(input, 2, Status.RUNNING, createdAt, now, until, null, null, request);
     }
     /** 过期只能记录不可用，不能把迟到会计依据转成可发送命令。 */
     public VoucherPreparation finish(Result result, Instant now) {
         if (status != Status.RUNNING) throw conflict();
         var value = expired(now) ? Result.unavailable("LEASE_EXPIRED") : result;
-        return new VoucherPreparation(input, 3, value.status(), createdAt, startedAt, leaseUntil, now, value);
+        return new VoucherPreparation(input, 3, value.status(), createdAt, startedAt, leaseUntil, now, value, mappingRequest);
     }
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !leaseUntil.isAfter(now); }

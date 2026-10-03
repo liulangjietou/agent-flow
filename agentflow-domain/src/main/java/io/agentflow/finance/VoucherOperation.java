@@ -209,7 +209,11 @@ public record VoucherOperation(Input input, long version, Status status, int att
      */
     public record Input(VoucherCommand command, String targetDigest) {
         /** 目标摘要来自服务端配置，不能由 ERP 回执更换。 */
-        public Input { if (command == null || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw invalid(); }
+        public Input {
+            if (command == null || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw invalid();
+            var managed = command.mapping().request().managedMapping();
+            if (managed != null && !managed.selection().targetDigest().equals(targetDigest)) throw invalid();
+        }
     }
     /**
      * 查无不自动重发，矛盾和冲销必须保留给财务对账。

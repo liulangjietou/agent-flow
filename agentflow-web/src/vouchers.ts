@@ -2,8 +2,15 @@
 export type VoucherKind = 'EMPLOYEE_ADVANCE' | 'EXPENSE_ACCRUAL' | 'PAYMENT'
 export interface VoucherBinding { applicationId: string; businessId: string; businessType: 'EXPENSE' | 'ADVANCE_REQUEST'; roundNo: number; applicationVersion: number; businessVersion: number; kind?: VoucherKind }
 export type VoucherAction = 'PREPARE' | 'QUERY' | 'RESEND_ORIGINAL'
+/** 仅投影原准备或命令的选择身份；不包含科目、账户、选择器或企业接口目标。 */
+export interface VoucherMappingEvidence {
+  source: 'ERP_MANAGED' | 'PLATFORM_PUBLISHED'; legalEntityId: string; currency: string
+  mappingId: string | null; mappingVersion: number | null; categoryRevision: number | null; activeRevision: number | null
+  definitionDigest: string | null; erpSourceVersion: string | null
+}
 export interface VoucherView extends VoucherBinding {
   kind: VoucherKind
+  mapping?: VoucherMappingEvidence | null
   preparation: null | { id: string; status: keyof typeof preparationLabels; attempt: number; createdAt: string; completedAt: string | null; issue: string | null }
   operation: null | { id: string; version: number; kind: VoucherKind; status: keyof typeof operationLabels; attempts: number; accountingDate: string; updatedAt: string; sendExpiresAt: string; observedStatus: 'PENDING' | 'POSTED' | 'FAILED' | 'REVERSED' | 'NOT_FOUND' | null; voucherReference: string | null; postedAt: string | null; disputed: boolean; issue: string | null }
   actions: { prepare: boolean; query: boolean; resendOriginal: boolean }
@@ -35,6 +42,7 @@ export function validateVoucherView(view: VoucherView, expected: VoucherBinding)
         || !Number.isFinite(Date.parse(operation.sendExpiresAt)) || typeof operation.disputed !== 'boolean'
         || operation.status === 'POSTED' && (operation.disputed || operation.observedStatus !== 'POSTED' || !operation.voucherReference || !operation.postedAt))
       || preparation?.status === 'READY' && preparation.id !== operation?.id) throw new Error('凭证状态未通过校验，请刷新核对。')
+  validateMappingEvidence(view)
   const dispute = view.dispute, candidate = dispute?.candidate
   if (dispute && (!operation || typeof dispute.canResolve !== 'boolean'
       || candidate && (!Object.prototype.hasOwnProperty.call(voucherOutcomeLabels, candidate.outcome) || !Number.isSafeInteger(candidate.revision) || candidate.revision < 0
@@ -43,6 +51,22 @@ export function validateVoucherView(view: VoucherView, expected: VoucherBinding)
       || dispute.latest && (!dispute.latest.id || !positive(dispute.latest.operationVersion) || dispute.latest.operationVersion > operation.version
         || !['POSTED', 'FAILED', 'REVERSED'].includes(dispute.latest.outcome)))) throw new Error('凭证裁决状态未通过核对，请刷新。')
   return view
+}
+
+/** 兼容旧响应省略摘要；提供摘要时必须完整区分平台选择与 ERP 原始版本。 */
+function validateMappingEvidence(view: VoucherView) {
+  const mapping = view.mapping
+  if (mapping === undefined) return
+  const invalid = () => { throw new Error('凭证科目版本依据不完整，请刷新核对。') }
+  if (mapping === null) { if (view.operation) invalid(); return }
+  if (typeof mapping !== 'object' || Array.isArray(mapping) || !view.operation && (!view.preparation || ['QUEUED', 'NOT_REQUIRED'].includes(view.preparation.status))) invalid()
+  const uuid = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)
+  if (!uuid(mapping.legalEntityId) || !/^[A-Z]{3}$/.test(mapping.currency) || !['ERP_MANAGED', 'PLATFORM_PUBLISHED'].includes(mapping.source)) invalid()
+  if (view.operation ? typeof mapping.erpSourceVersion !== 'string' || !mapping.erpSourceVersion.trim() || mapping.erpSourceVersion.length > 128 : mapping.erpSourceVersion !== null) invalid()
+  if (mapping.source === 'ERP_MANAGED') {
+    if ([mapping.mappingId, mapping.mappingVersion, mapping.categoryRevision, mapping.activeRevision, mapping.definitionDigest].some(value => value !== null)) invalid()
+  } else if (!uuid(mapping.mappingId) || !positive(mapping.mappingVersion!) || !positive(mapping.activeRevision!)
+    || !Number.isSafeInteger(mapping.categoryRevision) || mapping.categoryRevision! < 0 || typeof mapping.definitionDigest !== 'string' || !/^[a-f0-9]{64}$/.test(mapping.definitionDigest)) invalid()
 }
 
 /** 裁决只采用页面已展示的近期原查询终态，不接收可编辑的 ERP 事实。 */
@@ -96,6 +120,9 @@ export function validateVoucherReceipt(receipt: VoucherReceipt, view: VoucherVie
 }
 
 const issues: Record<string, string> = {
+  ACCOUNT_MAPPING_UNAVAILABLE: '本次业务所需科目未完整配置或不可用，请核对科目映射后重新准备',
+  ACCOUNT_MAPPING_SELECTION_MISSING: '旧准备任务未保存科目选择，请重新准备会计依据',
+  ACCOUNT_MAPPING_EVIDENCE_MISMATCH: 'ERP 返回的科目依据与本次选择不一致，请核对配置及 ERP 接口',
   NOT_CONFIGURED: '尚未配置会计服务', TARGET_CHANGED: '会计服务配置已变化，请核对原操作', TIMEOUT: '会计服务响应超时', CONNECTION: '暂时无法连接会计服务',
   AUTHENTICATION: '会计服务连接凭据不可用', REMOTE_FAILURE: '会计服务暂时不可用', INVALID_RESPONSE: '会计结果未通过校验', RESPONSE_TOO_LARGE: '会计结果未通过校验',
   LEASE_EXPIRED: '本次处理超时，需要重新核对', VOUCHER_BUDGET_NOT_FROZEN: '本轮预算尚未确认，暂不能准备凭证', VOUCHER_SOURCE_CHANGED: '原批准内容已变化，停止发送',

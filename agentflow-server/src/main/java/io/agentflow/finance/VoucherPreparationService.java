@@ -26,14 +26,15 @@ public class VoucherPreparationService {
     private final JdbcVoucherOperationRepository operations;
     private final VoucherOperationService execution;
     private final FinanceGatewayConfiguration configuration;
+    private final AccountMappingPreparation mappings;
     private final Duration lease;
     /** 两次只读 HTTP 共用有界准备租约，与实际过账租约分开。 */
     public VoucherPreparationService(ApplicationRepository applications, VoucherSources sources, JdbcVoucherPreparationRepository preparations,
-            JdbcVoucherOperationRepository operations, VoucherOperationService execution, FinanceGatewayConfiguration configuration,
+            JdbcVoucherOperationRepository operations, VoucherOperationService execution, FinanceGatewayConfiguration configuration, AccountMappingPreparation mappings,
             @Value("${agentflow.vouchers.preparation-lease-seconds:150}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Voucher preparation lease must be between 15 and 300 seconds");
         this.applications = applications; this.sources = sources; this.preparations = preparations; this.operations = operations;
-        this.execution = execution; this.configuration = configuration; this.lease = Duration.ofSeconds(leaseSeconds);
+        this.execution = execution; this.configuration = configuration; this.mappings = mappings; this.lease = Duration.ofSeconds(leaseSeconds);
     }
     /** 与真实最终批准同事务，普通表单、事前申请与中间节点不生成会计准备。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -86,23 +87,34 @@ public class VoucherPreparationService {
         sources.lock(initial.input().source()); var current = preparations.find(tenant, id).orElseThrow(VoucherPreparationService::notFound); now = time(now);
         if (current.expired(now)) { preparations.update(current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return null; }
         if (current.status() != VoucherPreparation.Status.QUEUED) return null;
-        var started = current.start(now, now.plus(lease)); preparations.update(started);
-        VoucherSource.Plan source;
-        try { source = sources.derive(started.input().source()); }
-        catch (DomainException problem) { preparations.update(started.finish(classify(problem), now)); return null; }
-        if (started.input().targetDigest() == null) { preparations.update(started.finish(VoucherPreparation.Result.unavailable("NOT_CONFIGURED"), now)); return null; }
+        VoucherSource.Plan source; AccountMappingPort.Request request;
+        try {
+            source = sources.derive(current.input().source());
+            request = mappings.select(tenant, source.mappingRequest(), current.input().targetDigest());
+        } catch (DomainException problem) {
+            var failed = current.start(now, now.plus(lease)); preparations.update(failed);
+            preparations.update(failed.finish(classify(problem), now)); return null;
+        }
+        var started = current.start(now, now.plus(lease), request); preparations.update(started);
         return new Work(started, source);
     }
     /** 准备完成和实际凭证登记原子提交；过期或失效来源不留下可发送任务。 */
     @Transactional
     public void finish(VoucherPreparation claimed, VoucherCommand command, VoucherPreparation.Result problem, Instant now) {
         sources.lock(claimed.input().source()); var current = preparations.find(claimed.input().source().tenantId(), claimed.input().id()).orElseThrow(VoucherPreparationService::notFound);
-        if (current.status() != VoucherPreparation.Status.RUNNING || current.version() != claimed.version() || !current.input().equals(claimed.input())) return;
+        if (current.status() != VoucherPreparation.Status.RUNNING || !current.equals(claimed)) return;
         now = time(now);
         if (current.expired(now)) { preparations.update(current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return; }
         if (problem != null) { preparations.update(current.finish(problem, now)); return; }
         if (command == null || !command.id().equals(current.input().id()) || !sources.derive(current.input().source()).matches(command)) {
             throw new DomainException("VOUCHER_SOURCE_CHANGED", "Prepared command no longer matches original approval");
+        }
+        VoucherPreparation.Result mappingFailure = null;
+        try { mappings.requireCurrent(current, command); }
+        catch (DomainException changed) { mappingFailure = classify(changed); }
+        now = completionTime(now);
+        if (mappingFailure != null || current.expired(now)) {
+            preparations.update(current.finish(mappingFailure == null ? VoucherPreparation.Result.unavailable("LEASE_EXPIRED") : mappingFailure, now)); return;
         }
         execution.register(command, current.input().targetDigest(), now);
         preparations.update(current.finish(VoucherPreparation.Result.ready(command.id()), now));
@@ -117,11 +129,13 @@ public class VoucherPreparationService {
         return switch (problem.code()) {
             case "VOUCHER_SOURCE_CHANGED", "VOUCHER_SOURCE_MISMATCH", "NOT_FOUND" -> VoucherPreparation.Result.voided();
             case "VOUCHER_ZERO_AMOUNT" -> VoucherPreparation.Result.notRequired();
-            case "VOUCHER_EVIDENCE_EXPIRED" -> VoucherPreparation.Result.unavailable(problem.code());
+            case "VOUCHER_EVIDENCE_EXPIRED", "NOT_CONFIGURED", "TARGET_CHANGED", "ACCOUNT_MAPPING_CHANGED", "ACCOUNT_MAPPING_SELECTION_MISSING" -> VoucherPreparation.Result.unavailable(problem.code());
             default -> VoucherPreparation.Result.blocked(problem.code());
         };
     }
     private static Instant time(Instant now) { return now.truncatedTo(ChronoUnit.MICROS); }
+    /** 锁后重新计时，保留调用方已观察到的更晚时刻，锁等待不能延长租约。 */
+    private static Instant completionTime(Instant requested) { var observed = Instant.now(); return time(observed.isAfter(requested) ? observed : requested); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher preparation or approved application not found"); }
     /**
      * 实际源在领取事务内派生，执行器只持有不可变数据且不携带数据库锁。
