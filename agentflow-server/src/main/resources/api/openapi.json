@@ -6563,6 +6563,7 @@
                 "INSTANCE_RESUME",
                 "INSTANCE_TERMINATE",
                 "EVENT_RECEIVED",
+                "SERVICE_TASK_COMPLETED",
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED"
               ]
@@ -9966,6 +9967,7 @@
                 "INSTANCE_RESUME",
                 "INSTANCE_TERMINATE",
                 "EVENT_RECEIVED",
+                "SERVICE_TASK_COMPLETED",
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED",
                 "TENANT_INITIALIZE",
@@ -11504,6 +11506,7 @@
                 "INSTANCE_RESUME",
                 "INSTANCE_TERMINATE",
                 "EVENT_RECEIVED",
+                "SERVICE_TASK_COMPLETED",
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED",
                 "TENANT_INITIALIZE",

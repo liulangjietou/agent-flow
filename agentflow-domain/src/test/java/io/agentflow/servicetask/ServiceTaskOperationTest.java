@@ -113,6 +113,21 @@ class ServiceTaskOperationTest {
     }
 
     @Test
+    void stoppedWorkflowCancelsOnlyCommandsProvenUnsent() {
+        var queued = queue();
+        var cancelled = queued.cancelUnsent(NOW.plusSeconds(1));
+        assertThat(cancelled.status()).isEqualTo(ServiceTaskOperation.Status.CANCELLED);
+        assertThat(cancelled.terminal()).isTrue();
+        var sent = queued.claim(NOW, LEASE);
+        assertThatThrownBy(() -> sent.cancelUnsent(NOW.plusSeconds(1))).isInstanceOf(DomainException.class);
+        var unknown = sent.unavailable(ServiceTaskOperation.Failure.TIMEOUT, NOW.plusSeconds(1));
+        assertThatThrownBy(() -> unknown.cancelUnsent(NOW.plusSeconds(2))).isInstanceOf(DomainException.class);
+        var query = unknown.claim(unknown.nextAttemptAt(), LEASE);
+        var missing = query.complete(observed(query, ServiceTaskObservation.Status.NOT_FOUND), query.updatedAt().plusSeconds(1));
+        assertThat(missing.cancelUnsent(missing.updatedAt()).observation().status()).isEqualTo(ServiceTaskObservation.Status.NOT_FOUND);
+    }
+
+    @Test
     void receiptShapeCannotCarryUnboundedRemoteTextOrFalseTerminalFacts() {
         var command = queue().input().command();
         assertThatThrownBy(() -> new ServiceTaskObservation(command.id(), command.digest(), ServiceTaskObservation.Status.PENDING, "receipt-1", NOW))

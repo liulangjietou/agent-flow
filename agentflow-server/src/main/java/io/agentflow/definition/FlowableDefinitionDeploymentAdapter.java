@@ -96,6 +96,9 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                             .append("\" name=\"").append(escape(node.name())).append("\"><timerEventDefinition><timeDuration>")
                             .append(TimerWaitPolicy.fromProperties(node.properties()).duration())
                             .append("</timeDuration></timerEventDefinition></intermediateCatchEvent>");
+                    case SERVICE_TASK -> xml.append("<receiveTask id=\"").append(escape(node.id())).append("\" name=\"")
+                            .append(escape(node.name())).append("\"><extensionElements><flowable:executionListener event=\"start\" ")
+                            .append("delegateExpression=\"${flowableServiceTaskArrival}\"/></extensionElements></receiveTask>");
                     case COPY -> {
                         String encodedRule = Base64.getEncoder().encodeToString(node.properties().get("recipientRule")
                                 .getBytes(java.nio.charset.StandardCharsets.UTF_8));

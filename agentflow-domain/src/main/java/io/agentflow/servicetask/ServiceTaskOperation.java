@@ -20,12 +20,15 @@ public record ServiceTaskOperation(Input input, long version, Status status, int
         if (input == null || status == null || createdAt == null || updatedAt == null || version < 1 || attempts < 0
                 || updatedAt.isBefore(createdAt) || version < (long) attempts + 1) throw invalid();
         boolean running = status == Status.EXECUTING || status == Status.QUERYING;
-        boolean terminal = status == Status.APPLIED || status == Status.REJECTED;
+        boolean confirmed = status == Status.APPLIED || status == Status.REJECTED;
+        boolean terminal = confirmed || status == Status.CANCELLED;
         if (running && (attempts == 0 || leaseUntil == null || !leaseUntil.isAfter(updatedAt)
                         || Duration.between(updatedAt, leaseUntil).compareTo(MAX_LEASE) > 0 || nextAttemptAt != null || observation != null || failure != null)
                 || !running && leaseUntil != null
                 || !running && !terminal && (nextAttemptAt == null || nextAttemptAt.isBefore(updatedAt))
-                || terminal && (attempts == 0 || nextAttemptAt != null || observation == null || failure != null || !observation.status().name().equals(status.name()))
+                || confirmed && (attempts == 0 || nextAttemptAt != null || observation == null || failure != null || !observation.status().name().equals(status.name()))
+                || status == Status.CANCELLED && (nextAttemptAt != null || failure != null
+                        || attempts == 0 && observation != null || attempts > 0 && (observation == null || observation.status() != ServiceTaskObservation.Status.NOT_FOUND))
                 || status == Status.UNKNOWN && (attempts == 0 || (observation == null) == (failure == null)
                         || observation != null && observation.status() != ServiceTaskObservation.Status.PENDING)
                 || status == Status.QUEUED && (failure != null || attempts == 0 && (observation != null || version != 1 || !createdAt.equals(updatedAt))
@@ -72,7 +75,13 @@ public record ServiceTaskOperation(Input input, long version, Status status, int
         return changed(Status.UNKNOWN, now, retryAt(now), null, value);
     }
 
-    public boolean terminal() { return status == Status.APPLIED || status == Status.REJECTED; }
+    /** 仅从未发送或原号查询确认不存在的命令可以取消，不能把未知副作用当成未发生。 */
+    public ServiceTaskOperation cancelUnsent(Instant now) {
+        if (status != Status.QUEUED || now.isBefore(updatedAt)) throw conflict();
+        return changed(Status.CANCELLED, now, null, observation, null);
+    }
+
+    public boolean terminal() { return status == Status.APPLIED || status == Status.REJECTED || status == Status.CANCELLED; }
     public boolean running() { return status == Status.EXECUTING || status == Status.QUERYING; }
     public boolean expired(Instant now) { return running() && !leaseUntil.isAfter(now); }
 
@@ -95,13 +104,13 @@ public record ServiceTaskOperation(Input input, long version, Status status, int
     }
 
     /** @author owlzhangfq@gmail.com */
-    public enum Status { QUEUED, EXECUTING, UNKNOWN, QUERYING, APPLIED, REJECTED }
+    public enum Status { QUEUED, EXECUTING, UNKNOWN, QUERYING, APPLIED, REJECTED, CANCELLED }
 
     /**
      * 有界依赖分类；不保存异常正文、密钥或服务返回的任意业务数据。
      * @author owlzhangfq@gmail.com
      */
-    public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE,
+    public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, OPERATION_DISABLED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE,
         INVALID_RESPONSE, RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR }
 
     private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_OPERATION", "Service task operation state or observation is inconsistent"); }
