@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "SUPPLIER_ADJUSTMENT_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+  "recordedAt": "2026-10-03T20:23:57.967779+00:00",
+  "implementationCommit": "e3c7a698dffaead7f51ad990f3d194afa79539e8",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "原调整准备、ERP 执行、人工裁决、安全结束及真实本地账务完成的同事务通知",
+    "ERP 成功在先，本地完成由后续银行复核和独立事务证明，不能相互替代",
+    "本地完成通知失败回滚完成表、账本、资金分录和占用，已提交的 ERP 成功及其消息保留",
+    "旧准备、执行和完成消息固定原编号；追加资金、另一调整及后续争议不替换原完成凭据",
+    "实际原参与人、当前任职和法人资格、原轮次敏感字段权限及外发抑制",
+    "真实 Vue 消息入口、只读 GET、原轮次导航，以及失权、身份切换、超时和卸载后的旧数据清除",
+    "已有本地完成后的原号重查不向恢复任职的财务补发过时中间结果"
+  ],
+  "validation": {
+    "java": {
+      "distinctTests": 207,
+      "byClass": {
+        "io.agentflow.procurement.SupplierAdjustmentDisputeResolutionTest": 8,
+        "io.agentflow.procurement.SupplierAdjustmentNoticeTest": 3,
+        "io.agentflow.procurement.SupplierAdjustmentPreparationTest": 4,
+        "io.agentflow.procurement.SupplierPayableAdjustmentTest": 13,
+        "io.agentflow.procurement.SupplierPaymentReturnAccountingTest": 9,
+        "io.agentflow.api.OpenApiContractTest": 7,
+        "io.agentflow.notification.InboxIntegrationTest": 9,
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": 13,
+        "io.agentflow.procurement.SupplierAdjustmentPersistenceTest": 47,
+        "io.agentflow.procurement.SupplierFinanceWorkflowTest": 86
+      },
+      "byModule": {
+        "agentflow-domain": 37,
+        "agentflow-server": 170
+      },
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "result": "PASS",
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-final-reports"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 147,
+      "files": 15,
+      "newNotificationTests": 9,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-web.log"
+    },
+    "typecheck": {
+      "result": "PASS",
+      "session": "4383",
+      "command": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit"
+    },
+    "build": {
+      "result": "PASS",
+      "session": "4383",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-build.log",
+      "note": "Vite 提示部分压缩块超过 500 kB，构建退出码为 0。"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 352,
+      "schemas": 713,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1582,
+      "namedTypes": 3049,
+      "missing": 0,
+      "parseErrors": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-authors-final.log"
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": {
+    "backend": {
+      "result": "EXPECTED_RED",
+      "tests": 3,
+      "reason": "ERP 成功、准备被阻断及裁决拒绝后均缺少原申请人和财务通知，实际消息为空。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-red.log",
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-red-report.xml"
+    },
+    "web": {
+      "result": "EXPECTED_RED",
+      "tests": 1,
+      "reason": "真实消息中心没有查看供应商应付调整入口。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-web-red.log"
+    },
+    "completedRecheck": {
+      "result": "EXPECTED_RED",
+      "tests": 1,
+      "reason": "财务在原完成时停用，恢复后再次查询，错误新增本地尚未完成的中间提示；实际接收人多出 finance。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-completed-recheck-red.log",
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-completed-recheck-red-report.xml"
+    }
+  },
+  "corrections": [
+    "首次范围 Maven 因新领域测试复制了不存在且未使用的静态 bank 夹具导入而编译失败；删除该导入后继续验证，不作为业务失败复现。",
+    "后续查询结果发布时复核本次实际完成凭据，已完成时不再投影 ERP_ADJUSTED 中间通知；首次 ERP 结果在独立本地完成前仍正常通知。"
+  ],
+  "sourceEvidence": {
+    "files": 24,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "e3c7a698dffaead7f51ad990f3d194afa79539e8"
+  },
+  "artifactEvidence": {
+    "files": 26,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "本地 Java/H2、Spring MockMvc、实际 Vue 组件及构建通过；没有宣称本阶段固定安装包、真实浏览器或 PostgreSQL 验收完成。",
+    "没有新增数据库迁移；真实企业通知、银行及 ERP 联调和远端 PR/CI 仍分别验收。",
+    "未重试管理员策略阻断的浏览器或镜像层 I/O 阻断的 PostgreSQL；未推送或创建 PR。",
+    "F17 其他独立财务恢复来源的覆盖核对及完整固定包验收仍待完成。"
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "29653": "EXIT_1_EXPECTED_BACKEND_RED_3",
+    "10627": "EXIT_1_EXPECTED_INBOX_RED",
+    "48920": "EXIT_0_WEB_9",
+    "36534": "EXIT_1_UNUSED_FIXTURE_IMPORT_COMPILE_FAILURE_FIXED",
+    "4383": "EXIT_0_TYPECHECK_BUILD",
+    "42904": "EXIT_0_OPENAPI_AND_WEB_147",
+    "65460": "EXIT_0_AUTHORS",
+    "84831": "EXIT_1_EXPECTED_COMPLETED_RECHECK_RED",
+    "56185": "EXIT_0_MATCHED_JAVA_207",
+    "46827": "EXIT_0_FINAL_AUTHORS"
+  }
+}
