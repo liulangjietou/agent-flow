@@ -1,3 +1,4 @@
+import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
 import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
 import { extractionPath, readExtractionOptions, readExtractionPage, readExtractionDetail, validateExtractionReceipt, type ExtractionReceipt, type ExtractionGenerate, type ExtractionReview } from './invoiceExtraction.js'
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
@@ -375,6 +376,22 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
   } catch { throw { status: 0, code: 'RESPONSE_UNREADABLE', message: businessWrite ? '操作响应未完整接收，请恢复上次操作确认结果。' : '服务响应无法读取，请重试。' } satisfies ApiError }
 }
 
+/** 关闭只在明确确认后发送，超时保留原请求，并在清除恢复槽前验证回执。 */
+async function sendExpenseRequestClose(operation: WriteRequest, key: string): Promise<ExpenseRequestCloseReceipt> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject({ status: 0, code: 'REQUEST_TIMEOUT', message: '关闭结果尚未确认，请恢复上次操作。' } satisfies ApiError)
+    }, 12_000)
+  })
+  try {
+    const value = await Promise.race([request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal }), timeout])
+    return readExpenseRequestCloseReceipt(value, decodeURIComponent(operation.path.split('/')[2]!), JSON.parse(operation.body!) as ExpenseRequestCloseInput)
+  } finally { clearTimeout(timer) }
+}
+
 /** 票据准备包含事务外原件读取；超时只结束等待，原请求继续留给本人恢复。 */
 async function sendExtraction(operation: WriteRequest, key: string): Promise<ExtractionReceipt> {
   const controller = new AbortController()
@@ -392,6 +409,7 @@ async function sendExtraction(operation: WriteRequest, key: string): Promise<Ext
 }
 
 export const writeRequests = new PendingWrites(async (operation, key) => {
+  if (/^\/expense-requests\/[^/?]+\/close$/.test(operation.path)) return sendExpenseRequestClose(operation, key)
   if (/^\/invoices\/[^/?]+\/extraction-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) return sendExtraction(operation, key)
   const actor = requestActor ? { ...requestActor } : null
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
@@ -585,6 +603,7 @@ export const api = {
   invoiceVerifications: (id: string, filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceVerificationJob>>(`/invoices/${encodeURIComponent(id)}/verifications` + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReports: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ExpenseItem>>('/expense-reports' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PriorRequestItem>>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
+  closeExpenseRequest: (id: string, input: ExpenseRequestCloseInput) => write<ExpenseRequestCloseReceipt>(`/expense-requests/${encodeURIComponent(id)}/close`, 'POST', '关闭事前费用额度', input),
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReport: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseWorkflow: (id: string, taskId: string | undefined, signal: AbortSignal) => request<ExpenseWorkflow>(`/expense-reports/${encodeURIComponent(id)}/workflow` + historyQuery({ taskId }), { signal, cache: 'no-store' }),

@@ -1117,6 +1117,9 @@ async function recoverOperation(id: string) {
           notice.value = '原计划保存结果已确认，请核对原单据后继续预检。'
         } else notice.value = '原计划操作已确认，请刷新计划详情或预检结果核对当前状态。'
         templateRefresh.value++
+      } else if (/^\/expense-requests\/[^/?]+\/close$/.test(request.path)) {
+        notice.value = '原额度关闭结果已确认，请核对最新额度状态。'
+        templateRefresh.value++
       } else if (request.path.startsWith('/expense-reports')) {
         if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
           const value = result as ExpenseDetailData

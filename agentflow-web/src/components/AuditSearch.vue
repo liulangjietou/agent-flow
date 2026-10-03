@@ -17,7 +17,8 @@ actions.TENANT_INITIALIZE = '完成工作区初始化'
 actions.INVOICE_EXTRACTION_QUEUE = '发起票据抽取'
 actions.INVOICE_EXTRACTION_CONFIRM = '确认票据候选值'
 actions.INVOICE_EXTRACTION_DISMISS = '放弃票据建议'
-const sources: Record<string, string> = { Application: '申请操作', Task: '任务操作', TenantInitialization: '工作区初始化', InvoiceExtractionRun: '票据抽取' }
+actions.EXPENSE_REQUEST_CLOSED = '关闭事前费用额度'
+const sources: Record<string, string> = { Application: '申请操作', Task: '任务操作', TenantInitialization: '工作区初始化', InvoiceExtractionRun: '票据抽取', ExpenseRequest: '事前批准额度' }
 const snapshot = () => JSON.stringify(fields)
 const changed = computed(() => submitted.value !== snapshot())
 const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })

@@ -9963,7 +9963,8 @@
                 "TENANT_INITIALIZE",
                 "INVOICE_EXTRACTION_QUEUE",
                 "INVOICE_EXTRACTION_CONFIRM",
-                "INVOICE_EXTRACTION_DISMISS"
+                "INVOICE_EXTRACTION_DISMISS",
+                "EXPENSE_REQUEST_CLOSED"
               ]
             }
           },
@@ -9979,7 +9980,8 @@
                 "Application",
                 "Task",
                 "TenantInitialization",
-                "InvoiceExtractionRun"
+                "InvoiceExtractionRun",
+                "ExpenseRequest"
               ]
             }
           },
@@ -11499,7 +11501,8 @@
                 "TENANT_INITIALIZE",
                 "INVOICE_EXTRACTION_QUEUE",
                 "INVOICE_EXTRACTION_CONFIRM",
-                "INVOICE_EXTRACTION_DISMISS"
+                "INVOICE_EXTRACTION_DISMISS",
+                "EXPENSE_REQUEST_CLOSED"
               ]
             }
           },
@@ -11515,7 +11518,8 @@
                 "Application",
                 "Task",
                 "TenantInitialization",
-                "InvoiceExtractionRun"
+                "InvoiceExtractionRun",
+                "ExpenseRequest"
               ]
             }
           },
@@ -40548,6 +40552,173 @@
                   }
                 ],
                 "comment": "本人对照原件后确认"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-requests/{id}/close": {
+      "post": {
+        "operationId": "closeExpenseRequest",
+        "tags": [
+          "事前申请"
+        ],
+        "summary": "本人关闭已批准事前额度",
+        "description": "原申请人以所见额度版本和明确原因关闭剩余额度；管理员、财务角色不能代替他人。关闭禁止新增或增加占用，原预留仍可减少、结算或释放。保留原批准结果。资源、审计和成功回执同事务保存；未知结果使用原请求和原幂等键恢复。",
+        "x-access": "额度原申请人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestCloseReceipt"
+                },
+                "example": {
+                  "requestId": "00000000-0000-0000-0000-000000000001",
+                  "applicationId": "00000000-0000-0000-0000-000000000002",
+                  "version": 2,
+                  "closed": true,
+                  "eventId": "00000000-0000-0000-0000-000000000003"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "额度版本冲突（CONCURRENCY_CONFLICT）或原幂等请求不匹配；刷新核对，不覆盖并发余额。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "已关闭额度（EXPENSE_REQUEST_CLOSED）或入口约束不通过。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRequestClose"
+              },
+              "example": {
+                "expectedVersion": 1,
+                "comment": "出差结束，不再使用剩余额度"
               }
             }
           }
@@ -70814,6 +70985,63 @@
             }
           }
         ]
+      },
+      "ExpenseRequestClose": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "comment"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          }
+        }
+      },
+      "ExpenseRequestCloseReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "applicationId",
+          "version",
+          "closed",
+          "eventId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 2
+          },
+          "closed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       }
     }
   }

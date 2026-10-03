@@ -40,6 +40,14 @@ public class JdbcExpenseRequestRepository implements ExpenseRequestRepository {
         store.replaceAmountUses(KIND, row, request.balances());
     }
 
+    @Override @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lock(String tenantId, UUID id) {
+        if (jdbc.queryForList("SELECT id FROM finance_resource WHERE tenant_id=? AND resource_type='PRIOR_REQUEST' AND id=? FOR UPDATE",
+                String.class, tenantId, id.toString()).isEmpty()) {
+            throw new DomainException("NOT_FOUND", "Prior request credit not found");
+        }
+    }
+
     @Override
     public Optional<ExpenseRequest> find(String tenantId, UUID id) {
         return store.find(KIND, tenantId, id).map(this::decode);

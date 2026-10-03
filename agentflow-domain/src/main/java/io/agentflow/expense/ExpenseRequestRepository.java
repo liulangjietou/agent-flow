@@ -14,6 +14,8 @@ public interface ExpenseRequestRepository {
     void create(ExpenseRequest request, String actor);
     /** 保存余额或关闭状态并追加版本证据。 */
     void update(ExpenseRequest request, long expectedVersion, String actor, String operation);
+    /** 与报销提交使用同一资源行锁，关闭后必须重新读取已提交的最新额度。 */
+    void lock(String tenantId, UUID id);
     /** 仅查询当前租户的事前申请。 */
     Optional<ExpenseRequest> find(String tenantId, UUID id);
     /** 批量读取当前及前一轮引用，避免按发票逐条查询数据库。 */
