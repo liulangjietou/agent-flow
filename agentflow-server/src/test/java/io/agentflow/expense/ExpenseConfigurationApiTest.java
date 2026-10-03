@@ -64,6 +64,45 @@ class ExpenseConfigurationApiTest {
         admin = token("admin");
     }
 
+    @Test void fixedAllowanceCanBeSavedAndPublishedThroughTheStrictAdminJsonBoundary() throws Exception {
+        write(put(CATEGORIES), admin, Map.of("expectedVersion", 0, "comment", "合成补贴类别", "categories",
+                List.of(Map.of("code", "ALLOWANCE", "name", "补贴", "units", List.of("DAY"), "active", true)))).andExpect(status().isOk());
+        write(put(POLICIES + "/allowance/draft"), admin, allowanceInput()).andExpect(status().isOk())
+                .andExpect(jsonPath("definition.rules[0].constraints.fixedAllowance.dailyRate.value").value("100.00"));
+        var publication = publish("allowance", 1, 1, 0);
+        assertThat(publication.at("/activePolicy/definition/rules/0/constraints/fixedAllowance/dayCountBasis").asText()).isEqualTo("CALENDAR_DAYS_INCLUSIVE");
+        assertThat(read(POLICIES + "/allowance/versions/1").at("/definition/rules/0/constraints/fixedAllowance/dailyRate/value").asText()).isEqualTo("100.00");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown", "basis-type", "amount-type", "missing-basis"})
+    void fixedAllowanceJsonKeepsUnknownFieldAndScalarTypeGuards(String defect) throws Exception {
+        var input = json.read(json.write(allowanceInput()), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        var fixed = (com.fasterxml.jackson.databind.node.ObjectNode) input.at("/definition/rules/0/constraints/fixedAllowance");
+        switch (defect) {
+            case "unknown" -> fixed.put("approved", true);
+            case "basis-type" -> fixed.put("dayCountBasis", true);
+            case "amount-type" -> ((com.fasterxml.jackson.databind.node.ObjectNode) fixed.get("dailyRate")).put("value", 100);
+            case "missing-basis" -> fixed.remove("dayCountBasis");
+            default -> throw new IllegalArgumentException("Unknown synthetic defect");
+        }
+        var response = write(put(POLICIES + "/allowance/draft"), admin, input);
+        if (defect.equals("amount-type")) {
+            response.andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("code").value("INVALID_MONEY"));
+        } else {
+            response.andExpect(status().isBadRequest());
+        }
+        assertThat(count("expense_policy_draft")).isZero();
+    }
+
+    private Map<String, Object> allowanceInput() {
+        return Map.of("expectedRevision", 0, "comment", "合成补贴规则", "definition", Map.of("name", "自然日补贴", "rules", List.of(
+                Map.of("key", "daily", "name", "每日补贴", "match", Map.of("legalEntityIds", List.of(), "categoryCodes", List.of("ALLOWANCE"),
+                        "cityTiers", List.of(), "employeeGrades", List.of(), "currency", "CNY"),
+                        "constraints", Map.of("effect", "ALLOW", "allowedServiceLevels", List.of(), "priorRequestRequired", false,
+                                "fixedAllowance", Map.of("dailyRate", Map.of("value", "100.00", "currency", "CNY"), "dayCountBasis", "CALENDAR_DAYS_INCLUSIVE"))))));
+    }
+
     @Test void categoryHistoryRetainsDisabledIdentityAndDoesNotRewriteBusinessRecords() throws Exception {
         var applications = jdbc.queryForList("SELECT * FROM approval_application ORDER BY id");
         var audits = jdbc.queryForList("SELECT * FROM audit_event ORDER BY id");

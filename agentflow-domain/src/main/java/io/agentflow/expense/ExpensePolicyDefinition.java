@@ -32,6 +32,13 @@ public record ExpensePolicyDefinition(String name, List<Rule> rules) {
         if (active.isEmpty() || rules.stream().flatMap(rule -> rule.match().categoryCodes().stream()).anyMatch(code -> !active.contains(code))) {
             throw new DomainException("EXPENSE_POLICY_CATEGORY_UNAVAILABLE", "Published expense policy must refer to active categories in the confirmed revision");
         }
+        for (var rule : rules) {
+            if (rule.constraints().fixedAllowance() == null) continue;
+            if (categories.activeCategories().stream().filter(category -> rule.match().categoryCodes().contains(category.code()))
+                    .anyMatch(category -> !category.units().equals(List.of(ExpenseLine.Unit.DAY)))) {
+                throw new DomainException("ALLOWANCE_CATEGORY_UNIT_REQUIRED", "Fixed daily allowances require categories measured only in days");
+            }
+        }
     }
 
     private static List<String> selectors(List<String> values) {
@@ -55,6 +62,8 @@ public record ExpensePolicyDefinition(String name, List<Rule> rules) {
             text(key, 64); text(name, 128);
             if (match == null || constraints == null || constraints.unitPriceLimit() != null
                     && !constraints.unitPriceLimit().currency().equals(match.currency())) throw invalid();
+            if (constraints.fixedAllowance() != null && (match.categoryCodes().isEmpty()
+                    || !constraints.fixedAllowance().dailyRate().currency().equals(match.currency()))) throw invalid();
         }
     }
 
@@ -94,13 +103,22 @@ public record ExpensePolicyDefinition(String name, List<Rule> rules) {
      * @author owlzhangfq@gmail.com
      */
     public record Constraints(Effect effect, Money unitPriceLimit, ExpenseLine.Unit limitUnit, Integer invoiceMaxAgeDays,
-                              AgeAction invoiceAgeAction, List<String> allowedServiceLevels, boolean priorRequestRequired) {
+                              AgeAction invoiceAgeAction, List<String> allowedServiceLevels, boolean priorRequestRequired,
+                              ExpenseAllowanceRule fixedAllowance) {
+        /** 既有规则不因增加补贴能力改变原有的单价上限语义。 */
+        public Constraints(Effect effect, Money unitPriceLimit, ExpenseLine.Unit limitUnit, Integer invoiceMaxAgeDays,
+                           AgeAction invoiceAgeAction, List<String> allowedServiceLevels, boolean priorRequestRequired) {
+            this(effect, unitPriceLimit, limitUnit, invoiceMaxAgeDays, invoiceAgeAction, allowedServiceLevels, priorRequestRequired, null);
+        }
+
         /** 限制成组出现且无默认金额或天数，允许零上限但不接受负金额。 */
         public Constraints {
             if (effect == null || (unitPriceLimit == null) != (limitUnit == null) || (invoiceMaxAgeDays == null) != (invoiceAgeAction == null)
                     || invoiceMaxAgeDays != null && (invoiceMaxAgeDays < 0 || invoiceMaxAgeDays > MAX_INVOICE_AGE_DAYS)) throw invalid();
             allowedServiceLevels = selectors(allowedServiceLevels);
             if (effect == Effect.DENY && (unitPriceLimit != null || invoiceMaxAgeDays != null || !allowedServiceLevels.isEmpty() || priorRequestRequired)) throw invalid();
+            if (fixedAllowance != null && (effect != Effect.ALLOW || unitPriceLimit != null
+                    || invoiceMaxAgeDays != null || !allowedServiceLevels.isEmpty())) throw invalid();
         }
     }
 

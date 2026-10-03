@@ -18,6 +18,7 @@ import java.util.UUID;
 @RestController
 public class ExpensePolicyGuidanceController {
     private static final Set<String> PARAMETERS = Set.of("legalEntityId", "reportType", "categoryCode", "cityCode", "incurredOn", "currency", "unit");
+    private static final String END_DATE = "endedOn";
     private final ExpensePolicyGuidanceService service;
 
     /** 入口统一校验查询格式，应用服务负责本人授权及版本编排。 */
@@ -30,12 +31,16 @@ public class ExpensePolicyGuidanceController {
     }
 
     private ExpensePolicyGuidance.Context context(MultiValueMap<String, String> parameters) {
-        if (!parameters.keySet().equals(PARAMETERS) || parameters.values().stream().anyMatch(values -> values.size() != 1)) throw invalid();
+        if (!parameters.keySet().containsAll(PARAMETERS)
+                || parameters.keySet().stream().anyMatch(key -> !PARAMETERS.contains(key) && !END_DATE.equals(key))
+                || parameters.values().stream().anyMatch(values -> values.size() != 1)) throw invalid();
         try {
             var legal = UUID.fromString(parameters.getFirst("legalEntityId")); var date = LocalDate.parse(parameters.getFirst("incurredOn"));
             if (!legal.toString().equals(parameters.getFirst("legalEntityId")) || !date.toString().equals(parameters.getFirst("incurredOn"))) throw invalid();
+            var end = parameters.containsKey(END_DATE) ? LocalDate.parse(parameters.getFirst(END_DATE)) : null;
+            if (end != null && !end.toString().equals(parameters.getFirst(END_DATE))) throw invalid();
             return new ExpensePolicyGuidance.Context(legal, ExpenseContent.Type.valueOf(parameters.getFirst("reportType")), parameters.getFirst("categoryCode"),
-                    parameters.getFirst("cityCode"), date, parameters.getFirst("currency"), ExpenseLine.Unit.valueOf(parameters.getFirst("unit")));
+                    parameters.getFirst("cityCode"), date, parameters.getFirst("currency"), ExpenseLine.Unit.valueOf(parameters.getFirst("unit")), end);
         } catch (IllegalArgumentException | DateTimeException malformed) { throw invalid(); }
     }
     private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_GUIDANCE_QUERY", "Expense policy guidance query is invalid"); }

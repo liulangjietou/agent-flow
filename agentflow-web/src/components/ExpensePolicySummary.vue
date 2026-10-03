@@ -17,6 +17,7 @@ defineProps<{ definition: ExpensePolicyDefinition }>()
         <div><dt>原币币种</dt><dd>{{ rule.match.currency || '不限' }}</dd></div>
         <div><dt>结论</dt><dd>{{ rule.constraints.effect === 'DENY' ? '禁止报销' : '允许，按约束执行' }}</dd></div>
         <template v-if="rule.constraints.effect === 'ALLOW'">
+          <div v-if="rule.constraints.fixedAllowance"><dt>定额补贴</dt><dd>{{ rule.constraints.fixedAllowance.dailyRate.currency }} {{ rule.constraints.fixedAllowance.dailyRate.value }} / 天；自然日含起止日，同日计一天；金额自动计算，不关联发票。</dd></div>
           <div><dt>单价限额</dt><dd>{{ rule.constraints.unitPriceLimit ? `${rule.constraints.unitPriceLimit.currency} ${rule.constraints.unitPriceLimit.value} / ${expenseUnits[rule.constraints.limitUnit!]}` : '未限制' }}</dd></div>
           <div><dt>票据时限</dt><dd>{{ rule.constraints.invoiceMaxAgeDays === null ? '未限制' : `${rule.constraints.invoiceMaxAgeDays} 天；超出时${rule.constraints.invoiceAgeAction === 'REJECT' ? '拒绝报销' : '要求例外说明'}` }}</dd></div>
           <div><dt>舱位或等级</dt><dd>{{ rule.constraints.allowedServiceLevels.join('、') || '不限' }}</dd></div>

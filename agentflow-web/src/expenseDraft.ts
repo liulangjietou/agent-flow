@@ -75,6 +75,9 @@ export function expenseContent(input: ExpenseContent, catalog: FinanceCatalog, n
     const currency = line.claimedGross.currency
     if (!/^[A-Z]{3}$/.test(currency)) fail('请填写三位大写币种代码。')
     const gross = amountMinor(line.claimedGross.value), tax = amountMinor(line.claimedTax.value)
+    if (line.allowance && (Number(quantity) !== line.allowance.calculation.days || line.incurredOn !== line.allowance.calculation.startsOn
+      || line.endedOn !== line.allowance.calculation.endsOn || line.unit !== 'DAY' || currency !== line.allowance.calculation.gross.currency
+      || gross !== amountMinor(line.allowance.calculation.gross.value) || tax !== 0n || line.invoiceIds.length)) fail('请重新计算补贴，保留系统金额并移除补贴行的发票。')
     if (gross <= 0n || tax > gross) fail('含税金额须大于零，税额不能超过含税额。')
     const targets = new Set<string>()
     let allocated = 0n
@@ -148,6 +151,7 @@ export function invoiceFillCurrencyConfirmation(line: ExpenseLine, run: Extracti
 /** 仅更新本地费用输入，既不引用发票，也不保存、查验或提交；分摊金额由本人核对。 */
 export function fillExpenseLineFromInvoice(line: ExpenseLine, invoice: InvoiceItem, run: ExtractionDetail,
     selected: InvoiceFillField[], currencyConfirmed: boolean): ExpenseLine {
+  if (line.allowance) throw new Error('补贴金额按行程自动计算，不能从票面带入金额或币种。')
   if (run.status !== 'CONFIRMED' || !extractionMatches(run.input, invoice)) throw new Error('本人确认记录或原件已变化，请重新选择来源。')
   const choices = invoiceFillChoices(run, line)
   if (!selected.length || new Set(selected).size !== selected.length || selected.some(field => !choices.some(choice => choice.field === field))) throw new Error('请逐项勾选已确认的金额或币种。')

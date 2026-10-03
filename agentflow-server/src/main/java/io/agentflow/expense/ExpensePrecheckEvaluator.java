@@ -98,8 +98,13 @@ public class ExpensePrecheckEvaluator {
                 ManagedExpensePolicy managed;
                 try { managed = selectedPolicy.forLine(line); }
                 catch (DomainException invalid) { throw rejected(Stage.POLICY, line.lineNo(), invalid.code()); }
+                if (line.allowance() != null && (managed == null || !managed.selection().equals(line.allowance().policy().selection()))) {
+                    throw rejected(Stage.POLICY, line.lineNo(), "ALLOWANCE_RECALCULATION_REQUIRED");
+                }
                 var policy = value(policies.assess(input.tenantId(), new ExpensePolicyPort.Request(input.employeeId(), entity.id(),
                         report.content().type(), line, rate, invoiceFacts, managed)), Stage.POLICY, line.lineNo());
+                try { line.requireCurrentAllowance(managed, entity.id(), policy.policy(), rate, policy.deductibleTax()); }
+                catch (DomainException invalid) { throw rejected(Stage.POLICY, line.lineNo(), invalid.code()); }
                 if (policy.priorRequestRequired() && line.priorRequest() == null) throw rejected(Stage.POLICY, line.lineNo(), "PRIOR_REQUEST_REQUIRED");
                 assessments.put(line.lineNo(), new ExpenseAssessment(rate, policy.policy(), policy.deductibleTax()));
                 validUntil = earliest(validUntil, policy.validUntil());

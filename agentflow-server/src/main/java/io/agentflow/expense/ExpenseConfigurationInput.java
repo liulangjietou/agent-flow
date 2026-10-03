@@ -114,11 +114,25 @@ public final class ExpenseConfigurationInput {
             @JsonDeserialize(using = Text.class) String limitUnit, @JsonDeserialize(using = Days.class) Integer invoiceMaxAgeDays,
             @JsonDeserialize(using = Text.class) String invoiceAgeAction,
             @NotNull @JsonDeserialize(contentUsing = Text.class) List<@NotNull String> allowedServiceLevels,
-            @NotNull @JsonDeserialize(using = Flag.class) Boolean priorRequestRequired) {
+            @NotNull @JsonDeserialize(using = Flag.class) Boolean priorRequestRequired,
+            @Valid Allowance fixedAllowance) {
         /** 限额金额使用系统既有精确十进制协议。 */
         public ExpensePolicyDefinition.Constraints domain() { return new ExpensePolicyDefinition.Constraints(enumeration(effect, ExpensePolicyDefinition.Effect.class), unitPriceLimit,
-                enumeration(limitUnit, ExpenseLine.Unit.class), invoiceMaxAgeDays, enumeration(invoiceAgeAction, ExpensePolicyDefinition.AgeAction.class), allowedServiceLevels, priorRequestRequired); }
+                enumeration(limitUnit, ExpenseLine.Unit.class), invoiceMaxAgeDays, enumeration(invoiceAgeAction, ExpensePolicyDefinition.AgeAction.class), allowedServiceLevels, priorRequestRequired,
+                fixedAllowance == null ? null : fixedAllowance.domain()); }
         /** 未声明的约束必须失败，不能让管理员误以为已发布。 */
+        @JsonAnySetter public void rejectUnknown(String name, Object value) { throw unknown(); }
+    }
+
+    /**
+     * 定额补贴必须显式声明每日金额和天数依据，不接受客户端扩展的计算参数。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Allowance(@NotNull Money dailyRate,
+            @NotBlank @JsonDeserialize(using = Text.class) String dayCountBasis) {
+        /** 金额与天数规则的一致性由补贴领域模型负责。 */
+        public ExpenseAllowanceRule domain() { return new ExpenseAllowanceRule(dailyRate, enumeration(dayCountBasis, ExpenseAllowanceRule.DayCountBasis.class)); }
+        /** 未知参数不能被静默忽略后发布。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw unknown(); }
     }
 

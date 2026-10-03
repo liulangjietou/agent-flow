@@ -15,7 +15,7 @@ const legalAdvances = computed(() => advances.items.filter(item => item.legalEnt
 function clear() { invoices.clear(); requests.clear(); advances.clear() }
 function load(more = false) { return current.value.load(props.scopeKey, undefined, more) }
 function addInvoice(item: InvoiceItem) {
-  if (props.locked || !selectedLine.value || !invoiceSelectable(item, content.value.legalEntityId, props.reportId) || content.value.lines.some(line => line.invoiceIds.includes(item.id)) || selectedLine.value.invoiceIds.length >= 50) return
+  if (props.locked || !selectedLine.value || selectedLine.value.allowance || !invoiceSelectable(item, content.value.legalEntityId, props.reportId) || content.value.lines.some(line => line.invoiceIds.includes(item.id)) || selectedLine.value.invoiceIds.length >= 50) return
   selectedLine.value.invoiceIds.push(item.id)
 }
 function addAdvance(id: string) {
@@ -41,7 +41,8 @@ onUnmounted(clear)
       <label v-if="kind !== 'advances'">归属费用行<select v-model="lineNo" :disabled="locked"><option :value="0">请选择费用行</option><option v-for="line in content.lines" :key="line.lineNo" :value="line.lineNo">第 {{ line.lineNo }} 行 · {{ line.description || '尚未填写说明' }}</option></select></label>
       <p class="funding-help">这里只显示本人当前所选法人的资源。选择不占用余额，正式提交时再次核验；已有占用是否可保留由预检确认。</p>
       <p v-if="current.error" class="funding-error" role="alert">{{ current.error }}</p>
-      <ul v-if="kind === 'invoices'"><li v-for="invoice in availableInvoices" :key="invoice.id"><div><strong>{{ invoice.original.filename }}</strong><small>{{ invoice.facts!.issueDate }} · {{ moneyLabel(invoice.facts!.gross) }}</small></div><button type="button" class="secondary" :disabled="locked || !selectedLine || selectedLine.invoiceIds.length >= 50 || content.lines.some(line => line.invoiceIds.includes(invoice.id))" @click="addInvoice(invoice)">{{ content.lines.some(line => line.invoiceIds.includes(invoice.id)) ? '已选择' : '引用发票' }}</button></li></ul>
+      <p v-if="kind === 'invoices' && selectedLine?.allowance">补贴行不关联发票，请选择其他费用行。</p>
+      <ul v-if="kind === 'invoices'"><li v-for="invoice in availableInvoices" :key="invoice.id"><div><strong>{{ invoice.original.filename }}</strong><small>{{ invoice.facts!.issueDate }} · {{ moneyLabel(invoice.facts!.gross) }}</small></div><button type="button" class="secondary" :disabled="locked || !selectedLine || !!selectedLine.allowance || selectedLine.invoiceIds.length >= 50 || content.lines.some(line => line.invoiceIds.includes(invoice.id))" @click="addInvoice(invoice)">{{ content.lines.some(line => line.invoiceIds.includes(invoice.id)) ? '已选择' : '引用发票' }}</button></li></ul>
       <ul v-if="kind === 'requests'"><template v-for="request in legalRequests" :key="request.id"><li v-for="line in request.lines" :key="line.lineNo"><div><strong>{{ request.id }} · 第 {{ line.lineNo }} 行</strong><small>可用 {{ moneyLabel(line.available) }} · {{ request.closed ? '已关闭，仅可保留原引用' : '已批准' }}</small></div><button type="button" class="secondary" :disabled="locked || !selectedLine || request.closed" @click="addPrior(request.id, line.lineNo)">引用额度</button></li></template></ul>
       <ul v-if="kind === 'advances'"><li v-for="advance in legalAdvances" :key="advance.id"><div><strong>{{ advance.id }}</strong><small>{{ advance.paidOn }} 放款 · 可用 {{ moneyLabel(advance.available) }}</small></div><button type="button" class="secondary" :disabled="locked || content.advanceOffsets.length >= 50 || content.advanceOffsets.some(item => item.advanceId === advance.id)" @click="addAdvance(advance.id)">{{ content.advanceOffsets.some(item => item.advanceId === advance.id) ? '已选择' : '选择借款' }}</button></li></ul>
       <p v-if="current.loading" class="funding-help" role="status">正在读取本人资源…</p>

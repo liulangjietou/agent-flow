@@ -42648,6 +42648,16 @@
                 "PERSON"
               ]
             }
+          },
+          {
+            "name": "endedOn",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "补贴行程结束日；完整日期产生自动补贴预览，未填时仅返回适用规则。"
           }
         ]
       }
@@ -55002,6 +55012,16 @@
               {
                 "type": "string",
                 "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAllowanceBasis"
               },
               {
                 "type": "null"
@@ -75463,6 +75483,16 @@
           },
           "priorRequestRequired": {
             "type": "boolean"
+          },
+          "fixedAllowance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAllowanceRule"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -76129,6 +76159,17 @@
               "KILOMETER",
               "PERSON"
             ]
+          },
+          "endedOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -76214,6 +76255,16 @@
           },
           "guidance": {
             "$ref": "#/components/schemas/ExpensePolicyGuidance"
+          },
+          "allowance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAllowanceBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -77133,6 +77184,76 @@
           "scenarios"
         ],
         "additionalProperties": false
+      },
+      "ExpenseAllowanceRule": {
+        "type": "object",
+        "properties": {
+          "dailyRate": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "dayCountBasis": {
+            "type": "string",
+            "enum": [
+              "CALENDAR_DAYS_INCLUSIVE"
+            ]
+          }
+        },
+        "required": [
+          "dailyRate",
+          "dayCountBasis"
+        ],
+        "additionalProperties": false,
+        "description": "已发布定额补贴规则。日额须大于零；按自然日含起止日，同日计一天。不与单价限额、票据时限或舱位限制共用。"
+      },
+      "ExpenseAllowanceCalculation": {
+        "type": "object",
+        "properties": {
+          "startsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "rule": {
+            "$ref": "#/components/schemas/ExpenseAllowanceRule"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "startsOn",
+          "endsOn",
+          "days",
+          "rule",
+          "gross"
+        ],
+        "additionalProperties": false,
+        "description": "服务端精确计算：行程包含的自然日数乘已发布日额。完整日期必须处于同一命中规则的有效期间。"
+      },
+      "ExpenseAllowanceBasis": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/ExpensePolicyReceipt"
+          },
+          "calculation": {
+            "$ref": "#/components/schemas/ExpenseAllowanceCalculation"
+          }
+        },
+        "required": [
+          "policy",
+          "calculation"
+        ],
+        "additionalProperties": false,
+        "description": "随费用修订及审批轮次保留的补贴依据。保存时服务端重新匹配本人规则，忽略客户端来源声明；拒绝手改天数、金额、税额或关联发票。"
       }
     }
   }

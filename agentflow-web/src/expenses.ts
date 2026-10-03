@@ -3,6 +3,11 @@ import type { ApprovalProxyOption, ApprovalProxyUse } from './api'
 /** 所有金额以十进制字符串传输；币种来自服务端财务事实。 */
 export interface Money { value: string; currency: string }
 export interface ExpensePolicySelection { policyId: string; policyVersion: number; categoryRevision: number; activeRevision: number; definitionDigest: string }
+export interface ExpenseAllowanceRule { dailyRate: Money; dayCountBasis: 'CALENDAR_DAYS_INCLUSIVE' }
+export interface ExpenseAllowanceBasis {
+  policy: { selection: ExpensePolicySelection; ruleKey: string; factSourceReference: string }
+  calculation: { startsOn: string; endsOn: string; days: number; rule: ExpenseAllowanceRule; gross: Money }
+}
 export type ExpensePolicyException = 'AMOUNT' | 'SERVICE_LEVEL' | 'INVOICE_AGE'
 export interface CostAllocation { costCenter: string; projectCode: string | null; amount: Money }
 export interface AdvanceOffset { advanceId: string; amount: Money }
@@ -12,6 +17,7 @@ export interface ExpenseLine {
   claimedGross: Money; claimedTax: Money; invoiceIds: string[]
   priorRequest: { requestId: string; lineNo: number } | null; allocations: CostAllocation[]
   description: string; exceptionReason: string | null
+  allowance?: ExpenseAllowanceBasis | null
 }
 export interface ExpenseContent { legalEntityId: string; type: 'TRAVEL' | 'DAILY' | 'ENTERTAINMENT' | 'TRAINING' | 'OTHER'; title: string; lines: ExpenseLine[]; advanceOffsets: AdvanceOffset[] }
 export interface ApprovedLine { lineNo: number; gross: Money; tax: Money; allocations: CostAllocation[] }
@@ -94,6 +100,11 @@ export function changedReductions(before: ApprovedLine[], inputs: ReductionLine[
 export function expenseError(cause: unknown): string {
   const failure = cause as { status?: number; code?: string }
   const messages: Record<string, string> = {
+    ALLOWANCE_RECALCULATION_REQUIRED: '补贴制度或行程已变化，请刷新费用标准、重新计算后保存。',
+    ALLOWANCE_CALCULATION_MISMATCH: '补贴金额、天数和税额必须使用系统计算值，且不能关联发票。',
+    ALLOWANCE_ITINERARY_REQUIRED: '补贴必须填写完整的行程起止日期。',
+    ALLOWANCE_ITINERARY_OVERLAP: '同一补贴类别的行程日期不能重复，请合并或调整费用行。',
+    ALLOWANCE_POLICY_PERIOD_MISMATCH: '行程跨越制度有效日期，请按制度有效期拆分行程。',
     CONCURRENCY_CONFLICT: '单据已更新，请刷新并核对最新金额后重新操作。', EXPENSE_BUDGET_NOT_CONFIRMED: '当前金额的预算尚未确认，请稍后刷新。',
     EXPENSE_PAPER_RECEIPT_REQUIRED: '请先由收单节点确认纸质原件。', TASK_DELEGATION_PENDING: '请先完成委派回交，再办理财务操作。',
     EXPENSE_WITHDRAWAL_NOT_ALLOWED: '本轮已进入财务审核，不能撤回。', PENDING_REQUEST_CHANGED: '上次操作结果尚未确认，请使用页面上的恢复入口。',

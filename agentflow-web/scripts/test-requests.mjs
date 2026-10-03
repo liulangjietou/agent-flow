@@ -11,7 +11,7 @@ const output = mkdtempSync('/fyoung/tmp/agentflow-web-requests-')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 
 // 费用制度执行实际编辑、发布确认和历史组件，验证身份隔离与原请求恢复。
-for (const component of ['AccountMappingManager', 'AccountMappingEntries', 'AccountMappingHistory', 'ExpenseConfigurationManager', 'ExpenseConfigurationHistory', 'ExpensePolicyRules', 'ExpensePolicySummary', 'ExpensePolicyGuidance']) {
+for (const component of ['AccountMappingManager', 'AccountMappingEntries', 'AccountMappingHistory', 'ExpenseConfigurationManager', 'ExpenseConfigurationHistory', 'ExpensePolicyRules', 'ExpensePolicySummary', 'ExpensePolicyGuidance', 'ExpenseLineEditor']) {
   const descriptor = parse(readFileSync(resolve(root, `src/components/${component}.vue`), 'utf8'), { filename: `${component}.vue` }).descriptor
   for (const rendered of [false, true]) {
     const name = component + (rendered ? 'Rendered' : 'Panel'), script = compileScript(descriptor, { id: name })

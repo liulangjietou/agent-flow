@@ -12,12 +12,19 @@ function optional(rule: ExpensePolicyRule, field: 'fromDate' | 'throughDate' | '
   const value = (event.target as HTMLInputElement).value
   rule.match[field] = value || null
   if (field === 'currency' && rule.constraints.unitPriceLimit) rule.constraints.unitPriceLimit.currency = value
+  if (field === 'currency' && rule.constraints.fixedAllowance) rule.constraints.fixedAllowance.dailyRate.currency = value
 }
 function effect(rule: ExpensePolicyRule, event: Event) {
   if (props.disabled) return
   rule.constraints.effect = (event.target as HTMLSelectElement).value as PolicyConstraints['effect']
   if (rule.constraints.effect === 'DENY') Object.assign(rule.constraints, { unitPriceLimit: null, limitUnit: null, invoiceMaxAgeDays: null,
-    invoiceAgeAction: null, allowedServiceLevels: [], priorRequestRequired: false })
+    invoiceAgeAction: null, allowedServiceLevels: [], priorRequestRequired: false, fixedAllowance: null })
+}
+function allowance(rule: ExpensePolicyRule, event: Event) {
+  if (props.disabled) return
+  rule.constraints.fixedAllowance = (event.target as HTMLInputElement).checked
+    ? { dailyRate: { value: '', currency: rule.match.currency ?? '' }, dayCountBasis: 'CALENDAR_DAYS_INCLUSIVE' } : null
+  if (rule.constraints.fixedAllowance) Object.assign(rule.constraints, { unitPriceLimit: null, limitUnit: null, invoiceMaxAgeDays: null, invoiceAgeAction: null, allowedServiceLevels: [] })
 }
 function amount(rule: ExpensePolicyRule, event: Event) {
   if (props.disabled) return
@@ -59,12 +66,17 @@ const matchFields: Array<{ key: keyof Pick<PolicyMatch, 'legalEntityIds' | 'cate
         <label>处理方式<select :value="rule.constraints.effect" @change="effect(rule, $event)"><option value="ALLOW">允许，按下方约束执行</option><option value="DENY">禁止报销</option></select><small>改为禁止会清空该规则的允许性约束</small></label>
       </div>
       <div v-if="rule.constraints.effect === 'ALLOW'" class="constraints">
-        <label class="check"><input type="checkbox" :checked="!!rule.constraints.unitPriceLimit" @change="amount(rule, $event)" />设置单价限额</label>
+        <label class="check"><input type="checkbox" :checked="!!rule.constraints.fixedAllowance" @change="allowance(rule, $event)" />按行程自动计算定额补贴</label>
+        <div v-if="rule.constraints.fixedAllowance" class="rule-grid">
+          <label>每日补贴金额<input v-model.trim="rule.constraints.fixedAllowance.dailyRate.value" inputmode="decimal" required pattern="[0-9]+(\.[0-9]{1,2})?" /><small>按上方原币计价，金额须大于零。</small></label>
+          <p class="help">按自然日计算，包含起止日，同日计一天。必须明确类别代码和币种；类别只能使用“天”单位。申请人只填写行程，补贴行不关联发票。</p>
+        </div>
+        <label v-else class="check"><input type="checkbox" :checked="!!rule.constraints.unitPriceLimit" @change="amount(rule, $event)" />设置单价限额</label>
         <div v-if="rule.constraints.unitPriceLimit" class="rule-grid">
           <label>单价限额<input v-model.trim="rule.constraints.unitPriceLimit.value" inputmode="decimal" required pattern="[0-9]+(\.[0-9]+)?" /><small>按上方原币计算，金额保留精确小数</small></label>
           <label>限额单位<select v-model="rule.constraints.limitUnit" required><option :value="null" disabled>请选择单位</option><option v-for="(label, value) in expenseUnits" :key="value" :value="value">{{ label }}</option></select></label>
         </div>
-        <div class="rule-grid">
+        <div v-if="!rule.constraints.fixedAllowance" class="rule-grid">
           <label>票据最长时限（天）<input type="number" min="0" max="36600" step="1" :value="rule.constraints.invoiceMaxAgeDays ?? ''" placeholder="留空表示不限制" @input="age(rule, $event)" /></label>
           <label v-if="rule.constraints.invoiceMaxAgeDays !== null">超出票据时限<select v-model="rule.constraints.invoiceAgeAction" required><option :value="null" disabled>请选择处理方式</option><option value="REJECT">拒绝报销</option><option value="REQUIRE_REASON">要求例外说明</option></select></label>
           <label>允许的舱位或等级<textarea :value="rule.constraints.allowedServiceLevels.join('\n')" rows="2" @change="!disabled && (rule.constraints.allowedServiceLevels = lines(($event.target as HTMLTextAreaElement).value))" /><small>企业事实源中的等级代码；每行一项，留空表示不限</small></label>

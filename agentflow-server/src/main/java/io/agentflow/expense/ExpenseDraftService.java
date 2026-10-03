@@ -20,16 +20,18 @@ public class ExpenseDraftService {
     private final ApprovalApplicationFacade applications;
     private final ApplicationFieldViews fields;
     private final CurrentActor actors;
+    private final ExpenseAllowancePreparation allowances;
 
     /** 注入已有申请授权及字段投影，不根据 ADMIN 角色放宽财务读取。 */
     public ExpenseDraftService(ExpenseReportRepository reports, ApprovalApplicationFacade applications,
-                                ApplicationFieldViews fields, CurrentActor actors) {
-        this.reports = reports; this.applications = applications; this.fields = fields; this.actors = actors;
+                                ApplicationFieldViews fields, CurrentActor actors, ExpenseAllowancePreparation allowances) {
+        this.reports = reports; this.applications = applications; this.fields = fields; this.actors = actors; this.allowances = allowances;
     }
 
     /** 创建一对一业务绑定、空或完整费用草稿和财务版本证据。 */
     @Transactional
-    public ExpenseResponse create(String businessNo, String processKey, long definitionVersion, ExpenseContent content) {
+    public ExpenseResponse create(String businessNo, String processKey, long definitionVersion, ExpenseAllowancePreparation.Prepared prepared) {
+        var content = allowances.requireCurrent(prepared);
         var actor = actors.actor(); UUID reportId = UUID.randomUUID();
         var application = applications.createBusiness(businessNo, processKey, definitionVersion, content.title(),
                 ExpenseFormContract.draftPayload(), new BusinessReference(BusinessReference.Type.EXPENSE, reportId));
@@ -40,10 +42,11 @@ public class ExpenseDraftService {
 
     /** 同时校验申请与财务版本，任一冲突使两个聚合和各自审计一起回滚。 */
     @Transactional
-    public ExpenseResponse revise(UUID reportId, long applicationVersion, long financialVersion, ExpenseContent content) {
+    public ExpenseResponse revise(UUID reportId, long applicationVersion, long financialVersion, ExpenseAllowancePreparation.Prepared prepared) {
         var report = require(reportId);
         var application = applications.requireApplicant(report.applicationId());
         application.requireEditable(applicationVersion);
+        var content = allowances.requireCurrent(prepared);
         report.revise(financialVersion, content);
         application = applications.reviseBusiness(application.id(), applicationVersion, content.title(),
                 ExpenseFormContract.draftPayload(), application.businessReference());

@@ -6,6 +6,8 @@ import com.sun.net.httpserver.HttpServer;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.definition.DefinitionApplicationService;
+import io.agentflow.form.FormSchema;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.Money;
 import org.junit.jupiter.api.*;
@@ -24,6 +26,7 @@ import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +39,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static io.agentflow.definition.DefinitionModels.*;
 
 /**
  * 真实 HTTP 制度提示以本人身份、授权目录和发布版本为边界，不产生预检或提交结论。
@@ -55,11 +60,14 @@ class ExpensePolicyGuidanceIntegrationTest {
     private final List<JsonNode> calls=new CopyOnWriteArrayList<>();
     private final List<String> operations=new CopyOnWriteArrayList<>();
     private BiFunction<String,JsonNode,String> responder;
+    private boolean fixedAllowance;
+    private String dailyRate = "100";
     @Autowired MockMvc mvc;
     @Autowired AuthService auth;
     @Autowired JsonUtil json;
     @Autowired JdbcTemplate jdbc;
     @Autowired ExpenseConfigurationService configuration;
+    @Autowired DefinitionApplicationService definitions;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory",()->"/fyoung/tmp/agentflow-policy-guidance-"+ENTITY);
@@ -160,8 +168,90 @@ class ExpensePolicyGuidanceIntegrationTest {
         assertThat(tree(response).has("guidance")).isFalse();
     }
 
+    @Test void allowancePreviewUsesServerCalendarDaysAndWaitsForCompleteItinerary() throws Exception {
+        fixedAllowance = true; configured();
+        var incomplete = ok(read(QUERY.replace("unit=NIGHT", "unit=DAY"), "alice"), 200);
+        assertThat(incomplete.has("allowance")).isFalse();
+        assertThat(incomplete.at("/guidance/constraints/fixedAllowance/dailyRate/value").asText()).isEqualTo("100.00");
+        var calculated = ok(read(QUERY.replace("unit=NIGHT", "unit=DAY") + "&endedOn=2026-10-04", "alice"), 200);
+        assertThat(calculated.at("/allowance/calculation/days").asInt()).isEqualTo(3);
+        assertThat(calculated.at("/allowance/calculation/gross/value").asText()).isEqualTo("300.00");
+        assertThat(calculated.at("/allowance/policy/selection")).isEqualTo(calculated.at("/guidance/selection"));
+        assertThat(read(QUERY.replace("unit=NIGHT", "unit=DAY") + "&endedOn=2026-10-01", "alice").getStatus()).isEqualTo(400);
+    }
+
+    @Test void actualDraftApiRecalculatesAndPreservesRevisionsWhileReplaySkipsExternalReads() throws Exception {
+        fixedAllowance = true; configured(); var definition = expenseDefinition();
+        var body = expenseBody(definition, "300", "3", "0");
+        String key = "allowance-" + UUID.randomUUID();
+        var created = ok(write("/api/v1/expense-reports", key, body), 201);
+        assertThat(created.at("/content/lines/0/allowance/calculation/gross/value").asText()).isEqualTo("300.00");
+        int before = calls.size(); var previous = responder;
+        responder = (operation, request) -> { throw new AssertionError("Successful replay must not read finance facts"); };
+        try {
+            var replay = write("/api/v1/expense-reports", key, body);
+            assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true");
+            assertThat(ok(replay, 201)).isEqualTo(created); assertThat(calls).hasSize(before);
+        } finally { responder = previous; }
+        var content = json.read(json.write(expenseBody(definition, "400", "4", "0").get("content")), ObjectNode.class);
+        ((ObjectNode)content.at("/lines/0")).put("endedOn", "2026-10-05");
+        String id = created.path("id").asText(), revise = "/api/v1/expense-reports/" + id + "/revise";
+        var updated = ok(write(revise, "allowance-" + UUID.randomUUID(), Map.of("applicationVersion", 1, "financialVersion", 1, "content", content)), 200);
+        assertThat(updated.path("financialVersion").asInt()).isEqualTo(2);
+        assertThat(updated.at("/content/lines/0/allowance/calculation/days").asInt()).isEqualTo(4);
+        dailyRate = "120";
+        configuration.saveDraft(admin, "guidance", 1, definition("新版补贴"), "提高合成日额");
+        configuration.publish(admin, "guidance", 2, 1, 1, "合成换版");
+        var stale = write(revise, "allowance-" + UUID.randomUUID(), Map.of("applicationVersion", 2, "financialVersion", 2, "content", content));
+        assertThat(stale.getStatus()).isEqualTo(422);
+        assertThat(tree(stale).path("code").asText()).isEqualTo("ALLOWANCE_CALCULATION_MISMATCH");
+        ((ObjectNode)content.at("/lines/0/claimedGross")).put("value", "480.00");
+        ((ObjectNode)content.at("/lines/0/allocations/0/amount")).put("value", "480.00");
+        var changed = ok(write(revise, "allowance-" + UUID.randomUUID(), Map.of("applicationVersion", 2, "financialVersion", 2, "content", content)), 200);
+        assertThat(changed.at("/content/lines/0/allowance/policy/selection/policyVersion").asInt()).isEqualTo(2);
+        var first = json.read(jdbc.queryForObject("SELECT state_json FROM expense_report_revision WHERE tenant_id='demo' AND report_id=? AND financial_version=1", String.class, id), JsonNode.class);
+        assertThat(first.at("/content/lines/0/allowance/calculation/gross/value").asText()).isEqualTo("300.00");
+        assertThat(first.at("/content/lines/0/allowance/policy/selection/policyVersion").asInt()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_report_revision WHERE tenant_id='demo' AND report_id=?", Integer.class, id)).isEqualTo(3);
+    }
+
+    @Test void actualDraftApiRejectsManualAmountsAndDaysWithoutCreatingApplications() throws Exception {
+        fixedAllowance = true; configured(); var definition = expenseDefinition();
+        for (var values : List.of(List.of("301", "3", "0"), List.of("300", "4", "0"), List.of("300", "3", "1"))) {
+            var body = expenseBody(definition, values.get(0), values.get(1), values.get(2));
+            var response = write("/api/v1/expense-reports", "allowance-" + UUID.randomUUID(), body);
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(tree(response).path("code").asText()).isEqualTo("ALLOWANCE_CALCULATION_MISMATCH");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_application WHERE tenant_id='demo' AND business_no=?", Integer.class, body.get("businessNo"))).isZero();
+        }
+    }
+
+    private DefinitionDraft expenseDefinition() {
+        var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("review", "主管", NodeType.USER_TASK, Map.of("assigneeRule", "role:MANAGER")), new Node("end", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("a", "start", "review", "", false), new Edge("b", "review", "end", "", false)));
+        var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,
+                null, null, null, null, null, null, true, Map.of()),
+                new FormSchema.Field("amount", "核定金额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
+                new FormSchema.Field("currency", "本位币", FormSchema.FieldType.TEXT, true, null, null, null, null, null),
+                new FormSchema.Field("overPolicy", "超标", FormSchema.FieldType.BOOLEAN, true, null, null, null, null, null)));
+        var draft = definitions.create("demo", "allowance-" + UUID.randomUUID(), "补贴测试", graph, schema, null);
+        return definitions.publish(new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN")), draft.id(), draft.revision(), "合成发布");
+    }
+    private Map<String,Object> expenseBody(DefinitionDraft definition, String gross, String days, String tax) {
+        var amount = new Money(new BigDecimal(gross), "CNY");
+        var line = new ExpenseLine(1, "TRAVEL", LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 4), "SH", new BigDecimal(days), ExpenseLine.Unit.DAY,
+                amount, new Money(new BigDecimal(tax), "CNY"), List.of(), null, List.of(new CostAllocation("IT", null, amount)), "合成补贴", null);
+        return Map.of("businessNo", "ALLOW-" + UUID.randomUUID(), "processKey", definition.key(), "definitionVersion", definition.version(),
+                "content", new ExpenseContent(ENTITY, ExpenseContent.Type.TRAVEL, "合成补贴", List.of(line), List.of()));
+    }
+    private MockHttpServletResponse write(String path, String key, Object body) throws Exception {
+        return mvc.perform(post(path).header("Authorization", "Bearer " + auth.login("demo", "alice", "demo").token())
+                .header("Idempotency-Key", key).contentType("application/json").content(json.write(body))).andReturn().getResponse();
+    }
+
     private void configured() {
-        configuration.saveCategories(admin,0,List.of(new ExpenseCategoryCatalog.Category("TRAVEL","差旅",List.of(ExpenseLine.Unit.NIGHT),true)),"合成类别");
+        configuration.saveCategories(admin,0,List.of(new ExpenseCategoryCatalog.Category("TRAVEL","差旅",List.of(fixedAllowance ? ExpenseLine.Unit.DAY : ExpenseLine.Unit.NIGHT),true)),"合成类别");
         configuration.saveDraft(admin,"guidance",0,definition("合成差旅制度"),"合成草稿");
         configuration.publish(admin,"guidance",1,1,0,"合成发布");
     }
@@ -171,12 +261,14 @@ class ExpensePolicyGuidanceIntegrationTest {
                 new ExpensePolicyDefinition.Rule("other","OTHER_EMPLOYEE_RULE",new ExpensePolicyDefinition.Match(List.of(ENTITY),List.of("TRAVEL"),List.of("T9"),List.of("G9"),null,null,"CNY"),constraints())));
     }
     private ExpensePolicyDefinition.Constraints constraints() {
+        if (fixedAllowance) return new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW, null, null, null, null, List.of(), false,
+                new ExpenseAllowanceRule(new Money(new BigDecimal(dailyRate), "CNY"), ExpenseAllowanceRule.DayCountBasis.CALENDAR_DAYS_INCLUSIVE));
         return new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW,new Money(new BigDecimal("200"),"CNY"),ExpenseLine.Unit.NIGHT,30,ExpensePolicyDefinition.AgeAction.REQUIRE_REASON,List.of("STANDARD"),true);
     }
     private String normal(String operation,JsonNode request) {
         Object data;
         if (operation.equals("catalog")) data=new FinanceCatalog(request.at("/data/employeeId").asText(),"catalog-1",Instant.now().plusSeconds(120),
-                List.of(new FinanceCatalog.LegalEntity(ENTITY,"合成法人","CNY",false,"v1","Asia/Shanghai")),List.of(new FinanceCatalog.Category("TRAVEL","差旅",List.of(ExpenseLine.Unit.NIGHT))),List.of(),List.of(),List.of(new FinanceCatalog.City("SH","上海")));
+                List.of(new FinanceCatalog.LegalEntity(ENTITY,"合成法人","CNY",false,"v1","Asia/Shanghai")),List.of(new FinanceCatalog.Category("TRAVEL","差旅",List.of(fixedAllowance ? ExpenseLine.Unit.DAY : ExpenseLine.Unit.NIGHT))),List.of(new FinanceCatalog.CostCenter(ENTITY, "IT", "合成成本中心")),List.of(),List.of(new FinanceCatalog.City("SH","上海")));
         else if (operation.equals("expense-policy-guidance")) {
             var managed=request.at("/data/managedPolicy"); boolean unmanaged=managed.isNull() || managed.isMissingNode(); var value=new java.util.LinkedHashMap<String,Object>();
             value.put("policyId",unmanaged?POLICY:UUID.fromString(managed.at("/selection/policyId").asText()));

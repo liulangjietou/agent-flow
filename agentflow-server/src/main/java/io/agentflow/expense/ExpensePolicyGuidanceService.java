@@ -43,7 +43,23 @@ public class ExpensePolicyGuidanceService {
         if (until.isAfter(advice.validUntil())) until = advice.validUntil();
         if (until.isAfter(catalog.validUntil())) until = catalog.validUntil();
         if (!until.isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense policy guidance facts expired");
-        return new View(context, advice.validThrough(until));
+        ExpenseAllowanceBasis allowance = null;
+        if (advice.constraints().fixedAllowance() != null) {
+            if (snapshot.selection() == null || !snapshot.selection().equals(advice.selection())) {
+                throw new DomainException("ALLOWANCE_RULE_REQUIRED", "Fixed allowances require a managed published rule");
+            }
+            var rule = snapshot.current().activePolicy().definition().rules().stream()
+                    .filter(candidate -> candidate.key().equals(advice.ruleKey())).findFirst()
+                    .orElseThrow(() -> new DomainException("ALLOWANCE_RULE_REQUIRED", "Allowance rule is absent from the published policy"));
+            if (!rule.constraints().equals(advice.constraints()) || context.unit() != ExpenseLine.Unit.DAY) {
+                throw new DomainException("ALLOWANCE_RULE_REQUIRED", "Allowance guidance must match the published rule and day unit");
+            }
+            // 尚未填写结束日时仍显示制度，完整行程才产生可保存的计算依据。
+            if (context.endedOn() != null) allowance = ExpenseAllowanceBasis.calculate(
+                    new ExpensePolicyReceipt(snapshot.selection(), rule.key(), advice.factSourceReference()), rule,
+                    context.legalEntityId(), context.categoryCode(), context.currency(), context.incurredOn(), context.endedOn());
+        }
+        return new View(context, advice.validThrough(until), allowance);
     }
 
     private String target(String tenant) {
@@ -54,5 +70,5 @@ public class ExpensePolicyGuidanceService {
      * 回显匹配输入用于页面核对，避免迟到结果覆盖另一条费用条件。
      * @author owlzhangfq@gmail.com
      */
-    public record View(ExpensePolicyGuidance.Context context, ExpensePolicyGuidance guidance) { }
+    public record View(ExpensePolicyGuidance.Context context, ExpensePolicyGuidance guidance, ExpenseAllowanceBasis allowance) { }
 }

@@ -22,6 +22,27 @@ function definition() { return { name: '本地验收制度', rules: [{ key: 'off
 function draft(revision = 1) { return { id: id(1), tenantId: actor.tenantId, key: 'expense-standard', revision, definition: definition(), publishedVersion: 0, publishedDraftRevision: 0 } }
 function published(version = 1) { return { policyId: id(1), tenantId: actor.tenantId, key: 'expense-standard', version, draftRevision: version, categoryRevision: 1, definition: definition(), publishedBy: actor.userId, publishedAt: at, comment: '确认发布' } }
 function current(publishedNow = false) { return { categories: categories(), activeRevision: publishedNow ? 1 : 0, activePolicy: publishedNow ? published() : null } }
+
+test('定额补贴编辑保留日额与天数口径，排除混合约束且历史摘要可读', async () => {
+  const data = definition(), row = data.rules[0], panel = await mount(Rules, { definition: data, disabled: false })
+  try {
+    panel.state.allowance(row, { target: { checked: true } })
+    assert.equal(row.constraints.unitPriceLimit, null); assert.equal(row.constraints.invoiceMaxAgeDays, null)
+    row.constraints.fixedAllowance.dailyRate.value = '100.00'
+    const parsed = model.readPolicyDefinition(data)
+    assert.equal(parsed.rules[0].constraints.fixedAllowance.dailyRate.value, '100.00')
+    const normalized = clone(data); normalized.rules[0].constraints.fixedAllowance.dailyRate.value = '100'
+    assert.equal(model.policyFingerprint(data), model.policyFingerprint(normalized))
+    for (const mutate of [rule => { rule.constraints.fixedAllowance.dailyRate.value = '0' }, rule => { rule.constraints.fixedAllowance.dayCountBasis = 'WORK_DAYS' },
+      rule => { rule.constraints.fixedAllowance.dailyRate.currency = 'USD' }, rule => { rule.match.categoryCodes = [] }, rule => { rule.constraints.allowedServiceLevels = ['BUSINESS'] }]) {
+      const bad = clone(data); mutate(bad.rules[0]); assert.throws(() => model.readPolicyDefinition(bad))
+    }
+    const html = await renderToString(createSSRApp(Summary, { definition: data }))
+    assert.match(html, /100.00 \/ 天/); assert.match(html, /自然日含起止日/)
+    panel.state.effect(row, { target: { value: 'DENY' } }); assert.equal(row.constraints.fixedAllowance, null)
+    assert.equal(model.readPolicyDefinition(data).rules[0].constraints.effect, 'DENY')
+  } finally { panel.close() }
+})
 function summary(value = draft()) { return { id: value.id, key: value.key, name: value.definition.name, revision: value.revision, publishedVersion: value.publishedVersion, publishedDraftRevision: value.publishedDraftRevision, updatedBy: actor.userId, updatedAt: at } }
 function stubReads() {
   api.expenseConfiguration = async () => current()

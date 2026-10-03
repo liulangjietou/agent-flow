@@ -60,6 +60,7 @@ class ExpenseDraftIntegrationTest {
     @Autowired ApplicationRepository applicationRepository;
     @Autowired ExpenseReportRepository reports;
     @Autowired ExpenseDraftService drafts;
+    @Autowired ExpenseAllowancePreparation allowances;
     @Autowired JdbcTemplate jdbc;
     @Autowired TaskService tasks;
 
@@ -153,7 +154,7 @@ class ExpenseDraftIntegrationTest {
     void missingSensitiveDetailsContractCannotCreateAnExpenseApplication() {
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            fails("EXPENSE_FORM_CONTRACT_REQUIRED", () -> drafts.create("invalid-" + UUID.randomUUID(), "expense-reimbursement", 1, content("旧表单", "10")));
+            fails("EXPENSE_FORM_CONTRACT_REQUIRED", () -> drafts.create("invalid-" + UUID.randomUUID(), "expense-reimbursement", 1, allowances.prepare(content("旧表单", "10"))));
             var fields = schema(FieldVisibility.READ_ONLY).fields().stream().map(field -> ExpenseFormContract.DETAILS.equals(field.key())
                     ? new FormSchema.Field(field.key(), field.label(), field.type(), true, null, null, null, null, null) : field).toList();
             fails("EXPENSE_FORM_CONTRACT_REQUIRED", () -> ExpenseFormContract.requireSchema(new FormSchema(2, fields)));
@@ -199,7 +200,7 @@ class ExpenseDraftIntegrationTest {
         jdbc.update("INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) SELECT tenant_id,report_id,2,actor_id,operation,state_json FROM expense_report_revision WHERE tenant_id='demo' AND report_id=?", id(draft).toString());
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            assertThatThrownBy(() -> drafts.revise(id(draft), 1, 1, content("不应保存", "20")))
+            assertThatThrownBy(() -> drafts.revise(id(draft), 1, 1, allowances.prepare(content("不应保存", "20"))))
                     .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         } finally { actors.clear(); }
         assertThat(reports.find("demo", id(draft)).orElseThrow().version()).isEqualTo(1);

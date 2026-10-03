@@ -2,9 +2,10 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import type { ExpenseLine } from '../expenses'
-import { policyGuidanceError, policyGuidanceMessages, policyGuidanceQuery, type PolicyGuidanceContext, type PolicyGuidance } from '../expensePolicyGuidance'
+import { policyGuidanceError, policyGuidanceMessages, policyGuidanceQuery, type PolicyGuidanceContext, type PolicyGuidance, type PolicyGuidanceView } from '../expensePolicyGuidance'
 
 const props = defineProps<{ context: PolicyGuidanceContext | null; line: ExpenseLine; scopeKey: string; disabled: boolean }>()
+const emit = defineEmits<{ resolved: [view: PolicyGuidanceView] }>()
 const advice = ref<PolicyGuidance | null>(null), loading = ref(false), error = ref('')
 const messages = computed(() => advice.value ? policyGuidanceMessages(advice.value, props.line) : [])
 const DEBOUNCE_MS = 450, TIMEOUT_MS = 12_000
@@ -26,6 +27,7 @@ async function refresh() {
     })])
     if (version !== epoch) return
     advice.value = result.guidance
+    emit('resolved', result)
     expiry = setTimeout(() => {
       if (version !== epoch) return
       clear(); error.value = '本行制度提示已过期，请刷新。'
