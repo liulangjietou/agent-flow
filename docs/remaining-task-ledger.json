@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T13:40:31.422339+00:00",
+  "recordedAt": "2026-10-03T14:31:49.522911+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,18 +1630,18 @@
           ]
         }
       ],
-      "observed": "InboxMessage.Kind 已有审批和核减事件，但没有付款结果或异常事件；PaymentOperationChanged 现有监听器用于凭证和结算，不向收件人生成消息。",
+      "observed": "员工借款与费用报销的付款操作通知、最小外发意向、原付款权限接口及消息页面已接通，122 项 Java、49 项前端范围验证通过。同轮重新授权后旧消息仍指向原付款。登记前异常、供应商及其他财务异常来源、固定包和环境验收仍待完成。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
-          "line": 31
+          "path": "docs/payment-notifications.md",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
-          "line": 127
+          "path": "docs/evidence/payment-notifications-employee-20261003.json",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementRegistration.java",
+          "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationService.java",
           "line": 1
         }
       ],
@@ -3441,10 +3441,10 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "A02",
-    "status": "PACKAGED_HTTP_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "implementationCommit": "ad3156555ce9c4b365446567a5e008f52a52269b",
-    "evidence": "docs/evidence/precheck-explanation-runtime-20261003.json",
-    "recordedAt": "2026-10-03T13:59:04.865230+00:00"
+    "taskId": "F17",
+    "status": "EMPLOYEE_PAYMENT_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
+    "implementationCommit": "8fb5793e50ae58b908caee0a9e7ec3d6d9c1b966",
+    "evidence": "docs/evidence/payment-notifications-employee-20261003.json",
+    "recordedAt": "2026-10-03T14:31:49.522911+00:00"
   }
 }
