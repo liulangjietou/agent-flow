@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T03:48:22.303636+00:00",
+  "taskId": "F02",
+  "status": "DOMAIN_AND_GATEWAY_PHASE_VERIFIED_TASK_OPEN",
+  "implementationCommit": "2f88c8588006d5b91a65f5d9393090d3aee66624",
+  "branch": "codex/governance-identifier-integration",
+  "implemented": [
+    "Immutable draft and publication lifecycle for a fixed legal entity and currency",
+    "Version, category revision, active revision, definition digest and finance target bound to selected account entries",
+    "Missing required account keys fail closed; unrelated account mappings are not sent",
+    "Managed ERP responses must echo the exact selection and configured account codes",
+    "Tenant and finance target checked before mapping, voucher post and original-operation query",
+    "Conditional voucher digest extension preserves legacy JSON and the existing independent digest vector"
+  ],
+  "red": {
+    "tests": 32,
+    "failures": 2,
+    "errors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red.log",
+    "coverageGap": "Prior gateway tests covered the caller target; managed mapping selection was not part of the existing contract.",
+    "findings": [
+      "A foreign tenant selection reached the synthetic ERP before response validation.",
+      "A command bound to another managed mapping target was posted to the caller target."
+    ],
+    "scope": "New managed-mode implementation before its transport guard; this is not evidence that legacy unmapped commands crossed tenants."
+  },
+  "green": {
+    "status": "PASS",
+    "tests": 95,
+    "suites": [
+      {
+        "module": "agentflow-domain",
+        "suite": "AccountMappingConfigurationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "AccountingContractsTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "VoucherCommandTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "VoucherSourceTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "VoucherPreparationTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "VoucherOperationTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "VoucherReversalCommandTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-domain",
+        "suite": "ExpenseAccrualReductionTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "suite": "GatewayAccountingTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "suite": "GatewayAccountingReversalTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "suite": "VoucherOperationIntegrationTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "database": "H2 integration subset; no migration or PostgreSQL-specific changes in this phase"
+  },
+  "validation": {
+    "zeroOutboundCallsForRejectedBindings": true,
+    "legacyDigestVector": "99de112e40fd24e5c91b5aaac01d92e0b306b1e874f97db515bb5828dbac8b80",
+    "managedJsonRoundTrip": "PASS",
+    "legacyJsonRoundTrip": "PASS",
+    "javaFiles": 1432,
+    "namedTypes": 2750,
+    "missingAuthorTags": 0,
+    "parseErrors": 0,
+    "gitDiffCheck": "PASS"
+  },
+  "remaining": [
+    "Management persistence and audited draft/publication APIs",
+    "Per-tenant, legal-entity and currency activation pointer with final transactional recheck",
+    "Preparation worker selection binding and publish/prepare concurrency coverage",
+    "Management and historical evidence pages",
+    "Fixed-package local ERP workflow, restart, restore and historical-data acceptance"
+  ],
+  "limitations": [
+    "Current automatic preparations still use the legacy request; managed configuration is not activated by this phase.",
+    "No database migration or public API was added; the 16 persistence integration cases use H2.",
+    "No full release-package, browser or real-enterprise ERP acceptance is claimed.",
+    "No Git remote exists; no push, PR or remote CI was performed."
+  ],
+  "taskCount": {
+    "knownOpenTaskCount": 38,
+    "localDevelopment": 20,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/finance/AccountMappingDefinition.java": "8e178a64f8bae593fc034b79e191ddc3501fcfe273e2f99a85c9d25a4bdda967",
+    "agentflow-domain/src/main/java/io/agentflow/finance/AccountMappingDraft.java": "2a4d1ef7a768ff1177fc81a7cca36a83da7d4b45db20c5a8b7854b09bb1dec9c",
+    "agentflow-domain/src/main/java/io/agentflow/finance/AccountMappingPort.java": "3faa9e5c1116162242163ea6fca0c4473e2d88ff4b2bb864544c82dff785e80d",
+    "agentflow-domain/src/main/java/io/agentflow/finance/AccountMappingSelection.java": "5339d705a7b4467ce4f18235f82eb515c6135f087fbef46d44e95e2615b70c59",
+    "agentflow-domain/src/main/java/io/agentflow/finance/ManagedAccountMapping.java": "65292320faa9e38dc42b9136307b5ad342068042deb66bed693b93abb7506e92",
+    "agentflow-domain/src/main/java/io/agentflow/finance/PublishedAccountMapping.java": "980e527333e53e3f521a9975a7da17b1ef9ca8911aae3d791fb63e32274cb426",
+    "agentflow-domain/src/main/java/io/agentflow/finance/VoucherCommand.java": "a9720127988db7dbd4dd529dacde5cc36ae918bccac691eeb15b3ac140dc6319",
+    "agentflow-domain/src/main/java/io/agentflow/finance/VoucherOperation.java": "09ae87f87ec434652212f71f68efe142fa06d1bb86cd3eb00dddbc153da94737",
+    "agentflow-domain/src/test/java/io/agentflow/finance/AccountMappingConfigurationTest.java": "c1e9702fabfd67171f8f17c88aeb10f6428f2b560ce874d3d439fbb790491a5b",
+    "agentflow-server/src/main/java/io/agentflow/finance/GatewayAccounting.java": "7221a7d18920f1da753d5e9f93be38bff9345a1520523088f0f649df141a4538",
+    "agentflow-server/src/test/java/io/agentflow/finance/GatewayAccountingTest.java": "acb466d9b42e73cc306a4b4c2ad31f65351c364822f0ef3e64284c738599f62e"
+  },
+  "artifacts": {
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red.log": "93edf0e884994a7e75f1fe277205801ed5687be96bb4e4a4e96ee2281e66ac03",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green.log": "e5f42304a7131c88a84618005522610497309a81247ba7f708f1496839260d3e",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-authors.log": "a1e2a835be99b2eb24ee0d730c0e8ceac5c3541c59e80f0ab3a605206265a100",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-tests.json": "c55160153d59fe027a5cfe07988f807ea6a8b7656cb3085a1e32808daffd1a2f",
+    "/fyoung/tmp/agentflow-remaining-20260928/record-account-mapping-foundation.py": "b1d40d3fc1f23bca188bdb535f2f9a99a0fec1b4d225a8cbaf3d0c16348b866f",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-domain-TEST-io.agentflow.finance.AccountMappingConfigurationTest.xml": "a1db90244a26356e230b2c9ac36753052cb7f07c22cca38d8da5194f4952e06e",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-domain-TEST-io.agentflow.finance.AccountingContractsTest.xml": "28eae08b7528f960fbdc376efd4f4b851146c149bc3da807bfcd5e4639916108",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-domain-TEST-io.agentflow.finance.VoucherCommandTest.xml": "90c45f984b34adafc3a7ebbf9e303a31eb2308ae628cb5228392c83ab5611546",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-domain-io.agentflow.finance.AccountMappingConfigurationTest.txt": "fbca83337e88fef7744cf11b0267127ce94a959a815e7cd1bddceb4127a5ef6a",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-domain-io.agentflow.finance.AccountingContractsTest.txt": "56c6aa73c040e73e29596d2aaa71612ddb71a6e7e2313bdbeaf58fc46141003d",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-domain-io.agentflow.finance.VoucherCommandTest.txt": "c64621fc045233fef8765021ea21df7c72d1405eb971302bd18be5a7c939e8ca",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-server-TEST-io.agentflow.finance.GatewayAccountingTest.xml": "741814ccc195e1bfc440eb8c92e17dc74558ee76d51e4b34f6d110e66ce79f6a",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-red-reports/agentflow-server-io.agentflow.finance.GatewayAccountingTest.txt": "0d32e6f602ee8828a379950e1d6ba346e2259cbd8f1e51fd276512616f72b2cf",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.AccountMappingConfigurationTest.xml": "843358bc0754f9b4fc6eb6942c71df85e1cfc529dd9310fcf64dabd72047015a",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.AccountingContractsTest.xml": "0825f4ca334dae7cacd8b897f7a2485838726752564206fbe6a9293bb1e2d74f",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.ExpenseAccrualReductionTest.xml": "e4dc85da1470d08d951e4f3b451a129ccb0357b94367ee473073bd849d7fb8bd",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.VoucherCommandTest.xml": "5ca88b2f59277e88df7c932a9d7bc2c1c54eeabc1c2713468995bc8ace424faf",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.VoucherOperationTest.xml": "cfdc942e4f9d7a761d09e3d3d331e4ff541c9d2cd2f1c733a9ed34b86afdfa4f",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.VoucherPreparationTest.xml": "eeb98b895ec2f9710671115e67fe378f698e846341a2a1e44dba0d2f8aa7ff83",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.VoucherReversalCommandTest.xml": "7184e9424a2ec3d881487b6571fbf274bb7bc86ebe093e05df053b26ea77bc26",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-domain-TEST-io.agentflow.finance.VoucherSourceTest.xml": "1aa07f84f0ee8313a11c749da110c99c15a738627cea6dbf75c325baf38245eb",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-server-TEST-io.agentflow.finance.GatewayAccountingReversalTest.xml": "c14f84d7ff9887197e2c8c45edcbc91021728ae8fae0e02396c22f1240dd4fae",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-server-TEST-io.agentflow.finance.GatewayAccountingTest.xml": "06dc42e6b5aaea35111100d9a98339aff6fa404efd66597bc62bc41d89984f33",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-foundation-green-reports/agentflow-server-TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml": "64e6b2ca33a95be47926794e2f63c2f6651ead0f8bb1fa0f1cd32726a657d130"
+  }
+}
