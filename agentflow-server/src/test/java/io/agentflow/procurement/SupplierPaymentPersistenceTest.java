@@ -113,7 +113,7 @@ class SupplierPaymentPersistenceTest {
         returnActor = mock(CurrentActor.class); when(returnActor.actor()).thenReturn(new Actor(tenant, "finance", Set.of("FINANCE")));
         returnAccess = mock(SupplierSettlementAccess.class);
         var returnSources = new SupplierPaymentReturnSources(sources, payments, new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard));
-        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations, jdbc, json));
+        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations, jdbc, json, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)));
     }
 
     @Test void cashierChoiceRegistrationAndAllBankRevisionsSurviveRepositoryRecreation() {
