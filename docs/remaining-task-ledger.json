@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T00:16:46.960716+00:00",
+  "recordedAt": "2026-10-03T00:52:33.984396+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 41,
+    "knownOpenTaskCount": 40,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 23,
+      "LOCAL_DEVELOPMENT": 22,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 41,
+    "projectRemainingLowerBound": 40,
     "completionPercentage": null,
     "notes": [
-      "41 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "40 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -951,7 +951,7 @@
           ]
         }
       ],
-      "observed": "现有 GatewayExpensePolicies 查询外部判定，ExpensePolicySnapshot 冻结版本；类别来自 FinanceCatalog。当前 308 操作的 OpenAPI 中没有制度/类别管理与发布入口。",
+      "observed": "现有 GatewayExpensePolicies 查询外部判定，ExpensePolicySnapshot 冻结版本；类别来自 FinanceCatalog。当前 309 操作的 OpenAPI 中没有制度/类别管理与发布入口。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/GatewayExpensePolicies.java",
@@ -1170,7 +1170,7 @@
       "id": "F07",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "借款冲销 FIFO 建议",
       "sourceRefs": [
         {
@@ -1190,19 +1190,26 @@
           ]
         }
       ],
-      "observed": "现有本人借款列表按资源游标返回，ExpenseFundingPicker 逐笔选择后手填金额；未按放款日生成先进先出建议。",
+      "observed": "已按有效预检核定额生成跨页 FIFO 建议，计入本单保留预留并排除冻结与其他占用；页面明确采纳、可调整、保存重检及正式提交复核均经本地验收。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseWorkspaceQuery.java",
-          "line": 82
+          "path": "docs/advance-offset-suggestion.md",
+          "line": 1
         },
         {
-          "path": "agentflow-web/src/components/ExpenseFundingPicker.vue",
-          "line": 21
+          "path": "docs/evidence/advance-offset-suggestion-20261002.json",
+          "line": 1
         }
       ],
       "acceptance": "跨分页按放款日期及稳定次序建议，在核定金额和可用余额内分配；申请人可调整，最终提交重验；预留和冻结借款不被错误使用。",
-      "dependsOn": []
+      "dependsOn": [],
+      "completion": {
+        "implementationCommit": "2ab9a3815fbde185c9042c11cce7370113822ece",
+        "verifiedAt": "2026-10-03T00:52:33.984396+00:00",
+        "evidence": "docs/evidence/advance-offset-suggestion-20261002.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "申请人本人；管理员与财务角色不扩大归属权限"
+      }
     },
     {
       "id": "F08",
@@ -3257,7 +3264,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F07",
     "F08",
     "F01",
     "F02",
@@ -3269,11 +3275,11 @@
     "ci": null
   },
   "latestProgress": {
-    "taskId": "F06",
-    "implementationCommit": "414b5d7e99b204abd897ebd27cc676b7338dc6f9",
-    "completedAt": "2026-10-03T00:16:46.960716+00:00",
-    "openapiPathCount": 273,
-    "openapiOperationCount": 308,
-    "evidence": "docs/evidence/expense-request-closure-20261002.json"
+    "taskId": "F07",
+    "implementationCommit": "2ab9a3815fbde185c9042c11cce7370113822ece",
+    "completedAt": "2026-10-03T00:52:33.984396+00:00",
+    "openapiPathCount": 274,
+    "openapiOperationCount": 309,
+    "evidence": "docs/evidence/advance-offset-suggestion-20261002.json"
   }
 }

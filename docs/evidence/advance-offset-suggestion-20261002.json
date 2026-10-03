@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F07",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "recordedAt": "2026-10-03T00:52:33.984396+00:00",
+  "implementationCommit": "2ab9a3815fbde185c9042c11cce7370113822ece",
+  "branch": "codex/governance-identifier-integration",
+  "feature": "借款冲销 FIFO 建议",
+  "requirements": [
+    "05-费用报销领域设计.md §6.2",
+    "01-UI设计说明.md 费用报销页面"
+  ],
+  "scope": {
+    "authority": "申请人本人；管理员、财务不扩大归属权限",
+    "ordering": "实际放款日 ASC，UUID 文本 ASC，100 笔一页跨页遍历",
+    "amount": "有效预检核定含税金额；排除其他单预留、消费、净还款、银行退回及待复核冻结，计入本单保留预留",
+    "limit": 50,
+    "adoption": "明确确认后只写本地草稿；余额变化重新确认；保存和重新预检后正式提交重验",
+    "mutationOnSuggestionRead": false
+  },
+  "redEvidence": {
+    "missingEndpoint": "advance-offset-red.log: expected 200 but was 404",
+    "postgresTransaction": "advance-offset-pg-red.log: SQLSTATE 25006, SELECT FOR UPDATE forbidden in read-only transaction",
+    "testCorrections": [
+      "还款冻结测试须有原还款事实",
+      "过期 READY 夹具须保持有效期晚于完成时点",
+      "撤回后发票需按既有规则重新查验",
+      "新 FIFO 批量夹具清理；原工作台测试按公开游标跨页查找，去掉首 100 笔假设",
+      "浏览器等待真实费用行出现，不能仅依赖 networkidle"
+    ]
+  },
+  "tests": {
+    "java": {
+      "total": 318,
+      "classes": [
+        {
+          "class": "ExpenseResourcesTest",
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "AdvanceRepaymentTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "AdvanceRepaymentResolutionTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "AdvanceDisbursementReturnTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "ExpenseSubmissionResourcesTest",
+          "tests": 23,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "AdvanceOffsetMigrationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "ExpenseSubmissionIntegrationTest",
+          "tests": 229,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "FinancialResourceRepositoryTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "postgres": {
+      "fifoHttpTests": 5,
+      "populatedV100ToV101Migration": 1,
+      "runnerTestsTotal": 7,
+      "note": "同一运行中还有 1 项损坏旧背景拒绝测试固定使用 H2，不计为 PostgreSQL 用例"
+    },
+    "frontend": {
+      "scopeTests": 28,
+      "newTestsIncluded": 9,
+      "build": "PASS",
+      "existingLargeChunkWarning": true
+    },
+    "openapi": {
+      "paths": 274,
+      "operations": 309,
+      "schemas": 619,
+      "recordFieldContract": "PASS"
+    },
+    "authors": {
+      "javaFiles": 1393,
+      "namedTypes": 2669,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "runtime": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-server.jar",
+    "jarSha256": "5aafd80e6911ab684858066b08a5982dcb300e99c31d372feb364fe6c8e658ef",
+    "database": "expense_fifo_884ae93dd4",
+    "backendPort": 18265,
+    "frontendPort": 15349,
+    "sourceDatabase": "expense_close_plan_27079cc0ee",
+    "syntheticLocalFinance": true,
+    "enterpriseAcceptance": false,
+    "upgrade": {
+      "result": "PASS",
+      "changedOriginalTables": [
+        "flyway_schema_history"
+      ],
+      "originalBusinessRowsPreserved": true,
+      "originalTables": 232,
+      "upgradedTables": 233,
+      "indexedAdvances": 6,
+      "originalFilesUnchanged": 9,
+      "sourceUnchanged": true
+    },
+    "http": {
+      "result": "PASS",
+      "reportId": "e5c946bc-3826-4cc1-b02b-109d114b35b6",
+      "applicationStatus": "IN_APPROVAL",
+      "financialVersion": 3,
+      "applicationVersion": 4,
+      "offsetTotal": {
+        "value": "80.00",
+        "currency": "CNY"
+      },
+      "payable": {
+        "value": "20.00",
+        "currency": "CNY"
+      },
+      "use": [
+        {
+          "tenant_id": "demo",
+          "resource_type": "ADVANCE",
+          "resource_id": "15b71173-0aef-4d0f-a89e-292e9951dc71",
+          "source_line": 0,
+          "report_id": "e5c946bc-3826-4cc1-b02b-109d114b35b6",
+          "round_no": 1,
+          "report_line": 0,
+          "amount": 80.0,
+          "currency": "CNY",
+          "status": "RESERVED"
+        }
+      ],
+      "sourceUnchanged": true
+    },
+    "browser": {
+      "status": "PASS",
+      "desktopWidth": 1440,
+      "mobileWidth": 500,
+      "horizontalOverflow": false,
+      "pageErrors": [],
+      "readSuggestionBeforeAdoption": 2,
+      "adoptionWroteOnlyLocalDraft": true,
+      "manualOffset": "80.00",
+      "freshPrecheckRequired": true,
+      "writeCount": 3
+    },
+    "restart": {
+      "result": "PASS",
+      "tablesUnchanged": 233,
+      "rowsUnchanged": 5013,
+      "filesUnchanged": 9,
+      "boot": 2,
+      "backendPid": 68865,
+      "jarSha256": "5aafd80e6911ab684858066b08a5982dcb300e99c31d372feb364fe6c8e658ef",
+      "sourceUnchanged": true,
+      "manualOffsetAndOneReservationPreserved": true
+    },
+    "screenshotsInspected": [
+      "advance-offset-mobile-confirm.png",
+      "advance-offset-rechecked-manual.png"
+    ]
+  },
+  "sourceFiles": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvance.java": "52819661306cec15c0f112ddc194d4e0e677c302470709b46357c50d4a2450c4",
+    "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvanceRepository.java": "fcc2dce236c3f0e56e729863cf23aa5891bef491a5996232c679857c676b36ae",
+    "agentflow-domain/src/test/java/io/agentflow/expense/AdvanceRepaymentTest.java": "05e43da8f7b0622e21fae5c075f2e657f10890c17f4c9617a3d4312bb4755eb5",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseResourcesTest.java": "6872ed64f4d3a71ec1ef4e360ebc56bc15d6899edd0f5cf2693820d92bc0397d",
+    "agentflow-server/src/main/java/db/migration/V101__Index_advance_paid_date.java": "9151bc26f9e5445a7ad70fab104a77f039be040978a568f7c0545966631d7a60",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOffsetSuggestionService.java": "58778ff43ed8a31572b81ab80b3dbc8cfd768741a7d82e11d27b5224e77c23c2",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckController.java": "47498dadb94b4cd6527bfb476dbbab4ea9d27fbd7d675afc08a4ba514b151571",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcEmployeeAdvanceRepository.java": "0c743494253169b2a94014a800a036da8ce89ad69fb28b9e9d44a067b898f467",
+    "agentflow-server/src/main/resources/api/openapi.json": "1830bd7e1fe517082eaf76d3be6b185a0cb50fef587acc318d88d1378bbb7f7a",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "400ccf8660d37fb40f62b840455e42a7735ce04544064138ce27fcd38098a76e",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceOffsetMigrationTest.java": "5b1527ca232fcbbf50d7c2698ecd02dc47df51e32477a4e8a1bfaaba1311102d",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "a872ab57ff9ea43e9a84fdf5d3fa42c527809804f303fa877ff3934728748525",
+    "agentflow-web/scripts/test-requests.mjs": "4b9161ebf377dca1bf32a72843ad824df8f5a2b11ba30e5b3d21c123372671dc",
+    "agentflow-web/src/advanceOffsetSuggestion.ts": "c4f9377c3dc6900b793b198fd13c9b9cf2db9aa1d6cf2729cb26c6cd277ed874",
+    "agentflow-web/src/api.ts": "3d8706928f39c162b06f83cddf6d6fa8763e329abcbd15df5dd94a2ea6d22f81",
+    "agentflow-web/src/components/AdvanceOffsetSuggestion.vue": "88ad4a93ee604cdb404234d40cde00b7d8d208ac090514b564ae1173eed7152a",
+    "agentflow-web/src/components/ExpenseEditor.vue": "f4fd5409a6ef2fc63719184a79ca10d26ef6409c3528cd965962923f57bd76a4",
+    "agentflow-web/src/components/ExpenseSubmission.vue": "377dda926acf1144433981aa7deb6b4784ac835dec142cf1805b8a1ba68b91e5",
+    "agentflow-web/tests/advance-offset-suggestion.test.mjs": "1483646bb52ab7818191db5f3f1e37703ead025484ef3f9ebb2214ed9f7dc1fc"
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-authors.log",
+      "sha256": "48424f8886f9d51172e03597b62f7a03833ecd5bea38f47aa21c1289a1f194b9",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-before-boot2.json",
+      "sha256": "61e17bdaff515c94d46b93e9a5ba8f5c1b8cb047e8d062e5710d53bc65dd1cb6",
+      "bytes": 25930
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-before-restart.json",
+      "sha256": "61e17bdaff515c94d46b93e9a5ba8f5c1b8cb047e8d062e5710d53bc65dd1cb6",
+      "bytes": 25930
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-browser-run.log",
+      "sha256": "4cf8f4f7530fed1688f30f0caade27979ce4ae2e685a78ee21067cb56b70e9b7",
+      "bytes": 1354
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-browser-run2.log",
+      "sha256": "2bfb46baa7bbe5bf3fb929bd3b9677669d50ee05932e162b6864ba67ffcb81a8",
+      "bytes": 253
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-browser.json",
+      "sha256": "26ad67c91f3c6725c317b2daf3134c4b1a688c22af33c97a83996dedfa831c0e",
+      "bytes": 2600
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-desktop-suggestion.png",
+      "sha256": "bf2c89209d02317425613b190e18e6b25bc90a5096a961b18624737bcd019a4d",
+      "bytes": 40818
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-evidence-snapshot/advance-offset-finance-calls.jsonl",
+      "sha256": "3ae1e48c73760d845f299ede3697a8d827636b7dce3069a13f9527d4b6abc942",
+      "bytes": 797
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-evidence-snapshot/advance-offset-runtime-boot1.log",
+      "sha256": "d9879a54b23895c248fa843fd897bcdeb51b3135b9d384acc4dbf705d0f8a013",
+      "bytes": 8261
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-evidence-snapshot/advance-offset-runtime-boot2.log",
+      "sha256": "b267f58e5f4cfd34455eff223f85f247d17a0be98c00c2dc3faa19c72db7a4bb",
+      "bytes": 7346
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-evidence-snapshot/advance-offset-runtime.json",
+      "sha256": "ac2a3d74b6fc72e365c05d0bc60c69a6fee62c4ec296dce643a4b695147b604f",
+      "bytes": 28598
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-regression-package.log",
+      "sha256": "8b03b7c55d3cdff55976f3df0a19d590389ad3a98dfc56209fe2eb1953d2d6ba",
+      "bytes": 137357
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-regression-package2.log",
+      "sha256": "544348110618296c6f38c56f61e6370a9319537d352b7f25827e45f44a7fb268",
+      "bytes": 136120
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "ceae5ebfc7fdaa80b4b48c8fbf886f5113a69196bd2fc3ffb319f5bdda0240c2",
+      "bytes": 72665
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.AdvanceDisbursementReturnTest.xml",
+      "sha256": "780a4c3f60a0fe0d7eaa6e033b3aacbd1fc9cba6bb8152523b1bdbaa5f3d0e57",
+      "bytes": 11508
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.AdvanceOffsetMigrationTest.xml",
+      "sha256": "dac7bc858aa558a8a026d7d4bffa4c9a68d09089b4e5fde381f6aac1222c1c2e",
+      "bytes": 76715
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.AdvanceRepaymentResolutionTest.xml",
+      "sha256": "774ea91da3fd98f5e9a6e063b48129b9bde547783ce4e1ee410d06aada1e5571",
+      "bytes": 11309
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml",
+      "sha256": "59f62a36ca0e6c2059987d245c0ed439c80b0cc196cd672c9bb55a60a12b1ed1",
+      "bytes": 11370
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.ExpenseResourcesTest.xml",
+      "sha256": "547a156eb82b4182cebdbf6ad8a96cfc73c4393207b740dba371e75132244460",
+      "bytes": 12984
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "d39a003796a60be086eb6f6920f7b01a09795319971c2eeafbef121bd826e5cc",
+      "bytes": 112458
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.ExpenseSubmissionResourcesTest.xml",
+      "sha256": "18a6b41b95a5694887afa9497e4341fb36730156e6e3081fd3bf06b91d08e28e",
+      "bytes": 14104
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-reports/TEST-io.agentflow.expense.FinancialResourceRepositoryTest.xml",
+      "sha256": "7c218bebf8ff640e1d71cdb5a65b7e72807f44cfcc1c369ccb9cb08691ab291b",
+      "bytes": 73877
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-final-tests.json",
+      "sha256": "d63753fccba9706053fe7bda9cc3f949c731e11e1d14690c5bde3f8be3292b5e",
+      "bytes": 1261
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-green.log",
+      "sha256": "d08dac4f46fda2790ebb306dab2e7cc2f8413f24847c1daa83725846cfd292d7",
+      "bytes": 8541
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-green2.log",
+      "sha256": "8b7d4350d259d0897500c5861e7c2d27d196f6ce7aaaa4455b9f832264a5b0d7",
+      "bytes": 108489
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-http-after.json",
+      "sha256": "b281e136d658b0c43ac3f1034f6ca7795fdb6d7d6bd75a6be9193d962f649cea",
+      "bytes": 678
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-http-seed.json",
+      "sha256": "29cc2d41a509b6164ab054e357d8699917ed5ceb60b4fb7d4aac566f576b0586",
+      "bytes": 6646
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-mobile-confirm.png",
+      "sha256": "b206f970a13b546c5488fa4fe37d0706a7a98a19c4ddb9393a7d7b8e9f209456",
+      "bytes": 52055
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-pg-green.json",
+      "sha256": "4ea52b3df5f4771259b9ee9e673555852a3003250d46f1566df3a2a291a7085f",
+      "bytes": 253
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-pg-green.log",
+      "sha256": "e3bdb810a1142c61af8138cbbe9c2bd57ded99f4690ff086931294bf9523de9e",
+      "bytes": 74198
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-pg-red.json",
+      "sha256": "e3bb3a9481c773455bb2d41a8ccf71c387635553bd7c09f3920ecea7b56c0901",
+      "bytes": 226
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-pg-red.log",
+      "sha256": "cf0105698ac90a458eba402eee5608ddda6fd67163b36aa6dad1483241dceb6f",
+      "bytes": 143426
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-pg-reports/TEST-io.agentflow.expense.AdvanceOffsetMigrationTest.xml",
+      "sha256": "06f89d2feafa92f46dca5be805798a7b8f13b45579b0570ff46c4e514fbfcc36",
+      "bytes": 75560
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-pg-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "0edb25a19517be979de57ad5d8c112c62543fce8f03bdd80f7f3d543449d50b6",
+      "bytes": 72113
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-rechecked-manual.png",
+      "sha256": "8a8201ece3a61f005d53f519267674a649f286cebb2e1fc3210ef0b822ad79ab",
+      "bytes": 112526
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-red.log",
+      "sha256": "55bd4cee75afd08b91ce3ff33a5ef507ca86a8318a5a1d4f56625641f3289881",
+      "bytes": 42936
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-regression.log",
+      "sha256": "62801395be13b299bc677fb537a8af7aebbe7f830be856e4a0dd58a9183bb798",
+      "bytes": 135474
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-restart-check.json",
+      "sha256": "3bb8892a7865257aaec1c9c43d11f4522c4259af76bfda50f5ad4afdbc6ddb2e",
+      "bytes": 293
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-restore.log",
+      "sha256": "d31b97a71f8b0b96f632e4afef3193d0f320f9cf9ebba3462cb29a2725299ecd",
+      "bytes": 17848
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-submitted.png",
+      "sha256": "5cdb226821ca1355919cc4f4de7f7874ad3c1471a4a417cd830464c7ad6c43ae",
+      "bytes": 242972
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-upgrade-check.json",
+      "sha256": "dfba87a020ce8564d91f829a6b284e53f42edf60bc074091103aee0efef3dee9",
+      "bytes": 28090
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-web-build.log",
+      "sha256": "54f9de6b134bc3b180697269063b41e19848e29ab0e39773ff4918ab2bc108e9",
+      "bytes": 781
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-web-dist/assets/index-ByxZgu3W.js",
+      "sha256": "a5a7653a2d153338b761990941939fa9114efbb1cc98c21e1cc90b687ee3cfb0",
+      "bytes": 1581247
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-web-dist/assets/index-Cy2L0lyM.css",
+      "sha256": "c75e7da553ac0907f084472702601021bdb9c3a8b7c503b3f339eaee8c2af4bc",
+      "bytes": 363024
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-web-dist/index.html",
+      "sha256": "b5646812bda8b19f8c5d42498f742288653ff5aa3cad5f670dda12e1d05d38a4",
+      "bytes": 420
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-web-tests.log",
+      "sha256": "0c8e44f56a81e29d8ce42c713e00039cfa7395a247daeaf879bb681ad6395c1f",
+      "bytes": 2983
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-offset-workspace-recon.png",
+      "sha256": "6a6f44155dabc6459dadab2339398899e136404868ce4b5cebaf28db8022c151",
+      "bytes": 218998
+    }
+  ],
+  "remoteDelivery": {
+    "configuredRemote": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "remainingCountAfterCompletion": 40,
+  "wholeRequirementAuditComplete": false
+}
