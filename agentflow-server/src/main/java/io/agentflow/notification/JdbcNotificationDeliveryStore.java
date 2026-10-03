@@ -2,6 +2,7 @@ package io.agentflow.notification;
 
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
+import io.agentflow.jdbc.JdbcTimestampPrecision;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -115,6 +116,9 @@ public class JdbcNotificationDeliveryStore {
     /** 状态和完整版本历史一起保存，任何一步失败均回滚。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public NotificationDelivery save(NotificationDelivery previous, NotificationDeliveryProgress next, String actor, String reason) {
+        // 返回与重读相同的租约边界，避免调用方持有数据库舍入前的到期时间。
+        next = new NotificationDeliveryProgress(next.status(), next.version(), next.attempts(), next.cycleAttempts(),
+                persistedTime(next.nextAttemptAt()), persistedTime(next.leaseUntil()), next.leaseToken(), next.errorCode(), persistedTime(next.changedAt()));
         int changed = jdbc.update("""
                 UPDATE notification_dispatch SET status=?,version=?,attempts=?,cycle_attempts=?,next_attempt_at=?,lease_until=?,lease_token=?,error_code=?,updated_at=?
                 WHERE id=? AND version=?
@@ -139,7 +143,8 @@ public class JdbcNotificationDeliveryStore {
         return new NotificationDelivery(UUID.fromString(row.getString("id")), row.getString("tenant_id"), row.getString("recipient_id"), UUID.fromString(row.getString("inbox_id")),
                 NotificationChannel.valueOf(row.getString("channel")), row.getLong("consent_generation"), row.getString("binding_id"), row.getString("destination_digest"), time(row, "created_at"), p);
     }
-    private static Timestamp stamp(Instant value) { return value == null ? null : Timestamp.from(value); }
+    private static Instant persistedTime(Instant value) { return value == null ? null : JdbcTimestampPrecision.roundedToMicros(value); }
+    private static Timestamp stamp(Instant value) { return value == null ? null : Timestamp.from(persistedTime(value)); }
     private static Instant time(ResultSet row, String column) throws SQLException { var value = row.getTimestamp(column); return value == null ? null : value.toInstant(); }
 
 }

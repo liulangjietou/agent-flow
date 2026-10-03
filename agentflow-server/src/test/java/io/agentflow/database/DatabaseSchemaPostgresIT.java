@@ -54,9 +54,11 @@ class DatabaseSchemaPostgresIT {
         var outcome = command(database, "migrate");
         assertThat(outcome.code()).as(outcome.output()).isZero();
         assertThat(command(database, "validate").code()).isZero();
-        // V24 新增通知快照列；旧草稿不补造文案，其余字段仍须逐项保持。
+        // V24、V33 新增通知和业务关联列；旧草稿不补造文案或费用绑定，其余字段逐项保持。
         var expectedDraft = new LinkedHashMap<>(draftBefore.get(0));
         expectedDraft.put("notification_texts_json", null);
+        expectedDraft.put("business_type", null);
+        expectedDraft.put("business_id", null);
         assertThat(jdbc.queryForList("SELECT * FROM approval_application")).containsExactly(expectedDraft);
         assertThat(jdbc.queryForList("SELECT * FROM ACT_RU_TASK")).isEqualTo(taskBefore);
         engine = ProcessEngineConfiguration.createStandaloneProcessEngineConfiguration().setDataSource(database)

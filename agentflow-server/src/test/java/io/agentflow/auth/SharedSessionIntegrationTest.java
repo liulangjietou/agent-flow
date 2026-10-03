@@ -2,6 +2,7 @@ package io.agentflow.auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.AgentflowApplication;
+import io.agentflow.database.DatabaseSchemaLifecycle;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.Node;
 import io.agentflow.definition.DefinitionModels.NodeType;
@@ -43,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -63,6 +65,9 @@ class SharedSessionIntegrationTest {
 
     @BeforeAll
     static void start() {
+        // 按部署流程初始化连接的当前 schema，避免其他 schema 的引擎表干扰首次启动探测。
+        DatabaseSchemaLifecycle.migrate(new DriverManagerDataSource(JDBC_URL,
+                setting("user", "USERNAME", "sa"), setting("password", "PASSWORD", "")));
         first = node(Map.of());
         second = node(Map.of());
         json = first.getBean(JsonUtil.class);

@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.jdbc.JdbcTimestampPrecision;
 import io.agentflow.finance.BudgetConsumptionReductionOperation;
 import io.agentflow.finance.ExpenseAccrualReductionOperation;
 import io.agentflow.finance.ExpenseAdjustmentFundingSource;
@@ -152,7 +153,7 @@ public class JdbcExpensePartialAdjustmentRepository {
         var currentSource = requireCompletionSource(before);
         var required = new ExpenseResourceReduction().requirements(basis.funding().financial().change()).stream().map(ExpenseResourceReduction.Requirement::effect).toList();
         var actual = jdbc.query("SELECT * FROM finance_consumption_reduction WHERE tenant_id=? AND adjustment_id=?", (row, index) -> {
-            if (!value.updatedAt().equals(instant(row.getTimestamp("adjusted_at")))) throw conflict();
+            if (!JdbcTimestampPrecision.matches(value.updatedAt(), row.getTimestamp("adjusted_at"))) throw conflict();
             return new ExpenseResourceReversal.Consumption(ExpenseResourceReversal.Kind.valueOf(row.getString("resource_type")), UUID.fromString(row.getString("resource_id")), row.getInt("source_line"),
                     new ExpenseUse(UUID.fromString(row.getString("report_id")), row.getInt("round_no"), row.getInt("report_line")),
                     row.getBigDecimal("amount") == null ? null : new Money(row.getBigDecimal("amount"), row.getString("currency")));
@@ -294,16 +295,17 @@ public class JdbcExpensePartialAdjustmentRepository {
                     || !value.status().name().equals(row.getString("status")) || !Objects.equals(activeReport(value), row.getString("active_report_id"))
                     || !Objects.equals(budget == null ? null : budget.input().command().id().toString(), row.getString("budget_operation_id"))
                     || !Objects.equals(budget == null ? null : budget.status().name(), row.getString("budget_status"))
-                    || !Objects.equals(budget == null ? null : budget.nextAttemptAt(), instant(row.getTimestamp("budget_next_at")))
-                    || !Objects.equals(budget == null ? null : budget.leaseUntil(), instant(row.getTimestamp("budget_lease_until")))
+                    || !JdbcTimestampPrecision.matches(budget == null ? null : budget.nextAttemptAt(), row.getTimestamp("budget_next_at"))
+                    || !JdbcTimestampPrecision.matches(budget == null ? null : budget.leaseUntil(), row.getTimestamp("budget_lease_until"))
                     || !Objects.equals(accrual == null ? null : accrual.input().command().id().toString(), row.getString("accrual_operation_id"))
                     || !Objects.equals(accrual == null ? null : accrual.status().name(), row.getString("accrual_status"))
-                    || !Objects.equals(accrual == null ? null : accrual.nextAttemptAt(), instant(row.getTimestamp("accrual_next_at")))
-                    || !Objects.equals(accrual == null ? null : accrual.leaseUntil(), instant(row.getTimestamp("accrual_lease_until")))
-                    || !Objects.equals(value.completion() == null ? null : value.completion().at(), instant(row.getTimestamp("completed_at")))
+                    || !JdbcTimestampPrecision.matches(accrual == null ? null : accrual.nextAttemptAt(), row.getTimestamp("accrual_next_at"))
+                    || !JdbcTimestampPrecision.matches(accrual == null ? null : accrual.leaseUntil(), row.getTimestamp("accrual_lease_until"))
+                    || !JdbcTimestampPrecision.matches(value.completion() == null ? null : value.completion().at(), row.getTimestamp("completed_at"))
                     || !Objects.equals(value.completion() == null ? null : sequence(basis), row.getObject("completed_sequence", Long.class))
-                    || !Objects.equals(value.retirement() == null ? null : value.retirement().at(), instant(row.getTimestamp("retired_at")))
-                    || !value.input().createdAt().equals(instant(row.getTimestamp("created_at"))) || !value.updatedAt().equals(instant(row.getTimestamp("updated_at")))) throw inconsistent();
+                    || !JdbcTimestampPrecision.matches(value.retirement() == null ? null : value.retirement().at(), row.getTimestamp("retired_at"))
+                    || !JdbcTimestampPrecision.matches(value.input().createdAt(), row.getTimestamp("created_at"))
+                    || !JdbcTimestampPrecision.matches(value.updatedAt(), row.getTimestamp("updated_at"))) throw inconsistent();
             requireRegisteredOperations(value); requireRecordedCompletion(value); disputes.recorded(value); return value;
         };
     }
@@ -346,7 +348,7 @@ public class JdbcExpensePartialAdjustmentRepository {
                 value.input().basis().tenantId(), value.id().toString(), value.version(), json.write(value));
     }
     private static String activeReport(ExpensePartialAdjustment value) { return value.completion() == null && value.retirement() == null ? value.input().basis().reportId().toString() : null; }
-    private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(value); }
+    private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(JdbcTimestampPrecision.roundedToMicros(value)); }
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
     private static DomainException pending() { return new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_PENDING", "Another partial adjustment already protects this expense"); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment source, current operation or version changed"); }

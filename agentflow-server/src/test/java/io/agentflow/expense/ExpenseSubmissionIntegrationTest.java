@@ -113,6 +113,7 @@ class ExpenseSubmissionIntegrationTest {
     private int partialAccrualQueries;
     private boolean invalidPartialBudget;
     private boolean invalidPartialAccrual;
+    private boolean nanosecondPeriodEvidence;
     private final Map<UUID, BudgetConsumptionReductionObservation> partialBudgetResults = new ConcurrentHashMap<>();
     private final Map<UUID, ExpenseAccrualReductionObservation> partialAccrualResults = new ConcurrentHashMap<>();
     private int budgetReversalWrites;
@@ -2582,9 +2583,28 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(partialAdjustments.find("demo", initial.id())).contains(initial);
     }
 
+    @Test void partialPreparationUsesExactNanosecondDeadlineAndRetainsConsumptionEvidence() throws Exception {
+        nanosecondPeriodEvidence = true;
+        var initial = persistedPartialIntent(); var queued = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
+        var ready = partialPreparations.find("demo", queued.input().id()).orElseThrow(); var deadline = ready.evidence().expiresAt();
+        assertThat(deadline.getNano() % 1_000).isEqualTo(789);
+        assertThat(partialPreparing.authorizationIssue(ready, deadline)).isEqualTo("PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT");
+        assertThatThrownBy(() -> tx().execute(status -> partialPreparing.authorize("demo", initial.id(), initial.version(),
+                ready.input().id(), ready.version(), "finance", deadline))).isInstanceOf(io.agentflow.common.DomainException.class);
+        assertThat(partialPreparations.find("demo", ready.input().id())).contains(ready);
+        var authorized = tx().execute(status -> partialPreparing.authorize("demo", initial.id(), initial.version(),
+                ready.input().id(), ready.version(), "finance", deadline.minusNanos(1)));
+        assertThat(partialAdjustments.find("demo", initial.id())).contains(authorized);
+        var consumed = partialPreparations.find("demo", ready.input().id()).orElseThrow();
+        assertThat(consumed.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.AUTHORIZED);
+        assertThat(consumed.updatedAt()).isEqualTo(deadline.minusNanos(1));
+    }
+
     @Test void partialPreparationExpiryLatestOwnerAndRealOriginalRevisionGuardAuthorization() throws Exception {
+        nanosecondPeriodEvidence = true;
         var initial = persistedPartialIntent(); var first = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
         var oldReady = partialPreparations.find("demo", first.input().id()).orElseThrow();
+        assertThat(oldReady.evidence().expiresAt().getNano() % 1_000).isEqualTo(789);
         assertThatThrownBy(() -> tx().execute(status -> partialPreparing.authorize("demo", initial.id(), initial.version(), oldReady.input().id(), oldReady.version(), "cashier", adjustmentTime()))).isInstanceOf(io.agentflow.common.DomainException.class);
         assertThatThrownBy(() -> tx().execute(status -> partialPreparing.authorize("demo", initial.id(), initial.version(), oldReady.input().id(), oldReady.version(), "finance", oldReady.evidence().expiresAt()))).isInstanceOf(io.agentflow.common.DomainException.class);
         var next = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
@@ -4514,8 +4534,9 @@ class ExpenseSubmissionIntegrationTest {
         var key = UUID.randomUUID().toString(); var queued = ok(send(route + "/actions", "finance", key, query), 202);
         assertThat(ok(send(route + "/actions", "finance", key, query), 202)).isEqualTo(queued);
         assertCode(send(route + "/actions", "finance", query), "CONCURRENCY_CONFLICT");
-        var reading = reversalExecution.claim("demo", receipt.reversalId(), Instant.now()); var at = Instant.now();
-        reversalExecution.finish(reading, new FinanceResult.Success<>(new VoucherReversalObservation(receipt.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at);
+        var reading = reversalExecution.claim("demo", receipt.reversalId(), Instant.now()); var at = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(789);
+        // 保留外部观察的纳秒，模拟后台读取结果后才以微秒时钟完成本地动作。
+        reversalExecution.finish(reading, new FinanceResult.Success<>(new VoucherReversalObservation(receipt.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at.plus(1, java.time.temporal.ChronoUnit.MICROS));
         var notFound = ok(read(route, "finance"), 200); assertThat(notFound.at("/operation/canResendOriginal").asBoolean()).isTrue();
         var resend = new VoucherReversalPreparationService.OperationInput(1, app(report).version(), current(report).version(), original.version(), receipt.reversalId(), notFound.at("/operation/version").asLong(), VoucherReversalPreparationService.Action.RESEND_ORIGINAL, "查无受理后明确按原编号重发");
         assertThat(send(route + "/actions", "cashier", resend).getStatus()).isIn(403, 404);
@@ -4547,10 +4568,11 @@ class ExpenseSubmissionIntegrationTest {
     @Test void reversalRetirementPreservesConfirmedFailureAndIndependentPaymentDispute() throws Exception {
         var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); var resources = resourceVersions(report);
         var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
-        var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var at = Instant.now();
+        var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var at = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(789);
         var rejected = new VoucherReversalObservation(authorized.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.FAILED, 1, at,
                 "ERP-REJECTED-BEFORE-POSTING", null, VoucherReversalObservation.Rejection.ACCOUNTING_PERIOD_CLOSED);
-        reversalExecution.finish(claimed, new FinanceResult.Success<>(rejected), at);
+        // 完成动作晚于外部观察，避免夹具在时钟精度转换后把合法原件放到未来。
+        reversalExecution.finish(claimed, new FinanceResult.Success<>(rejected), at.plus(1, java.time.temporal.ChronoUnit.MICROS));
         var failed = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
         var oldOriginal = voucherOperations.find("demo", authorized.operationId()).orElseThrow();
         assertThatThrownBy(() -> asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, oldOriginal, failed))))
@@ -5033,7 +5055,9 @@ class ExpenseSubmissionIntegrationTest {
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(json.read(data.toString(), BudgetPrecheckPort.Request.class), "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "accounting-period" -> {
                 var request = json.read(data.toString(), AccountingPeriodPort.Request.class); var date = request.accountingDate(); var at = Instant.now();
-                yield new AccountingPeriodPort.OpenPeriod(request, "synthetic-period", "v1", date.minusDays(30), date.plusDays(30), at, at.plusSeconds(300));
+                // 固定纳秒并提前证据截止，确保精确到期测试不依赖操作系统时钟精度。
+                if (nanosecondPeriodEvidence) at = at.truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(789);
+                yield new AccountingPeriodPort.OpenPeriod(request, "synthetic-period", "v1", date.minusDays(30), date.plusDays(30), at, at.plusSeconds(nanosecondPeriodEvidence ? 120 : 300));
             }
             case "account-mapping" -> {
                 var request = json.read(data.toString(), AccountMappingPort.Request.class); var at = Instant.now();
