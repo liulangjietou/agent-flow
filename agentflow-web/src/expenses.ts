@@ -19,6 +19,7 @@ export interface FrozenExpenseLine {
   original: ExpenseLine; claimedBase: Money; deductibleTaxBase: Money
   assessment: { exchangeRate: { fromCurrency: string; toCurrency: string; rate: string | number; source: string; rateDate: string }; policy: {
     policyId: string; version: number; assessedGross: Money; allowedGross: Money; decision: 'WITHIN_LIMIT' | 'REQUIRES_EXCEPTION' | 'DENIED'
+    evidenceReference?: string; taxRuleReference?: string
     exceptionReasons?: ExpensePolicyException[]; managedPolicy?: { selection: ExpensePolicySelection; ruleKey: string; factSourceReference: string } | null
   } }
 }

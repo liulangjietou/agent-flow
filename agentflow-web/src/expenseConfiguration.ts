@@ -69,6 +69,29 @@ export function readExpenseCategories(value: unknown, actor: Identity, version?:
   return { tenantId: result.tenantId, version: result.version, categories }
 }
 
+/** 管理编辑与本人填报提示共用规则约束校验，防止两处接受不同的金额或单位。 */
+export function readPolicyConstraints(value: unknown, expectedCurrency: string | null): PolicyConstraints {
+  requireValue(object(value))
+  const c = value as unknown as PolicyConstraints
+  const constraints: PolicyConstraints = { effect: c.effect, unitPriceLimit: c.unitPriceLimit ?? null, limitUnit: c.limitUnit ?? null,
+    invoiceMaxAgeDays: c.invoiceMaxAgeDays ?? null, invoiceAgeAction: c.invoiceAgeAction ?? null,
+    allowedServiceLevels: selectors(c.allowedServiceLevels), priorRequestRequired: c.priorRequestRequired }
+  requireValue(['ALLOW', 'DENY'].includes(c.effect) && typeof c.priorRequestRequired === 'boolean'
+    && (constraints.unitPriceLimit === null) === (constraints.limitUnit === null)
+    && (constraints.invoiceMaxAgeDays === null) === (constraints.invoiceAgeAction === null))
+  if (constraints.unitPriceLimit !== null) {
+    const amount = constraints.unitPriceLimit
+    requireValue(object(amount) && typeof amount.value === 'string' && /^\d+(?:\.\d+)?$/.test(amount.value)
+      && currency(amount.currency) && amount.currency === expectedCurrency && unit(constraints.limitUnit))
+    constraints.unitPriceLimit = { value: amount.value, currency: amount.currency }
+  }
+  if (constraints.invoiceMaxAgeDays !== null) requireValue(integer(constraints.invoiceMaxAgeDays) && constraints.invoiceMaxAgeDays <= 36600
+    && ['REJECT', 'REQUIRE_REASON'].includes(constraints.invoiceAgeAction!))
+  if (constraints.effect === 'DENY') requireValue(!constraints.unitPriceLimit && constraints.invoiceMaxAgeDays === null
+    && !constraints.allowedServiceLevels.length && !constraints.priorRequestRequired)
+  return constraints
+}
+
 /** 集合条件按领域规则排序，金额始终保留十进制字符串。 */
 export function readPolicyDefinition(value: unknown): ExpensePolicyDefinition {
   const definition = value as ExpensePolicyDefinition
@@ -80,23 +103,7 @@ export function readPolicyDefinition(value: unknown): ExpensePolicyDefinition {
       throughDate: rule.match.throughDate ?? null, currency: rule.match.currency ?? null }
     requireValue((match.fromDate === null || day(match.fromDate)) && (match.throughDate === null || day(match.throughDate))
       && (!match.fromDate || !match.throughDate || match.fromDate <= match.throughDate) && (match.currency === null || currency(match.currency)))
-    const c = rule.constraints
-    const constraints: PolicyConstraints = { effect: c.effect, unitPriceLimit: c.unitPriceLimit ?? null, limitUnit: c.limitUnit ?? null,
-      invoiceMaxAgeDays: c.invoiceMaxAgeDays ?? null, invoiceAgeAction: c.invoiceAgeAction ?? null,
-      allowedServiceLevels: selectors(c.allowedServiceLevels), priorRequestRequired: c.priorRequestRequired }
-    requireValue(['ALLOW', 'DENY'].includes(c.effect) && typeof c.priorRequestRequired === 'boolean'
-      && (constraints.unitPriceLimit === null) === (constraints.limitUnit === null)
-      && (constraints.invoiceMaxAgeDays === null) === (constraints.invoiceAgeAction === null))
-    if (constraints.unitPriceLimit !== null) {
-      const amount = constraints.unitPriceLimit
-      requireValue(object(amount) && typeof amount.value === 'string' && /^\d+(?:\.\d+)?$/.test(amount.value)
-        && currency(amount.currency) && amount.currency === match.currency && unit(constraints.limitUnit))
-      constraints.unitPriceLimit = { value: amount.value, currency: amount.currency }
-    }
-    if (constraints.invoiceMaxAgeDays !== null) requireValue(integer(constraints.invoiceMaxAgeDays) && constraints.invoiceMaxAgeDays <= 36600
-      && ['REJECT', 'REQUIRE_REASON'].includes(constraints.invoiceAgeAction!))
-    if (constraints.effect === 'DENY') requireValue(!constraints.unitPriceLimit && constraints.invoiceMaxAgeDays === null
-      && !constraints.allowedServiceLevels.length && !constraints.priorRequestRequired)
+    const constraints = readPolicyConstraints(rule.constraints, match.currency)
     return { key: rule.key, name: rule.name, match, constraints }
   })
   requireValue(new Set(rules.map(rule => rule.key)).size === rules.length && new Set(rules.map(rule => JSON.stringify(rule.match))).size === rules.length)

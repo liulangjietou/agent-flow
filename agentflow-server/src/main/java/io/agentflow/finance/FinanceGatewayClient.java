@@ -359,6 +359,8 @@ public class FinanceGatewayClient {
         CATALOG("catalog", Set.of(FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         EMPLOYEE_ACCOUNT("employee-account", Set.of(FinanceResult.Reason.EMPLOYEE_UNAVAILABLE, FinanceResult.Reason.ACCOUNT_UNAVAILABLE, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
         EXCHANGE_RATE("exchange-rate", Set.of(FinanceResult.Reason.RATE_UNAVAILABLE, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE)),
+        EXPENSE_POLICY_GUIDANCE("expense-policy-guidance", Set.of(FinanceResult.Reason.POLICY_NOT_FOUND,
+                FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         EXPENSE_POLICY("expense-policy", Set.of(FinanceResult.Reason.POLICY_NOT_FOUND, FinanceResult.Reason.EXPENSE_PROHIBITED,
                 FinanceResult.Reason.PRIOR_REQUEST_REQUIRED, FinanceResult.Reason.COST_OBJECT_UNAVAILABLE, FinanceResult.Reason.LEGAL_ENTITY_UNAVAILABLE, FinanceResult.Reason.EMPLOYEE_UNAVAILABLE)),
         INVOICE_VERIFICATION("invoice-verification", Set.of(FinanceResult.Reason.INVOICE_INVALID, FinanceResult.Reason.INVOICE_CANCELLED,

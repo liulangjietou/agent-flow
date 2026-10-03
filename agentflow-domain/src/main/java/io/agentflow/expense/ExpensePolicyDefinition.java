@@ -76,11 +76,16 @@ public record ExpensePolicyDefinition(String name, List<Rule> rules) {
 
         /** 本地已知维度不能被远端回执改换；职级和城市等级继续由可信事实源匹配。 */
         public boolean acceptsKnownFacts(UUID legalEntityId, ExpenseLine line) {
+            return acceptsKnownFacts(legalEntityId, line.categoryCode(), line.incurredOn(), line.claimedGross().currency());
+        }
+
+        /** 填报尚未具备完整费用行时也核对相同维度，不伪造金额或发票来匹配。 */
+        public boolean acceptsKnownFacts(UUID legalEntityId, String categoryCode, LocalDate incurredOn, String lineCurrency) {
             return (legalEntityIds.isEmpty() || legalEntityIds.contains(legalEntityId))
-                    && (categoryCodes.isEmpty() || categoryCodes.contains(line.categoryCode()))
-                    && (currency == null || currency.equals(line.claimedGross().currency()))
-                    && (fromDate == null || !line.incurredOn().isBefore(fromDate))
-                    && (throughDate == null || !line.incurredOn().isAfter(throughDate));
+                    && (categoryCodes.isEmpty() || categoryCodes.contains(categoryCode))
+                    && (currency == null || currency.equals(lineCurrency))
+                    && (fromDate == null || !incurredOn.isBefore(fromDate))
+                    && (throughDate == null || !incurredOn.isAfter(throughDate));
         }
     }
 

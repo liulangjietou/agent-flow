@@ -42465,6 +42465,188 @@
           }
         ]
       }
+    },
+    "/api/v1/finance/expense-policy-guidance": {
+      "get": {
+        "operationId": "getExpensePolicyGuidance",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "查询当前员工填报时适用的费用标准",
+        "description": "按本人授权目录与当前发布选择，从同一财务事实源读取一条适用规则。只接受七个各出现一次的匹配维度；不接受员工、职级、城市等级、金额结论或制度选择覆盖。网络等待期间换版返回 409。提示有效期同时受规则、目录与五分钟上限约束，不构成最终预检或审批结论。",
+        "x-access": "已认证员工本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyGuidanceView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "本人适用规则不得由浏览器或代理缓存"
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "目录条件未授权（EXPENSE_GUIDANCE_CONTEXT_UNAVAILABLE），或事实源未匹配到有效规则（FINANCE_RULE_REJECTED）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "服务未配置、超时或协议错误：FINANCE_GATEWAY_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "制度、财务目标变化或事实过期；重新查询，不沿用旧提示。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "legalEntityId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reportType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TRAVEL",
+                "DAILY",
+                "ENTERTAINMENT",
+                "TRAINING",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "categoryCode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "cityCode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "incurredOn",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          {
+            "name": "unit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ITEM",
+                "DAY",
+                "NIGHT",
+                "KILOMETER",
+                "PERSON"
+              ]
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -73872,6 +74054,143 @@
         "required": [
           "items",
           "nextBeforeVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyGuidanceContext": {
+        "type": "object",
+        "properties": {
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportType": {
+            "type": "string",
+            "enum": [
+              "TRAVEL",
+              "DAILY",
+              "ENTERTAINMENT",
+              "TRAINING",
+              "OTHER"
+            ]
+          },
+          "categoryCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "cityCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "incurredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "ITEM",
+              "DAY",
+              "NIGHT",
+              "KILOMETER",
+              "PERSON"
+            ]
+          }
+        },
+        "required": [
+          "legalEntityId",
+          "reportType",
+          "categoryCode",
+          "cityCode",
+          "incurredOn",
+          "currency",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "description": "填报匹配条件；员工身份、职级、城市等级和制度版本不能由申请人覆盖。"
+      },
+      "ExpensePolicyGuidance": {
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "policyName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "ruleKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "ruleName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "constraints": {
+            "$ref": "#/components/schemas/ExpensePolicyConstraints"
+          },
+          "factSourceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePolicySelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "policyId",
+          "policyVersion",
+          "policyName",
+          "ruleKey",
+          "ruleName",
+          "constraints",
+          "factSourceReference",
+          "validUntil"
+        ],
+        "additionalProperties": false,
+        "description": "本人适用规则提示；selection 缺失表示尚未启用平台制度，仍须有外部制度编号、版本和事实来源。提示不含查验、税额或可报金额结论。"
+      },
+      "ExpensePolicyGuidanceView": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/ExpensePolicyGuidanceContext"
+          },
+          "guidance": {
+            "$ref": "#/components/schemas/ExpensePolicyGuidance"
+          }
+        },
+        "required": [
+          "context",
+          "guidance"
         ],
         "additionalProperties": false
       }

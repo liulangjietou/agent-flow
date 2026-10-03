@@ -72,6 +72,8 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
               <p>制度版本 {{ frozen.assessment.policy.version }} · 额度 {{ moneyLabel(frozen.assessment.policy.allowedGross) }} · {{ frozen.assessment.policy.decision === 'WITHIN_LIMIT' ? '标准内' : frozen.assessment.policy.decision === 'REQUIRES_EXCEPTION' ? '需例外审批' : '不予报销' }}</p>
               <p v-if="frozen.assessment.policy.exceptionReasons?.length">例外原因：{{ frozen.assessment.policy.exceptionReasons.map(reason => policyExceptionLabels[reason] ?? '需核对的制度例外').join('、') }}</p>
               <p v-if="frozen.assessment.policy.managedPolicy">本轮固定类别修订 {{ frozen.assessment.policy.managedPolicy.selection.categoryRevision }} · 制度生效修订 {{ frozen.assessment.policy.managedPolicy.selection.activeRevision }} · 规则 {{ frozen.assessment.policy.managedPolicy.ruleKey }}</p>
+              <p>制度 {{ frozen.assessment.policy.policyId }}<template v-if="frozen.assessment.policy.evidenceReference"> · 判定证据 {{ frozen.assessment.policy.evidenceReference }}</template></p>
+              <p v-if="frozen.assessment.policy.managedPolicy">匹配事实来源：{{ frozen.assessment.policy.managedPolicy.factSourceReference }}</p>
             </template>
           </template>
         </div></details>

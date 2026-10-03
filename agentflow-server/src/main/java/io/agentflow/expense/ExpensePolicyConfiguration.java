@@ -78,9 +78,14 @@ public class ExpensePolicyConfiguration {
     public record Snapshot(ExpenseConfigurationService.Current current, ExpensePolicySelection selection) {
         /** 未管理租户保留旧外部制度，已管理租户缺少类别时明确阻断。 */
         public ManagedExpensePolicy forLine(ExpenseLine line) {
+            return forCategory(line.categoryCode(), line.unit());
+        }
+
+        /** 填报规则提示和正式预检引用相同的类别修订与发布正文。 */
+        public ManagedExpensePolicy forCategory(String categoryCode, ExpenseLine.Unit unit) {
             if (selection == null) return null;
             var category = current.categories().activeCategories().stream()
-                    .filter(value -> value.code().equals(line.categoryCode()) && value.units().contains(line.unit())).findFirst()
+                    .filter(value -> value.code().equals(categoryCode) && value.units().contains(unit)).findFirst()
                     .orElseThrow(() -> new DomainException("EXPENSE_CATEGORY_UNAVAILABLE", "Expense category or unit is not available in the managed revision"));
             return new ManagedExpensePolicy(selection, current.activePolicy().definition(), category);
         }

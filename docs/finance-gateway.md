@@ -1,6 +1,6 @@
 # 财务网关
 
-当前实现六项真实 HTTP 只读端口：员工财务目录、本人收款账户、法人汇率、费用与税务制度判定、发票原件查验和预算预检。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API、[持久验票任务](invoice-verification.md) 和[费用提交预检](expense-precheck.md) 已调用对应端口；另已实现[预算变更与查询契约](budget-operations.md)及适配器；预算台账和后台执行已持久化；正式提交已实现；另已实现 [支付命令与原交易查询适配器](payment-system-port.md)，并已实现 [会计期间、科目映射与凭证端口](accounting-ports.md)。结算队列、付款授权和真实企业联调继续实施。
+基础财务查询包括员工财务目录、本人收款账户、法人汇率、填报制度提示、费用与税务制度判定、发票原件查验和预算预检，均通过真实 HTTP 适配器执行。调用链为财务应用服务 → 领域端口 → 网关适配器 → 企业事实源。目录 API、[持久验票任务](invoice-verification.md) 和[费用提交预检](expense-precheck.md) 已调用对应端口；另已实现[预算变更与查询契约](budget-operations.md)及适配器；预算台账和后台执行已持久化；正式提交已实现；另已实现 [支付命令与原交易查询适配器](payment-system-port.md)，并已实现 [会计期间、科目映射与凭证端口](accounting-ports.md)。结算队列、付款授权和真实企业联调继续实施。
 
 ## 部署配置
 
@@ -23,7 +23,7 @@ agentflow:
 
 ## 固定协议
 
-六个端口均使用 `POST` 和 `application/json`。POST 只承载只读查询；企业实现不得据此冻结预算、扣款、记账或修改票据归属。平台每次读取生成新的 `requestId`，不自动重试。请求统一为：
+本节的基础只读端口均使用 `POST` 和 `application/json`。POST 只承载只读查询；企业实现不得据此冻结预算、扣款、记账或修改票据归属。平台每次读取生成新的 `requestId`，不自动重试。请求统一为：
 
 ```json
 {
@@ -57,6 +57,7 @@ agentflow:
 | `catalog` | `employeeId` | `FinanceCatalog` | 员工相同、有效期未结束；目录内部无重复键和孤立成本对象 |
 | `employee-account` | `employeeId`, `legalEntityId` | `EmployeeAccountPort.Account` | 员工、法人相同，有效期未结束 |
 | `exchange-rate` | `legalEntityId`, `fromCurrency`, `toCurrency`, `rateDate` | `ExpenseExchangeRate` | 同一币种对、同一日期，显式来源；同币种汇率只能为 1 |
+| `expense-policy-guidance` | `ExpensePolicyGuidancePort.Request` | `ExpensePolicyGuidance` | 本人匹配条件、币种、发布选择及适用规则正文相符，有效期未结束 |
 | `expense-policy` | `ExpensePolicyPort.Request` | `ExpensePolicyPort.Assessment` | 制度核算额等于该行按传入汇率折算值；可抵扣税额不超过折算申报税额；有效期未结束 |
 | `invoice-verification` | `InvoiceVerificationPort.Request` | `Invoice.VerifiedFacts` | 法人、原件摘要相同；已到查验时刻且尚未过期 |
 | `budget-precheck` | `BudgetPrecheckPort.Request` | `BudgetPrecheckPort.Assessment` | 完整请求逐项相同，查验时间已到且有效期未结束；不能只匹配总金额 |
@@ -66,6 +67,12 @@ agentflow:
 账户结果包含 `snapshot` 和 `validUntil`。快照字段为 `legalEntityId`、`employeeId`、`accountReference`、`maskedAccount`、`accountDigest`、`sourceVersion`。`accountDigest` 必须为 64 位小写 SHA-256 十六进制；完整账号只保留在资金主数据。掩码仅允许数字、`*`、`•`、`x/X`、空格及连字符，须有至少两个连续掩码字符，最多显示 8 位数字，单段最多 4 位，例如 `6222 **** **** 1234`。账户引用和摘要不通过报销详情返回页面。
 
 制度请求含员工、法人、报销种类、完整 `ExpenseLine`、已选 `ExpenseExchangeRate` 及逐张 `InvoiceEvidence(invoiceId, facts)`；票据必须完整对应本行的本地发票标识，不得多出、漏掉或跨法人。制度结果含 `policy`、本位币 `deductibleTax`、`priorRequestRequired`、`validUntil`。`policy` 保留制度 ID/版本、核算额、制度允许额、`WITHIN_LIMIT` / `REQUIRES_EXCEPTION` / `DENIED`、税务规则引用及证据引用。超标不是已获特批，后续审批仍然必需。
+
+填报提示请求为 `employeeId`、`context` 和可选 `managedPolicy`。`context` 固定 `legalEntityId`、`reportType`、`categoryCode`、`cityCode`、`incurredOn`、`currency`、`unit` 七个字段。平台先核对本人当前目录；员工职级和城市等级由企业事实源取得并按规则顺序匹配。提示不需要伪造尚未查验的发票、税额或汇率。
+
+提示成功正文含 `policyId`、`policyVersion`、`policyName`、`ruleKey`、`ruleName`、`constraints`、`factSourceReference`、`validUntil`，启用平台制度时另含 `selection`。`managedPolicy` 与正式制度判定使用同一 `selection`、`definition` 和本行 `category`；响应必须命中其规则，名称及约束须与发布正文一致。响应只返回适用的一条规则，不返回完整定义、其他员工规则或原始职级资料。尚未管理的租户仍须返回外部制度编号、版本和来源，不能默认解释为不限额。
+
+员工通过 `GET /api/v1/finance/expense-policy-guidance` 发起提示查询，七个参数各出现一次，响应禁止缓存。查询期间平台配置或目标变化会丢弃结果；有效期取规则、本人目录及五分钟上限的最早时刻。此入口没有财务写入副作用。后续预检仍须使用实际费用、汇率和查验票据执行 `expense-policy`，不能把提示当作已合规或直接提交的凭证。完整页面行为见[费用制度管理](expense-configuration.md)。
 
 验票请求含 `employeeId`、`legalEntityId`、`originalFileId`、`originalDigest`、`mediaType` 和 Base64 编码的 `original`。实际字节必须从服务器原件存储读取，并与 SHA-256 摘要相符；最大 20 MiB，支持 PDF、OFD、PNG、JPEG、XML（媒体类型 `application/xml`）。XML 已经过禁用外部访问的结构检查，保留原始编码和签名字节，不执行样式表或引用；企业查验端仍须安全解析并验证签名及业务真实性，详见 [XML 原件](invoice-xml-originals.md)。接口不接受文件下载 URL。成功结果保留规范票号、法人、含税金额、税额、开票日期、相同原件摘要、查验引用、查验时刻及有效期。数电票使用 `DIGITAL` 和二十位 `number`，`code` 为 null 或省略；传统票使用 `TRADITIONAL`、`code` 和 `number`。真实票种、真实性及买方校验责任在企业查验服务。
 
@@ -84,6 +91,7 @@ agentflow:
 | 目录 | `EMPLOYEE_UNAVAILABLE` |
 | 账户 | `EMPLOYEE_UNAVAILABLE`, `ACCOUNT_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE` |
 | 汇率 | `RATE_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE` |
+| 填报提示 | `POLICY_NOT_FOUND`, `LEGAL_ENTITY_UNAVAILABLE`, `EMPLOYEE_UNAVAILABLE` |
 | 制度 | `POLICY_NOT_FOUND`, `EXPENSE_PROHIBITED`, `PRIOR_REQUEST_REQUIRED`, `COST_OBJECT_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE`, `EMPLOYEE_UNAVAILABLE` |
 | 验票 | `INVOICE_INVALID`, `INVOICE_CANCELLED`, `INVOICE_BUYER_MISMATCH`, `LEGAL_ENTITY_UNAVAILABLE` |
 | 预算预检 | `BUDGET_INSUFFICIENT`, `BUDGET_POLICY_UNAVAILABLE`, `ACCOUNTING_PERIOD_CLOSED`, `COST_OBJECT_UNAVAILABLE`, `LEGAL_ENTITY_UNAVAILABLE`, `EMPLOYEE_UNAVAILABLE` |

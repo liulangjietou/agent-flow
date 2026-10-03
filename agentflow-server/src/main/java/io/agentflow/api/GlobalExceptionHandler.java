@@ -96,7 +96,7 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
-            case "INVALID_EXPENSE_CONFIGURATION_REQUEST", "INVALID_EXPENSE_CONFIGURATION_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "INVALID_EXPENSE_CONFIGURATION_REQUEST", "INVALID_EXPENSE_CONFIGURATION_QUERY", "INVALID_EXPENSE_GUIDANCE_QUERY" -> HttpStatus.BAD_REQUEST;
             case "EXPENSE_CONFIGURATION_UNCHANGED", "EXPENSE_CATEGORY_REMOVAL_FORBIDDEN", "EXPENSE_POLICY_CATEGORY_UNAVAILABLE", "EXPENSE_POLICY_INCOMPLETE" -> HttpStatus.CONFLICT;
             case "EXPENSE_CONFIGURATION_INCONSISTENT" -> HttpStatus.SERVICE_UNAVAILABLE;
             case "ADVANCE_OVERDUE", "POLICY_CONFIGURATION_CHANGED", "EXPENSE_CATEGORY_CONFIGURATION_CHANGED" -> HttpStatus.CONFLICT;

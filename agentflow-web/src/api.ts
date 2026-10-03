@@ -1,3 +1,4 @@
+import { policyGuidanceQuery, readPolicyGuidance, type PolicyGuidanceContext } from './expensePolicyGuidance.js'
 import { readExpenseCategories, readExpenseConfiguration, readPolicyDraft, readPublishedPolicy, readPolicyDirectory, readCategoryHistory, readPolicyHistory, readActivationHistory, readCategoryRevision, readPolicyDraftRevision, validateConfigurationReceipt, type CategoryInput, type PolicyDraftInput, type PolicyPublishInput, type ExpenseCategories, type ExpensePolicyDraft, type ExpenseConfigurationCurrent } from './expenseConfiguration.js'
 import type { AdvanceOffsetSuggestion } from './advanceOffsetSuggestion'
 import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
@@ -525,6 +526,7 @@ export const api = {
   downloadExpenseArchive: (id: string, roundNo: number, signal: AbortSignal) => request<Blob>(`/expense-reports/${encodeURIComponent(id)}/archive/content` + historyQuery({ roundNo }), { signal, cache: 'no-store' }, 'zip'),
   retryExpenseSettlement: (id: string, input: SettlementRetry) => write<SettlementReceipt>(`/expense-reports/${encodeURIComponent(id)}/settlement/retry`, 'POST', '重新办理报销核销', input),
   financeCatalog: (signal: AbortSignal) => request<FinanceCatalog>('/finance/catalog', { signal, cache: 'no-store' }),
+  expensePolicyGuidance: (context: PolicyGuidanceContext, signal: AbortSignal) => request('/finance/expense-policy-guidance?' + policyGuidanceQuery(context), { signal, cache: 'no-store' }).then(value => readPolicyGuidance(value, context)),
   financePayment: (id: string, roundNo: number, signal: AbortSignal) => request<FinancePaymentView>(`/applications/${encodeURIComponent(id)}/payments` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   authorizePayment: (id: string, input: PaymentAuthorizationInput) => write<FinancePaymentReceipt>(`/applications/${encodeURIComponent(id)}/payments/authorizations`, 'POST', '财务授权付款', input),
   financePaymentAction: (id: string, input: FinancePaymentActionInput) => write<FinancePaymentReceipt>(`/payments/${encodeURIComponent(id)}/finance-actions`, 'POST', '财务核对付款授权', input),

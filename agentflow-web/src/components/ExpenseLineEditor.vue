@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ExpenseLine } from '../expenses'
+import type { ExpenseLine, ExpenseContent } from '../expenses'
 import { expenseUnits, type FinanceCatalog } from '../expenseDraft'
+import { policyGuidanceContext } from '../expensePolicyGuidance'
+import ExpensePolicyGuidance from './ExpensePolicyGuidance.vue'
 const line = defineModel<ExpenseLine>({ required: true })
-const props = defineProps<{ catalog: FinanceCatalog; legalEntityId: string; locked: boolean }>()
+const props = defineProps<{ catalog: FinanceCatalog; legalEntityId: string; reportType: ExpenseContent['type']; scopeKey: string; locked: boolean }>()
 const emit = defineEmits<{ remove: [] }>()
+const guidanceContext = computed(() => policyGuidanceContext(props.legalEntityId, props.reportType, line.value, props.catalog))
 const centers = computed(() => props.catalog.costCenters.filter(value => value.legalEntityId === props.legalEntityId))
 const projects = computed(() => props.catalog.projects.filter(value => value.legalEntityId === props.legalEntityId))
 const units = computed(() => props.catalog.categories.find(value => value.code === line.value.categoryCode)?.units ?? [])
@@ -28,6 +31,7 @@ function addAllocation() {
       <label>含税金额<input v-model="line.claimedGross.value" inputmode="decimal" maxlength="18" required /></label>
       <label>可抵扣税额<input v-model="line.claimedTax.value" inputmode="decimal" maxlength="18" required /></label>
     </div>
+    <ExpensePolicyGuidance :context="guidanceContext" :line="line" :scope-key="scopeKey" :disabled="locked" />
     <label>费用说明<textarea v-model="line.description" rows="2" maxlength="2000" required /></label>
     <label>超标说明（适用时填写）<textarea v-model="line.exceptionReason" rows="2" maxlength="2000" /></label>
     <div class="allocation-heading"><h4>成本分摊 · {{ line.claimedGross.currency }}</h4><button type="button" class="quiet" :disabled="line.allocations.length >= 50" @click="addAllocation">＋ 添加分摊</button></div>
