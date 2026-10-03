@@ -219,7 +219,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'DISBURSEMENT_RETURN_RESULT' | 'DISBURSEMENT_RETURN_ATTENTION' | 'REPAYMENT_RESULT' | 'REPAYMENT_ATTENTION' | 'REPAYMENT_REVIEW_RESULT' | 'REPAYMENT_REVIEW_ATTENTION' | 'EXPENSE_RETURN_RESULT' | 'EXPENSE_RETURN_ATTENTION' | 'SUPPLIER_RETURN_RESULT' | 'SUPPLIER_RETURN_ATTENTION' | 'SUPPLIER_ADJUSTMENT_RESULT' | 'SUPPLIER_ADJUSTMENT_ATTENTION' | 'SUPPLIER_SETTLEMENT_RESULT' | 'SUPPLIER_SETTLEMENT_ATTENTION' | 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'DISBURSEMENT_RETURN_RESULT' | 'DISBURSEMENT_RETURN_ATTENTION' | 'REPAYMENT_RESULT' | 'REPAYMENT_ATTENTION' | 'REPAYMENT_REVIEW_RESULT' | 'REPAYMENT_REVIEW_ATTENTION' | 'BUDGET_ADJUSTMENT_RESULT' | 'BUDGET_ADJUSTMENT_ATTENTION' | 'EXPENSE_RETURN_RESULT' | 'EXPENSE_RETURN_ATTENTION' | 'SUPPLIER_RETURN_RESULT' | 'SUPPLIER_RETURN_ATTENTION' | 'SUPPLIER_ADJUSTMENT_RESULT' | 'SUPPLIER_ADJUSTMENT_ATTENTION' | 'SUPPLIER_SETTLEMENT_RESULT' | 'SUPPLIER_SETTLEMENT_ATTENTION' | 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -310,6 +310,14 @@ export interface DisbursementReturnNotificationTarget {
   resolution: { id: string; advanceVersion: number; outcome: 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; resolvedAt: string } | null
 }
 /** 原还款复核与真实裁决的只读摘要。 */
+export interface BudgetAdjustmentNotificationTarget {
+  messageId: string; requestId: string; applicationId: string; roundNo: number; sourceType: 'REVIEW' | 'OPERATION'; sourceId: string
+  fact: 'REVIEW_UNAVAILABLE' | 'REVIEW_BLOCKED' | 'REVIEW_SOURCE_CHANGED' | 'UNKNOWN' | 'NOT_FOUND' | 'REJECTED' | 'APPLIED' | 'RECONCILING' | 'EXPIRED' | 'VOIDED' | 'RETIRED'
+  review: { id: string; version: number; status: keyof typeof import('./budgetFinance').budgetReviewLabels; requestedAt: string; updatedAt: string; issue: string } | null
+  operation: { id: string; version: number; status: keyof typeof import('./budgetFinance').budgetOperationLabels; createdAt: string; updatedAt: string; failure: string | null; observation: BudgetAdjustmentNotificationObservation | null; conflictingObservation: BudgetAdjustmentNotificationObservation | null } | null
+  retirement: { operationId: string; operationVersion: number; basis: 'NEVER_SENT' | 'REJECTED'; retiredAt: string } | null
+}
+export interface BudgetAdjustmentNotificationObservation { outcome: 'APPLIED' | 'REJECTED' | 'PENDING' | 'NOT_FOUND'; revision: number; observedAt: string; appliedAt: string | null; rejection: string | null }
 export interface RepaymentReviewNotificationTarget {
   messageId: string; checkId: string; paymentId: string; advanceId: string; repaymentId: string; applicationId: string; roundNo: number
   fact: 'UNAVAILABLE' | 'SOURCE_CHANGED' | 'UNRESOLVED' | 'RETURN_REVIEW' | 'REVIEW_REQUIRED' | 'RESOLVED'
@@ -917,6 +925,7 @@ export const api = {
   expenseReturnNotificationTarget: (id: string, signal?: AbortSignal) => request<ExpenseReturnNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-return-target`, { cache: 'no-store', signal }),
   disbursementReturnNotificationTarget: (id: string, signal?: AbortSignal) => request<DisbursementReturnNotificationTarget>(`/notifications/${encodeURIComponent(id)}/disbursement-return-target`, { cache: 'no-store', signal }),
   repaymentReviewNotificationTarget: (id: string, signal?: AbortSignal) => request<RepaymentReviewNotificationTarget>(`/notifications/${encodeURIComponent(id)}/repayment-review-target`, { cache: 'no-store', signal }),
+  budgetAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<BudgetAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/budget-adjustment-target`, { cache: 'no-store', signal }),
   repaymentNotificationTarget: (id: string, signal?: AbortSignal) => request<RepaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/repayment-target`, { cache: 'no-store', signal }),
   supplierAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-adjustment-target`, { cache: 'no-store', signal }),
   supplierSettlementNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierSettlementNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-settlement-target`, { cache: 'no-store', signal }),

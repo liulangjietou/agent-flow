@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +25,14 @@ public class BudgetAdjustmentExecutionService {
     private final PaymentPersonnel personnel;
     private final FinanceGatewayConfiguration configuration;
     private final Duration lease;
+    private final ApplicationEventPublisher events;
 
     /** 租约覆盖一次有界网关调用，数据库事务中不执行任何 HTTP。 */
     public BudgetAdjustmentExecutionService(ApprovedBudgetAdjustmentSources sources, JdbcBudgetAdjustmentOperationRepository operations,
-            PaymentPersonnel personnel, FinanceGatewayConfiguration configuration,
+            PaymentPersonnel personnel, FinanceGatewayConfiguration configuration, ApplicationEventPublisher events,
             @Value("${agentflow.budget-adjustments.execution-lease-seconds:90}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Budget execution lease must be between 15 and 300 seconds");
-        this.sources = sources; this.operations = operations; this.personnel = personnel; this.configuration = configuration; this.lease = Duration.ofSeconds(leaseSeconds);
+        this.sources = sources; this.operations = operations; this.personnel = personnel; this.configuration = configuration; this.events = events; this.lease = Duration.ofSeconds(leaseSeconds);
     }
 
     /** 只读守卫沿用调用方事务，拒绝后由调用方决定保存停止状态或整体回滚。 */
@@ -46,31 +48,31 @@ public class BudgetAdjustmentExecutionService {
     @Transactional
     public BudgetAdjustmentOperation claim(String tenant, UUID id, Instant now) {
         var current = locked(tenant, id); if (current == null || operations.retirement(tenant, id).isPresent()) return null; now = time(now);
-        if (current.expired(now)) { operations.update(current.expire(now)); return null; }
+        if (current.expired(now)) { persist(current.expire(now)); return null; }
         if (current.running() || current.nextAttemptAt() == null || now.isBefore(current.nextAttemptAt())) return null;
         if (current.status() == BudgetAdjustmentOperation.Status.QUEUED) {
             try { requireNewExecution(current.command().source(), current.command().authorizedBy()); }
-            catch (DomainException changed) { operations.update(current.voidBeforeSend(now)); return null; }
+            catch (DomainException changed) { persist(current.voidBeforeSend(now)); return null; }
         }
-        var claimed = current.claim(now, lease); operations.update(claimed); return claimed.running() ? claimed : null;
+        var claimed = current.claim(now, lease); persist(claimed); return claimed.running() ? claimed : null;
     }
 
     /** 只接收仍持有原领取版本的响应，迟到进程不覆盖已恢复的新版本。 */
     @Transactional
     public void finish(BudgetAdjustmentOperation claimed, FinanceResult<BudgetAdjustmentObservation> result, Instant now) {
-        var current = currentClaim(claimed); if (current != null) operations.update(current.complete(result, time(now)));
+        var current = currentClaim(claimed); if (current != null) persist(current.complete(result, time(now)));
     }
 
     /** 领取后发生本地异常只保留未知，不把异常当作无副作用拒绝。 */
     @Transactional
     public void fail(BudgetAdjustmentOperation claimed, Instant now) {
-        var current = currentClaim(claimed); if (current != null) operations.update(current.unavailable(BudgetAdjustmentOperation.Failure.INTERNAL_ERROR, time(now)));
+        var current = currentClaim(claimed); if (current != null) persist(current.unavailable(BudgetAdjustmentOperation.Failure.INTERNAL_ERROR, time(now)));
     }
 
     /** 已通过权限入口的财务明确请求复核原操作，不生成新命令。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public BudgetAdjustmentOperation query(String tenant, UUID id, long version, Instant now) {
-        var current = currentVersion(tenant, id, version); var next = current.requestQuery(time(now)); operations.update(next); return next;
+        var current = currentVersion(tenant, id, version); var next = current.requestQuery(time(now)); persist(next); return next;
     }
 
     /** 查无重发只接受原授权人，仍须在原期限内且原批准、任职和目标有效。 */
@@ -79,7 +81,7 @@ public class BudgetAdjustmentExecutionService {
         var current = currentVersion(tenant, id, version);
         if (!finance.equals(current.command().authorizedBy())) throw new DomainException("FORBIDDEN", "Only the original finance authorizer may resend this budget command");
         requireNewExecution(current.command().source(), finance);
-        var next = current.retryNotFound(time(now)); operations.update(next); return next;
+        var next = current.retryNotFound(time(now)); persist(next); return next;
     }
 
     /** 安全结束不依赖旧目的地仍可用，但必须由当前法人内独立财务作出具名决定。 */
@@ -89,9 +91,12 @@ public class BudgetAdjustmentExecutionService {
         personnel.requireEligible(tenant, finance, current.command().source().round().content().legalEntityId());
         if (!current.safelyUnexecuted()) throw new DomainException("BUDGET_ADJUSTMENT_RETIREMENT_UNSAFE", "Original budget operation must prove no external adjustment before replacement");
         if (current.status() == BudgetAdjustmentOperation.Status.QUEUED) { current = current.voidBeforeSend(now); operations.update(current); }
-        var decision = BudgetAdjustmentRetirement.from(current, finance, now); operations.retire(tenant, decision); return decision;
+        var decision = BudgetAdjustmentRetirement.from(current, finance, now); operations.retire(tenant, decision); events.publishEvent(new BudgetAdjustmentOperationChanged(current, decision)); return decision;
     }
 
+    private void persist(BudgetAdjustmentOperation value) {
+        operations.update(value); events.publishEvent(new BudgetAdjustmentOperationChanged(value, null));
+    }
     private BudgetAdjustmentOperation locked(String tenant, UUID id) {
         var current = operations.find(tenant, id).orElse(null); if (current == null) return null;
         sources.lock(current.command().source()); return operations.find(tenant, id).orElseThrow(BudgetAdjustmentExecutionService::conflict);

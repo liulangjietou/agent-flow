@@ -88,8 +88,8 @@ class BudgetAdjustmentExecutionPersistenceTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
             if (!eligible.get()) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Synthetic inactive finance appointment"); return null;
         }).when(personnel).requireEligible(anyString(), anyString(), any());
-        execution = proxy(new BudgetAdjustmentExecutionService(sources, operations, personnel, configuration, 30));
-        reviewService = proxy(new BudgetAdjustmentReviewService(sources, reviews, operations, execution, 30));
+        execution = proxy(new BudgetAdjustmentExecutionService(sources, operations, personnel, configuration, mock(org.springframework.context.ApplicationEventPublisher.class), 30));
+        reviewService = proxy(new BudgetAdjustmentReviewService(sources, reviews, operations, execution, mock(org.springframework.context.ApplicationEventPublisher.class), 30));
     }
 
     @Test void originalApprovalReadyRevisionAndSingleConsumptionSurviveRepositoryReconstruction() {

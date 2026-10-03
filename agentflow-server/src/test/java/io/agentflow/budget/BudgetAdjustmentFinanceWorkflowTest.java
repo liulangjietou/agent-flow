@@ -108,6 +108,15 @@ class BudgetAdjustmentFinanceWorkflowTest {
     @Autowired BudgetAdjustmentExecutionWorker executionWorker;
     @Autowired JdbcBudgetAdjustmentReviewRepository reviews;
     @Autowired JdbcBudgetAdjustmentOperationRepository operations;
+    @Autowired BudgetAdjustmentExecutionService financeExecution;
+    @Autowired BudgetAdjustmentReviewService financeReviews;
+    @Autowired org.springframework.context.ApplicationEventPublisher events;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    @Autowired io.agentflow.notification.BudgetAdjustmentNotificationAccess noticeAccess;
+    @Autowired io.agentflow.notification.NotificationPreferencesService notificationPreferences;
+    @Autowired io.agentflow.notification.NotificationDeliveryService notificationDeliveries;
+    @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore notificationDeliveryStore;
+
 
 
     @BeforeEach void setup() {
@@ -320,6 +329,154 @@ class BudgetAdjustmentFinanceWorkflowTest {
         assertThat(view(id, "finance").path("destinationReady").asBoolean()).isFalse();
         error(send(financePath(id) + "/authorizations", "finance", input), 422, "BUDGET_ADJUSTMENT_DESTINATION_UNAVAILABLE");
         assertThat(operations.activeForRequest("demo", id)).isEmpty();
+    }
+
+    @Test void budgetAdjustmentNotificationFailedReviewKeepsOriginalAttemptAfterFreshAuthorization() throws Exception {
+        var id = approved(); responder = (kind, request) -> kind.equals("budget-ledger") ? "{}" : normal(kind, request);
+        var failed = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText()); reviewWorker.poll();
+        assertThat(noticeRecipients("REVIEW", failed, "REVIEW_UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        var target = noticePath("REVIEW", failed, "REVIEW_UNAVAILABLE", "alice"); var before = ok(read(target, "alice"), 200);
+        assertThat(before.at("/review/status").asText()).isEqualTo("UNAVAILABLE"); assertThat(before.path("operation").isNull()).isTrue();
+        responder = this::normal; queueAndRead(id); authorize(id); executionWorker.poll();
+        assertThat(ok(read(target, "alice"), 200)).isEqualTo(before);
+    }
+
+    @Test void budgetAdjustmentNotificationUnknownAndAppliedAreDistinctFactsOnOriginalOperation() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id);
+        responder = (kind, request) -> kind.equals("budget-adjustment-command") ? malformedCommand(request) : normal(kind, request); executionWorker.poll();
+        assertThat(noticeRecipients("OPERATION", operation, "UNKNOWN")).containsExactlyInAnyOrder("alice", "finance");
+        var unknown = noticePath("OPERATION", operation, "UNKNOWN", "alice"); var response = read(unknown, "alice"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(ok(response, 200).at("/operation/status").asText()).isEqualTo("UNKNOWN");
+        ok(send(actionUrl(operation), "finance", action(view(id, "finance"), "QUERY")), 202); responder = this::normal; executionWorker.poll();
+        assertThat(noticeRecipients("OPERATION", operation, "APPLIED")).containsExactlyInAnyOrder("alice", "finance");
+        var updated = ok(read(unknown, "alice"), 200); assertThat(updated.path("fact").asText()).isEqualTo("UNKNOWN");
+        assertThat(updated.at("/operation/id").asText()).isEqualTo(operation.toString()); assertThat(updated.at("/operation/status").asText()).isEqualTo("APPLIED");
+        assertThat(updated.toString()).doesNotContain("ledger", "commandDigest", "targetDigest", "beforeLimit", "afterLimit", "changes", "actions");
+        assertThat(calls.get("budget-adjustment-command").get()).isEqualTo(1);
+    }
+
+    @Test void budgetAdjustmentNotificationConflictKeepsBothOriginalObservations() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id); executionWorker.poll();
+        ok(send(actionUrl(operation), "finance", action(view(id, "finance"), "QUERY")), 202);
+        responder = (kind, request) -> kind.equals("budget-adjustment-query") ? envelope(request, observation(operation, BudgetAdjustmentObservation.Status.REJECTED, BudgetAdjustmentObservation.Rejection.LEDGER_VERSION_CONFLICT)) : normal(kind, request); executionWorker.poll();
+        assertThat(noticeRecipients("OPERATION", operation, "RECONCILING")).containsExactlyInAnyOrder("alice", "finance");
+        var target = ok(read(noticePath("OPERATION", operation, "RECONCILING", "alice"), "alice"), 200);
+        assertThat(target.at("/operation/observation/outcome").asText()).isEqualTo("APPLIED"); assertThat(target.at("/operation/conflictingObservation/outcome").asText()).isEqualTo("REJECTED");
+        assertThat(target.path("retirement").isNull()).isTrue(); assertThat(operations.activeForRequest("demo", id)).isPresent();
+    }
+
+    @Test void budgetAdjustmentNotificationRetirementKeepsOriginalCommandAfterReplacementAndReplay() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id); var input = action(view(id, "finance"), "RETIRE"); String key = UUID.randomUUID().toString();
+        var response = send(actionUrl(operation), "finance", key, input); ok(response, 202);
+        assertThat(send(actionUrl(operation), "finance", key, input).getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(noticeRecipients("OPERATION", operation, "RETIRED")).containsExactlyInAnyOrder("alice", "finance");
+        var target = noticePath("OPERATION", operation, "RETIRED", "alice"); var original = ok(read(target, "alice"), 200);
+        assertThat(original.at("/retirement/basis").asText()).isEqualTo("NEVER_SENT"); assertThat(original.at("/operation/status").asText()).isEqualTo("VOIDED");
+        queueAndRead(id); var replacement = authorize(id); executionWorker.poll(); assertThat(replacement).isNotEqualTo(operation);
+        assertThat(ok(read(target, "alice"), 200)).isEqualTo(original);
+        assertThat(calls.get("budget-adjustment-command").get()).isEqualTo(1);
+    }
+
+    @Test void budgetAdjustmentNotificationScopeHistoryAndDeduplicationProtectOriginalMessage() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id);
+        responder = (kind, request) -> kind.equals("budget-adjustment-command") ? malformedCommand(request) : normal(kind, request); executionWorker.poll();
+        var target = noticePath("OPERATION", operation, "UNKNOWN", "finance"); var message = UUID.fromString(target.split("/")[4]);
+        var before = operations.find("demo", operation).orElseThrow(); int externalCalls = calls.values().stream().mapToInt(AtomicInteger::get).sum();
+        ok(read(target, "finance"), 200); for (String user : List.of("alice", "admin", "cashier", "bob")) assertThat(read(target, user).getStatus()).isIn(403, 404);
+        assertThat(read(target + "?requestId=" + id, "finance").getStatus()).isEqualTo(400);
+        actors.set(new Actor("demo", "finance", Set.of("ADMIN")));
+        try { assertThatThrownBy(() -> noticeAccess.target(message)).isInstanceOf(io.agentflow.common.DomainException.class); } finally { actors.clear(); }
+        actors.set(new Actor("foreign", "finance", Set.of("FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> noticeAccess.target(message)).isInstanceOf(io.agentflow.common.DomainException.class); } finally { actors.clear(); }
+        String event = "budget-adjustment:OPERATION:" + operation + ":UNKNOWN";
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "budget-adjustment:OPERATION:" + operation + ":NOT_FOUND", message.toString());
+        try { assertThat(read(target, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event, message.toString()); }
+        long version = before.command().source().approvedRequestVersion(); String raw = jdbc.queryForObject("SELECT state_json FROM budget_adjustment_revision WHERE tenant_id='demo' AND request_id=? AND request_version=?", String.class, id.toString(), version);
+        var altered = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(raw, JsonNode.class); altered.put("tenantId", "foreign");
+        jdbc.update("UPDATE budget_adjustment_revision SET state_json=? WHERE tenant_id='demo' AND request_id=? AND request_version=?", altered.toString(), id.toString(), version);
+        try { assertThat(read(target, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE budget_adjustment_revision SET state_json=? WHERE tenant_id='demo' AND request_id=? AND request_version=?", raw, id.toString(), version); }
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx -> events.publishEvent(new BudgetAdjustmentOperationChanged(before, null)));
+        assertThat(noticeRecipients("OPERATION", operation, "UNKNOWN")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(operations.find("demo", operation)).contains(before); assertThat(calls.values().stream().mapToInt(AtomicInteger::get).sum()).isEqualTo(externalCalls);
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, message.toString())).isNull();
+    }
+
+    @Test void budgetAdjustmentNotificationBlockedAndRevokedReviewsRemainIndependentAttempts() throws Exception {
+        var id = approved(); ledgerLimit = "760";
+        var blocked = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText()); reviewWorker.poll();
+        assertThat(noticeRecipients("REVIEW", blocked, "REVIEW_BLOCKED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(ok(read(noticePath("REVIEW", blocked, "REVIEW_BLOCKED", "alice"), "alice"), 200).path("operation").isNull()).isTrue();
+        ledgerLimit = "1000"; var stopped = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText());
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        try {
+            reviewWorker.poll(); assertThat(noticeRecipients("REVIEW", stopped, "REVIEW_SOURCE_CHANGED")).containsExactly("alice");
+            assertThat(ok(read(noticePath("REVIEW", stopped, "REVIEW_SOURCE_CHANGED", "alice"), "alice"), 200).at("/review/status").asText()).isEqualTo("VOIDED");
+            assertThat(operations.activeForRequest("demo", id)).isEmpty();
+        } finally { jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString()); }
+    }
+
+    @Test void budgetAdjustmentNotificationNotFoundRejectionAndExpiryNeverInventAdjustment() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id);
+        responder = (kind, request) -> kind.equals("budget-adjustment-command") ? malformedCommand(request) : normal(kind, request); executionWorker.poll();
+        ok(send(actionUrl(operation), "finance", action(view(id, "finance"), "QUERY")), 202);
+        responder = (kind, request) -> kind.equals("budget-adjustment-query") ? envelope(request, observation(operation, BudgetAdjustmentObservation.Status.NOT_FOUND, null)) : normal(kind, request); executionWorker.poll();
+        assertThat(noticeRecipients("OPERATION", operation, "NOT_FOUND")).containsExactlyInAnyOrder("alice", "finance");
+        ok(send(actionUrl(operation), "finance", action(view(id, "finance"), "RETRY")), 202);
+        responder = (kind, request) -> kind.equals("budget-adjustment-command") ? envelope(request, observation(operation, BudgetAdjustmentObservation.Status.REJECTED, BudgetAdjustmentObservation.Rejection.LEDGER_VERSION_CONFLICT)) : normal(kind, request); executionWorker.poll();
+        assertThat(noticeRecipients("OPERATION", operation, "REJECTED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(ok(read(noticePath("OPERATION", operation, "NOT_FOUND", "alice"), "alice"), 200).at("/operation/status").asText()).isEqualTo("REJECTED");
+        responder = this::normal; var second = approved(); queueAndRead(second); var expiredId = authorize(second); var queued = operations.find("demo", expiredId).orElseThrow();
+        assertThat(financeExecution.claim("demo", expiredId, queued.command().expiresAt())).isNull();
+        assertThat(noticeRecipients("OPERATION", expiredId, "EXPIRED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(ok(read(noticePath("OPERATION", expiredId, "EXPIRED", "alice"), "alice"), 200).at("/operation/observation").isNull()).isTrue();
+    }
+
+    @Test void budgetAdjustmentNotificationFailureRollsBackResultAndDispatchThenRevocationStopsDelivery() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id); var claimed = financeExecution.claim("demo", operation, Instant.now());
+        var result = new io.agentflow.finance.FinanceResult.Success<>(applied(claimed.command())); String event = "budget-adjustment:OPERATION:" + operation + ":APPLIED";
+        var actor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var preference = notificationPreferences.get(actor); notificationPreferences.revise(actor, preference.version(), true, false);
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT budget_notice_failure CHECK (NOT (event_key='" + event + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> financeExecution.finish(claimed, result, Instant.now())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT budget_notice_failure"); }
+            assertThat(operations.find("demo", operation)).contains(claimed); assertThat(noticeRecipients("OPERATION", operation, "APPLIED")).isEmpty();
+            assertThat(operations.history("demo", operation)).hasSize(2);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=?", Integer.class, event)).isZero();
+            financeExecution.finish(claimed, result, Instant.now()); var target = noticePath("OPERATION", operation, "APPLIED", "finance");
+            UUID delivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, target.split("/")[4]));
+            jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+            assertThat(read(target, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(delivery, Instant.now())).isNull();
+            assertThat(notificationDeliveryStore.find(delivery).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+        } finally {
+            jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+            var latest = notificationPreferences.get(actor); notificationPreferences.revise(actor, latest.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    @Test void budgetAdjustmentNotificationFailureRollsBackSafeRetirementAndReviewFailure() throws Exception {
+        var id = approved(); queueAndRead(id); var operation = authorize(id); var queued = operations.find("demo", operation).orElseThrow();
+        String event = "budget-adjustment:OPERATION:" + operation + ":RETIRED";
+        jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT budget_retire_notice_failure CHECK (NOT (event_key='" + event + "' AND recipient_id='finance'))");
+        try { assertThatThrownBy(() -> new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx -> financeExecution.retire("demo", operation, queued.version(), "finance", Instant.now()))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT budget_retire_notice_failure"); }
+        assertThat(operations.find("demo", operation)).contains(queued); assertThat(operations.retirement("demo", operation)).isEmpty();
+        assertThat(noticeRecipients("OPERATION", operation, "RETIRED")).isEmpty(); assertThat(noticeRecipients("OPERATION", operation, "VOIDED")).isEmpty();
+        ok(send(actionUrl(operation), "finance", action(view(id, "finance"), "RETIRE")), 202);
+        var review = UUID.fromString(ok(send(financePath(id) + "/reviews", "finance", reviewInput(id)), 202).path("reviewId").asText()); var claimed = financeReviews.claim("demo", review, Instant.now());
+        String failedEvent = "budget-adjustment:REVIEW:" + review + ":REVIEW_UNAVAILABLE";
+        jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT budget_review_notice_failure CHECK (NOT (event_key='" + failedEvent + "' AND recipient_id='finance'))");
+        try { assertThatThrownBy(() -> financeReviews.fail(claimed, Instant.now())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT budget_review_notice_failure"); }
+        assertThat(reviews.find("demo", review)).contains(claimed); assertThat(noticeRecipients("REVIEW", review, "REVIEW_UNAVAILABLE")).isEmpty();
+        financeReviews.fail(claimed, Instant.now()); assertThat(noticeRecipients("REVIEW", review, "REVIEW_UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    private List<String> noticeRecipients(String type, UUID id, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, "budget-adjustment:" + type + ":" + id + ":" + fact);
+    }
+    private String noticePath(String type, UUID id, String fact, String recipient) {
+        String message = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key=?", String.class, recipient, "budget-adjustment:" + type + ":" + id + ":" + fact);
+        return "/api/v1/notifications/" + message + "/budget-adjustment-target";
     }
 
     private UUID approved() throws Exception { UUID id = create(); submit(id); approveTask(id, "finance", "APPROVE"); approveTask(id, "manager", "APPROVE"); assertThat(app(id).status()).isEqualTo(ApplicationStatus.APPROVED); return id; }

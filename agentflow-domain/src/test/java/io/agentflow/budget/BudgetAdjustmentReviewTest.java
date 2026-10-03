@@ -1,6 +1,7 @@
 package io.agentflow.budget;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.notification.BudgetAdjustmentNotice;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
 import java.util.List;
@@ -15,6 +16,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @author owlzhangfq@gmail.com
  */
 class BudgetAdjustmentReviewTest {
+    @Test void reviewNoticesNeverPromoteLedgerReadIntoBudgetExecution() {
+        var queued = queue(); var running = queued.claim(NOW.plusSeconds(1), Duration.ofSeconds(10));
+        assertThat(BudgetAdjustmentNotice.from(queued)).isEmpty(); assertThat(BudgetAdjustmentNotice.from(running)).isEmpty();
+        assertThat(BudgetAdjustmentNotice.from(running.fail(BudgetAdjustmentReview.Issue.CONNECTION, NOW.plusSeconds(2)))).contains(BudgetAdjustmentNotice.REVIEW_UNAVAILABLE);
+        assertThat(BudgetAdjustmentNotice.from(queued.voidSource(NOW.plusSeconds(1)))).contains(BudgetAdjustmentNotice.REVIEW_SOURCE_CHANGED);
+        var blocked = running.complete(new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED), NOW.plusSeconds(2));
+        assertThat(BudgetAdjustmentNotice.from(blocked)).contains(BudgetAdjustmentNotice.REVIEW_BLOCKED);
+    }
+
     @Test void namedReadDoesNotAuthorizeAndOnlyExactActorAndEvidenceCanBeConsumedOnce() {
         var queue = queue(); var source = queue.input().source();
         var ready = queue.claim(NOW.plusSeconds(1), Duration.ofSeconds(30)).complete(new FinanceResult.Success<>(currentLedger(source)), NOW.plusSeconds(2));

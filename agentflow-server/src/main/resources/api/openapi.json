@@ -47420,6 +47420,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/budget-adjustment-target": {
+      "get": {
+        "operationId": "budgetAdjustmentNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原预算调整复核或指令",
+        "description": "固定原复核尝试或原预算调整指令，原批准修订、原消息事实与当前原轮次权限共同核验。历史未知或查无消息可以展示同一原指令的后续结果，新的授权不会替换原操作。返回结果、冲突观察及真实安全结束决定，不返回额度、台账、外部引用或办理许可。拒绝查询参数，响应 no-store；读取不查询外部系统、不执行指令，也不标记已读。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAdjustmentNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -54000,7 +54105,9 @@
               "REPAYMENT_RESULT",
               "REPAYMENT_ATTENTION",
               "REPAYMENT_REVIEW_RESULT",
-              "REPAYMENT_REVIEW_ATTENTION"
+              "REPAYMENT_REVIEW_ATTENTION",
+              "BUDGET_ADJUSTMENT_RESULT",
+              "BUDGET_ADJUSTMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -83453,6 +83560,331 @@
             ]
           },
           "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BudgetAdjustmentNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "sourceType",
+          "sourceId",
+          "fact",
+          "review",
+          "operation",
+          "retirement"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "REVIEW",
+              "OPERATION"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "REVIEW_UNAVAILABLE",
+              "REVIEW_BLOCKED",
+              "REVIEW_SOURCE_CHANGED",
+              "UNKNOWN",
+              "NOT_FOUND",
+              "REJECTED",
+              "APPLIED",
+              "RECONCILING",
+              "EXPIRED",
+              "VOIDED",
+              "RETIRED"
+            ]
+          },
+          "review": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentNotificationReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentNotificationReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "CONSUMED",
+              "BLOCKED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "type": "string",
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "SOURCE_CHANGED",
+              "LEDGER_CHANGED",
+              "LEDGER_REJECTED"
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentNotificationOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "failure",
+          "observation",
+          "conflictingObservation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "QUERYING",
+              "UNKNOWN",
+              "APPLIED",
+              "REJECTED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "LEASE_EXPIRED",
+              "INTERNAL_ERROR",
+              "AUTHORIZATION_EXPIRED",
+              "SOURCE_CHANGED",
+              "INCONSISTENT_OBSERVATION",
+              "RECHECK_REQUESTED",
+              null
+            ]
+          },
+          "observation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentNotificationObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflictingObservation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BudgetAdjustmentNotificationObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentNotificationObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "appliedAt",
+          "rejection"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "PENDING",
+              "NOT_FOUND"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appliedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "rejection": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "AUTHORIZATION_EXPIRED",
+              "BUDGET_PERIOD_CLOSED",
+              "BUDGET_INSUFFICIENT",
+              "LEDGER_VERSION_CONFLICT",
+              "BUDGET_POLICY_UNAVAILABLE",
+              "BUDGET_POSITION_UNAVAILABLE",
+              "LEGAL_ENTITY_UNAVAILABLE",
+              "EMPLOYEE_UNAVAILABLE",
+              null
+            ]
+          }
+        }
+      },
+      "BudgetAdjustmentNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "operationVersion",
+          "basis",
+          "retiredAt"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_SENT",
+              "REJECTED"
+            ]
+          },
+          "retiredAt": {
             "type": "string",
             "format": "date-time"
           }
