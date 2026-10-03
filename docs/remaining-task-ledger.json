@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T22:39:24.509677+00:00",
+  "recordedAt": "2026-10-03T23:05:26.538033+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "既有财务通知保持。本阶段补齐报销部分调整的单侧准备、预算差额、挂账差额、资源受阻／完成、安全结束及实际争议裁决通知；原消息按具体命令及裁决编号读取，重新授权不换号。149 个不同 Java 用例和 190 项前端用例通过；事务回滚、实时失权投递拦截及原轮次只读详情已验证。余下来源覆盖核对、固定包持久化／重启与组合验收仍待完成。",
+      "observed": "现有 17 类通知通过 408 个不同 Java 用例；固定后端 HTTP 验证付款未知原号恢复、消息/意向重启保留、当前失权抑制和明确确认后原投递重试。独立恢复保留 253 张表、427 条记录；230 份响应及 43 份请求通过契约。反向来源核对新复现供应商应付复核、ERP 预留异常和授权安全结束的漏通知，3 个最小用例因消息为空失败；这些仍属 F17。浏览器与 PostgreSQL 补验保持待办。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1774,6 +1774,14 @@
         },
         {
           "path": "docs/evidence/partial-expense-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/financial-notifications-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-notifications-runtime-20261003.json",
           "line": 1
         }
       ],
@@ -3574,9 +3582,10 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "PARTIAL_EXPENSE_ADJUSTMENT_NOTIFICATIONS_SCOPE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "d9b23246402b05f49b0522d800ef3c40df3998eb",
-    "evidence": "docs/evidence/partial-expense-notifications-20261003.json",
-    "recordedAt": "2026-10-03T22:39:24.509677+00:00"
+    "status": "FIXED_BACKEND_RUNTIME_VERIFIED_SOURCE_GAPS_REPRODUCED_TASK_OPEN",
+    "recordedAt": "2026-10-03T23:05:26.538033+00:00",
+    "sourceCommit": "6bc1d184009fee36b0d99cbee6a74a195fca250d",
+    "evidence": "docs/evidence/financial-notifications-runtime-20261003.json",
+    "knownOpenTaskCount": 34
   }
 }
