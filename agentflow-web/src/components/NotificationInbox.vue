@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, reactive, ref, watch } from 'vue'
-import { api, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type ReversalCheckNotificationTarget, type ExpenseReturnNotificationTarget, type SupplierReturnNotificationTarget, type SupplierAdjustmentNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget } from '../api'
+import { api, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type ReversalCheckNotificationTarget, type DisbursementReturnNotificationTarget, type ExpenseReturnNotificationTarget, type SupplierReturnNotificationTarget, type SupplierAdjustmentNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget } from '../api'
 import { isTaskNotification, isPaymentNotification, isVoucherNotification, isBudgetNotification, isReversalNotification, isReversalCheckNotification, isSettlementNotification, notificationLabels, NotificationInboxQuery } from '../notificationInbox'
 import PaymentNotificationDetail from './PaymentNotificationDetail.vue'
 import VoucherNotificationDetail from './VoucherNotificationDetail.vue'
@@ -8,8 +8,10 @@ import BudgetNotificationDetail from './BudgetNotificationDetail.vue'
 import ReversalCheckNotificationDetail from './ReversalCheckNotificationDetail.vue'
 import { isSupplierReturnNotification } from '../supplierReturnNotification'
 import { isExpenseReturnNotification } from '../expenseReturnNotification'
+import { isDisbursementReturnNotification } from '../disbursementReturnNotification'
 import SupplierReturnNotificationDetail from './SupplierReturnNotificationDetail.vue'
 import ExpenseReturnNotificationDetail from './ExpenseReturnNotificationDetail.vue'
+import DisbursementReturnNotificationDetail from './DisbursementReturnNotificationDetail.vue'
 import { isSupplierAdjustmentNotification } from '../supplierAdjustmentNotification'
 import SupplierAdjustmentNotificationDetail from './SupplierAdjustmentNotificationDetail.vue'
 import { isSupplierSettlementNotification } from '../supplierSettlementNotification'
@@ -20,9 +22,10 @@ import NotificationPreferencesPanel from './NotificationPreferencesPanel.vue'
 import NotificationDeliveriesPanel from './NotificationDeliveriesPanel.vue'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
-const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage]; paymentOpen: [target: FinancialNotificationTarget]; voucherOpen: [target: VoucherNotificationTarget]; budgetOpen: [target: BudgetNotificationTarget]; reversalOpen: [target: ReversalNotificationTarget]; reversalCheckOpen: [target: ReversalCheckNotificationTarget]; supplierReturnOpen: [target: SupplierReturnNotificationTarget]; expenseReturnOpen: [target: ExpenseReturnNotificationTarget]; supplierAdjustmentOpen: [target: SupplierAdjustmentNotificationTarget]; supplierSettlementOpen: [target: SupplierSettlementNotificationTarget]; settlementOpen: [target: ExpenseSettlementNotificationTarget] }>()
+const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage]; paymentOpen: [target: FinancialNotificationTarget]; voucherOpen: [target: VoucherNotificationTarget]; budgetOpen: [target: BudgetNotificationTarget]; reversalOpen: [target: ReversalNotificationTarget]; reversalCheckOpen: [target: ReversalCheckNotificationTarget]; supplierReturnOpen: [target: SupplierReturnNotificationTarget]; expenseReturnOpen: [target: ExpenseReturnNotificationTarget]; disbursementReturnOpen: [target: DisbursementReturnNotificationTarget]; supplierAdjustmentOpen: [target: SupplierAdjustmentNotificationTarget]; supplierSettlementOpen: [target: SupplierSettlementNotificationTarget]; settlementOpen: [target: ExpenseSettlementNotificationTarget] }>()
 const selectedSupplierReturn = ref<InboxMessage | null>(null)
 const selectedExpenseReturn = ref<InboxMessage | null>(null)
+const selectedDisbursementReturn = ref<InboxMessage | null>(null)
 const selectedSupplierAdjustment = ref<InboxMessage | null>(null)
 const selectedSupplierSettlement = ref<InboxMessage | null>(null)
 const selectedSettlement = ref<InboxMessage | null>(null)
@@ -32,8 +35,9 @@ const selectedReversal = ref<InboxMessage | null>(null)
 const selectedBudget = ref<InboxMessage | null>(null)
 const selectedVoucher = ref<InboxMessage | null>(null)
 function open(item: InboxMessage) {
-  selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null; selectedReversalCheck.value = null; selectedSettlement.value = null; selectedSupplierAdjustment.value = null; selectedSupplierSettlement.value = null; selectedSupplierReturn.value = null; selectedExpenseReturn.value = null
+  selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null; selectedReversalCheck.value = null; selectedSettlement.value = null; selectedSupplierAdjustment.value = null; selectedSupplierSettlement.value = null; selectedSupplierReturn.value = null; selectedExpenseReturn.value = null; selectedDisbursementReturn.value = null
   if (isSupplierAdjustmentNotification(item)) selectedSupplierAdjustment.value = item
+  else if (isDisbursementReturnNotification(item)) selectedDisbursementReturn.value = item
   else if (isExpenseReturnNotification(item)) selectedExpenseReturn.value = item
   else if (isSupplierReturnNotification(item)) selectedSupplierReturn.value = item
   else if (isSupplierSettlementNotification(item)) selectedSupplierSettlement.value = item
@@ -49,7 +53,7 @@ const readFilter = ref<'all' | 'unread'>('all')
 const query = reactive(new NotificationInboxQuery(api.inbox))
 function refresh() { void query.load(props.scopeKey, readFilter.value) }
 watch([() => props.scopeKey, () => props.refreshVersion, readFilter], refresh, { immediate: true, flush: 'sync' })
-watch(() => props.scopeKey, () => { selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null; selectedReversalCheck.value = null; selectedSettlement.value = null; selectedSupplierAdjustment.value = null; selectedSupplierSettlement.value = null; selectedSupplierReturn.value = null; selectedExpenseReturn.value = null }, { flush: 'sync' })
+watch(() => props.scopeKey, () => { selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null; selectedReversalCheck.value = null; selectedSettlement.value = null; selectedSupplierAdjustment.value = null; selectedSupplierSettlement.value = null; selectedSupplierReturn.value = null; selectedExpenseReturn.value = null; selectedDisbursementReturn.value = null }, { flush: 'sync' })
 onUnmounted(() => query.clear())
 const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 </script>
@@ -62,6 +66,7 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
     <PaymentNotificationDetail v-if="selectedPayment" :message="selectedPayment" :scope-key="scopeKey" :locked="locked" @close="selectedPayment = null" @open="emit('paymentOpen', $event)" />
     <SupplierReturnNotificationDetail v-if="selectedSupplierReturn" :message="selectedSupplierReturn" :scope-key="scopeKey" :locked="locked" @close="selectedSupplierReturn = null" @open="emit('supplierReturnOpen', $event)" />
     <ExpenseReturnNotificationDetail v-if="selectedExpenseReturn" :message="selectedExpenseReturn" :scope-key="scopeKey" :locked="locked" @close="selectedExpenseReturn = null" @open="emit('expenseReturnOpen', $event)" />
+    <DisbursementReturnNotificationDetail v-if="selectedDisbursementReturn" :message="selectedDisbursementReturn" :scope-key="scopeKey" :locked="locked" @close="selectedDisbursementReturn = null" @open="emit('disbursementReturnOpen', $event)" />
     <SupplierAdjustmentNotificationDetail v-if="selectedSupplierAdjustment" :message="selectedSupplierAdjustment" :scope-key="scopeKey" :locked="locked" @close="selectedSupplierAdjustment = null" @open="emit('supplierAdjustmentOpen', $event)" />
     <SupplierSettlementNotificationDetail v-if="selectedSupplierSettlement" :message="selectedSupplierSettlement" :scope-key="scopeKey" :locked="locked" @close="selectedSupplierSettlement = null" @open="emit('supplierSettlementOpen', $event)" />
     <ExpenseSettlementNotificationDetail v-if="selectedSettlement" :message="selectedSettlement" :scope-key="scopeKey" :locked="locked" @close="selectedSettlement = null" @open="emit('settlementOpen', $event)" />
@@ -78,7 +83,7 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
       <li v-for="item in query.items" :key="item.id" :class="{ unread: !item.readAt }">
         <div class="message-state"><i aria-hidden="true" /><span>{{ item.readAt ? '已读' : '未读' }}</span></div>
         <div class="message-body"><div class="message-meta"><strong>{{ notificationLabels[item.kind] }}</strong><time :datetime="item.createdAt">{{ time(item.createdAt) }}</time></div><h3>{{ item.title }}</h3><p v-if="item.content" class="message-content">{{ item.content }}</p><p>{{ item.businessNo }} · 第 {{ item.roundNo }} 轮<span v-if="item.nodeName"> · {{ item.nodeName }}</span></p><p class="message-actor">操作人 {{ item.actor }}<span v-if="item.readAt"> · {{ time(item.readAt) }} 已读</span></p></div>
-        <div class="message-actions"><button class="secondary" :disabled="locked" @click="open(item)">{{ isSupplierAdjustmentNotification(item) ? '查看供应商应付调整' : isExpenseReturnNotification(item) ? '查看报销退回' : isSupplierReturnNotification(item) ? '查看供应商回款' : isSupplierSettlementNotification(item) ? '查看供应商结算' : isSettlementNotification(item) ? '查看原结算' : isReversalCheckNotification(item) ? '查看原核对' : isReversalNotification(item) ? '查看原冲销' : isBudgetNotification(item) ? '查看原预算' : isVoucherNotification(item) ? '查看原凭证' : isPaymentNotification(item) ? '查看原付款' : item.kind === 'APPLICATION_COPIED' ? '查看抄送' : isTaskNotification(item) ? '查看待办' : '查看申请' }} ↗</button><button v-if="!item.readAt" class="quiet" :disabled="locked" @click="emit('read', item)">标为已读</button></div>
+        <div class="message-actions"><button class="secondary" :disabled="locked" @click="open(item)">{{ isSupplierAdjustmentNotification(item) ? '查看供应商应付调整' : isDisbursementReturnNotification(item) ? '查看借款放款退回' : isExpenseReturnNotification(item) ? '查看报销退回' : isSupplierReturnNotification(item) ? '查看供应商回款' : isSupplierSettlementNotification(item) ? '查看供应商结算' : isSettlementNotification(item) ? '查看原结算' : isReversalCheckNotification(item) ? '查看原核对' : isReversalNotification(item) ? '查看原冲销' : isBudgetNotification(item) ? '查看原预算' : isVoucherNotification(item) ? '查看原凭证' : isPaymentNotification(item) ? '查看原付款' : item.kind === 'APPLICATION_COPIED' ? '查看抄送' : isTaskNotification(item) ? '查看待办' : '查看申请' }} ↗</button><button v-if="!item.readAt" class="quiet" :disabled="locked" @click="emit('read', item)">标为已读</button></div>
       </li>
     </ol>
     <div v-if="query.loaded && query.items.length" class="inbox-footer"><span>已加载 {{ query.items.length }} 条消息</span><button v-if="query.nextCursor" class="secondary" :disabled="query.loading || locked" @click="query.more">{{ query.loading ? '正在加载…' : '加载更多' }}</button><span v-else>已加载全部匹配消息</span></div>

@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,11 +38,12 @@ public class AdvanceDisbursementReturnService {
     private final JdbcDisbursementResolutionRepository decisions;
     private final EmployeeAdvanceRepository balances;
     private final PaymentAudit audit;
+    private final ApplicationEventPublisher events;
     /** 借款状态归领域，权限、短事务和审计归应用编排。 */
     public AdvanceDisbursementReturnService(CurrentActor actors, AdvanceDisbursementReturnSources sources, PaymentAccess access, PaymentPersonnel personnel,
-            JdbcDisbursementReturnCheckRepository checks, JdbcDisbursementResolutionRepository decisions, EmployeeAdvanceRepository balances, PaymentAudit audit) {
+            JdbcDisbursementReturnCheckRepository checks, JdbcDisbursementResolutionRepository decisions, EmployeeAdvanceRepository balances, PaymentAudit audit, ApplicationEventPublisher events) {
         this.actors = actors; this.sources = sources; this.access = access; this.personnel = personnel;
-        this.checks = checks; this.decisions = decisions; this.balances = balances; this.audit = audit;
+        this.checks = checks; this.decisions = decisions; this.balances = balances; this.audit = audit; this.events = events;
     }
     /** 幂等回放也要核验当前字段、任职和职责，原出纳不能改为财务裁决自己执行的付款。 */
     public void authorize(UUID advanceId) {
@@ -75,6 +77,7 @@ public class AdvanceDisbursementReturnService {
         var decision = new AdvanceDisbursementReturn(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.evidenceReference(), input.comment());
         var advance = funding.advance(); long version = advance.version(); advance.resolveDisbursementReview(version, decision);
         balances.update(advance, version, actor.userId(), "DISBURSEMENT_RETURN_RESOLVED"); var resolved = check.resolve(decision, now); checks.update(resolved); decisions.create(decision, advance);
+        events.publishEvent(new AdvanceDisbursementReturnChanged(resolved));
         var event = audit.record(funding.authorization(), decision.id(), advance.version(), "FINANCE", "DISBURSEMENT_RETURN_RESOLVE", check.status().name(), resolved.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, check.input().id(), resolved.version(), decision.id(), advance.version(), event);
     }
@@ -109,16 +112,16 @@ public class AdvanceDisbursementReturnService {
     public AdvanceDisbursementReturnCheck claim(String tenant, UUID id, Instant at) {
         var initial = checks.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         var source = sources.locked(tenant, initial.input().request().command().binding().businessId()); var current = checks.find(tenant, id).orElseThrow(); var now = time(at);
-        if (current.expired(now)) { checks.update(current.fail(AdvanceDisbursementReturnCheck.Issue.TIMEOUT, now)); return null; }
+        if (current.expired(now)) { persistCheck(current.fail(AdvanceDisbursementReturnCheck.Issue.TIMEOUT, now)); return null; }
         if (current.status() != AdvanceDisbursementReturnCheck.Status.QUEUED || !available(current, source, now)) return null;
-        var claimed = current.claim(now, QUERY_LEASE); checks.update(claimed); return claimed;
+        var claimed = current.claim(now, QUERY_LEASE); persistCheck(claimed); return claimed;
     }
     /** 新银行退回或原件变化只冻结后续使用，查询结果不会自行减掉债务。 */
     @Transactional
     public void finish(AdvanceDisbursementReturnCheck claimed, FinanceResult<AdvanceDisbursementReturnPort.Receipt> result, Instant at) {
         var source = sources.locked(claimed.input().tenantId(), claimed.input().request().command().binding().businessId()); var current = current(claimed); if (current == null) return; var now = time(at);
         if (!available(current, source, now)) return;
-        var completed = current.complete(result, now); checks.update(completed); if (completed.receipt() == null) return;
+        var completed = current.complete(result, now); persistCheck(completed); if (completed.receipt() == null) return;
         var receipt = completed.receipt(); var advance = source.funding().advance(); var previous = decisions.latest(advance.tenantId(), advance.id()).orElse(null);
         boolean same = receipt.status() != AdvanceDisbursementReturnPort.Status.UNRESOLVED
                 && (previous == null ? receipt.status() == AdvanceDisbursementReturnPort.Status.CONFIRMED : receipt.sameReturns(previous.receipt()))
@@ -131,11 +134,11 @@ public class AdvanceDisbursementReturnService {
     @Transactional
     public void fail(AdvanceDisbursementReturnCheck claimed, Instant at) {
         sources.locked(claimed.input().tenantId(), claimed.input().request().command().binding().businessId()); var current = current(claimed);
-        if (current != null) checks.update(current.fail(AdvanceDisbursementReturnCheck.Issue.INTERNAL_ERROR, time(at)));
+        if (current != null) persistCheck(current.fail(AdvanceDisbursementReturnCheck.Issue.INTERNAL_ERROR, time(at)));
     }
     private boolean available(AdvanceDisbursementReturnCheck check, AdvanceDisbursementReturnSources.Source source, Instant now) {
         try { requireCheck(check, source); personnel.requireEligible(check.input().tenantId(), check.input().requestedBy(), source.funding().advance().legalEntityId()); return true; }
-        catch (DomainException changed) { checks.update(check.voidSource(now)); return false; }
+        catch (DomainException changed) { persistCheck(check.voidSource(now)); return false; }
     }
     private void requireCheck(AdvanceDisbursementReturnCheck check, AdvanceDisbursementReturnSources.Source source) {
         if (!check.input().tenantId().equals(source.funding().advance().tenantId()) || check.input().paymentVersion() != source.paymentVersion()
@@ -144,6 +147,9 @@ public class AdvanceDisbursementReturnService {
         }
     }
     private AdvanceDisbursementReturnCheck current(AdvanceDisbursementReturnCheck claimed) { return checks.find(claimed.input().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == AdvanceDisbursementReturnCheck.Status.RUNNING).orElse(null); }
+    private void persistCheck(AdvanceDisbursementReturnCheck value) {
+        checks.update(value); events.publishEvent(new AdvanceDisbursementReturnChanged(value));
+    }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed advance or disbursement query changed"); }
     /**

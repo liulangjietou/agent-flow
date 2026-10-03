@@ -8,6 +8,7 @@ import { reversalPreparationLabels, reversalExecutionLabels } from './voucherRev
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
   EXPENSE_RETURN_RESULT: '报销退回核对结果', EXPENSE_RETURN_ATTENTION: '报销退回需核对',
+  DISBURSEMENT_RETURN_RESULT: '借款放款退回核对结果', DISBURSEMENT_RETURN_ATTENTION: '借款放款退回需核对',
   EXPENSE_SETTLEMENT_RESULT: '报销核销已完成', EXPENSE_SETTLEMENT_ATTENTION: '报销结算需核对',
   REVERSAL_CHECK_RESULT: '外部冲销登记结果', REVERSAL_CHECK_ATTENTION: '外部冲销核对需处理',
   REVERSAL_RESULT: '独立冲销结果更新', REVERSAL_ATTENTION: '独立冲销需核对',
