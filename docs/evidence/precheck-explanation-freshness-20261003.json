@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A02",
+  "stage": "Authoritative precheck explanation freshness foundation",
+  "status": "STAGE_VERIFIED_TASK_OPEN",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T12:56:48.554672+00:00",
+  "implementationCommit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+  "branch": "codex/governance-identifier-integration",
+  "rootCause": "READY carried full authority evidence, but BLOCKED and UNAVAILABLE findings had no persisted policy/dependency/expiry basis for a future explanation and review use case. Existing tests did not require this A02 capability.",
+  "implementation": [
+    "Add optional immutable observation to persisted precheck result; preserve historical records without backfill.",
+    "Observe local dependencies and fixed policy in a short transaction before finance HTTP; bound by five minutes and earliest consumed authority expiry.",
+    "Detect application/financial version, latest attempt, appointment, destination, policy, verification retry and canonical occupation changes before explanation use.",
+    "Keep original rule outcome, formal submission authority and public precheck DTO unchanged."
+  ],
+  "verification": {
+    "red": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "case": "blockedResultRetainsExplanationFreshnessWithoutAReadyPreview"
+    },
+    "verifiedUniqueCases": 283,
+    "initialScope": {
+      "tests": 33,
+      "failed": 0
+    },
+    "submissionInitial": {
+      "tests": 250,
+      "failed": 1,
+      "passed": 249
+    },
+    "retest": {
+      "tests": 1,
+      "failed": 0
+    },
+    "fixtureCorrection": [
+      "io.agentflow.expense.ExpenseSubmissionIntegrationTest#advanceOffsetSuggestionRejectsExpiredSupersededOrChangedPrechecksAndAllowsManualAmounts"
+    ],
+    "countMethod": "Six distinct suites; the one failed fixture case is replaced only by its successful focused rerun, not counted twice.",
+    "authors": {
+      "javaFiles": 1506,
+      "namedTypes": 2891,
+      "missingTags": 0,
+      "parseErrors": 0
+    },
+    "database": "H2 integration with synthetic loopback finance HTTP",
+    "legacyJson": "Persisted historical JSON without observation reads successfully and remains byte-for-byte unchanged after reads",
+    "postgres": "NOT_RUN",
+    "browser": "NOT_RUN",
+    "actualPackagedUpgrade": "NOT_RUN",
+    "modelExecution": "NOT_IMPLEMENTED_IN_THIS_STAGE"
+  },
+  "fixtureCorrection": "The pre-existing advance-offset expiry test manually shortened only the authority evidence deadline. It now shortens the observation deadline too and restores the fixture through the domain type before asserting FACTS_EXPIRED; production validation was not weakened.",
+  "remaining": [
+    "Explicit owner source selection and model target authorization",
+    "Persistent model execution, output source validation and review state",
+    "API/OpenAPI and expense UI with stale/unknown-result recovery",
+    "Fixed package, nonempty upgrade, restart and applicable UI acceptance"
+  ],
+  "counting": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/precheck-explanation-freshness-evidence-snapshot",
+  "artifactCount": 14,
+  "bearerRedactions": 0,
+  "artifacts": [
+    {
+      "path": "precheck-explanation-freshness-red.log",
+      "size": 44383,
+      "sha256": "059852c92946e81cbd8be8b8838f8f164de8bd62de659438547f72ee643cbf01"
+    },
+    {
+      "path": "precheck-explanation-freshness-red.xml",
+      "size": 73193,
+      "sha256": "0a857daa561dc1ce10eee6f0f9ac48abd4e2b722f52263c2df432a73cb778764"
+    },
+    {
+      "path": "precheck-explanation-freshness-green.log",
+      "size": 51468,
+      "sha256": "54654b686faa21b4104344304a8c5a142f29879202a94b3caebd0a27ad2e2dac"
+    },
+    {
+      "path": "precheck-explanation-submission-regression.log",
+      "size": 223955,
+      "sha256": "43177b269ecc4271aa2dac0f1eb1688e5e6c47689dc9be181977c8518fce1c14"
+    },
+    {
+      "path": "precheck-explanation-expiry-fixture-verified.log",
+      "size": 41682,
+      "sha256": "9e244c86ecc3731a384889c01eef1426172ff373d3dbfc1398caffe2ba2fc58f"
+    },
+    {
+      "path": "precheck-explanation-expiry-fixture-verified.xml",
+      "size": 72578,
+      "sha256": "7ac1f041fa0a4caff9ef1ea39638847181284d71d19f5b2be91ea16ee369b4a5"
+    },
+    {
+      "path": "precheck-explanation-verification-summary.json",
+      "size": 541,
+      "sha256": "2eb8e55063e5e8afed9f54052868e3914b172651938a39d1ebbd5c110aaf7a72"
+    },
+    {
+      "path": "precheck-explanation-authors-verified.log",
+      "size": 73,
+      "sha256": "486359455c699d59ece7aa147a14305f0417e7b237571021a26c7060cf152055"
+    },
+    {
+      "path": "precheck-explanation-freshness-reports/TEST-io.agentflow.expense.ExpensePrecheckIntegrationTest.xml",
+      "size": 76817,
+      "sha256": "026314da20ed49cfce8af843f750a04ecedee6aaeedbd88e3513baf9faef49d5"
+    },
+    {
+      "path": "precheck-explanation-freshness-reports/TEST-io.agentflow.expense.ExpensePrecheckJobTest.xml",
+      "size": 10711,
+      "sha256": "4eeb640936314c92534a39672cceaa85c9582a340908448b0df0c38d4a3fd50b"
+    },
+    {
+      "path": "precheck-explanation-freshness-reports/TEST-io.agentflow.expense.ExpensePrecheckMigrationTest.xml",
+      "size": 50845,
+      "sha256": "355a9639810f25e49dd9496162044e38f23c45a1ea09ae185776bd96307a8059"
+    },
+    {
+      "path": "precheck-explanation-submission-initial-reports/TEST-io.agentflow.approval.ExpenseSubprocessIntegrationTest.xml",
+      "size": 74508,
+      "sha256": "77c6c221c3f35db115121b5c1876793343da3843121ad288a36ad63fa8adb4ac"
+    },
+    {
+      "path": "precheck-explanation-submission-initial-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "size": 114225,
+      "sha256": "e85da111e5dce9b9ffbc58b137d5455b1bb0a506076ede8527b991ad5201c3d8"
+    },
+    {
+      "path": "precheck-explanation-submission-initial-reports/TEST-io.agentflow.procurement.CrossBusinessInvoiceClaimTest.xml",
+      "size": 198868,
+      "sha256": "77c2e3173f56607002b750ad1dec122d004a15b4eaa4ca177b8fe4337b8e9524"
+    }
+  ],
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePrecheckJob.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "3c79b3f6d6903445400c59c44af8c3e7e56a77bbca898fc7bbd8cd2e0306576d"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePrecheckObservation.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "d94308d702849ab683fd622b43d926ad2f57233efd21902da903898e08dfac2d"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/expense/ExpensePrecheckJobTest.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "39673a3fbb5385f59235de88b177c600eea66c1d2b2c891b58755df7459ffe16"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "6ccd3b1960bd5725f60735fc5b79e8eafcff5860c3f23035c474c0d6a89ec701"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckObservations.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "6e4b5784e6bdc56e7df9a1388f3029593e2143f9d1d217ef91d7658f1d41e9fc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "dd3641db8f44188ab13c51334d367e5b9925dc113f4716db3ffd015bcfd2408a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckIntegrationTest.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "565b91dbeef8b25e0e46df18f1973da5a47a18cec130aa7b1613b8d2b92d5329"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "commit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+      "sha256": "38b1cfdd07351906935751c2acb1d38ee667865172671355cb49ac8e2fea0e1c"
+    }
+  ]
+}
