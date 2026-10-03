@@ -7,6 +7,7 @@ import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.*;
 import io.agentflow.notification.NotificationTexts;
@@ -54,7 +55,7 @@ import static org.assertj.core.api.Assertions.*;
         "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false"})
 @Import(VoucherOperationIntegrationTest.ListenerConfiguration.class)
 class VoucherOperationIntegrationTest {
-    private static final UUID ENTITY = UUID.randomUUID();
+    private final UUID entity = UUID.randomUUID();
     private static final ExecutorService HTTP_THREADS = Executors.newCachedThreadPool();
     private static final HttpServer SERVER = server();
     private static final String ENDPOINT = "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/finance";
@@ -77,12 +78,15 @@ class VoucherOperationIntegrationTest {
     @Autowired JdbcVoucherPreparationRepository preparations;
     @Autowired VoucherPreparationService preparationService;
     @Autowired VoucherPreparationWorker preparationWorker;
+    @Autowired AccountMappingConfigurationService mappingConfiguration;
+    @Autowired ExpenseConfigurationService expenseConfiguration;
+    @Autowired JdbcExpenseConfigurationRepository configurationLocks;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry values) {
         values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
         values.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> "true");
-        values.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_VOUCHER_TEST_URL", "jdbc:h2:mem:voucher-operations;DB_CLOSE_DELAY=-1"));
+        values.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_VOUCHER_TEST_URL", "jdbc:h2:mem:voucher-operations;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000"));
         values.add("spring.datasource.driver-class-name", () -> System.getenv().getOrDefault("AGENTFLOW_VOUCHER_TEST_DRIVER", "org.h2.Driver"));
         values.add("spring.datasource.username", () -> System.getenv().getOrDefault("AGENTFLOW_VOUCHER_TEST_USER", "sa"));
         values.add("spring.datasource.password", () -> System.getenv().getOrDefault("AGENTFLOW_VOUCHER_TEST_PASSWORD", ""));
@@ -295,17 +299,191 @@ class VoucherOperationIntegrationTest {
         assertThat(reload(preparation).result().code()).isEqualTo("TARGET_CHANGED"); assertThat(QUERIES.get()).isZero(); assertThat(WRITES.get()).isZero();
     }
 
+    @Test void publishedMappingIsUsedByTheActualPreparationWorker() {
+        var advance = advance(); var preparation = enqueue(advance);
+        var published = publishMapping("first", true);
+        RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence); preparationWorker.poll();
+        assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.READY);
+        var mapping = operations.find("demo", preparation.input().id()).orElseThrow().input().command().mapping();
+        assertThat(mapping.request().managedMapping()).isNotNull();
+        assertThat(mapping.request().managedMapping().selection().mappingId()).isEqualTo(published.activeMapping().mappingId());
+        assertThat(mapping.entries()).isEqualTo(published.activeMapping().definition().entries());
+        assertThat(WRITES.get()).isZero();
+    }
+
+    @Test void firstPublicationWhileLegacyEvidenceIsInFlightPreventsRegistration() throws Exception {
+        var preparation = enqueue(advance()); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        configuration.getTenants().get("demo").setTimeoutSeconds(10);
+        RESPONDER.set((path, request) -> { entered.countDown(); await(release); return accountingEvidence(path, request); });
+        var threads = Executors.newFixedThreadPool(2);
+        try {
+            var running = threads.submit(preparationWorker::poll); assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            threads.submit(() -> publishMapping("first", true)).get(2, TimeUnit.SECONDS);
+            release.countDown(); running.get(5, TimeUnit.SECONDS);
+            assertThat(operations.find("demo", preparation.input().id())).isEmpty();
+            assertThat(reload(preparation).result().code()).isEqualTo("ACCOUNT_MAPPING_CHANGED");
+            assertThat(WRITES.get()).isZero();
+        } finally { release.countDown(); threads.shutdownNow(); }
+    }
+
+    @Test void aPersistedSelectionAndOriginalPostingSurviveLaterPublication() {
+        var preparation = enqueue(advance()); var first = publishMapping("first", true);
+        String originalInput = jdbc.queryForObject("SELECT input_json FROM voucher_preparation WHERE tenant_id='demo' AND id=?", String.class, preparation.input().id().toString());
+        assertThat(json.write(preparation)).doesNotContain("mappingRequest");
+        var work = preparationService.claim("demo", preparation.input().id(), now());
+        assertThat(reload(preparation)).isEqualTo(work.preparation());
+        var command = prepared(work); preparationService.finish(work.preparation(), command, null, now());
+        var original = operations.find("demo", command.id()).orElseThrow();
+        assertThat(reload(preparation).mappingRequest()).isEqualTo(command.mapping().request());
+        assertThat(jdbc.queryForObject("SELECT input_json FROM voucher_preparation WHERE tenant_id='demo' AND id=?", String.class, command.id().toString())).isEqualTo(originalInput);
+        var history = jdbc.queryForList("SELECT state_json FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id=? ORDER BY version", String.class, command.id().toString());
+        assertThat(history).hasSize(3);
+        assertThat(json.read(history.get(1), VoucherPreparation.class).mappingRequest()).isEqualTo(work.preparation().mappingRequest());
+        assertThat(json.read(history.get(2), VoucherPreparation.class)).isEqualTo(reload(preparation));
+        publishMapping("second", true);
+        var receipt = posted(command, 1); RESPONDER.set((path, request) -> receipt); worker.poll();
+        assertThat(reload(original).usablePosted()).isTrue(); recheck(original); worker.poll();
+        assertThat(reload(original).input()).isEqualTo(original.input());
+        assertThat(reload(original).input().command().mapping().request().managedMapping().selection().mappingId()).isEqualTo(first.activeMapping().mappingId());
+        assertThat(WRITES.get()).isEqualTo(1);
+    }
+
+    @Test void replacementWhileManagedEvidenceIsInFlightRequiresANewExplicitAttempt() throws Exception {
+        var advance = advance(); var preparation = enqueue(advance()); publishMapping("first", true);
+        configuration.getTenants().get("demo").setTimeoutSeconds(10);
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        RESPONDER.set((path, request) -> { if (path.endsWith("account-mapping")) { entered.countDown(); await(release); } return accountingEvidence(path, request); });
+        var threads = Executors.newFixedThreadPool(2);
+        try {
+            var running = threads.submit(preparationWorker::poll); assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            var second = threads.submit(() -> publishMapping("second", true)).get(2, TimeUnit.SECONDS);
+            release.countDown(); running.get(5, TimeUnit.SECONDS);
+            assertThat(reload(preparation).result().code()).isEqualTo("ACCOUNT_MAPPING_CHANGED");
+            assertThat(operations.find("demo", preparation.input().id())).isEmpty();
+            var retry = preparationService.retry("demo", advance.applicationId(), 5, "finance", now());
+            RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence); preparationWorker.poll();
+            assertThat(reload(retry).status()).isEqualTo(VoucherPreparation.Status.READY);
+            assertThat(reload(retry).mappingRequest().managedMapping().selection().mappingId()).isEqualTo(second.activeMapping().mappingId());
+            assertThat(reload(preparation).mappingRequest().managedMapping().selection().activeRevision()).isEqualTo(1);
+        } finally { release.countDown(); threads.shutdownNow(); }
+    }
+
+    @Test void incompletePublishedMappingCannotFallBackToErpDefaults() {
+        var advance = advance(); var preparation = enqueue(advance()); publishMapping("incomplete", false);
+        preparationWorker.poll();
+        assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.BLOCKED);
+        assertThat(reload(preparation).result().code()).isEqualTo("ACCOUNT_MAPPING_UNAVAILABLE");
+        assertThat(QUERIES.get()).isZero(); assertThat(operations.find("demo", preparation.input().id())).isEmpty();
+        publishMapping("complete", true); var retry = preparationService.retry("demo", advance.applicationId(), 5, "finance", now());
+        RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence); preparationWorker.poll();
+        assertThat(reload(retry).status()).isEqualTo(VoucherPreparation.Status.READY);
+    }
+
+    @Test void finisherRejectsEvidenceThatDropsTheClaimedManagedSelection() {
+        var preparation = enqueue(advance()); publishMapping("first", true);
+        var work = preparationService.claim("demo", preparation.input().id(), now());
+        var command = prepared(work, work.source().mappingRequest());
+        preparationService.finish(work.preparation(), command, null, now());
+        assertThat(reload(preparation).result().code()).isEqualTo("ACCOUNT_MAPPING_EVIDENCE_MISMATCH");
+        assertThat(operations.find("demo", command.id())).isEmpty();
+    }
+
+    @Test void legacyRunningStateCanBeRestoredButCannotRegisterUnboundEvidence() {
+        var advance = advance(); var preparation = enqueue(advance()); var started = preparation.start(now(), now().plusSeconds(15));
+        tx().executeWithoutResult(status -> preparations.update(started));
+        assertThat(json.write(started)).doesNotContain("mappingRequest"); assertThat(reload(preparation)).isEqualTo(started);
+        var plan = sources.derive(started.input().source());
+        preparationService.finish(started, prepared(new VoucherPreparationService.Work(started, plan)), null, now());
+        assertThat(reload(preparation).result().code()).isEqualTo("ACCOUNT_MAPPING_SELECTION_MISSING");
+        assertThat(operations.find("demo", preparation.input().id())).isEmpty();
+        var retry = preparationService.retry("demo", advance.applicationId(), 5, "finance", now());
+        RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence); preparationWorker.poll();
+        assertThat(reload(retry).status()).isEqualTo(VoucherPreparation.Status.READY);
+    }
+
+    @Test void aPublishedMappingForThePreviousTargetStopsBeforeAnyExternalRead() {
+        var advance = advance(); publishMapping("first", true);
+        configuration.getTenants().get("demo").setEndpoint(ENDPOINT + "/changed");
+        var preparation = enqueue(advance()); preparationWorker.poll();
+        assertThat(reload(preparation).result().code()).isEqualTo("TARGET_CHANGED");
+        assertThat(QUERIES.get()).isZero(); assertThat(WRITES.get()).isZero();
+    }
+
+    @Test void registrationWaitsForThePublicationLockAndObservesItsCommittedReplacement() throws Exception {
+        var preparation = enqueue(advance()); publishMapping("first", true);
+        var work = preparationService.claim("demo", preparation.input().id(), now()); var command = prepared(work);
+        var locked = new CountDownLatch(1); var release = new CountDownLatch(1); var finishing = new CountDownLatch(1);
+        var threads = Executors.newFixedThreadPool(2);
+        try {
+            var publication = threads.submit(() -> tx().executeWithoutResult(status -> {
+                configurationLocks.lock("demo"); locked.countDown(); await(release); publishMapping("second", true);
+            }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var registration = threads.submit(() -> { finishing.countDown(); preparationService.finish(work.preparation(), command, null, now()); });
+            assertThat(finishing.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> registration.get(250, TimeUnit.MILLISECONDS)).isInstanceOf(java.util.concurrent.TimeoutException.class);
+            release.countDown(); publication.get(5, TimeUnit.SECONDS); registration.get(5, TimeUnit.SECONDS);
+            assertThat(reload(preparation).result().code()).isEqualTo("ACCOUNT_MAPPING_CHANGED");
+            assertThat(operations.find("demo", command.id())).isEmpty();
+        } finally { release.countDown(); threads.shutdownNow(); }
+    }
+
+    @Test void waitingForTheConfigurationLockCannotExtendThePreparationLease() throws Exception {
+        var advance = advance(); publishMapping("first", true);
+        var source = sources.reference(applications.findById("demo", advance.applicationId()).orElseThrow());
+        // 恢复已消耗十二秒的有效十五秒租约，以短等待覆盖真实过期边界。
+        var startedAt = now().minusSeconds(12);
+        var preparation = VoucherPreparation.queue(new VoucherPreparation.Input(UUID.randomUUID(), source, 1, "manager", target()), startedAt);
+        tx().executeWithoutResult(status -> preparations.create(preparation));
+        var work = preparationService.claim("demo", preparation.input().id(), startedAt); var command = prepared(work);
+        var locked = new CountDownLatch(1); var release = new CountDownLatch(1); var finishing = new CountDownLatch(1);
+        var threads = Executors.newFixedThreadPool(2);
+        try {
+            var holder = threads.submit(() -> tx().executeWithoutResult(status -> { configurationLocks.lock("demo"); locked.countDown(); await(release); }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            var registration = threads.submit(() -> { var at = now(); finishing.countDown(); preparationService.finish(work.preparation(), command, null, at); });
+            assertThat(finishing.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> registration.get(250, TimeUnit.MILLISECONDS)).isInstanceOf(java.util.concurrent.TimeoutException.class);
+            Thread.sleep(Math.max(1, java.time.Duration.between(Instant.now(), work.preparation().leaseUntil()).toMillis() + 30));
+            release.countDown(); holder.get(5, TimeUnit.SECONDS); registration.get(5, TimeUnit.SECONDS);
+            assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.UNAVAILABLE);
+            assertThat(reload(preparation).result().code()).isEqualTo("LEASE_EXPIRED");
+            assertThat(operations.find("demo", command.id())).isEmpty();
+        } finally { release.countDown(); threads.shutdownNow(); }
+    }
+
+    @Test void categoryRevisionAloneDoesNotRebindAnAlreadyPublishedMapping() {
+        var preparation = enqueue(advance()); var published = publishMapping("first", true);
+        var work = preparationService.claim("demo", preparation.input().id(), now());
+        var current = expenseConfiguration.categories("demo"); var categories = new ArrayList<>(current.categories());
+        categories.add(new ExpenseCategoryCatalog.Category("synthetic-" + UUID.randomUUID(), "新增合成类别", List.of(ExpenseLine.Unit.ITEM), true));
+        expenseConfiguration.saveCategories(new Actor("demo", "admin", java.util.Set.of("FINANCE_CONFIG_ADMIN")), current.version(), categories, "新增类别不改写原科目发布");
+        preparationService.finish(work.preparation(), prepared(work), null, now());
+        assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.READY);
+        assertThat(reload(preparation).mappingRequest().managedMapping().selection().categoryRevision()).isEqualTo(published.activeMapping().categoryRevision());
+    }
+
+    private AccountMappingConfigurationService.Current publishMapping(String name, boolean complete) {
+        var actor = new Actor("demo", "admin", java.util.Set.of("FINANCE_CONFIG_ADMIN"));
+        var entries = List.of(new AccountMappingPort.Entry(new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_RECEIVABLE, ""), "synthetic-" + name + "-receivable"),
+                new AccountMappingPort.Entry(new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_PAYABLE, ""), "synthetic-" + name + "-payable"));
+        String key = "mapping-" + UUID.randomUUID();
+        var draft = mappingConfiguration.saveDraft(actor, key, 0, new AccountMappingDefinition("合成科目", entity, "CNY", complete ? entries : entries.subList(0, 1)), "合成测试配置");
+        var current = mappingConfiguration.current("demo", entity, "CNY");
+        return mappingConfiguration.publish(actor, key, draft.revision(), current.categoryRevision(), current.activeRevision(), "合成测试发布");
+    }
+
     private AdvanceRequest advance() {
         var at = now().minusSeconds(60); var id = UUID.randomUUID(); fixtures.add(id);
         var app = Application.draftBusiness(UUID.randomUUID(), "demo", "SYNTHETIC-" + id, "fixture", 1, "alice", "合成凭证", Map.of(), null, null, null,
                 new BusinessReference(BusinessReference.Type.ADVANCE_REQUEST, id));
-        var request = AdvanceRequest.draft(id, "demo", app.id(), "alice", new AdvanceRequestContent(ENTITY, "合成借款", "合成用途", new Money(new BigDecimal("100.00"), "CNY"), at.atZone(ZoneOffset.UTC).toLocalDate().plusDays(10)));
+        var request = AdvanceRequest.draft(id, "demo", app.id(), "alice", new AdvanceRequestContent(entity, "合成借款", "合成用途", new Money(new BigDecimal("100.00"), "CNY"), at.atZone(ZoneOffset.UTC).toLocalDate().plusDays(10)));
         tx().executeWithoutResult(transaction -> {
             applications.save(app); advances.create(request, "alice");
-            var catalog = new FinanceCatalog("alice", "v1", at.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(ENTITY, "法人", "CNY", false, "v1", "UTC")), List.of(), List.of(), List.of(), List.of());
-            var account = new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1");
+            var catalog = new FinanceCatalog("alice", "v1", at.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "UTC")), List.of(), List.of(), List.of(), List.of());
+            var account = new EmployeeAccountSnapshot(entity, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1");
             request.freeze(1, 1, catalog, new EmployeeAccountPort.Account(account, at.plusSeconds(600)),
-                    new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, ENTITY, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位"), at);
+                    new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位"), at);
             advances.update(request, 1, "alice", "SYNTHETIC_SUBMIT"); request.approve(2, 1, 5, "manager", at); advances.update(request, 2, "manager", "SYNTHETIC_APPROVE");
             applications.update(Application.restore(app.id(), "demo", app.businessNo(), app.processKey(), 1, "alice", app.title(), AdvanceRequestFormContract.submittedPayload(request.currentRound()),
                     ApplicationStatus.APPROVED, 1, 5, null, null, NotificationTexts.EMPTY, app.businessReference()), 1);
@@ -326,9 +504,13 @@ class VoucherOperationIntegrationTest {
         return preparations.latest(sources.reference(app)).orElseThrow();
     }
     private static VoucherCommand prepared(VoucherPreparationService.Work work) {
+        return prepared(work, work.preparation().mappingRequest() == null ? work.source().mappingRequest() : work.preparation().mappingRequest());
+    }
+    private static VoucherCommand prepared(VoucherPreparationService.Work work, AccountMappingPort.Request request) {
         var plan = work.source(); var at = now(); var date = plan.accountingDate();
         return plan.prepare(work.preparation().input().id(), new AccountingPeriodPort.OpenPeriod(plan.periodRequest(), "synthetic-period", "v1", date.minusDays(30), date.plusDays(30), at, at.plusSeconds(300)),
-                new AccountMappingPort.Mapping(plan.mappingRequest(), "v1", at, at.plusSeconds(300), plan.mappingRequest().keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList()), at);
+                new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.managedMapping() == null
+                        ? request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList() : request.managedMapping().entries()), at);
     }
     private static Object accountingEvidence(String path, JsonNode envelope) {
         var data = envelope.path("data"); var at = now();
@@ -338,7 +520,8 @@ class VoucherOperationIntegrationTest {
         }
         if (path.endsWith("account-mapping")) {
             var request = wire.read(data.toString(), AccountMappingPort.Request.class);
-            return new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+            var entries = request.managedMapping() == null ? request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList() : request.managedMapping().entries();
+            return new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), entries);
         }
         return posted(wire.read(data.path("command").toString(), VoucherCommand.class), 1);
     }

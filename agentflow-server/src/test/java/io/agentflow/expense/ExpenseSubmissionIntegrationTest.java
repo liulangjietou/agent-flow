@@ -156,6 +156,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired JdbcVoucherOperationRepository voucherOperations;
     @Autowired VoucherOperationWorker voucherWorker;
     @Autowired VoucherPreparationService voucherPreparationService;
+    @Autowired AccountMappingConfigurationService mappingConfiguration;
+    @Autowired ExpenseConfigurationService mappingCategories;
     @Autowired VoucherOperationService voucherExecution;
     @Autowired VoucherReversalService voucherReversals;
     @Autowired VoucherReversalWorker voucherReversalWorker;
@@ -3818,6 +3820,30 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
     }
 
+    @Test void approvedExpenseUsesPublishedCategoryTaxOffsetAndPayableMappingWithOriginalAllocations() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        var preparation = voucherPreparations.latest("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var plan = voucherSources.derive(preparation.input().source()); var request = plan.mappingRequest();
+        var currentCategories = mappingCategories.categories("demo"); var categories = new ArrayList<>(currentCategories.categories());
+        request.keys().stream().filter(key -> key.role() == AccountMappingPort.Role.EXPENSE)
+                .filter(key -> categories.stream().noneMatch(category -> category.code().equals(key.selector())))
+                .forEach(key -> categories.add(new ExpenseCategoryCatalog.Category(key.selector(), "合成映射类别", List.of(ExpenseLine.Unit.values()), true)));
+        mappingCategories.saveCategories(admin, currentCategories.version(), categories, "合成报销科目类别");
+        var entries = new ArrayList<>(request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-managed-" + key.role())).toList());
+        entries.add(new AccountMappingPort.Entry(new AccountMappingPort.Key(AccountMappingPort.Role.BANK, "unused-bank"), "synthetic-unused"));
+        String key = "expense-" + UUID.randomUUID();
+        var draft = mappingConfiguration.saveDraft(admin, key, 0, new AccountMappingDefinition("合成报销科目", entity, "CNY", entries), "合成报销配置");
+        var head = mappingConfiguration.current("demo", entity, "CNY");
+        var published = mappingConfiguration.publish(admin, key, draft.revision(), head.categoryRevision(), head.activeRevision(), "合成报销发布");
+        voucherPreparationWorker.poll(); voucherWorker.poll();
+        var operation = voucherOperations.find("demo", preparation.input().id()).orElseThrow(); var command = operation.input().command();
+        assertThat(operation.usablePosted()).isTrue(); assertThat(command.lines()).isEqualTo(plan.lines()); assertThat(command.totals()).isEqualTo(plan.totals());
+        assertThat(command.mapping().request().keys()).isEqualTo(request.keys());
+        assertThat(command.mapping().request().keys()).extracting(AccountMappingPort.Key::role).contains(AccountMappingPort.Role.EXPENSE, AccountMappingPort.Role.DEDUCTIBLE_TAX, AccountMappingPort.Role.EMPLOYEE_RECEIVABLE, AccountMappingPort.Role.EMPLOYEE_PAYABLE);
+        assertThat(command.mapping().request().managedMapping().selection().mappingId()).isEqualTo(published.activeMapping().mappingId());
+        assertThat(command.mapping().entries()).hasSize(entries.size() - 1);
+    }
+
     @Test void paymentVoucherUsesFrozenExpenseTimeZoneAfterResourcesAndBudgetWereConsumed() throws Exception {
         legalTimeZone = "America/New_York"; var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll();
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
@@ -4986,7 +5012,8 @@ class ExpenseSubmissionIntegrationTest {
             }
             case "account-mapping" -> {
                 var request = json.read(data.toString(), AccountMappingPort.Request.class); var at = Instant.now();
-                yield new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList());
+                yield new AccountMappingPort.Mapping(request, "v1", at, at.plusSeconds(300), request.managedMapping() == null
+                        ? request.keys().stream().map(key -> new AccountMappingPort.Entry(key, "synthetic-" + key.role())).toList() : request.managedMapping().entries());
             }
             case "voucher-reversal" -> {
                 var request = json.read(data.toString(), VoucherReversalPort.Request.class);

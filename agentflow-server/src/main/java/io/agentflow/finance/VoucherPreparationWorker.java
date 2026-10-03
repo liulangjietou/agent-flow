@@ -43,7 +43,7 @@ public class VoucherPreparationWorker {
                 try {
                     var period = periods.period(candidate.tenantId(), input.targetDigest(), source.periodRequest());
                     if (!(period instanceof FinanceResult.Success<AccountingPeriodPort.OpenPeriod> availablePeriod)) { execution.finish(job, null, problem(period), Instant.now()); continue; }
-                    var mapping = mappings.mapping(candidate.tenantId(), input.targetDigest(), source.mappingRequest());
+                    var mapping = mappings.mapping(candidate.tenantId(), input.targetDigest(), job.mappingRequest());
                     if (!(mapping instanceof FinanceResult.Success<AccountMappingPort.Mapping> availableMapping)) { execution.finish(job, null, problem(mapping), Instant.now()); continue; }
                     var command = source.prepare(input.id(), availablePeriod.value(), availableMapping.value(), Instant.now().truncatedTo(ChronoUnit.MICROS));
                     execution.finish(job, command, null, Instant.now());

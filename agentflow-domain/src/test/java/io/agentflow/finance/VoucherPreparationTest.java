@@ -53,6 +53,31 @@ class VoucherPreparationTest {
         assertThatThrownBy(() -> new VoucherPreparation.Source(source.tenantId(), source.businessType(), source.businessId(), source.applicationId(), 1, 5, 3, "alice", id, null)).isInstanceOf(DomainException.class);
         assertThatThrownBy(() -> new VoucherPreparation.Source(source.tenantId(), source.businessType(), source.businessId(), source.applicationId(), 1, 5, 3, "alice", null, 4L)).isInstanceOf(DomainException.class);
     }
+    @Test void selectionSurvivesCompletionAndExpirationWithoutChangingOriginalInput() {
+        var queued = VoucherPreparation.queue(input("a".repeat(64)), NOW);
+        var request = new AccountMappingPort.Request(UUID.randomUUID(), "CNY", java.util.List.of(new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_PAYABLE, "")));
+        var started = queued.start(NOW, NOW.plusSeconds(30), request);
+        assertThat(started.finish(VoucherPreparation.Result.ready(queued.input().id()), NOW.plusSeconds(1)).mappingRequest()).isEqualTo(request);
+        var expired = started.finish(VoucherPreparation.Result.ready(queued.input().id()), NOW.plusSeconds(30));
+        assertThat(expired.mappingRequest()).isEqualTo(request); assertThat(expired.input()).isEqualTo(queued.input());
+        assertThat(expired.result().code()).isEqualTo("LEASE_EXPIRED");
+    }
+    @Test void queuedOrUnconfiguredPreparationCannotPretendToHaveSelectedAMapping() {
+        var request = new AccountMappingPort.Request(UUID.randomUUID(), "CNY", java.util.List.of(new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_PAYABLE, "")));
+        assertThatThrownBy(() -> new VoucherPreparation(input("a".repeat(64)), 1, VoucherPreparation.Status.QUEUED, NOW, null, null, null, null, request)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> VoucherPreparation.queue(input(null), NOW).start(NOW, NOW.plusSeconds(30), request)).isInstanceOf(DomainException.class);
+    }
+    @Test void managedSelectionMustRetainPreparationTenantAndTarget() {
+        var queued = VoucherPreparation.queue(input("a".repeat(64)), NOW); var entity = UUID.randomUUID();
+        var key = new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_PAYABLE, "");
+        for (var scope : java.util.List.of(java.util.List.of("foreign", "a".repeat(64)), java.util.List.of("demo", "b".repeat(64)))) {
+            var selection = new AccountMappingSelection(UUID.randomUUID(), 1, 0, 1, "c".repeat(64), scope.get(1));
+            var managed = new ManagedAccountMapping(scope.get(0), entity, "CNY", selection, java.util.List.of(new AccountMappingPort.Entry(key, "synthetic-payable")));
+            var request = new AccountMappingPort.Request(entity, "CNY", java.util.List.of(key), managed);
+            assertThatThrownBy(() -> queued.start(NOW, NOW.plusSeconds(30), request)).isInstanceOfSatisfying(DomainException.class,
+                    failure -> assertThat(failure.code()).isEqualTo("INVALID_VOUCHER_PREPARATION"));
+        }
+    }
     private static VoucherPreparation.Input input(String target) {
         return new VoucherPreparation.Input(UUID.randomUUID(), new VoucherPreparation.Source("demo", BusinessReference.Type.ADVANCE_REQUEST, UUID.randomUUID(), UUID.randomUUID(), 1, 5, 3, "alice"), 1, "manager", target);
     }

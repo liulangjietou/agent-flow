@@ -96,6 +96,9 @@ export function validateVoucherReceipt(receipt: VoucherReceipt, view: VoucherVie
 }
 
 const issues: Record<string, string> = {
+  ACCOUNT_MAPPING_UNAVAILABLE: '本次业务所需科目未完整配置或不可用，请核对科目映射后重新准备',
+  ACCOUNT_MAPPING_SELECTION_MISSING: '旧准备任务未保存科目选择，请重新准备会计依据',
+  ACCOUNT_MAPPING_EVIDENCE_MISMATCH: 'ERP 返回的科目依据与本次选择不一致，请核对配置及 ERP 接口',
   NOT_CONFIGURED: '尚未配置会计服务', TARGET_CHANGED: '会计服务配置已变化，请核对原操作', TIMEOUT: '会计服务响应超时', CONNECTION: '暂时无法连接会计服务',
   AUTHENTICATION: '会计服务连接凭据不可用', REMOTE_FAILURE: '会计服务暂时不可用', INVALID_RESPONSE: '会计结果未通过校验', RESPONSE_TOO_LARGE: '会计结果未通过校验',
   LEASE_EXPIRED: '本次处理超时，需要重新核对', VOUCHER_BUDGET_NOT_FROZEN: '本轮预算尚未确认，暂不能准备凭证', VOUCHER_SOURCE_CHANGED: '原批准内容已变化，停止发送',
