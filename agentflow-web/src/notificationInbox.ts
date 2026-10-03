@@ -1,8 +1,10 @@
-import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget } from './api'
 import { validatePayment } from './payments.js'
 import { validateSupplierCashier } from './supplierCashier.js'
+import { preparationLabels, operationLabels } from './vouchers.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  VOUCHER_RESULT: '凭证结果更新', VOUCHER_ATTENTION: '凭证处理需核对',
   SUPPLIER_PAYMENT_RESULT: '供应商付款结果更新', SUPPLIER_PAYMENT_ATTENTION: '供应商付款需核对',
   PAYMENT_RESULT: '付款结果更新', PAYMENT_ATTENTION: '付款执行需核对',
   ADVANCE_OVERDUE: '借款逾期提醒',
@@ -17,6 +19,33 @@ export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK
 /** 付款消息先读取受当前权限保护的原付款，不把历史消息当作本轮最新授权。 */
 export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
 export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
+export const isVoucherNotification = (item: InboxMessage) => ['VOUCHER_RESULT', 'VOUCHER_ATTENTION'].includes(item.kind)
+
+/** 原准备和过账必须同号；消息详情没有写入许可，也不接受同轮最新准备替换旧编号。 */
+export function readVoucherNotificationTarget(value: VoucherNotificationTarget, message: InboxMessage): VoucherNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的凭证记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const issue = (v: unknown) => v === null || typeof v === 'string' && /^[A-Z][A-Z0-9_]{0,127}$/.test(v)
+  if (!value || !isVoucherNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.voucherId, value.applicationId, value.businessId].every(uuid) || !positive(value.roundNo)
+      || !['EMPLOYEE_ADVANCE', 'EXPENSE_ACCRUAL', 'PAYMENT'].includes(value.kind) || typeof value.reversalBound !== 'boolean'
+      || Object.keys(value).some(key => !['messageId', 'voucherId', 'applicationId', 'businessId', 'roundNo', 'kind', 'preparation', 'operation', 'reversalBound'].includes(key))) invalid()
+  const preparation = value.preparation, operation = value.operation
+  if (preparation === undefined || operation === undefined || !preparation && !operation || value.reversalBound && !operation) invalid()
+  if (preparation && (preparation.id !== value.voucherId || !Object.prototype.hasOwnProperty.call(preparationLabels, preparation.status) || !positive(preparation.attempt)
+      || !instant(preparation.createdAt) || !issue(preparation.issue)
+      || (['QUEUED', 'RUNNING'].includes(preparation.status) ? preparation.completedAt !== null : !instant(preparation.completedAt))
+      || (preparation.status === 'READY') !== !!operation)) invalid()
+  if (operation && (operation.id !== value.voucherId || operation.kind !== value.kind || !Object.prototype.hasOwnProperty.call(operationLabels, operation.status)
+      || !positive(operation.version) || !Number.isSafeInteger(operation.attempts) || operation.attempts < 0 || typeof operation.disputed !== 'boolean'
+      || !instant(operation.updatedAt) || !instant(operation.sendExpiresAt) || !/^\d{4}-\d{2}-\d{2}$/.test(operation.accountingDate)
+      || !issue(operation.issue) || operation.observedStatus !== null && !['PENDING', 'POSTED', 'FAILED', 'REVERSED', 'NOT_FOUND'].includes(operation.observedStatus)
+      || operation.voucherReference !== null && (typeof operation.voucherReference !== 'string' || !operation.voucherReference.trim() || operation.voucherReference.length > 256)
+      || operation.postedAt !== null && !instant(operation.postedAt))) invalid()
+  return value
+}
 /** 原消息、轮次和付款三个标识必须同时匹配，损坏响应不能成为财务入口。 */
 export function readPaymentNotificationTarget(value: PaymentNotificationTarget, message: InboxMessage): PaymentNotificationTarget {
   const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)

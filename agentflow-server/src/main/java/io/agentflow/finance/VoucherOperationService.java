@@ -49,13 +49,13 @@ public class VoucherOperationService {
     public VoucherOperation claim(String tenant, UUID id, Instant now) {
         var initial = operations.find(tenant, id).orElse(null); if (initial == null) return null;
         lock(initial.input().command()); var current = operations.find(tenant, id).orElseThrow(VoucherOperationService::notFound); now = time(now);
-        if (current.expired(now)) { operations.update(current.expire(now)); return null; }
+        if (current.expired(now)) { complete(current, current.expire(now)); return null; }
         if (current.running() || current.nextAttemptAt() == null || now.isBefore(current.nextAttemptAt())) return null;
         if (current.status() == VoucherOperation.Status.QUEUED) {
             try { requireSource(current.input().command()); }
-            catch (DomainException changed) { operations.update(current.voidBeforeSend(now)); return null; }
+            catch (DomainException changed) { complete(current, current.voidBeforeSend(now)); return null; }
         }
-        var claimed = current.claim(now, lease); operations.update(claimed); return claimed.running() ? claimed : null;
+        var claimed = current.claim(now, lease); complete(current, claimed); return claimed.running() ? claimed : null;
     }
 
     /** 有效领取结果和事件同事务落地，事件消费者失败会回滚本地确认，再通过原操作查询恢复。 */

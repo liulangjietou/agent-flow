@@ -7,6 +7,7 @@ import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.callback.*;
 import io.agentflow.expense.*;
@@ -640,12 +641,41 @@ class PaymentOperationIntegrationTest {
         RESPONDER.set((path, data) -> path.endsWith("accounting-period") ? new FinanceResult.Rejected<>(FinanceResult.Reason.ACCOUNTING_PERIOD_CLOSED) : response(path, data));
         preparationWorker.poll(); assertThat(paymentPreparation(payment).status()).isEqualTo(VoucherPreparation.Status.BLOCKED);
         assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(VOUCHER_WRITES.get()).isZero();
+        UUID originalPreparation = paymentPreparation(payment).input().id();
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+                "voucher:" + originalPreparation + ":PREPARATION_BLOCKED")).containsExactlyInAnyOrder("alice", "cashier");
         recheck(payment); worker.poll();
         tx().executeWithoutResult(status -> preparationService.retryPayment("demo", source.applicationId(), source.roundNo(), "finance", now()));
         assertThat(paymentPreparation(payment).input().source()).isEqualTo(source);
         RESPONDER.set(PaymentOperationIntegrationTest::response); preparationWorker.poll(); voucherWorker.poll();
         assertThat(paymentPreparation(payment).input().attempt()).isEqualTo(2); assertThat(paymentVoucher(payment).usablePosted()).isTrue();
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+                "voucher:" + paymentPreparation(payment).input().id() + ":POSTED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Long.class,
+                "voucher:" + originalPreparation + ":POSTED")).isZero();
         assertThat(WRITES.get()).isEqualTo(1);
+    }
+
+    @Test void paymentVoucherNotificationStillRequiresOriginalCashierLegalEntityScopeBeforeDelivery() {
+        var recipient = new Actor("demo", "cashier", java.util.Set.of("CASHIER"));
+        var preference = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, preference.version(), true, false);
+        var appointmentIds = jdbc.queryForList("SELECT a.id FROM organization_appointment a JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id WHERE a.tenant_id='demo' AND p.subject='cashier' AND d.legal_entity_id=?", String.class, ENTITY.toString());
+        try {
+            var payment = job(); worker.poll(); configuration.setEnabled(false); preparationWorker.poll();
+            var preparation = paymentPreparation(payment); assertThat(preparation.status()).isEqualTo(VoucherPreparation.Status.UNAVAILABLE);
+            String inboxId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='cashier'", String.class,
+                    "voucher:" + preparation.input().id() + ":PREPARATION_UNAVAILABLE");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, inboxId));
+            for (String id : appointmentIds) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            assertThat(notificationDeliveries.claim(deliveryId, now())).isNull();
+            var delivery = notificationStore.get(recipient, deliveryId).orElseThrow();
+            assertThat(delivery.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
+            assertThat(delivery.progress().attempts()).isZero(); assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        } finally {
+            for (String id : appointmentIds) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id);
+            configuration.setEnabled(true);
+            var current = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
     }
 
     @Test void bankReversalBeforeVoucherSendStopsNewPostingAndKeepsPreparedProof() {

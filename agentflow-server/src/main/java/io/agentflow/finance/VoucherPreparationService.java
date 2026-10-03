@@ -6,6 +6,7 @@ import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,14 +28,16 @@ public class VoucherPreparationService {
     private final VoucherOperationService execution;
     private final FinanceGatewayConfiguration configuration;
     private final AccountMappingPreparation mappings;
+    private final ApplicationEventPublisher events;
     private final Duration lease;
     /** 两次只读 HTTP 共用有界准备租约，与实际过账租约分开。 */
     public VoucherPreparationService(ApplicationRepository applications, VoucherSources sources, JdbcVoucherPreparationRepository preparations,
-            JdbcVoucherOperationRepository operations, VoucherOperationService execution, FinanceGatewayConfiguration configuration, AccountMappingPreparation mappings,
+            JdbcVoucherOperationRepository operations, VoucherOperationService execution, FinanceGatewayConfiguration configuration, AccountMappingPreparation mappings, ApplicationEventPublisher events,
             @Value("${agentflow.vouchers.preparation-lease-seconds:150}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Voucher preparation lease must be between 15 and 300 seconds");
         this.applications = applications; this.sources = sources; this.preparations = preparations; this.operations = operations;
         this.execution = execution; this.configuration = configuration; this.mappings = mappings; this.lease = Duration.ofSeconds(leaseSeconds);
+        this.events = events;
     }
     /** 与真实最终批准同事务，普通表单、事前申请与中间节点不生成会计准备。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -85,17 +88,17 @@ public class VoucherPreparationService {
     public Work claim(String tenant, UUID id, Instant now) {
         var initial = preparations.find(tenant, id).orElse(null); if (initial == null) return null;
         sources.lock(initial.input().source()); var current = preparations.find(tenant, id).orElseThrow(VoucherPreparationService::notFound); now = time(now);
-        if (current.expired(now)) { preparations.update(current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return null; }
+        if (current.expired(now)) { complete(current, current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return null; }
         if (current.status() != VoucherPreparation.Status.QUEUED) return null;
         VoucherSource.Plan source; AccountMappingPort.Request request;
         try {
             source = sources.derive(current.input().source());
             request = mappings.select(tenant, source.mappingRequest(), current.input().targetDigest());
         } catch (DomainException problem) {
-            var failed = current.start(now, now.plus(lease)); preparations.update(failed);
-            preparations.update(failed.finish(classify(problem), now)); return null;
+            var failed = current.start(now, now.plus(lease)); complete(current, failed);
+            complete(failed, failed.finish(classify(problem), now)); return null;
         }
-        var started = current.start(now, now.plus(lease), request); preparations.update(started);
+        var started = current.start(now, now.plus(lease), request); complete(current, started);
         return new Work(started, source);
     }
     /** 准备完成和实际凭证登记原子提交；过期或失效来源不留下可发送任务。 */
@@ -104,8 +107,8 @@ public class VoucherPreparationService {
         sources.lock(claimed.input().source()); var current = preparations.find(claimed.input().source().tenantId(), claimed.input().id()).orElseThrow(VoucherPreparationService::notFound);
         if (current.status() != VoucherPreparation.Status.RUNNING || !current.equals(claimed)) return;
         now = time(now);
-        if (current.expired(now)) { preparations.update(current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return; }
-        if (problem != null) { preparations.update(current.finish(problem, now)); return; }
+        if (current.expired(now)) { complete(current, current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return; }
+        if (problem != null) { complete(current, current.finish(problem, now)); return; }
         if (command == null || !command.id().equals(current.input().id()) || !sources.derive(current.input().source()).matches(command)) {
             throw new DomainException("VOUCHER_SOURCE_CHANGED", "Prepared command no longer matches original approval");
         }
@@ -114,10 +117,13 @@ public class VoucherPreparationService {
         catch (DomainException changed) { mappingFailure = classify(changed); }
         now = completionTime(now);
         if (mappingFailure != null || current.expired(now)) {
-            preparations.update(current.finish(mappingFailure == null ? VoucherPreparation.Result.unavailable("LEASE_EXPIRED") : mappingFailure, now)); return;
+            complete(current, current.finish(mappingFailure == null ? VoucherPreparation.Result.unavailable("LEASE_EXPIRED") : mappingFailure, now)); return;
         }
         execution.register(command, current.input().targetDigest(), now);
-        preparations.update(current.finish(VoucherPreparation.Result.ready(command.id()), now));
+        complete(current, current.finish(VoucherPreparation.Result.ready(command.id()), now));
+    }
+    private void complete(VoucherPreparation previous, VoucherPreparation current) {
+        preparations.update(current); events.publishEvent(new VoucherPreparationChanged(previous, current));
     }
     private VoucherPreparation enqueue(VoucherPreparation.Source source, long attempt, String actor, Instant now) {
         String target = configuration.destination(source.tenantId()).map(destination -> destination.digest(source.tenantId())).orElse(null);

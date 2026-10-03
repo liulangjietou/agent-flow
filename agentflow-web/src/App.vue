@@ -106,7 +106,7 @@ import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vu
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget } from './api'
+import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
@@ -600,6 +600,11 @@ function openPaymentNotification(target: FinancialNotificationTarget) {
     if ('executionRequestId' in target && !target.canOpenCashier) { notice.value = '原出纳选择已停止，请保留原记录核对。'; return }
     notificationPaymentId.value = target.paymentId; cashierKind.value = 'executionRequestId' in target ? 'supplier' : 'employee'; page.value = 'cashier'
   } else { recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo }
+}
+/** 原凭证详情通过权限后，仍沿原轮次打开业务申请。 */
+function openVoucherNotification(target: VoucherNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
 }
 /** 旧消息按单项任务实时复核；已结束或转交的任务回到申请权限查询。 */
 async function openNotification(message: InboxMessage) {
@@ -1333,7 +1338,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" />
+        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" @voucher-open="openVoucherNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />

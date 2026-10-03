@@ -134,6 +134,7 @@ class ExpenseSubmissionIntegrationTest {
     }
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
+    @Autowired io.agentflow.notification.VoucherNotificationAccess voucherNotificationAccess;
     @Autowired AuthService auth;
     @Autowired CurrentActor actors;
     @Autowired JdbcTemplate jdbc;
@@ -818,6 +819,19 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(read(path + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
         configuration.setEnabled(false); voucherPreparationWorker.poll(); configuration.setEnabled(true);
         var blocked = ok(read(path, "finance"), 200); assertThat(blocked.at("/preparation/issue").asText()).isEqualTo("NOT_CONFIGURED");
+        String noticeKey = "voucher:" + blocked.at("/preparation/id").asText() + ":PREPARATION_UNAVAILABLE";
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, noticeKey))
+                .containsExactlyInAnyOrder("alice", "finance");
+        String noticeId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='finance'", String.class, noticeKey);
+        String noticePath = "/api/v1/notifications/" + noticeId + "/voucher-target";
+        assertThat(ok(read(noticePath, "finance"), 200).at("/preparation/issue").asText()).isEqualTo("NOT_CONFIGURED");
+        for (String role : List.of("EMPLOYEE", "ADMIN")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> voucherNotificationAccess.target(UUID.fromString(noticeId))).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); }
+            finally { actors.clear(); }
+        }
+        for (String user : List.of("alice", "admin", "bob")) assertThat(read(noticePath, user).getStatus()).isEqualTo(404);
         assertThat(blocked.at("/actions/prepare").asBoolean()).isTrue();
         var input = voucherInput(report, "PREPARE", null); String key = UUID.randomUUID().toString();
         for (String user : List.of("alice", "manager", "admin")) assertThat(send(path + "/actions", user, input).getStatus()).isEqualTo(403);
@@ -835,6 +849,9 @@ class ExpenseSubmissionIntegrationTest {
         for (String field : List.of("observedStatus", "voucherReference", "postedAt", "issue")) assertThat(queued.path("operation").has(field)).isTrue();
         assertThat(queued.at("/operation/status").asText()).isEqualTo("QUEUED"); assertThat(queued.at("/actions/query").asBoolean()).isFalse();
         voucherWorker.poll(); var posted = ok(read(path, "finance"), 200); assertThat(posted.at("/operation/status").asText()).isEqualTo("POSTED");
+        var oldNotice = ok(read(noticePath, "finance"), 200);
+        assertThat(oldNotice.at("/preparation/id").asText()).isEqualTo(blocked.at("/preparation/id").asText());
+        assertThat(oldNotice.path("operation").isNull()).isTrue();
         assertThat(posted.at("/mapping/source").asText()).isEqualTo("ERP_MANAGED");
         assertThat(posted.at("/mapping/mappingId").isNull()).isTrue();
         assertThat(posted.at("/mapping/erpSourceVersion").asText()).isNotBlank();
@@ -4471,6 +4488,11 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(reversalWrites).isZero(); assertThat(voucherOperations.find("demo", source.id()).orElseThrow().usablePosted()).isTrue();
         var receipt = authorizeExecution(report, prepared); var held = voucherOperations.find("demo", source.id()).orElseThrow();
         assertThat(held.reversalId()).isEqualTo(prepared.input().id()); assertThat(held.usablePosted()).isFalse();
+        String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class,
+                "voucher:" + source.id() + ":POSTED");
+        var notice = ok(read("/api/v1/notifications/" + messageId + "/voucher-target", "alice"), 200);
+        assertThat(notice.at("/operation/status").asText()).isEqualTo("POSTED");
+        assertThat(notice.path("reversalBound").asBoolean()).isTrue();
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
         assertThat(reversalWrites).isZero(); reversalExecutionWorker.poll();
         var operation = reversalOperations.find("demo", receipt.reversalId()).orElseThrow();

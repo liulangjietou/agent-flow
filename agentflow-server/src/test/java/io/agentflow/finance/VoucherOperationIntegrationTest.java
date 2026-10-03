@@ -52,7 +52,8 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.vouchers.worker-enabled=false",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.preparation-lease-seconds=15",
         "agentflow.vouchers.lease-seconds=15", "agentflow.budgets.worker-enabled=false", "agentflow.invoices.verification-worker-enabled=false",
-        "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false"})
+        "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false", "agentflow.notifications.delivery-worker-enabled=false"})
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 @Import(VoucherOperationIntegrationTest.ListenerConfiguration.class)
 class VoucherOperationIntegrationTest {
     private final UUID entity = UUID.randomUUID();
@@ -81,6 +82,14 @@ class VoucherOperationIntegrationTest {
     @Autowired AccountMappingConfigurationService mappingConfiguration;
     @Autowired ExpenseConfigurationService expenseConfiguration;
     @Autowired JdbcExpenseConfigurationRepository configurationLocks;
+    @Autowired io.agentflow.organization.OrganizationRepository organization;
+    @Autowired io.agentflow.approval.repository.SubmissionRoundRepository submissionRounds;
+    @Autowired org.springframework.test.web.servlet.MockMvc mvc;
+    @Autowired io.agentflow.auth.AuthService auth;
+    @Autowired org.springframework.context.ApplicationEventPublisher events;
+    @Autowired io.agentflow.notification.NotificationPreferencesService notificationPreferences;
+    @Autowired io.agentflow.notification.NotificationDeliveryService notificationDeliveries;
+    @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore notificationStore;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry values) {
@@ -106,6 +115,166 @@ class VoucherOperationIntegrationTest {
         }
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test void preparationFailureNotifiesOriginalParticipantsWithoutClaimingPostingFailed() {
+        noticeOrganization(); var preparation = enqueue(advance()); configuration.setEnabled(false);
+        preparationWorker.poll();
+        assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.UNAVAILABLE);
+        assertThat(voucherNoticeRecipients(preparation.input().id())).containsExactlyInAnyOrder("alice", "manager");
+        assertThat(jdbc.queryForList("SELECT content FROM notification_inbox WHERE tenant_id='demo' AND event_key LIKE ?", String.class,
+                "voucher:" + preparation.input().id() + ":%")).allSatisfy(content ->
+                assertThat(content).contains("准备", "尚未登记过账命令").doesNotContain("100.00", "synthetic-account", "1234", "合成用途"));
+        assertThat(operations.find("demo", preparation.input().id())).isEmpty(); assertThat(WRITES.get()).isZero();
+    }
+
+    @Test void legacyDirectOperationNotifiesOnlyProvenApplicantAndRetainsOriginalTarget() throws Exception {
+        noticeOrganization(); var advance = advance(); saveNoticeRound(advance); var original = register(command(advance)); worker.poll();
+        UUID id = original.input().command().id();
+        assertThat(preparations.find("demo", id)).isEmpty(); assertThat(voucherNoticeRecipients(id)).containsExactly("alice");
+        var response = noticeGet(voucherNoticePath(id, "alice", "POSTED"), "alice"); assertThat(response.getStatus()).isEqualTo(200);
+        var detail = json.read(response.getContentAsString(), JsonNode.class);
+        assertThat(detail.path("preparation").isNull()).isTrue(); assertThat(detail.at("/operation/id").asText()).isEqualTo(id.toString());
+        assertThat(detail.path("reversalBound").isBoolean()).isTrue(); assertThat(detail.path("reversalBound").asBoolean()).isFalse();
+    }
+
+    @Test void expiredPostingLeaseNotifiesOriginalParticipantsOnceWithoutResending() {
+        noticeOrganization(); var preparation = enqueue(advance()); RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence);
+        preparationWorker.poll(); assertThat(voucherNoticeRecipients(preparation.input().id())).isEmpty();
+        var claimed = execution.claim("demo", preparation.input().id(), now());
+        assertThat(execution.claim("demo", preparation.input().id(), claimed.leaseUntil())).isNull();
+        var current = operations.find("demo", preparation.input().id()).orElseThrow();
+        assertThat(current.failure()).isEqualTo(VoucherOperation.Failure.LEASE_EXPIRED);
+        assertThat(voucherNoticeRecipients(preparation.input().id())).containsExactlyInAnyOrder("alice", "manager");
+        var query = execution.claim("demo", preparation.input().id(), claimed.leaseUntil().plusSeconds(1));
+        execution.fail(query, VoucherOperation.Failure.CONNECTION, query.updatedAt());
+        assertThat(voucherNoticeRecipients(preparation.input().id())).containsExactlyInAnyOrder("alice", "manager");
+        assertThat(WRITES.get()).isZero();
+    }
+
+    @Test void originalPreparationTargetCannotBeReplacedByLaterSuccessfulPreparationOrAnotherRecipient() throws Exception {
+        noticeOrganization(); var advance = advance(); var first = enqueue(advance); configuration.setEnabled(false); preparationWorker.poll();
+        saveNoticeRound(advance); String path = voucherNoticePath(first.input().id(), "alice", "PREPARATION_UNAVAILABLE");
+        configuration.setEnabled(true); RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence);
+        var second = preparationService.retry("demo", advance.applicationId(), 5, "finance", now()); preparationWorker.poll(); worker.poll();
+        assertThat(operations.find("demo", second.input().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.POSTED);
+        assertThat(voucherNoticeRecipients(second.input().id())).containsExactlyInAnyOrder("alice", "finance");
+        var response = noticeGet(path, "alice"); assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        var detail = json.read(response.getContentAsString(), JsonNode.class);
+        assertThat(detail.path("voucherId").asText()).isEqualTo(first.input().id().toString());
+        assertThat(detail.path("preparation").path("status").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(detail.path("operation").isNull()).isTrue();
+        assertThat(response.getContentAsString()).doesNotContain("synthetic-account", "targetDigest", "100.00", second.input().id().toString(), "actions");
+        for (String user : List.of("manager", "finance", "admin", "bob")) assertThat(noticeGet(path, user).getStatus()).isEqualTo(404);
+        assertThat(noticeGet(path + "?roundNo=1", "alice").getStatus()).isEqualTo(400);
+        String ownManager = voucherNoticePath(first.input().id(), "manager", "PREPARATION_UNAVAILABLE");
+        // 最小提示不赋予财务字段权限，夹具没有给原发起人原轮次明细读取权限。
+        assertThat(noticeGet(ownManager, "manager").getStatus()).isIn(403, 404);
+        String key = "voucher:" + first.input().id() + ":PREPARATION_UNAVAILABLE";
+        jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", key);
+        try { assertThat(noticeGet(path, "alice").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", key); }
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='alice'");
+        try { assertThat(noticeGet(path, "alice").getStatus()).isIn(403, 404); }
+        finally { jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='alice'"); }
+    }
+
+    @Test void voucherPendingAndExplicitRecheckAreQuietWhileNewResultsAndConflictsAreDistinct() {
+        noticeOrganization(); var preparation = enqueue(advance()); RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence); preparationWorker.poll();
+        UUID id = preparation.input().id(); var operation = operations.find("demo", id).orElseThrow();
+        var claimed = execution.claim("demo", id, now()); execution.finish(claimed, new FinanceResult.Success<>(pending(operation.input().command(), 1)), now());
+        assertThat(operations.find("demo", id).orElseThrow().failure()).isNull(); assertThat(voucherNoticeRecipients(id)).isEmpty();
+        tx().executeWithoutResult(status -> execution.query("demo", id, operations.find("demo", id).orElseThrow().version(), now()));
+        assertThat(voucherNoticeRecipients(id)).isEmpty();
+        claimed = execution.claim("demo", id, now()); execution.finish(claimed, new FinanceResult.Success<>(posted(operation.input().command(), 2)), now());
+        var posted = operations.find("demo", id).orElseThrow();
+        tx().executeWithoutResult(status -> { events.publishEvent(new VoucherOperationChanged(operation, posted)); events.publishEvent(new VoucherOperationChanged(operation, posted)); });
+        assertThat(voucherNoticeRecipients(id)).containsExactlyInAnyOrder("alice", "manager");
+        tx().executeWithoutResult(status -> execution.query("demo", id, posted.version(), now()));
+        claimed = execution.claim("demo", id, now()); execution.finish(claimed, new FinanceResult.Success<>(notFound(operation.input().command())), now());
+        assertThat(operations.find("demo", id).orElseThrow().status()).isEqualTo(VoucherOperation.Status.RECONCILING);
+        assertThat(jdbc.queryForList("SELECT DISTINCT event_key FROM notification_inbox WHERE tenant_id='demo' AND event_key LIKE ?", String.class, "voucher:" + id + ":%"))
+                .containsExactlyInAnyOrder("voucher:" + id + ":POSTED", "voucher:" + id + ":RECONCILING");
+    }
+
+    @Test void voucherExpiryNoticeAndOutboundIntentAreAtomicAndInactiveRecipientSuppressesDelivery() {
+        noticeOrganization(); var recipient = new Actor("demo", "manager", java.util.Set.of("USER"));
+        var preference = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, preference.version(), true, false);
+        var preparation = enqueue(advance()); var work = preparationService.claim("demo", preparation.input().id(), now());
+        UUID id = preparation.input().id();
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT voucher_notice_fixture CHECK(application_id<>'" + preparation.input().source().applicationId() + "' OR kind<>'VOUCHER_ATTENTION')");
+            try { assertThatThrownBy(() -> preparationService.claim("demo", id, work.preparation().leaseUntil())).isInstanceOf(DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT voucher_notice_fixture"); }
+            assertThat(reload(preparation)).isEqualTo(work.preparation()); assertThat(voucherNoticeRecipients(id)).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON d.inbox_id=n.id WHERE n.application_id=? AND n.kind='VOUCHER_ATTENTION'", Long.class,
+                    preparation.input().source().applicationId().toString())).isZero();
+            preparationService.claim("demo", id, work.preparation().leaseUntil());
+            assertThat(voucherNoticeRecipients(id)).containsExactlyInAnyOrder("alice", "manager");
+            String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='manager'", String.class,
+                    "voucher:" + id + ":PREPARATION_UNAVAILABLE");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, messageId));
+            jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='manager'");
+            assertThat(notificationDeliveries.claim(deliveryId, now().plusSeconds(30))).isNull();
+            var delivery = notificationStore.get(recipient, deliveryId).orElseThrow();
+            assertThat(delivery.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.RECIPIENT_INACTIVE);
+            assertThat(delivery.progress().attempts()).isZero();
+        } finally {
+            jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='manager'");
+            var current = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    @Test void commandExpiryAndSourceChangeBeforeSendProduceOriginalFactsWithoutErpWrites() {
+        noticeOrganization(); var preparation = enqueue(advance()); RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence); preparationWorker.poll();
+        var operation = operations.find("demo", preparation.input().id()).orElseThrow();
+        execution.claim("demo", preparation.input().id(), operation.input().command().expiresAt());
+        assertThat(voucherNoticeRecipients(preparation.input().id())).containsExactlyInAnyOrder("alice", "manager");
+        assertThat(operations.find("demo", preparation.input().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.EXPIRED);
+        var another = enqueue(advance()); preparationWorker.poll();
+        jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", another.input().source().applicationId().toString());
+        execution.claim("demo", another.input().id(), now());
+        assertThat(voucherNoticeRecipients(another.input().id())).containsExactlyInAnyOrder("alice", "manager");
+        assertThat(operations.find("demo", another.input().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.VOIDED); assertThat(WRITES.get()).isZero();
+    }
+
+    private void saveNoticeRound(AdvanceRequest advance) {
+        var original = applications.findById("demo", advance.applicationId()).orElseThrow();
+        tx().executeWithoutResult(status -> submissionRounds.append(new io.agentflow.approval.model.SubmissionRound("demo", original.id(), 1,
+                "synthetic-" + original.id(), original.definitionVersion(), original.title(), original.payload(), "alice", now().minusSeconds(120),
+                io.agentflow.approval.model.SubmissionRound.Status.APPROVED, null, "manager", now().minusSeconds(119), original.formSchema())));
+    }
+    private String voucherNoticePath(UUID id, String recipient, String fact) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key=?", String.class,
+                recipient, "voucher:" + id + ":" + fact) + "/voucher-target";
+    }
+    private org.springframework.mock.web.MockHttpServletResponse noticeGet(String path, String user) throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn().getResponse();
+    }
+
+    private List<String> voucherNoticeRecipients(UUID id) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key LIKE ? ORDER BY recipient_id",
+                String.class, "voucher:" + id + ":%");
+    }
+
+    private void noticeOrganization() {
+        tx().executeWithoutResult(status -> {
+            if (!organization.initialized("demo")) organization.initialize("demo", "admin", now());
+            var legal = new io.agentflow.organization.OrganizationUnit(entity, io.agentflow.organization.OrganizationUnit.Kind.LEGAL_ENTITY, "合成凭证法人", null, null, true, 1);
+            var department = new io.agentflow.organization.OrganizationUnit(UUID.randomUUID(), io.agentflow.organization.OrganizationUnit.Kind.DEPARTMENT, "合成凭证部门", entity, null, true, 1);
+            var position = new io.agentflow.organization.OrganizationUnit(UUID.randomUUID(), io.agentflow.organization.OrganizationUnit.Kind.POSITION, "合成凭证岗位", entity, null, true, 1);
+            organization.save("demo", legal, 0); organization.save("demo", department, 0); organization.save("demo", position, 0);
+            for (String user : List.of("alice", "manager", "finance")) {
+                var person = organization.personBySubject("demo", user).orElse(null);
+                if (person == null) {
+                    person = new io.agentflow.organization.OrganizationPerson(UUID.randomUUID(), user, user, true, !user.equals("alice"), 1);
+                    organization.save("demo", person, 0);
+                }
+                organization.save("demo", new io.agentflow.organization.OrganizationAppointment(UUID.randomUUID(), person.id(), department.id(), position.id(), true, 1), 0);
+            }
+        });
+    }
 
     @Test void workerPostsOnlyCommittedCommandAndRestoresAllRevisions() {
         var command = command(advance()); var job = register(command);
