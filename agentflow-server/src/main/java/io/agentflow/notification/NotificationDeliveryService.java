@@ -36,6 +36,7 @@ public class NotificationDeliveryService {
     private final DisbursementReturnNotificationAccess disbursementReturns;
     private final RepaymentNotificationAccess repayments;
     private final RepaymentReviewNotificationAccess repaymentReviews;
+    private final ExpensePartialAdjustmentNotificationAccess expensePartialAdjustments;
     private final ExpenseAdjustmentNotificationAccess expenseAdjustments;
     private final BudgetAdjustmentNotificationAccess budgetAdjustments;
     private final SupplierAdjustmentNotificationAccess supplierAdjustments;
@@ -43,7 +44,8 @@ public class NotificationDeliveryService {
     /** 组织、偏好、投递按固定顺序加锁，不能与关闭偏好的顺序反转。 */
     public NotificationDeliveryService(JdbcNotificationDeliveryStore store, NotificationPreferencesRepository preferences,
                                        NotificationDestinations destinations, OrganizationRepository organization, AuthService demo,
-                                       FlowableApprovalProxyNotifications proxies, PaymentNotificationAccess payments, SupplierPaymentNotificationAccess supplierPayments, VoucherNotificationAccess vouchers, BudgetNotificationAccess budgets, ReversalNotificationAccess reversals, ReversalCheckNotificationAccess reversalChecks, ExpenseSettlementNotificationAccess settlements, SupplierSettlementNotificationAccess supplierSettlements, SupplierReturnNotificationAccess supplierReturns, SupplierAdjustmentNotificationAccess supplierAdjustments, ExpenseReturnNotificationAccess expenseReturns, DisbursementReturnNotificationAccess disbursementReturns, RepaymentNotificationAccess repayments, RepaymentReviewNotificationAccess repaymentReviews, BudgetAdjustmentNotificationAccess budgetAdjustments, ExpenseAdjustmentNotificationAccess expenseAdjustments) {
+                                       FlowableApprovalProxyNotifications proxies, PaymentNotificationAccess payments, SupplierPaymentNotificationAccess supplierPayments, VoucherNotificationAccess vouchers, BudgetNotificationAccess budgets, ReversalNotificationAccess reversals, ReversalCheckNotificationAccess reversalChecks, ExpenseSettlementNotificationAccess settlements, SupplierSettlementNotificationAccess supplierSettlements, SupplierReturnNotificationAccess supplierReturns, SupplierAdjustmentNotificationAccess supplierAdjustments, ExpenseReturnNotificationAccess expenseReturns, DisbursementReturnNotificationAccess disbursementReturns, RepaymentNotificationAccess repayments, RepaymentReviewNotificationAccess repaymentReviews, BudgetAdjustmentNotificationAccess budgetAdjustments, ExpenseAdjustmentNotificationAccess expenseAdjustments, ExpensePartialAdjustmentNotificationAccess expensePartialAdjustments) {
+        this.expensePartialAdjustments = expensePartialAdjustments;
         this.expenseAdjustments = expenseAdjustments;
         this.store = store; this.preferences = preferences; this.destinations = destinations; this.organization = organization; this.demo = demo;
         this.proxies = proxies;
@@ -119,7 +121,7 @@ public class NotificationDeliveryService {
         if (!active) return FailureCode.RECIPIENT_INACTIVE;
         // 领取可能等待目录锁，代理期限必须在等待后重新观察；旧消息不随新授权复活。
         return store.ownsMessage(value) && proxies.deliveryAllowed(value, Instant.now()) && payments.deliveryAllowed(value) && supplierPayments.deliveryAllowed(value)
-                && vouchers.deliveryAllowed(value) && budgets.deliveryAllowed(value) && reversals.deliveryAllowed(value) && reversalChecks.deliveryAllowed(value) && settlements.deliveryAllowed(value) && supplierSettlements.deliveryAllowed(value) && supplierReturns.deliveryAllowed(value) && supplierAdjustments.deliveryAllowed(value) && expenseReturns.deliveryAllowed(value) && disbursementReturns.deliveryAllowed(value) && repayments.deliveryAllowed(value) && repaymentReviews.deliveryAllowed(value) && budgetAdjustments.deliveryAllowed(value) && expenseAdjustments.deliveryAllowed(value) ? null : FailureCode.MESSAGE_UNAVAILABLE;
+                && vouchers.deliveryAllowed(value) && budgets.deliveryAllowed(value) && reversals.deliveryAllowed(value) && reversalChecks.deliveryAllowed(value) && settlements.deliveryAllowed(value) && supplierSettlements.deliveryAllowed(value) && supplierReturns.deliveryAllowed(value) && supplierAdjustments.deliveryAllowed(value) && expenseReturns.deliveryAllowed(value) && disbursementReturns.deliveryAllowed(value) && repayments.deliveryAllowed(value) && repaymentReviews.deliveryAllowed(value) && budgetAdjustments.deliveryAllowed(value) && expenseAdjustments.deliveryAllowed(value) && expensePartialAdjustments.deliveryAllowed(value) ? null : FailureCode.MESSAGE_UNAVAILABLE;
     }
     private static FailureCode bindingFailure(NotificationDelivery value, NotificationDestinations.Destination target) {
         if (value.bindingId() == null || value.destinationDigest() == null) return FailureCode.BINDING_NOT_CAPTURED;

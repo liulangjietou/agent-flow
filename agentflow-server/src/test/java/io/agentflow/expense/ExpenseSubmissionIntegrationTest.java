@@ -2282,6 +2282,126 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(send(path(other) + "/resource-adjustment/actions", "finance", wrong).getStatus()).isEqualTo(409);
     }
 
+    @Test void partialNotificationPreparationFailureKeepsExactSide() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.ACCRUAL);
+        var claimed = partialPreparing.claim("demo", preparation.input().id(), adjustmentTime()); partialPreparing.fail(claimed, adjustmentTime());
+        assertPartialNoticeRecipients(initial.id(), "PREPARATION", preparation.input().id(), "PREPARATION_UNAVAILABLE");
+        var path = partialNoticePath(initial.id(), "PREPARATION", preparation.input().id(), "PREPARATION_UNAVAILABLE", "finance");
+        var response = read(path, "finance"); var detail = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(detail.path("preparation").path("side").asText()).isEqualTo("ACCRUAL");
+        assertThat(detail.path("budget").isNull()).isTrue(); assertThat(detail.path("adjustment").isNull()).isTrue();
+        assertThat(detail.toString()).doesNotContain("amount", "targetDigest", "evidenceReference", "authorizedBy", "actions");
+        for (var other : List.of("alice", "cashier", "admin")) assertThat(read(path, other).getStatus()).isEqualTo(404);
+        assertThat(read(path + "?adjustmentId=" + initial.id(), "finance").getStatus()).isEqualTo(400);
+
+    }
+
+    @Test void partialNotificationUnknownSidesRemainIndependent() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); invalidPartialBudget = true; invalidPartialAccrual = true; partialWorker.poll();
+        assertPartialNoticeRecipients(queued.id(), "BUDGET", queued.budget().input().command().id(), "BUDGET_UNKNOWN");
+        assertPartialNoticeRecipients(queued.id(), "ACCRUAL", queued.accrual().input().command().id(), "ACCRUAL_UNKNOWN");
+        var unknown = partialAdjustments.find("demo", queued.id()).orElseThrow(); assertThat(unknown.completion()).isNull();
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpensePartialAdjustmentChanged.Budget(unknown)));
+        assertPartialNoticeRecipients(queued.id(), "BUDGET", queued.budget().input().command().id(), "BUDGET_UNKNOWN");
+        invalidPartialBudget = false; invalidPartialAccrual = false;
+        var budgetQuery = tx().execute(status -> partialFinance.queryBudget("demo", queued.id(), unknown.version(), adjustmentTime()));
+        tx().executeWithoutResult(status -> partialFinance.queryAccrual("demo", queued.id(), budgetQuery.version(), adjustmentTime())); partialWorker.poll();
+        var detail = ok(read(partialNoticePath(queued.id(), "BUDGET", queued.budget().input().command().id(), "BUDGET_UNKNOWN", "alice"), "alice"), 200);
+        assertThat(detail.path("fact").asText()).isEqualTo("BUDGET_UNKNOWN"); assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED");
+        assertThat(detail.path("completion").isNull()).isFalse(); assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+    }
+
+    @Test void partialNotificationResourcesRequireActualCompletion() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); partialAdjustmentExecution.apply(partialCandidate(ready));
+        assertPartialNoticeRecipients(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED");
+        var completed = partialAdjustments.find("demo", ready.id()).orElseThrow();
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpensePartialAdjustmentChanged.Resources(completed)));
+        assertPartialNoticeRecipients(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED");
+        var detail = ok(read(partialNoticePath(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED", "alice"), "alice"), 200);
+        assertThat(detail.path("completion").path("budgetVersion").asLong()).isEqualTo(completed.completion().budgetVersion());
+
+    }
+
+    @Test void partialNotificationRetirementUsesItsActualRecord() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); var report = reports.find("demo", queued.input().basis().reportId()).orElseThrow();
+        ok(send(path(report) + "/partial-adjustments/retirements", "finance", partialRetireInput(report, queued)), 202);
+        assertPartialNoticeRecipients(queued.id(), "ADJUSTMENT", queued.id(), "RETIRED");
+        var detail = ok(read(partialNoticePath(queued.id(), "ADJUSTMENT", queued.id(), "RETIRED", "finance"), "finance"), 200);
+        assertThat(detail.path("retirement").isNull()).isFalse(); assertThat(detail.path("completion").isNull()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE event_key LIKE ?", Integer.class,
+                "expense-partial-adjustment:" + queued.id() + ":%:BUDGET_VOIDED")).isZero();
+
+    }
+
+    @Test void partialNotificationDisputeKeepsNamedDecision() throws Exception {
+        var before = partialDisputed(completedPartialForDispute(), true); var report = reports.find("demo", before.input().basis().reportId()).orElseThrow();
+        ok(send(path(report) + "/partial-adjustments/disputes", "finance", partialDisputeInput(report, before, "BUDGET", "APPLIED")), 202);
+        var current = partialAdjustments.find("demo", before.id()).orElseThrow(); var decision = partialDisputes.recorded(current).get(0);
+        assertPartialNoticeRecipients(current.id(), "DISPUTE", decision.id(), "DISPUTE_RESOLVED");
+        var detail = ok(read(partialNoticePath(current.id(), "DISPUTE", decision.id(), "DISPUTE_RESOLVED", "finance"), "finance"), 200);
+        assertThat(detail.path("resolution").path("operationId").asText()).isEqualTo(decision.operationId().toString());
+        assertThat(detail.path("completion").isNull()).isFalse();
+
+    }
+
+    @Test void partialNotificationRejectsFabricatedSideFactAndTime() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); invalidPartialBudget = true; partialWorker.poll();
+        var op = queued.budget().input().command().id(); var path = partialNoticePath(queued.id(), "BUDGET", op, "BUDGET_UNKNOWN", "finance");
+        var id = path.split("/")[4]; var key = partialNoticeKey(queued.id(), "BUDGET", op, "BUDGET_UNKNOWN");
+        for (var fake : List.of(partialNoticeKey(queued.id(), "ACCRUAL", op, "BUDGET_UNKNOWN"), partialNoticeKey(queued.id(), "BUDGET", UUID.randomUUID(), "BUDGET_UNKNOWN"), partialNoticeKey(queued.id(), "BUDGET", op, "BUDGET_RECONCILING"))) {
+            jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", fake, id);
+            try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", key, id); }
+        }
+        var time = jdbc.queryForObject("SELECT created_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id);
+        jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", java.sql.Timestamp.from(time.toInstant().plusSeconds(1)), id);
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", time, id); }
+        assertThat(read(path, "finance").getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id)).isNull();
+    }
+
+    @Test void partialNotificationBlockedResourcesDoNotEraseSuccess() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); partialAdjustmentExecution.block(partialCandidate(ready), "CONCURRENCY_CONFLICT");
+        assertPartialNoticeRecipients(ready.id(), "ADJUSTMENT", ready.id(), "RESOURCES_BLOCKED");
+        var detail = ok(read(partialNoticePath(ready.id(), "ADJUSTMENT", ready.id(), "RESOURCES_BLOCKED", "finance"), "finance"), 200);
+        assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED"); assertThat(detail.path("accrual").path("status").asText()).isEqualTo("POSTED");
+        assertThat(detail.path("completion").isNull()).isTrue();
+    }
+
+    @Test void partialNotificationRollbackAndRevokedDeliveryRemainAtomic() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); var report = reports.find("demo", ready.input().basis().reportId()).orElseThrow(); var before = resourceVersions(report);
+        var actor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false); var key = partialNoticeKey(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED");
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT partial_notice_failure CHECK (NOT (event_key='" + key + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> partialAdjustmentExecution.apply(partialCandidate(ready))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT partial_notice_failure"); }
+            assertThat(resourceVersions(report)).isEqualTo(before); assertThat(partialAdjustments.find("demo", ready.id())).contains(ready);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE event_key=?", Integer.class, key)).isZero();
+            partialAdjustmentExecution.apply(partialCandidate(ready)); var path = partialNoticePath(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED", "finance");
+            var delivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, path.split("/")[4]));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (var id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(delivery, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(delivery).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (var id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    private String partialNoticeKey(UUID id, String source, UUID sourceId, String fact) {
+        return "expense-partial-adjustment:" + id + ":" + source + ":" + sourceId + ":" + fact;
+    }
+    private void assertPartialNoticeRecipients(UUID id, String source, UUID sourceId, String fact) {
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+                partialNoticeKey(id, source, sourceId, fact))).containsExactlyInAnyOrder("alice", "finance");
+    }
+    private String partialNoticePath(UUID id, String source, UUID sourceId, String fact, String recipient) {
+        var message = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                partialNoticeKey(id, source, sourceId, fact), recipient);
+        return "/api/v1/notifications/" + message + "/expense-partial-adjustment-target";
+    }
+
     @Test void expenseAdjustmentNotificationPreparationFailureKeepsOriginalSource() throws Exception {
         var report = resourceAdjustmentReport();
         var receipt = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report)));
@@ -3930,6 +4050,13 @@ class ExpenseSubmissionIntegrationTest {
         var resolved = partialAdjustments.find("demo", queued.id()).orElseThrow(); assertThat(resolved.completion()).isNull();
         var preparation = registerPartialPreparation(resolved, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
         var authorized = authorizePartialPreparation(resolved, partialPreparations.find("demo", preparation.input().id()).orElseThrow());
+        var originalNotice = ok(read(partialNoticePath(queued.id(), "BUDGET", budgetCommand.id(), "BUDGET_REJECTED", "finance"), "finance"), 200);
+        assertThat(originalNotice.path("sourceId").asText()).isEqualTo(budgetCommand.id().toString());
+        assertThat(originalNotice.path("budget").path("id").asText()).isEqualTo(budgetCommand.id().toString());
+        assertThat(originalNotice.path("adjustment").path("version").asLong()).isEqualTo(resolved.version());
+        var budgetDecision = partialDisputes.recorded(resolved).stream().filter(d -> d.side() == ExpensePartialAdjustmentPreparation.Side.BUDGET).findFirst().orElseThrow();
+        var originalDecision = ok(read(partialNoticePath(queued.id(), "DISPUTE", budgetDecision.id(), "DISPUTE_RESOLVED", "finance"), "finance"), 200);
+        assertThat(originalDecision.path("budget").path("id").asText()).isEqualTo(budgetCommand.id().toString());
         var view = ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("budget");
         assertThat(view.path("id").asText()).isEqualTo(preparation.input().id().toString());
         assertThat(view.path("latestResolution").path("operationId").asText()).isEqualTo(budgetCommand.id().toString());

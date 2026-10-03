@@ -47630,6 +47630,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/expense-partial-adjustment-target": {
+      "get": {
+        "operationId": "expensePartialAdjustmentNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人原报销部分调整消息",
+        "description": "核验原结算、具体单侧准备或命令和实际裁决记录，原消息不换成重新授权的操作编号。预算、挂账、资源完成和安全结束分别展示。拒绝查询参数，响应 no-store；只读不查询外部系统、不执行调整、不标记已读。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -54214,7 +54319,9 @@
               "BUDGET_ADJUSTMENT_RESULT",
               "BUDGET_ADJUSTMENT_ATTENTION",
               "EXPENSE_ADJUSTMENT_RESULT",
-              "EXPENSE_ADJUSTMENT_ATTENTION"
+              "EXPENSE_ADJUSTMENT_ATTENTION",
+              "EXPENSE_PARTIAL_ADJUSTMENT_RESULT",
+              "EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -84289,6 +84396,410 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/ExpenseAdjustmentNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "side",
+          "version",
+          "status",
+          "updatedAt",
+          "issue"
+        ],
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUDGET",
+              "ACCRUAL"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "updatedAt",
+          "failure",
+          "outcome",
+          "conflictingOutcome"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "APPLIED",
+              "POSTED",
+              "REJECTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "POSTED",
+              "FAILED",
+              "PENDING",
+              "NOT_FOUND",
+              null
+            ]
+          },
+          "conflictingOutcome": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "POSTED",
+              "FAILED",
+              "PENDING",
+              "NOT_FOUND",
+              null
+            ]
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationAdjustment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "updatedAt",
+          "resourcesCompleted",
+          "issue"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_FINANCE",
+              "READY",
+              "APPLIED",
+              "REVIEW_REQUIRED",
+              "RETIRED"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resourcesCompleted": {
+            "type": "boolean"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationCompletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "budgetVersion",
+          "accrualVersion",
+          "completedAt"
+        ],
+        "properties": {
+          "budgetVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accrualVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "retiredAt"
+        ],
+        "properties": {
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationResolution": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "side",
+          "operationId",
+          "beforeVersion",
+          "afterVersion",
+          "outcome",
+          "resolvedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUDGET",
+              "ACCRUAL"
+            ]
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "beforeVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "afterVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "REJECTED",
+              "POSTED",
+              "FAILED"
+            ]
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpensePartialAdjustmentNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "adjustmentId",
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "sourceType",
+          "sourceId",
+          "fact",
+          "preparation",
+          "budget",
+          "accrual",
+          "adjustment",
+          "completion",
+          "retirement",
+          "resolution"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "PREPARATION",
+              "BUDGET",
+              "ACCRUAL",
+              "ADJUSTMENT",
+              "DISPUTE"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "PREPARATION_UNAVAILABLE",
+              "PREPARATION_VOIDED",
+              "BUDGET_UNKNOWN",
+              "BUDGET_NOT_FOUND",
+              "BUDGET_REJECTED",
+              "BUDGET_EXPIRED",
+              "BUDGET_VOIDED",
+              "BUDGET_RECONCILING",
+              "BUDGET_APPLIED",
+              "ACCRUAL_UNKNOWN",
+              "ACCRUAL_NOT_FOUND",
+              "ACCRUAL_FAILED",
+              "ACCRUAL_EXPIRED",
+              "ACCRUAL_VOIDED",
+              "ACCRUAL_RECONCILING",
+              "ACCRUAL_POSTED",
+              "RESOURCES_BLOCKED",
+              "COMPLETED",
+              "RETIRED",
+              "DISPUTE_RESOLVED"
+            ]
+          },
+          "preparation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationPreparation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "budget": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accrual": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adjustment": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationAdjustment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationCompletion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolution": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePartialAdjustmentNotificationResolution"
               },
               {
                 "type": "null"

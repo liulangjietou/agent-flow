@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.time.Duration;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpensePartialPreparationService {
+    private final ApplicationEventPublisher events;
     private static final Duration LEASE = Duration.ofSeconds(90);
     private final ExpenseReportRepository reports;
     private final JdbcExpensePartialAdjustmentRepository adjustments;
@@ -30,7 +33,8 @@ public class ExpensePartialPreparationService {
     /** 复用原付款和凭证的领域转换及事件，读取新观察不能绕过原争议规则。 */
     public ExpensePartialPreparationService(ExpenseReportRepository reports, JdbcExpensePartialAdjustmentRepository adjustments,
             JdbcExpensePartialPreparationRepository preparations, ExpensePartialAdjustmentSources sources, PaymentPersonnel personnel,
-            FinanceGatewayConfiguration gateway, PaymentOperationService payments, VoucherOperationService vouchers) {
+            FinanceGatewayConfiguration gateway, PaymentOperationService payments, VoucherOperationService vouchers, ApplicationEventPublisher events) {
+        this.events = events;
         this.reports = reports; this.adjustments = adjustments; this.preparations = preparations; this.sources = sources;
         this.personnel = personnel; this.gateway = gateway; this.payments = payments; this.vouchers = vouchers;
     }
@@ -74,21 +78,21 @@ public class ExpensePartialPreparationService {
     @Transactional
     public ExpensePartialAdjustmentPreparation claim(String tenant, UUID id, Instant at) {
         var value = locked(tenant, id); if (value == null) return null; var now = time(at);
-        if (value.expired(now)) { preparations.update(value.fail("TIMEOUT", now)); return null; }
+        if (value.expired(now)) { save(value.fail("TIMEOUT", now)); return null; }
         if (value.status() != ExpensePartialAdjustmentPreparation.Status.QUEUED) return null;
         ExpenseAdjustmentFundingSource source;
         try { source = requireAvailable(value, now); }
-        catch (DomainException changed) { preparations.update(value.voidSource(now)); return null; }
-        var claimed = value.claim(source, now, LEASE); preparations.update(claimed); return claimed;
+        catch (DomainException changed) { save(value.voidSource(now)); return null; }
+        var claimed = value.claim(source, now, LEASE); save(claimed); return claimed;
     }
 
     /** 先核对领取时原修订仍有效，再通过原状态机接受观察；非法或变化的事实不会生成就绪授权。 */
     @Transactional
     public void finish(ExpensePartialAdjustmentPreparation claimed, ExpensePartialPreparationReader.Snapshot result, Instant at) {
         var current = currentClaim(claimed); if (current == null) return; var now = time(at);
-        if (current.expired(now)) { preparations.update(current.fail("TIMEOUT", now)); return; }
+        if (current.expired(now)) { save(current.fail("TIMEOUT", now)); return; }
         try { requireAvailable(current, now); sources.requireCurrent(current.readSource()); }
-        catch (DomainException changed) { preparations.update(current.voidSource(now)); return; }
+        catch (DomainException changed) { save(current.voidSource(now)); return; }
         var original = current.readSource();
         if (original.payment() != null) acceptPayment(original.payment(), bankResult(result.bank()), now);
         acceptVoucher(original.financial().accrual(), result.accrual(), now);
@@ -103,13 +107,13 @@ public class ExpensePartialPreparationService {
                 next = current.ready(new ExpensePartialAdjustmentPreparation.Evidence(fresh, bank, period.value(), now), now);
             }
         } catch (DomainException changed) { next = current.fail("SOURCE_CHANGED", now); }
-        preparations.update(next);
+        save(next);
     }
 
     /** 读取或保存异常保留原意图与稳定分类，不伪造已取得原件。 */
     @Transactional
     public void fail(ExpensePartialAdjustmentPreparation claimed, Instant at) {
-        var current = currentClaim(claimed); if (current != null) preparations.update(current.fail("INTERNAL_ERROR", time(at)));
+        var current = currentClaim(claimed); if (current != null) save(current.fail("INTERNAL_ERROR", time(at)));
     }
 
     private ExpenseAdjustmentFundingSource requireAvailable(ExpensePartialAdjustmentPreparation value, Instant at) {
@@ -156,4 +160,8 @@ public class ExpensePartialPreparationService {
     }
     private static Instant time(Instant at) { var now = Instant.now(); return (at.isAfter(now) ? at : now).truncatedTo(ChronoUnit.MICROS); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment preparation or its original source changed"); }
+    private void save(ExpensePartialAdjustmentPreparation value) {
+        preparations.update(value); events.publishEvent(new ExpensePartialAdjustmentChanged.Preparation(value));
+    }
+
 }
