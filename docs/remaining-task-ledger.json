@@ -753,7 +753,7 @@
           ]
         }
       ],
-      "observed": "后端及本人费用页面已接通明确来源选择、原检查与解释分离、历史来源核对、人工采纳／放弃及原请求恢复。118 项前端及共享请求范围用例、类型检查、构建和 OpenAPI 通过；后端阶段另有 132 项证据。固定包升级、实际运行、重启、浏览器与 PostgreSQL 补验待完成。",
+      "observed": "后端与本人费用页面、明确来源选择、历史核对、人工采纳／放弃和原请求恢复已接通。前阶段 132 项 Java、118 项前端用例分别通过；固定包 V106→V107 保留 250 张旧表及 109 行，8 次启动、实际断线原键恢复、超时迟到与真实到期、排队后修改阻断通过。365 份实际响应中解释接口 274 份通过契约与页面解析核对；浏览器与 PostgreSQL 新范围补验仍待完成。",
       "references": [
         {
           "path": "docs/precheck-explanation.md",
@@ -765,6 +765,10 @@
         },
         {
           "path": "docs/evidence/precheck-explanation-ui-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/precheck-explanation-runtime-20261003.json",
           "line": 1
         }
       ],
@@ -779,6 +783,11 @@
         "status": "VERIFIED_TASK_OPEN",
         "implementationCommit": "8ecc84fe2549eb5c16e4b804099938bfd35ec4e3",
         "evidence": "docs/evidence/precheck-explanation-ui-20261003.json"
+      },
+      "runtimeStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "implementationCommit": "ad3156555ce9c4b365446567a5e008f52a52269b",
+        "evidence": "docs/evidence/precheck-explanation-runtime-20261003.json"
       }
     },
     {
@@ -3433,8 +3442,9 @@
   },
   "latestProgress": {
     "taskId": "A02",
-    "status": "BACKEND_AND_UI_VERIFIED_RUNTIME_PENDING",
-    "implementationCommit": "8ecc84fe2549eb5c16e4b804099938bfd35ec4e3",
-    "evidence": "docs/evidence/precheck-explanation-ui-20261003.json"
+    "status": "PACKAGED_HTTP_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+    "implementationCommit": "ad3156555ce9c4b365446567a5e008f52a52269b",
+    "evidence": "docs/evidence/precheck-explanation-runtime-20261003.json",
+    "recordedAt": "2026-10-03T13:59:04.865230+00:00"
   }
 }

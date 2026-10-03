@@ -14,7 +14,7 @@ W01 的可信目录、公开设计及授权运行记录接口与页面已经接�
 
 V02 的编号字符校验子问题已修复：草稿预检、保存和发布提前拦截非法流程/节点/连线编号；106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿修正和原在审接续成功。见[修复说明](definition-identifier-syntax.md)。V02 整体验收仍为 OPEN，总数不变。
 
-A02 的本人费用页面已接通明确来源选择、原检查与解释分离、历史来源核对、人工采纳／放弃及原请求恢复；118 项前端及共享请求范围用例、类型检查、构建和 OpenAPI 通过。后端阶段另有 132 项相关用例证据。固定包升级、实际运行、重启、浏览器与 PostgreSQL 补验仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)和[页面阶段证据](evidence/precheck-explanation-ui-20261003.json)。
+A02 后端与本人费用页面已接通，前阶段分别有 132 项 Java、118 项前端用例证据。固定包 V106→V107 保留 250 张旧表及 109 行；8 次启动完成实际断线后的原键恢复、执行中强退不重发、超时迟到与真实到期，以及排队后修改阻断。365 份实际响应中，解释接口 274 份通过契约及页面解析核对。浏览器与 PostgreSQL 补验仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)、[页面阶段证据](evidence/precheck-explanation-ui-20261003.json)和[运行阶段证据](evidence/precheck-explanation-runtime-20261003.json)。
 
 机器可读原表：[remaining-task-ledger.json](remaining-task-ledger.json)。原始规范为相邻 `doc/00` 至 `doc/05`，路径、SHA-256、规范行范围保存在原表；后附历史进度不再重复计为新需求。
 
@@ -36,7 +36,7 @@ A02 的本人费用页面已接通明确来源选择、原检查与解释分离�
 | 编号 | 待完成目标 | 当前事实 | 验收终点 |
 | --- | --- | --- | --- |
 | A01 | OFD 完整票据渲染与应用抽取入口 | 基础图元、模板、字体、静态批注、复合图元和隔离进程已有范围证据；公开抽取仍未支持 OFD。缺其余绘制能力、数字签章与嵌套内容、应用字体配置及全页模型输入。 [invoice-extraction.md:78](invoice-extraction.md#L78)、[InvoiceExtractionSources.java:1](../agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java#L1) | 完整原件逐页对照；签章不能被静默丢弃；受控字体和资源限制经实际安装包验证；公开入口及完整页输入接通。签章图像呈现与签名有效性分别声明。 原依据：05 §4.1、§16；05 §16。 |
-| A02 | 模型预检解释与补正建议 | 后端与本人费用页面已接通；原请求恢复及 118 项前端范围用例通过，后端阶段另有 132 项用例证据。固定包、实际运行与重启等验收待完成。 [ExpensePrecheckEvaluator.java:1](../agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java#L1)、[draft-assist.md:3](draft-assist.md#L3) | 输入绑定当前预检及选定可读事实；解释带来源；过期结果不可采纳；建议不修改规则结论、金额或审批结果。 原依据：05 §16；04 §5。 |
+| A02 | 模型预检解释与补正建议 | 后端、本人费用页面及固定包 HTTP／升级／重启验收通过；浏览器和 PostgreSQL 新范围补验仍待完成。 [ExpensePrecheckEvaluator.java:1](../agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java#L1)、[draft-assist.md:3](draft-assist.md#L3) | 输入绑定当前预检及选定可读事实；解释带来源；过期结果不可采纳；建议不修改规则结论、金额或审批结果。 原依据：05 §16；04 §5。 |
 | A03 | 结构化财务业务填报助手 | 普通草稿入口对 businessReference 非空明确返回 AGENT_DRAFT_UNSUPPORTED。票面金额辅助填报已完成，但没有按行程生成费用行、类别和分摊建议的专用入口。 [DraftAssistInputs.java:28](../agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java#L28)、[expense-invoice-fill-20261002.json:1](evidence/expense-invoice-fill-20261002.json#L1) | 结构化业务建议走各自领域保存服务；报销行程、类别和分摊逐项人工确认；不由模型生成补贴标准、真实余额或批准事实；适用业务边界明确。 原依据：05 §16；04 §5。 |
 | A04 | 费用异常的 Agent 风险提示 | 当前 ApprovalRiskPolicy 只评估本次表单白名单条件。没有费用领域同日多笔、节假日消费、连号等事实的专用模型提示与复核链路。 [ApprovalRiskPolicy.java:48](../agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java#L48)、[agent-execution.md:1](agent-execution.md#L1) | 可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。 原依据：05 §16。 |
 | I01 | 外部组织同步的本地完整用例 | 现有组织目录为可信管理员维护单位、人员、任职和关系；已实现 OIDC，但没有同步批次、来源映射、冲突处置及恢复入口。 [OrganizationController.java:1](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java#L1)、[OrganizationService.java:1](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationService.java#L1) | 以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。 原依据：04 §3.A、§3.G；04 §3.G。 |

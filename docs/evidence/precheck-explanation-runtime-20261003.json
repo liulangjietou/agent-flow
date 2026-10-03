@@ -1,0 +1,776 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A02",
+  "stage": "PACKAGED_UPGRADE_HTTP_RECOVERY",
+  "status": "STAGE_VERIFIED_TASK_OPEN",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T13:58:15.074104+00:00",
+  "implementationCommit": "ad3156555ce9c4b365446567a5e008f52a52269b",
+  "packagedSourceCommit": "8d982328ce75a30976455e131cbfa3d365ac33d3",
+  "branch": "codex/governance-identifier-integration",
+  "verification": {
+    "result": "PASS",
+    "runtime": {
+      "directory": "/fyoung/tmp/agentflow-explanation-runtime-feumi_gr",
+      "synthetic": true,
+      "result": "PASS",
+      "legacyJarSha256": "5c94e4361d12f091e4c4fca2bbb9eaf4099844f18bafe3c2ae4421ccdc0bd4ef",
+      "jarSha256": "7f3b15d973812ab83d50b16bd79cd6d8564bcc7f1e17450ed1d1f47d85d71b45",
+      "upgrade": {
+        "preservedTables": 250,
+        "preservedRows": 109,
+        "changedTables": [
+          "flyway_schema_history"
+        ],
+        "newTables": [
+          "AGENT_PRECHECK_EXPLANATION_RUN",
+          "AGENT_PRECHECK_EXPLANATION_TRANSITION"
+        ]
+      },
+      "queuedRestart": {
+        "runId": "94ebbdb5-428c-4778-a1d3-6a8c991156af",
+        "modelCalls": 1,
+        "originalGenerationReplay": true,
+        "originalReviewReplay": true,
+        "financialStateUnchanged": true,
+        "realLostResponses": 2
+      },
+      "runningRestart": {
+        "runId": "54aa7dc1-d0f1-454a-9acc-38fcf575cbdc",
+        "failure": "MODEL_TIMEOUT",
+        "modelCalls": 1,
+        "resends": 0
+      },
+      "outcomes": [
+        "BLOCKED",
+        "READY",
+        "UNAVAILABLE"
+      ],
+      "forgedEvidenceRejected": true,
+      "supersededCannotAdoptCanDismiss": true,
+      "lateModelResult": {
+        "runId": "4a6a6e90-284e-4b2b-bcd9-281472ee0277",
+        "failure": "MODEL_TIMEOUT",
+        "calls": 1,
+        "suggestion": null,
+        "returnedAfterFailure": true
+      },
+      "realExpiry": {
+        "runId": "caf6e312-f339-4852-af68-8ac18680ae00",
+        "validUntil": "2026-10-03T13:56:19.045798Z",
+        "canAdoptBefore": true,
+        "canAdoptAfter": false,
+        "unavailableCode": "FACTS_EXPIRED",
+        "staleAdoptionHttpStatus": 409,
+        "dismissed": true,
+        "clockModified": false
+      },
+      "queuedRevision": {
+        "runId": "4141bb69-ccf3-41e8-9129-4bd05ca6c0bb",
+        "failure": "INPUT_UNAVAILABLE",
+        "modelCalls": 0,
+        "originalFinancialVersion": 1,
+        "revisedFinancialVersion": 2
+      },
+      "originalHumanApprovalContinued": true,
+      "originalFilePreserved": true,
+      "httpResponses": 365,
+      "boots": 8,
+      "modelRequests": 7,
+      "ownedRuntimeStopped": true
+    },
+    "contracts": {
+      "result": "PASS",
+      "counts": {
+        "responses": 274,
+        "successfulRequests": 12,
+        "input": 9,
+        "page": 1,
+        "detail": 237,
+        "receipt": 12,
+        "lostResponse": 2
+      },
+      "operations": [
+        "generatePrecheckExplanation",
+        "precheckExplanation",
+        "precheckExplanationInput",
+        "precheckExplanations",
+        "reviewPrecheckExplanation"
+      ],
+      "states": [
+        "ADOPTED",
+        "COMPLETED",
+        "DISMISSED",
+        "FAILED",
+        "QUEUED",
+        "RUNNING"
+      ],
+      "outcomes": [
+        "BLOCKED",
+        "READY",
+        "UNAVAILABLE"
+      ],
+      "failures": [
+        "INPUT_UNAVAILABLE",
+        "INVALID_MODEL_OUTPUT",
+        "MODEL_TIMEOUT"
+      ],
+      "compiledSources": [
+        {
+          "path": "agentflow-web/src/precheckExplanation.ts",
+          "sha256": "c0e8ad63c39884ba2a8ac44352204f58152adaa5de035aa7da4c7d0f013c73ab"
+        },
+        {
+          "path": "agentflow-web/src/formSchema.ts",
+          "sha256": "a2114f9959b76d6b6d673d193227cd8802c340f4922c01db2f095eab448b91c4"
+        },
+        {
+          "path": "agentflow-web/src/expenseDraft.ts",
+          "sha256": "7e6e196b6727bf417425db6f1949606e3be8d360112a335af7355d74735a2133"
+        },
+        {
+          "path": "agentflow-web/src/expenses.ts",
+          "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+        },
+        {
+          "path": "agentflow-web/src/invoiceExtraction.ts",
+          "sha256": "e9b83643071e9f4905dc5b6656d03f184835198133c972f5b984a396fe081542"
+        }
+      ],
+      "compiledDirectory": "/fyoung/tmp/agentflow-explanation-contract-I298Ov",
+      "scope": "Actual packaged HTTP response contracts and current frontend parsers; no interactive browser or PostgreSQL verification."
+    },
+    "countMethod": "365 observed HTTP responses include polling. The 274 explanation responses, 12 successful request bodies and 2 dropped-receipt diagnostics are contract observations, not additional unit-test cases. Earlier attempts are not added.",
+    "package": "Maven package -DskipTests passed. No Java or production frontend sources changed during this stage; prior range results remain separate.",
+    "previousStages": [
+      {
+        "evidence": "docs/evidence/precheck-explanation-backend-20261003.json",
+        "sourceHashesVerified": 19,
+        "unchanged": true
+      },
+      {
+        "evidence": "docs/evidence/precheck-explanation-ui-20261003.json",
+        "sourceHashesVerified": 18,
+        "unchanged": true
+      }
+    ],
+    "boundaries": [
+      "All setup and mutations used public APIs; database reads for whole-table hashes only occurred with the owned application stopped.",
+      "Two actual TCP disconnects occurred after the proxy fully received the committed upstream receipt; the first usable client receipt came from replay after process restart.",
+      "The financial source and model are explicitly synthetic loopback services; original free text, account and identity were excluded from model requests.",
+      "Real expiry used a 10-second synthetic financial source validity with no application or system clock modification.",
+      "Queued source revision failed before model transmission. RUNNING recovery waited for the original lease and did not resend.",
+      "The old in-flight human application continued through its original pending task to APPROVED; original attachment bytes remained identical."
+    ],
+    "initialAttempt": {
+      "result": "FIXTURE_FAILURE",
+      "directory": "/fyoung/tmp/agentflow-explanation-runtime-mx67ke54",
+      "reason": "After organization initialization, static user:finance was not a valid organization assignee. Fixture now creates the finance person and appointment and uses its explicit role:ORG_PERSON rule. No product source change.",
+      "ownedRuntimeStopped": true
+    },
+    "browser": "NOT_RUN_EXISTING_ADMIN_POLICY_BLOCKER",
+    "postgres": "NOT_RUN_EXISTING_DOCKER_LAYER_IO_BLOCKER",
+    "enterpriseModelQuality": "NOT_RUN_E08"
+  },
+  "remaining": [
+    "Interactive browser acceptance after the existing administrator policy blocker resolves.",
+    "PostgreSQL verification after the existing Docker image-layer I/O blocker resolves."
+  ],
+  "packages": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/service-task-runtime-view-server.jar",
+      "sha256": "5c94e4361d12f091e4c4fca2bbb9eaf4099844f18bafe3c2ae4421ccdc0bd4ef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/precheck-explanation-runtime-server.jar",
+      "sha256": "7f3b15d973812ab83d50b16bd79cd6d8564bcc7f1e17450ed1d1f47d85d71b45"
+    }
+  ],
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/precheck-explanation-runtime-evidence-snapshot",
+  "artifactCount": 84,
+  "artifacts": [
+    {
+      "path": "compiled-frontend/expenseDraft.js",
+      "size": 15271,
+      "sha256": "a06fa3176cd51a1547d388e12768f677c818e76fc9f8c55eda0d32e4ef6e7831"
+    },
+    {
+      "path": "compiled-frontend/expenses.js",
+      "size": 10168,
+      "sha256": "bfe8c5333187cc2e860d1320b32d266d7c9a1f5b8c96b951ba2010eb33f374f3"
+    },
+    {
+      "path": "compiled-frontend/formSchema.js",
+      "size": 15195,
+      "sha256": "7fdb0fce829ff9877c710a3b1dbb03aef4d93a61b124e7a835cd88c1f0007175"
+    },
+    {
+      "path": "compiled-frontend/invoiceExtraction.js",
+      "size": 14169,
+      "sha256": "bc65b8e18b7bc6a19a33dab55fd059833db86636dd8dc16287ff964ec9ec372e"
+    },
+    {
+      "path": "compiled-frontend/package.json",
+      "size": 18,
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "path": "compiled-frontend/precheckExplanation.js",
+      "size": 11999,
+      "sha256": "f5350d1ddf86ab144dad66db1ee681aabcb4a549214d818007814efb1a5b6b77"
+    },
+    {
+      "path": "precheck-explanation-runtime-contract.log",
+      "size": 1300,
+      "sha256": "fd4ca10ab726deed3e929f46e2f6bd75c64ef9950a1a7357bc375f5cded66562"
+    },
+    {
+      "path": "precheck-explanation-runtime-final.log",
+      "size": 2400,
+      "sha256": "94ab939e67f9981fd600a559d3d85b4a0098a85be291921a3e6e859e73c38d59"
+    },
+    {
+      "path": "precheck-explanation-runtime-first.log",
+      "size": 3339,
+      "sha256": "1ff7f1fc5611ef1db114541eb7ee7733ead6798dd98633da58766a5384949e38"
+    },
+    {
+      "path": "precheck-explanation-runtime-package.log",
+      "size": 13873,
+      "sha256": "b003e5c27b80555b84decf6f283a8d0efa0eace21870beb9b5eea98fefde1c50"
+    },
+    {
+      "path": "precheck-explanation-runtime-second.log",
+      "size": 1659,
+      "sha256": "0be0c7db6262a2c0ee70812531bad73e66d2fff431f1867f04409938f85273b5"
+    },
+    {
+      "path": "run/SnapshotH2.java",
+      "size": 2043,
+      "sha256": "a7b09a69190df4260ba76f337ad6b3a4a13c0473a771d46734b9e12b9bd0bbf8"
+    },
+    {
+      "path": "run/after-upgrade.json",
+      "size": 33739,
+      "sha256": "cfa9646917d73dc25a38cbd6293f1f4d6d4e194a48d40b14b0f427a9edfddef1"
+    },
+    {
+      "path": "run/after-upgrade.tsv",
+      "size": 23363,
+      "sha256": "3e5515aef723bd38254ee56f1e7afeff5070d08721b155cbb0088637342ad176"
+    },
+    {
+      "path": "run/attachments/fd510493-a3c9-4ae8-a42c-dc875b66b258.bin",
+      "size": 57,
+      "sha256": "6521a1ce1860fb201574141691d7832fbdcb162daf80a6ad6a80fc314d66ce26"
+    },
+    {
+      "path": "run/before-upgrade.json",
+      "size": 33454,
+      "sha256": "624c20581caab82a4462fb63277bb1692919e3d6d2d764ef6768647a47a32cd3"
+    },
+    {
+      "path": "run/before-upgrade.tsv",
+      "size": 23160,
+      "sha256": "60dcd29f6b1b36622404b52e54cd9c203fa2655c7d9d79a04e202d644bbcdcea"
+    },
+    {
+      "path": "run/contract-verification.json",
+      "size": 1612,
+      "sha256": "12ad3774df85dd8bba60257d3121763aab1d917d531ff2a28f5a874b6ce13fd8"
+    },
+    {
+      "path": "run/data/agentflow.mv.db",
+      "size": 42786816,
+      "sha256": "263bad1428c28df160816667be457ff5d1b97525ca3362551bd45ce2e1162175"
+    },
+    {
+      "path": "run/finance-requests.json",
+      "size": 32618,
+      "sha256": "bac56e81177c6f907c943aa0ec758314d79f93ebe7701a522a27a8a4fcc173d3"
+    },
+    {
+      "path": "run/h2.jar",
+      "size": 2689845,
+      "sha256": "82a80a2ac06901b03cdb233c663d21c4f49c884bf6d0cf85022729e8db9ab86f"
+    },
+    {
+      "path": "run/http-records.json",
+      "size": 630097,
+      "sha256": "45b1fe1174f09a093e6b42a0ce0b6ab9970ed82f046c969079ec170b7e04c759"
+    },
+    {
+      "path": "run/legacy-fixture.json",
+      "size": 1470,
+      "sha256": "216b07684f86e489639f9bc82d2356ab3e725078318a3c6765ff3b7dded664e8"
+    },
+    {
+      "path": "run/lost-responses.json",
+      "size": 1599,
+      "sha256": "54b7f27c5ab029989b5bbd3345c0832d347b85c470e9a39f4445d7d280dceacd"
+    },
+    {
+      "path": "run/model-requests.json",
+      "size": 16710,
+      "sha256": "ce1ebb50951c0d1a37584e410ca9190dad9da0ca8ccac50ab729aaac5bf10b52"
+    },
+    {
+      "path": "run/owned-process.json",
+      "size": 139,
+      "sha256": "3692ae2b03a49dde198ddbc78b021942aa811e6bd910d59f6518645059b079d2"
+    },
+    {
+      "path": "run/result.json",
+      "size": 1924,
+      "sha256": "420278ef2c3bebc4d6fe1720d91b753889ed83e6e7349c2366db9e7fc98e52aa"
+    },
+    {
+      "path": "run/runtime-1.log",
+      "size": 30550,
+      "sha256": "6c203090eadc4a4cb35a0509c950e0391edafa848f9c3fe7b9cbacaed19d2c64"
+    },
+    {
+      "path": "run/runtime-1.yaml",
+      "size": 3485,
+      "sha256": "03dbf85a8ac1a425f4225eb10ca907e633ef43191dbcdc1ef2206619e122d32c"
+    },
+    {
+      "path": "run/runtime-2.log",
+      "size": 8523,
+      "sha256": "6d3501b1ccec0ad6ecb831b6a601f668ba03d44c1be960cac161b091c7176c0e"
+    },
+    {
+      "path": "run/runtime-2.yaml",
+      "size": 3485,
+      "sha256": "03dbf85a8ac1a425f4225eb10ca907e633ef43191dbcdc1ef2206619e122d32c"
+    },
+    {
+      "path": "run/runtime-3.log",
+      "size": 7607,
+      "sha256": "e714ad8e29643cca363f95cbfc825073c886708b52a43c8631a9e3652cad8ae6"
+    },
+    {
+      "path": "run/runtime-3.yaml",
+      "size": 3485,
+      "sha256": "03dbf85a8ac1a425f4225eb10ca907e633ef43191dbcdc1ef2206619e122d32c"
+    },
+    {
+      "path": "run/runtime-4.log",
+      "size": 7606,
+      "sha256": "4c756b76f4d06d7ab79a7cc96c7d14e1f01c153f4a18a2e99eebb242c15dcbdb"
+    },
+    {
+      "path": "run/runtime-4.yaml",
+      "size": 3484,
+      "sha256": "cb49ca34dd7bfb6a18a46121df9d5fbe952dfdcf3966a67e9f95f884f93a8d1f"
+    },
+    {
+      "path": "run/runtime-5.log",
+      "size": 7606,
+      "sha256": "48d10e98e29466bd72825499ac2b16b14d8c8e8ef9fc3e8a8da874568c0c684f"
+    },
+    {
+      "path": "run/runtime-5.yaml",
+      "size": 3484,
+      "sha256": "cb49ca34dd7bfb6a18a46121df9d5fbe952dfdcf3966a67e9f95f884f93a8d1f"
+    },
+    {
+      "path": "run/runtime-6.log",
+      "size": 8280,
+      "sha256": "d47db315622b9284b14db0a5792106195c6760ab0da95924ba537019066b7b96"
+    },
+    {
+      "path": "run/runtime-6.yaml",
+      "size": 3484,
+      "sha256": "cb49ca34dd7bfb6a18a46121df9d5fbe952dfdcf3966a67e9f95f884f93a8d1f"
+    },
+    {
+      "path": "run/runtime-7.log",
+      "size": 7605,
+      "sha256": "c2ff3c69212cd3e4e61b3f81115f27a761aace8ab12351f55cec7e4801278104"
+    },
+    {
+      "path": "run/runtime-7.yaml",
+      "size": 3485,
+      "sha256": "03dbf85a8ac1a425f4225eb10ca907e633ef43191dbcdc1ef2206619e122d32c"
+    },
+    {
+      "path": "run/runtime-8.log",
+      "size": 8279,
+      "sha256": "26ee29eabb158711efb36ab316b89b46aeea0d673e9dc7d4538313abf05b8bed"
+    },
+    {
+      "path": "run/runtime-8.yaml",
+      "size": 3484,
+      "sha256": "cb49ca34dd7bfb6a18a46121df9d5fbe952dfdcf3966a67e9f95f884f93a8d1f"
+    },
+    {
+      "path": "sources/agentflow-domain/src/main/java/io/agentflow/agent/AssistInput.java",
+      "size": 2326,
+      "sha256": "61d73c824c41605cb1f816d177d5565cbf82e63a9184389f43a6a4417c6aa9d3"
+    },
+    {
+      "path": "sources/agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationInput.java",
+      "size": 3121,
+      "sha256": "8c955c960f36d9011e99538b4a3d212faeadfe9932e93b530950e096d23ecf8c"
+    },
+    {
+      "path": "sources/agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationModelPort.java",
+      "size": 366,
+      "sha256": "2c2dbd9f93bb8481457e2d4427607d6921cb9d3711601e204b84a8ee9f57214a"
+    },
+    {
+      "path": "sources/agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationRun.java",
+      "size": 7597,
+      "sha256": "ea94c22d0ecd4d37aa8f63a4d3cd66e253ff9e6c34464eaa04bde6a0917df6e8"
+    },
+    {
+      "path": "sources/agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationSuggestion.java",
+      "size": 3700,
+      "sha256": "14e1b629acc19e4fea81115e8b1a802942ed44dbf982b2b6db70bfc072c98d2a"
+    },
+    {
+      "path": "sources/agentflow-domain/src/test/java/io/agentflow/agent/PrecheckExplanationRunTest.java",
+      "size": 9497,
+      "sha256": "e85960a88282ecda81be428956a527fa462fdb8855cb9c1194ff45a8acdd40e4"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java",
+      "size": 2310,
+      "sha256": "1169628d72008ff17836cbf21a13da6b1f832f7403102f1d790216f281a7df8c"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/JdbcPrecheckExplanationRepository.java",
+      "size": 9747,
+      "sha256": "8cd1fffc170b37a3201a92be5312a4c18da73249098a111b52d2b299a417a548"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatiblePrecheckExplanationModel.java",
+      "size": 4182,
+      "sha256": "95cc0860ac9fe60cf9173ee4524f668d0cee9b92aa1182daa2e739d7534a1d2f"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationController.java",
+      "size": 6705,
+      "sha256": "11c5511023eb632326758967b9410c8f498b760cfb510063b8b7972b971a956d"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationService.java",
+      "size": 14808,
+      "sha256": "9efd68fd883225351000c610c967cbd1623fa85e44f804e18b6b4eeda0c7ed29"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationSources.java",
+      "size": 4699,
+      "sha256": "a94b67d73b1266fbcb0b3b0d5468c6a92ec897f916cc8a53aafe9a504304a685"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationWorker.java",
+      "size": 2037,
+      "sha256": "20cb0e0bc842e8103c8c00764e2fa298f10d37aa746695fe0b382bc395c85193"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/resources/api/openapi.json",
+      "size": 2358119,
+      "sha256": "ebdc1d32da378d91a9e57fe76803c644d697ca3712c9689260a830777b59d2a2"
+    },
+    {
+      "path": "sources/agentflow-server/src/main/resources/db/migration/V107__precheck_explanation_runs.sql",
+      "size": 2861,
+      "sha256": "e483614bd775552a5bc1bfe92c237d2c285b4b9dad0d4099d6a8c763167a22f4"
+    },
+    {
+      "path": "sources/agentflow-server/src/test/java/io/agentflow/agent/PrecheckExplanationMigrationTest.java",
+      "size": 6978,
+      "sha256": "e8720fdbe937f51b5ab07b178e4f24e921bfc6c7ae16461564ebcb6211c3b437"
+    },
+    {
+      "path": "sources/agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "size": 67554,
+      "sha256": "4292989c96f8a3dd2a309d7d637dcbacd75fdb309ebfe79fdd9a1270212e596b"
+    },
+    {
+      "path": "sources/agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+      "size": 30256,
+      "sha256": "eb3364359155ade0d9e5482d15b0739744fe74bdc7c8dcd58b6ed17b45c75142"
+    },
+    {
+      "path": "sources/agentflow-web/package.json",
+      "size": 618,
+      "sha256": "34864352efdf65949a94ccb9fbf34c0426fe38a0da3a11a8cb1519b1fdec2af4"
+    },
+    {
+      "path": "sources/agentflow-web/scripts/check-openapi.mjs",
+      "size": 35664,
+      "sha256": "926a6ffc20dbd206d89aa7d559b5b9947807098cda9052a03e1ddcf18c917bb9"
+    },
+    {
+      "path": "sources/agentflow-web/scripts/check-precheck-explanation-runtime.mjs",
+      "size": 6329,
+      "sha256": "ddf7d64b4d6d438355f0e4369f456938574a3744e41775350c7ca9f19cb0d869"
+    },
+    {
+      "path": "sources/agentflow-web/scripts/test-requests.mjs",
+      "size": 70701,
+      "sha256": "3826e43d4cb520822166129090e32d2ad7d8bf1d193cda6b04c2ffde44595c2a"
+    },
+    {
+      "path": "sources/agentflow-web/src/App.vue",
+      "size": 135465,
+      "sha256": "a86897628c6b56844cd0a3226306fe53acdfa541af8b4029a69ad2b24dd70009"
+    },
+    {
+      "path": "sources/agentflow-web/src/api.ts",
+      "size": 117336,
+      "sha256": "f3cbb73e241fe2914b56a4220ddce43eecefe309721a2d9c2f8b87a0b3a9fcd6"
+    },
+    {
+      "path": "sources/agentflow-web/src/components/ApplicationRecord.vue",
+      "size": 39618,
+      "sha256": "e7ea2a6575324b3f457731145cce81c0ff1835de30dae6e0d20176ca698be279"
+    },
+    {
+      "path": "sources/agentflow-web/src/components/ExpenseDetail.vue",
+      "size": 18667,
+      "sha256": "7e0c671b812d12666eaaa91e7caa9573917c1cb0b1e14f2aa112c4679203b00b"
+    },
+    {
+      "path": "sources/agentflow-web/src/components/ExpenseEditor.vue",
+      "size": 18645,
+      "sha256": "9a74b49eefc7f7c295f73116c162b391a2e571fbb358f0333496d70a2c06577a"
+    },
+    {
+      "path": "sources/agentflow-web/src/components/ExpenseSubmission.vue",
+      "size": 13765,
+      "sha256": "aeb47d6c9b999a1a0d9a307b3b08db39f07f2e4e16e1f3ff19ac230fb85ee507"
+    },
+    {
+      "path": "sources/agentflow-web/src/components/PrecheckExplanationPanel.vue",
+      "size": 21717,
+      "sha256": "459b0f01506ba5bce2f2bf590b42e74c10eafb233e42870dad10a993e245ab77"
+    },
+    {
+      "path": "sources/agentflow-web/src/precheckExplanation.ts",
+      "size": 14527,
+      "sha256": "c0e8ad63c39884ba2a8ac44352204f58152adaa5de035aa7da4c7d0f013c73ab"
+    },
+    {
+      "path": "sources/agentflow-web/tests/authentication.test.mjs",
+      "size": 6411,
+      "sha256": "2961da449e54cdcf48215400cd46245327532b684d9f1085c8c236899fa49405"
+    },
+    {
+      "path": "sources/agentflow-web/tests/draft-assist.test.mjs",
+      "size": 21041,
+      "sha256": "bd4806c41db3366c082b7cd031762b83b1a3037021ac6d5497d16ab56f4b977a"
+    },
+    {
+      "path": "sources/agentflow-web/tests/expense-actions.test.mjs",
+      "size": 14253,
+      "sha256": "1e85f724ae8a4e8b3945f7307f71052110593e3522fdc75e3fe8c6d077bc026e"
+    },
+    {
+      "path": "sources/agentflow-web/tests/expense-invoice-fill.test.mjs",
+      "size": 16052,
+      "sha256": "d7cbb4a9dfd46caca44514a6b8a4513c8d0cd1dfef3742c9919c77ab56807eac"
+    },
+    {
+      "path": "sources/agentflow-web/tests/expense-origination.test.mjs",
+      "size": 22462,
+      "sha256": "8b681c843c0ed800a5afe04a293da628e02432cbe38919a2ad91363de06a9dbc"
+    },
+    {
+      "path": "sources/agentflow-web/tests/precheck-explanation.test.mjs",
+      "size": 23024,
+      "sha256": "e7c44118a4951024616bcb99e33720e7bccb24415cf9e9cb2e7354d3aacfd764"
+    },
+    {
+      "path": "sources/agentflow-web/tests/requests.test.mjs",
+      "size": 22588,
+      "sha256": "107788511ec45fc65d7c223645b0a3d8f48a32f3c224076b3a5d3d8398f90d5f"
+    },
+    {
+      "path": "sources/scripts/check-precheck-explanation.py",
+      "size": 39360,
+      "sha256": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7"
+    },
+    {
+      "path": "web-dist/assets/index-DPbAvMlE.css",
+      "size": 391143,
+      "sha256": "e50b466409de8dd49792ab73f78028176f8b13e6e2e11a34b271f016b3a7200a"
+    },
+    {
+      "path": "web-dist/assets/index-HIz_zcGT.js",
+      "size": 1738944,
+      "sha256": "8f87fd5096cfe5472d6834c8d1b18a9de4b579f6475a439225356cae57ecd8bb"
+    },
+    {
+      "path": "web-dist/index.html",
+      "size": 420,
+      "sha256": "e6040cbafe45be723284f01f65c8787c577af7bcc369935ce9e2d324172f89c6"
+    }
+  ],
+  "sourceCount": 38,
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/AssistInput.java",
+      "sha256": "61d73c824c41605cb1f816d177d5565cbf82e63a9184389f43a6a4417c6aa9d3"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationInput.java",
+      "sha256": "8c955c960f36d9011e99538b4a3d212faeadfe9932e93b530950e096d23ecf8c"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationModelPort.java",
+      "sha256": "2c2dbd9f93bb8481457e2d4427607d6921cb9d3711601e204b84a8ee9f57214a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationRun.java",
+      "sha256": "ea94c22d0ecd4d37aa8f63a4d3cd66e253ff9e6c34464eaa04bde6a0917df6e8"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationSuggestion.java",
+      "sha256": "14e1b629acc19e4fea81115e8b1a802942ed44dbf982b2b6db70bfc072c98d2a"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/agent/PrecheckExplanationRunTest.java",
+      "sha256": "e85960a88282ecda81be428956a527fa462fdb8855cb9c1194ff45a8acdd40e4"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java",
+      "sha256": "1169628d72008ff17836cbf21a13da6b1f832f7403102f1d790216f281a7df8c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/JdbcPrecheckExplanationRepository.java",
+      "sha256": "8cd1fffc170b37a3201a92be5312a4c18da73249098a111b52d2b299a417a548"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatiblePrecheckExplanationModel.java",
+      "sha256": "95cc0860ac9fe60cf9173ee4524f668d0cee9b92aa1182daa2e739d7534a1d2f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationController.java",
+      "sha256": "11c5511023eb632326758967b9410c8f498b760cfb510063b8b7972b971a956d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationService.java",
+      "sha256": "9efd68fd883225351000c610c967cbd1623fa85e44f804e18b6b4eeda0c7ed29"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationSources.java",
+      "sha256": "a94b67d73b1266fbcb0b3b0d5468c6a92ec897f916cc8a53aafe9a504304a685"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationWorker.java",
+      "sha256": "20cb0e0bc842e8103c8c00764e2fa298f10d37aa746695fe0b382bc395c85193"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "ebdc1d32da378d91a9e57fe76803c644d697ca3712c9689260a830777b59d2a2"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V107__precheck_explanation_runs.sql",
+      "sha256": "e483614bd775552a5bc1bfe92c237d2c285b4b9dad0d4099d6a8c763167a22f4"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/agent/PrecheckExplanationMigrationTest.java",
+      "sha256": "e8720fdbe937f51b5ab07b178e4f24e921bfc6c7ae16461564ebcb6211c3b437"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "4292989c96f8a3dd2a309d7d637dcbacd75fdb309ebfe79fdd9a1270212e596b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+      "sha256": "eb3364359155ade0d9e5482d15b0739744fe74bdc7c8dcd58b6ed17b45c75142"
+    },
+    {
+      "path": "agentflow-web/package.json",
+      "sha256": "34864352efdf65949a94ccb9fbf34c0426fe38a0da3a11a8cb1519b1fdec2af4"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "926a6ffc20dbd206d89aa7d559b5b9947807098cda9052a03e1ddcf18c917bb9"
+    },
+    {
+      "path": "agentflow-web/scripts/check-precheck-explanation-runtime.mjs",
+      "sha256": "ddf7d64b4d6d438355f0e4369f456938574a3744e41775350c7ca9f19cb0d869"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "3826e43d4cb520822166129090e32d2ad7d8bf1d193cda6b04c2ffde44595c2a"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "a86897628c6b56844cd0a3226306fe53acdfa541af8b4029a69ad2b24dd70009"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "f3cbb73e241fe2914b56a4220ddce43eecefe309721a2d9c2f8b87a0b3a9fcd6"
+    },
+    {
+      "path": "agentflow-web/src/components/ApplicationRecord.vue",
+      "sha256": "e7ea2a6575324b3f457731145cce81c0ff1835de30dae6e0d20176ca698be279"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseDetail.vue",
+      "sha256": "7e0c671b812d12666eaaa91e7caa9573917c1cb0b1e14f2aa112c4679203b00b"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseEditor.vue",
+      "sha256": "9a74b49eefc7f7c295f73116c162b391a2e571fbb358f0333496d70a2c06577a"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseSubmission.vue",
+      "sha256": "aeb47d6c9b999a1a0d9a307b3b08db39f07f2e4e16e1f3ff19ac230fb85ee507"
+    },
+    {
+      "path": "agentflow-web/src/components/PrecheckExplanationPanel.vue",
+      "sha256": "459b0f01506ba5bce2f2bf590b42e74c10eafb233e42870dad10a993e245ab77"
+    },
+    {
+      "path": "agentflow-web/src/precheckExplanation.ts",
+      "sha256": "c0e8ad63c39884ba2a8ac44352204f58152adaa5de035aa7da4c7d0f013c73ab"
+    },
+    {
+      "path": "agentflow-web/tests/authentication.test.mjs",
+      "sha256": "2961da449e54cdcf48215400cd46245327532b684d9f1085c8c236899fa49405"
+    },
+    {
+      "path": "agentflow-web/tests/draft-assist.test.mjs",
+      "sha256": "bd4806c41db3366c082b7cd031762b83b1a3037021ac6d5497d16ab56f4b977a"
+    },
+    {
+      "path": "agentflow-web/tests/expense-actions.test.mjs",
+      "sha256": "1e85f724ae8a4e8b3945f7307f71052110593e3522fdc75e3fe8c6d077bc026e"
+    },
+    {
+      "path": "agentflow-web/tests/expense-invoice-fill.test.mjs",
+      "sha256": "d7cbb4a9dfd46caca44514a6b8a4513c8d0cd1dfef3742c9919c77ab56807eac"
+    },
+    {
+      "path": "agentflow-web/tests/expense-origination.test.mjs",
+      "sha256": "8b681c843c0ed800a5afe04a293da628e02432cbe38919a2ad91363de06a9dbc"
+    },
+    {
+      "path": "agentflow-web/tests/precheck-explanation.test.mjs",
+      "sha256": "e7c44118a4951024616bcb99e33720e7bccb24415cf9e9cb2e7354d3aacfd764"
+    },
+    {
+      "path": "agentflow-web/tests/requests.test.mjs",
+      "sha256": "107788511ec45fc65d7c223645b0a3d8f48a32f3c224076b3a5d3d8398f90d5f"
+    },
+    {
+      "path": "scripts/check-precheck-explanation.py",
+      "sha256": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7"
+    }
+  ],
+  "counting": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false,
+    "completionPercentage": null
+  }
+}
