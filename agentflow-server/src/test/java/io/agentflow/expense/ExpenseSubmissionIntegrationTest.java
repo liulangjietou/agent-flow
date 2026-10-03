@@ -4806,7 +4806,10 @@ class ExpenseSubmissionIntegrationTest {
         var raw = json.read(json.write(prechecks.find("demo", checked).orElseThrow()), com.fasterxml.jackson.databind.node.ObjectNode.class);
         Instant expires = prechecks.find("demo", checked).orElseThrow().completedAt().plusMillis(1);
         ((com.fasterxml.jackson.databind.node.ObjectNode) raw.path("result").path("evidence")).put("validUntil", expires.toString());
-        jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", json.write(raw), checked.toString());
+        // 合成缩短权威期限时同步缩短解释期限，保持夹具可还原后再验证业务过期保护。
+        ((com.fasterxml.jackson.databind.node.ObjectNode) raw.path("result").path("observation")).put("validUntil", expires.toString());
+        var expired = json.read(json.write(raw), ExpensePrecheckJob.class);
+        jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", json.write(expired), checked.toString());
         if (!Instant.now().isAfter(expires)) Thread.sleep(2);
         assertCode(read(endpoint, "alice"), "FACTS_EXPIRED");
         checked = precheck(current(report)); advance.requirePaymentReview(1); advances.update(advance, 1, "fixture", "PAYMENT_REVIEW");

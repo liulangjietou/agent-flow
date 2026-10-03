@@ -60,6 +60,37 @@ class ExpensePrecheckJobTest {
         assertThatThrownBy(() -> new FinanceCatalog.LegalEntity(ENTITY, "法人", "CNY", false, "v1", null)).isInstanceOf(DomainException.class);
     }
 
+    @Test
+    void explanationObservationCannotChangeTheRuleOutcomeOrExtendAuthorityValidity() {
+        var input = input(); var evidence = evidence(input, NOW.plusSeconds(60));
+        var observation = new ExpensePrecheckObservation(NOW, NOW.plusSeconds(60), null, "b".repeat(64));
+        var ready = new Result(evidence, List.of()).observed(observation);
+        assertThat(ready.status()).isEqualTo(Status.READY); assertThat(ready.evidence()).isSameAs(evidence);
+        var blocked = new Result(null, List.of(new Finding(Stage.BUDGET, null, Nature.REJECTED, "BUDGET_INSUFFICIENT")));
+        assertThat(blocked.observed(observation).status()).isEqualTo(Status.BLOCKED);
+        assertThat(blocked.observed(observation).findings()).isEqualTo(blocked.findings());
+        assertThatThrownBy(() -> ready.observed(new ExpensePrecheckObservation(NOW, NOW.plusSeconds(61), null, "b".repeat(64))))
+                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new ExpensePrecheckObservation(NOW, NOW.plusSeconds(301), null, "b".repeat(64)))
+                .isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> new ExpensePrecheckObservation(NOW, NOW.plusSeconds(60), null, "bad-digest"))
+                .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    void explanationObservationMustComeFromThisExecutionAndHasAnExclusiveExpiry() {
+        var observation = new ExpensePrecheckObservation(NOW, NOW.plusSeconds(60), null, "b".repeat(64));
+        assertThat(observation.currentAt(NOW.minusNanos(1))).isFalse();
+        assertThat(observation.currentAt(NOW)).isTrue();
+        assertThat(observation.currentAt(NOW.plusSeconds(60))).isFalse();
+        var running = ExpensePrecheckJob.queue(input(), NOW).start(NOW.plusSeconds(1), NOW.plusSeconds(30));
+        var blocked = Result.unavailable(Stage.SYSTEM, "TIMEOUT");
+        assertThatThrownBy(() -> running.finish(blocked.observed(observation), NOW.plusSeconds(5))).isInstanceOf(DomainException.class);
+        var future = new ExpensePrecheckObservation(NOW.plusSeconds(6), NOW.plusSeconds(60), null, "b".repeat(64));
+        assertThatThrownBy(() -> running.finish(blocked.observed(future), NOW.plusSeconds(5))).isInstanceOf(DomainException.class);
+        assertThat(running.finish(blocked, NOW.plusSeconds(5)).result().observation()).isNull();
+    }
+
     private Input input() {
         return new Input(UUID.randomUUID(), "tenant", UUID.randomUUID(), UUID.randomUUID(), "alice", 1, 1, 1, 1,
                 new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, ENTITY, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位"), DATE, "a".repeat(64));

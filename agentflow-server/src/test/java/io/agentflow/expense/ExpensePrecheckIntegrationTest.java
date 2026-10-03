@@ -143,6 +143,131 @@ class ExpensePrecheckIntegrationTest {
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
     @Test
+    void blockedResultRetainsExplanationFreshnessWithoutAReadyPreview() throws Exception {
+        var report = fixture(false).report();
+        RESPONDER.set((operation, request) -> operation.equals("budget-precheck") ? rejected(request, "BUDGET_INSUFFICIENT") : normal(operation, request));
+        UUID id = enqueue(report); worker.poll();
+        var checked = job(id);
+        assertThat(checked.status()).isEqualTo(Status.BLOCKED);
+        assertThat(checked.result().evidence()).isNull();
+        var observation = json.read(json.write(checked), JsonNode.class).at("/result/observation");
+        assertThat(observation.isObject()).as("Blocked findings need their own explanation freshness evidence").isTrue();
+        assertThat(observation.path("dependencyDigest").asText()).matches("[a-f0-9]{64}");
+        assertThat(Instant.parse(observation.path("observedAt").asText())).isBeforeOrEqualTo(checked.completedAt());
+        assertThat(Instant.parse(observation.path("validUntil").asText())).isAfter(checked.completedAt());
+        assertThat(execution.explanationFailure(checked, report, Instant.now())).isNull();
+        assertThat(execution.readyFailure(checked, report, Instant.now())).isEqualTo("PRECHECK_NOT_READY");
+        assertThat(new JdbcExpensePrecheckRepository(jdbc, json).find("demo", id)).contains(checked);
+        assertThat(tree(read(report, "/prechecks/" + id, "alice")).toString()).doesNotContain("observation", "dependencyDigest");
+        assertThat(reports.find("demo", report.id()).orElseThrow().state()).isEqualTo(report.state());
+        assertThat(execution.explanationFailure(checked, report, checked.result().observation().validUntil())).isEqualTo("FACTS_EXPIRED");
+    }
+
+    @Test
+    void blockedExplanationBindsThePolicyObservedBeforeExternalEvaluation() throws Exception {
+        try {
+            publishManagedPolicy();
+            RESPONDER.set((operation, request) -> operation.equals("expense-policy") ? managedAssessment(request)
+                    : operation.equals("budget-precheck") ? rejected(request, "BUDGET_INSUFFICIENT") : normal(operation, request));
+            var report = fixture(false).report(); UUID id = enqueue(report);
+            var claimed = execution.claim("demo", id, Instant.now()); var evaluated = evaluator.evaluate(claimed);
+            assertThat(evaluated.status()).isEqualTo(Status.BLOCKED);
+            var observed = evaluated.observation(); assertThat(observed.policySelection().policyVersion()).isEqualTo(1);
+            var previous = expenseConfiguration.draft("demo", "managed");
+            expenseConfiguration.saveDraft(admin, "managed", 1, new ExpensePolicyDefinition("新制度", previous.definition().rules()), "更新合成制度");
+            expenseConfiguration.publish(admin, "managed", 2, 1, 1, "发布合成制度");
+            execution.finish(claimed, evaluated, Instant.now());
+            var checked = job(id);
+            assertThat(checked.result().observation()).isEqualTo(observed);
+            assertThat(checked.status()).isEqualTo(Status.BLOCKED);
+            assertThat(execution.explanationFailure(checked, report, Instant.now())).isEqualTo("POLICY_CONFIGURATION_CHANGED");
+        } finally { clearExpenseConfiguration(); }
+    }
+
+    @Test
+    void newPrecheckOrDraftRevisionInvalidatesBlockedExplanation() throws Exception {
+        var report = fixture(false).report();
+        RESPONDER.set((operation, request) -> operation.equals("budget-precheck") ? rejected(request, "BUDGET_INSUFFICIENT") : normal(operation, request));
+        UUID first = enqueue(report); worker.poll(); var checked = job(first);
+        UUID second = enqueue(report);
+        assertThat(execution.explanationFailure(checked, report, Instant.now())).isEqualTo("PRECHECK_SUPERSEDED");
+        assertThat(execution.explanationFailure(job(second), report, Instant.now())).isEqualTo("PRECHECK_NOT_FINISHED");
+        worker.poll(); var latest = job(second);
+        assertThat(execution.explanationFailure(latest, report, Instant.now())).isNull();
+        report.revise(1, report.content()); reports.update(report, 1, "alice", "FIXTURE_REVISE");
+        assertThat(execution.explanationFailure(latest, report, Instant.now())).isEqualTo("CONTEXT_CHANGED");
+    }
+
+    @Test
+    void invoiceRetryInvalidatesBlockedExplanationEvenIfItFailsWithoutChangingInvoiceVersion() throws Exception {
+        var fixture = fixture(true); var report = fixture.report();
+        RESPONDER.set((operation, request) -> operation.equals("budget-precheck") ? rejected(request, "BUDGET_INSUFFICIENT") : normal(operation, request));
+        UUID id = enqueue(report); worker.poll(); var checked = job(id);
+        assertThat(checked.status()).isEqualTo(Status.BLOCKED);
+        long version = invoices.find("demo", fixture.invoice()).orElseThrow().version();
+        actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
+        UUID retry;
+        try { retry = verification.queue(fixture.invoice(), new InvoiceVerificationService.QueueInput(version, entity, target())).id(); }
+        finally { actors.clear(); }
+        assertThat(execution.explanationFailure(checked, report, Instant.now())).isEqualTo("RESOURCES_CHANGED");
+        var claimed = verification.claim("demo", retry, Instant.now()); verification.fail(claimed, InvoiceVerificationJob.Failure.TIMEOUT, Instant.now());
+        assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().version()).isEqualTo(version);
+        assertThat(execution.explanationFailure(checked, report, Instant.now())).isEqualTo("RESOURCES_CHANGED");
+        UUID next = enqueue(report); worker.poll(); var nextCheck = job(next);
+        assertThat(nextCheck.result().findings().get(0).code()).isEqualTo("INVOICE_VERIFICATION_REQUIRED");
+        assertThat(execution.explanationFailure(nextCheck, report, Instant.now())).isNull();
+    }
+
+    @Test
+    void canonicalOccupationChangesInvalidateExplanationWithoutTouchingTheSelectedInvoice() throws Exception {
+        var first = fixture(true); UUID id = enqueue(first.report());
+        RESPONDER.set((operation, request) -> operation.equals("budget-precheck") ? rejected(request, "BUDGET_INSUFFICIENT") : normal(operation, request));
+        worker.poll(); var checked = job(id); var source = invoices.find("demo", first.invoice()).orElseThrow().state();
+        assertThat(execution.explanationFailure(checked, first.report(), Instant.now())).isNull();
+        var duplicate = fixture(true); var invoice = invoices.find("demo", duplicate.invoice()).orElseThrow();
+        invoice.occupy(invoice.version(), new ExpenseUse(duplicate.report().id(), 1, 1), "alice", entity, Instant.now());
+        invoices.update(invoice, 2, "alice", "FIXTURE_OCCUPY");
+        assertThat(invoices.find("demo", first.invoice()).orElseThrow().state()).isEqualTo(source);
+        assertThat(execution.explanationFailure(checked, first.report(), Instant.now())).isEqualTo("RESOURCES_CHANGED");
+    }
+
+    @Test
+    void blockedExplanationExpiresWithTheEarliestReadAuthorityFact() throws Exception {
+        var report = fixture(false).report(); var deadline = new AtomicReference<Instant>();
+        RESPONDER.set((operation, request) -> {
+            if (operation.equals("budget-precheck")) return rejected(request, "BUDGET_INSUFFICIENT");
+            var response = json.read(normal(operation, request), JsonNode.class);
+            if (operation.equals("expense-policy")) {
+                deadline.set(Instant.now().plusSeconds(40));
+                ((com.fasterxml.jackson.databind.node.ObjectNode) response.path("data")).put("validUntil", deadline.get().toString());
+            }
+            return response.toString();
+        });
+        UUID id = enqueue(report); worker.poll(); var checked = job(id);
+        assertThat(checked.status()).isEqualTo(Status.BLOCKED);
+        assertThat(checked.result().observation().validUntil()).isEqualTo(deadline.get());
+        assertThat(execution.explanationFailure(checked, report, deadline.get().minusNanos(1))).isNull();
+        assertThat(execution.explanationFailure(checked, report, deadline.get())).isEqualTo("FACTS_EXPIRED");
+    }
+
+    @Test
+    void historicalResultsStayReadableWithoutInventingExplanationFreshness() throws Exception {
+        var report = fixture(false).report();
+        RESPONDER.set((operation, request) -> operation.equals("budget-precheck") ? rejected(request, "BUDGET_INSUFFICIENT") : normal(operation, request));
+        UUID id = enqueue(report); worker.poll();
+        var old = json.read(json.write(job(id)), JsonNode.class);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) old.path("result")).remove("observation");
+        String oldJson = old.toString();
+        jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", oldJson, id.toString());
+        jdbc.update("UPDATE expense_precheck_revision SET state_json=? WHERE tenant_id='demo' AND job_id=? AND version=3", oldJson, id.toString());
+        var retained = job(id); assertThat(retained.result().observation()).isNull();
+        assertThat(execution.explanationFailure(retained, report, Instant.now())).isEqualTo("PRECHECK_EXPLANATION_REFRESH_REQUIRED");
+        assertThat(read(report, "/prechecks/" + id, "alice").getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT state_json FROM expense_precheck_job WHERE tenant_id='demo' AND id=?", String.class, id.toString())).isEqualTo(oldJson);
+        assertThat(count("budget-precheck")).isEqualTo(1);
+    }
+
+    @Test
     void publishingManagedPolicyInvalidatesAnUnexpiredLegacyPrecheck() throws Exception {
         var report = fixture(false).report(); UUID checked = enqueue(report); worker.poll();
         assertThat(job(checked).status()).isEqualTo(Status.READY);
