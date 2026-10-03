@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import { ExpenseDetailQuery, budgetIssues, expenseTypes, moneyLabel, reductionReasons } from '../expenses'
+import { ExpenseDetailQuery, budgetIssues, expenseTypes, moneyLabel, policyExceptionLabels, reductionReasons } from '../expenses'
 import ExpenseActions from './ExpenseActions.vue'
 import ExpenseEditor from './ExpenseEditor.vue'
 import VoucherStatus from './VoucherStatus.vue'
@@ -66,7 +66,13 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
           <p v-if="line.priorRequest">事前申请 {{ line.priorRequest.requestId }} · 第 {{ line.priorRequest.lineNo }} 行</p>
           <h5>申报时成本分摊</h5><ul><li v-for="allocation in line.allocations" :key="`${allocation.costCenter}:${allocation.projectCode}`">{{ allocation.costCenter }}<template v-if="allocation.projectCode"> / {{ allocation.projectCode }}</template> · {{ moneyLabel(allocation.amount) }}</li></ul>
           <template v-if="financial"><h5>当前核定分摊</h5><ul><li v-for="allocation in financial.approvedLines.find(value => value.lineNo === line.lineNo)!.allocations" :key="`${allocation.costCenter}:${allocation.projectCode}`">{{ allocation.costCenter }}<template v-if="allocation.projectCode"> / {{ allocation.projectCode }}</template> · {{ moneyLabel(allocation.amount) }}</li></ul>
-            <template v-for="frozen in financial.originalLines.filter(value => value.original.lineNo === line.lineNo)" :key="frozen.original.lineNo"><p>提交时折算 {{ moneyLabel(frozen.claimedBase) }} · 可抵扣 {{ moneyLabel(frozen.deductibleTaxBase) }}</p><p>汇率 {{ frozen.assessment.exchangeRate.fromCurrency }} → {{ frozen.assessment.exchangeRate.toCurrency }}：{{ frozen.assessment.exchangeRate.rate }} · {{ frozen.assessment.exchangeRate.rateDate }} · {{ frozen.assessment.exchangeRate.source }}</p><p>制度版本 {{ frozen.assessment.policy.version }} · 额度 {{ moneyLabel(frozen.assessment.policy.allowedGross) }} · {{ frozen.assessment.policy.decision === 'WITHIN_LIMIT' ? '标准内' : frozen.assessment.policy.decision === 'REQUIRES_EXCEPTION' ? '需例外审批' : '不予报销' }}</p></template>
+            <template v-for="frozen in financial.originalLines.filter(value => value.original.lineNo === line.lineNo)" :key="frozen.original.lineNo">
+              <p>提交时折算 {{ moneyLabel(frozen.claimedBase) }} · 可抵扣 {{ moneyLabel(frozen.deductibleTaxBase) }}</p>
+              <p>汇率 {{ frozen.assessment.exchangeRate.fromCurrency }} → {{ frozen.assessment.exchangeRate.toCurrency }}：{{ frozen.assessment.exchangeRate.rate }} · {{ frozen.assessment.exchangeRate.rateDate }} · {{ frozen.assessment.exchangeRate.source }}</p>
+              <p>制度版本 {{ frozen.assessment.policy.version }} · 额度 {{ moneyLabel(frozen.assessment.policy.allowedGross) }} · {{ frozen.assessment.policy.decision === 'WITHIN_LIMIT' ? '标准内' : frozen.assessment.policy.decision === 'REQUIRES_EXCEPTION' ? '需例外审批' : '不予报销' }}</p>
+              <p v-if="frozen.assessment.policy.exceptionReasons?.length">例外原因：{{ frozen.assessment.policy.exceptionReasons.map(reason => policyExceptionLabels[reason] ?? '需核对的制度例外').join('、') }}</p>
+              <p v-if="frozen.assessment.policy.managedPolicy">本轮固定类别修订 {{ frozen.assessment.policy.managedPolicy.selection.categoryRevision }} · 制度生效修订 {{ frozen.assessment.policy.managedPolicy.selection.activeRevision }} · 规则 {{ frozen.assessment.policy.managedPolicy.ruleKey }}</p>
+            </template>
           </template>
         </div></details>
       </article>

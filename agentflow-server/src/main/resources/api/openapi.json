@@ -78,6 +78,10 @@
     {
       "name": "事件契约",
       "description": "已发布的白名单事件契约，固定来源和事件类型，启停精确版本并追加具名原因。来源凭据及事件执行单独接入。"
+    },
+    {
+      "name": "费用配置",
+      "description": "费用类别、制度草稿、不可变发布及生效历史"
     }
   ],
   "paths": {
@@ -40818,6 +40822,1649 @@
           }
         ]
       }
+    },
+    "/api/v1/admin/expense-categories": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expenseCategories",
+        "summary": "读取费用类别目录",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCategoryCatalog"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": true,
+        "operationId": "reviseExpenseCategories",
+        "summary": "保存费用类别修订",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。写入必须有原幂等键、旧版本及原因；保存历史与成功回执同事务，结果未知时逐字节恢复原请求。 类别只能停用，不能删除历史代码。启用平台制度后修订会使旧预检失效；员工目录取当前配置与外部授权的交集。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCategoryCatalog"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseCategoryUpdate"
+              },
+              "example": {
+                "expectedVersion": 0,
+                "categories": [
+                  {
+                    "code": "hotel",
+                    "name": "合成住宿类别",
+                    "units": [
+                      "NIGHT"
+                    ],
+                    "active": true
+                  }
+                ],
+                "comment": "合成目录首次配置"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/expense-categories/versions": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expenseCategoryVersions",
+        "summary": "读取类别修订历史",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCategoryPage"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/expense-categories/versions/{version}": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expenseCategoryVersion",
+        "summary": "读取某一类别修订",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCategoryRevision"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/expense-policies": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expensePolicyDrafts",
+        "summary": "读取费用制度草稿目录",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyDraftPage"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "afterKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/expense-policies/current": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "currentExpensePolicy",
+        "summary": "读取当前生效费用制度",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseConfigurationCurrent"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/expense-policies/activations": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expensePolicyActivations",
+        "summary": "读取制度生效历史",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyActivationPage"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/expense-policies/{key}/draft": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expensePolicyDraft",
+        "summary": "读取费用制度草稿",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyDraft"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          }
+        ]
+      },
+      "put": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": true,
+        "operationId": "saveExpensePolicyDraft",
+        "summary": "保存费用制度草稿",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。写入必须有原幂等键、旧版本及原因；保存历史与成功回执同事务，结果未知时逐字节恢复原请求。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyDraft"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePolicyDraftSave"
+              },
+              "example": {
+                "expectedRevision": 0,
+                "definition": {
+                  "name": "仅用于本地协议验收的合成制度",
+                  "rules": [
+                    {
+                      "key": "hotel-rule",
+                      "name": "合成住宿规则",
+                      "match": {
+                        "legalEntityIds": [],
+                        "categoryCodes": [
+                          "hotel"
+                        ],
+                        "cityTiers": [],
+                        "employeeGrades": [],
+                        "fromDate": null,
+                        "throughDate": null,
+                        "currency": "CNY"
+                      },
+                      "constraints": {
+                        "effect": "ALLOW",
+                        "unitPriceLimit": {
+                          "value": "123.45",
+                          "currency": "CNY"
+                        },
+                        "limitUnit": "NIGHT",
+                        "invoiceMaxAgeDays": null,
+                        "invoiceAgeAction": null,
+                        "allowedServiceLevels": [],
+                        "priorRequestRequired": false
+                      }
+                    }
+                  ]
+                },
+                "comment": "只保存草稿，不改变当前制度"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/expense-policies/{key}/draft/versions/{version}": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expensePolicyDraftRevision",
+        "summary": "读取制度草稿内容修订",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyDraftRevision"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/expense-policies/{key}/publish": {
+      "post": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": true,
+        "operationId": "publishExpensePolicy",
+        "summary": "发布并切换生效费用制度",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。写入必须有原幂等键、旧版本及原因；保存历史与成功回执同事务，结果未知时逐字节恢复原请求。 当前租户仅有一个完整生效制度集；发布另一业务键也必须核对 expectedActiveRevision。发布后旧 READY 不可提交，远端不返回对应 managedPolicy 回执时预检不可用。未发布前保持既有企业制度源。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseConfigurationCurrent"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePolicyPublish"
+              },
+              "example": {
+                "expectedDraftRevision": 1,
+                "expectedCategoryRevision": 1,
+                "expectedActiveRevision": 0,
+                "comment": "已核对三个版本，发布合成制度"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/expense-policies/{key}/versions": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expensePolicyVersions",
+        "summary": "读取制度发布历史",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePolicyVersionPage"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          },
+          {
+            "name": "beforeVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/expense-policies/{key}/versions/{version}": {
+      "get": {
+        "x-access": "FINANCE_CONFIG_ADMIN",
+        "x-idempotency": false,
+        "operationId": "expensePolicyVersion",
+        "summary": "读取不可变制度发布物",
+        "tags": [
+          "费用配置"
+        ],
+        "description": "仅明确授予 FINANCE_CONFIG_ADMIN 的当前租户操作者；ADMIN/FINANCE 不隐含该权限。拒绝未知或重复查询参数。只读响应禁止缓存。",
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedExpensePolicy"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置历史损坏时停止使用，不能退回旧制度继续放行。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -51288,6 +52935,30 @@
           "evidenceReference": {
             "type": "string",
             "maxLength": 128
+          },
+          "exceptionReasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "AMOUNT",
+                "SERVICE_LEVEL",
+                "INVOICE_AGE"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "managedPolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePolicyReceipt"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -51299,7 +52970,8 @@
           "taxRuleReference",
           "evidenceReference"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "制度及税务判定。非金额例外明确列出 SERVICE_LEVEL/INVOICE_AGE，不伪造低额度；启用平台制度时 managedPolicy 回执必须匹配平台选择的版本、规则正文摘要和命中规则。历史外部制度可无该回执。"
       },
       "ExpenseAssessment": {
         "type": "object",
@@ -71242,6 +72914,957 @@
           "paidOn",
           "capacity",
           "amount"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCategoryDefinition": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ITEM",
+                "DAY",
+                "NIGHT",
+                "KILOMETER",
+                "PERSON"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "units",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCategoryCatalog": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseCategoryDefinition"
+            },
+            "minItems": 0,
+            "maxItems": 2000
+          }
+        },
+        "required": [
+          "tenantId",
+          "version",
+          "categories"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCategoryUpdate": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseCategoryDefinition"
+            },
+            "minItems": 0,
+            "maxItems": 2000
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "categories",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCategoryRevision": {
+        "type": "object",
+        "properties": {
+          "catalog": {
+            "$ref": "#/components/schemas/ExpenseCategoryCatalog"
+          },
+          "updatedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "catalog",
+          "updatedBy",
+          "updatedAt",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCategorySummary": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "categoryCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "updatedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "version",
+          "categoryCount",
+          "updatedBy",
+          "updatedAt",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyMatch": {
+        "type": "object",
+        "properties": {
+          "legalEntityIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "categoryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "cityTiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "employeeGrades": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "fromDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "throughDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "legalEntityIds",
+          "categoryCodes",
+          "cityTiers",
+          "employeeGrades"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyConstraints": {
+        "type": "object",
+        "properties": {
+          "effect": {
+            "type": "string",
+            "enum": [
+              "ALLOW",
+              "DENY"
+            ]
+          },
+          "unitPriceLimit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limitUnit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ITEM",
+                  "DAY",
+                  "NIGHT",
+                  "KILOMETER",
+                  "PERSON"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "invoiceMaxAgeDays": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 36600
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "invoiceAgeAction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "REJECT",
+                  "REQUIRE_REASON"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowedServiceLevels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "minItems": 0,
+            "maxItems": 200,
+            "uniqueItems": true
+          },
+          "priorRequestRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "effect",
+          "allowedServiceLevels",
+          "priorRequestRequired"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyRule": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "match": {
+            "$ref": "#/components/schemas/ExpensePolicyMatch"
+          },
+          "constraints": {
+            "$ref": "#/components/schemas/ExpensePolicyConstraints"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "match",
+          "constraints"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyDefinition": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePolicyRule"
+            },
+            "minItems": 0,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "name",
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyDraftSave": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ExpensePolicyDefinition"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "definition",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyPublish": {
+        "type": "object",
+        "properties": {
+          "expectedDraftRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "expectedCategoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "expectedActiveRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "expectedDraftRevision",
+          "expectedCategoryRevision",
+          "expectedActiveRevision",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyDraft": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ExpensePolicyDefinition"
+          },
+          "publishedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "publishedDraftRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "key",
+          "revision",
+          "definition",
+          "publishedVersion",
+          "publishedDraftRevision"
+        ],
+        "additionalProperties": false
+      },
+      "PublishedExpensePolicy": {
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "draftRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "categoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ExpensePolicyDefinition"
+          },
+          "publishedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "policyId",
+          "tenantId",
+          "key",
+          "version",
+          "draftRevision",
+          "categoryRevision",
+          "definition",
+          "publishedBy",
+          "publishedAt",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseConfigurationCurrent": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "$ref": "#/components/schemas/ExpenseCategoryCatalog"
+          },
+          "activeRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "activePolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublishedExpensePolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "categories",
+          "activeRevision",
+          "activePolicy"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyDraftSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "publishedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "publishedDraftRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "updatedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "revision",
+          "publishedVersion",
+          "publishedDraftRevision",
+          "updatedBy",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyVersionSummary": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "draftRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "categoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "publishedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "version",
+          "draftRevision",
+          "categoryRevision",
+          "name",
+          "publishedBy",
+          "publishedAt",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyDraftRevision": {
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ExpensePolicyDefinition"
+          },
+          "updatedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "policyId",
+          "revision",
+          "definition",
+          "updatedBy",
+          "updatedAt",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyActivation": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "policyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "activatedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "revision",
+          "key",
+          "policyId",
+          "policyVersion",
+          "activatedBy",
+          "activatedAt",
+          "comment"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicySelection": {
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "categoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "activeRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "definitionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "policyId",
+          "policyVersion",
+          "categoryRevision",
+          "activeRevision",
+          "definitionDigest"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyReceipt": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "$ref": "#/components/schemas/ExpensePolicySelection"
+          },
+          "ruleKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "factSourceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "selection",
+          "ruleKey",
+          "factSourceReference"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCategoryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseCategorySummary"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "nextBeforeVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextBeforeVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyDraftPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePolicyDraftSummary"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "nextAfterKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextAfterKey"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyVersionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePolicyVersionSummary"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "nextBeforeVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextBeforeVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePolicyActivationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpensePolicyActivation"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "nextBeforeVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextBeforeVersion"
         ],
         "additionalProperties": false
       }

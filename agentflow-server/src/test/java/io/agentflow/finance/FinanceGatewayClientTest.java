@@ -68,7 +68,10 @@ class FinanceGatewayClientTest {
         server.createContext("/finance/", this::handle); server.start();
         config = FinanceGatewayConfigurationTest.configured("http://127.0.0.1:" + server.getAddress().getPort() + "/finance", "tenant-a-test-token");
         config.validate(); client = new FinanceGatewayClient(config, mapper);
-        master = new GatewayFinanceMasterData(client); rates = new GatewayExchangeRates(client);
+        var expenseConfiguration = org.mockito.Mockito.mock(ExpenseConfigurationService.class);
+        org.mockito.Mockito.when(expenseConfiguration.current("tenant-a")).thenReturn(new ExpenseConfigurationService.Current(new ExpenseCategoryCatalog("tenant-a", 0, List.of()), 0, null));
+        master = new GatewayFinanceMasterData(client, new ExpensePolicyConfiguration(expenseConfiguration, org.mockito.Mockito.mock(JdbcExpenseConfigurationRepository.class), json));
+        rates = new GatewayExchangeRates(client);
         policies = new GatewayExpensePolicies(client); invoices = new GatewayInvoiceVerification(client);
         budgets = new GatewayBudgetPrecheck(client);
         answer(catalog("alice", Instant.now().plusSeconds(60)));
@@ -218,6 +221,34 @@ class FinanceGatewayClientTest {
         assertThat(policies.assess("tenant-a", request)).isEqualTo(invalid());
         responder.set(in -> { var body = success(in, good); ((ObjectNode) body.at("/data/policy/assessedGross")).put("value", 100); return json.write(body); });
         assertThat(policies.assess("tenant-a", request)).isEqualTo(invalid());
+    }
+
+    @Test
+    void managedPolicyRequiresMatchingVersionRuleSourceAndPublishedConstraints() {
+        var original = policyRequest();
+        var selection = new ExpensePolicySelection(UUID.randomUUID(), 2, 3, 4, "a".repeat(64));
+        var definition = new ExpensePolicyDefinition("合成制度", List.of(new ExpensePolicyDefinition.Rule("training", "培训规则",
+                new ExpensePolicyDefinition.Match(List.of(ENTITY), List.of("TRAINING"), List.of("tier-1"), List.of("grade-a"), DATE, DATE, "CNY"),
+                new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW, cny("90"), ExpenseLine.Unit.ITEM, null, null, List.of(), true))));
+        var managed = new ManagedExpensePolicy(selection, definition, new ExpenseCategoryCatalog.Category("TRAINING", "培训", List.of(ExpenseLine.Unit.ITEM), true));
+        var request = new ExpensePolicyPort.Request(original.employeeId(), original.legalEntityId(), original.reportType(), original.line(), original.exchangeRate(), original.invoices(), managed);
+        var policy = new ExpensePolicySnapshot(selection.policyId(), 2, cny("100"), cny("90"), ExpensePolicySnapshot.Decision.REQUIRES_EXCEPTION,
+                "tax-v1", "managed-assessment", List.of(ExpensePolicySnapshot.ExceptionReason.AMOUNT), new ExpensePolicyReceipt(selection, "training", "grade-city-source-v1"));
+        var result = new ExpensePolicyPort.Assessment(policy, cny("6"), true, Instant.now().plusSeconds(60));
+        answer(result); assertThat(policies.assess("tenant-a", request).requireValue()).isEqualTo(result);
+        assertThat(received.get().at("/data/managedPolicy/definition/rules/0/match/employeeGrades/0").asText()).isEqualTo("grade-a");
+        for (var mutation : List.<Consumer<ObjectNode>>of(
+                node -> node.remove("managedPolicy"),
+                node -> ((ObjectNode) node.at("/managedPolicy/selection")).put("categoryRevision", 2),
+                node -> ((ObjectNode) node.at("/managedPolicy/selection")).put("activeRevision", 5),
+                node -> ((ObjectNode) node.at("/managedPolicy/selection")).put("definitionDigest", "b".repeat(64)),
+                node -> ((ObjectNode) node.at("/managedPolicy")).put("ruleKey", "missing-rule"))) {
+            responder.set(in -> { var response = success(in, result); mutation.accept((ObjectNode) response.at("/data/policy")); return json.write(response); });
+            assertThat(policies.assess("tenant-a", request)).isEqualTo(invalid());
+        }
+        answer(new ExpensePolicyPort.Assessment(policy, cny("6"), false, result.validUntil()));
+        assertThat(policies.assess("tenant-a", request)).isEqualTo(invalid());
+        answer(result); assertThat(policies.assess("tenant-a", original)).isEqualTo(invalid());
     }
 
     @Test

@@ -15,7 +15,13 @@ import java.util.UUID;
  */
 public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
         BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
-        List<InvoiceReceipt> invoices, Instant validUntil) {
+        List<InvoiceReceipt> invoices, Instant validUntil, ExpensePolicySelection policySelection) {
+    /** 原外部制度证据保持可读取，但启用平台版本后必须重新预检。 */
+    public ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
+            BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
+            List<InvoiceReceipt> invoices, Instant validUntil) {
+        this(catalogVersion, legalEntity, rateDate, budget, preview, resources, invoices, validUntil, null);
+    }
     /** 有效期取全部事实的最早时点；预览不可作为实际提交历史保存。 */
     public ExpensePrecheckEvidence {
         if (org.apache.commons.lang3.StringUtils.isBlank(catalogVersion) || catalogVersion.length() > 128
@@ -25,6 +31,8 @@ public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.Lega
         resources = List.copyOf(resources); invoices = List.copyOf(invoices);
         if (resources.stream().map(value -> value.kind() + ":" + value.id()).distinct().count() != resources.size()
                 || invoices.stream().map(InvoiceReceipt::invoiceId).distinct().count() != invoices.size()) throw invalid();
+        if (preview.originalLines().stream().anyMatch(line -> !Objects.equals(policySelection,
+                line.assessment().policy().managedPolicy() == null ? null : line.assessment().policy().managedPolicy().selection()))) throw invalid();
     }
 
     private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PRECHECK", "Expense precheck evidence is inconsistent"); }

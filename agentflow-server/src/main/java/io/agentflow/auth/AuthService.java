@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
     private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
-            "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "PROCESS_ADMIN", "ADMIN"),
+            "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "FINANCE_CONFIG_ADMIN", "PROCESS_ADMIN", "ADMIN"),
             "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"),
             "cashier", Set.of("EMPLOYEE", "CASHIER"),
             "manager", Set.of("EMPLOYEE", "APPROVER", "MANAGER"),

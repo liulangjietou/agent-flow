@@ -30,6 +30,7 @@ export const precheckStages: Record<string, string> = { INPUT: '填报内容', C
 export const precheckIssues: Record<string, string> = {
   APPLICATION_NOT_EDITABLE: '当前单据不能编辑或提交', EXPENSE_LINES_REQUIRED: '请先保存至少一行费用', FINANCE_GATEWAY_UNAVAILABLE: '财务服务尚未配置',
   PRECHECK_NOT_READY: '检查尚未通过', PRECHECK_SUPERSEDED: '已有更新的检查，请刷新结果', FACTS_EXPIRED: '财务事实已过期，请重新检查',
+  POLICY_CONFIGURATION_CHANGED: '费用制度或类别版本已变化，请重新检查后提交',
   CONTEXT_CHANGED: '单据版本已变化，请重新打开并检查', INITIATOR_CHANGED: '任职已变化，请重新选择并检查', RESOURCES_CHANGED: '原件或资金占用已变化，请重新检查',
   TARGET_CHANGED: '财务服务配置已变化，请刷新后检查', NOT_CONFIGURED: '财务服务尚未配置', TIMEOUT: '服务响应超时，请明确重试检查',
   EXPENSE_LEGAL_ENTITY_MISMATCH: '所选任职与费用法人不一致', EXPENSE_PRECHECK_ACTIVE: '已有检查正在执行，请刷新当前结果',

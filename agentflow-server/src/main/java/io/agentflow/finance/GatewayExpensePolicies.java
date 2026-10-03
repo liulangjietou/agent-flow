@@ -20,6 +20,22 @@ public class GatewayExpensePolicies implements ExpensePolicyPort {
         return client.read(tenantId, FinanceGatewayClient.Operation.EXPENSE_POLICY, request, Assessment.class,
                 value -> value.validUntil().isAfter(Instant.now())
                         && value.policy().assessedGross().equals(request.exchangeRate().convert(request.line().claimedGross()))
-                        && value.deductibleTax().compareTo(request.exchangeRate().convert(request.line().claimedTax())) <= 0);
+                        && value.deductibleTax().compareTo(request.exchangeRate().convert(request.line().claimedTax())) <= 0
+                        && matchesManagedPolicy(request, value));
+    }
+
+    private static boolean matchesManagedPolicy(Request request, Assessment assessment) {
+        var managed = request.managedPolicy(); var receipt = assessment.policy().managedPolicy();
+        if (managed == null) return receipt == null;
+        if (receipt == null || !receipt.selection().equals(managed.selection())) return false;
+        var rule = managed.definition().rules().stream().filter(value -> value.key().equals(receipt.ruleKey())).findFirst().orElse(null);
+        if (rule == null || !rule.match().acceptsKnownFacts(request.legalEntityId(), request.line())
+                || rule.constraints().priorRequestRequired() != assessment.priorRequestRequired()) return false;
+        if (rule.constraints().effect() == io.agentflow.expense.ExpensePolicyDefinition.Effect.DENY) return assessment.policy().decision() == io.agentflow.expense.ExpensePolicySnapshot.Decision.DENIED;
+        return assessment.policy().exceptionReasons().stream().allMatch(reason -> switch (reason) {
+            case AMOUNT -> rule.constraints().unitPriceLimit() != null;
+            case SERVICE_LEVEL -> !rule.constraints().allowedServiceLevels().isEmpty();
+            case INVOICE_AGE -> rule.constraints().invoiceAgeAction() == io.agentflow.expense.ExpensePolicyDefinition.AgeAction.REQUIRE_REASON;
+        });
     }
 }

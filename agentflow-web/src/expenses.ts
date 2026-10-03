@@ -2,6 +2,8 @@ import type { ApprovalProxyOption, ApprovalProxyUse } from './api'
 
 /** 所有金额以十进制字符串传输；币种来自服务端财务事实。 */
 export interface Money { value: string; currency: string }
+export interface ExpensePolicySelection { policyId: string; policyVersion: number; categoryRevision: number; activeRevision: number; definitionDigest: string }
+export type ExpensePolicyException = 'AMOUNT' | 'SERVICE_LEVEL' | 'INVOICE_AGE'
 export interface CostAllocation { costCenter: string; projectCode: string | null; amount: Money }
 export interface AdvanceOffset { advanceId: string; amount: Money }
 export interface ExpenseLine {
@@ -15,7 +17,10 @@ export interface ExpenseContent { legalEntityId: string; type: 'TRAVEL' | 'DAILY
 export interface ApprovedLine { lineNo: number; gross: Money; tax: Money; allocations: CostAllocation[] }
 export interface FrozenExpenseLine {
   original: ExpenseLine; claimedBase: Money; deductibleTaxBase: Money
-  assessment: { exchangeRate: { fromCurrency: string; toCurrency: string; rate: string | number; source: string; rateDate: string }; policy: { policyId: string; version: number; assessedGross: Money; allowedGross: Money; decision: 'WITHIN_LIMIT' | 'REQUIRES_EXCEPTION' | 'DENIED' } }
+  assessment: { exchangeRate: { fromCurrency: string; toCurrency: string; rate: string | number; source: string; rateDate: string }; policy: {
+    policyId: string; version: number; assessedGross: Money; allowedGross: Money; decision: 'WITHIN_LIMIT' | 'REQUIRES_EXCEPTION' | 'DENIED'
+    exceptionReasons?: ExpensePolicyException[]; managedPolicy?: { selection: ExpensePolicySelection; ruleKey: string; factSourceReference: string } | null
+  } }
 }
 export type ReductionReason = 'INELIGIBLE_COST' | 'OVER_STANDARD_NOT_ACCEPTED' | 'INVALID_INVOICE' | 'TAX_CORRECTION' | 'OTHER'
 export interface ExpenseAdjustment {
@@ -51,6 +56,7 @@ export interface AdvanceItem { id: string; legalEntityId: string; version: numbe
 export const reductionReasons: Record<ReductionReason, string> = { INELIGIBLE_COST: '不符合报销范围', OVER_STANDARD_NOT_ACCEPTED: '超标部分不予报销', INVALID_INVOICE: '票据不符合要求', TAX_CORRECTION: '调整可抵扣税额', OTHER: '其他原因' }
 export const expenseStatuses: Record<string, string> = { DRAFT: '草稿', IN_APPROVAL: '审批中', RETURNED: '已退回', WITHDRAWN: '已撤回', REJECTED: '已驳回', APPROVED: '审批通过', CANCELLED: '已作废', REVOKED: '已撤销' }
 export const expenseTypes: Record<ExpenseContent['type'], string> = { TRAVEL: '差旅', DAILY: '日常费用', ENTERTAINMENT: '业务招待', TRAINING: '培训', OTHER: '其他费用' }
+export const policyExceptionLabels: Record<ExpensePolicyException, string> = { AMOUNT: '金额超出标准', SERVICE_LEVEL: '出行等级不符合标准', INVOICE_AGE: '票据超过报销时限' }
 export const budgetIssues: Record<string, string> = {
   NOT_CONFIGURED: '尚未配置预算服务', TARGET_CHANGED: '预算服务配置已变化，需要核对原操作', TIMEOUT: '预算服务响应超时', CONNECTION: '暂时无法连接预算服务',
   AUTHENTICATION: '预算服务连接凭据不可用', REMOTE_FAILURE: '预算服务暂时不可用', INVALID_RESPONSE: '预算结果未通过校验', RESPONSE_TOO_LARGE: '预算结果未通过校验',

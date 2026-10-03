@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.expense.ExpensePolicyConfiguration;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.Map;
@@ -12,14 +13,17 @@ import java.util.UUID;
 @Component
 public class GatewayFinanceMasterData implements FinanceMasterDataPort, EmployeeAccountPort {
     private final FinanceGatewayClient client;
+    private final ExpensePolicyConfiguration policies;
 
     /** 同一真实主数据服务承担目录与员工账户读取。 */
-    public GatewayFinanceMasterData(FinanceGatewayClient client) { this.client = client; }
+    public GatewayFinanceMasterData(FinanceGatewayClient client, ExpensePolicyConfiguration policies) { this.client = client; this.policies = policies; }
 
     /** 目录只服务当前员工，并在到达平台时重新核对有效期。 */
     @Override public FinanceResult<FinanceCatalog> catalog(String tenantId, String employeeId) {
-        return client.read(tenantId, FinanceGatewayClient.Operation.CATALOG, Map.of("employeeId", employeeId), FinanceCatalog.class,
+        var result = client.read(tenantId, FinanceGatewayClient.Operation.CATALOG, Map.of("employeeId", employeeId), FinanceCatalog.class,
                 value -> employeeId.equals(value.employeeId()) && value.validUntil().isAfter(Instant.now()));
+        if (result instanceof FinanceResult.Success<FinanceCatalog> success) return new FinanceResult.Success<>(policies.filterCatalog(tenantId, success.value()));
+        return result;
     }
 
     /** 完整卡号不能作为掩码进入存储、页面或付款授权材料。 */

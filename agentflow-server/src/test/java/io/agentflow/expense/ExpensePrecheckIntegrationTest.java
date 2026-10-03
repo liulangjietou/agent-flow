@@ -117,6 +117,7 @@ class ExpensePrecheckIntegrationTest {
     @Autowired ExpensePrecheckResources resourceSnapshots;
     @Autowired FinanceGatewayConfiguration configuration;
     @Autowired JdbcExpenseSubmissionControlRepository controls;
+    @Autowired ExpenseConfigurationService expenseConfiguration;
 
     @BeforeEach void setup() {
         wire = json; CALLS.clear(); LAST_BUDGET.set(null);
@@ -140,6 +141,118 @@ class ExpensePrecheckIntegrationTest {
         actors.clear();
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @Test
+    void publishingManagedPolicyInvalidatesAnUnexpiredLegacyPrecheck() throws Exception {
+        var report = fixture(false).report(); UUID checked = enqueue(report); worker.poll();
+        assertThat(job(checked).status()).isEqualTo(Status.READY);
+        assertThat(tree(read(report, "/prechecks/" + checked, "alice")).path("usable").asBoolean()).isTrue();
+        try {
+            expenseConfiguration.saveCategories(admin, 0, List.of(new ExpenseCategoryCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM), true)), "配置合成类别");
+            var definition = new ExpensePolicyDefinition("合成制度", List.of(new ExpensePolicyDefinition.Rule("office", "办公规则",
+                    new ExpensePolicyDefinition.Match(List.of(entity), List.of("OFFICE"), List.of(), List.of(), null, null, "USD"),
+                    new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW, null, null, null, null, List.of(), false))));
+            expenseConfiguration.saveDraft(admin, "managed", 0, definition, "保存合成草稿");
+            expenseConfiguration.publish(admin, "managed", 1, 1, 0, "启用合成制度");
+            var view = tree(read(report, "/prechecks/" + checked, "alice"));
+            assertThat(view.path("usable").asBoolean()).isFalse();
+            assertThat(view.path("unavailableCode").asText()).isEqualTo("POLICY_CONFIGURATION_CHANGED");
+            var submit = mvc.perform(post(path(report) + "/submit").header("Authorization", token("alice")).header("Idempotency-Key", UUID.randomUUID())
+                    .contentType("application/json").content(json.write(new ExpenseSubmissionService.Input(1L, 1L, checked)))).andReturn().getResponse();
+            assertThat(submit.getStatus()).isEqualTo(409);
+            assertThat(tree(submit).path("code").asText()).isEqualTo("POLICY_CONFIGURATION_CHANGED");
+            assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
+        } finally {
+            jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
+            for (var table : List.of("expense_policy_activation", "expense_policy_version", "expense_policy_draft_revision", "expense_policy_draft", "expense_category_revision", "expense_configuration")) jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo'");
+        }
+    }
+
+    @Test
+    void managedPrecheckFreezesExactReceiptAndRejectsSourcesThatIgnoreTheSelectedVersion() throws Exception {
+        try {
+            publishManagedPolicy();
+            var report = fixture(false).report();
+            UUID unsupported = enqueue(report); worker.poll();
+            assertThat(job(unsupported).status()).isEqualTo(Status.UNAVAILABLE);
+            assertThat(job(unsupported).result().findings()).anySatisfy(finding -> assertThat(finding.code()).isEqualTo("INVALID_RESPONSE"));
+            RESPONDER.set((operation, request) -> operation.equals("expense-policy") ? managedAssessment(request) : normal(operation, request));
+            UUID checked = enqueue(report); worker.poll();
+            assertThat(job(checked).status()).isEqualTo(Status.READY);
+            var selection = job(checked).result().evidence().policySelection();
+            assertThat(selection).isNotNull(); assertThat(selection.policyVersion()).isEqualTo(1); assertThat(selection.categoryRevision()).isEqualTo(1);
+            var frozen = job(checked).result().evidence().preview().originalLines().get(0).assessment().policy();
+            assertThat(frozen.managedPolicy().selection()).isEqualTo(selection);
+            assertThat(frozen.managedPolicy().ruleKey()).isEqualTo("office");
+            assertThat(tree(read(report, "/prechecks/" + checked, "alice")).path("usable").asBoolean()).isTrue();
+            var current = expenseConfiguration.draft("demo", "managed");
+            expenseConfiguration.saveDraft(admin, "managed", current.revision(), new ExpensePolicyDefinition("修改未发布", current.definition().rules()), "仅修改草稿");
+            assertThat(tree(read(report, "/prechecks/" + checked, "alice")).path("usable").asBoolean()).isTrue();
+            expenseConfiguration.saveCategories(admin, 1, List.of(new ExpenseCategoryCatalog.Category("OFFICE", "办公新名称", List.of(ExpenseLine.Unit.ITEM), true)), "修改目录版本");
+            assertThat(tree(read(report, "/prechecks/" + checked, "alice")).path("unavailableCode").asText()).isEqualTo("POLICY_CONFIGURATION_CHANGED");
+            assertThat(job(checked).result().evidence().preview().originalLines().get(0).assessment().policy()).isEqualTo(frozen);
+        } finally { clearExpenseConfiguration(); }
+    }
+
+    @Test
+    void policyPublishedWhileEvaluationRunsCannotFinishReady() throws Exception {
+        try {
+            publishManagedPolicy();
+            RESPONDER.set((operation, request) -> operation.equals("expense-policy") ? managedAssessment(request) : normal(operation, request));
+            var report = fixture(false).report(); UUID id = enqueue(report);
+            var claimed = execution.claim("demo", id, Instant.now()); var evaluated = evaluator.evaluate(claimed);
+            assertThat(evaluated.evidence()).isNotNull();
+            var draft = expenseConfiguration.draft("demo", "managed");
+            expenseConfiguration.saveDraft(admin, "managed", 1, new ExpensePolicyDefinition("新发布版本", draft.definition().rules()), "变更草稿");
+            expenseConfiguration.publish(admin, "managed", 2, 1, 1, "发布新版本");
+            execution.finish(claimed, evaluated, Instant.now());
+            assertThat(job(id).status()).isEqualTo(Status.UNAVAILABLE);
+            assertThat(job(id).result().findings()).anySatisfy(finding -> assertThat(finding.code()).isEqualTo("POLICY_CONFIGURATION_CHANGED"));
+        } finally { clearExpenseConfiguration(); }
+    }
+
+    @Test
+    void managedCatalogCannotAddAnUnauthorizedCategoryOrUnitAndDisableTakesEffect() throws Exception {
+        try {
+            publishManagedPolicy();
+            expenseConfiguration.saveCategories(admin, 1, List.of(
+                    new ExpenseCategoryCatalog.Category("OFFICE", "受控制度办公", List.of(ExpenseLine.Unit.ITEM, ExpenseLine.Unit.NIGHT), true),
+                    new ExpenseCategoryCatalog.Category("PRIVATE", "未授权类别", List.of(ExpenseLine.Unit.ITEM), true)), "更新合成类别");
+            var response = mvc.perform(get("/api/v1/finance/catalog").header("Authorization", token("alice"))).andReturn().getResponse();
+            assertThat(response.getStatus()).isEqualTo(200);
+            var catalog = tree(response); assertThat(catalog.path("categories")).hasSize(1);
+            assertThat(catalog.path("categories").get(0).path("name").asText()).isEqualTo("受控制度办公");
+            assertThat(catalog.path("categories").get(0).path("units")).hasSize(1);
+            var previous = expenseConfiguration.categories("demo");
+            expenseConfiguration.saveCategories(admin, 2, previous.categories().stream().map(category -> new ExpenseCategoryCatalog.Category(category.code(), category.name(), category.units(), false)).toList(), "停用类别");
+            var report = fixture(false).report(); UUID id = enqueue(report); worker.poll();
+            assertThat(job(id).status()).isEqualTo(Status.BLOCKED);
+            assertThat(count("expense-policy")).isZero();
+        } finally { clearExpenseConfiguration(); }
+    }
+
+    private void publishManagedPolicy() {
+        expenseConfiguration.saveCategories(admin, 0, List.of(new ExpenseCategoryCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM), true)), "配置合成类别");
+        var definition = new ExpensePolicyDefinition("合成制度", List.of(new ExpensePolicyDefinition.Rule("office", "办公规则",
+                new ExpensePolicyDefinition.Match(List.of(entity), List.of("OFFICE"), List.of(), List.of(), null, null, "USD"),
+                new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW, null, null, null, null, List.of(), false))));
+        expenseConfiguration.saveDraft(admin, "managed", 0, definition, "保存合成草稿");
+        expenseConfiguration.publish(admin, "managed", 1, 1, 0, "启用合成制度");
+    }
+
+    private String managedAssessment(JsonNode request) {
+        var input = json.read(request.path("data").toString(), ExpensePolicyPort.Request.class); var selected = input.managedPolicy().selection();
+        var amount = input.exchangeRate().convert(input.line().claimedGross());
+        var policy = new ExpensePolicySnapshot(selected.policyId(), selected.policyVersion(), amount, amount, ExpensePolicySnapshot.Decision.WITHIN_LIMIT,
+                "synthetic-tax", "synthetic-policy", List.of(), new ExpensePolicyReceipt(selected, "office", "synthetic-grade-city-v1"));
+        return json.write(Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "SUCCESS",
+                "data", new ExpensePolicyPort.Assessment(policy, input.exchangeRate().convert(input.line().claimedTax()), false, Instant.now().plusSeconds(600))));
+    }
+
+    private void clearExpenseConfiguration() {
+        jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
+        for (var table : List.of("expense_policy_activation", "expense_policy_version", "expense_policy_draft_revision", "expense_policy_draft", "expense_category_revision", "expense_configuration")) jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo'");
+    }
 
     @Test
     void optionsLocateLatestAttemptInsteadOfFirstUuidHistoryItem() throws Exception {

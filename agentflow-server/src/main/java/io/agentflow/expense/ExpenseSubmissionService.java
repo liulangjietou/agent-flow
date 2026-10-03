@@ -30,15 +30,17 @@ public class ExpenseSubmissionService {
     private final ExpenseResourceChanges changes;
     private final JdbcExpenseSubmissionControlRepository controls;
     private final BudgetOperationService budgets;
+    private final ExpensePolicyConfiguration policyConfiguration;
 
     /** 外部调用由持久执行器承担，提交事务只使用仍然有效的已确认事实。 */
     public ExpenseSubmissionService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             DefinitionDraftRepository definitions, JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService validation,
             ExpensePrecheckResources resources, ExpenseResourceChanges changes, JdbcExpenseSubmissionControlRepository controls,
-            BudgetOperationService budgets) {
+            BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration) {
         this.actors = actors; this.reports = reports; this.applications = applications; this.definitions = definitions;
         this.prechecks = prechecks; this.validation = validation; this.resources = resources; this.changes = changes;
         this.controls = controls; this.budgets = budgets;
+        this.policyConfiguration = policyConfiguration;
     }
 
     /** 申请人只提交双版本与预检编号；金额、任职、纸件要求和预算输入全部从服务端事实派生。 */
@@ -54,6 +56,7 @@ public class ExpenseSubmissionService {
                 .orElseThrow(() -> new DomainException("NOT_FOUND", "Expense precheck not found"));
         if (checked.status() != ExpensePrecheckJob.Status.READY) throw new DomainException("PRECHECK_NOT_READY", "Expense precheck is not ready");
         var evidence = checked.result().evidence(); resources.lockReferences(actor.tenantId(), evidence.resources());
+        policyConfiguration.lockForSubmission(actor.tenantId());
         String failure = validation.readyFailure(checked, report, Instant.now());
         if (failure != null) throw new DomainException(failure, "Expense precheck must be refreshed before submission");
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())

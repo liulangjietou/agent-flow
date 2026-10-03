@@ -120,6 +120,23 @@ class ExpenseReportTest {
     }
 
     @Test
+    void nonMonetaryPolicyExceptionRequiresReasonWithoutInventingALowerAmountLimit() {
+        var line = line(1, "100", "0", "CNY", List.of(), null);
+        var report = draft(content(List.of(line), List.of()));
+        var policy = new ExpensePolicySnapshot(UUID.randomUUID(), 1, line.claimedGross(), line.claimedGross(), ExpensePolicySnapshot.Decision.REQUIRES_EXCEPTION,
+                "tax-test", "service-level-fact", List.of(ExpensePolicySnapshot.ExceptionReason.SERVICE_LEVEL), null);
+        var assessment = new ExpenseAssessment(assessment(line, "1").exchangeRate(), policy, Money.zero("CNY"));
+        fails("EXPENSE_EXCEPTION_REASON_REQUIRED", () -> report.freeze(1, 1, "CNY", account(), Map.of(1, assessment), "alice", SUBMITTED));
+        var explained = new ExpenseLine(line.lineNo(), line.categoryCode(), line.incurredOn(), null, line.cityCode(), line.quantity(), line.unit(), line.claimedGross(), line.claimedTax(),
+                line.invoiceIds(), null, line.allocations(), line.description(), "无标准舱位，申请例外审批");
+        report.revise(1, content(List.of(explained), List.of()));
+        report.freeze(2, 1, "CNY", account(), Map.of(1, assessment), "alice", SUBMITTED);
+        assertThat(report.currentRound().approvedGross()).isEqualTo(line.claimedGross());
+        assertThat(report.currentRound().originalLines().get(0).assessment().policy().exceptionReasons()).containsExactly(ExpensePolicySnapshot.ExceptionReason.SERVICE_LEVEL);
+        assertThat(ExpenseFormContract.submittedPayload(report.currentRound()).get(ExpenseFormContract.OVER_POLICY)).isEqualTo(true);
+    }
+
+    @Test
     void wrongPayeeEntityCurrencyAndExcessOffsetsFailBeforeFreezing() {
         var line = line(1, "100", "0", "CNY", List.of(), null);
         var report = draft(content(List.of(line), List.of()));

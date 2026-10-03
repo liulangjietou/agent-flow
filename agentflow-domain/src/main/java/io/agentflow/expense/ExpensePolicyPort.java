@@ -22,12 +22,18 @@ public interface ExpensePolicyPort {
      * @author owlzhangfq@gmail.com
      */
     record Request(String employeeId, UUID legalEntityId, ExpenseContent.Type reportType, ExpenseLine line,
-                   ExpenseExchangeRate exchangeRate, List<InvoiceEvidence> invoices) {
+                   ExpenseExchangeRate exchangeRate, List<InvoiceEvidence> invoices, ManagedExpensePolicy managedPolicy) {
+        /** 尚未启用平台配置的既有租户保持原外部制度协议。 */
+        public Request(String employeeId, UUID legalEntityId, ExpenseContent.Type reportType, ExpenseLine line,
+                       ExpenseExchangeRate exchangeRate, List<InvoiceEvidence> invoices) {
+            this(employeeId, legalEntityId, reportType, line, exchangeRate, invoices, null);
+        }
         /** 所有票据必须属于该行，金额判定基于同一原币与法人。 */
         public Request {
             if (StringUtils.isBlank(employeeId) || employeeId.length() > 128 || legalEntityId == null || reportType == null
                     || line == null || exchangeRate == null || !line.claimedGross().currency().equals(exchangeRate.fromCurrency())
-                    || invoices == null || invoices.size() != line.invoiceIds().size() || invoices.stream().anyMatch(java.util.Objects::isNull)) throw invalid();
+                    || invoices == null || invoices.size() != line.invoiceIds().size() || invoices.stream().anyMatch(java.util.Objects::isNull)
+                    || managedPolicy != null && (!managedPolicy.category().code().equals(line.categoryCode()) || !managedPolicy.category().units().contains(line.unit()))) throw invalid();
             var ids = new HashSet<UUID>();
             for (var invoice : invoices) if (!ids.add(invoice.invoiceId()) || !line.invoiceIds().contains(invoice.invoiceId())
                     || !legalEntityId.equals(invoice.facts().legalEntityId())) throw invalid();

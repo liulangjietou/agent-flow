@@ -38,15 +38,16 @@ public class ExpensePrecheckEvaluator {
     private final ExpensePolicyPort policies;
     private final BudgetPrecheckPort budgets;
     private final FinanceGatewayConfiguration configuration;
+    private final ExpensePolicyConfiguration policyConfiguration;
 
     /** 端口调用与本地事务分离，领域计划只在副本上运行。 */
     public ExpensePrecheckEvaluator(ExpenseReportRepository reports, ExpensePrecheckResources resources,
             JdbcInvoiceOriginalRepository originals, JdbcInvoiceVerificationRepository verifications, InvoiceOriginalFiles files,
             FinanceMasterDataPort masterData, EmployeeAccountPort accounts, ExchangeRatePort rates, ExpensePolicyPort policies,
-            BudgetPrecheckPort budgets, FinanceGatewayConfiguration configuration) {
+            BudgetPrecheckPort budgets, FinanceGatewayConfiguration configuration, ExpensePolicyConfiguration policyConfiguration) {
         this.reports = reports; this.resources = resources; this.originals = originals; this.verifications = verifications;
         this.files = files; this.masterData = masterData; this.accounts = accounts; this.rates = rates; this.policies = policies;
-        this.budgets = budgets; this.configuration = configuration;
+        this.budgets = budgets; this.configuration = configuration; this.policyConfiguration = policyConfiguration;
     }
 
     /** 不占用或修改原资源；不可用与业务拒绝只保存稳定分类。 */
@@ -62,6 +63,7 @@ public class ExpensePrecheckEvaluator {
         if (report.version() != input.financialVersion() || !report.employeeId().equals(input.employeeId())
                 || !report.applicationId().equals(input.applicationId())) throw unavailable(Stage.CONTEXT, "CONTEXT_CHANGED");
         if (report.content().lines().isEmpty()) throw rejected(Stage.INPUT, null, "EXPENSE_LINES_REQUIRED");
+        var selectedPolicy = policyConfiguration.snapshot(input.tenantId());
         ExpenseSubmissionResources.Resources loaded;
         try { loaded = resources.load(report); }
         catch (DomainException invalid) { throw rejected(Stage.RESOURCES, null, invalid.code()); }
@@ -93,8 +95,11 @@ public class ExpensePrecheckEvaluator {
                     exchangeRates.put(line.claimedGross().currency(), rate);
                 }
                 ensureLive(job);
+                ManagedExpensePolicy managed;
+                try { managed = selectedPolicy.forLine(line); }
+                catch (DomainException invalid) { throw rejected(Stage.POLICY, line.lineNo(), invalid.code()); }
                 var policy = value(policies.assess(input.tenantId(), new ExpensePolicyPort.Request(input.employeeId(), entity.id(),
-                        report.content().type(), line, rate, invoiceFacts)), Stage.POLICY, line.lineNo());
+                        report.content().type(), line, rate, invoiceFacts, managed)), Stage.POLICY, line.lineNo());
                 if (policy.priorRequestRequired() && line.priorRequest() == null) throw rejected(Stage.POLICY, line.lineNo(), "PRIOR_REQUEST_REQUIRED");
                 assessments.put(line.lineNo(), new ExpenseAssessment(rate, policy.policy(), policy.deductibleTax()));
                 validUntil = earliest(validUntil, policy.validUntil());
@@ -116,7 +121,7 @@ public class ExpensePrecheckEvaluator {
         ensureLive(job);
         if (!validUntil.isAfter(Instant.now())) throw unavailable(Stage.CONTEXT, "FACTS_EXPIRED");
         return new Result(new ExpensePrecheckEvidence(catalog.sourceVersion(), entity, rateDate, budget, report.currentRound(),
-                ExpensePrecheckResources.versions(loaded), invoiceEvidence, validUntil), List.of());
+                ExpensePrecheckResources.versions(loaded), invoiceEvidence, validUntil, selectedPolicy.selection()), List.of());
     }
 
     private List<ExpensePolicyPort.InvoiceEvidence> invoiceFacts(ExpensePrecheckJob job, ExpenseLine line,

@@ -39,16 +39,18 @@ public class ExpensePrecheckService {
     private final FinanceGatewayConfiguration configuration;
     private final JdbcExpensePrecheckRepository jobs;
     private final ExpensePrecheckResources resources;
+    private final ExpensePolicyConfiguration policyConfiguration;
     private final int timeoutSeconds;
 
     /** 身份检查不复用管理员读取权限，所有外部事实由独立执行器获取。 */
     public ExpensePrecheckService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
-            JdbcExpensePrecheckRepository jobs, ExpensePrecheckResources resources,
+            JdbcExpensePrecheckRepository jobs, ExpensePrecheckResources resources, ExpensePolicyConfiguration policyConfiguration,
             @Value("${agentflow.expenses.precheck-timeout-seconds:300}") int timeoutSeconds) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Expense precheck timeout must be between 15 and 900 seconds");
         this.actors = actors; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
         this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.resources = resources; this.timeoutSeconds = timeoutSeconds;
+        this.policyConfiguration = policyConfiguration;
     }
 
     /** 返回实际目标和双版本，不把配置可用解释为费用已经通过。 */
@@ -134,7 +136,8 @@ public class ExpensePrecheckService {
         Instant now = time(at); String failure = contextFailure(job);
         if (failure != null) result = Result.unavailable(Stage.CONTEXT, failure);
         else if (result.evidence() != null) {
-            if (!result.evidence().validUntil().isAfter(at)) result = Result.unavailable(Stage.CONTEXT, "FACTS_EXPIRED");
+            if (!policyConfiguration.current(job.input().tenantId(), result.evidence().policySelection())) result = Result.unavailable(Stage.POLICY, "POLICY_CONFIGURATION_CHANGED");
+            else if (!result.evidence().validUntil().isAfter(at)) result = Result.unavailable(Stage.CONTEXT, "FACTS_EXPIRED");
             else if (!resources.current(reports.find(job.input().tenantId(), job.input().reportId()).orElseThrow(), result.evidence())) {
                 result = Result.unavailable(Stage.RESOURCES, "RESOURCES_CHANGED");
             }
@@ -147,6 +150,7 @@ public class ExpensePrecheckService {
         if (job.status() != Status.READY) return "PRECHECK_NOT_READY";
         if (jobs.latestAttempt(job.input().tenantId(), job.input().reportId()) != job.input().attempt()) return "PRECHECK_SUPERSEDED";
         if (!job.result().evidence().validUntil().isAfter(now)) return "FACTS_EXPIRED";
+        if (!policyConfiguration.current(job.input().tenantId(), job.result().evidence().policySelection())) return "POLICY_CONFIGURATION_CHANGED";
         String failure = contextFailure(job); if (failure != null) return failure;
         return resources.current(report, job.result().evidence()) ? null : "RESOURCES_CHANGED";
     }
