@@ -874,6 +874,42 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void paymentRequestNotificationKeepsUnsentOriginalExpenseAndCurrentParticipantAccess() throws Exception {
+        hideBusinessDetails = true;
+        var report = paymentReport(); UUID original = authorizePayment(report);
+        var staleSelection = new HashMap<>(cashierInput("EXECUTE", 1, null)); staleSelection.put("debitAccountVersion", "outdated");
+        ok(send("/api/v1/cashier/payments/" + original + "/actions", "cashier", staleSelection), 202); paymentRequestWorker.poll();
+        assertThat(paymentRequests.forAuthorization("demo", original).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.BLOCKED);
+        assertThat(paymentOperations.find("demo", original)).isEmpty();
+        var messages = jdbc.queryForList("SELECT id,recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_ATTENTION'",
+                report.applicationId().toString());
+        assertThat(messages).extracting(row -> row.get("recipient_id")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        String financePath = null;
+        for (var message : messages) {
+            String user = message.get("recipient_id").toString(), path = "/api/v1/notifications/" + message.get("id") + "/payment-target";
+            var view = ok(read(path, user), 200);
+            assertThat(view.path("paymentId").asText()).isEqualTo(original.toString());
+            assertThat(view.at("/payment/operation").isNull()).isTrue();
+            assertThat(view.at("/payment/request/status").asText()).isEqualTo("BLOCKED");
+            assertThat(view.path("view").asText()).isEqualTo(user.equals("cashier") ? "CASHIER_PAYMENT" : "APPLICATION_ROUND");
+            assertThat(view.toString()).doesNotContain("debitReference", "accountDigest", "synthetic-private-account");
+            for (String stranger : List.of("admin", "bob", "manager")) assertThat(read(path, stranger).getStatus()).isEqualTo(404);
+            if (user.equals("finance")) financePath = path;
+        }
+        ok(send("/api/v1/payments/" + original + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1,
+                "comment", "账户检查未通过，停止原授权")), 202);
+        UUID replacement = authorizePayment(report);
+        var history = ok(read(financePath, "finance"), 200);
+        assertThat(history.path("paymentId").asText()).isEqualTo(original.toString()).isNotEqualTo(replacement.toString());
+        assertThat(history.at("/payment/status").asText()).isEqualTo("VOIDED");
+        assertThat(history.at("/payment/operation").isNull()).isTrue(); assertThat(paymentWrites).isZero();
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(read(financePath, "finance").getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test
     void paymentNotificationKeepsOriginalFailedExpenseAfterReplacementAndRechecksCurrentAccess() throws Exception {
         hideBusinessDetails = true;
         var report = paymentReport(); UUID original = authorizePayment(report);

@@ -88,10 +88,15 @@ public class PaymentNotificationAccess {
         var source = PaymentNotice.source(row.eventKey()).filter(value -> value.notice().kind() == row.kind()).orElse(null);
         if (source == null) return null;
         var payment = authorizations.find(tenant, source.paymentId()).orElse(null);
-        if (payment == null || payment.execution() == null) return null;
-        var terms = payment.terms(); var command = payment.execution().command();
+        if (payment == null) return null;
+        var terms = payment.terms();
+        // 尚未登记付款命令时，原出纳只来自持久请求，不能从当前角色或其他授权推定。
+        String cashier = payment.execution() == null
+                ? requests.forAuthorization(tenant, terms.id()).map(value -> value.input().cashier()).orElse(null)
+                : payment.execution().command().authorization().executedBy();
+        if (cashier == null) return null;
         if (!terms.binding().applicationId().equals(row.applicationId()) || terms.binding().roundNo() != row.roundNo()
-                || !List.of(terms.payee().employeeId(), command.authorization().authorizedBy(), command.authorization().executedBy()).contains(recipient)
+                || !List.of(terms.payee().employeeId(), payment.decision().authorizedBy(), cashier).contains(recipient)
                 || !eligible(tenant, recipient, terms.payee().employeeId(), terms.payee().legalEntityId())) return null;
         return payment;
     }

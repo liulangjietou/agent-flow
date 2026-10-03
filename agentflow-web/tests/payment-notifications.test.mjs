@@ -1,11 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createRenderer, reactive } from 'vue'
+import { createRenderer, createSSRApp, reactive } from 'vue'
+import { renderToString } from 'vue/server-renderer'
 const { api } = await import(process.env.AGENTFLOW_TEST_API)
 const { readPaymentNotificationTarget, isPaymentNotification } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONS)
 const { default: Panel } = await import(process.env.AGENTFLOW_TEST_PAYMENTNOTIFICATIONDETAILPANEL)
 const { default: Inbox } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONINBOXRENDERED)
 const { default: Workspace } = await import(process.env.AGENTFLOW_TEST_CASHIERWORKSPACE)
+const { default: Facts } = await import(process.env.AGENTFLOW_TEST_PAYMENTFACTSRENDERED)
 const { createNavigation } = await import(process.env.AGENTFLOW_TEST_PAYMENT_NOTIFICATION_NAVIGATION)
 const originals = { ...api }, originalFetch = globalThis.fetch
 const messageId = '12345678-1234-1234-1234-123456789001', paymentId = '12345678-1234-1234-1234-123456789002'
@@ -25,6 +27,21 @@ function mount(Component = Panel, input = {}) {
   const instance = app.mount({})
   return { props, state: instance.$.setupState, close() { app.unmount(); Object.assign(api, originals); globalThis.fetch = originalFetch } }
 }
+
+test('登记前异常可读取原授权，实际模板明确显示尚未发送付款', async () => {
+  for (const [status, issue, authorizationStatus] of [['QUEUED', 'TIMEOUT', 'AUTHORIZED'], ['BLOCKED', 'ACCOUNT_CHANGED', 'AUTHORIZED'], ['VOIDED', 'SOURCE_CHANGED', 'VOIDED'], ['EXPIRED', 'AUTHORIZATION_EXPIRED', 'EXPIRED']]) {
+    const value = target(); Object.assign(value.payment, { status: authorizationStatus, version: authorizationStatus === 'AUTHORIZED' ? 1 : 2, executedBy: null, operation: null,
+      request: { id: otherId, version: 3, status, cashier: 'cashier', createdAt: when, updatedAt: when, issue } })
+    api.paymentNotificationTarget = async () => value
+    const p = mount()
+    try {
+      await settle(); assert.equal(p.state.error, ''); assert.equal(p.state.detail.paymentId, paymentId)
+      assert.equal(p.state.detail.payment.operation, null); assert.equal(p.state.detail.payment.request.status, status)
+      const html = await renderToString(createSSRApp(Facts, { payment: p.state.detail.payment }))
+      assert.match(html, /尚未发送付款/); assert.match(html, /cashier/); assert.doesNotMatch(html, /银行回单|资金交易号|付款成功/)
+    } finally { p.close() }
+  }
+})
 
 test('原消息、原付款和原轮次必须同时匹配，审批消息不能借用付款入口', () => {
   const value = target(); assert.equal(readPaymentNotificationTarget(value, message()), value)

@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 import io.agentflow.finance.PaymentOperation;
+import io.agentflow.finance.PaymentExecutionRequest;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,7 +18,7 @@ public enum PaymentNotice {
     RECONCILING(InboxMessage.Kind.PAYMENT_ATTENTION, "原付款回执存在冲突，请查看原记录并按权限核对。"),
     EXPIRED(InboxMessage.Kind.PAYMENT_ATTENTION, "原付款授权已过期，尚未开始的新发送已停止，请核对原记录。"),
     SOURCE_CHANGED(InboxMessage.Kind.PAYMENT_ATTENTION, "原付款依据发生变化，尚未开始的新发送已停止，请核对原记录。"),
-    ACCOUNT_CHANGED(InboxMessage.Kind.PAYMENT_ATTENTION, "原付款账户依据发生变化，尚未开始的新发送已停止，请核对原记录。"),
+    ACCOUNT_CHANGED(InboxMessage.Kind.PAYMENT_ATTENTION, "原付款账户依据未通过复核，尚未开始的新发送已停止，请核对原记录。"),
     CHECK_UNAVAILABLE(InboxMessage.Kind.PAYMENT_ATTENTION, "原付款发送前的依据检查暂不可用，请查看原记录；这不表示银行付款失败。");
 
     private static final String KEY_PREFIX = "employee-payment:";
@@ -45,6 +46,18 @@ public enum PaymentNotice {
             };
             case UNKNOWN -> operation.failure() == null || operation.failure() == PaymentOperation.Failure.RECHECK_REQUESTED ? null : UNKNOWN;
             case QUEUED -> operation.failure() == null ? null : CHECK_UNAVAILABLE;
+            default -> null;
+        };
+        return Optional.ofNullable(notice);
+    }
+
+    /** 原出纳选择仍在复查，不能把检查异常解释为银行资金结果。 */
+    public static Optional<PaymentNotice> from(PaymentExecutionRequest request) {
+        PaymentNotice notice = switch (request.status()) {
+            case BLOCKED -> ACCOUNT_CHANGED;
+            case VOIDED -> SOURCE_CHANGED;
+            case EXPIRED -> EXPIRED;
+            case QUEUED -> request.failure() == null ? null : CHECK_UNAVAILABLE;
             default -> null;
         };
         return Optional.ofNullable(notice);

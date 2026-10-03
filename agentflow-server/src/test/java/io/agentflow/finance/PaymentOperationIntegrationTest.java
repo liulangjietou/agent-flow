@@ -170,6 +170,87 @@ class PaymentOperationIntegrationTest {
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
 
+    @Test void requestAccountChangeNotifiesOriginalParticipantsWithoutCreatingPayment() throws Exception {
+        var authorization = authorized(); var request = request(authorization, "v2"); requestWorker.poll();
+        assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.BLOCKED);
+        assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_ATTENTION'",
+                String.class, authorization.terms().binding().applicationId().toString())).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        String path = requestNotificationPath(authorization, "cashier");
+        var response = notificationGet(path, "cashier"); assertThat(response.getStatus()).isEqualTo(200);
+        var value = json.read(response.getContentAsString(), JsonNode.class);
+        assertThat(value.path("paymentId").asText()).isEqualTo(authorization.terms().id().toString());
+        assertThat(value.at("/payment/request/status").asText()).isEqualTo("BLOCKED");
+        assertThat(value.at("/payment/operation").isNull()).isTrue(); assertThat(value.at("/payment/executedBy").isNull()).isTrue();
+        assertThat(value.toString()).doesNotContain("synthetic-account", "debitReference", "commandDigest");
+        for (String user : List.of("alice", "finance", "admin", "bob")) assertThat(notificationGet(path, user).getStatus()).isEqualTo(404);
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+        assertThat(notificationGet(path, "cashier").getStatus()).isEqualTo(404);
+    }
+
+    @Test void requestReadFailureAndPaymentCheckShareOneNoticeAfterRecoveryWithoutSendingMoney() {
+        var authorization = authorized(); var request = request(authorization, "v1"); var at = now();
+        assertThat(requestNotificationRecipients(authorization)).isEmpty();
+        var work = requestService.claim("demo", request.input().id(), at);
+        assertThat(requestNotificationRecipients(authorization)).isEmpty();
+        requestService.fail(work, PaymentExecutionRequest.Failure.TIMEOUT, false, at);
+        var retry = executionRequests.find("demo", request.input().id()).orElseThrow();
+        var second = requestService.claim("demo", request.input().id(), retry.nextAttemptAt());
+        requestService.fail(second, PaymentExecutionRequest.Failure.CONNECTION, false, second.request().updatedAt());
+        assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        var later = executionRequests.find("demo", request.input().id()).orElseThrow().nextAttemptAt();
+        var recovered = requestService.claim("demo", request.input().id(), later);
+        requestService.finish(recovered, directory(later), account(later), later);
+        var ready = executionRequests.find("demo", request.input().id()).orElseThrow();
+        assertThat(ready.status()).isEqualTo(PaymentExecutionRequest.Status.READY);
+        var checking = execution.claim("demo", authorization.terms().id(), later);
+        execution.checkFailed(checking, PaymentOperation.Failure.TIMEOUT, false, later);
+        requestService.fail(work, PaymentExecutionRequest.Failure.INTERNAL_ERROR, false, later);
+        assertThat(executionRequests.find("demo", request.input().id())).contains(ready);
+        assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+                Long.class, authorization.terms().binding().applicationId().toString())).isZero();
+        assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isZero();
+    }
+
+    @Test void requestExpiryNotificationFailureRollsBackAuthorizationRequestAndOutboundIntent() throws Exception {
+        var recipient = new io.agentflow.common.Actor("demo", "cashier", java.util.Set.of("CASHIER"));
+        var preference = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, preference.version(), true, false);
+        try {
+            var authorization = authorized(); var request = request(authorization, "v1"); var until = authorization.decision().expiresAt();
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT payment_request_notice_fixture CHECK(application_id<>'"
+                    + authorization.terms().binding().applicationId() + "' OR kind<>'PAYMENT_ATTENTION' OR recipient_id<>'cashier')");
+            try { assertThatThrownBy(() -> requestService.claim("demo", request.input().id(), until)).isInstanceOf(RuntimeException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT payment_request_notice_fixture"); }
+            assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization);
+            assertThat(executionRequests.find("demo", request.input().id())).contains(request);
+            assertThat(requestNotificationRecipients(authorization)).isEmpty();
+            assertThat(requestService.claim("demo", request.input().id(), until)).isNull();
+            assertThat(authorizations.find("demo", authorization.terms().id()).orElseThrow().status()).isEqualTo(PaymentAuthorization.Status.EXPIRED);
+            assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.EXPIRED);
+            assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
+            var target = notificationGet(requestNotificationPath(authorization, "cashier"), "cashier"); assertThat(target.getStatus()).isEqualTo(200);
+            assertThat(json.read(target.getContentAsString(), JsonNode.class).at("/payment/operation").isNull()).isTrue();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.application_id=? AND n.kind='PAYMENT_ATTENTION'",
+                    Long.class, authorization.terms().binding().applicationId().toString())).isEqualTo(1);
+            assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
+        } finally {
+            var current = notificationPreferences.get(recipient);
+            notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    private List<String> requestNotificationRecipients(PaymentAuthorization authorization) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_ATTENTION'",
+                String.class, authorization.terms().binding().applicationId().toString());
+    }
+
+    private String requestNotificationPath(PaymentAuthorization authorization, String recipient) {
+        String id = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND recipient_id=? AND kind='PAYMENT_ATTENTION'",
+                String.class, authorization.terms().binding().applicationId().toString(), recipient);
+        return "/api/v1/notifications/" + id + "/payment-target";
+    }
+
     @Test void paymentResultNotifiesOnlyOriginalParticipantsOnceWithoutCopyingFinancialFields() {
         var payment = job(); worker.poll();
         assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
@@ -844,6 +925,7 @@ class PaymentOperationIntegrationTest {
         requestWorker.poll(); assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.QUEUED);
         requestWorker.poll(); var ready = executionRequests.find("demo", request.input().id()).orElseThrow(); assertThat(ready.status()).isEqualTo(PaymentExecutionRequest.Status.READY);
         requestService.finish(stale, directory(now()), account(now()), now()); assertThat(executionRequests.find("demo", request.input().id())).contains(ready);
+        assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_operation WHERE tenant_id='demo' AND id=?", Long.class, authorization.terms().id().toString())).isEqualTo(1);
         assertThat(WRITES.get()).isZero();
     }
@@ -863,6 +945,7 @@ class PaymentOperationIntegrationTest {
             tx().executeWithoutResult(status -> { sources.lock(authorization); authorizations.update(authorization.voidBeforeExecution("finance", "取消尚未完成的执行检查", now())); });
             release.countDown(); running.get(4, TimeUnit.SECONDS);
             assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.VOIDED);
+            assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
             assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
         } finally { release.countDown(); thread.shutdownNow(); }
     }
@@ -872,6 +955,7 @@ class PaymentOperationIntegrationTest {
         requestService.finish(work, directory(until), account(until), until);
         assertThat(authorizations.find("demo", authorization.terms().id()).orElseThrow().status()).isEqualTo(PaymentAuthorization.Status.EXPIRED);
         assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.EXPIRED);
+        assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
         assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
     }
 
