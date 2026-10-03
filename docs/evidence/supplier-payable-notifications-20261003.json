@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T23:22:35.827556+00:00",
+  "task": "F17",
+  "status": "SUPPLIER_PAYABLE_SOURCES_AND_UI_SCOPE_VERIFIED_TASK_OPEN",
+  "sourceCommit": "24b0096108349599c3feec7c1347376249821288",
+  "branch": "codex/governance-identifier-integration",
+  "knownOpenTaskCount": 34,
+  "businessCodeChanged": true,
+  "sourceTrace": {
+    "callers": [
+      "SupplierFinanceActions",
+      "SupplierPayableReviewWorker",
+      "SupplierPayableHoldWorker"
+    ],
+    "downstream": [
+      "SupplierPayableReview",
+      "SupplierPayableHoldOperation",
+      "SupplierPaymentAuthorization",
+      "SupplierAuthorizationRetirement",
+      "ProcurementPayablePort",
+      "SupplierPayableHoldPort"
+    ],
+    "responsibility": "原应用服务保存后发布事件；领域拥有状态与结束依据；通知层拥有最小内容、实际收件范围、原记录投影与去重。",
+    "transaction": "原业务修订、站内消息、外发意向共享事务；网关和外发不在该事务内执行。",
+    "existingCoverageGap": "既有付款通知从出纳请求开始；原复核和预留测试只核验状态与资金安全，没有断言收件消息。"
+  },
+  "delivered": {
+    "reviewFacts": [
+      "REVIEW_UNAVAILABLE",
+      "REVIEW_BLOCKED",
+      "REVIEW_SOURCE_CHANGED",
+      "REVIEW_INTERRUPTED"
+    ],
+    "operationFacts": [
+      "UNKNOWN",
+      "NOT_FOUND",
+      "HELD",
+      "REJECTED",
+      "RECONCILING",
+      "EXPIRED",
+      "VOIDED",
+      "RETIRED"
+    ],
+    "reviewRecipients": "原 requestedBy 财务；不向申请人或其他财务分享未消费复核材料。",
+    "holdRecipients": "原申请人与原授权人；实际结束另包含 retiredBy，去重并重新核对人员和原法人任职。",
+    "target": "GET /api/v1/notifications/{id}/supplier-payable-target",
+    "detailScope": "本人消息、原批准修订、原事实及发生时间、当前原轮次可读和财务字段权限；管理员无绕过。",
+    "historicalBinding": "原复核或预留编号固定；后续重新授权不替换旧消息。",
+    "minimalProjection": "不含金额、账户、外部引用、命令、参与人名单或办理许可。"
+  },
+  "redEvidence": {
+    "backend": {
+      "baselineEvidence": "docs/evidence/financial-notifications-runtime-20261003.json",
+      "failures": 3,
+      "cases": [
+        "payableReviewFailureNotifiesOriginalParticipant",
+        "payableHoldUnknownNotifiesOriginalParticipants",
+        "payableAuthorizationRetirementNotifiesActualDecision"
+      ],
+      "reason": "业务状态已保存但对应收件消息为空；原始失败、XML 和可重放补丁保留。"
+    },
+    "frontend": {
+      "failures": 1,
+      "reason": "实际 NotificationInbox 缺少查看原应付按钮。"
+    },
+    "fixtureCorrection": "完整前端新增范围首次为 11 通过、1 失败；将沿用的原指令从未发送断言更正为实际原预留从未发送，随后 12 项通过。未计为产品缺陷。"
+  },
+  "validation": {
+    "java": {
+      "classes": 13,
+      "distinctCases": 301,
+      "results": [
+        {
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.notification.InboxIntegrationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.notification.NotificationDeliveryApiIntegrationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierAdjustmentPersistenceTest",
+          "tests": 47,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierFinanceWorkflowTest",
+          "tests": 95,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierPayableHoldPersistenceTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierPayableHoldTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierPayableNoticeTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierPayableReviewPersistenceTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierPayableReviewTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierPaymentPersistenceTest",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierSettlementPersistenceTest",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "exitCode": 0,
+      "reportSource": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire",
+      "counting": "一次指定范围实际运行，按 XML 的 classname/name 去重；没有累加历史报告。",
+      "newIntegrationCases": 9,
+      "newDomainCases": 2,
+      "selector": "SupplierPayableNoticeTest,SupplierPayableReviewTest,SupplierPayableHoldTest,SupplierPayableReviewPersistenceTest,SupplierPayableHoldPersistenceTest,SupplierPaymentPersistenceTest,SupplierSettlementPersistenceTest,SupplierAdjustmentPersistenceTest,SupplierFinanceWorkflowTest,NotificationDeliveryIntegrationTest,NotificationDeliveryApiIntegrationTest,InboxIntegrationTest,OpenApiContractTest"
+    },
+    "web": {
+      "testFiles": 21,
+      "tests": 200,
+      "failures": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "newCases": 12,
+      "environment": "真实 Vue 组件及 API/导航模块，测试渲染器，不是实际浏览器。"
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 360,
+      "schemas": 748,
+      "requestExamples": 125
+    },
+    "build": {
+      "exitCode": 0,
+      "warning": "已有大资源块提示保留。"
+    },
+    "authors": {
+      "javaFiles": 1625,
+      "namedTypes": 3170,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    },
+    "package": {
+      "exitCode": 0,
+      "testsSkipped": true,
+      "note": "打包不重复计为测试运行；前述 301 项来自独立范围门禁。"
+    }
+  },
+  "fixedPackage": {
+    "sourceCommit": "24b0096108349599c3feec7c1347376249821288",
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-server-24b0096.jar",
+    "sha256": "86dd5149834888c66c2b6e1afe29c6f3f3d0167c7a1af15babeef13a80a6117c",
+    "webDirectory": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/web-dist",
+    "runtimeAcceptance": "PENDING"
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot",
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java": "f1c96b6d713cf10bbb7d80be21a07d7ffba416e321fc565622cc882a89903330",
+    "agentflow-domain/src/main/java/io/agentflow/notification/SupplierPayableNotice.java": "c12996acc578c9bebce965c17d1052f1ce10a52c2bea17cd23f104027a9c5bd2",
+    "agentflow-domain/src/test/java/io/agentflow/procurement/SupplierPayableNoticeTest.java": "1928a6ee173c0bcea5a891424ed8c161920e2e5cb55a69dd02187fe93740b609",
+    "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java": "651c3c4be16b3d143cd6d086902f8150952a0903c41f5072356c0f1994c3043f",
+    "agentflow-server/src/main/java/io/agentflow/notification/SupplierPayableNotificationAccess.java": "789284d8cb84ea91872b55b3ec8e2058f762dfb696cac840a6d45be1ec2b47d7",
+    "agentflow-server/src/main/java/io/agentflow/notification/SupplierPayableNotificationController.java": "ab9a0cd73d1211eb81e2ab34bee62b62840945b63107333de9269d9dbf71c3b5",
+    "agentflow-server/src/main/java/io/agentflow/notification/SupplierPayableNotificationService.java": "8929bdde71dcadb88c6c6e05c5c4e416860687e250be23c415349f4f7c75e2f6",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableChanged.java": "4cc2432412c3821a65fb2ab16e5692398d4b9ba0c09309b9ebb6d2e3fcab09e8",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldService.java": "2e08188dc76750fab4c1cac3f920eaf4a5a3e4795f1fa856e62aa8a3fd7994f8",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewService.java": "3079b7989f25b56565d8c7973fc0ef991a5b10864adeda3fd4bef78847caecf7",
+    "agentflow-server/src/main/resources/api/openapi.json": "33a98bc230a26bc0d10cfe977c6d60c854bc0b44b544fa28406f04fac9d83b19",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "a62ae7251c56b9721305c124ea1a62f1ff074736d788cede7cbfae355860259a",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierAdjustmentPersistenceTest.java": "38ab51dfa3a8c470e959b5a755c0b1a94cc8b538e06a8b42b94f71cf5794916e",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierFinanceWorkflowTest.java": "75b5ce558bd55846467b53d2ca8de32dc9268be95817c2c9f66a0379374a7256",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPayableHoldPersistenceTest.java": "b51a4b6425bf8f04987350d6a1b8673dd39be5cd56d625237bf12d31ac18f38b",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPayableReviewPersistenceTest.java": "afb3d90307c9b2ec14d217451a0faacbe8df81dc29d014e7439dbdb16c5ab5cf",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPaymentPersistenceTest.java": "a1daf0ac05ea36719b9c9262c8ec85496af9bc8558303ca4c7942106862fb35a",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierSettlementPersistenceTest.java": "3cdb2bbad06eabff5531e98dba194e8fdf972faf2c2713781448a3e409e51d7f",
+    "agentflow-web/scripts/test-requests.mjs": "1bb570c187573d79fb96898f71a46c03f611e4094627972fdaa595bb0f287fd7",
+    "agentflow-web/src/App.vue": "4aa0aed53e9ec988c18925d55186b4337a7a5af4666a49f130ac5012621286e6",
+    "agentflow-web/src/api.ts": "3d4e9357efa6aa940e9b6114014a49c853ccb56288e3359dc1074401c525c942",
+    "agentflow-web/src/components/NotificationInbox.vue": "88221592b53946316bef14b20a459e75ab6a3ee94942d530b8e387e3236f764b",
+    "agentflow-web/src/components/SupplierPayableNotificationDetail.vue": "64dd65e6dc7dbc66490023c6ee481a8ea8923effd4eaa6eeb5d0cf6870fbf57d",
+    "agentflow-web/src/notificationInbox.ts": "e7288367e15cd3fc3b5e3686651684d7dec26acfe5f8d67e0f57bf1aef99eea6",
+    "agentflow-web/src/supplierPayableNotification.ts": "67c94ceda649306ff46b3b817f90854fb31782c25fe7478ec139c7487f4681b4",
+    "agentflow-web/tests/supplier-payable-notifications.test.mjs": "f60010521c96727bb6b8e3182a20da26d6574d28574c27358425c6aa013a5815"
+  },
+  "artifactHashes": {
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/reproduction/supplier-payable-notifications-red-cases.txt": "5c56b2cb7dea09223c3172a9418b2e10db43f40e6f37fe0b7223940075fb92e1",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/reproduction/supplier-payable-notifications-red-summary.json": "362e8a48677338f8740110b58bda19011adeafa3181b247c275a90b361176b85",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/reproduction/supplier-payable-notifications-red.log": "c837c5dfc7f54bec6fabc90d01697bb7a27fe3f74cc9e62ab11262d46cce9db8",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/reproduction/supplier-payable-notifications-red.patch": "4f8dc8d8b808d8ce1e5257ba0db730be23e7caf2de87da85ce6805f8d34a9ebf",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/reproduction/supplier-payable-notifications-red.xml": "622fd19f8534d02fa0504aadeb2a563c8f631aa33f8ad3aabb7e8055987b8425",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/source.patch": "90a0e95fb54893dce69c99121e9c664e016507700925c5a85abca9556d6adf25",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-authors.log": "c6d115d7859eaea8206a5c9b0bfbce217dc6784450909474c4356627892e1ced",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-build.log": "b5898a9ca48fe49f56a50c1e91e47aac92a840fda539493fe89ce1ed357da49a",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-commit-identity.json": "7a644eaebbc46ecd0325940399e9832877f49089648758597a3ab0fafed71ea7",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-openapi.log": "d7f578b26e02a3954b9a05a40ba1e8b9088d50c0e7f5bbafb028cb97d79a775b",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-package.log": "191e9ee2b4dd0a0e1fb0f4c694e2682d38c2a218f22f885815e3e8b2547bfcd9",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-scope.log": "7c081e8def9d92839c70e48f08c0f916e9ac5d60be9e637f8aea8a90cae0eb6d",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-source-files.json": "251401741c0307ad7a287690d539d42fc7f3aec8e3834b31397e9427d36df5cb",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-typecheck.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-web-initial.log": "f52456f5fd53ef15e5fb8823908c328f6e95f731768c73fb37ad2a271457bc59",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-web-red.log": "5cf796eb473940b1318fc8c3184797fb175af68b1706e11f49464bab2b005ba5",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-web-regression-command.json": "00119c26b945b4c5313ff81284ff07803628694289ade9792b515cc5108c2c06",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-web-regression.log": "d0eb7905b7d898b3882241e26ac18504735662737381d21189fc23ee75f0d1e1",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/supplier-payable-notifications-web-scope-green.log": "c4f726f406e43d62e20d8dc0e01a1a229c778c059900b0d11dbe81b2c218253f",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.api.OpenApiContractTest.xml": "0f676517204102c263d1f11055517c2b44023a8f5c075dd16f769c4d93c99bff",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.notification.InboxIntegrationTest.xml": "a7f26f5703bddae717bae5fe5de08d06a3d846b612ee74bb41b033527cb6e1e9",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml": "b85f5d3b33e3602138f890539885dfcbc8ea439afc7930f763300b808f67d4a0",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml": "3a1ef7d6fbda4f83667d6c49d0351a3e4f091387e532aee957aa97709e95dda2",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierAdjustmentPersistenceTest.xml": "6b514d74d5ae0a8e88f50b0d5aae10ceb819b734c702724ca04f670bd527a47e",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierFinanceWorkflowTest.xml": "e90f111178d26c1abcdc0490626233b274289647d2baa013205df864a20518d3",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierPayableHoldPersistenceTest.xml": "305ea6128b3a829bce9de4e16e5ec87effded3c55ed1632350253132e3dcbcaa",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierPayableHoldTest.xml": "ff6b6a8cbcc4308d1c8b0b9d27d180d96c40f1afb5eedcbac64cd41412a71b24",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierPayableNoticeTest.xml": "77bc87238eeb83da93731853d35e9a0c5f20b2a076aae726487a0ecae49042bf",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierPayableReviewPersistenceTest.xml": "a9e1c2b05a118f075825210a5ea79bf18222e720c0abe793124462c0a66d131d",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierPayableReviewTest.xml": "528c34753c0dcde87dc4e8b5ff4160563ea3c7448af8b1e54d0b85777750f86a",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierPaymentPersistenceTest.xml": "61cc818e45402397805650ec2b217d8c4fc5693ccaae271a013591447f146233",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/TEST-io.agentflow.procurement.SupplierSettlementPersistenceTest.xml": "cec4434eee662b73eb6a46ec07ada4a451e66da2c06db207c695c5fc2cdd32d0",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/surefire/summary.json": "99aa9182498126b9cd3a35507a43fd8e04d7d63b113d7d2e1a8d2e3de65ac1b2",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/web-dist/assets/index-DU0REWUh.css": "b108c54bbb537f3000c907d3b3a579d51c1a543c4a32334f592a0675df94c69e",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/web-dist/assets/index-b0WqfcTn.js": "36d7a70578f998de1606619835e11e93f26fa1922ee0a6e5a42f8fca4af67785",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-evidence-snapshot/web-dist/index.html": "7d6ab2f4d4fdf0602b714b907f6006df7bb28c4d5f7d13e8025d1016f17a718d",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-payable-notifications-server-24b0096.jar": "86dd5149834888c66c2b6e1afe29c6f3f3d0167c7a1af15babeef13a80a6117c"
+  },
+  "remaining": [
+    "以本次固定包验证新增原应付来源的 HTTP、持久化、重启与恢复；前次固定包属于旧源码，不能替代。",
+    "F17 余下业务来源继续反向核对，不以新增一个通知家族宣称完整覆盖。",
+    "浏览器管理员策略与 PostgreSQL Docker I/O 限制未绕过，相关补验保留。",
+    "真实企业邮件、IM、财务及银行仍由各 E 项验收；V02 后才进入 E15 推送、PR 与 CI。",
+    "V03 未完成，34 是确认下限；F04/F05 原业务问题仍待答复。"
+  ]
+}

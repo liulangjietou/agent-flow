@@ -2,6 +2,8 @@
 
 F17 仍为 OPEN，已确认未完成总数保持 **34 项**。本轮验证固定后端包的真实 HTTP、持久化、重启与独立恢复，同时复现供应商应付来源的三个漏通知场景；没有把已实现的通知类数量当作完整覆盖证明。
 
+后续进展：上述三个供应商应付缺口已在 `24b0096` 补齐来源、只读接口和消息页面，并通过范围测试，见[实施记录](supplier-payable-notifications.md)。本文的固定包和恢复结果仍对应下列原源码；新增来源的固定包补验单独进行。
+
 ## 已验证范围
 
 产品源码为 `6bc1d184009fee36b0d99cbee6a74a195fca250d`，固定后端 jar 的 SHA-256 为 `814aad25835bf05b001849adb4929bcc74b922769bb46cce22c8feb94bfc3c4b`。现有 17 类通知、55 处发布点完成组合核对，32 个测试类中的 **408 个不同 Java 用例通过**。原核减通知仍由 `ExpenseReductionService → ApprovalNotificationService.expenseAdjusted` 生成，已有成功与回滚证据保留。

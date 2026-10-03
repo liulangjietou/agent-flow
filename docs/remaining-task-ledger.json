@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T23:05:26.538033+00:00",
+  "recordedAt": "2026-10-03T23:22:35.827556+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "现有 17 类通知通过 408 个不同 Java 用例；固定后端 HTTP 验证付款未知原号恢复、消息/意向重启保留、当前失权抑制和明确确认后原投递重试。独立恢复保留 253 张表、427 条记录；230 份响应及 43 份请求通过契约。反向来源核对新复现供应商应付复核、ERP 预留异常和授权安全结束的漏通知，3 个最小用例因消息为空失败；这些仍属 F17。浏览器与 PostgreSQL 补验保持待办。",
+      "observed": "原 17 类通知已有固定后端运行与独立恢复证据；本轮补齐第 18 类供应商应付复核、ERP 预留及实际安全结束来源，原复核/预留编号、同事务消息与外发意向、当前权限和只读页面已接通。301 个 Java、200 个前端范围用例及构建/契约通过。新增来源固定包运行与来源核对仍待继续；浏览器与 PostgreSQL 补验保持待办。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1782,6 +1782,14 @@
         },
         {
           "path": "docs/evidence/financial-notifications-runtime-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-payable-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-payable-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3582,10 +3590,10 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "FIXED_BACKEND_RUNTIME_VERIFIED_SOURCE_GAPS_REPRODUCED_TASK_OPEN",
-    "recordedAt": "2026-10-03T23:05:26.538033+00:00",
-    "sourceCommit": "6bc1d184009fee36b0d99cbee6a74a195fca250d",
-    "evidence": "docs/evidence/financial-notifications-runtime-20261003.json",
+    "status": "SUPPLIER_PAYABLE_SOURCES_AND_UI_SCOPE_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-03T23:22:35.827556+00:00",
+    "sourceCommit": "24b0096108349599c3feec7c1347376249821288",
+    "evidence": "docs/evidence/supplier-payable-notifications-20261003.json",
     "knownOpenTaskCount": 34
   }
 }
