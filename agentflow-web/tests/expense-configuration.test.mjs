@@ -146,6 +146,18 @@ test('类别刷新保留本地旧基线并阻止覆盖；显式放弃后采用�
   assert.equal(panel.state.categories.baseline.version, 2); assert.equal(panel.state.categories.categories[0].name, '办公费'); panel.close()
 })
 
+test('全局原请求恢复的刷新不被尚未释放的编辑锁挡住', async () => {
+  stubReads(); const panel = await mount(); await panel.state.selectPolicy('expense-standard')
+  panel.state.policy.definition.name = '恢复后的制度'; panel.state.policy.comment = '修改'
+  panel.props.locked = true
+  drafts.configurationDrafts.acknowledge(panel.props.scopeKey, '/admin/expense-policies/expense-standard/draft', JSON.stringify(drafts.policyInput(panel.state.policy)))
+  api.expensePolicyDraft = async () => ({ ...draft(2), definition: { ...definition(), name: '恢复后的制度' } })
+  api.saveExpensePolicyDraft = async () => assert.fail('恢复刷新只读')
+  panel.props.refreshVersion++; await settle(); await settle()
+  panel.props.locked = false; await settle()
+  assert.equal(panel.state.policy.baseline.revision, 2); assert.equal(panel.state.policy.definition.name, '恢复后的制度'); assert.equal(panel.state.policy.comment, ''); panel.close()
+})
+
 test('发布先读三版本，未确认不发送；确认后仅发送保存的三版本和理由', async () => {
   stubReads(); const panel = await mount(); await panel.state.selectPolicy('expense-standard')
   let request; api.publishExpensePolicy = async (key, input) => { request = { key, input }; return current(true) }

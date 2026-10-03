@@ -63,4 +63,6 @@ onUnmounted(clear)
 </template>
 <style scoped>
 .mapping-history{padding:18px;border:1px solid var(--line);border-radius:12px;margin:14px 0;font-size:13px}.history-heading,.draft-lookup{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.history-heading{justify-content:space-between}h3,h4{margin:0;font-size:15px}ol{list-style:none;padding:0}li button{display:grid;text-align:left;gap:5px;width:100%;padding:13px;background:var(--paper);border:1px solid var(--line);margin-bottom:8px;border-radius:8px;overflow-wrap:anywhere}li span,small{font-size:12px;color:var(--muted)}.draft-lookup label{display:grid;gap:5px}.draft-lookup input{width:95px}.history-detail{padding:16px;margin-top:14px;background:var(--paper);border-radius:8px;overflow-wrap:anywhere}.history-error{color:var(--red,#c9564d)}button:focus-visible,input:focus-visible{outline:2px solid #087a76;outline-offset:3px}
+
+input{font:inherit;color:var(--ink);background:#fff;border:1px solid #cfdbd9;border-radius:7px;padding:10px;min-height:40px;box-sizing:border-box}
 </style>

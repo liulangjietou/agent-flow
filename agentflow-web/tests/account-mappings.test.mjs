@@ -164,6 +164,18 @@ test('刷新不把本地修改重套新基线，旧草稿需显式放弃', async
   panel.state.discardChanges(); assert.equal(panel.state.edit.baseline.revision, 2); panel.close()
 })
 
+test('全局原请求恢复仍持有操作锁时，刷新也须接纳已确认的保存修订', async () => {
+  stubReads(); const panel = await mount(); await panel.state.selectMapping(key)
+  panel.state.edit.definition.name = '恢复后名称'; panel.state.edit.comment = '修改'
+  panel.props.locked = true
+  drafts.mappingDrafts.acknowledge(panel.props.scopeKey, '/admin/account-mappings/' + key + '/draft', JSON.stringify(drafts.mappingInput(panel.state.edit)))
+  api.accountMappingDraft = async () => ({ ...draft(2), definition: { ...definition(), name: '恢复后名称' } })
+  api.saveAccountMappingDraft = async () => assert.fail('恢复后的刷新不能重新写入')
+  panel.props.refreshVersion++; await settle(); await settle()
+  panel.props.locked = false; await settle()
+  assert.equal(panel.state.edit.baseline.revision, 2); assert.equal(panel.state.edit.definition.name, '恢复后名称'); assert.equal(panel.state.edit.comment, ''); panel.close()
+})
+
 test('发布确认重新读取三个版本，明确确认后才发送', async () => {
   stubReads(); const panel = await mount(); await panel.state.selectMapping(key)
   let sent; api.publishAccountMapping = async (key, body) => { sent = { key, body }; return current(true) }
