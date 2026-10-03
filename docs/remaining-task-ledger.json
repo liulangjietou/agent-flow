@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T09:10:56.203357+00:00",
+  "recordedAt": "2026-10-03T09:57:38.042206+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1653,7 +1653,7 @@
           ]
         }
       ],
-      "observed": "固定契约、字段权限投影、不可变命令和查询优先的恢复状态已实现并验证。持久目录/队列、事务外适配器、Flowable 等待推进、模拟及页面尚未接通；DefinitionValidator 仍拒绝公开使用 SERVICE_TASK。",
+      "observed": "可信目录与持久队列、事务外 HTTP、原生等待推进已完成组件验证，含暂停/停止、撤回重提、并发、原号恢复和 V106 升级。161 项范围回归、18 项 PostgreSQL 验证通过。公开目录、设计绑定、模拟及页面尚未接通；DefinitionValidator 仍拒绝公开使用 SERVICE_TASK，独立进程和配套恢复尚待验收。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskOperation.java",
@@ -1670,14 +1670,19 @@
         {
           "path": "docs/evidence/service-task-foundation-20261003.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/service-task-backend-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。",
       "dependsOn": [],
       "progress": {
-        "stage": "DOMAIN_FOUNDATION_VERIFIED",
-        "implementationCommit": "a065643f52ef97177f123aa90b090f4615133f4f",
-        "evidence": "docs/evidence/service-task-foundation-20261003.json"
+        "stage": "BACKEND_COMPONENTS_VERIFIED",
+        "implementationCommit": "9c0bdda645053ca5fb728d77040718cd4f922027",
+        "evidence": "docs/evidence/service-task-backend-20261003.json",
+        "domainFoundationEvidence": "docs/evidence/service-task-foundation-20261003.json"
       }
     },
     {
@@ -3392,8 +3397,8 @@
   },
   "latestProgress": {
     "taskId": "W01",
-    "status": "DOMAIN_FOUNDATION_VERIFIED",
-    "implementationCommit": "a065643f52ef97177f123aa90b090f4615133f4f",
-    "evidence": "docs/evidence/service-task-foundation-20261003.json"
+    "status": "BACKEND_COMPONENTS_VERIFIED",
+    "implementationCommit": "9c0bdda645053ca5fb728d77040718cd4f922027",
+    "evidence": "docs/evidence/service-task-backend-20261003.json"
   }
 }

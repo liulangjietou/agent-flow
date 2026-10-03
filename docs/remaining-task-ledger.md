@@ -10,7 +10,7 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 
 计数单位是一个可独立验收的交付目标。同一功能的后台、页面、迁移和测试合算一项；本地实现与企业实际联调分开。已完成 OFD 组件属于 A01 的阶段进展，不把每个图元或测试计成新任务。
 
-W01 已完成领域基础：固定契约、字段权限投影、原命令摘要和查询恢复状态；1,023 项领域测试通过，末次 30 项领域及 32 项服务端回归通过，范围重叠不累加。持久执行、引擎衔接和页面仍待接通，因此总数保持 34。见[阶段证据](evidence/service-task-foundation-20261003.json)。
+W01 已完成领域基础和后台组件：可信目录、持久队列、事务外 HTTP、原号恢复及原生等待推进。161 项范围回归和 18 项 PostgreSQL 流程/非空升级测试通过，两组有重叠，不累加。公开目录、设计绑定、模拟与页面，以及独立安装包的重启/配套恢复仍待完成，总数保持 34。见[后台阶段证据](evidence/service-task-backend-20261003.json)和[实现说明](service-tasks.md)。
 
 机器可读原表：[remaining-task-ledger.json](remaining-task-ledger.json)。原始规范为相邻 `doc/00` 至 `doc/05`，路径、SHA-256、规范行范围保存在原表；后附历史进度不再重复计为新需求。
 
@@ -46,7 +46,7 @@ W01 已完成领域基础：固定契约、字段权限投影、原命令摘要�
 | F15 | 费用财务专用报表 | 当前运营统计涵盖审批均时、退回、SLA、通知和 Agent 采纳；没有费用 P50/P90、超标核减、查验重复拦截、借款账龄和计划执行率的读模型。 [ApprovalOperationsReadPort.java:36](../agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java#L36)、[operations-outcome-metrics.md:1](operations-outcome-metrics.md#L1) | 按法人/部门/类别提供提交至批准至付款 P50/P90、超标核减和退回原因、查验失败和重复拦截、借款账龄/计划执行率、凭证/付款失败积压；口径、未知样本与权限可核验。 原依据：05 §17。 |
 | F16 | 出纳工作台法人/账户/到期日筛选 | CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。 [CashierPaymentWorkspace.java:81](../agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java#L81)、[payment-batches.md:1](payment-batches.md#L1) | 定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。 原依据：05 §10.2；01 费用报销页面。 |
 | F17 | 付款结果与财务异常业务通知 | InboxMessage.Kind 已有审批和核减事件，但没有付款结果或异常事件；PaymentOperationChanged 现有监听器用于凭证和结算，不向收件人生成消息。 [InboxMessage.java:31](../agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java#L31)、[PaymentOperationService.java:127](../agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java#L127) | 真实结果/冲突驱动最小站内通知与外发意向；接收人和读取权限实时校验；重复或迟到事件去重；未知不写成成功，核减既有通知保持。 原依据：04 §3.F。 |
-| W01 | 白名单服务任务的设计与执行 | 固定契约、字段权限投影、不可变命令及恢复状态已验证；持久目录/队列、适配器、Flowable 衔接、模拟和页面仍待开发，公开入口保持关闭。见[阶段证据](evidence/service-task-foundation-20261003.json)。 | 仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。 原依据：04 §3.D；02 §7。 |
+| W01 | 白名单服务任务的设计与执行 | 领域基础、持久目录/队列、事务外 HTTP 和原生等待推进已有组件证据；目录接口、设计绑定、模拟、页面及固定包验收未完成。公开 SERVICE_TASK 仍关闭。 [后台阶段证据](evidence/service-task-backend-20261003.json)、[实现说明](service-tasks.md)。 | 仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。 原依据：04 §3.D；02 §7。 |
 
 ### 本地验收与核对
 
@@ -114,4 +114,4 @@ W01 已完成领域基础：固定契约、字段权限投影、原命令摘要�
 
 ## 接续顺序
 
-按本地优先的授权，F01、F02、F03、F06、F07、F08、F10、F13 已完成，当前推进 W01 的持久执行与引擎衔接；F04 的聚合时间窗口和有效单据口径、F05 的超容差规则仍等待业务答复。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。
+按本地优先的授权，F01、F02、F03、F06、F07、F08、F10、F13 已完成，当前推进 W01 的目录接口、设计绑定和页面；F04 的聚合时间窗口和有效单据口径、F05 的超容差规则仍等待业务答复。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。
