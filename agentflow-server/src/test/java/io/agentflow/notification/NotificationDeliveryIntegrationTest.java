@@ -174,6 +174,16 @@ class NotificationDeliveryIntegrationTest {
         assertThat(get(value).progress().attempts()).isZero();
     }
 
+    @Test void nanosecondClaimReturnsThePersistedLeaseAndExpiresAtThatBoundary() {
+        bind(target()); var value = enqueue(ALICE);
+        // 固定纳秒且略晚于当前时钟，确保领取用例不会以加锁后的时间替换夹具。
+        Instant claimedAt = Instant.now().plusSeconds(2).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusNanos(123_456_789);
+        var claim = deliveries.claim(value.id(), claimedAt);
+        assertThat(claim.delivery().progress()).isEqualTo(get(value).progress());
+        assertThat(deliveries.claim(value.id(), claim.delivery().progress().leaseUntil())).isNull();
+        assertThat(get(value).progress().status()).isEqualTo(Status.UNKNOWN);
+    }
+
     @Test void expiredClaimNeverResendsAndExplicitRetryRejectsLateOriginalReceipt() {
         bind(target()); var value = enqueue(ALICE); var claim = deliveries.claim(value.id(), Instant.now());
         assertThat(deliveries.claim(value.id(), claim.delivery().progress().leaseUntil())).isNull();

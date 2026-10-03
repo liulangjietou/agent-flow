@@ -4463,8 +4463,9 @@ class ExpenseSubmissionIntegrationTest {
         var key = UUID.randomUUID().toString(); var queued = ok(send(route + "/actions", "finance", key, query), 202);
         assertThat(ok(send(route + "/actions", "finance", key, query), 202)).isEqualTo(queued);
         assertCode(send(route + "/actions", "finance", query), "CONCURRENCY_CONFLICT");
-        var reading = reversalExecution.claim("demo", receipt.reversalId(), Instant.now()); var at = Instant.now();
-        reversalExecution.finish(reading, new FinanceResult.Success<>(new VoucherReversalObservation(receipt.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at);
+        var reading = reversalExecution.claim("demo", receipt.reversalId(), Instant.now()); var at = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(789);
+        // 保留外部观察的纳秒，模拟后台读取结果后才以微秒时钟完成本地动作。
+        reversalExecution.finish(reading, new FinanceResult.Success<>(new VoucherReversalObservation(receipt.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at.plus(1, java.time.temporal.ChronoUnit.MICROS));
         var notFound = ok(read(route, "finance"), 200); assertThat(notFound.at("/operation/canResendOriginal").asBoolean()).isTrue();
         var resend = new VoucherReversalPreparationService.OperationInput(1, app(report).version(), current(report).version(), original.version(), receipt.reversalId(), notFound.at("/operation/version").asLong(), VoucherReversalPreparationService.Action.RESEND_ORIGINAL, "查无受理后明确按原编号重发");
         assertThat(send(route + "/actions", "cashier", resend).getStatus()).isIn(403, 404);
@@ -4496,10 +4497,11 @@ class ExpenseSubmissionIntegrationTest {
     @Test void reversalRetirementPreservesConfirmedFailureAndIndependentPaymentDispute() throws Exception {
         var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll(); var resources = resourceVersions(report);
         var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
-        var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var at = Instant.now();
+        var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var at = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(789);
         var rejected = new VoucherReversalObservation(authorized.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.FAILED, 1, at,
                 "ERP-REJECTED-BEFORE-POSTING", null, VoucherReversalObservation.Rejection.ACCOUNTING_PERIOD_CLOSED);
-        reversalExecution.finish(claimed, new FinanceResult.Success<>(rejected), at);
+        // 完成动作晚于外部观察，避免夹具在时钟精度转换后把合法原件放到未来。
+        reversalExecution.finish(claimed, new FinanceResult.Success<>(rejected), at.plus(1, java.time.temporal.ChronoUnit.MICROS));
         var failed = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
         var oldOriginal = voucherOperations.find("demo", authorized.operationId()).orElseThrow();
         assertThatThrownBy(() -> asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, oldOriginal, failed))))

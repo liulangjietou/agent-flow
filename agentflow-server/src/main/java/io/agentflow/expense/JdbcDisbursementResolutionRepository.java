@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.jdbc.JdbcTimestampPrecision;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -38,7 +39,8 @@ public class JdbcDisbursementResolutionRepository {
                 INSERT INTO advance_disbursement_resolution(tenant_id,id,advance_id,advance_version,check_id,check_version,outcome,resolved_by,observed_at,resolved_at,state_json)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?)
                 """, decision.tenantId(), decision.id().toString(), after.id().toString(), after.version(), decision.checkId().toString(), check.version(),
-                decision.receipt().status().name(), decision.resolvedBy(), Timestamp.from(decision.receipt().observedAt()), Timestamp.from(decision.resolvedAt()), json.write(decision));
+                decision.receipt().status().name(), decision.resolvedBy(), Timestamp.from(JdbcTimestampPrecision.roundedToMicros(decision.receipt().observedAt())),
+                Timestamp.from(JdbcTimestampPrecision.roundedToMicros(decision.resolvedAt())), json.write(decision));
         try {
             for (var entry : after.disbursementReturns()) if (entry.resolutionId().equals(decision.id())) credits.record(decision, entry);
         } catch (DuplicateKeyException duplicate) { throw new DomainException("DISBURSEMENT_RETURN_ALREADY_RECORDED", "Received funds or credit already belongs to another repayment, disbursement adjustment or expense return"); }
@@ -57,7 +59,8 @@ public class JdbcDisbursementResolutionRepository {
             if (!value.tenantId().equals(row.getString("tenant_id")) || !value.id().toString().equals(row.getString("id"))
                     || !command.binding().businessId().toString().equals(row.getString("advance_id")) || !value.checkId().toString().equals(row.getString("check_id"))
                     || !value.receipt().status().name().equals(row.getString("outcome")) || !value.resolvedBy().equals(row.getString("resolved_by"))
-                    || !value.receipt().observedAt().equals(row.getTimestamp("observed_at").toInstant()) || !value.resolvedAt().equals(row.getTimestamp("resolved_at").toInstant())) throw new IllegalStateException("Persisted disbursement resolution identity is inconsistent");
+                    || !JdbcTimestampPrecision.roundedToMicros(value.receipt().observedAt()).equals(row.getTimestamp("observed_at").toInstant())
+                    || !JdbcTimestampPrecision.roundedToMicros(value.resolvedAt()).equals(row.getTimestamp("resolved_at").toInstant())) throw new IllegalStateException("Persisted disbursement resolution identity is inconsistent");
             return value;
         };
     }

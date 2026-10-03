@@ -3,6 +3,7 @@ package io.agentflow.expense;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
+import io.agentflow.jdbc.JdbcTimestampPrecision;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
@@ -43,7 +44,8 @@ public class JdbcExpensePaymentReturnRepository {
                 INSERT INTO expense_payment_return_registration(tenant_id,id,report_id,return_version,settlement_version,check_id,check_version,outcome,registered_by,observed_at,registered_at,state_json)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                 """, tenant, decision.id().toString(), reportId.toString(), after.version(), settlement.version(), decision.checkId().toString(), check.version(),
-                decision.receipt().status().name(), decision.registeredBy(), Timestamp.from(decision.receipt().observedAt()), Timestamp.from(decision.registeredAt()), json.write(decision));
+                decision.receipt().status().name(), decision.registeredBy(), Timestamp.from(JdbcTimestampPrecision.roundedToMicros(decision.receipt().observedAt())),
+                Timestamp.from(JdbcTimestampPrecision.roundedToMicros(decision.registeredAt())), json.write(decision));
         try {
             for (var entry : after.entries()) if (entry.registrationId().equals(decision.id())) credits.record(decision, entry);
         } catch (DuplicateKeyException duplicate) {
@@ -57,7 +59,8 @@ public class JdbcExpensePaymentReturnRepository {
             if (!value.tenantId().equals(row.getString("tenant_id")) || !value.id().toString().equals(row.getString("id"))
                     || !command.binding().businessId().toString().equals(row.getString("report_id")) || !value.checkId().toString().equals(row.getString("check_id"))
                     || !value.receipt().status().name().equals(row.getString("outcome")) || !value.registeredBy().equals(row.getString("registered_by"))
-                    || !value.receipt().observedAt().equals(row.getTimestamp("observed_at").toInstant()) || !value.registeredAt().equals(row.getTimestamp("registered_at").toInstant())) {
+                    || !JdbcTimestampPrecision.roundedToMicros(value.receipt().observedAt()).equals(row.getTimestamp("observed_at").toInstant())
+                    || !JdbcTimestampPrecision.roundedToMicros(value.registeredAt()).equals(row.getTimestamp("registered_at").toInstant())) {
                 throw new IllegalStateException("Persisted expense return registration identity is inconsistent");
             }
             return value;
