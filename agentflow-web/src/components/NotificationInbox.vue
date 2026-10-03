@@ -1,25 +1,28 @@
 <script setup lang="ts">
 import { onUnmounted, reactive, ref, watch } from 'vue'
-import { api, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget } from '../api'
-import { isTaskNotification, isPaymentNotification, isVoucherNotification, isBudgetNotification, isReversalNotification, notificationLabels, NotificationInboxQuery } from '../notificationInbox'
+import { api, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type ReversalCheckNotificationTarget } from '../api'
+import { isTaskNotification, isPaymentNotification, isVoucherNotification, isBudgetNotification, isReversalNotification, isReversalCheckNotification, notificationLabels, NotificationInboxQuery } from '../notificationInbox'
 import PaymentNotificationDetail from './PaymentNotificationDetail.vue'
 import VoucherNotificationDetail from './VoucherNotificationDetail.vue'
 import BudgetNotificationDetail from './BudgetNotificationDetail.vue'
+import ReversalCheckNotificationDetail from './ReversalCheckNotificationDetail.vue'
 import ReversalNotificationDetail from './ReversalNotificationDetail.vue'
 import NotificationPreferencesPanel from './NotificationPreferencesPanel.vue'
 import NotificationDeliveriesPanel from './NotificationDeliveriesPanel.vue'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
-const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage]; paymentOpen: [target: FinancialNotificationTarget]; voucherOpen: [target: VoucherNotificationTarget]; budgetOpen: [target: BudgetNotificationTarget]; reversalOpen: [target: ReversalNotificationTarget] }>()
+const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage]; paymentOpen: [target: FinancialNotificationTarget]; voucherOpen: [target: VoucherNotificationTarget]; budgetOpen: [target: BudgetNotificationTarget]; reversalOpen: [target: ReversalNotificationTarget]; reversalCheckOpen: [target: ReversalCheckNotificationTarget] }>()
 const selectedPayment = ref<InboxMessage | null>(null)
+const selectedReversalCheck = ref<InboxMessage | null>(null)
 const selectedReversal = ref<InboxMessage | null>(null)
 const selectedBudget = ref<InboxMessage | null>(null)
 const selectedVoucher = ref<InboxMessage | null>(null)
 function open(item: InboxMessage) {
-  selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null
+  selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null; selectedReversalCheck.value = null
   if (isPaymentNotification(item)) selectedPayment.value = item
   else if (isVoucherNotification(item)) selectedVoucher.value = item
   else if (isBudgetNotification(item)) selectedBudget.value = item
+  else if (isReversalCheckNotification(item)) selectedReversalCheck.value = item
   else if (isReversalNotification(item)) selectedReversal.value = item
   else emit('open', item)
 }
@@ -27,7 +30,7 @@ const readFilter = ref<'all' | 'unread'>('all')
 const query = reactive(new NotificationInboxQuery(api.inbox))
 function refresh() { void query.load(props.scopeKey, readFilter.value) }
 watch([() => props.scopeKey, () => props.refreshVersion, readFilter], refresh, { immediate: true, flush: 'sync' })
-watch(() => props.scopeKey, () => { selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null }, { flush: 'sync' })
+watch(() => props.scopeKey, () => { selectedPayment.value = null; selectedVoucher.value = null; selectedBudget.value = null; selectedReversal.value = null; selectedReversalCheck.value = null }, { flush: 'sync' })
 onUnmounted(() => query.clear())
 const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 </script>
@@ -38,6 +41,7 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
     <NotificationPreferencesPanel :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
     <NotificationDeliveriesPanel :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
     <PaymentNotificationDetail v-if="selectedPayment" :message="selectedPayment" :scope-key="scopeKey" :locked="locked" @close="selectedPayment = null" @open="emit('paymentOpen', $event)" />
+    <ReversalCheckNotificationDetail v-if="selectedReversalCheck" :message="selectedReversalCheck" :scope-key="scopeKey" :locked="locked" @close="selectedReversalCheck = null" @open="emit('reversalCheckOpen', $event)" />
     <ReversalNotificationDetail v-if="selectedReversal" :message="selectedReversal" :scope-key="scopeKey" :locked="locked" @close="selectedReversal = null" @open="emit('reversalOpen', $event)" />
     <BudgetNotificationDetail v-if="selectedBudget" :message="selectedBudget" :scope-key="scopeKey" :locked="locked" @close="selectedBudget = null" @open="emit('budgetOpen', $event)" />
     <VoucherNotificationDetail v-if="selectedVoucher" :message="selectedVoucher" :scope-key="scopeKey" :locked="locked" @close="selectedVoucher = null" @open="emit('voucherOpen', $event)" />
@@ -50,7 +54,7 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
       <li v-for="item in query.items" :key="item.id" :class="{ unread: !item.readAt }">
         <div class="message-state"><i aria-hidden="true" /><span>{{ item.readAt ? '已读' : '未读' }}</span></div>
         <div class="message-body"><div class="message-meta"><strong>{{ notificationLabels[item.kind] }}</strong><time :datetime="item.createdAt">{{ time(item.createdAt) }}</time></div><h3>{{ item.title }}</h3><p v-if="item.content" class="message-content">{{ item.content }}</p><p>{{ item.businessNo }} · 第 {{ item.roundNo }} 轮<span v-if="item.nodeName"> · {{ item.nodeName }}</span></p><p class="message-actor">操作人 {{ item.actor }}<span v-if="item.readAt"> · {{ time(item.readAt) }} 已读</span></p></div>
-        <div class="message-actions"><button class="secondary" :disabled="locked" @click="open(item)">{{ isReversalNotification(item) ? '查看原冲销' : isBudgetNotification(item) ? '查看原预算' : isVoucherNotification(item) ? '查看原凭证' : isPaymentNotification(item) ? '查看原付款' : item.kind === 'APPLICATION_COPIED' ? '查看抄送' : isTaskNotification(item) ? '查看待办' : '查看申请' }} ↗</button><button v-if="!item.readAt" class="quiet" :disabled="locked" @click="emit('read', item)">标为已读</button></div>
+        <div class="message-actions"><button class="secondary" :disabled="locked" @click="open(item)">{{ isReversalCheckNotification(item) ? '查看原核对' : isReversalNotification(item) ? '查看原冲销' : isBudgetNotification(item) ? '查看原预算' : isVoucherNotification(item) ? '查看原凭证' : isPaymentNotification(item) ? '查看原付款' : item.kind === 'APPLICATION_COPIED' ? '查看抄送' : isTaskNotification(item) ? '查看待办' : '查看申请' }} ↗</button><button v-if="!item.readAt" class="quiet" :disabled="locked" @click="emit('read', item)">标为已读</button></div>
       </li>
     </ol>
     <div v-if="query.loaded && query.items.length" class="inbox-footer"><span>已加载 {{ query.items.length }} 条消息</span><button v-if="query.nextCursor" class="secondary" :disabled="query.loading || locked" @click="query.more">{{ query.loading ? '正在加载…' : '加载更多' }}</button><span v-else>已加载全部匹配消息</span></div>

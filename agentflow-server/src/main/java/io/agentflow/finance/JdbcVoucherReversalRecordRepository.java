@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +19,7 @@ import java.util.UUID;
  */
 @Repository
 public class JdbcVoucherReversalRecordRepository {
+    private static final long HALF_MICROSECOND_NANOS = 500;
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
     private final JdbcVoucherReversalCheckRepository checks;
@@ -42,7 +45,7 @@ public class JdbcVoucherReversalRecordRepository {
                     reversal_posting_reference,reversal_voucher_reference,recorded_by,observed_at,recorded_at,state_json)
                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """, value.tenantId(), value.id().toString(), value.operationId().toString(), value.operationVersion(), value.checkId().toString(), check.version(), value.legalEntityId().toString(),
-                    reversal.postingReference(), reversal.voucherReference(), value.recordedBy(), Timestamp.from(value.receipt().observedAt()), Timestamp.from(value.recordedAt()), json.write(value));
+                    reversal.postingReference(), reversal.voucherReference(), value.recordedBy(), Timestamp.from(value.receipt().observedAt().truncatedTo(ChronoUnit.MICROS)), Timestamp.from(value.recordedAt()), json.write(value));
         } catch (DuplicateKeyException duplicate) { throw new DomainException("VOUCHER_REVERSAL_ALREADY_RECORDED", "Original voucher or independent reverse posting already has a record"); }
     }
     /** 登记按原凭证唯一；读取不会续期原证据或重新执行财务动作。 */
@@ -54,9 +57,14 @@ public class JdbcVoucherReversalRecordRepository {
                     || !value.checkId().toString().equals(row.getString("check_id")) || !value.legalEntityId().toString().equals(row.getString("legal_entity_id"))
                     || !reversal.postingReference().equals(row.getString("reversal_posting_reference")) || !reversal.voucherReference().equals(row.getString("reversal_voucher_reference"))
                     || !value.recordedBy().equals(row.getString("recorded_by")) || !value.recordedAt().equals(row.getTimestamp("recorded_at").toInstant())
-                    || !value.receipt().observedAt().equals(row.getTimestamp("observed_at").toInstant())) throw new IllegalStateException("Persisted voucher reversal record identity is inconsistent");
+                    || !sameObservedTime(value.receipt().observedAt(), row.getTimestamp("observed_at").toInstant())) throw new IllegalStateException("Persisted voucher reversal record identity is inconsistent");
             return value;
         }, tenant, operationId.toString()).stream().findFirst();
+    }
+    // 原始证据保留纳秒；索引按微秒写入，并兼容旧版本直接绑定 Timestamp 后由数据库产生的舍入值。
+    private static boolean sameObservedTime(Instant evidence, Instant stored) {
+        return evidence.truncatedTo(ChronoUnit.MICROS).equals(stored)
+                || evidence.plusNanos(HALF_MICROSECOND_NANOS).truncatedTo(ChronoUnit.MICROS).equals(stored);
     }
     private static DomainException changed() { return new DomainException("VOUCHER_REVERSAL_SOURCE_CHANGED", "Voucher reversal record must match its consumed check and current original revision"); }
 }

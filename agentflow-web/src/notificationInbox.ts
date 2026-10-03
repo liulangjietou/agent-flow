@@ -1,10 +1,12 @@
-import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget, ReversalNotificationTarget } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget, ReversalNotificationTarget, ReversalCheckNotificationTarget } from './api'
 import { validatePayment } from './payments.js'
 import { validateSupplierCashier } from './supplierCashier.js'
 import { preparationLabels, operationLabels } from './vouchers.js'
+import { reversalCheckLabels } from './voucherReversal.js'
 import { reversalPreparationLabels, reversalExecutionLabels } from './voucherReversalExecution.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  REVERSAL_CHECK_RESULT: '外部冲销登记结果', REVERSAL_CHECK_ATTENTION: '外部冲销核对需处理',
   REVERSAL_RESULT: '独立冲销结果更新', REVERSAL_ATTENTION: '独立冲销需核对',
   BUDGET_RESULT: '预算操作结果更新', BUDGET_ATTENTION: '预算操作需核对',
   VOUCHER_RESULT: '凭证结果更新', VOUCHER_ATTENTION: '凭证处理需核对',
@@ -23,6 +25,34 @@ export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK
 export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
 export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
 export const isVoucherNotification = (item: InboxMessage) => ['VOUCHER_RESULT', 'VOUCHER_ATTENTION'].includes(item.kind)
+
+export const isReversalCheckNotification = (item: InboxMessage) => ['REVERSAL_CHECK_RESULT', 'REVERSAL_CHECK_ATTENTION'].includes(item.kind)
+/** 绑定原核对；未核清、候选证据及实际登记必须分别保留，不能接受新核对替换。 */
+export function readReversalCheckNotificationTarget(value: ReversalCheckNotificationTarget, message: InboxMessage): ReversalCheckNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的冲销核对记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const closed = (v: object, keys: string[]) => Object.keys(v).every(key => keys.includes(key))
+  const issue = (v: unknown) => v === null || typeof v === 'string' && ['NOT_CONFIGURED', 'TARGET_CHANGED', 'TIMEOUT', 'CONNECTION', 'AUTHENTICATION', 'REMOTE_FAILURE', 'INVALID_RESPONSE', 'RESPONSE_TOO_LARGE', 'INTERNAL_ERROR', 'SOURCE_UNAVAILABLE', 'SOURCE_CHANGED'].includes(v)
+  if (!value || !isReversalCheckNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.checkId, value.operationId, value.applicationId, value.businessId].every(uuid) || value.checkId === value.operationId
+      || !positive(value.roundNo) || !positive(value.version) || !['EMPLOYEE_ADVANCE', 'EXPENSE_ACCRUAL', 'PAYMENT'].includes(value.kind)
+      || !Object.prototype.hasOwnProperty.call(operationLabels, value.originalStatus) || typeof value.originalHeld !== 'boolean'
+      || !Object.prototype.hasOwnProperty.call(reversalCheckLabels, value.status) || !instant(value.requestedAt) || !instant(value.updatedAt) || !issue(value.issue)
+      || ['UNAVAILABLE', 'VOIDED'].includes(value.status) !== (value.issue !== null)
+      || !closed(value, ['messageId', 'checkId', 'operationId', 'applicationId', 'businessId', 'roundNo', 'kind', 'originalStatus', 'originalHeld', 'version', 'status', 'requestedAt', 'updatedAt', 'issue', 'observation', 'record'])) invalid()
+  const observed = value.observation, record = value.record
+  if (observed !== null && (typeof observed !== 'object' || Array.isArray(observed)) || record !== null && (typeof record !== 'object' || Array.isArray(record))
+      || ['CHECKED', 'RECORDED'].includes(value.status) !== !!observed || (value.status === 'RECORDED') !== !!record) invalid()
+  if (observed && (!['UNRESOLVED', 'VERIFIED'].includes(observed.status) || !positive(observed.revision) || !instant(observed.observedAt) || !instant(observed.validUntil)
+      || (observed.status === 'VERIFIED' ? typeof observed.voucherReference !== 'string' || !observed.voucherReference.trim() || observed.voucherReference.length > 128
+        || typeof observed.accountingDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(observed.accountingDate) || !instant(observed.postedAt)
+        : observed.voucherReference !== null || observed.accountingDate !== null || observed.postedAt !== null)
+      || !closed(observed, ['status', 'revision', 'observedAt', 'validUntil', 'voucherReference', 'accountingDate', 'postedAt']))) invalid()
+  if (record && (!uuid(record.id) || !instant(record.recordedAt) || observed?.status !== 'VERIFIED' || !closed(record, ['id', 'recordedAt']))) invalid()
+  return value
+}
 
 export const isReversalNotification = (item: InboxMessage) => ['REVERSAL_RESULT', 'REVERSAL_ATTENTION'].includes(item.kind)
 /** 原冲销准备、命令和安全结束不能被新的尝试或办理权限替换。 */

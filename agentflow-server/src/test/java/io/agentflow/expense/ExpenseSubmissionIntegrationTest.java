@@ -137,6 +137,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired io.agentflow.notification.VoucherNotificationAccess voucherNotificationAccess;
     @Autowired io.agentflow.notification.BudgetNotificationAccess budgetNotificationAccess;
     @Autowired io.agentflow.notification.ReversalNotificationAccess reversalNotificationAccess;
+    @Autowired io.agentflow.notification.ReversalCheckNotificationAccess reversalCheckNotificationAccess;
     @Autowired io.agentflow.notification.NotificationPreferencesService notificationPreferences;
     @Autowired io.agentflow.notification.NotificationDeliveryService notificationDeliveries;
     @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore notificationDeliveryStore;
@@ -4318,6 +4319,135 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(ok(read(path(report) + "/archive", "finance"), 200).path("issue").isNull()).isTrue(); assertThat(paymentWrites).isEqualTo(1);
     }
 
+    @Test void externalReversalCheckFailureNotifiesOriginalApplicantAndVerifier() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        var id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now());
+        voucherReversals.fail(claimed, Instant.now());
+        assertThat(voucherReversalChecks.find("demo", id).orElseThrow().status()).isEqualTo(VoucherReversalCheck.Status.UNAVAILABLE);
+        assertThat(reversalCheckNoticeRecipients(id, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id())).isEmpty();
+        assertThat(voucherOperations.find("demo", original.input().command().id())).contains(original); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void externalReversalRecordNotifiesOnceAfterExplicitOriginalAcceptance() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var check = checkedReversal(report, original);
+        assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).isEmpty();
+        var input = reversalRecordInput(report, original, check); var key = UUID.randomUUID().toString(); var route = reversalPath(original) + "/records";
+        var first = ok(send(route, "finance", key, input), 202); assertThat(ok(send(route, "finance", key, input), 202)).isEqualTo(first);
+        assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(voucherOperations.find("demo", original.input().command().id())).contains(original); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void externalReversalMessagesKeepOldCheckAfterNewRegistrationAndEnforceCurrentPermissions() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        UUID id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now()); voucherReversals.fail(claimed, Instant.now());
+        String path = reversalCheckNoticePath(id, "UNAVAILABLE", "finance"); var response = read(path, "finance"); var previous = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(previous.path("checkId").asText()).isEqualTo(id.toString());
+        assertThat(previous.path("observation").isNull()).isTrue(); assertThat(previous.path("record").isNull()).isTrue();
+        assertThat(previous.toString()).doesNotContain("commandDigest", "targetDigest", "evidenceReference", "entries", "accountReference", "actions");
+        var next = checkedReversal(report, original); ok(send(reversalPath(original) + "/records", "finance", reversalRecordInput(report, original, next)), 202);
+        assertThat(ok(read(path, "finance"), 200)).isEqualTo(previous);
+        assertThat(ok(read(reversalCheckNoticePath(next.input().id(), "RECORDED", "alice"), "alice"), 200).at("/record/id").asText())
+                .isEqualTo(voucherReversalRecords.forOperation("demo", original.input().command().id()).orElseThrow().id().toString());
+        assertThat(read(path + "?checkId=" + next.input().id(), "finance").getStatus()).isEqualTo(400);
+        for (String user : List.of("alice", "admin", "manager", "cashier")) assertThat(read(path, user).getStatus()).isEqualTo(404);
+        UUID messageId = UUID.fromString(path.split("/")[4]);
+        for (String role : List.of("ADMIN", "EMPLOYEE")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> reversalCheckNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); } finally { actors.clear(); }
+        }
+        actors.set(new Actor("foreign", "finance", Set.of("ADMIN", "FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> reversalCheckNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "reversal-check:" + id + ":UNRESOLVED", messageId.toString());
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "reversal-check:" + id + ":UNAVAILABLE", messageId.toString()); }
+    }
+
+    @Test void unresolvedExternalReversalIsAnObservationWithoutPostingOrRegistration() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        UUID id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now()); var now = Instant.now();
+        var unresolved = new VoucherReversalPort.Receipt(claimed.input().request(), VoucherReversalPort.Status.UNRESOLVED, 1, now, now.plusSeconds(60), null, null);
+        voucherReversals.finish(claimed, new FinanceResult.Success<>(unresolved), now.plusMillis(1));
+        assertThat(reversalCheckNoticeRecipients(id, "UNRESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        var value = ok(read(reversalCheckNoticePath(id, "UNRESOLVED", "alice"), "alice"), 200);
+        assertThat(value.at("/observation/status").asText()).isEqualTo("UNRESOLVED"); assertThat(value.at("/observation/voucherReference").isNull()).isTrue();
+        assertThat(value.path("record").isNull()).isTrue(); assertThat(value.path("originalStatus").asText()).isEqualTo("REVERSED");
+        assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id())).isEmpty(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void externalReversalRegistrationAndOutboundIntentRollBackTogetherAndRecheckCurrentEntity() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var check = checkedReversal(report, original);
+        var actor = new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false);
+        var input = json.read(json.write(reversalRecordInput(report, original, check)), VoucherReversalService.RecordInput.class);
+        String eventKey = "reversal-check:" + check.input().id() + ":RECORDED";
+        try {
+            actors.set(actor);
+            try { assertThatThrownBy(() -> tx().execute(status -> {
+                voucherReversals.record(report.applicationId(), original.input().command().id(), input);
+                assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=? AND i.recipient_id='finance'", Integer.class, eventKey)).isEqualTo(1);
+                throw new IllegalStateException("Synthetic external reversal notification rollback"); })).hasMessageContaining("Synthetic external reversal notification rollback");
+            } finally { actors.clear(); }
+            assertThat(voucherReversalChecks.find("demo", check.input().id())).contains(check); assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id())).isEmpty();
+            assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).isEmpty();
+            ok(send(reversalPath(original) + "/records", "finance", input), 202);
+            String messageId = reversalCheckNoticePath(check.input().id(), "RECORDED", "finance").split("/")[4];
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, messageId));
+            assertThat(reversalCheckNotificationAccess.deliveryAllowed(notificationDeliveryStore.find(deliveryId).orElseThrow())).isTrue();
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(organizationRepository.person("demo", finance).orElseThrow().active()).isTrue();
+                assertThat(read(reversalCheckNoticePath(check.input().id(), "RECORDED", "finance"), "finance").getStatus()).isEqualTo(404);
+                assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(longs = {123, 789})
+    void externalReversalRegistrationPreservesNanosecondEvidenceAndStillNotifies(long nanos) throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        UUID id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now());
+        var proof = reversalReceipt(claimed, 1, original.input().command().id().toString());
+        var precise = new VoucherReversalPort.Receipt(proof.request(), proof.status(), proof.revision(), proof.observedAt().plusNanos(nanos), proof.validUntil(), proof.current(), proof.reversal());
+        voucherReversals.finish(claimed, new FinanceResult.Success<>(precise), precise.observedAt().plus(1, java.time.temporal.ChronoUnit.MICROS));
+        var checked = voucherReversalChecks.find("demo", id).orElseThrow(); assertThat(checked.status()).isEqualTo(VoucherReversalCheck.Status.CHECKED);
+        ok(send(reversalPath(original) + "/records", "finance", reversalRecordInput(report, original, checked)), 202);
+        assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id()).orElseThrow().receipt()).isEqualTo(precise);
+        assertThat(reversalCheckNoticeRecipients(id, "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(reversalCheckNoticePath(id, "RECORDED", "alice"), "alice"), 200);
+        assertThat(Instant.parse(detail.at("/observation/observedAt").asText())).isEqualTo(precise.observedAt());
+        String operationId = original.input().command().id().toString();
+        var indexedAt = precise.observedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        assertThat(jdbc.queryForObject("SELECT observed_at FROM voucher_reversal_record WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.class, operationId).toInstant()).isEqualTo(indexedAt);
+        try {
+            // 模拟旧版本直接绑定纳秒时间后的数据库舍入，完整原始证据仍须可读。
+            jdbc.update("UPDATE voucher_reversal_record SET observed_at=? WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.from(precise.observedAt()), operationId);
+            assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id()).orElseThrow().receipt()).isEqualTo(precise);
+            jdbc.update("UPDATE voucher_reversal_record SET observed_at=? WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.from(indexedAt.plus(2, java.time.temporal.ChronoUnit.MICROS)), operationId);
+            assertThatThrownBy(() -> voucherReversalRecords.forOperation("demo", original.input().command().id()))
+                    .isInstanceOf(IllegalStateException.class).hasMessage("Persisted voucher reversal record identity is inconsistent");
+        } finally { jdbc.update("UPDATE voucher_reversal_record SET observed_at=? WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.from(indexedAt), operationId); }
+    }
+
+    private String reversalCheckNoticePath(UUID id, String fact, String recipient) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "reversal-check:" + id + ":" + fact, recipient) + "/reversal-check-target";
+    }
+
+    private List<String> reversalCheckNoticeRecipients(UUID id, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id", String.class,
+                "reversal-check:" + id + ":" + fact);
+    }
+
     @Test void independentReversalCannotBeErasedByLaterPostedDecision() throws Exception {
         var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll();
         var operation = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var check = checkedReversal(report, operation);
@@ -4350,6 +4480,9 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(voucherReversalRecords.forOperation("foreign", originalInput.command().id())).isEmpty();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_REVERSAL_RECORD'", Integer.class, report.applicationId().toString())).isEqualTo(1);
         assertThat(paymentWrites).isEqualTo(1);
+        var notice = ok(read(reversalCheckNoticePath(check.input().id(), "RECORDED", "alice"), "alice"), 200);
+        assertThat(notice.path("kind").asText()).isEqualTo(kind.name()); assertThat(notice.at("/observation/voucherReference").asText()).startsWith("reverse-voucher-");
+        assertThat(notice.at("/record/id").asText()).isEqualTo(voucherReversalRecords.forOperation("demo", operation.input().command().id()).orElseThrow().id().toString());
     }
 
     @Test void voucherReversalRequiresCurrentVersionsAuthorityAndOriginalBindingEvenOnReplay() throws Exception {
@@ -4416,6 +4549,7 @@ class ExpenseSubmissionIntegrationTest {
         var claimed = voucherReversals.claim("demo", id, Instant.now()); var result = new FinanceResult.Success<>(reversalReceipt(claimed, 2, operation.input().command().id().toString()));
         assertThat(voucherReversals.claim("demo", id, claimed.leaseUntil())).isNull(); voucherReversals.finish(claimed, result, claimed.leaseUntil());
         assertThat(voucherReversalChecks.find("demo", id).orElseThrow().issue()).isEqualTo(VoucherReversalCheck.Issue.TIMEOUT);
+        assertThat(reversalCheckNoticeRecipients(id, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
         assertThat(voucherReversalRecords.forOperation("demo", operation.input().command().id())).isEmpty();
     }
 
@@ -4445,10 +4579,12 @@ class ExpenseSubmissionIntegrationTest {
         try { voucherReversals.finish(claimed, new FinanceResult.Success<>(proof), Instant.now()); }
         finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
         assertThat(voucherReversalChecks.find("demo", claimed.input().id()).orElseThrow().status()).isEqualTo(VoucherReversalCheck.Status.VOIDED);
+        assertThat(reversalCheckNoticeRecipients(claimed.input().id(), "SOURCE_CHANGED")).containsExactly("alice");
         queued = ok(send(reversalPath(operation) + "/checks", "finance", reversalQueryInput(report, operation)), 202);
         var second = voucherReversals.claim("demo", UUID.fromString(queued.path("checkId").asText()), Instant.now()); var secondProof = reversalReceipt(second, 2, operation.input().command().id().toString());
         correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); voucherReversals.finish(second, new FinanceResult.Success<>(secondProof), Instant.now());
         assertThat(voucherReversalChecks.find("demo", second.input().id()).orElseThrow().status()).isEqualTo(VoucherReversalCheck.Status.VOIDED);
+        assertThat(reversalCheckNoticeRecipients(second.input().id(), "SOURCE_CHANGED")).containsExactlyInAnyOrder("alice", "finance");
         assertThat(voucherReversalRecords.forOperation("demo", operation.input().command().id())).isEmpty();
     }
 

@@ -107,6 +107,7 @@ class AdvanceRepaymentIntegrationTest {
     @Autowired VoucherOperationService voucherExecution;
     @Autowired JdbcVoucherOperationRepository vouchers;
     @Autowired VoucherReversalPreparationService reversalPreparing;
+    @Autowired VoucherReversalService externalReversalChecks;
     @Autowired VoucherReversalRetirementService reversalRetirement;
     @Autowired JdbcVoucherReversalOperationRepository reversalOperations;
     @Autowired JdbcVoucherReversalPreparationRepository reversalPreparations;
@@ -176,6 +177,22 @@ class AdvanceRepaymentIntegrationTest {
         assertThat(after.outstanding()).isEqualTo(before.outstanding()); assertThat(after.balance()).isEqualTo(before.balance()); assertThat(after.repayments()).isEqualTo(before.repayments());
         assertThat(vouchers.requiresAdvanceReview("demo", payment)).isFalse(); assertThat(reversalOperations.retirements("demo", payment)).hasSize(1);
     }
+    @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})
+    void originalExternalReversalCheckNotificationUsesTheLoanRoundAndPreservesItsHold(VoucherCommand.Kind kind) throws Exception {
+        var loan = paidLoan(); voucherQueryStatus = VoucherObservation.Status.REVERSED; voucherQueryRevision = 2; queryVoucher(loan, kind);
+        var original = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow(); var held = balance(loan); UUID id;
+        actors.set(new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { id = externalReversalChecks.queue(app(loan).id(), original.input().command().id(), new VoucherReversalService.QueryInput(1, app(loan).version(), request(loan).version(), original.version(), "明确查询原借款反向凭证")).checkId(); }
+        finally { actors.clear(); }
+        var claimed = externalReversalChecks.claim("demo", id, Instant.now()); externalReversalChecks.fail(claimed, Instant.now());
+        String key = "reversal-check:" + id + ":UNAVAILABLE";
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, key)).containsExactlyInAnyOrder("alice", "finance");
+        String message = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, key);
+        var detail = ok(read("/api/v1/notifications/" + message + "/reversal-check-target", "alice"), 200);
+        assertThat(detail.path("kind").asText()).isEqualTo(kind.name()); assertThat(detail.path("businessId").asText()).isEqualTo(loan.toString());
+        assertThat(detail.path("record").isNull()).isTrue(); assertThat(balance(loan).state()).isEqualTo(held.state());
+    }
+
     private void authorizeLoanReversal(UUID loan, VoucherCommand.Kind kind) {
         var original = vouchers.forRound("demo", app(loan).id(), 1, kind).orElseThrow(); var command = original.input().command();
         UUID id;
