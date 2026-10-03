@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T03:48:22.303636+00:00",
+  "recordedAt": "2026-10-03T04:14:38.448896+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1013,10 +1013,14 @@
           ]
         }
       ],
-      "observed": "固定法人及币种的草稿/发布领域模型、必要科目子集、管理版本与原目标绑定、严格 ERP 回显及旧凭证摘要兼容已实现。2 条新增模式隔离用例先失败，修复后 95 条范围测试通过（含 16 条 H2 持久化用例）。管理存储、API、页面、准备任务绑定及完整安装包验收仍未完成。",
+      "observed": "科目版本领域与网关契约已有阶段证据；V104 管理存储和 9 个认证接口已完成。草稿、历史、三版本发布、范围外键、幂等回放及失败回滚通过 86 条范围测试，其中 29 条在 PostgreSQL 17.11 同时通过。自动凭证准备选择绑定、管理页面和完整安装包验收仍未完成。",
       "references": [
         {
           "path": "docs/account-mapping-configuration.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/account-mapping-management-backend-20261003.json",
           "line": 1
         },
         {
@@ -2138,10 +2142,14 @@
           ]
         }
       ],
-      "observed": "当前 git remote 为空；本地提交存在，没有 GitHub PR 或远程 CI 结果。",
+      "observed": "origin 已配置为 https://github.com/liulangjietou/agent-flow.git；GitHub 仓库可访问且具有推送权限。当前远端尚无分支，本地开发分支尚无 PR 或 CI 结果。E15 依赖 V02 最终版本验收，仍为 OPEN。",
       "references": [
         {
           "path": "docs/remaining-implementation-plan.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/account-mapping-management-backend-20261003.json",
           "line": 1
         }
       ],
@@ -3291,9 +3299,17 @@
     "F13"
   ],
   "externalDelivery": {
-    "remoteConfigured": false,
+    "remoteConfigured": true,
+    "origin": "https://github.com/liulangjietou/agent-flow.git",
+    "repository": "https://github.com/liulangjietou/agent-flow",
+    "pushPermission": true,
+    "remoteBranches": [],
     "pullRequest": null,
-    "ci": null
+    "ci": null,
+    "dependsOn": [
+      "V02"
+    ],
+    "verifiedAt": "2026-10-03T04:14:38.448896+00:00"
   },
   "latestProgress": {
     "taskId": "F01",
@@ -3306,11 +3322,12 @@
   },
   "latestInProgress": {
     "taskId": "F02",
-    "phase": "DOMAIN_AND_GATEWAY_PHASE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "2f88c8588006d5b91a65f5d9393090d3aee66624",
-    "evidence": "docs/evidence/account-mapping-foundation-20261003.json",
-    "tests": 95,
-    "managementApiImplemented": false,
+    "phase": "MANAGEMENT_BACKEND_PHASE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "ef0869a4c43bc0b3bcef3baf26f75e3ed38f58da",
+    "evidence": "docs/evidence/account-mapping-management-backend-20261003.json",
+    "scopedTests": 86,
+    "postgresSubset": 29,
+    "managementApiImplemented": true,
     "preparationSelectionIntegrated": false,
     "taskCompleted": false
   }
