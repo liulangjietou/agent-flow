@@ -1,4 +1,4 @@
-import type { ProcessTemplate, TemplateCopyInput } from './api'
+import type { FinancialTemplateExamples, ProcessTemplate, TemplateCopyInput } from './api'
 
 /**
  * 目录重载时先清空租户副本，只有当前账号的最新请求可以更新页面。
@@ -37,6 +37,38 @@ export class TemplateCatalog {
       if (current()) this.error = (error as { message?: string })?.message ?? '模板目录加载失败，请重试。'
     } finally {
       if (current()) this.loading = false
+    }
+  }
+}
+
+/**
+ * 配套样例按需读取；切换账号、模板或卸载后，旧请求不能恢复预览和下载内容。
+ * @author owlzhangfq@gmail.com
+ */
+export class FinancialExamplePreview {
+  value: FinancialTemplateExamples | null = null
+  loading = false
+  error = ''
+  private generation = 0
+
+  constructor(private fetchExamples: (templateKey: string) => Promise<FinancialTemplateExamples>) {}
+
+  /** 页面上下文变更立即释放旧数据。 */
+  clear() { this.generation++; this.value = null; this.loading = false; this.error = '' }
+
+  /** 这里只发只读请求，不能把配置样例当作发布请求。 */
+  async load(scope: string, templateKey: string) {
+    this.clear()
+    if (!scope || !templateKey) return
+    const generation = this.generation
+    this.loading = true
+    try {
+      const value = await this.fetchExamples(templateKey)
+      if (generation === this.generation) this.value = value
+    } catch (error) {
+      if (generation === this.generation) this.error = (error as { message?: string })?.message ?? '配套样例加载失败，请重试。'
+    } finally {
+      if (generation === this.generation) this.loading = false
     }
   }
 }

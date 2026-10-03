@@ -1,6 +1,7 @@
 package io.agentflow.template;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
@@ -9,6 +10,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionController.DefinitionResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 模板目录接口，三个入口均先验证当前管理权限，复制重试沿用统一幂等协议。
+ * 模板目录接口均先验证当前管理权限，复制重试沿用统一幂等协议。
  * @author owlzhangfq@gmail.com
  */
 @RestController
@@ -31,15 +33,18 @@ public class ProcessTemplateController {
     private final TemplateCopyRepository copies;
     private final CurrentActor currentActor;
     private final IdempotencyExecutor idempotency;
+    private final ClasspathFinancialTemplateExamples examples;
 
     /** 创建模板接口。 */
     public ProcessTemplateController(ClasspathProcessTemplateCatalog catalog, ProcessTemplateApplicationService service,
-                                     TemplateCopyRepository copies, CurrentActor currentActor, IdempotencyExecutor idempotency) {
+                                     TemplateCopyRepository copies, CurrentActor currentActor, IdempotencyExecutor idempotency,
+                                     ClasspathFinancialTemplateExamples examples) {
         this.catalog = catalog;
         this.service = service;
         this.copies = copies;
         this.currentActor = currentActor;
         this.idempotency = idempotency;
+        this.examples = examples;
     }
 
     /** 返回目录完整说明及本租户副本的当前状态。 */
@@ -47,7 +52,15 @@ public class ProcessTemplateController {
     public List<TemplateResponse> list() {
         Actor actor = requireProcessAdmin();
         return catalog.list().stream().map(template -> new TemplateResponse(template,
-                copies.findByTemplate(actor.tenantId(), template.key()))).toList();
+                copies.findByTemplate(actor.tenantId(), template.key()), examples.summary(template.key()))).toList();
+    }
+
+    /** 读取合成财务配置及业务输入；此入口不创建草稿、发布配置或执行任何财务操作。 */
+    @GetMapping("/{key}/financial-examples")
+    public ResponseEntity<JsonNode> financialExamples(@PathVariable String key) {
+        requireProcessAdmin();
+        catalog.get(key);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(examples.get(key));
     }
 
     /** 返回目录内已验证的场景，不创建任何流程资源。 */
@@ -78,7 +91,8 @@ public class ProcessTemplateController {
      * 完整模板描述平铺返回，副本列表只来自当前租户。
      * @author owlzhangfq@gmail.com
      */
-    public record TemplateResponse(@JsonUnwrapped ProcessTemplate template, List<TemplateCopyRepository.CopyView> copies) { }
+    public record TemplateResponse(@JsonUnwrapped ProcessTemplate template, List<TemplateCopyRepository.CopyView> copies,
+            @JsonInclude(JsonInclude.Include.NON_NULL) ClasspathFinancialTemplateExamples.Summary companion) { }
 
     /**
      * 复制请求在入口严格校验一次，禁止 JSON 数字和字符串之间的宽松转换。

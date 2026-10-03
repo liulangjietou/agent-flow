@@ -43853,6 +43853,810 @@
           }
         ]
       }
+    },
+    "/api/v1/process-templates/{key}/financial-examples": {
+      "get": {
+        "operationId": "financialTemplateExamples",
+        "tags": [
+          "模板"
+        ],
+        "summary": "财务模板配套配置与业务样例",
+        "description": "仅三个员工财务模板提供同一合成样例包；只读获取，不保存或发布配置，不创建业务单据。编号、日期、科目与原件须按本租户事实重新绑定。普通模板和未知模板返回 404。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialTemplateExamples"
+                },
+                "example": {
+                  "schemaVersion": 1,
+                  "key": "employee-finance",
+                  "version": 1,
+                  "name": "员工财务配套样例",
+                  "description": "三类财务模板共用的合成配置与办理数据。按步骤绑定本租户事实后，在专用业务入口执行；金额、账户和编号均为演示值。",
+                  "templateKeys": [
+                    "expense-report",
+                    "expense-plan",
+                    "advance-request"
+                  ],
+                  "bindings": [
+                    {
+                      "key": "legalEntityId",
+                      "exampleValue": "00000000-0000-4000-8000-000000000013",
+                      "instruction": "替换为当前租户法人，并同步替换制度、科目映射及业务内容中的同一编号。"
+                    },
+                    {
+                      "key": "businessDate",
+                      "exampleValue": "2026-01-10",
+                      "instruction": "费用/计划/记账日按本次演示日期填写；金额、数量和分摊需保持一致。"
+                    },
+                    {
+                      "key": "dueDate",
+                      "exampleValue": "2026-02-10",
+                      "instruction": "替换为借款提交时法人本地日期之后的归还日。"
+                    },
+                    {
+                      "key": "invoiceId",
+                      "exampleValue": "00000000-0000-4000-8000-000000000014",
+                      "instruction": "使用本人票夹已上传且通过查验的原件编号；两份重复占用样例必须绑定同一张票。"
+                    },
+                    {
+                      "key": "advanceId",
+                      "exampleValue": "00000000-0000-4000-8000-000000000015",
+                      "instruction": "使用 advance-basic 实付确认后生成的借款余额资源编号。"
+                    },
+                    {
+                      "key": "planResourceId",
+                      "exampleValue": "00000000-0000-4000-8000-000000000016",
+                      "instruction": "使用 plan-basic 批准后生成的事前额度资源编号，并引用第 1 行。"
+                    },
+                    {
+                      "key": "costCenter",
+                      "exampleValue": "IT",
+                      "instruction": "替换为法人有效成本中心。"
+                    },
+                    {
+                      "key": "cityCode",
+                      "exampleValue": "SH",
+                      "instruction": "替换为可信主数据中的城市代码；城市等级和员工职级由事实源返回。"
+                    },
+                    {
+                      "key": "bankAccountId",
+                      "exampleValue": "synthetic-f13-bank",
+                      "instruction": "映射中的银行选择键替换为实际付款账户标识；SYNTHETIC 科目代码全部由财务复核后替换。"
+                    }
+                  ],
+                  "setupSteps": [
+                    "在独立演示租户准备申请人、本次任职、主管、部门/分管负责人、费用归口与财务办理人；财务人员遵守本单职责分离。",
+                    "先保存本包费用类别；已有类别必须完整保留，新增样例类别不能覆盖既有类别。",
+                    "按当前类别修订保存制度草稿，再核对草稿/类别/当前生效三版本后发布；发布会切换本租户生效制度集。",
+                    "按法人和币种保存科目映射草稿，核对三版本后发布；科目能否过账继续由 ERP 判定。",
+                    "由可信财务主数据源选择下方一种签收制度。paperReceiptRequired 不是申请人或模板请求可覆盖的字段。",
+                    "分别复制三个模板，绑定审批人并核对 5000、50000 和 10000 元阈值，然后验证、模拟和发布。",
+                    "从专用财务入口创建 content；每次预检使用页面/API 返回的当前版本、目标摘要和本次任职，提交使用本次预检编号。",
+                    "先运行事前和借款前置样例，再运行有关联资源的报销；所有写操作遵循现有幂等和版本协议。"
+                  ],
+                  "configuration": {
+                    "categories": [
+                      {
+                        "code": "DEMO_OFFICE",
+                        "name": "演示办公费用",
+                        "units": [
+                          "ITEM"
+                        ],
+                        "active": true
+                      },
+                      {
+                        "code": "DEMO_HOTEL",
+                        "name": "演示住宿费用",
+                        "units": [
+                          "NIGHT"
+                        ],
+                        "active": true
+                      }
+                    ],
+                    "expensePolicy": {
+                      "name": "员工财务演示制度",
+                      "rules": [
+                        {
+                          "key": "office",
+                          "name": "演示办公标准",
+                          "match": {
+                            "legalEntityIds": [
+                              "00000000-0000-4000-8000-000000000013"
+                            ],
+                            "categoryCodes": [
+                              "DEMO_OFFICE"
+                            ],
+                            "cityTiers": [],
+                            "employeeGrades": [],
+                            "fromDate": null,
+                            "throughDate": null,
+                            "currency": "CNY"
+                          },
+                          "constraints": {
+                            "effect": "ALLOW",
+                            "unitPriceLimit": null,
+                            "limitUnit": null,
+                            "invoiceMaxAgeDays": null,
+                            "invoiceAgeAction": null,
+                            "allowedServiceLevels": [],
+                            "priorRequestRequired": false
+                          }
+                        },
+                        {
+                          "key": "hotel",
+                          "name": "演示一线城市 G1 住宿标准",
+                          "match": {
+                            "legalEntityIds": [
+                              "00000000-0000-4000-8000-000000000013"
+                            ],
+                            "categoryCodes": [
+                              "DEMO_HOTEL"
+                            ],
+                            "cityTiers": [
+                              "T1"
+                            ],
+                            "employeeGrades": [
+                              "G1"
+                            ],
+                            "fromDate": null,
+                            "throughDate": null,
+                            "currency": "CNY"
+                          },
+                          "constraints": {
+                            "effect": "ALLOW",
+                            "unitPriceLimit": {
+                              "value": "500.00",
+                              "currency": "CNY"
+                            },
+                            "limitUnit": "NIGHT",
+                            "invoiceMaxAgeDays": null,
+                            "invoiceAgeAction": null,
+                            "allowedServiceLevels": [],
+                            "priorRequestRequired": false
+                          }
+                        }
+                      ]
+                    },
+                    "accountMapping": {
+                      "name": "员工财务演示科目",
+                      "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                      "currency": "CNY",
+                      "entries": [
+                        {
+                          "key": {
+                            "role": "EXPENSE",
+                            "selector": "DEMO_OFFICE"
+                          },
+                          "accountCode": "SYNTHETIC.DEMO_OFFICE"
+                        },
+                        {
+                          "key": {
+                            "role": "EXPENSE",
+                            "selector": "DEMO_HOTEL"
+                          },
+                          "accountCode": "SYNTHETIC.DEMO_HOTEL"
+                        },
+                        {
+                          "key": {
+                            "role": "DEDUCTIBLE_TAX",
+                            "selector": ""
+                          },
+                          "accountCode": "SYNTHETIC.DEDUCTIBLE_TAX"
+                        },
+                        {
+                          "key": {
+                            "role": "EMPLOYEE_RECEIVABLE",
+                            "selector": ""
+                          },
+                          "accountCode": "SYNTHETIC.EMPLOYEE_RECEIVABLE"
+                        },
+                        {
+                          "key": {
+                            "role": "EMPLOYEE_PAYABLE",
+                            "selector": ""
+                          },
+                          "accountCode": "SYNTHETIC.EMPLOYEE_PAYABLE"
+                        },
+                        {
+                          "key": {
+                            "role": "BANK",
+                            "selector": "synthetic-f13-bank"
+                          },
+                          "accountCode": "SYNTHETIC.BANK"
+                        }
+                      ]
+                    },
+                    "receiptOptions": [
+                      {
+                        "id": "00000000-0000-4000-8000-000000000013",
+                        "name": "演示法人",
+                        "baseCurrency": "CNY",
+                        "paperReceiptRequired": true,
+                        "sourceVersion": "synthetic-paper-true",
+                        "timeZone": "Asia/Shanghai"
+                      },
+                      {
+                        "id": "00000000-0000-4000-8000-000000000013",
+                        "name": "演示法人",
+                        "baseCurrency": "CNY",
+                        "paperReceiptRequired": false,
+                        "sourceVersion": "synthetic-paper-false",
+                        "timeZone": "Asia/Shanghai"
+                      }
+                    ]
+                  },
+                  "scenarios": [
+                    {
+                      "id": "plan-basic",
+                      "name": "先批准一笔 800 元事前申请",
+                      "templateKey": "expense-plan",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示事前采购计划",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "plannedOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "amount": {
+                              "value": "800.00",
+                              "currency": "CNY"
+                            },
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "800.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示计划行"
+                          }
+                        ]
+                      },
+                      "steps": [
+                        "从事前申请模板副本创建计划，选择申请人本次任职并预检。",
+                        "提交后依次由直属主管与财务审批；等待预算操作确认。",
+                        "把批准生成的事前额度资源编号记录为 planResourceId，后续引用第 1 行。"
+                      ],
+                      "expected": [
+                        "批准前没有可核销额度。",
+                        "批准及预算确认后生成本申请人的 800 元额度。"
+                      ]
+                    },
+                    {
+                      "id": "advance-basic",
+                      "name": "先批准并实付一笔 300 元借款",
+                      "templateKey": "advance-request",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "title": "演示员工借款",
+                        "purpose": "仅用于本地借款冲销演示",
+                        "amount": {
+                          "value": "300.00",
+                          "currency": "CNY"
+                        },
+                        "dueOn": "2026-02-10"
+                      },
+                      "steps": [
+                        "把归还日替换为法人本地日期之后的日期，再创建、预检和提交。",
+                        "主管、财务审批后完成挂账、财务授权、出纳付款及可信回执确认。",
+                        "只有实际放款确认后的借款余额记录才能绑定为 advanceId。"
+                      ],
+                      "expected": [
+                        "批准本身不产生可冲销余额。",
+                        "实付确认后未还款为 300 元，后续样例只选择其中 60 元。"
+                      ]
+                    },
+                    {
+                      "id": "expense-basic",
+                      "name": "普通 80 元报销",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示普通办公报销",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "80.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "80.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示普通办公报销",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "创建报销草稿并预检，选择本次任职、记账日与当前目标摘要。",
+                        "提交后按模板完成主管、收单与财务审核；纸件开关为 true 时先确认实际签收，false 时不登记纸件签收但保留人工收单审批。"
+                      ],
+                      "expected": [
+                        "预检成功后才能提交。",
+                        "80 元不进入部门、分管负责人或财务复核分支。"
+                      ]
+                    },
+                    {
+                      "id": "expense-over-standard",
+                      "name": "650 元住宿超过 500 元每晚上限",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "TRAVEL",
+                        "title": "演示住宿超标准",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_HOTEL",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "NIGHT",
+                            "claimedGross": {
+                              "value": "650.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "650.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示住宿超标准",
+                            "exceptionReason": "合成说明：会展期间协议酒店无房，需要费用归口负责人复核。"
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "发布本包住宿标准并完成可信城市等级/员工职级匹配。",
+                        "以 1 晚 650 元预检，保留超标理由，提交后由费用归口负责人办理例外审批。"
+                      ],
+                      "expected": [
+                        "原制度每晚上限为 500 元，超额为 150 元。",
+                        "服务端 overPolicy 为 true，主管之后进入费用例外节点。",
+                        "后来核减不清除已经冻结的原制度例外依据。"
+                      ]
+                    },
+                    {
+                      "id": "expense-reduction",
+                      "name": "核减后不再触发财务复核",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示 10500 元核减为 9500 元",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "10500.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "10500.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示 10500 元核减为 9500 元",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "按默认 10000 元财务复核阈值提交；完成主管、部门与收单节点。",
+                        "当前财务审核人把 reductions 数组作为核减请求的 lines，附当前版本、原因枚举和理由，再核对返回的新财务版本。",
+                        "等待核减对应预算调整确认后批准财务审核。"
+                      ],
+                      "expected": [
+                        "原申报仍是 10500 元，核定变为 9500 元。",
+                        "财务审核后的网关使用核定额，不进入财务复核节点。"
+                      ],
+                      "reductions": [
+                        {
+                          "lineNo": 1,
+                          "approvedGross": "9500.00",
+                          "approvedTax": "0.00"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "expense-finance-recheck",
+                      "name": "核定 10500 元仍需财务复核",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示保留财务复核",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "10500.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "10500.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示保留财务复核",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "按默认阈值提交，完成主管、部门、收单和财务审核，不做核减。",
+                        "财务复核节点需要符合财务职责分离约束的人员明确办理。"
+                      ],
+                      "expected": [
+                        "核定额超过 10000 元，必进入财务复核节点。",
+                        "财务节点不能因人员重复而自动跳过。"
+                      ]
+                    },
+                    {
+                      "id": "expense-advance-offset",
+                      "name": "80 元报销选择 60 元已放款借款",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示报销冲销 60 元借款",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "80.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "80.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示报销冲销 60 元借款",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": [
+                          {
+                            "advanceId": "00000000-0000-4000-8000-000000000015",
+                            "amount": {
+                              "value": "60.00",
+                              "currency": "CNY"
+                            }
+                          }
+                        ]
+                      },
+                      "steps": [
+                        "先完成 advance-basic 实际放款，并把 advanceId 替换为生成的借款资源编号。",
+                        "在报销预检与提交时冻结 60 元占用，完成审批、挂账及报销结算。"
+                      ],
+                      "expected": [
+                        "审批前仅形成占用，不能预先扣减欠款。",
+                        "结算确认后借款未还款由 300 元减为 240 元，员工应付为 20 元。"
+                      ]
+                    },
+                    {
+                      "id": "expense-prior-plan",
+                      "name": "80 元报销引用事前第 1 行",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示引用已批准事前额度",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "80.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [],
+                            "priorRequest": {
+                              "requestId": "00000000-0000-4000-8000-000000000016",
+                              "lineNo": 1
+                            },
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "80.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示引用已批准事前额度",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "先完成 plan-basic，并把 planResourceId 替换为批准生成的资源编号。",
+                        "在报销中选择该申请第 1 行，预检、提交、审批并完成结算。"
+                      ],
+                      "expected": [
+                        "归属、法人、币种与可用余额均由服务端校验。",
+                        "先预留 80 元，结算成功才消费额度，原批准总额保持 800 元。"
+                      ]
+                    },
+                    {
+                      "id": "expense-invoice-owner",
+                      "name": "100 元发票由第一份报销占用",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示发票首次占用",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "100.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [
+                              "00000000-0000-4000-8000-000000000014"
+                            ],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "100.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示发票首次占用",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "本人票夹登记并上传一份合法的合成原件，通过独立查验确认含税 100 元、税额 0 元及本法人抬头。",
+                        "用票夹真实 invoiceId 替换样例编号，创建、预检并提交本单；保留在审占用。"
+                      ],
+                      "expected": [
+                        "票据原件、查验结果和所有权通过真实入口形成。",
+                        "第一单成功提交后持有该票据占用。"
+                      ]
+                    },
+                    {
+                      "id": "expense-invoice-duplicate",
+                      "name": "第二单重复使用同一发票",
+                      "templateKey": "expense-report",
+                      "content": {
+                        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+                        "type": "DAILY",
+                        "title": "演示同票第二份报销",
+                        "lines": [
+                          {
+                            "lineNo": 1,
+                            "categoryCode": "DEMO_OFFICE",
+                            "incurredOn": "2026-01-10",
+                            "endedOn": null,
+                            "cityCode": "SH",
+                            "quantity": 1,
+                            "unit": "ITEM",
+                            "claimedGross": {
+                              "value": "100.00",
+                              "currency": "CNY"
+                            },
+                            "claimedTax": {
+                              "value": "0.00",
+                              "currency": "CNY"
+                            },
+                            "invoiceIds": [
+                              "00000000-0000-4000-8000-000000000014"
+                            ],
+                            "priorRequest": null,
+                            "allocations": [
+                              {
+                                "costCenter": "IT",
+                                "projectCode": null,
+                                "amount": {
+                                  "value": "100.00",
+                                  "currency": "CNY"
+                                }
+                              }
+                            ],
+                            "description": "演示同票第二份报销",
+                            "exceptionReason": null
+                          }
+                        ],
+                        "advanceOffsets": []
+                      },
+                      "steps": [
+                        "保持 expense-invoice-owner 的第一单在审，两单使用同一个真实 invoiceId。",
+                        "创建第二单并发起预检；如果并发预检已经完成，再尝试带原依据提交。"
+                      ],
+                      "expected": [
+                        "预检或提交重新核对占用时拒绝第二单。",
+                        "不能新增第二份票据占用，也不能改变第一单占用。"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -49402,6 +50206,9 @@
             "items": {
               "$ref": "#/components/schemas/TemplateCopy"
             }
+          },
+          "companion": {
+            "$ref": "#/components/schemas/TemplateCompanionSummary"
           }
         },
         "description": "内置模板复制后成为租户独立草稿。notificationsAvailable 表示复制时是否携带三类站内通知文案；结构化财务模板必须从各自业务入口填报和预检。",
@@ -76121,6 +76928,211 @@
             ]
           }
         }
+      },
+      "TemplateCompanionSummary": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "scenarioCount": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "name",
+          "description",
+          "scenarioCount"
+        ],
+        "additionalProperties": false
+      },
+      "FinancialTemplateExampleBinding": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "exampleValue": {
+            "type": "string"
+          },
+          "instruction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "exampleValue",
+          "instruction"
+        ],
+        "additionalProperties": false
+      },
+      "FinancialTemplateExampleConfiguration": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseCategoryDefinition"
+            }
+          },
+          "expensePolicy": {
+            "$ref": "#/components/schemas/ExpensePolicyDefinition"
+          },
+          "accountMapping": {
+            "$ref": "#/components/schemas/AccountMappingDefinition"
+          },
+          "receiptOptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceLegalEntity"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "categories",
+          "expensePolicy",
+          "accountMapping",
+          "receiptOptions"
+        ],
+        "additionalProperties": false
+      },
+      "FinancialTemplateExampleScenario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "templateKey": {
+            "type": "string",
+            "enum": [
+              "expense-report",
+              "expense-plan",
+              "advance-request"
+            ]
+          },
+          "content": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseContent"
+              },
+              {
+                "$ref": "#/components/schemas/ExpensePlanContent"
+              },
+              {
+                "$ref": "#/components/schemas/AdvanceRequestContent"
+              }
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reductions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseReductionLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "templateKey",
+          "content",
+          "steps",
+          "expected"
+        ],
+        "additionalProperties": false
+      },
+      "FinancialTemplateExamples": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "key": {
+            "type": "string",
+            "const": "employee-finance"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "templateKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinancialTemplateExampleBinding"
+            }
+          },
+          "setupSteps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/FinancialTemplateExampleConfiguration"
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinancialTemplateExampleScenario"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "key",
+          "version",
+          "name",
+          "description",
+          "templateKeys",
+          "bindings",
+          "setupSteps",
+          "configuration",
+          "scenarios"
+        ],
+        "additionalProperties": false
       }
     }
   }

@@ -77,6 +77,27 @@ class ProcessTemplateIntegrationTest {
                 .andExpect(jsonPath("$[0].copies").isArray());
     }
 
+    @Test
+    void financialExamplesRequireProcessAdministrationAndNeverCreateTenantResources() throws Exception {
+        var before = jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition", Long.class);
+        var applications = jdbc.queryForObject("SELECT COUNT(*) FROM approval_application", Long.class);
+        for (String key : List.of("expense-report", "expense-plan", "advance-request")) {
+            mvc.perform(get("/api/v1/process-templates/" + key + "/financial-examples").header("Authorization", token("admin")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.key").value("employee-finance"))
+                    .andExpect(jsonPath("$.scenarios.length()").value(10));
+            mvc.perform(get("/api/v1/process-templates/" + key + "/financial-examples").header("Authorization", token("finance")))
+                    .andExpect(status().isForbidden());
+            assertThat(template(key, token("admin")).path("companion").path("scenarioCount").asInt()).isEqualTo(10);
+        }
+        mvc.perform(get("/api/v1/process-templates/leave-request/financial-examples").header("Authorization", token("admin")))
+                .andExpect(status().isNotFound());
+        assertThat(template("leave-request", token("admin")).has("companion")).isFalse();
+        mvc.perform(get("/api/v1/process-templates/expense-report/financial-examples"))
+                .andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition", Long.class)).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_application", Long.class)).isEqualTo(applications);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"expense-report", "expense-plan", "advance-request"})
     void financialTemplatesCopyTheirStructuredFieldsAndSimulateConfiguredAmountBoundaries(String templateKey) throws Exception {

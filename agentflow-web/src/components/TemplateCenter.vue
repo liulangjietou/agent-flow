@@ -4,6 +4,7 @@ import { api, type TemplateCopyInput } from '../api'
 import { fieldErrorMessage, fieldTypes, ownValue } from '../formSchema'
 import { TemplateCatalog, validateTemplateCopy } from '../templateCenter'
 import FormFields from './FormFields.vue'
+import FinancialTemplateCompanion from './FinancialTemplateCompanion.vue'
 
 const props = defineProps<{ examplesOnly?: boolean; scopeKey: string; refreshVersion: number; locked: boolean; hasUnsavedDefinition: boolean }>()
 const emit = defineEmits<{ copy: [templateKey: string, body: TemplateCopyInput]; open: [definitionId: string]; returnDesigner: []; import: [] }>()
@@ -73,6 +74,7 @@ onUnmounted(() => catalog.clear())
         <article v-if="selected" :key="selected.key" class="panel template-detail">
           <div class="template-detail-heading"><div><p class="eyebrow">{{ selected.key }} / V{{ selected.templateVersion }}</p><h3>{{ selected.name }}</h3><p>{{ selected.description }}</p></div><span class="status-chip">{{ businessLabels[selected.businessType] }}</span></div>
           <section class="template-section"><h4>适用范围</h4><p>{{ selected.scope }}</p></section>
+          <FinancialTemplateCompanion v-if="selected.companion" :template-key="selected.key" :scope-key="scopeKey" :summary="selected.companion" :locked="locked" />
           <form v-if="!examplesOnly" class="template-copy-form" novalidate @submit.prevent="copy">
             <h4>复制为我的流程草稿</h4><p>复制后进入设计器；审批角色与示例阈值需核对，发布由你决定。</p>
             <fieldset :disabled="locked"><label for="template-target-key">目标流程标识<input id="template-target-key" v-model="targetKey" aria-required="true" :aria-invalid="!!copyErrors.key" :aria-describedby="copyErrors.key ? 'template-key-error' : undefined" /><small v-if="copyErrors.key" id="template-key-error" class="inline-error">{{ copyErrors.key }}</small></label><label for="template-target-name">目标流程名称<input id="template-target-name" v-model="targetName" aria-required="true" :aria-invalid="!!copyErrors.name" :aria-describedby="copyErrors.name ? 'template-name-error' : undefined" /><small v-if="copyErrors.name" id="template-name-error" class="inline-error">{{ copyErrors.name }}</small></label></fieldset>

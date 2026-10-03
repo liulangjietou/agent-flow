@@ -33,7 +33,10 @@ for (const methods of Object.values(spec.paths)) for (const operation of Object.
   const body = operation.requestBody?.content['application/json']
   if (body?.example !== undefined) { validate(body.schema, body.example); examples++ }
   assert.equal(Boolean(operation.parameters?.find(p => p.name === 'Idempotency-Key')?.required), operation['x-idempotency'])
-  for (const response of Object.values(operation.responses)) for (const media of Object.values(response.content ?? {})) validator(media.schema)
+  for (const response of Object.values(operation.responses)) for (const media of Object.values(response.content ?? {})) {
+    validator(media.schema)
+    if (media.example !== undefined) validate(media.schema, media.example)
+  }
 }
 console.log(JSON.stringify({ result: 'PASS', operations: ids.size, schemas: Object.keys(spec.components.schemas).length, requestExamples: examples }))
 // 写入型验收只在明确指定独立本机演示入口时运行，保留所有验收数据。

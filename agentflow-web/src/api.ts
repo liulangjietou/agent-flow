@@ -137,11 +137,18 @@ export interface DefinitionAvailabilityHistory { items: DefinitionAvailabilityCh
 export interface DefinitionAvailabilityInput { startEnabled: boolean; expectedRevision: number; reason: string }
 export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
 export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
+export interface TemplateCompanionSummary { key: string; version: number; name: string; description: string; scenarioCount: number }
+export interface FinancialTemplateExamples {
+  schemaVersion: number; key: string; version: number; name: string; description: string; templateKeys: string[]
+  bindings: { key: string; exampleValue: string; instruction: string }[]; setupSteps: string[]
+  configuration: Record<string, unknown>
+  scenarios: { id: string; name: string; templateKey: string; content: Record<string, unknown>; steps: string[]; expected: string[]; reductions?: Record<string, unknown>[] }[]
+}
 export interface ProcessTemplate {
   key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT' | 'BUDGET_ADJUSTMENT' | 'EXPENSE' | 'EXPENSE_PLAN' | 'ADVANCE_REQUEST'
   dependencies: string[]; defaultRoles: string[]; fieldDescriptions: Record<string, string>; risks: string[]; upgradePolicy: string
   notificationTexts: Record<string, string>; notificationsAvailable: boolean; graph: Graph; formSchema: FormSchema
-  scenarios: TemplateScenario[]; copies: TemplateCopy[]
+  scenarios: TemplateScenario[]; copies: TemplateCopy[]; companion?: TemplateCompanionSummary
 }
 export interface TemplateCopyInput { key: string; name: string; templateVersion: number }
 /** 自检只读快照。@author owlzhangfq@gmail.com */
@@ -817,6 +824,7 @@ export const api = {
   searchDefinitions: (filters: DefinitionCatalogFilters, signal: AbortSignal) => request<DefinitionCatalogPage>('/process-definitions/search?' + new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)])), { signal }),
   getDefinition: (id: string, signal?: AbortSignal) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { signal }),
   templates: () => request<ProcessTemplate[]>('/process-templates'),
+  financialTemplateExamples: (templateKey: string) => request<FinancialTemplateExamples>(`/process-templates/${encodeURIComponent(templateKey)}/financial-examples`),
   copyTemplate: (templateKey: string, body: TemplateCopyInput) => write<Definition>(`/process-templates/${encodeURIComponent(templateKey)}/copy`, 'POST', '复制流程模板为草稿', body),
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null; notificationTexts?: NotificationTexts }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null; notificationTexts?: NotificationTexts }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),
