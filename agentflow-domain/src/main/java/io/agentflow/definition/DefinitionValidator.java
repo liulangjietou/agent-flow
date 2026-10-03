@@ -14,6 +14,7 @@ import static io.agentflow.definition.DefinitionModels.*;
  */
 public final class DefinitionValidator {
     private static final int MAX_SUBPROCESS_NODE_NAME_LENGTH = 200;
+    private static final int MAX_SERVICE_NODE_NAME_LENGTH = 200;
     private static final Pattern LITERAL_ASSIGNEE_RULE =
             Pattern.compile("(?:role|user):[\\p{L}\\p{N}_][\\p{L}\\p{N}_.@-]{0,127}");
 
@@ -44,6 +45,11 @@ public final class DefinitionValidator {
                 try { EventWaitPolicy.fromProperties(n.properties()); }
                 catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
             } else if (EventWaitPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) errors.add("EVENT_REQUIRES_WAIT_NODE:" + n.id());
+            if (n.type() == NodeType.SERVICE_TASK) {
+                if (n.id().length() > FormSchema.MAX_NODE_ID_LENGTH || n.name().length() > MAX_SERVICE_NODE_NAME_LENGTH) errors.add("SERVICE_NODE_LIMIT_EXCEEDED:" + n.id());
+                try { ServiceTaskPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            } else if (ServiceTaskPolicy.hasProperties(n.properties())) errors.add("SERVICE_REQUIRES_SERVICE_NODE:" + n.id());
             if (n.type() == NodeType.TIMER_WAIT) {
                 try { TimerWaitPolicy.fromProperties(n.properties()); }
                 catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
@@ -88,9 +94,10 @@ public final class DefinitionValidator {
                 errors.add("COPY_NODE_LIMIT_EXCEEDED:" + n.id());
             }
             if (n.type() == NodeType.SERVICE_TASK) {
+                // 输入契约与恢复状态先落地；持久编排和引擎执行接通前仍禁止发布。
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
             }
-            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS) {
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS || n.type() == NodeType.SERVICE_TASK) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
                     errors.add("TASK_NAME_EXPRESSION_FORBIDDEN:" + n.id());
@@ -166,7 +173,7 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
             // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
             if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY
-                    || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS) && outgoingCount > 1) {
+                    || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS || n.type() == NodeType.SERVICE_TASK) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
