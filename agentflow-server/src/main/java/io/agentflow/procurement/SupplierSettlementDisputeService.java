@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ public class SupplierSettlementDisputeService {
     private final CurrentActor actors;
     private final SupplierSettlementAccess access;
     private final SupplierSettlementSources sources;
+    private final ApplicationEventPublisher events;
     private final JdbcSupplierPayableSettlementRepository settlements;
     private final SupplierSettlementService execution;
     private final JdbcTemplate jdbc;
@@ -38,8 +40,8 @@ public class SupplierSettlementDisputeService {
 
     /** 原号查询复用既有结算入口；裁决事务不执行银行或 ERP 网络调用。 */
     public SupplierSettlementDisputeService(CurrentActor actors, SupplierSettlementAccess access, SupplierSettlementSources sources,
-            JdbcSupplierPayableSettlementRepository settlements, SupplierSettlementService execution, JdbcTemplate jdbc, JsonUtil json) {
-        this.actors = actors; this.access = access; this.sources = sources; this.settlements = settlements; this.execution = execution; this.jdbc = jdbc; this.json = json;
+            JdbcSupplierPayableSettlementRepository settlements, SupplierSettlementService execution, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
+        this.actors = actors; this.events = events; this.access = access; this.sources = sources; this.settlements = settlements; this.execution = execution; this.jdbc = jdbc; this.json = json;
     }
 
     /** 历史决定与当前候选分别展示，读取仍受原轮次完整财务字段权限约束。 */
@@ -69,7 +71,7 @@ public class SupplierSettlementDisputeService {
         var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         var decision = new SupplierSettlementDisputeResolution(UUID.randomUUID(), tenant, id, before.version(), Math.incrementExact(before.version()), candidate,
                 actors.actor().userId(), now, input.evidenceReference().trim(), input.comment());
-        var after = settlements.resolve(decision); execution.completeLocal(tenant, id, now);
+        var after = settlements.resolve(decision); execution.completeLocal(tenant, id, now); events.publishEvent(new SupplierSettlementChanged.Operation(after));
         var event = audit(before, after, decision, now); var source = before.command().payment().holdCommand().authorization().source().reservation().source();
         return new Receipt(id, before.command().payment().id(), source.requestId(), source.applicationId(), source.round().roundNo(), after.version(), after.status(), decision.id(), event);
     }

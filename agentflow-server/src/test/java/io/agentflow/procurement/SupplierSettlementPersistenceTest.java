@@ -108,8 +108,8 @@ class SupplierSettlementPersistenceTest {
         intents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
         settlements = new JdbcSupplierPayableSettlementRepository(jdbc, json, intents, payments, reservations);
         var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
-        settlementPreparation = proxy(new SupplierSettlementPreparationService(settlementSources, intents, settlements, 30));
-        settlementExecution = proxy(new SupplierSettlementService(settlementSources, settlements, reservations, 30));
+        settlementPreparation = proxy(new SupplierSettlementPreparationService(settlementSources, intents, settlements, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class), 30));
+        settlementExecution = proxy(new SupplierSettlementService(settlementSources, settlements, reservations, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class), 30));
     }
 
     @Test void immutableIntentAndCommandSurviveRecreationWithExactPaidSourceAndTenantIsolation() {

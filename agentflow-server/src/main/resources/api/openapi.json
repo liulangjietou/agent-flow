@@ -46685,6 +46685,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/supplier-settlement-target": {
+      "get": {
+        "operationId": "supplierSettlementNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原供应商结算",
+        "description": "消息固定原准备与执行编号，同一事实按原编号去重。响应区分当时通知事实、当前 ERP 状态、实际本地完成和安全结束。旧消息不跟随后一次准备；当前原轮次字段权限、原参与关系及法人任职重新核验，管理员不能绕过。拒绝查询参数，响应 no-store，不核销、不完成占用、不提供金额、账户或办理许可。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierSettlementNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -53251,7 +53356,9 @@
               "REVERSAL_CHECK_RESULT",
               "REVERSAL_CHECK_ATTENTION",
               "EXPENSE_SETTLEMENT_RESULT",
-              "EXPENSE_SETTLEMENT_ATTENTION"
+              "EXPENSE_SETTLEMENT_ATTENTION",
+              "SUPPLIER_SETTLEMENT_RESULT",
+              "SUPPLIER_SETTLEMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -81250,6 +81357,265 @@
           },
           "current": {
             "$ref": "#/components/schemas/ExpenseSettlementNotificationState"
+          }
+        }
+      },
+      "SupplierSettlementNotificationPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "issue",
+          "updatedAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "BLOCKED",
+              "VOIDED"
+            ]
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "LEASE_EXPIRED",
+              "SOURCE_CHANGED",
+              "ACCOUNTING_PERIOD_REJECTED",
+              "EVIDENCE_CHANGED",
+              null
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierSettlementNotificationOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "status",
+          "issue",
+          "updatedAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CHECKING",
+              "SETTLING",
+              "UNKNOWN",
+              "QUERYING",
+              "SETTLED",
+              "REJECTED",
+              "NOT_FOUND",
+              "RECONCILING",
+              "VOIDED"
+            ]
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "LEASE_EXPIRED",
+              "SOURCE_CHANGED",
+              "EVIDENCE_CHANGED",
+              "FINANCE_RETIRED",
+              "STALE_OBSERVATION",
+              "INCONSISTENT_OBSERVATION",
+              "RECHECK_REQUESTED",
+              null
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierSettlementNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "basis",
+          "retiredAt"
+        ],
+        "properties": {
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_REJECTED"
+            ]
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierSettlementNotificationCompletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "operationVersion",
+          "paymentId",
+          "completedAt"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierSettlementNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "settlementId",
+          "paymentId",
+          "requestId",
+          "applicationId",
+          "roundNo",
+          "accountingDate",
+          "fact",
+          "preparation",
+          "operation",
+          "retirement",
+          "completion"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settlementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "PREPARATION_RETRY",
+              "PREPARATION_BLOCKED",
+              "PREPARATION_VOIDED",
+              "EXECUTION_RETRY",
+              "UNKNOWN",
+              "NOT_FOUND",
+              "RECONCILING",
+              "REJECTED",
+              "VOIDED",
+              "ERP_SETTLED",
+              "COMPLETED",
+              "RETIRED"
+            ]
+          },
+          "preparation": {
+            "$ref": "#/components/schemas/SupplierSettlementNotificationPreparation"
+          },
+          "operation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SupplierSettlementNotificationCompletion"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }

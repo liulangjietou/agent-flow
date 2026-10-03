@@ -219,7 +219,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'SUPPLIER_SETTLEMENT_RESULT' | 'SUPPLIER_SETTLEMENT_ATTENTION' | 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -266,6 +266,15 @@ export interface ReversalNotificationTarget {
   preparation: { id: string; version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'AUTHORIZED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; accountingDate: string; issue: string | null }
   operation: { id: string; version: number; status: 'QUEUED' | 'POSTING' | 'QUERYING' | 'UNKNOWN' | 'POSTED' | 'FAILED' | 'NOT_FOUND' | 'EXPIRED' | 'VOIDED' | 'RECONCILING'; attempts: number; highestRevision: number; updatedAt: string; expiresAt: string; observedStatus: 'PENDING' | 'POSTED' | 'FAILED' | 'NOT_FOUND' | null; issue: string | null; disputed: boolean; voucherReference: string | null; postedAt: string | null } | null
   retirement: { id: string; retiredAt: string; basis: 'NEVER_DISPATCHED' | 'CONFIRMED_FAILED' } | null
+}
+/** 同一原结算的当前准备、ERP 结果及实际完成事实，不携带办理许可。 */
+export interface SupplierSettlementNotificationTarget {
+  messageId: string; settlementId: string; paymentId: string; requestId: string; applicationId: string; roundNo: number; accountingDate: string
+  fact: 'PREPARATION_RETRY' | 'PREPARATION_BLOCKED' | 'PREPARATION_VOIDED' | 'EXECUTION_RETRY' | 'UNKNOWN' | 'NOT_FOUND' | 'RECONCILING' | 'REJECTED' | 'VOIDED' | 'ERP_SETTLED' | 'COMPLETED' | 'RETIRED'
+  preparation: { version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'BLOCKED' | 'VOIDED'; issue: string | null; updatedAt: string }
+  operation: { version: number; status: 'QUEUED' | 'CHECKING' | 'SETTLING' | 'UNKNOWN' | 'QUERYING' | 'SETTLED' | 'REJECTED' | 'NOT_FOUND' | 'RECONCILING' | 'VOIDED'; issue: string | null; updatedAt: string } | null
+  retirement: { basis: 'NEVER_DISPATCHED' | 'CONFIRMED_REJECTED'; retiredAt: string } | null
+  completion: { operationId: string; operationVersion: number; paymentId: string; completedAt: string } | null
 }
 /** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
 export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
@@ -854,6 +863,7 @@ export const api = {
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   paymentNotificationTarget: (id: string, signal: AbortSignal) => request<PaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/payment-target`, { signal, cache: 'no-store' }),
   supplierPaymentNotificationTarget: (id: string, signal: AbortSignal) => request<SupplierPaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-payment-target`, { signal, cache: 'no-store' }),
+  supplierSettlementNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierSettlementNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-settlement-target`, { cache: 'no-store', signal }),
   expenseSettlementNotificationTarget: (id: string, signal: AbortSignal) => request<ExpenseSettlementNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-settlement-target`, { signal, cache: 'no-store' }),
   reversalCheckNotificationTarget: (id: string, signal: AbortSignal) => request<ReversalCheckNotificationTarget>(`/notifications/${encodeURIComponent(id)}/reversal-check-target`, { signal, cache: 'no-store' }),
   reversalNotificationTarget: (id: string, signal: AbortSignal) => request<ReversalNotificationTarget>(`/notifications/${encodeURIComponent(id)}/reversal-target`, { signal, cache: 'no-store' }),

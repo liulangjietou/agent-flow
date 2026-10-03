@@ -29,6 +29,7 @@ public record InboxMessage(UUID id, String tenantId, String recipient, UUID appl
      * @author owlzhangfq@gmail.com
      */
     public enum Kind {
+        SUPPLIER_SETTLEMENT_RESULT, SUPPLIER_SETTLEMENT_ATTENTION,
         EXPENSE_SETTLEMENT_RESULT, EXPENSE_SETTLEMENT_ATTENTION,
         REVERSAL_RESULT, REVERSAL_ATTENTION, REVERSAL_CHECK_RESULT, REVERSAL_CHECK_ATTENTION,
         BUDGET_RESULT, BUDGET_ATTENTION,
