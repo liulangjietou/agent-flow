@@ -1145,7 +1145,7 @@
           ]
         }
       ],
-      "observed": "ExpenseRequest.ApprovedLine 能表达容差上限，但 ExpensePlan.approve 固定使用 BigDecimal.ZERO；没有按类别的模式、容差说明与额外审批配置。",
+      "observed": "ExpenseRequest.ApprovedLine 能表达容差上限，但 ExpensePlan.approvedRequest 固定使用 BigDecimal.ZERO；没有按类别的模式、容差说明与额外审批配置。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java",
