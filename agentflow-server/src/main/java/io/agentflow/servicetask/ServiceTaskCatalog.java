@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -71,7 +73,42 @@ public class ServiceTaskCatalog {
                 .filter(current -> current.enabled() && current.contract().equals(value.contract()) && current.targetDigest().equals(value.targetDigest())).isPresent();
     }
 
+    /** 最新安装版本始终显示，停用和配置缺失只影响可用状态。 */
+    public ServiceTaskCatalogViews.Directory list(String tenant, ServiceTaskCatalogQuery query) {
+        var references = jdbc.query("""
+                SELECT operation_key,MAX(operation_version) AS latest_version FROM service_task_contract
+                WHERE tenant_id=? AND operation_key>? GROUP BY operation_key ORDER BY operation_key LIMIT ?
+                """, (row, index) -> new Reference(row.getString("operation_key"), row.getLong("latest_version")),
+                tenant, query.afterKey() == null ? "" : query.afterKey(), query.limit() + 1);
+        var items = references.stream().limit(query.limit()).map(reference -> option(tenant, reference.key(), reference.version())).toList();
+        return new ServiceTaskCatalogViews.Directory(items, references.size() > query.limit() ? items.get(items.size() - 1).key() : null);
+    }
+
+    /** 历史版本按倒序分页，不把浏览器数字精度限制施加到已安装的原版本上。 */
+    public ServiceTaskCatalogViews.Versions versions(String tenant, String key, ServiceTaskCatalogQuery query) {
+        var arguments = new ArrayList<Object>(List.of(tenant, key));
+        String sql = "SELECT operation_version FROM service_task_contract WHERE tenant_id=? AND operation_key=?";
+        if (query.beforeVersion() != null) {
+            sql += " AND operation_version<?";
+            arguments.add(query.beforeVersion());
+        }
+        arguments.add(query.limit() + 1);
+        var versions = jdbc.queryForList(sql + " ORDER BY operation_version DESC LIMIT ?", Long.class, arguments.toArray());
+        var items = versions.stream().limit(query.limit()).map(version -> option(tenant, key, version)).toList();
+        return new ServiceTaskCatalogViews.Versions(items, versions.size() > query.limit() ? items.get(items.size() - 1).version() : null);
+    }
+
+    /** 精确读取不会退回到其他版本或租户，投影不包含目标摘要、地址和凭据。 */
+    public ServiceTaskCatalogViews.Option option(String tenant, String key, long version) {
+        var installed = find(tenant, key, version).orElseThrow(() -> new DomainException("NOT_FOUND", "Service task contract version not found"));
+        var contract = installed.contract();
+        return new ServiceTaskCatalogViews.Option(contract.key(), Long.toString(contract.version()), contract.name(), contract.digest(),
+                contract.parameters(), available(tenant, installed));
+    }
+
     private static DomainException unavailable() { return new DomainException("SERVICE_TASK_CONTRACT_UNAVAILABLE", "The exact service task contract version is unavailable"); }
     /** @author owlzhangfq@gmail.com */
     public record Installed(ServiceTaskContract contract, String targetDigest) { }
+    /** @author owlzhangfq@gmail.com */
+    private record Reference(String key, long version) { }
 }

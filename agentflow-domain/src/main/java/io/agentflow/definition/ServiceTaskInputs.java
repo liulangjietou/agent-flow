@@ -56,11 +56,20 @@ public final class ServiceTaskInputs {
     /** 激活原等待时冻结命令；值类型和大小只在命令构造边界校验，未映射的字段不进入命令。 */
     public ServiceTaskCommand command(UUID id, String tenantId, ServiceTaskCommand.Binding origin, Map<String, Object> sourceValues) {
         if (!nodeId.equals(origin.nodeId())) throw invalid("SERVICE_TASK_NODE_MISMATCH", "Service task inputs belong to another node");
+        return new ServiceTaskCommand(id, tenantId, origin, contract, project(sourceValues));
+    }
+
+    /** 模拟与发起检查本次映射值；实际执行命令仍在节点激活时固定，不提前创建操作号。 */
+    public void validateSource(Map<String, Object> sourceValues) {
+        contract.freezeInputs(project(sourceValues));
+    }
+
+    private Map<String, Object> project(Map<String, Object> sourceValues) {
         var inputs = new LinkedHashMap<String, Object>();
         for (var binding : bindings) {
             if (sourceValues.containsKey(binding.fieldKey())) inputs.put(binding.parameterName(), sourceValues.get(binding.fieldKey()));
         }
-        return new ServiceTaskCommand(id, tenantId, origin, contract, inputs);
+        return inputs;
     }
 
     private static boolean compatible(FormSchema.FieldType field, ServiceTaskContract.Type parameter) {

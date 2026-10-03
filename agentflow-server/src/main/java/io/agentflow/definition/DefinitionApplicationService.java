@@ -5,6 +5,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.servicetask.ServiceTaskBindings;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class DefinitionApplicationService {
     private final DefinitionReferenceInspector references;
     private final EventContractBindings eventContracts;
     private final SubprocessDeploymentBindings subprocesses;
+    private final ServiceTaskBindings serviceTasks;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
@@ -38,7 +40,7 @@ public class DefinitionApplicationService {
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
                                         DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees,
                                         DefinitionReferenceInspector references, EventContractBindings eventContracts,
-                                        SubprocessDeploymentBindings subprocesses) {
+                                        SubprocessDeploymentBindings subprocesses, ServiceTaskBindings serviceTasks) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
@@ -46,6 +48,7 @@ public class DefinitionApplicationService {
         this.references = references;
         this.eventContracts = eventContracts;
         this.subprocesses = subprocesses;
+        this.serviceTasks = serviceTasks;
     }
 
     /** 校验流程图，不改变持久化状态。 */
@@ -134,6 +137,7 @@ public class DefinitionApplicationService {
     public DefinitionDraft create(String tenantId, String key, String name, Graph graph, FormSchema formSchema,
                                   NotificationTexts notificationTexts) {
         requireValid(graph, formSchema, key);
+        serviceTasks.requireDeclared(tenantId, graph, formSchema);
         DefinitionDraft draft = DefinitionDraft.create(UUID.randomUUID(), tenantId, key, name, graph, formSchema, notificationTexts);
         return repository.save(draft);
     }
@@ -156,6 +160,7 @@ public class DefinitionApplicationService {
                                   NotificationTexts notificationTexts, long expectedRevision) {
         DefinitionDraft draft = get(tenantId, id);
         requireValid(graph, formSchema == null ? draft.formSchema() : formSchema, draft.key());
+        serviceTasks.requireDeclared(tenantId, graph, formSchema == null ? draft.formSchema() : formSchema);
         draft.update(name, graph, formSchema, notificationTexts, expectedRevision);
         return repository.save(draft);
     }
@@ -188,12 +193,19 @@ public class DefinitionApplicationService {
     /** 使用同一套受限条件求值器模拟流程路径，不接触流程引擎。 */
     public List<String> simulate(String tenantId, UUID id, DefinitionModels.EvaluationContext context) {
         DefinitionDraft draft = get(tenantId, id);
-        return simulatePreview(draft.graph(), draft.formSchema(), context).path();
+        return simulatePreview(tenantId, draft.graph(), draft.formSchema(), context).path();
     }
 
     /** 试算当前设计快照，不读取或修改持久化草稿，也不启动实例。 */
     public DefinitionSimulator.Result simulatePreview(Graph graph, FormSchema formSchema, DefinitionModels.EvaluationContext context) {
         return simulator.simulateDetailed(graph, formSchema, context);
+    }
+
+    /** 公开模拟同时核对服务任务的原契约、字段权限和本次输入，整个过程不创建队列或访问远端。 */
+    public DefinitionSimulator.Result simulatePreview(String tenantId, Graph graph, FormSchema formSchema, DefinitionModels.EvaluationContext context) {
+        var result = simulatePreview(graph, formSchema, context);
+        serviceTasks.requireReady(tenantId, graph, formSchema, context.values());
+        return result;
     }
 
     /** 只读比较同租户、同 key 的发布基线与当前设计，不要求当前图已经通过发布校验。 */

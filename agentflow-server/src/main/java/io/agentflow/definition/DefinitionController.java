@@ -187,7 +187,7 @@ public class DefinitionController {
     @PostMapping("/simulate")
     public DefinitionSimulator.Result simulatePreview(@Valid @RequestBody PreviewSimulationRequest request) {
         requireProcessAdmin();
-        return service.simulatePreview(request.graph(), request.formSchema(), new DefinitionModels.EvaluationContext(request.values()));
+        return service.simulatePreview(currentActor.actor().tenantId(), request.graph(), request.formSchema(), new DefinitionModels.EvaluationContext(request.values()));
     }
 
     /** 模拟已保存定义，保留已有调用契约。 */

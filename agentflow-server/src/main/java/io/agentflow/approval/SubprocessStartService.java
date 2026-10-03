@@ -16,6 +16,7 @@ import io.agentflow.definition.DefinitionModels;
 import io.agentflow.definition.SubprocessDefinitionResolver;
 import io.agentflow.definition.SubprocessPolicy;
 import io.agentflow.event.EventContractBindings;
+import io.agentflow.servicetask.ServiceTaskBindings;
 import io.agentflow.organization.InitiatorContext;
 import io.agentflow.organization.FormAssigneeBindings;
 import io.agentflow.organization.LocalOrganizationDirectory;
@@ -44,14 +45,17 @@ public class SubprocessStartService {
     private final SubprocessAttachmentService attachments;
     private final ApplicationAuditPort audit;
     private final FormAssigneeBindings formAssignees;
+    private final ServiceTaskBindings serviceTasks;
 
     /** 固定版本解析、业务仓储、事件与附件通过组合完成，不在流程变量中保存完整父申请。 */
     public SubprocessStartService(ApplicationRepository applications, SubmissionRoundRepository rounds,
             SubprocessCallRepository calls, DefinitionDraftRepository definitions, SubprocessDefinitionResolver resolver,
-            EventContractBindings events, SubprocessAttachmentService attachments, ApplicationAuditPort audit, FormAssigneeBindings formAssignees) {
+            EventContractBindings events, SubprocessAttachmentService attachments, ApplicationAuditPort audit, FormAssigneeBindings formAssignees,
+            ServiceTaskBindings serviceTasks) {
         this.applications = applications; this.rounds = rounds; this.calls = calls; this.definitions = definitions;
         this.resolver = resolver; this.events = events; this.attachments = attachments; this.audit = audit;
         this.formAssignees = formAssignees;
+        this.serviceTasks = serviceTasks;
     }
 
     /** 原生实例创建前核对实际父身份并准备独立子输入；任何失败都留在当前启动事务内。 */
@@ -89,6 +93,7 @@ public class SubprocessStartService {
                 : bound.graph().riskPolicy().assess(bound.definitionId(), bound.version(), bound.formSchema(),
                         bound.graph().conditionLanguageVersion(), child.payload());
         var selected = formAssignees.freeze(parent.tenantId(), bound.graph(), child.payload());
+        serviceTasks.requireReady(parent.tenantId(), bound.graph(), bound.formSchema(), child.payload());
         return new Prepared(UUID.randomUUID(), parent, policy, bound.definitionId(), node.name(), child, preparedFiles, at, risk, selected);
     }
 

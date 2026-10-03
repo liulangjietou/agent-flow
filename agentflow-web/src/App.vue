@@ -77,6 +77,8 @@ import DefinitionResponsibilities from './components/DefinitionResponsibilities.
 import { readResponsibilities, writeResponsibilities, type ApprovalResponsibilities } from './approvalResponsibilities'
 import DefinitionDeadline from './components/DefinitionDeadline.vue'
 import DefinitionTimerWait from './components/DefinitionTimerWait.vue'
+import DefinitionServiceTask from './components/DefinitionServiceTask.vue'
+import type { ServiceTaskBinding } from './serviceTasks'
 import DefinitionEventWait from './components/DefinitionEventWait.vue'
 import DefinitionSubprocess from './components/DefinitionSubprocess.vue'
 import type { SubprocessBinding } from './subprocessDesigner'
@@ -109,7 +111,7 @@ import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from './invoiceExtraction'
 
-type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
+type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SERVICE_TASK' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }))
@@ -262,6 +264,7 @@ const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'COPY', label: '抄送', icon: '抄' },
   { type: 'TIMER_WAIT', label: '定时等待', icon: '时' },
   { type: 'EVENT_WAIT', label: '事件等待', icon: '事' },
+  { type: 'SERVICE_TASK', label: '服务任务', icon: '服' },
   { type: 'SUB_PROCESS', label: '子流程', icon: '子' },
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
   { type: 'PARALLEL_GATEWAY', label: '并行网关', icon: '＋' },
@@ -792,7 +795,13 @@ function editQuick(command: QuickCommand) {
       ? '步骤已添加，请配置节点规则；完成后保存并校验。' : '流程已更新，可通过撤销恢复。'
   } catch (error) { notice.value = errorMessage(error) }
 }
-/** 子引用与输入作为一份配置更新，撤销、保存和切换视图均使用同一快照。 */
+/** 服务引用、契约摘要与输入整体更新，两种视图及撤销共用同一快照。 */
+function patchServiceTask(id: string, value: ServiceTaskBinding) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type === 'SERVICE_TASK') node.serviceTask = { ...value, inputs: { ...value.inputs } }
+}
+/** 子引用与输入整体更新。 */
 function patchSubprocess(id: string, value: SubprocessBinding) {
   if (editorLocked.value || !canManageDefinitions.value) return
   const node = nodes.value.find(node => node.id === id)
@@ -1341,7 +1350,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
           <DefinitionRiskPolicy v-model="definitionRiskPolicy" :form-schema="definitionFormSchema" :language-version="conditionLanguageVersion" :locked="editorLocked || !canManageDefinitions" @before-change="remember" />
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
-          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @responsibilities="patchResponsibilities" @policy="patchApprovalPolicy" @event-contract="patchEventContract" @subprocess="patchSubprocess" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @responsibilities="patchResponsibilities" @policy="patchApprovalPolicy" @service-task="patchServiceTask" @event-contract="patchEventContract" @subprocess="patchSubprocess" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
@@ -1363,7 +1372,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'SUB_PROCESS' ? '子' : node.type === 'EVENT_WAIT' ? '事' : node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'SERVICE_TASK' ? '服' : node.type === 'SUB_PROCESS' ? '子' : node.type === 'EVENT_WAIT' ? '事' : node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
@@ -1372,6 +1381,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" :form-schema="definitionFormSchema" :approval-mode="selectedNode.approvalMode" :approval-percentage="selectedNode.approvalPercentage" @policy="(mode, percentage) => patchApprovalPolicy(selectedNode!.id, mode, percentage)" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionSubprocess v-if="selectedNode.type === 'SUB_PROCESS'" :key="selectedNode.id" :node-id="selectedNode.id" :form-schema="definitionFormSchema" :model-value="selectedNode.subprocess ?? { inputs: {} }" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchSubprocess(selectedNode.id, $event)" />
+                <DefinitionServiceTask v-if="selectedNode.type === 'SERVICE_TASK'" :key="selectedNode.id" :node-id="selectedNode.id" :form-schema="definitionFormSchema" :model-value="selectedNode.serviceTask ?? { inputs: {} }" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchServiceTask(selectedNode.id, $event)" />
                 <DefinitionEventWait v-if="selectedNode.type === 'EVENT_WAIT'" :key="selectedNode.id" :model-value="{ key: selectedNode.eventContractKey, version: selectedNode.eventContractVersion }" :scope-key="actorScope" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchEventContract(selectedNode.id, $event)" />
                 <DefinitionTimerWait v-if="selectedNode.type === 'TIMER_WAIT'" :key="selectedNode.id" v-model="selectedNode.timerDelaySeconds" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionCopyRecipient v-if="selectedNode.type === 'COPY'" :key="selectedNode.id" :model-value="selectedNode.recipientRule ?? ''" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="selectedNode.recipientRule = $event" />
@@ -1390,7 +1400,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <DefinitionNotificationTexts v-model="definitionNotificationTexts" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <DefinitionAvailability v-if="definitionStatus === 'PUBLISHED' && definitionId && canManageDefinitions" :definition-id="definitionId" :revision="definitionRevision" :start-enabled="definitionStartEnabled" :scope-key="actorScope" :locked="busy || writesBlocked || confirmationOpen" :error="availabilityError" :refresh-version="templateRefresh" @change="changeDefinitionAvailability" @refresh="refreshDefinitionAvailability" />
-          <FormSchemaEditor v-model="definitionFormSchema" :scope-key="canManageDefinitions ? actorScope + ':' + definitionId + ':' + definitionKey : ''" :approval-nodes="nodes.filter(node => ['USER_TASK', 'COPY', 'SUB_PROCESS'].includes(node.type))" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+          <FormSchemaEditor v-model="definitionFormSchema" :scope-key="canManageDefinitions ? actorScope + ':' + definitionId + ':' + definitionKey : ''" :approval-nodes="nodes.filter(node => ['USER_TASK', 'COPY', 'SUB_PROCESS', 'SERVICE_TASK'].includes(node.type))" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
             <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>
             <template v-if="validationOpened"><p class="validation-live-help">修改后自动重新检查。提醒不阻止发布，分支执行顺序保持不变。</p><ul v-if="validationOtherErrors.length"><li v-for="error in validationOtherErrors" :key="error">{{ simulationIssue(error).label }}<button v-if="simulationIssue(error).target" type="button" class="secondary" @click="locateDesignTarget(simulationIssue(error).target)">定位 {{ simulationIssue(error).target }}</button></li></ul>

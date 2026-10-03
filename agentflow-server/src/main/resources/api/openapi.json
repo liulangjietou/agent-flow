@@ -44670,6 +44670,415 @@
           }
         ]
       }
+    },
+    "/api/v1/process-definitions/service-task-options": {
+      "get": {
+        "operationId": "definitionServiceTaskDirectory",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "分页读取白名单服务任务目录",
+        "description": "限定当前认证租户和流程管理角色，响应禁止缓存。仅返回已安装的白名单契约及当前可用状态，不返回目标地址、凭据或目标摘要。必须明确选择原键、原版本和原契约摘要；停用的最新版不会自动回退。版本和游标使用十进制文本。未知或重复查询参数返回 400；本接口不创建执行命令也不调用外部系统。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTaskDirectory"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "key": "expense.register",
+                      "version": "9223372036854775807",
+                      "name": "登记费用审核结果",
+                      "contractDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                      "parameters": [
+                        {
+                          "name": "memo",
+                          "type": "TEXT",
+                          "required": true,
+                          "sensitive": true
+                        }
+                      ],
+                      "enabled": true
+                    }
+                  ],
+                  "nextAfterKey": null
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "认证租户目录不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "afterKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/process-definitions/service-task-options/{key}/versions": {
+      "get": {
+        "operationId": "definitionServiceTaskVersions",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "分页读取固定服务任务版本",
+        "description": "限定当前认证租户和流程管理角色，响应禁止缓存。仅返回已安装的白名单契约及当前可用状态，不返回目标地址、凭据或目标摘要。必须明确选择原键、原版本和原契约摘要；停用的最新版不会自动回退。版本和游标使用十进制文本。未知或重复查询参数返回 400；本接口不创建执行命令也不调用外部系统。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTaskVersionPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "key": "expense.register",
+                      "version": "9223372036854775807",
+                      "name": "登记费用审核结果",
+                      "contractDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                      "parameters": [
+                        {
+                          "name": "memo",
+                          "type": "TEXT",
+                          "required": true,
+                          "sensitive": true
+                        }
+                      ],
+                      "enabled": true
+                    }
+                  ],
+                  "nextBeforeVersion": null
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "认证租户目录不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            }
+          },
+          {
+            "name": "beforeVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "1 至 9223372036854775807 的规范十进制文本，禁止用浮点数读取或重写。"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/process-definitions/service-task-options/{key}/versions/{version}": {
+      "get": {
+        "operationId": "definitionServiceTaskVersion",
+        "tags": [
+          "流程设计"
+        ],
+        "summary": "读取精确服务任务契约",
+        "description": "限定当前认证租户和流程管理角色，响应禁止缓存。仅返回已安装的白名单契约及当前可用状态，不返回目标地址、凭据或目标摘要。必须明确选择原键、原版本和原契约摘要；停用的最新版不会自动回退。版本和游标使用十进制文本。未知或重复查询参数返回 400；本接口不创建执行命令也不调用外部系统。",
+        "x-access": "ADMIN 或 PROCESS_ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTaskOption"
+                },
+                "example": {
+                  "key": "expense.register",
+                  "version": "9223372036854775807",
+                  "name": "登记费用审核结果",
+                  "contractDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "parameters": [
+                    {
+                      "name": "memo",
+                      "type": "TEXT",
+                      "required": true,
+                      "sensitive": true
+                    }
+                  ],
+                  "enabled": true
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "认证租户目录不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "1 至 9223372036854775807 的规范十进制文本，禁止用浮点数读取或重写。"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -77336,6 +77745,123 @@
           "updatedAt"
         ],
         "additionalProperties": false
+      },
+      "ServiceTaskParameter": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,63}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "NUMBER",
+              "BOOLEAN",
+              "DATE"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sensitive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "required",
+          "sensitive"
+        ]
+      },
+      "ServiceTaskOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "1 至 9223372036854775807 的规范十进制文本，禁止用浮点数读取或重写。"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "contractDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "parameters": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/components/schemas/ServiceTaskParameter"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "name",
+          "contractDigest",
+          "parameters",
+          "enabled"
+        ]
+      },
+      "ServiceTaskDirectory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/ServiceTaskOption"
+            }
+          },
+          "nextAfterKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ServiceTaskVersionPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/ServiceTaskOption"
+            }
+          },
+          "nextBeforeVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ]
       }
     }
   }

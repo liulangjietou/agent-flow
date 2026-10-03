@@ -73,6 +73,17 @@ export function parseSimulationValues(raw: string): Record<string, unknown> {
 }
 
 const ruleLabels: Record<string, string> = {
+  INVALID_SERVICE_TASK_POLICY: '请明确选择操作版本并配置字段映射；服务节点不接受地址、脚本或执行表达式',
+  SERVICE_TASK_CONTRACT_UNAVAILABLE: '原操作暂不可用或契约不一致，请核对原版本后再发布或发起',
+  SERVICE_TASK_CONTRACT_MISMATCH: '节点所选版本与契约不一致，请明确重新选择',
+  SERVICE_TASK_INPUT_UNKNOWN: '输入映射引用了不存在的表单字段或服务参数',
+  SERVICE_TASK_INPUT_TYPE_MISMATCH: '来源字段类型须与服务参数一致',
+  SERVICE_TASK_INPUT_NOT_READABLE: '服务节点对来源字段须有只读权限；隐藏或脱敏字段不能外发',
+  SERVICE_TASK_INPUT_SENSITIVITY_LOSS: '此参数未声明敏感性，不能接收受限制字段',
+  SERVICE_TASK_REQUIRED_INPUT_MISSING: '请为服务任务的每个必填参数选择来源字段',
+  INVALID_SERVICE_TASK_INPUTS: '映射值不符合参数类型、必填或大小限制，请检查测试数据或申请表单',
+  SERVICE_REQUIRES_SERVICE_NODE: '仅服务任务节点可以配置操作引用和参数映射',
+  SERVICE_REQUIRES_APPROVAL_PATH: '每条完成路径仍须有人工审批依据，服务结果不能代替审批',
   SUBPROCESS_REFERENCE_REQUIRED: '请选择子流程的明确发布版本',
   SUBPROCESS_REFERENCE_INVALID: '子流程须引用准确标识和有效发布版本，不能使用最新版本或表达式',
   SUBPROCESS_INPUT_MAPPING_INVALID: '子流程输入只能映射已声明的字段标识，最多 50 项',

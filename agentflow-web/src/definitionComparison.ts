@@ -67,6 +67,7 @@ const labels: Record<string, string> = {
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
   excludeApplicant: '禁止申请人办理', 'properties.excludeApplicant': '禁止申请人办理',
   differentApproverFrom: '排除前序步骤批准人', 'properties.differentApproverFrom': '排除前序步骤批准人',
+  serviceOperationKey: '服务操作', 'properties.serviceOperationKey': '服务操作', serviceOperationVersion: '服务版本', 'properties.serviceOperationVersion': '服务版本', serviceContractDigest: '服务契约', 'properties.serviceContractDigest': '服务契约',
   eventContractKey: '引用事件', 'properties.eventContractKey': '引用事件', eventContractVersion: '事件发布版本', 'properties.eventContractVersion': '事件发布版本',
   subprocessKey: '子流程标识', 'properties.subprocessKey': '子流程标识', subprocessVersion: '子流程发布版本', 'properties.subprocessVersion': '子流程发布版本',
   timerDelaySeconds: '等待时长（秒）', 'properties.timerDelaySeconds': '等待时长（秒）',
@@ -79,7 +80,7 @@ const own = <T>(values: Record<string, T>, key: string): T | undefined => Object
 
 /** 未知配置保留原键，避免静默隐藏新增属性。 */
 export const comparisonProperty = (property: string) => property.startsWith('properties.subprocessInput.')
-  ? `子流程输入 ${property.slice('properties.subprocessInput.'.length)}` : own(labels, property) ?? property
+  ? `子流程输入 ${property.slice('properties.subprocessInput.'.length)}` : property.startsWith('properties.serviceInput.') ? `服务参数 ${property.slice('properties.serviceInput.'.length)}` : own(labels, property) ?? property
 
 /** 仅格式化文本供 Vue 转义渲染，不将版本配置解释为 HTML。 */
 export function comparisonValue(value: unknown, property = ''): string {

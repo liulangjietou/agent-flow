@@ -12,6 +12,10 @@ ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
+// 服务目录末页的空游标会被服务器省略；版本必须保持文本。
+validate({ $ref: '#/components/schemas/ServiceTaskDirectory' }, { items: [] })
+validate({ $ref: '#/components/schemas/ServiceTaskVersionPage' }, { items: [] })
+assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskVersionPage' })({ items: [], nextBeforeVersion: 2 }), false)
 // 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
 const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
 validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })

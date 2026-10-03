@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import io.agentflow.servicetask.ServiceTaskBindings;
 
 /**
  * Flowable 运行时防腐层：只向审批域返回稳定的流程标识。
@@ -40,6 +41,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final EventContractBindings eventContracts;
     private final DefinitionInitiatorRequirements initiatorRequirements;
     private final FormAssigneeBindings formAssignees;
+    private final ServiceTaskBindings serviceTasks;
     public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
     public static final String FORM_ASSIGNEES = "agentflowFormAssignees";
 
@@ -47,7 +49,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
                                          TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
                                          JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements,
-                                         FormAssigneeBindings formAssignees) {
+                                         FormAssigneeBindings formAssignees, ServiceTaskBindings serviceTasks) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
@@ -57,6 +59,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         this.eventContracts = eventContracts;
         this.initiatorRequirements = initiatorRequirements;
         this.formAssignees = formAssignees;
+        this.serviceTasks = serviceTasks;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -79,6 +82,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
             if (published != null) {
                 published.requireStartEnabled();
                 eventContracts.requireAvailable(command.tenantId(), published.graph());
+                serviceTasks.requireReady(command.tenantId(), published.graph(), published.formSchema(), command.payload() == null ? Map.of() : command.payload());
                 // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
                 if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
                     throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");

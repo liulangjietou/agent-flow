@@ -22,6 +22,9 @@ public record ServiceTaskPolicy(String operationKey, long operationVersion, Stri
     private static final Pattern FIELD = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{0,63}");
     private static final Pattern DIGEST = Pattern.compile("[a-f0-9]{64}");
     private static final Pattern VERSION = Pattern.compile("[1-9][0-9]{0,18}");
+    private static final Set<String> LAYOUT_PROPERTIES = Set.of("x", "y");
+    private static final int MAX_COORDINATE_TEXT = 32;
+    private static final int MAX_COORDINATE = 1_000_000;
 
     public ServiceTaskPolicy {
         if (operationKey == null || !KEY.matcher(operationKey).matches() || operationVersion < 1
@@ -40,6 +43,13 @@ public record ServiceTaskPolicy(String operationKey, long operationVersion, Stri
         for (var entry : properties.entrySet()) {
             if (entry.getKey() == null) throw invalid();
             if (REFERENCE_PROPERTIES.contains(entry.getKey())) continue;
+            // 布局元数据保留在流程图中，不进入服务参数和执行契约。
+            if (LAYOUT_PROPERTIES.contains(entry.getKey())) {
+                String coordinate = entry.getValue();
+                if (coordinate == null || coordinate.length() > MAX_COORDINATE_TEXT || !coordinate.matches("[0-9]+(?:\\.[0-9]+)?")
+                        || Double.parseDouble(coordinate) > MAX_COORDINATE) throw invalid();
+                continue;
+            }
             if (!entry.getKey().startsWith(INPUT_PREFIX)) throw invalid();
             inputs.put(entry.getKey().substring(INPUT_PREFIX.length()), entry.getValue());
         }

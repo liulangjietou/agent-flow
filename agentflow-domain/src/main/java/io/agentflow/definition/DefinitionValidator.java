@@ -93,10 +93,6 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.COPY && (n.id().length() > 128 || n.name().length() > 200)) {
                 errors.add("COPY_NODE_LIMIT_EXCEEDED:" + n.id());
             }
-            if (n.type() == NodeType.SERVICE_TASK) {
-                // 输入契约与恢复状态先落地；持久编排和引擎执行接通前仍禁止发布。
-                errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
-            }
             if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS || n.type() == NodeType.SERVICE_TASK) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
@@ -228,6 +224,9 @@ public final class DefinitionValidator {
         if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.EVENT_WAIT)) {
             validateWaitApprovalPaths(graph, errors, "EVENT_REQUIRES_APPROVAL_PATH");
         }
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.SERVICE_TASK)) {
+            validateWaitApprovalPaths(graph, errors, "SERVICE_REQUIRES_APPROVAL_PATH");
+        }
         return List.copyOf(errors);
     }
 
@@ -270,7 +269,8 @@ public final class DefinitionValidator {
         for (var field : fields) {
             if (field.nodeAccess() != null) for (String nodeId : field.nodeAccess().keySet()) {
                 var node = nodes.get(nodeId);
-                if (node == null || node.type() != NodeType.USER_TASK && node.type() != NodeType.COPY && node.type() != NodeType.SUB_PROCESS) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
+                if (node == null || node.type() != NodeType.USER_TASK && node.type() != NodeType.COPY && node.type() != NodeType.SUB_PROCESS
+                        && node.type() != NodeType.SERVICE_TASK) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
             }
             if (field.columns() != null) validateFieldNodes(field.columns(), nodes, errors);
         }
