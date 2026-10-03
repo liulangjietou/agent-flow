@@ -3,7 +3,7 @@ import { onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import SupplierCashierDetail from './SupplierCashierDetail.vue'
 import { paymentOperationLabels, supplierPreparationLabels, holdLabels, validateSupplierCashier, supplierCashierError, type SupplierCashierView } from '../supplierCashier'
-const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean }>()
+const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean; initialPaymentId?: string }>()
 const items = ref<SupplierCashierView[]>([]), nextBeforeId = ref<string | null>(null), selected = ref(''), loading = ref(false), saving = ref(false), error = ref('')
 let epoch = 0, controller: AbortController | null = null
 function stop() { epoch++; controller?.abort(); controller = null }
@@ -23,6 +23,8 @@ async function load(append = false) {
   finally { clearTimeout(timeout); if (current === epoch) { loading.value = false; controller = null } }
 }
 watch(() => [props.scopeKey, props.refreshVersion] as const, (current, previous) => { if (current[0] === previous?.[0] && saving.value) return; stop(); items.value = []; nextBeforeId.value = null; selected.value = ''; saving.value = false; loading.value = false; error.value = ''; if (props.scopeKey) void load() }, { immediate: true, flush: 'sync' })
+// 原请求仍占有授权时才从消息进入，详情接口重新核对当前法人权限。
+watch(() => JSON.stringify([props.scopeKey, props.initialPaymentId]), () => { if (!saving.value) selected.value = props.scopeKey ? props.initialPaymentId ?? '' : '' }, { immediate: true, flush: 'sync' })
 onUnmounted(stop)
 </script>
 

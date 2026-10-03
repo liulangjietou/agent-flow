@@ -106,7 +106,7 @@ import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vu
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type PaymentNotificationTarget } from './api'
+import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
@@ -593,11 +593,12 @@ async function readNotification(message: InboxMessage) {
   finally { busy.value = false }
 }
 /** 已在消息详情核验的原付款只定位既有工作区，打开时业务接口仍复核当前权限。 */
-function openPaymentNotification(target: PaymentNotificationTarget) {
+function openPaymentNotification(target: FinancialNotificationTarget) {
   if (busy.value || writesBlocked.value) return
   if (target.view === 'CASHIER_PAYMENT') {
     if (!canCashier.value) { notice.value = '当前账号没有出纳工作区权限，请重新登录后核对。'; return }
-    notificationPaymentId.value = target.paymentId; cashierKind.value = 'employee'; page.value = 'cashier'
+    if ('executionRequestId' in target && !target.canOpenCashier) { notice.value = '原出纳选择已停止，请保留原记录核对。'; return }
+    notificationPaymentId.value = target.paymentId; cashierKind.value = 'executionRequestId' in target ? 'supplier' : 'employee'; page.value = 'cashier'
   } else { recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo }
 }
 /** 旧消息按单项任务实时复核；已结束或转交的任务回到申请权限查询。 */
@@ -1426,7 +1427,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <div class="cashier-kind" role="group" aria-label="付款业务"><button type="button" class="quiet" :aria-pressed="cashierKind === 'employee'" :disabled="busy || writesBlocked" @click="cashierKind = 'employee'">借款与报销</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'supplier'" :disabled="busy || writesBlocked" @click="cashierKind = 'supplier'">供应商付款</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'batches'" :disabled="busy || writesBlocked" @click="cashierKind = 'batches'">批量付款</button></div>
           <CashierWorkspace v-if="cashierKind === 'employee'" :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
           <PaymentBatchWorkspace v-else-if="cashierKind === 'batches'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
-          <SupplierCashierWorkspace v-else :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
+          <SupplierCashierWorkspace v-else :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         </section>
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>

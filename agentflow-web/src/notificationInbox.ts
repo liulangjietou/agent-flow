@@ -1,7 +1,9 @@
-import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget } from './api'
 import { validatePayment } from './payments.js'
+import { validateSupplierCashier } from './supplierCashier.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  SUPPLIER_PAYMENT_RESULT: '供应商付款结果更新', SUPPLIER_PAYMENT_ATTENTION: '供应商付款需核对',
   PAYMENT_RESULT: '付款结果更新', PAYMENT_ATTENTION: '付款执行需核对',
   ADVANCE_OVERDUE: '借款逾期提醒',
   TASK_ESCALATED: '审批超时升级提醒',
@@ -13,15 +15,30 @@ export const notificationLabels: Record<InboxMessage['kind'], string> = {
 /** 只有办理提醒尝试打开实时任务；已结束的会签直接进入仍受权限约束的申请详情。 */
 export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK_TRANSFERRED', 'TASK_DELEGATED', 'TASK_RESOLVED', 'TASK_OVERDUE'].includes(item.kind)
 /** 付款消息先读取受当前权限保护的原付款，不把历史消息当作本轮最新授权。 */
-export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind)
+export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
+export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
 /** 原消息、轮次和付款三个标识必须同时匹配，损坏响应不能成为财务入口。 */
 export function readPaymentNotificationTarget(value: PaymentNotificationTarget, message: InboxMessage): PaymentNotificationTarget {
   const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)
-  if (!value || !isPaymentNotification(message) || value.messageId !== message.id || !uuid(value.messageId) || !uuid(value.paymentId)
+  if (!value || !isPaymentNotification(message) || isSupplierPaymentNotification(message) || value.messageId !== message.id || !uuid(value.messageId) || !uuid(value.paymentId)
       || !uuid(value.applicationId) || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
       || !Number.isSafeInteger(value.roundNo) || value.roundNo < 1 || !['APPLICATION_ROUND', 'CASHIER_PAYMENT'].includes(value.view)) throw new Error('消息对应的付款记录不一致，请刷新消息后重新读取。')
   const payment = validatePayment(value.payment, value.paymentId)
   if (payment.applicationId !== value.applicationId || payment.roundNo !== value.roundNo) throw new Error('付款不属于该消息记录的申请轮次。')
+  return value
+}
+
+/** 原授权与原出纳请求同时匹配，消息只读投影不能携带资金操作许可。 */
+export function readSupplierPaymentNotificationTarget(value: SupplierPaymentNotificationTarget, message: InboxMessage): SupplierPaymentNotificationTarget {
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)
+  if (!value || !isSupplierPaymentNotification(message) || value.messageId !== message.id || !uuid(value.messageId) || !uuid(value.paymentId)
+      || !uuid(value.executionRequestId) || !uuid(value.applicationId) || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || !Number.isSafeInteger(value.roundNo) || value.roundNo < 1 || !['APPLICATION_ROUND', 'CASHIER_PAYMENT'].includes(value.view)
+      || typeof value.canOpenCashier !== 'boolean') throw new Error('消息对应的供应商付款记录不一致，请重新读取。')
+  const payment = validateSupplierCashier(value.payment, value.paymentId)
+  if (payment.applicationId !== value.applicationId || payment.roundNo !== value.roundNo || payment.preparation?.id !== value.executionRequestId
+      || payment.actions.execute || payment.actions.query || payment.actions.resendOriginal
+      || value.canOpenCashier && (value.view !== 'CASHIER_PAYMENT' || !['QUEUED', 'RUNNING', 'READY'].includes(payment.preparation.status))) throw new Error('供应商原选择或只读权限不一致，请重新读取。')
   return value
 }
 

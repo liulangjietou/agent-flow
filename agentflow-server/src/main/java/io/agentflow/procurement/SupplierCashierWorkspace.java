@@ -86,11 +86,7 @@ public class SupplierCashierWorkspace {
         boolean query = payment != null && !payment.running() && payment.status() != SupplierPaymentOperation.Status.QUEUED && payment.dispatches() > 0;
         boolean resend = separated && window && retirement == null && hold.status() == SupplierPayableHoldOperation.Status.HELD && payment != null && payment.command().cashier().equals(user)
                 && payment.status() == SupplierPaymentOperation.Status.NOT_FOUND && payment.highestRevision() == 0 && payment.conflictingObservation() == null;
-        return new View(authorization.id(), source.requestId(), source.applicationId(), source.round().roundNo(), source.round().content().legalEntityId(),
-                source.employeeId(), authorization.payable().supplierName(), authorization.source().amount(), authorization.payable().account().maskedAccount(),
-                authorization.authorizedBy(), authorization.authorizedAt(), authorization.expiresAt(), retirement == null ? null : retirement.retiredAt(),
-                new Hold(hold.version(), hold.status(), hold.updatedAt()), request == null ? null : new Preparation(request.input().id(), request.version(), request.status(), request.input().cashier(), request.updatedAt(), request.failure() == null ? null : request.failure().name()),
-                payment == null ? null : operation(payment), new Actions(execute, query, resend));
+        return View.of(authorization, hold, request, payment, retirement == null ? null : retirement.retiredAt(), new Actions(execute, query, resend));
     }
     private static Operation operation(SupplierPaymentOperation value) {
         var observation = value.observation();
@@ -122,7 +118,18 @@ public class SupplierCashierWorkspace {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record View(UUID authorizationId, UUID requestId, UUID applicationId, int roundNo, UUID legalEntityId, String employeeId, String supplierName,
             Money amount, String maskedPayeeAccount, String authorizedBy, Instant authorizedAt, Instant expiresAt, Instant retiredAt,
-            Hold hold, Preparation preparation, Operation operation, Actions actions) { }
+            Hold hold, Preparation preparation, Operation operation, Actions actions) {
+        /** 调用方已完成权限与原来源定位，只投影必要资金字段；历史消息明确传入原登记请求。 */
+        public static View of(SupplierPaymentAuthorization authorization, SupplierPayableHoldOperation hold,
+                              SupplierPaymentExecutionRequest request, SupplierPaymentOperation payment, Instant retiredAt, Actions actions) {
+            var source = authorization.source().reservation().source();
+            return new View(authorization.id(), source.requestId(), source.applicationId(), source.round().roundNo(), source.round().content().legalEntityId(),
+                    source.employeeId(), authorization.payable().supplierName(), authorization.source().amount(), authorization.payable().account().maskedAccount(),
+                    authorization.authorizedBy(), authorization.authorizedAt(), authorization.expiresAt(), retiredAt,
+                    new Hold(hold.version(), hold.status(), hold.updatedAt()), request == null ? null : new Preparation(request.input().id(), request.version(), request.status(), request.input().cashier(), request.updatedAt(), request.failure() == null ? null : request.failure().name()),
+                    payment == null ? null : SupplierCashierWorkspace.operation(payment), actions);
+        }
+    }
     /**
      * 分页游标仍受当前法人范围限制。
      * @author owlzhangfq@gmail.com

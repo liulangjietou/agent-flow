@@ -219,7 +219,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -227,6 +227,8 @@ export interface CopySnapshot { applicationId: string; businessNo: string; round
 export interface InboxPage { items: InboxMessage[]; nextCursor?: string | null; unreadCount: number }
 /** 明确打开本人消息后，按当前业务权限读取原付款。 */
 export interface PaymentNotificationTarget { messageId: string; paymentId: string; view: 'APPLICATION_ROUND' | 'CASHIER_PAYMENT'; applicationId: string; roundNo: number; payment: PaymentView }
+export interface SupplierPaymentNotificationTarget { messageId: string; paymentId: string; executionRequestId: string; view: 'APPLICATION_ROUND' | 'CASHIER_PAYMENT'; applicationId: string; roundNo: number; canOpenCashier: boolean; payment: SupplierCashierView }
+export type FinancialNotificationTarget = PaymentNotificationTarget | SupplierPaymentNotificationTarget
 /** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
 export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
 
@@ -813,6 +815,7 @@ export const api = {
   retryNotificationDelivery: (id: string, input: NotificationDeliveryRetryInput) => write<NotificationDelivery>('/notifications/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '恢复外部通知投递', input),
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   paymentNotificationTarget: (id: string, signal: AbortSignal) => request<PaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/payment-target`, { signal, cache: 'no-store' }),
+  supplierPaymentNotificationTarget: (id: string, signal: AbortSignal) => request<SupplierPaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-payment-target`, { signal, cache: 'no-store' }),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskCountersignMembers: (taskId: string, signal: AbortSignal) => request<CountersignView>(`/tasks/${encodeURIComponent(taskId)}/countersign-members`, { signal, cache: 'no-store' }),
   changeCountersignMembers: (taskId: string, body: CountersignInput) => write<CountersignReceipt>(`/tasks/${encodeURIComponent(taskId)}/countersign-changes`, 'POST', body.action === 'ADD' ? '增加必要会签人' : '移除未决会签任务', body),

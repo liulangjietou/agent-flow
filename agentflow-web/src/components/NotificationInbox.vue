@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { onUnmounted, reactive, ref, watch } from 'vue'
-import { api, type InboxMessage, type PaymentNotificationTarget } from '../api'
+import { api, type InboxMessage, type FinancialNotificationTarget } from '../api'
 import { isTaskNotification, isPaymentNotification, notificationLabels, NotificationInboxQuery } from '../notificationInbox'
 import PaymentNotificationDetail from './PaymentNotificationDetail.vue'
 import NotificationPreferencesPanel from './NotificationPreferencesPanel.vue'
 import NotificationDeliveriesPanel from './NotificationDeliveriesPanel.vue'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
-const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage]; paymentOpen: [target: PaymentNotificationTarget] }>()
+const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage]; paymentOpen: [target: FinancialNotificationTarget] }>()
 const selectedPayment = ref<InboxMessage | null>(null)
 function open(item: InboxMessage) { if (isPaymentNotification(item)) selectedPayment.value = item; else emit('open', item) }
 const readFilter = ref<'all' | 'unread'>('all')

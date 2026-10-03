@@ -103,6 +103,10 @@ class SupplierFinanceWorkflowTest {
     @Autowired AuthService auth;
     @Autowired CurrentActor actors;
     @Autowired JdbcTemplate jdbc;
+    @Autowired io.agentflow.notification.NotificationPreferencesService noticePreferences;
+    @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore noticeDeliveries;
+    @Autowired io.agentflow.notification.NotificationDeliveryService noticeDeliveryService;
+    @Autowired io.agentflow.notification.SupplierPaymentNotificationAccess noticeAccess;
     @Autowired OrganizationService organization;
     @Autowired DefinitionApplicationService definitions;
     @Autowired ApplicationRepository applications;
@@ -172,6 +176,134 @@ class SupplierFinanceWorkflowTest {
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
+
+    @Test void supplierPaymentResultNotifiesOriginalParticipantsWithoutCopyingFinancialFields() throws Exception {
+        UUID id = paidBank(); var payment = bankPayments.find("demo", id).orElseThrow();
+        var source = payment.command().holdCommand().authorization().source().reservation().source();
+        var messages = jdbc.queryForList("SELECT recipient_id,title,content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='SUPPLIER_PAYMENT_RESULT'",
+                source.applicationId().toString());
+        assertThat(messages).extracting(row -> row.get("recipient_id")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        assertThat(json.write(messages)).doesNotContain("70.00", "private-ledger", payment.command().digest(), payment.command().payee().accountDigest());
+        ok(send(cashierPath(id) + "/actions", "cashier", bankAction(cashierView(id), "QUERY")), 202); pollBank(id);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='SUPPLIER_PAYMENT_RESULT'",
+                Long.class, source.applicationId().toString())).isEqualTo(3);
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+    }
+
+    @Test void supplierPaymentMessagesReadOnlyOriginalFactsAndRecheckCurrentPermissions() throws Exception {
+        UUID id = paidBank(); var request = cashierRequests.registered("demo", id).orElseThrow();
+        for (String user : List.of("alice", "finance", "cashier")) {
+            String path = supplierNoticePath(id, request.input().id(), user, "SUCCEEDED"); var response = read(path, user); var target = ok(response, 200);
+            assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+            assertThat(target.path("paymentId").asText()).isEqualTo(id.toString());
+            assertThat(target.path("executionRequestId").asText()).isEqualTo(request.input().id().toString());
+            assertThat(target.at("/payment/preparation/id").asText()).isEqualTo(request.input().id().toString());
+            assertThat(target.at("/payment/operation/status").asText()).isEqualTo("SUCCEEDED");
+            assertThat(target.at("/payment/actions/execute").asBoolean()).isFalse(); assertThat(target.at("/payment/actions/query").asBoolean()).isFalse();
+            assertThat(target.at("/payment/actions/resendOriginal").asBoolean()).isFalse();
+            assertThat(target.path("canOpenCashier").asBoolean()).isEqualTo(user.equals("cashier"));
+            assertThat(target.toString()).doesNotContain("private-ledger", "debitReference", "commandDigest", "accountDigest", "contractReference");
+            for (String stranger : List.of("admin", "bob", "manager")) okError(read(path, stranger), 404, "NOT_FOUND");
+            okError(read(path + "?paymentId=" + id, user), 400, "INVALID_INBOX_QUERY");
+        }
+        String path = supplierNoticePath(id, request.input().id(), "cashier", "SUCCEEDED");
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+        okError(read(path, "cashier"), 404, "NOT_FOUND");
+        String financePath = supplierNoticePath(id, request.input().id(), "finance", "SUCCEEDED");
+        jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", financeAppointment.toString());
+        assertThat(read(financePath, "finance").getStatus()).isIn(403, 404);
+    }
+
+    @Test void stoppedSupplierRequestMessageNeverChangesToLaterChoiceOrBankPayment() throws Exception {
+        UUID id = authorizedHold(approved()); var choice = new java.util.HashMap<>(executeInput(cashierView(id))); choice.put("debitAccountVersion", "outdated");
+        var first = ok(send(cashierPath(id) + "/actions", "cashier", choice), 202); UUID firstId = UUID.fromString(first.path("preparationId").asText());
+        pollPreparation(firstId); assertThat(cashierRequests.find("demo", firstId).orElseThrow().status()).isEqualTo(SupplierPaymentExecutionRequest.Status.BLOCKED);
+        assertThat(bankPayments.find("demo", id)).isEmpty();
+        String path = supplierNoticePath(id, firstId, "cashier", "EVIDENCE_CHANGED"); var stopped = ok(read(path, "cashier"), 200);
+        assertThat(stopped.path("canOpenCashier").asBoolean()).isFalse(); assertThat(stopped.at("/payment/operation").isNull()).isTrue();
+        var second = ok(send(cashierPath(id) + "/actions", "cashier", executeInput(cashierView(id))), 202); UUID secondId = UUID.fromString(second.path("preparationId").asText());
+        assertThat(secondId).isNotEqualTo(firstId); pollPreparation(secondId); pollBank(id);
+        var original = ok(read(path, "cashier"), 200); assertThat(original.at("/payment/preparation/id").asText()).isEqualTo(firstId.toString());
+        assertThat(original.at("/payment/preparation/status").asText()).isEqualTo("BLOCKED"); assertThat(original.at("/payment/operation").isNull()).isTrue();
+        var paid = ok(read(supplierNoticePath(id, secondId, "cashier", "SUCCEEDED"), "cashier"), 200);
+        assertThat(paid.at("/payment/operation/status").asText()).isEqualTo("SUCCEEDED"); assertThat(paid.path("executionRequestId").asText()).isEqualTo(secondId.toString());
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+    }
+
+    @Test void supplierRequestExpiryAndNotificationsCommitAtomically() throws Exception {
+        UUID id = authorizedHold(approved()); var receipt = ok(send(cashierPath(id) + "/actions", "cashier", executeInput(cashierView(id))), 202);
+        UUID requestId = UUID.fromString(receipt.path("preparationId").asText()); var original = cashierRequests.find("demo", requestId).orElseThrow();
+        var authorization = authorizations.find("demo", id).orElseThrow(); var application = authorization.source().reservation().source().applicationId();
+        jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT supplier_notice_fixture CHECK(application_id<>'" + application + "' OR kind<>'SUPPLIER_PAYMENT_ATTENTION' OR recipient_id<>'cashier')");
+        try { assertThatThrownBy(() -> cashierPreparation.claim("demo", requestId, authorization.expiresAt())).isInstanceOf(RuntimeException.class); }
+        finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT supplier_notice_fixture"); }
+        assertThat(cashierRequests.find("demo", requestId)).contains(original);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='SUPPLIER_PAYMENT_ATTENTION'", Long.class, application.toString())).isZero();
+        assertThat(cashierPreparation.claim("demo", requestId, authorization.expiresAt())).isNull();
+        assertThat(cashierRequests.find("demo", requestId).orElseThrow().status()).isEqualTo(SupplierPaymentExecutionRequest.Status.EXPIRED);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='SUPPLIER_PAYMENT_ATTENTION'", Long.class, application.toString())).isEqualTo(3);
+        assertThat(bankPayments.find("demo", id)).isEmpty(); assertThat(calls.getOrDefault("supplier-payment-command", new AtomicInteger()).get()).isZero();
+    }
+
+    @Test void supplierBankConflictAndResolutionKeepDistinctNoticesWithoutRepeatingSuccess() throws Exception {
+        UUID id = paidBank(); UUID requestId = cashierRequests.registered("demo", id).orElseThrow().input().id();
+        queryDispute(id, "WRONG-RECEIPT", 2);
+        var conflict = ok(read(supplierNoticePath(id, requestId, "cashier", "RECONCILING"), "cashier"), 200);
+        assertThat(conflict.at("/payment/operation/disputed").asBoolean()).isTrue();
+        queryDispute(id, "RECEIPT-1", 3); ok(send(disputePath(id) + "/resolutions", "finance", disputeInput(disputeView(id))), 202);
+        var resolved = ok(read(supplierNoticePath(id, requestId, "cashier", "RECONCILING"), "cashier"), 200);
+        assertThat(resolved.at("/payment/operation/status").asText()).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Long.class,
+                "supplier-payment:" + id + ":" + requestId + ":SUCCEEDED")).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Long.class,
+                "supplier-payment:" + id + ":" + requestId + ":RECONCILING")).isEqualTo(3);
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+    }
+
+    @Test void supplierNoticeOutboundIntentIsSuppressedWhenOriginalCashierLosesEntityScope() throws Exception {
+        var recipient = new Actor("demo", "cashier", Set.of("CASHIER")); var preference = noticePreferences.get(recipient);
+        noticePreferences.revise(recipient, preference.version(), true, false);
+        try {
+            UUID id = paidBank(); UUID requestId = cashierRequests.registered("demo", id).orElseThrow().input().id();
+            String key = "supplier-payment:" + id + ":" + requestId + ":SUCCEEDED";
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT d.id FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.event_key=? AND n.recipient_id='cashier'", String.class, key));
+            var intent = noticeDeliveries.find(deliveryId).orElseThrow(); assertThat(noticeAccess.deliveryAllowed(intent)).isTrue();
+            jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", cashierAppointment.toString());
+            assertThat(noticeAccess.deliveryAllowed(intent)).isFalse(); assertThat(noticeDeliveryService.claim(deliveryId, Instant.now())).isNull();
+            var suppressed = noticeDeliveries.find(deliveryId).orElseThrow().progress();
+            assertThat(suppressed.status()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.Status.SUPPRESSED);
+            assertThat(suppressed.errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
+            assertThat(suppressed.attempts()).isZero();
+        } finally {
+            var current = noticePreferences.get(recipient); noticePreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    @Test void pendingSupplierBankAndExplicitQueryDoNotNotifyUntilAnActualUnknownFailure() throws Exception {
+        UUID id = authorizedHold(approved()); var receipt = ok(send(cashierPath(id) + "/actions", "cashier", executeInput(cashierView(id))), 202);
+        UUID requestId = UUID.fromString(receipt.path("preparationId").asText()); pollPreparation(requestId);
+        var command = bankPayments.find("demo", id).orElseThrow().command(); var app = command.holdCommand().authorization().source().reservation().source().applicationId();
+        responder = (operation, request) -> operation.equals("supplier-payment-command")
+                ? json.write(Map.of("contractVersion", 1, "tenantId", "demo", "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data",
+                    new PaymentObservation(id, command.digest(), PaymentObservation.Status.PENDING, 1L, Instant.now(), "BANK-1", null, null, null, null, null))) : normal(operation, request);
+        pollBank(id); assertThat(bankPayments.find("demo", id).orElseThrow().status()).isEqualTo(SupplierPaymentOperation.Status.UNKNOWN);
+        assertThat(bankPayments.find("demo", id).orElseThrow().observation().status()).isEqualTo(PaymentObservation.Status.PENDING);
+        assertThat(bankPayments.find("demo", id).orElseThrow().failure()).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind IN ('SUPPLIER_PAYMENT_RESULT','SUPPLIER_PAYMENT_ATTENTION')", Long.class, app.toString())).isZero();
+        ok(send(cashierPath(id) + "/actions", "cashier", bankAction(cashierView(id), "QUERY")), 202);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='SUPPLIER_PAYMENT_ATTENTION'", Long.class, app.toString())).isZero();
+        var querying = bankService.claim("demo", id, Instant.now()); bankService.fail(querying, Instant.now());
+        var target = ok(read(supplierNoticePath(id, requestId, "cashier", "UNKNOWN"), "cashier"), 200);
+        assertThat(target.at("/payment/operation/status").asText()).isEqualTo("UNKNOWN");
+        assertThat(target.at("/payment/operation/issue").asText()).isEqualTo("INTERNAL_ERROR");
+        assertThat(calls.get("supplier-payment-command").get()).isEqualTo(1);
+    }
+
+    private String supplierNoticePath(UUID payment, UUID request, String user, String fact) {
+        String id = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key=?", String.class,
+                user, "supplier-payment:" + payment + ":" + request + ":" + fact);
+        return "/api/v1/notifications/" + id + "/supplier-payment-target";
+    }
 
     @Test void explicitReviewAndAuthorizationUseOriginalFactsAndReplayOnlyOneDecision() throws Exception {
         UUID id = approved(); var initial = view(id, "finance"); assertThat(initial.at("/actions/review").asBoolean()).isTrue();

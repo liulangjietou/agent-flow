@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
-import { api, type InboxMessage, type PaymentNotificationTarget } from '../api'
-import { readPaymentNotificationTarget } from '../notificationInbox'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { api, type InboxMessage, type FinancialNotificationTarget } from '../api'
+import { isSupplierPaymentNotification, readPaymentNotificationTarget, readSupplierPaymentNotificationTarget } from '../notificationInbox'
 import PaymentFacts from './PaymentFacts.vue'
+import SupplierPaymentFacts from './SupplierPaymentFacts.vue'
 
 const props = defineProps<{ message: InboxMessage; scopeKey: string; locked?: boolean }>()
-const emit = defineEmits<{ close: []; open: [target: PaymentNotificationTarget] }>()
-const detail = ref<PaymentNotificationTarget | null>(null), loading = ref(false), error = ref('')
+const emit = defineEmits<{ close: []; open: [target: FinancialNotificationTarget] }>()
+const detail = ref<FinancialNotificationTarget | null>(null), loading = ref(false), error = ref('')
+const supplierDetail = computed(() => detail.value && 'executionRequestId' in detail.value ? detail.value : null)
+const employeeDetail = computed(() => detail.value && !('executionRequestId' in detail.value) ? detail.value : null)
+const canNavigate = computed(() => !!detail.value && (!supplierDetail.value || supplierDetail.value.view === 'APPLICATION_ROUND' || supplierDetail.value.canOpenCashier))
 let generation = 0, controller: AbortController | null = null
 function stop() { generation++; controller?.abort(); controller = null }
 /** 每次显式读取原付款；身份切换、失权或超时立即放弃旧记录。 */
@@ -17,10 +21,11 @@ async function load() {
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     const value = await Promise.race([
-      api.paymentNotificationTarget(message.id, request.signal),
+      isSupplierPaymentNotification(message) ? api.supplierPaymentNotificationTarget(message.id, request.signal) : api.paymentNotificationTarget(message.id, request.signal),
       new Promise<never>((_, reject) => { timeout = setTimeout(() => { request.abort(); reject(new Error('原付款读取超时，请重试。')) }, 12_000) })
     ])
-    if (current === generation) detail.value = readPaymentNotificationTarget(value, message)
+    if (current === generation) detail.value = 'executionRequestId' in value
+      ? readSupplierPaymentNotificationTarget(value, message) : readPaymentNotificationTarget(value, message)
   } catch (cause) {
     if (current === generation) error.value = [401, 403, 404].includes((cause as { status?: number })?.status ?? 0)
       ? '当前账号已无法读取这笔原付款，请刷新消息并核对当前权限。'
@@ -40,8 +45,8 @@ onUnmounted(stop)
     <p class="notice-payment-help">消息保留发生时的提示，下方显示原付款当前记录。查询不会重新付款。</p>
     <p v-if="loading" role="status">正在核对当前权限并读取原付款…</p>
     <p v-if="error" class="notice-payment-error" role="alert">{{ error }}</p>
-    <template v-if="detail"><PaymentFacts :payment="detail.payment" /><p class="notice-payment-id">原付款编号：{{ detail.paymentId }}</p></template>
-    <div class="notice-payment-actions"><button type="button" class="secondary" :disabled="locked || loading" @click="load">重新读取</button><button v-if="detail" type="button" class="secondary" :disabled="locked || loading" @click="emit('open', detail)">{{ detail.view === 'CASHIER_PAYMENT' ? '打开原付款工作区' : '查看原申请轮次' }}</button></div>
+    <template v-if="detail"><SupplierPaymentFacts v-if="supplierDetail" :view="supplierDetail.payment" /><PaymentFacts v-else-if="employeeDetail" :payment="employeeDetail.payment" /><p class="notice-payment-id">原付款编号：{{ detail.paymentId }}<template v-if="supplierDetail"><br />原出纳登记：{{ supplierDetail.executionRequestId }}</template></p><p v-if="supplierDetail && !canNavigate" class="notice-payment-help">这次出纳选择已停止，保留原记录供核对。</p></template>
+    <div class="notice-payment-actions"><button type="button" class="secondary" :disabled="locked || loading" @click="load">重新读取</button><button v-if="detail && canNavigate" type="button" class="secondary" :disabled="locked || loading" @click="emit('open', detail)">{{ detail.view === 'CASHIER_PAYMENT' ? '打开原付款工作区' : '查看原申请轮次' }}</button></div>
   </section>
 </template>
 

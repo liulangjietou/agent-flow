@@ -11,7 +11,7 @@ const output = mkdtempSync('/fyoung/tmp/agentflow-web-requests-')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 
 // 费用制度执行实际编辑、发布确认和历史组件，验证身份隔离与原请求恢复。
-for (const component of ['AccountMappingManager', 'AccountMappingEntries', 'AccountMappingHistory', 'ExpenseConfigurationManager', 'ExpenseConfigurationHistory', 'ExpensePolicyRules', 'ExpensePolicySummary', 'ExpensePolicyGuidance', 'ExpenseLineEditor', 'ServiceTaskRuntimePanel', 'PaymentFacts', 'PaymentNotificationDetail', 'NotificationInbox']) {
+for (const component of ['AccountMappingManager', 'AccountMappingEntries', 'AccountMappingHistory', 'ExpenseConfigurationManager', 'ExpenseConfigurationHistory', 'ExpensePolicyRules', 'ExpensePolicySummary', 'ExpensePolicyGuidance', 'ExpenseLineEditor', 'ServiceTaskRuntimePanel', 'PaymentFacts', 'SupplierPaymentFacts', 'PaymentNotificationDetail', 'NotificationInbox']) {
   const descriptor = parse(readFileSync(resolve(root, `src/components/${component}.vue`), 'utf8'), { filename: `${component}.vue` }).descriptor
   for (const rendered of [false, true]) {
     const name = component + (rendered ? 'Rendered' : 'Panel'), script = compileScript(descriptor, { id: name })
@@ -22,6 +22,7 @@ for (const component of ['AccountMappingManager', 'AccountMappingEntries', 'Acco
       source = source.replace('export default', 'const component =') + '\n' + template.code + '\ncomponent.render = render; export default component;'
     }
     if (rendered) source = source.replace("import PaymentFacts from './PaymentFacts.vue'", "import PaymentFacts from './PaymentFactsRendered.js'")
+      .replace("import SupplierPaymentFacts from './SupplierPaymentFacts.vue'", "import SupplierPaymentFacts from './SupplierPaymentFactsRendered.js'")
       .replace("import PaymentNotificationDetail from './PaymentNotificationDetail.vue'", "import PaymentNotificationDetail from './PaymentNotificationDetailRendered.js'")
     source = source.replace(/from ['"]vue['"]/g, `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
       .replace(/['"]\.\.\/([^'"]+)['"]/g, (_, module) => `'./${module.endsWith('.js') ? module : module + '.js'}'`)

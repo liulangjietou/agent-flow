@@ -70,6 +70,12 @@ public class JdbcSupplierPaymentExecutionRepository {
         return jdbc.query("SELECT * FROM supplier_payment_execution_request WHERE tenant_id=? AND active_authorization_id=?", this::restore, tenant, authorizationId.toString()).stream().findFirst();
     }
 
+    /** 唯一银行命令对应的登记请求永久保留，不能以最近一次失败选择替代。 */
+    public Optional<SupplierPaymentExecutionRequest> registered(String tenant, UUID authorizationId) {
+        return jdbc.query("SELECT * FROM supplier_payment_execution_request WHERE tenant_id=? AND registered_authorization_id=?",
+                this::restore, tenant, authorizationId.toString()).stream().findFirst();
+    }
+
     /** 工作区可读取最近一次选择及其终止原因，历史不会被新选择覆盖。 */
     public Optional<SupplierPaymentExecutionRequest> latest(String tenant, UUID authorizationId) {
         return jdbc.query("SELECT * FROM supplier_payment_execution_request WHERE tenant_id=? AND authorization_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
