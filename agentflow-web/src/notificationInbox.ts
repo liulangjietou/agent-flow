@@ -1,6 +1,8 @@
-import type { InboxMessage, InboxPage, InboxQuery } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget } from './api'
+import { validatePayment } from './payments.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  PAYMENT_RESULT: '付款结果更新', PAYMENT_ATTENTION: '付款执行需核对',
   ADVANCE_OVERDUE: '借款逾期提醒',
   TASK_ESCALATED: '审批超时升级提醒',
   COMMENT_MENTIONED: '有人在评论中提及你',
@@ -10,6 +12,18 @@ export const notificationLabels: Record<InboxMessage['kind'], string> = {
 }
 /** 只有办理提醒尝试打开实时任务；已结束的会签直接进入仍受权限约束的申请详情。 */
 export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK_TRANSFERRED', 'TASK_DELEGATED', 'TASK_RESOLVED', 'TASK_OVERDUE'].includes(item.kind)
+/** 付款消息先读取受当前权限保护的原付款，不把历史消息当作本轮最新授权。 */
+export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind)
+/** 原消息、轮次和付款三个标识必须同时匹配，损坏响应不能成为财务入口。 */
+export function readPaymentNotificationTarget(value: PaymentNotificationTarget, message: InboxMessage): PaymentNotificationTarget {
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)
+  if (!value || !isPaymentNotification(message) || value.messageId !== message.id || !uuid(value.messageId) || !uuid(value.paymentId)
+      || !uuid(value.applicationId) || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || !Number.isSafeInteger(value.roundNo) || value.roundNo < 1 || !['APPLICATION_ROUND', 'CASHIER_PAYMENT'].includes(value.view)) throw new Error('消息对应的付款记录不一致，请刷新消息后重新读取。')
+  const payment = validatePayment(value.payment, value.paymentId)
+  if (payment.applicationId !== value.applicationId || payment.roundNo !== value.roundNo) throw new Error('付款不属于该消息记录的申请轮次。')
+  return value
+}
 
 /**
  * 消息查询绑定当前账号与未读筛选，取消、失败与分页均不混入其他上下文的记录。

@@ -874,6 +874,45 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void paymentNotificationKeepsOriginalFailedExpenseAfterReplacementAndRechecksCurrentAccess() throws Exception {
+        hideBusinessDetails = true;
+        var report = paymentReport(); UUID original = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + original + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); paymentMode = "FAILED"; paymentWorker.poll();
+        var failed = paymentOperations.find("demo", original).orElseThrow();
+        var messages = jdbc.queryForList("SELECT id,recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+                report.applicationId().toString());
+        assertThat(messages).extracting(row -> row.get("recipient_id")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        String financePath = null;
+        for (var message : messages) {
+            String user = message.get("recipient_id").toString();
+            String path = "/api/v1/notifications/" + message.get("id") + "/payment-target";
+            var response = read(path, user); var view = ok(response, 200);
+            assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+            assertThat(view.path("paymentId").asText()).isEqualTo(original.toString());
+            assertThat(view.at("/payment/purpose").asText()).isEqualTo("EXPENSE_REIMBURSEMENT");
+            assertThat(view.at("/payment/operation/status").asText()).isEqualTo("FAILED");
+            assertThat(view.path("view").asText()).isEqualTo(user.equals("cashier") ? "CASHIER_PAYMENT" : "APPLICATION_ROUND");
+            assertThat(view.toString()).doesNotContain("commandDigest", "targetDigest", "accountDigest", "synthetic-private-account");
+            for (String stranger : List.of("admin", "bob", "manager")) assertThat(read(path, stranger).getStatus()).isEqualTo(404);
+            if (user.equals("finance")) financePath = path;
+        }
+        ok(send("/api/v1/payments/" + original + "/finance-actions", "finance", Map.of("action", "RETIRE", "authorizationVersion", 2,
+                "operationVersion", failed.version(), "comment", "核实原失败交易后结束授权")), 202);
+        UUID replacement = authorizePayment(report);
+        assertThat(ok(read(paymentPath(report), "finance"), 200).at("/payment/id").asText()).isEqualTo(replacement.toString());
+        var history = ok(read(financePath, "finance"), 200);
+        assertThat(history.path("paymentId").asText()).isEqualTo(original.toString());
+        assertThat(history.at("/payment/status").asText()).isEqualTo("RETIRED");
+        assertThat(history.at("/payment/operation/status").asText()).isEqualTo("FAILED");
+        assertThat(paymentWrites).isEqualTo(1); assertThat(paymentOperations.find("demo", replacement)).isEmpty();
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(read(financePath, "finance").getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test
     void paymentApiSeparatesFinanceCashierAndApplicantThroughRealApprovalAndBankQueue() throws Exception {
         var report = paymentReport(); String path = paymentPath(report); var input = authorizationInput(report);
         var initial = ok(read(path, "finance"), 200); assertThat(initial.at("/actions/authorize").asBoolean()).isTrue();

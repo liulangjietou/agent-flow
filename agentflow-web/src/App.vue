@@ -106,7 +106,7 @@ import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vu
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
+import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type PaymentNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
@@ -154,8 +154,10 @@ const taskCount = ref<number | null>(null)
 const taskRefresh = ref(0)
 const taskQueueView = ref<'list' | 'board'>('list')
 const cashierKind = ref<'employee' | 'supplier' | 'batches'>('employee')
+const notificationPaymentId = ref('')
+watch(page, value => { if (value !== 'cashier') notificationPaymentId.value = '' })
 const taskQueuePanel = ref<InstanceType<typeof PendingTaskQueue> | null>(null)
-watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee' }, { flush: 'sync' })
+watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee'; notificationPaymentId.value = '' }, { flush: 'sync' })
 let workspaceRefreshGeneration = 0
 let taskCountRequest: AbortController | null = null
 let taskDetailRequest: AbortController | null = null
@@ -589,6 +591,14 @@ async function readNotification(message: InboxMessage) {
   try { await api.readNotification(message.id); templateRefresh.value++; notice.value = '消息已标为已读。' }
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
+}
+/** 已在消息详情核验的原付款只定位既有工作区，打开时业务接口仍复核当前权限。 */
+function openPaymentNotification(target: PaymentNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  if (target.view === 'CASHIER_PAYMENT') {
+    if (!canCashier.value) { notice.value = '当前账号没有出纳工作区权限，请重新登录后核对。'; return }
+    notificationPaymentId.value = target.paymentId; cashierKind.value = 'employee'; page.value = 'cashier'
+  } else { recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo }
 }
 /** 旧消息按单项任务实时复核；已结束或转交的任务回到申请权限查询。 */
 async function openNotification(message: InboxMessage) {
@@ -1322,7 +1332,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
+        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
@@ -1414,7 +1424,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         </section>
         <section v-else-if="page === 'cashier' && canCashier" :key="actorScope">
           <div class="cashier-kind" role="group" aria-label="付款业务"><button type="button" class="quiet" :aria-pressed="cashierKind === 'employee'" :disabled="busy || writesBlocked" @click="cashierKind = 'employee'">借款与报销</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'supplier'" :disabled="busy || writesBlocked" @click="cashierKind = 'supplier'">供应商付款</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'batches'" :disabled="busy || writesBlocked" @click="cashierKind = 'batches'">批量付款</button></div>
-          <CashierWorkspace v-if="cashierKind === 'employee'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
+          <CashierWorkspace v-if="cashierKind === 'employee'" :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
           <PaymentBatchWorkspace v-else-if="cashierKind === 'batches'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
           <SupplierCashierWorkspace v-else :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         </section>

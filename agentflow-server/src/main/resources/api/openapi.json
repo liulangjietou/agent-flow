@@ -45950,6 +45950,111 @@
           }
         }
       }
+    },
+    "/api/v1/notifications/{id}/payment-target": {
+      "get": {
+        "operationId": "paymentNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原付款",
+        "description": "以原通知事件定位固定付款；按当前本人、财务完整字段或出纳法人权限复核。返回原付款当前投影，不改为本轮最新授权，不触发付款。拒绝查询参数，响应 no-store。",
+        "x-access": "原消息接收人及当前原付款读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -52502,7 +52607,9 @@
               "APPLICATION_PAUSED",
               "APPLICATION_RESUMED",
               "COMMENT_MENTIONED",
-              "ADVANCE_OVERDUE"
+              "ADVANCE_OVERDUE",
+              "PAYMENT_RESULT",
+              "PAYMENT_ATTENTION"
             ]
           },
           "actor": {
@@ -79619,6 +79726,47 @@
           "unavailableCode"
         ],
         "additionalProperties": false
+      },
+      "PaymentNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "paymentId",
+          "view",
+          "applicationId",
+          "roundNo",
+          "payment"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "APPLICATION_ROUND",
+              "CASHIER_PAYMENT"
+            ]
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentView"
+          }
+        }
       }
     }
   }

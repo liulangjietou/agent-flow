@@ -3,7 +3,7 @@ import { onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import CashierPaymentDetail from './CashierPaymentDetail.vue'
 import { authorizationLabels, paymentOperationLabels, validateCashierPayment, paymentError, type CashierPaymentView } from '../payments'
-const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean }>()
+const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: boolean; initialPaymentId?: string }>()
 const items = ref<CashierPaymentView[]>([]), nextBeforeId = ref<string | null>(null), selected = ref(''), loading = ref(false), saving = ref(false), error = ref('')
 let epoch = 0, controller: AbortController | null = null
 function stop() { epoch++; controller?.abort(); controller = null }
@@ -23,6 +23,8 @@ async function load(append = false) {
   finally { clearTimeout(timeout); if (current === epoch) { loading.value = false; controller = null } }
 }
 watch(() => JSON.stringify([props.scopeKey, props.refreshVersion]), () => { stop(); items.value = []; nextBeforeId.value = null; selected.value = ''; saving.value = false; loading.value = false; error.value = ''; if (props.scopeKey) void load() }, { immediate: true, flush: 'sync' })
+// 消息入口可定位第一页之外的原付款，详情仍通过原出纳接口复核当前范围。
+watch(() => JSON.stringify([props.scopeKey, props.initialPaymentId]), () => { if (!saving.value) selected.value = props.scopeKey ? props.initialPaymentId ?? '' : '' }, { immediate: true, flush: 'sync' })
 onUnmounted(stop)
 </script>
 

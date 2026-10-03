@@ -54,6 +54,7 @@ import static org.assertj.core.api.Assertions.*;
         "agentflow.payments.request-worker-enabled=false", "agentflow.payments.request-lease-seconds=15", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.budgets.worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.advance-requests.precheck-worker-enabled=false",
+        "agentflow.notifications.delivery-worker-enabled=false",
         "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false"})
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(print = org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint.NONE)
 @Import(PaymentOperationIntegrationTest.ListenerConfiguration.class)
@@ -74,6 +75,7 @@ class PaymentOperationIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     @Autowired ApplicationRepository applications;
+    @Autowired io.agentflow.approval.repository.SubmissionRoundRepository submissionRounds;
     @Autowired AdvanceRequestRepository advances;
     @Autowired EmployeeAdvanceRepository balances;
     @Autowired OrganizationRepository organization;
@@ -110,6 +112,9 @@ class PaymentOperationIntegrationTest {
     @Autowired PaymentBatchService paymentBatches;
     @Autowired JdbcPaymentBatchRepository batchRecords;
     @Autowired io.agentflow.common.CurrentActor actors;
+    @Autowired io.agentflow.notification.NotificationPreferencesService notificationPreferences;
+    @Autowired io.agentflow.notification.NotificationDeliveryService notificationDeliveries;
+    @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore notificationStore;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry values) {
         values.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> ENDPOINT);
@@ -164,6 +169,168 @@ class PaymentOperationIntegrationTest {
         jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN ('finance','cashier')");
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test void paymentResultNotifiesOnlyOriginalParticipantsOnceWithoutCopyingFinancialFields() {
+        var payment = job(); worker.poll();
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        var content = jdbc.queryForList("SELECT title,content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+                payment.input().command().binding().applicationId().toString());
+        assertThat(content).allSatisfy(row -> {
+            assertThat(row.get("title")).isEqualTo("付款结果更新");
+            assertThat(row.get("content").toString()).doesNotContain("100.00", "CNY", "synthetic-account", "****1234", "bank-");
+        });
+        recheck(payment); worker.poll();
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+    }
+
+    @Test void uncertainPaymentNotifiesAsUnknownAndOriginalQueryCanLaterConfirmSuccess() {
+        var payment = job(); var checking = execution.claim("demo", payment.input().command().id(), now());
+        var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
+        execution.fail(sending, PaymentOperation.Failure.TIMEOUT, now());
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).isEmpty();
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        recheck(payment); worker.poll();
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).hasSize(3);
+        assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isEqualTo(1);
+    }
+
+    @Test void pendingBankAcceptanceAndExplicitRecheckDoNotCreateAnomalyNotifications() {
+        var payment = job(); var command = payment.input().command();
+        var checking = execution.claim("demo", command.id(), now());
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
+        var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
+        var pending = new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.PENDING, 1L, now(),
+                "bank-" + command.id(), null, null, null, null, null);
+        execution.finish(sending, new FinanceResult.Success<>(pending), now());
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.UNKNOWN);
+        assertThat(reload(payment).failure()).isNull();
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).isEmpty();
+        recheck(payment);
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
+    }
+
+    @Test void explicitBankFailureIsAResultAndDoesNotClaimMoneyWasPaid() {
+        var payment = job(); var command = payment.input().command();
+        var checking = execution.claim("demo", command.id(), now());
+        var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
+        var failed = new PaymentObservation(command.id(), command.digest(), PaymentObservation.Status.FAILED, 1L, now(),
+                "bank-" + command.id(), null, null, null, null, PaymentObservation.Failure.PAYMENT_REJECTED);
+        execution.finish(sending, new FinanceResult.Success<>(failed), now());
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
+        assertThat(jdbc.queryForList("SELECT content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+                String.class, command.binding().applicationId().toString())).allSatisfy(text -> assertThat(text).contains("未成功回执"));
+        assertThat(balances.find("demo", command.binding().businessId())).isEmpty();
+    }
+
+    @Test void resultAfterCashierDeactivationKeepsPaymentFactWithoutNotifyingInactiveRecipient() {
+        var payment = job(); var checking = execution.claim("demo", payment.input().command().id(), now());
+        var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+        execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now());
+        assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void reversedPaymentKeepsOriginalSuccessNoticeAndAddsOneReturnNotice() {
+        var payment = job(); worker.poll(); reverse(payment); recheck(payment); worker.poll();
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "alice", "finance", "finance", "cashier", "cashier");
+        assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
+        assertThat(jdbc.queryForList("SELECT DISTINCT content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+                String.class, payment.input().command().binding().applicationId().toString())).anyMatch(text -> text.contains("资金退回"));
+    }
+
+    @Test void paymentNotificationAndOutboundIntentRollbackWithOriginalResult() {
+        var recipient = new io.agentflow.common.Actor("demo", "cashier", java.util.Set.of("CASHIER"));
+        var preference = notificationPreferences.get(recipient);
+        notificationPreferences.revise(recipient, preference.version(), true, false);
+        try {
+            var payment = job(); var checking = execution.claim("demo", payment.input().command().id(), now());
+            var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT payment_notification_fixture CHECK(application_id<>'"
+                    + payment.input().command().binding().applicationId() + "' OR kind<>'PAYMENT_RESULT' OR recipient_id<>'cashier')");
+            try { assertThatThrownBy(() -> execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now())).isInstanceOf(RuntimeException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT payment_notification_fixture"); }
+            assertThat(reload(payment)).isEqualTo(sending);
+            assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).isEmpty();
+            assertThat(balances.find("demo", payment.input().command().binding().businessId())).isEmpty();
+            execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now());
+            assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).hasSize(3);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.application_id=? AND n.kind='PAYMENT_RESULT'",
+                    Long.class, payment.input().command().binding().applicationId().toString())).isEqualTo(1);
+        } finally {
+            var current = notificationPreferences.get(recipient);
+            notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    @Test void paymentNotificationTargetUsesCurrentCashierScopeAndNeverGrantsApplicationAccess() throws Exception {
+        var payment = job(); worker.poll();
+        // 原付款夹具以前只检查结算；读取历史原轮次还需要当时真实保存的提交快照。
+        var original = applications.findById("demo", payment.input().command().binding().applicationId()).orElseThrow();
+        tx().executeWithoutResult(status -> submissionRounds.append(new io.agentflow.approval.model.SubmissionRound(
+                "demo", original.id(), 1, "synthetic-" + original.id(), original.definitionVersion(), original.title(), original.payload(),
+                "alice", now().minusSeconds(120), io.agentflow.approval.model.SubmissionRound.Status.APPROVED, null, "manager", now().minusSeconds(119), original.formSchema())));
+        String id = paymentMessageId(payment, "cashier");
+        String path = "/api/v1/notifications/" + id + "/payment-target";
+        var current = notificationGet(path, "cashier");
+        assertThat(current.getStatus()).isEqualTo(200); assertThat(current.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(json.read(current.getContentAsString(), JsonNode.class).path("view").asText()).isEqualTo("CASHIER_PAYMENT");
+        assertThat(json.read(current.getContentAsString(), JsonNode.class).path("paymentId").asText()).isEqualTo(payment.input().command().id().toString());
+        assertThat(json.read(current.getContentAsString(), JsonNode.class).path("payment").path("id").asText()).isEqualTo(payment.input().command().id().toString());
+        for (String user : List.of("admin", "alice", "finance", "bob")) assertThat(notificationGet(path, user).getStatus()).isEqualTo(404);
+        assertThat(notificationGet(path + "?paymentId=" + UUID.randomUUID(), "cashier").getStatus()).isEqualTo(400);
+        String eventKey = jdbc.queryForObject("SELECT event_key FROM notification_inbox WHERE id=?", String.class, id);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "employee-payment:" + UUID.randomUUID() + ":SUCCEEDED", id);
+        try { assertThat(notificationGet(path, "cashier").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", eventKey, id); }
+        var applicant = notificationGet("/api/v1/notifications/" + paymentMessageId(payment, "alice") + "/payment-target", "alice");
+        assertThat(applicant.getStatus()).isEqualTo(200);
+        assertThat(json.read(applicant.getContentAsString(), JsonNode.class).path("view").asText()).isEqualTo("APPLICATION_ROUND");
+        assertThat(notificationGet("/api/v1/applications/" + payment.input().command().binding().applicationId(), "cashier").getStatus()).isEqualTo(404);
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+        assertThat(notificationGet(path, "cashier").getStatus()).isEqualTo(404);
+    }
+
+    @Test void paymentNotificationDispatchIsSuppressedWhenOriginalCashierLosesLegalEntityAppointment() {
+        var recipient = new io.agentflow.common.Actor("demo", "cashier", java.util.Set.of("CASHIER"));
+        var preference = notificationPreferences.get(recipient);
+        notificationPreferences.revise(recipient, preference.version(), true, false);
+        String appointment = "SELECT a.id FROM organization_appointment a JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id "
+                + "JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id WHERE a.tenant_id='demo' AND p.subject='cashier' AND d.legal_entity_id=?";
+        var ids = jdbc.queryForList(appointment, String.class, ENTITY.toString());
+        try {
+            var payment = job(); worker.poll();
+            UUID delivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND recipient_id='cashier' AND inbox_id=?",
+                    String.class, paymentMessageId(payment, "cashier")));
+            for (var id : ids) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            assertThat(notificationDeliveries.claim(delivery, now())).isNull();
+            assertThat(notificationStore.get(recipient, delivery).orElseThrow().progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
+            assertThat(notificationStore.get(recipient, delivery).orElseThrow().progress().attempts()).isZero();
+        } finally {
+            for (var id : ids) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id);
+            var current = notificationPreferences.get(recipient);
+            notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    private String paymentMessageId(PaymentOperation payment, String recipient) {
+        return jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND recipient_id=? AND kind='PAYMENT_RESULT'",
+                String.class, payment.input().command().binding().applicationId().toString(), recipient);
+    }
+
+    private org.springframework.mock.web.MockHttpServletResponse notificationGet(String path, String user) throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .header("Authorization", "Bearer " + auth.login("demo", user, "demo").token())).andReturn().getResponse();
+    }
+
+    private List<String> paymentNotificationRecipients(PaymentOperation payment, String kind) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind=? ORDER BY recipient_id",
+                String.class, payment.input().command().binding().applicationId().toString(), kind);
+    }
 
     @Test void signedCallbackIsDurableIdempotentAndOnlyWakesTheOriginalBankQuery() throws Exception {
         var payment = job(); worker.poll(); var paid = reload(payment); var balance = balances.find("demo", payment.input().command().binding().businessId()).orElseThrow();
@@ -488,6 +655,8 @@ class PaymentOperationIntegrationTest {
         var changed = job(); RESPONDER.set((path, request) -> path.endsWith("employee-account") ? new EmployeeAccountPort.Account(
                 new EmployeeAccountSnapshot(ENTITY, "alice", "changed-account", "****5678", "b".repeat(64), "v2"), now().plusSeconds(60)) : response(path, request));
         worker.poll(); assertThat(reload(changed).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(reload(changed).failure()).isEqualTo(PaymentOperation.Failure.ACCOUNT_CHANGED);
+        assertThat(paymentNotificationRecipients(changed, "PAYMENT_ATTENTION")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        assertThat(paymentNotificationRecipients(changed, "PAYMENT_RESULT")).isEmpty();
         var blocked = job(); RESPONDER.set((path, request) -> new FinanceResult.Rejected<>(FinanceResult.Reason.CASHIER_UNAVAILABLE));
         worker.poll(); assertThat(reload(blocked).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(WRITES.get()).isZero();
     }
@@ -503,6 +672,8 @@ class PaymentOperationIntegrationTest {
         var done = reload(job); assertThat(done.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isZero();
         assertThat(balances.find("demo", job.input().command().binding().businessId())).isPresent();
         execution.finish(sending, new FinanceResult.Success<>(paid(job.input().command(), 1)), now()); assertThat(reload(job)).isEqualTo(done);
+        assertThat(paymentNotificationRecipients(job, "PAYMENT_ATTENTION")).hasSize(3);
+        assertThat(paymentNotificationRecipients(job, "PAYMENT_RESULT")).hasSize(3);
         preparationWorker.poll(); voucherWorker.poll();
         assertThat(paymentVoucher(job).usablePosted()).isTrue(); assertThat(WRITES.get()).isZero();
     }
@@ -536,6 +707,7 @@ class PaymentOperationIntegrationTest {
                 paid.paymentReference(), paid.paidAmount(), paid.accountDigest(), paid.completedAt(), paid.receiptReference(), null);
         RESPONDER.set((path, data) -> path.endsWith("payment-query") ? corrected : response(path, data)); recheck(job); worker.poll();
         var disputed = reload(job); var frozen = balances.find("demo", id).orElseThrow(); assertThat(frozen.paymentReviewRequired()).isTrue();
+        assertThat(paymentNotificationRecipients(job, "PAYMENT_ATTENTION")).hasSize(3);
         var history = operations.disputeEvidence("demo", command.id());
         tx().executeWithoutResult(status -> {
             sources.lock(authorizations.find("demo", command.id()).orElseThrow()); var now = now();
@@ -544,6 +716,7 @@ class PaymentOperationIntegrationTest {
             operations.update(resolved); disputeDecisions.create(decision); events.publishEvent(new PaymentOperationChanged(disputed, resolved)); events.publishEvent(new PaymentDisputeResolved(resolved, decision));
         });
         var restored = balances.find("demo", id).orElseThrow(); assertThat(restored.balance()).isEqualTo(ledger);
+        assertThat(paymentNotificationRecipients(job, "PAYMENT_RESULT")).hasSize(6);
         assertThat(restored.paymentReviewRequired()).isFalse(); assertThat(restored.available()).isEqualTo(command.amount());
         assertThat(restored.version()).isEqualTo(frozen.version() + 1); recheck(job); worker.poll();
         assertThat(balances.find("demo", id).orElseThrow().state()).isEqualTo(restored.state());
@@ -870,8 +1043,8 @@ class PaymentOperationIntegrationTest {
             var department = new OrganizationUnit(UUID.randomUUID(), OrganizationUnit.Kind.DEPARTMENT, "财务部", ENTITY, null, true, 1);
             var position = new OrganizationUnit(UUID.randomUUID(), OrganizationUnit.Kind.POSITION, "财务执行岗位", ENTITY, null, true, 1);
             organization.save("demo", department, 0); organization.save("demo", position, 0);
-            for (String user : List.of("finance", "cashier")) {
-                var person = new OrganizationPerson(UUID.randomUUID(), user, user, true, true, 1); organization.save("demo", person, 0);
+            for (String user : List.of("alice", "finance", "cashier")) {
+                var person = new OrganizationPerson(UUID.randomUUID(), user, user, true, !user.equals("alice"), 1); organization.save("demo", person, 0);
                 organization.save("demo", new OrganizationAppointment(UUID.randomUUID(), person.id(), department.id(), position.id(), true, 1), 0);
             }
         });
