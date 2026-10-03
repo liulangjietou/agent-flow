@@ -96,6 +96,9 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "INVALID_ACCOUNT_MAPPING_QUERY", "INVALID_ACCOUNT_MAPPING_DEFINITION", "INVALID_ACCOUNT_MAPPING" -> HttpStatus.BAD_REQUEST;
+            case "ACCOUNT_MAPPING_UNCHANGED", "ACCOUNT_MAPPING_SCOPE_IMMUTABLE", "ACCOUNT_MAPPING_NOT_PUBLISHABLE", "ACCOUNT_MAPPING_SCOPE_MISMATCH" -> HttpStatus.CONFLICT;
+            case "ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT" -> HttpStatus.SERVICE_UNAVAILABLE;
             case "INVALID_EXPENSE_CONFIGURATION_REQUEST", "INVALID_EXPENSE_CONFIGURATION_QUERY", "INVALID_EXPENSE_GUIDANCE_QUERY" -> HttpStatus.BAD_REQUEST;
             case "EXPENSE_CONFIGURATION_UNCHANGED", "EXPENSE_CATEGORY_REMOVAL_FORBIDDEN", "EXPENSE_POLICY_CATEGORY_UNAVAILABLE", "EXPENSE_POLICY_INCOMPLETE" -> HttpStatus.CONFLICT;
             case "EXPENSE_CONFIGURATION_INCONSISTENT" -> HttpStatus.SERVICE_UNAVAILABLE;
