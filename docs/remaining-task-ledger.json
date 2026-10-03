@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T15:11:19.728117+00:00",
+  "recordedAt": "2026-10-03T18:04:55.795225+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工借款、报销及供应商付款的结果和登记前异常通知、最小外发意向、原记录权限接口及消息页面已接通。供应商阶段 314 项 Java、71 项前端用例通过；同一授权后续另选账户不会改变旧消息的原请求或混入新付款，失去原法人范围会抑制外发。其他财务异常来源、固定包和环境验收仍待完成。",
+      "observed": "员工及供应商付款、凭证准备异常与原过账结果通知、最小外发意向、受控原记录详情和消息页面已接通。凭证阶段 238 项 Java、68 项前端用例通过；重新准备不替换旧消息，原凭证绑定独立冲销时保留过账事实并明确停用。普通挂账沿用原审批范围，付款凭证继续检查原法人范围。预算、核销及其他恢复来源、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1654,6 +1654,14 @@
         },
         {
           "path": "docs/evidence/supplier-payment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/voucher-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/voucher-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3454,9 +3462,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "SUPPLIER_PAYMENT_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
-    "implementationCommit": "40b220d2459e289eb8a4b23524fa7fa31b422ac1",
-    "evidence": "docs/evidence/supplier-payment-notifications-20261003.json",
-    "recordedAt": "2026-10-03T15:11:19.728117+00:00"
+    "status": "VOUCHER_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
+    "implementationCommit": "b8949565afd55c297d9e20d1e9a0337e3cf70f9b",
+    "evidence": "docs/evidence/voucher-notifications-20261003.json",
+    "recordedAt": "2026-10-03T18:04:55.795225+00:00"
   }
 }
