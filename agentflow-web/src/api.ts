@@ -1,3 +1,4 @@
+import { readExpenseCategories, readExpenseConfiguration, readPolicyDraft, readPublishedPolicy, readPolicyDirectory, readCategoryHistory, readPolicyHistory, readActivationHistory, readCategoryRevision, readPolicyDraftRevision, validateConfigurationReceipt, type CategoryInput, type PolicyDraftInput, type PolicyPublishInput, type ExpenseCategories, type ExpensePolicyDraft, type ExpenseConfigurationCurrent } from './expenseConfiguration.js'
 import type { AdvanceOffsetSuggestion } from './advanceOffsetSuggestion'
 import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
 import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
@@ -409,7 +410,26 @@ async function sendExtraction(operation: WriteRequest, key: string): Promise<Ext
   } finally { clearTimeout(timer) }
 }
 
+/** 配置写入超时保留原键，回执须符合原租户、原内容及版本后才能确认成功。 */
+async function sendExpenseConfiguration(operation: WriteRequest, key: string) {
+  const actor = requestActor ? { ...requestActor } : null, controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const value = await Promise.race([
+      request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject({ status: 0, code: 'REQUEST_TIMEOUT', message: '配置保存结果尚未确认，请恢复原操作。' } satisfies ApiError) }, 12_000) })
+    ])
+    return validateConfigurationReceipt(value, operation.path, operation.body!, actor)
+  } finally { clearTimeout(timer) }
+}
+/** 所有配置读取固定身份并禁止缓存；返回后仍由页面代次丢弃迟到响应。 */
+function configurationRead<T>(path: string, signal: AbortSignal, read: (value: unknown, actor: Pick<Actor, 'tenantId' | 'userId'> | null) => T): Promise<T> {
+  const actor = requestActor ? { ...requestActor } : null
+  return request(path, { signal, cache: 'no-store' }).then(value => read(value, actor))
+}
+
 export const writeRequests = new PendingWrites(async (operation, key) => {
+  if (operation.path === '/admin/expense-categories' || /^\/admin\/expense-policies\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendExpenseConfiguration(operation, key)
   if (/^\/expense-requests\/[^/?]+\/close$/.test(operation.path)) return sendExpenseRequestClose(operation, key)
   if (/^\/invoices\/[^/?]+\/extraction-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) return sendExtraction(operation, key)
   const actor = requestActor ? { ...requestActor } : null
@@ -438,6 +458,20 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  expenseConfiguration: (signal: AbortSignal) => configurationRead('/admin/expense-policies/current', signal, readExpenseConfiguration),
+  expenseCategories: (signal: AbortSignal) => configurationRead('/admin/expense-categories', signal, readExpenseCategories),
+  saveExpenseCategories: (body: CategoryInput) => write<ExpenseCategories>('/admin/expense-categories', 'PUT', '保存费用类别修订', body),
+  expenseCategoryVersions: (beforeVersion: number | undefined, signal: AbortSignal) => configurationRead('/admin/expense-categories/versions' + historyQuery({ beforeVersion, limit: 25 }), signal, value => readCategoryHistory(value, beforeVersion)),
+  expenseCategoryVersion: (version: number, signal: AbortSignal) => configurationRead('/admin/expense-categories/versions/' + version, signal, (value, actor) => readCategoryRevision(value, actor, version)),
+  expensePolicies: (afterKey: string | undefined, signal: AbortSignal) => configurationRead('/admin/expense-policies' + historyQuery({ afterKey, limit: 25 }), signal, value => readPolicyDirectory(value, afterKey)),
+  expensePolicyDraft: (key: string, signal: AbortSignal) => configurationRead('/admin/expense-policies/' + encodeURIComponent(key) + '/draft', signal, (value, actor) => readPolicyDraft(value, actor, key)),
+  saveExpensePolicyDraft: (key: string, body: PolicyDraftInput) => write<ExpensePolicyDraft>('/admin/expense-policies/' + encodeURIComponent(key) + '/draft', 'PUT', '保存费用制度草稿', body),
+  publishExpensePolicy: (key: string, body: PolicyPublishInput) => write<ExpenseConfigurationCurrent>('/admin/expense-policies/' + encodeURIComponent(key) + '/publish', 'POST', '发布费用制度并切换生效版本', body),
+  expensePolicyVersions: (key: string, beforeVersion: number | undefined, signal: AbortSignal) => configurationRead('/admin/expense-policies/' + encodeURIComponent(key) + '/versions' + historyQuery({ beforeVersion, limit: 25 }), signal, value => readPolicyHistory(value, beforeVersion)),
+  expensePolicyVersion: (key: string, version: number, signal: AbortSignal) => configurationRead('/admin/expense-policies/' + encodeURIComponent(key) + '/versions/' + version, signal, (value, actor) => readPublishedPolicy(value, actor, key, version)),
+  expensePolicyDraftVersion: (key: string, policyId: string, version: number, signal: AbortSignal) => configurationRead('/admin/expense-policies/' + encodeURIComponent(key) + '/draft/versions/' + version, signal, value => readPolicyDraftRevision(value, policyId, version)),
+  expensePolicyActivations: (beforeVersion: number | undefined, signal: AbortSignal) => configurationRead('/admin/expense-policies/activations' + historyQuery({ beforeVersion, limit: 25 }), signal, value => readActivationHistory(value, beforeVersion)),
+
   eventContracts: (afterKey: string | undefined, signal: AbortSignal) => request<EventDirectory>('/event-contracts' + historyQuery({ limit: 25, afterKey }), { signal, cache: 'no-store' }).then(value => readEventDirectory(value, afterKey)),
   eventContractVersions: (key: string, beforeVersion: number | undefined, signal: AbortSignal) => request<EventVersions>(`/event-contracts/${encodeURIComponent(key)}/versions` + historyQuery({ limit: 25, beforeVersion }), { signal, cache: 'no-store' }).then(value => readEventVersions(value, key, beforeVersion)),
   eventContract: (key: string, version: number, signal: AbortSignal) => request<EventContract>(`/event-contracts/${encodeURIComponent(key)}/versions/${version}`, { signal, cache: 'no-store' }).then(value => readEventContract(value, key, version)),
